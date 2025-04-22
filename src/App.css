@@ -1,0 +1,157 @@
+.App {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+.App-header {
+  margin-bottom: 30px;
+}
+
+.App-header h1 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.user-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f5f5f5;
+  padding: 10px 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.user-info button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.map-container {
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.map-error {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 20px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.stores-list {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.stores-list h3 {
+  background-color: #f5f5f5;
+  margin: 0;
+  padding: 15px;
+  border-bottom: 1px solid #ddd;
+  font-size: 18px;
+}
+
+.stores-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stores-list th, 
+.stores-list td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.stores-list th {
+  background-color: #f9f9f9;
+  font-weight: bold;
+}
+
+.stores-list tr:hover {
+  background-color: #f5f5f5;
+}
+
+.inventory-available {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.inventory-unavailable {
+  color: #c62828;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+
+.filter-panel {
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.map-container {
+  flex: 1;
+  height: 100%;
+}
+
+.store-list {
+  width: 300px;
+  height: 100%;
+  overflow-y: auto;
+  background-color: white;
+  border-left: 1px solid #ddd;
+  padding: 16px;
+}
+
+.store-item {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.store-item:hover {
+  background-color: #f5f5f5;
+}
+
+.store-item.selected {
+  background-color: #e3f2fd;
+}
+
+.store-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.store-address {
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.store-inventory {
+  font-size: 0.9em;
+  color: #2196f3;
+} 

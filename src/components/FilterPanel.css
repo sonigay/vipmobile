@@ -1,0 +1,140 @@
+.filter-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.filter-header {
+  color: #1a2b4b;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.filter-content {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.filter-left {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.search-group {
+  display: flex;
+  gap: 12px;
+  min-width: 280px;
+}
+
+.model-search {
+  width: 180px;
+}
+
+.color-select {
+  width: 140px;
+}
+
+.radius-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 12px;
+  border-left: 1px solid #eef2f6;
+}
+
+.radius-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e293b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.radius-slider {
+  flex: 1;
+  min-width: 200px;
+  padding: 0 12px;
+}
+
+.selected-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  min-width: 200px;
+}
+
+.selected-filters-title {
+  color: #64748b;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.selected-filter-items {
+  display: flex;
+  gap: 16px;
+}
+
+.selected-filter-item {
+  color: #1e293b;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.selected-filter-item svg {
+  font-size: 16px;
+  color: #64748b;
+}
+
+/* MUI Autocomplete 커스텀 스타일 */
+.MuiAutocomplete-root .MuiOutlinedInput-root {
+  padding: 4px 8px !important;
+}
+
+.MuiAutocomplete-root .MuiOutlinedInput-root .MuiAutocomplete-input {
+  padding: 4px !important;
+}
+
+/* MUI Select 커스텀 스타일 */
+.MuiSelect-select {
+  padding: 10px 14px !important;
+}
+
+/* MUI Slider 커스텀 스타일 */
+.MuiSlider-root {
+  color: #0ea5e9 !important;
+}
+
+.MuiSlider-thumb {
+  width: 16px !important;
+  height: 16px !important;
+  background-color: #fff !important;
+  border: 2px solid currentColor !important;
+}
+
+.MuiSlider-track {
+  height: 4px !important;
+}
+
+.MuiSlider-rail {
+  height: 4px !important;
+  opacity: 0.3;
+} 
