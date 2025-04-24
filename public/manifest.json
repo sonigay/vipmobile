@@ -1,6 +1,6 @@
 {
-  "short_name": "VIP+ 재고조회",
-  "name": "VIP+ 재고조회 - 가용재고 조회 서비스",
+  "short_name": "VIP+ 애플리케이션",
+  "name": "VIP+ 애플리케이션 - 가용재고 확인 서비스",
   "icons": [
     {
       "src": "favicon.ico",
@@ -23,6 +23,6 @@
   "theme_color": "#1976d2",
   "background_color": "#ffffff",
   "orientation": "portrait",
-  "description": "실시간 재고 확인 서비스",
+  "description": "가용재고 확인 서비스",
   "prefer_related_applications": false
 } 
