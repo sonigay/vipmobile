@@ -33,6 +33,9 @@ const defaultOptions = {
   fullscreenControl: true,
 };
 
+// Google Maps libraries를 상수로 정의
+const libraries = ['places', 'marker'];
+
 function Map({ 
   userLocation, 
   filteredStores, 
@@ -45,7 +48,7 @@ function Map({
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries: ['places', 'marker'],
+    libraries
   });
 
   const [map, setMap] = useState(null);
