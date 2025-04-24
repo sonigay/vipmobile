@@ -8,4 +8,14 @@
   Content-Type: application/javascript
 
 /static/js/*
-  Content-Type: application/javascript 
+  Content-Type: application/javascript
+
+/favicon.ico
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/manifest.json
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jegomap-cache-v1';
+const CACHE_NAME = 'vipmap-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
