@@ -161,8 +161,6 @@ function Map({
         lat: parseFloat(store.latitude),
         lng: parseFloat(store.longitude)
       };
-
-      const isLoggedInStore = store.id === loggedInStoreId;
       
       const marker = new window.google.maps.Marker({
         map,

@@ -1,6 +1,6 @@
 import React from 'react';
 import './StoreList.css';
-import { Typography, Box, Paper } from '@mui/material';
+import { Typography, Paper } from '@mui/material';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 
