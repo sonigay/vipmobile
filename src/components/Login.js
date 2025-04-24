@@ -44,9 +44,15 @@ function Login({ onLogin }) {
         justifyContent: 'center' 
       }}>
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography variant="h5" component="h1" gutterBottom>
-            VIP+ 가용재고 조회 시스템
-          </Typography>
+          
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <img 
+              src="/login.png" 
+              alt="VIP+" 
+              style={{ maxWidth: '150px', margin: '0 auto' }}
+            />
+          </Box>
+
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
