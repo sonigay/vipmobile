@@ -105,8 +105,8 @@ app.post('/api/update-coordinates', async (req, res) => {
 
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[20]; // U열: 주소
-      const status = row[0];   // A열: 거래상태
+      const address = row[23]; // X열: 주소
+      const status = row[3];   // D열: 거래상태
       
       // 사용 중인 매장만 처리
       if (!address || status !== "사용") continue;
@@ -218,17 +218,17 @@ app.get('/api/stores', async (req, res) => {
     // 매장 정보와 재고 정보 결합
     const stores = storeRows
       .filter(row => {
-        const name = (row[4] || '').toString().trim();  // E열: 업체명
-        const status = row[2];                          // C열: 거래상태
+        const name = (row[5] || '').toString().trim();  // F열: 업체명
+        const status = row[3];                          // D열: 거래상태
         return name && status === "사용";
       })
       .map(row => {
         const latitude = parseFloat(row[0] || '0');    // A열: 위도
         const longitude = parseFloat(row[1] || '0');   // B열: 경도
-        const status = row[2];                         // C열: 거래상태
-        const name = row[4].toString().trim();         // E열: 업체명
-        const storeId = row[5];                        // F열: 매장 ID
-        const address = (row[22] || '').toString();    // W열: 주소
+        const status = row[3];                         // D열: 거래상태
+        const name = row[5].toString().trim();         // F열: 업체명
+        const storeId = row[6];                        // G열: 매장 ID
+        const address = (row[23] || '').toString();    // X열: 주소
         
         // 빈 매장 ID 제외
         if (!storeId || storeId.toString().trim() === '') {
@@ -343,8 +343,8 @@ async function checkAndUpdateAddresses() {
 
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[22];  // W열: 주소
-      const status = row[2];    // C열: 거래상태
+      const address = row[23];  // X열: 주소
+      const status = row[3];    // D열: 거래상태
       const latitude = row[0];   // A열: 위도
       const longitude = row[1];  // B열: 경도
       
