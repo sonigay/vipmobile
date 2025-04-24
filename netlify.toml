@@ -18,4 +18,11 @@
 [[headers]]
   for = "/*.js"
   [headers.values]
-    Content-Type = "application/javascript" 
+    Content-Type = "application/javascript"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0" 
