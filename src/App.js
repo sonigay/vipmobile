@@ -99,56 +99,6 @@ function App() {
     }
   }, [isLoggedIn, data, userLocation]);
 
-  const filterStores = useCallback((stores, selectedModel, selectedColor, userLocation, searchRadius) => {
-    console.log('재고 필터링 시작:', { selectedModel, selectedColor });
-    
-    if (!stores || !Array.isArray(stores)) {
-      console.log('매장 데이터가 없거나 유효하지 않음');
-      return [];
-    }
-
-    return stores.filter(store => {
-      // 1. 재고 확인
-      let hasInventory = false;
-      let totalQuantity = 0;
-      
-      if (store.inventory && selectedModel) {
-        if (store.inventory[selectedModel]) {
-          if (selectedColor) {
-            // 특정 모델과 색상의 재고 확인
-            totalQuantity = store.inventory[selectedModel][selectedColor] || 0;
-            hasInventory = totalQuantity > 0;
-            console.log(`매장 [${store.name}] - ${selectedModel} ${selectedColor} 재고: ${totalQuantity}`);
-          } else {
-            // 특정 모델의 전체 재고 확인
-            Object.values(store.inventory[selectedModel]).forEach(qty => {
-              totalQuantity += qty;
-            });
-            hasInventory = totalQuantity > 0;
-            console.log(`매장 [${store.name}] - ${selectedModel} 전체 재고: ${totalQuantity}`);
-          }
-        }
-      }
-      
-      store.totalQuantity = totalQuantity;
-      store.hasInventory = hasInventory;
-
-      // 2. 위치 기반 필터링
-      if (userLocation && searchRadius) {
-        const distance = calculateDistance(
-          userLocation.lat,
-          userLocation.lng,
-          parseFloat(store.latitude),
-          parseFloat(store.longitude)
-        );
-        store.distance = distance;
-        return distance <= searchRadius && hasInventory;
-      }
-      
-      return hasInventory;
-    });
-  }, []);
-
   // 매장 필터링
   useEffect(() => {
     if (!data?.stores) {
