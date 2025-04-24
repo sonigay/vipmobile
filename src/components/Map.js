@@ -33,9 +33,6 @@ const defaultOptions = {
   fullscreenControl: true,
 };
 
-// Google Maps libraries를 상수로 정의
-const libraries = ['places', 'marker'];
-
 function Map({ 
   userLocation, 
   filteredStores, 
@@ -48,7 +45,7 @@ function Map({
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries
+    libraries: ['places', 'marker'],
   });
 
   const [map, setMap] = useState(null);
@@ -164,6 +161,8 @@ function Map({
         lat: parseFloat(store.latitude),
         lng: parseFloat(store.longitude)
       };
+
+      const isLoggedInStore = store.id === loggedInStoreId;
       
       const marker = new window.google.maps.Marker({
         map,
@@ -208,7 +207,7 @@ function Map({
     }
 
     setMarkers(newMarkers);
-  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, circle, markers]);
+  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon]);
 
   if (loadError) {
     return (
