@@ -8,4 +8,7 @@
   Content-Type: application/javascript
 
 /static/js/*
-  Content-Type: application/javascript 
+  Content-Type: application/javascript
+
+/favicon.ico
+  Content-Type: image/x-icon 
