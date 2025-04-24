@@ -2,4 +2,10 @@
   X-Frame-Options: DENY
   X-XSS-Protection: 1; mode=block
   X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin 
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/*.js
+  Content-Type: application/javascript
+
+/static/js/*
+  Content-Type: application/javascript 
