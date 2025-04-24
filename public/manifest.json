@@ -1,6 +1,6 @@
 {
-  "short_name": "제고맵",
-  "name": "제고맵 - 재고 확인 서비스",
+  "short_name": "가용재고 조회",
+  "name": "VIP+ 가용재고 조회 서비스",
   "icons": [
     {
       "src": "favicon.ico",

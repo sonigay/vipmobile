@@ -45,12 +45,12 @@ function Login({ onLogin }) {
       }}>
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
           <Typography variant="h5" component="h1" gutterBottom>
-            재고 조회 시스템
+            VIP+ 가용재고 조회 시스템
           </Typography>
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
-              label="매장 ID"
+              label="매장 ID(P코드)"
               value={storeId}
               onChange={(e) => setStoreId(e.target.value)}
               margin="normal"
