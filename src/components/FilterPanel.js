@@ -8,7 +8,8 @@ import {
   Typography,
   Slider,
   Box,
-  Paper
+  Paper,
+  Grid
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
@@ -60,14 +61,16 @@ function FilterPanel({
         필터 설정
       </Typography>
 
+      {/* 모델 및 색상 선택 */}
       <Box sx={{ 
         display: 'flex', 
         flexDirection: { xs: 'column', md: 'row' },
         gap: 2,
-        width: '100%'
+        width: '100%',
+        mb: 3
       }}>
         {/* 모델 검색 */}
-        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '40%' } }}>
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '60%' } }}>
           <Autocomplete
             value={selectedModel}
             onChange={handleModelChange}
@@ -88,7 +91,7 @@ function FilterPanel({
         </Box>
 
         {/* 색상 선택 */}
-        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '25%' } }}>
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '40%' } }}>
           <FormControl fullWidth size="small">
             <InputLabel>색상 선택</InputLabel>
             <Select
@@ -107,25 +110,25 @@ function FilterPanel({
             </Select>
           </FormControl>
         </Box>
+      </Box>
 
-        {/* 검색 반경 - 아래로 이동됨 */}
-        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '30%' } }}>
-          <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-            <LocationOnIcon sx={{ mr: 1, fontSize: 20 }} />
-            검색 반경: {(selectedRadius/1000).toFixed(1)}km
-          </Typography>
-          <Slider
-            value={selectedRadius}
-            onChange={handleRadiusChange}
-            onChangeCommitted={handleRadiusChange}
-            min={1000}
-            max={50000}
-            step={1000}
-            marks={marks}
-            valueLabelDisplay="auto"
-            valueLabelFormat={(value) => `${(value/1000).toFixed(1)}km`}
-          />
-        </Box>
+      {/* 검색 반경 - 별도 섹션으로 분리 */}
+      <Box sx={{ width: '100%' }}>
+        <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center', fontWeight: 'medium' }}>
+          <LocationOnIcon sx={{ mr: 1, fontSize: 20 }} />
+          검색 반경: {(selectedRadius/1000).toFixed(1)}km
+        </Typography>
+        <Slider
+          value={selectedRadius}
+          onChange={handleRadiusChange}
+          onChangeCommitted={handleRadiusChange}
+          min={1000}
+          max={50000}
+          step={1000}
+          marks={marks}
+          valueLabelDisplay="auto"
+          valueLabelFormat={(value) => `${(value/1000).toFixed(1)}km`}
+        />
       </Box>
     </Paper>
   );
