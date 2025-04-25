@@ -54,6 +54,29 @@ function Map({
 
   const center = useMemo(() => userLocation || defaultCenter, [userLocation]);
 
+  // 재고 수량 계산 함수
+  const calculateInventory = useCallback((store) => {
+    if (!store.inventory) return 0;
+    
+    // 모델과 색상 모두 선택되지 않은 경우: 총 재고
+    if (!selectedModel) {
+      return Object.entries(store.inventory).reduce((total, [model, colors]) => {
+        return total + Object.values(colors).reduce((sum, quantity) => sum + quantity, 0);
+      }, 0);
+    }
+    
+    // 해당 모델의 재고가 없는 경우
+    if (!store.inventory[selectedModel]) return 0;
+    
+    // 모델만 선택된 경우: 해당 모델의 전체 재고
+    if (!selectedColor) {
+      return Object.values(store.inventory[selectedModel]).reduce((sum, quantity) => sum + quantity, 0);
+    }
+    
+    // 모델과 색상 모두 선택된 경우: 해당 모델/색상의 재고
+    return store.inventory[selectedModel][selectedColor] || 0;
+  }, [selectedModel, selectedColor]);
+
   // 지도 로드 핸들러
   const onLoad = useCallback((map) => {
     console.log('지도 로드됨');
@@ -74,31 +97,9 @@ function Map({
     const isSelected = selectedStore?.id === store.id;
     const isLoggedInStore = loggedInStoreId === store.id;
     
-    // 재고 확인 함수
-    const checkInventory = (store) => {
-      if (!store.inventory) return false;
-      
-      // 모델이 선택된 경우
-      if (selectedModel) {
-        if (!store.inventory[selectedModel]) return false;
-        
-        // 색상도 선택된 경우
-        if (selectedColor) {
-          return (store.inventory[selectedModel][selectedColor] || 0) > 0;
-        }
-        
-        // 모델만 선택된 경우
-        return Object.values(store.inventory[selectedModel]).some(qty => qty > 0);
-      }
-      
-      // 아무것도 선택되지 않은 경우: 전체 재고 확인
-      return Object.entries(store.inventory).some(([_, colors]) => 
-        Object.values(colors).some(qty => qty > 0)
-      );
-    };
-
-    const hasInventory = checkInventory(store);
-    console.log(`매장: ${store.name}, 재고여부: ${hasInventory}, 선택모델: ${selectedModel}, 선택색상: ${selectedColor}`);
+    const inventoryCount = calculateInventory(store);
+    const hasInventory = inventoryCount > 0;
+    console.log(`매장: ${store.name}, 재고수량: ${inventoryCount}, 선택모델: ${selectedModel}, 선택색상: ${selectedColor}`);
 
     // 1. 선택된 매장
     if (isSelected) {
@@ -108,7 +109,7 @@ function Map({
         fillOpacity: 1,
         strokeColor: '#1976d2',
         strokeWeight: 2,
-        scale: 12
+        scale: 14
       };
     }
 
@@ -120,7 +121,7 @@ function Map({
         fillOpacity: 1,
         strokeColor: '#7b1fa2',
         strokeWeight: 2,
-        scale: 12,
+        scale: 14,
         rotation: 180
       };
     }
@@ -132,9 +133,9 @@ function Map({
       fillOpacity: 1,
       strokeColor: hasInventory ? '#388e3c' : '#d32f2f',
       strokeWeight: 2,
-      scale: 10
+      scale: hasInventory ? 14 : 10
     };
-  }, [selectedStore, loggedInStoreId, selectedModel, selectedColor]);
+  }, [selectedStore, loggedInStoreId, selectedModel, selectedColor, calculateInventory]);
 
   // 마커와 원 업데이트
   useEffect(() => {
@@ -161,14 +162,21 @@ function Map({
         lat: parseFloat(store.latitude),
         lng: parseFloat(store.longitude)
       };
-
-      const isLoggedInStore = store.id === loggedInStoreId;
+      
+      const inventoryCount = calculateInventory(store);
       
       const marker = new window.google.maps.Marker({
         map,
         position,
         title: store.name,
-        icon: getMarkerIcon(store)
+        icon: getMarkerIcon(store),
+        label: inventoryCount > 0 ? {
+          text: String(inventoryCount),
+          color: '#FFFFFF',
+          fontSize: '13px',
+          fontWeight: 'bold'
+        } : null,
+        zIndex: inventoryCount > 0 ? 10 : 1  // 재고가 있는 마커를 위에 표시
       });
 
       marker.addListener('click', () => {
@@ -207,7 +215,7 @@ function Map({
     }
 
     setMarkers(newMarkers);
-  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon]);
+  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory]);
 
   if (loadError) {
     return (
