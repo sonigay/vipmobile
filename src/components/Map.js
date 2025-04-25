@@ -109,20 +109,19 @@ function Map({
         fillOpacity: 1,
         strokeColor: '#1976d2',
         strokeWeight: 2,
-        scale: 14
+        scale: 16
       };
     }
 
     // 2. 로그인한 매장
     if (isLoggedInStore) {
       return {
-        path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+        path: window.google.maps.SymbolPath.CIRCLE,
         fillColor: '#9c27b0',
         fillOpacity: 1,
         strokeColor: '#7b1fa2',
         strokeWeight: 2,
-        scale: 14,
-        rotation: 180
+        scale: 16
       };
     }
 
@@ -164,19 +163,27 @@ function Map({
       };
       
       const inventoryCount = calculateInventory(store);
+      const isSelected = selectedStore?.id === store.id;
+      const isLoggedInStore = loggedInStoreId === store.id;
+      
+      let labelOptions = null;
+      
+      if (inventoryCount > 0) {
+        labelOptions = {
+          text: String(inventoryCount),
+          color: isSelected || isLoggedInStore ? '#FFEB3B' : '#FFFFFF',
+          fontSize: isSelected || isLoggedInStore ? '14px' : '13px',
+          fontWeight: 'bold'
+        };
+      }
       
       const marker = new window.google.maps.Marker({
         map,
         position,
         title: store.name,
         icon: getMarkerIcon(store),
-        label: inventoryCount > 0 ? {
-          text: String(inventoryCount),
-          color: '#FFFFFF',
-          fontSize: '13px',
-          fontWeight: 'bold'
-        } : null,
-        zIndex: inventoryCount > 0 ? 10 : 1  // 재고가 있는 마커를 위에 표시
+        label: labelOptions,
+        zIndex: isSelected ? 30 : (isLoggedInStore ? 20 : (inventoryCount > 0 ? 10 : 1))
       });
 
       marker.addListener('click', () => {
@@ -215,7 +222,7 @@ function Map({
     }
 
     setMarkers(newMarkers);
-  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory]);
+  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory, selectedStore]);
 
   if (loadError) {
     return (
