@@ -246,6 +246,26 @@ function App() {
     setSelectedStore(store);
   }, []);
 
+  // 매장 재고 계산 함수 추가
+  const getStoreInventory = useCallback((store) => {
+    if (!store || !store.inventory) return 0;
+    
+    // 모델과 색상 모두 선택된 경우
+    if (selectedModel && selectedColor && store.inventory[selectedModel]) {
+      return store.inventory[selectedModel][selectedColor] || 0;
+    }
+    
+    // 모델만 선택된 경우
+    if (selectedModel && store.inventory[selectedModel]) {
+      return Object.values(store.inventory[selectedModel]).reduce((sum, qty) => sum + qty, 0);
+    }
+    
+    // 아무것도 선택되지 않은 경우: 총 재고 계산
+    return Object.entries(store.inventory).reduce((total, [model, colors]) => {
+      return total + Object.values(colors).reduce((sum, qty) => sum + qty, 0);
+    }, 0);
+  }, [selectedModel, selectedColor]);
+
   if (!isLoggedIn) {
     return (
       <ThemeProvider theme={theme}>
@@ -262,8 +282,24 @@ function App() {
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
           <AppBar position="static">
             <Toolbar>
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                가까운 가용재고 조회
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+                {loggedInStore && (
+                  <>
+                    <span style={{ fontWeight: 'bold' }}>{loggedInStore.name}</span>
+                    {selectedModel ? (
+                      <span style={{ marginLeft: '16px', fontSize: '0.9em' }}>
+                        {selectedModel} 
+                        {selectedColor ? ` ${selectedColor}` : ''} 
+                        재고: {getStoreInventory(loggedInStore)}
+                      </span>
+                    ) : (
+                      <span style={{ marginLeft: '16px', fontSize: '0.9em' }}>
+                        총 재고: {getStoreInventory(loggedInStore)}
+                      </span>
+                    )}
+                  </>
+                )}
+                {!loggedInStore && '가까운 가용재고 조회'}
               </Typography>
               {isLoggedIn && (
                 <Button color="inherit" onClick={handleLogout}>
