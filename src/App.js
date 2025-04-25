@@ -284,15 +284,15 @@ function App() {
               <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
                 {loggedInStore && (
                   <>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.8em' }}>{loggedInStore.name}</span>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>{loggedInStore.name}</span>
                     {selectedModel ? (
-                      <span style={{ marginLeft: '16px', fontSize: '0.7em' }}>
+                      <span style={{ marginLeft: '16px', fontSize: '0.6em' }}>
                         {selectedModel} 
                         {selectedColor ? ` ${selectedColor}` : ''} 
                         재고: {getStoreInventory(loggedInStore)}
                       </span>
                     ) : (
-                      <span style={{ marginLeft: '16px', fontSize: '0.7em' }}>
+                      <span style={{ marginLeft: '16px', fontSize: '0.6em' }}>
                         총 재고: {getStoreInventory(loggedInStore)}
                       </span>
                     )}
@@ -301,7 +301,7 @@ function App() {
                 {!loggedInStore && '가까운 가용재고 조회'}
               </Typography>
               {isLoggedIn && (
-                <Button color="inherit" onClick={handleLogout}>
+                <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
                   로그아웃
                 </Button>
               )}
