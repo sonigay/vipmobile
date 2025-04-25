@@ -4,17 +4,15 @@ import { Paper, Typography, Box, CircularProgress } from '@mui/material';
 
 const containerStyle = {
   width: '100%',
-  height: '700px',
-  aspectRatio: 'auto'
+  height: '100%',
+  minHeight: '700px'
 };
 
 const mapContainerStyle = {
-  flex: 1,
+  width: '100%',
+  height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  minWidth: '600px',
-  maxWidth: '100%',
-  height: '100%',
   margin: 0,
   padding: 0
 };

@@ -4,7 +4,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress } from '@mui/material';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
-import StoreList from './components/StoreList';
 import Login from './components/Login';
 import { fetchData, fetchModels } from './api';
 import { calculateDistance } from './utils/distanceUtils';
@@ -324,7 +323,7 @@ function App() {
                 onColorSelect={handleColorSelect}
                 onRadiusSelect={handleRadiusSelect}
               />
-              <Box sx={{ flex: 1, display: 'flex', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
                 <Map
                   userLocation={userLocation}
                   filteredStores={filteredStores}
@@ -334,13 +333,6 @@ function App() {
                   selectedModel={selectedModel}
                   selectedColor={selectedColor}
                   loggedInStoreId={loggedInStore?.id}
-                />
-                <StoreList
-                  stores={filteredStores}
-                  selectedStore={selectedStore}
-                  onStoreSelect={handleStoreSelect}
-                  selectedModel={selectedModel}
-                  selectedColor={selectedColor}
                 />
               </Box>
             </>

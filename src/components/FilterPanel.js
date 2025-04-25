@@ -7,13 +7,14 @@ import {
   MenuItem, 
   Typography,
   Slider,
+  Box,
+  Paper
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import SearchIcon from '@mui/icons-material/Search';
 import TuneIcon from '@mui/icons-material/Tune';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
 
 const marks = [
@@ -53,94 +54,80 @@ function FilterPanel({
   }, [onRadiusSelect]);
 
   return (
-    <div className="filter-panel">
-      <Typography className="filter-header">
-        <TuneIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+    <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+        <TuneIcon sx={{ mr: 1 }} />
         필터 설정
       </Typography>
 
-      <div className="filter-content">
-        <div className="filter-left">
-          <div className="search-group">
-            <div className="model-search">
-              <Autocomplete
-                value={selectedModel}
-                onChange={handleModelChange}
-                options={Array.isArray(models) ? models : []}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="모델 검색"
-                    variant="outlined"
-                    size="small"
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />
-                    }}
-                  />
-                )}
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', md: 'row' },
+        gap: 2,
+        width: '100%'
+      }}>
+        {/* 모델 검색 */}
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '40%' } }}>
+          <Autocomplete
+            value={selectedModel}
+            onChange={handleModelChange}
+            options={Array.isArray(models) ? models : []}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="모델 검색"
+                variant="outlined"
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />
+                }}
               />
-            </div>
+            )}
+          />
+        </Box>
 
-            <div className="color-select">
-              <FormControl fullWidth size="small">
-                <InputLabel>색상 선택</InputLabel>
-                <Select
-                  value={selectedColor || ''}
-                  onChange={handleColorChange}
-                  label="색상 선택"
-                  disabled={!selectedModel}
-                >
-                  <MenuItem value="">전체</MenuItem>
-                  {selectedModel && colorsByModel[selectedModel]?.map((color) => (
-                    <MenuItem key={color} value={color}>
-                      {color}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </div>
-          </div>
+        {/* 색상 선택 */}
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '25%' } }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>색상 선택</InputLabel>
+            <Select
+              value={selectedColor || ''}
+              onChange={handleColorChange}
+              label="색상 선택"
+              disabled={!selectedModel}
+              startAdornment={<ColorLensIcon color="action" sx={{ mr: 1 }} />}
+            >
+              <MenuItem value="">전체</MenuItem>
+              {selectedModel && colorsByModel[selectedModel]?.map((color) => (
+                <MenuItem key={color} value={color}>
+                  {color}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
 
-          <div className="radius-group">
-            <div className="radius-label">
-              <LocationOnIcon sx={{ fontSize: 20 }} />
-              <span>검색 반경</span>
-            </div>
-            <div className="radius-slider">
-              <Slider
-                value={selectedRadius}
-                onChange={handleRadiusChange}
-                onChangeCommitted={handleRadiusChange}
-                min={1000}
-                max={50000}
-                step={1000}
-                marks={marks}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(value) => `${(value/1000).toFixed(1)}km`}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="selected-filters">
-          <Typography className="selected-filters-title">
-            <FilterListIcon />
-            선택됨
+        {/* 검색 반경 - 아래로 이동됨 */}
+        <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '30%' } }}>
+          <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+            <LocationOnIcon sx={{ mr: 1, fontSize: 20 }} />
+            검색 반경: {(selectedRadius/1000).toFixed(1)}km
           </Typography>
-          <div className="selected-filter-items">
-            <div className="selected-filter-item">
-              <SearchIcon />
-              {selectedModel || '전체'}
-            </div>
-            <div className="selected-filter-item">
-              <ColorLensIcon />
-              {selectedColor || (selectedModel ? '전체' : '-')}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <Slider
+            value={selectedRadius}
+            onChange={handleRadiusChange}
+            onChangeCommitted={handleRadiusChange}
+            min={1000}
+            max={50000}
+            step={1000}
+            marks={marks}
+            valueLabelDisplay="auto"
+            valueLabelFormat={(value) => `${(value/1000).toFixed(1)}km`}
+          />
+        </Box>
+      </Box>
+    </Paper>
   );
 }
 
