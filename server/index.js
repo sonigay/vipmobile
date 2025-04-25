@@ -340,16 +340,15 @@ async function checkAndUpdateAddresses() {
     // 헤더 제거
     const storeRows = storeValues.slice(1);
     const updates = [];
-
+    
+    // 모든 주소에 대해 좌표 업데이트 (행 위치가 변경되어도 항상 처리)
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
       const address = row[23];  // X열: 주소
       const status = row[3];    // D열: 거래상태
-      const latitude = row[0];   // A열: 위도
-      const longitude = row[1];  // B열: 경도
       
-      // 사용 중이고 위도/경도가 없는 매장만 처리
-      if (!address || status !== "사용" || (latitude && longitude)) continue;
+      // 사용 중인 매장만 처리
+      if (!address || status !== "사용") continue;
 
       try {
         // Google Geocoding API 호출
@@ -401,6 +400,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log(`Server is running on http://localhost:${port}`);
     
     // 서버 시작 시 첫 업데이트 실행
+    // 주소 변경 시 행 위치에 상관없이 항상 좌표 업데이트
+    console.log('모든 사용 중인 주소에 대해 위도/경도 값을 업데이트합니다...');
     await checkAndUpdateAddresses();
     
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
