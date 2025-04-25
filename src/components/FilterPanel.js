@@ -56,7 +56,7 @@ function FilterPanel({
 
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+      <Typography variant="h8" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
         <TuneIcon sx={{ mr: 1 }} />
         필터 설정
       </Typography>
