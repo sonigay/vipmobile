@@ -284,15 +284,15 @@ function App() {
               <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
                 {loggedInStore && (
                   <>
-                    <span style={{ fontWeight: 'bold' }}>{loggedInStore.name}</span>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.8em' }}>{loggedInStore.name}</span>
                     {selectedModel ? (
-                      <span style={{ marginLeft: '16px', fontSize: '0.9em' }}>
+                      <span style={{ marginLeft: '16px', fontSize: '0.7em' }}>
                         {selectedModel} 
                         {selectedColor ? ` ${selectedColor}` : ''} 
                         재고: {getStoreInventory(loggedInStore)}
                       </span>
                     ) : (
-                      <span style={{ marginLeft: '16px', fontSize: '0.9em' }}>
+                      <span style={{ marginLeft: '16px', fontSize: '0.7em' }}>
                         총 재고: {getStoreInventory(loggedInStore)}
                       </span>
                     )}
