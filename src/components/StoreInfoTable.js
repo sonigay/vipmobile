@@ -17,6 +17,22 @@ import PersonIcon from '@mui/icons-material/Person';
 import { fetchAgentData } from '../api';
 
 /**
+ * 문자열을 정리하는 함수 (공백 제거, 소문자 변환)
+ */
+const cleanString = (str) => {
+  if (!str) return '';
+  return str.toString().trim().toLowerCase();
+};
+
+/**
+ * 문자열에서 앞 N글자 추출하는 함수 (공백 제거 및 정리 포함)
+ */
+const getPrefix = (str, length = 3) => {
+  const cleaned = cleanString(str);
+  return cleaned.substring(0, length);
+};
+
+/**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
 function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
@@ -30,7 +46,11 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
         이름: selectedStore.name,
         담당자: selectedStore.manager || '없음',
         담당자타입: typeof selectedStore.manager,
-        담당자길이: selectedStore.manager ? selectedStore.manager.length : 0
+        담당자길이: selectedStore.manager ? selectedStore.manager.length : 0,
+        담당자정리후: cleanString(selectedStore.manager),
+        담당자정리후길이: cleanString(selectedStore.manager).length,
+        담당자2글자: getPrefix(selectedStore.manager, 2),
+        담당자3글자: getPrefix(selectedStore.manager, 3)
       });
     }
   }, [selectedStore]);
@@ -50,60 +70,114 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
         console.log('대리점 정보 로드됨:', agents.length);
         
         // 매칭 전에 모든 대리점 정보 확인 (디버깅)
-        console.log('모든 대리점 정보:', agents.map(agent => ({
-          대상: agent.target,
-          대상앞3글자: agent.target.substring(0, 3),
-          자격: agent.qualification,
-          연락처: agent.contactId
-        })));
+        console.log('모든 대리점 정보:');
+        agents.forEach((agent, index) => {
+          // 더 자세한 디버깅을 위해 각 항목별로 출력
+          console.log(`대리점 #${index + 1}:`, {
+            대상: agent.target,
+            대상정리후: cleanString(agent.target),
+            대상3글자: getPrefix(agent.target, 3),
+            자격: agent.qualification,
+            연락처: agent.contactId,
+            매칭여부담당자3글자: getPrefix(selectedStore.manager, 3) === getPrefix(agent.target, 3)
+          });
+        });
         
         // 매칭 로직 개선 - 다양한 매칭 방법 시도
         let matched = null;
         
-        // 1. 담당자와 대리점 대상의 앞 3글자 정확히 일치하는지 확인
+        // 0. 정리 후 완전히 일치하는지 확인 (정확한 매칭)
         matched = agents.find(agent => {
           if (!agent.target || !selectedStore.manager) return false;
           
-          // 앞 3글자 비교 (정확히 일치)
-          const targetPrefix = agent.target.substring(0, 3);
-          const managerPrefix = selectedStore.manager.substring(0, 3);
+          // 공백 제거 후 완전 일치 확인
+          const cleanedTarget = cleanString(agent.target);
+          const cleanedManager = cleanString(selectedStore.manager);
           
-          const isExactMatch = targetPrefix === managerPrefix;
+          const isExactFullMatch = cleanedTarget === cleanedManager;
           
-          if (isExactMatch) {
-            console.log(`[정확 매칭] 성공: ${targetPrefix} === ${managerPrefix}`);
+          if (isExactFullMatch) {
+            console.log(`[완전 매칭] 성공: "${cleanedTarget}" === "${cleanedManager}"`);
           }
           
-          return isExactMatch;
+          return isExactFullMatch;
         });
         
-        // 2. 정확한 매칭이 없으면 포함 관계 확인
+        // 1. 정리 후 담당자와 대리점 대상의 앞 3글자 정확히 일치하는지 확인
         if (!matched) {
           matched = agents.find(agent => {
             if (!agent.target || !selectedStore.manager) return false;
             
-            // 담당자 이름이 대리점 대상에 포함되는지 확인
-            const isIncluded = agent.target.includes(selectedStore.manager) || 
-                               selectedStore.manager.includes(agent.target);
+            // 앞 3글자 비교 (정확히 일치) - 공백 제거 후
+            const targetPrefix = getPrefix(agent.target, 3);
+            const managerPrefix = getPrefix(selectedStore.manager, 3);
+            
+            const isExactMatch = targetPrefix === managerPrefix;
+            
+            if (isExactMatch) {
+              console.log(`[정확 매칭] 성공: "${targetPrefix}" === "${managerPrefix}"`);
+              console.log(`- 원본 값: "${agent.target}" ↔ "${selectedStore.manager}"`);
+            }
+            
+            return isExactMatch;
+          });
+        }
+        
+        // 2. 앞 2글자라도 일치하는지 확인
+        if (!matched) {
+          matched = agents.find(agent => {
+            if (!agent.target || !selectedStore.manager) return false;
+            
+            // 앞 2글자 비교 (정확히 일치) - 공백 제거 후
+            const targetPrefix = getPrefix(agent.target, 2);
+            const managerPrefix = getPrefix(selectedStore.manager, 2);
+            
+            const isExactMatch = targetPrefix === managerPrefix;
+            
+            if (isExactMatch) {
+              console.log(`[2글자 매칭] 성공: "${targetPrefix}" === "${managerPrefix}"`);
+              console.log(`- 원본 값: "${agent.target}" ↔ "${selectedStore.manager}"`);
+            }
+            
+            return isExactMatch && targetPrefix.length >= 2; // 2글자 이상인 경우만
+          });
+        }
+        
+        // 3. 정확한 매칭이 없으면 포함 관계 확인
+        if (!matched) {
+          matched = agents.find(agent => {
+            if (!agent.target || !selectedStore.manager) return false;
+            
+            // 공백 제거 후 담당자 이름이 대리점 대상에 포함되는지 확인
+            const cleanedTarget = cleanString(agent.target);
+            const cleanedManager = cleanString(selectedStore.manager);
+            
+            const isIncluded = cleanedTarget.includes(cleanedManager) || 
+                               cleanedManager.includes(cleanedTarget);
             
             if (isIncluded) {
-              console.log(`[포함 매칭] 성공: "${agent.target}" ↔ "${selectedStore.manager}"`);
+              console.log(`[포함 매칭] 성공: "${cleanedTarget}" ↔ "${cleanedManager}"`);
+              console.log(`- 원본 값: "${agent.target}" ↔ "${selectedStore.manager}"`);
             }
             
             return isIncluded;
           });
         }
         
-        // 3. 그래도 매칭이 없으면 첫 글자라도 같은지 확인
+        // 4. 그래도 매칭이 없으면 첫 글자라도 같은지 확인
         if (!matched) {
           matched = agents.find(agent => {
             if (!agent.target || !selectedStore.manager) return false;
             
-            // 첫 글자 비교
-            const isFirstCharMatch = agent.target.charAt(0) === selectedStore.manager.charAt(0);
+            // 공백 제거 후 첫 글자 비교
+            const cleanedTarget = cleanString(agent.target);
+            const cleanedManager = cleanString(selectedStore.manager);
+            
+            const isFirstCharMatch = cleanedTarget.charAt(0) === cleanedManager.charAt(0);
             
             if (isFirstCharMatch) {
-              console.log(`[첫글자 매칭] 성공: "${agent.target.charAt(0)}" ↔ "${selectedStore.manager.charAt(0)}"`);
+              console.log(`[첫글자 매칭] 성공: "${cleanedTarget.charAt(0)}" ↔ "${cleanedManager.charAt(0)}"`);
+              console.log(`- 원본 값: "${agent.target}" ↔ "${selectedStore.manager}"`);
             }
             
             return isFirstCharMatch;
@@ -115,7 +189,17 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
           setMatchedAgent(matched);
         } else {
           console.log('매칭된 대리점 없음 - 모든 매칭 방법 실패');
-          setMatchedAgent(null);
+          
+          // 마지막 수단으로 사용자 지정 대리점 (agentTarget)과 매칭 시도
+          if (agentTarget && agentContactId) {
+            console.log(`사용자 로그인 대리점으로 강제 매칭: ${agentTarget}`);
+            setMatchedAgent({
+              target: agentTarget,
+              contactId: agentContactId
+            });
+          } else {
+            setMatchedAgent(null);
+          }
         }
       } catch (error) {
         console.error('대리점 데이터 로드 실패:', error);
@@ -125,7 +209,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
     };
     
     loadAgentData();
-  }, [selectedStore]);
+  }, [selectedStore, agentTarget, agentContactId]);
 
   const handlePhoneCall = () => {
     // 매칭된 대리점이 있는 경우
