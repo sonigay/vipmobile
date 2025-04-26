@@ -105,16 +105,6 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
     loadAgentData();
   }, [selectedStore]);
 
-  const handlePhoneCall = () => {
-    // 매칭된 대리점이 있는 경우
-    if (matchedAgent) {
-      console.log(`담당자 ${selectedStore.manager}에 연결: ${matchedAgent.contactId}`);
-      window.location.href = `tel:${matchedAgent.contactId}`;
-    } else {
-      alert('담당자와 매칭되는 대리점 연락처를 찾을 수 없습니다.');
-    }
-  };
-
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
@@ -132,35 +122,45 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
               </TableRow>
               <TableRow>
                 <TableCell variant="head">담당자</TableCell>
-                <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
                     <span style={{ fontWeight: 'medium' }}>
-                      {selectedStore.manager || '미지정'}
-                    </span>
-                    {matchedAgent && (
-                      <Typography variant="caption" sx={{ ml: 1, color: 'success.main' }}>
-                        (매칭됨)
+                      {selectedStore.manager || '미지정'} 
+                      <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                        (앞3글자: {getPrefix(selectedStore.manager, 3)})
                       </Typography>
-                    )}
+                    </span>
                   </Box>
-                  {selectedStore.manager && (
-                    <Button
-                      variant="contained"
-                      color={matchedAgent ? 'primary' : 'secondary'}
-                      startIcon={<PhoneIcon />}
-                      onClick={handlePhoneCall}
-                      size="small"
-                      disabled={loading}
-                    >
-                      {matchedAgent ? '담당자 연결' : '연결 불가'}
-                    </Button>
-                  )}
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell variant="head">주소</TableCell>
                 <TableCell>{selectedStore.address || '주소 정보 없음'}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell variant="head">매칭 결과</TableCell>
+                <TableCell>
+                  {loading ? (
+                    '데이터 로딩 중...'
+                  ) : matchedAgent ? (
+                    <Box sx={{ color: 'success.main' }}>
+                      <Typography variant="body2">
+                        매칭된 대리점: {matchedAgent.target} 
+                        <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                          (앞3글자: {getPrefix(matchedAgent.target, 3)})
+                        </Typography>
+                      </Typography>
+                      <Typography variant="body2">
+                        연락처: {matchedAgent.contactId}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="error">
+                      매칭 실패: 담당자({selectedStore.manager})와 일치하는 대리점이 없습니다
+                    </Typography>
+                  )}
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
