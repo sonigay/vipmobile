@@ -39,7 +39,8 @@ function Map({
   selectedModel,
   selectedColor,
   loggedInStoreId,
-  onStoreSelect
+  onStoreSelect,
+  isAgentMode
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
@@ -90,6 +91,34 @@ function Map({
     setCircle(null);
     setMap(null);
   }, [markers, circle]);
+
+  // 반경 원 생성 또는 업데이트
+  useEffect(() => {
+    if (map && userLocation && selectedRadius) {
+      // 이전 원 제거
+      if (circle) {
+        circle.setMap(null);
+      }
+
+      // 새 원 생성
+      const newCircle = new window.google.maps.Circle({
+        strokeColor: "#4285F4",
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        fillColor: "#4285F4",
+        fillOpacity: 0.1,
+        map,
+        center: userLocation,
+        radius: selectedRadius,
+      });
+
+      setCircle(newCircle);
+    } else if (circle && (!selectedRadius || !userLocation)) {
+      // selectedRadius가 null이면 원 제거 (관리자 모드)
+      circle.setMap(null);
+      setCircle(null);
+    }
+  }, [map, userLocation, selectedRadius, circle]);
 
   const getMarkerIcon = useCallback((store) => {
     const isSelected = selectedStore?.id === store.id;

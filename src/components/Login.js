@@ -5,12 +5,14 @@ import {
   TextField,
   Button,
   Typography,
-  Container
+  Container,
+  CircularProgress
 } from '@mui/material';
 
 function Login({ onLogin }) {
   const [storeId, setStoreId] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,19 +21,54 @@ function Login({ onLogin }) {
       return;
     }
 
+    setLoading(true);
+    setError('');
+
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/stores`);
-      const stores = await response.json();
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
       
-      const store = stores.find(s => s.id === storeId);
-      if (store) {
-        onLogin(store);
+      // 새로운 로그인 API를 사용하여 로그인
+      const response = await fetch(`${API_URL}/api/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ storeId }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        setError(data.error || '로그인에 실패했습니다.');
+        return;
+      }
+      
+      if (data.success) {
+        if (data.isAgent) {
+          // 대리점 관리자인 경우
+          onLogin({
+            id: data.agentInfo.contactId,
+            name: `${data.agentInfo.target} (${data.agentInfo.qualification})`,
+            isAgent: true,
+            target: data.agentInfo.target,
+            qualification: data.agentInfo.qualification,
+            contactId: data.agentInfo.contactId
+          });
+        } else {
+          // 일반 매장인 경우
+          onLogin({
+            ...data.storeInfo,
+            isAgent: false
+          });
+        }
       } else {
-        setError('존재하지 않는 매장 ID입니다.');
+        setError('존재하지 않는 ID입니다.');
       }
     } catch (error) {
       setError('서버 연결에 실패했습니다.');
       console.error('Login error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -56,20 +93,22 @@ function Login({ onLogin }) {
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
-              label="매장 ID(P코드)"
+              label="매장 ID(P코드) 또는 관리자 ID"
               value={storeId}
               onChange={(e) => setStoreId(e.target.value)}
               margin="normal"
               error={!!error}
               helperText={error}
+              disabled={loading}
             />
             <Button
               type="submit"
               variant="contained"
               fullWidth
               sx={{ mt: 2 }}
+              disabled={loading}
             >
-              로그인
+              {loading ? <CircularProgress size={24} /> : '로그인'}
             </Button>
           </form>
         </Paper>

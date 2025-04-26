@@ -53,6 +53,7 @@ if (!GOOGLE_PRIVATE_KEY) {
 // 시트 이름 설정
 const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
+const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 
 // Geocoder 설정
 const geocoder = NodeGeocoder({
@@ -322,6 +323,117 @@ app.get('/api/models', async (req, res) => {
     console.error('Error fetching model and color data:', error);
     res.status(500).json({ 
       error: 'Failed to fetch model and color data', 
+      message: error.message 
+    });
+  }
+});
+
+// 대리점 ID 정보 가져오기
+app.get('/api/agents', async (req, res) => {
+  try {
+    console.log('Fetching agent data...');
+    
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    
+    if (!agentValues) {
+      throw new Error('Failed to fetch data from agent sheet');
+    }
+
+    // 헤더 제거
+    const agentRows = agentValues.slice(1);
+    
+    // 대리점 데이터 구성
+    const agents = agentRows.map(row => {
+      return {
+        target: row[0] || '',       // A열: 대상
+        qualification: row[1] || '', // B열: 자격
+        contactId: row[2] || ''      // C열: 연락처(아이디)
+      };
+    }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
+    
+    console.log(`Returning ${agents.length} agent records`);
+    res.json(agents);
+  } catch (error) {
+    console.error('Error fetching agent data:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch agent data', 
+      message: error.message 
+    });
+  }
+});
+
+// 로그인 검증 API 추가
+app.post('/api/login', async (req, res) => {
+  try {
+    const { storeId } = req.body;
+    
+    if (!storeId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Store ID is required' 
+      });
+    }
+    
+    console.log(`Login attempt with ID: ${storeId}`);
+    
+    // 1. 먼저 대리점 관리자 ID인지 확인
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    if (agentValues) {
+      const agentRows = agentValues.slice(1);
+      const agent = agentRows.find(row => row[2] === storeId); // C열: 연락처(아이디)
+      
+      if (agent) {
+        console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
+        return res.json({
+          success: true,
+          isAgent: true,
+          agentInfo: {
+            target: agent[0] || '',       // A열: 대상
+            qualification: agent[1] || '', // B열: 자격
+            contactId: agent[2] || ''      // C열: 연락처(아이디)
+          }
+        });
+      }
+    }
+    
+    // 2. 대리점 관리자가 아닌 경우 일반 매장으로 검색
+    const storeValues = await getSheetValues(STORE_SHEET_NAME);
+    if (!storeValues) {
+      throw new Error('Failed to fetch data from store sheet');
+    }
+    
+    const storeRows = storeValues.slice(1);
+    const storeRow = storeRows.find(row => row[6] === storeId); // G열: 매장 ID
+    
+    if (storeRow) {
+      const store = {
+        id: storeRow[6],                      // G열: 매장 ID
+        name: storeRow[5],                    // F열: 업체명
+        manager: storeRow[12] || '',          // M열: 담당자
+        address: storeRow[23] || '',          // X열: 주소
+        latitude: parseFloat(storeRow[0] || '0'),  // A열: 위도
+        longitude: parseFloat(storeRow[1] || '0')  // B열: 경도
+      };
+      
+      console.log(`Found store: ${store.name}`);
+      return res.json({
+        success: true,
+        isAgent: false,
+        storeInfo: store
+      });
+    }
+    
+    // 3. 매장 ID도 아닌 경우
+    return res.status(404).json({
+      success: false,
+      error: 'Store not found'
+    });
+    
+  } catch (error) {
+    console.error('Error in login:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Login failed', 
       message: error.message 
     });
   }

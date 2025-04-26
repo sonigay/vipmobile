@@ -8,6 +8,7 @@ import Login from './components/Login';
 import { fetchData, fetchModels } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
+import StoreInfoTable from './components/StoreInfoTable';
 
 const theme = createTheme({
   palette: {
@@ -26,6 +27,11 @@ function App() {
   const [userLocation, setUserLocation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loggedInStore, setLoggedInStore] = useState(null);
+  // 관리자 모드 관련 상태 추가
+  const [isAgentMode, setIsAgentMode] = useState(false);
+  const [agentTarget, setAgentTarget] = useState('');
+  const [agentQualification, setAgentQualification] = useState('');
+  const [agentContactId, setAgentContactId] = useState('');
 
   // 데이터 로딩 함수
   const loadData = useCallback(async () => {
@@ -156,7 +162,8 @@ function App() {
     }
 
     console.log('필터링 시작:', {
-      총매장수: data.stores.length
+      총매장수: data.stores.length,
+      관리자모드: isAgentMode
     });
 
     try {
@@ -166,8 +173,8 @@ function App() {
         distance: null
       }));
 
-      // 2. 거리 계산 및 필터링
-      if (userLocation && selectedRadius) {
+      // 2. 거리 계산
+      if (userLocation) {
         filtered = filtered.map(store => {
           if (!store.latitude || !store.longitude) {
             return { ...store, distance: Infinity };
@@ -181,14 +188,20 @@ function App() {
           );
 
           return { ...store, distance };
-        }).filter(store => store.distance <= selectedRadius / 1000);
+        });
+        
+        // 관리자 모드가 아닌 경우에만 반경 필터링 적용
+        if (!isAgentMode && selectedRadius) {
+          filtered = filtered.filter(store => store.distance <= selectedRadius / 1000);
+        }
       }
 
       // 3. 결과 로깅
       console.log('필터링 결과:', {
         총매장수: data.stores.length,
         필터링된매장수: filtered.length,
-        검색반경: selectedRadius ? `${selectedRadius/1000}km` : '없음'
+        검색반경: selectedRadius ? `${selectedRadius/1000}km` : '없음',
+        관리자모드: isAgentMode
       });
 
       setFilteredStores(filtered);
@@ -196,16 +209,37 @@ function App() {
       console.error('필터링 중 오류 발생:', error);
       setFilteredStores([]);
     }
-  }, [data, selectedRadius, userLocation]);
+  }, [data, selectedRadius, userLocation, isAgentMode]);
 
   const handleLogin = (store) => {
     setIsLoggedIn(true);
     setLoggedInStore(store);
-    if (store.latitude && store.longitude) {
+    
+    // 관리자 모드인지 확인
+    if (store.isAgent) {
+      console.log('로그인: 관리자 모드');
+      setIsAgentMode(true);
+      setAgentTarget(store.target);
+      setAgentQualification(store.qualification);
+      setAgentContactId(store.contactId);
+      
+      // 관리자 모드에서는 서울시청을 중심으로 전체 지역 보기
       setUserLocation({
-        lat: parseFloat(store.latitude),
-        lng: parseFloat(store.longitude)
+        lat: 37.5665,
+        lng: 126.9780,
       });
+      // 검색 반경 최대로 설정 (지도에서 전체 지역 보이도록)
+      setSelectedRadius(50000);
+    } else {
+      console.log('로그인: 일반 매장 모드');
+      setIsAgentMode(false);
+      // 일반 매장인 경우 기존 로직 유지
+      if (store.latitude && store.longitude) {
+        setUserLocation({
+          lat: parseFloat(store.latitude),
+          lng: parseFloat(store.longitude)
+        });
+      }
     }
   };
 
@@ -218,6 +252,11 @@ function App() {
     setSelectedRadius(2000);
     setFilteredStores([]);
     setSelectedStore(null);
+    // 관리자 모드 상태 초기화
+    setIsAgentMode(false);
+    setAgentTarget('');
+    setAgentQualification('');
+    setAgentContactId('');
   };
 
   const handleModelSelect = useCallback((model) => {
@@ -282,7 +321,13 @@ function App() {
           <AppBar position="static">
             <Toolbar>
               <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                {loggedInStore && (
+                {isAgentMode ? (
+                  // 관리자 모드일 때 대리점 정보 표시
+                  <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
+                    {agentTarget} ({agentQualification})
+                  </span>
+                ) : loggedInStore && (
+                  // 일반 매장 모드일 때 기존 정보 표시
                   <>
                     <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>{loggedInStore.name}</span>
                     {selectedModel ? (
@@ -313,26 +358,37 @@ function App() {
             </Box>
           ) : (
             <>
-              <FilterPanel
-                models={data?.models}
-                colorsByModel={data?.colorsByModel}
-                selectedModel={selectedModel}
-                selectedColor={selectedColor}
-                selectedRadius={selectedRadius}
-                onModelSelect={handleModelSelect}
-                onColorSelect={handleColorSelect}
-                onRadiusSelect={handleRadiusSelect}
-              />
+              {isAgentMode ? (
+                // 관리자 모드일 때 StoreInfoTable 표시
+                <StoreInfoTable 
+                  selectedStore={selectedStore}
+                  agentTarget={agentTarget}
+                  agentContactId={agentContactId}
+                />
+              ) : (
+                // 일반 매장 모드일 때 FilterPanel 표시
+                <FilterPanel
+                  models={data?.models}
+                  colorsByModel={data?.colorsByModel}
+                  selectedModel={selectedModel}
+                  selectedColor={selectedColor}
+                  selectedRadius={selectedRadius}
+                  onModelSelect={handleModelSelect}
+                  onColorSelect={handleColorSelect}
+                  onRadiusSelect={handleRadiusSelect}
+                />
+              )}
               <Box sx={{ flex: 1 }}>
                 <Map
                   userLocation={userLocation}
                   filteredStores={filteredStores}
                   selectedStore={selectedStore}
                   onStoreSelect={handleStoreSelect}
-                  selectedRadius={selectedRadius}
+                  selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
                   selectedModel={selectedModel}
                   selectedColor={selectedColor}
                   loggedInStoreId={loggedInStore?.id}
+                  isAgentMode={isAgentMode}
                 />
               </Box>
             </>
