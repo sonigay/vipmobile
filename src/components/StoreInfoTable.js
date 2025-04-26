@@ -3,17 +3,15 @@ import {
   Typography,
   Box,
   Paper,
-  Button,
   Table,
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow
 } from '@mui/material';
-import PhoneIcon from '@mui/icons-material/Phone';
 import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
+import PhoneIcon from '@mui/icons-material/Phone';
 import { fetchAgentData } from '../api';
 
 /**
@@ -29,7 +27,7 @@ const getPrefix = (str, length = 3) => {
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
 function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
-  const [matchedAgent, setMatchedAgent] = useState(null);
+  const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // 디버깅을 위한 로그 추가
@@ -44,7 +42,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
     }
   }, [selectedStore]);
 
-  // 선택된 매장의 담당자와 일치하는 대리점 정보 불러오기
+  // 선택된 매장의 담당자와 일치하는 담당자 연락처 정보 불러오기
   useEffect(() => {
     const loadAgentData = async () => {
       if (!selectedStore?.manager) {
@@ -56,14 +54,14 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
         setLoading(true);
         const agents = await fetchAgentData();
         
-        console.log('대리점 정보 로드됨:', agents.length);
+        console.log('담당자 연락처 정보 로드됨:', agents.length);
         
-        // 매칭 전에 모든 대리점 정보 확인 (디버깅)
-        console.log('모든 대리점 정보:');
+        // 매칭 전에 모든 담당자 정보 확인 (디버깅)
+        console.log('모든 담당자 연락처 정보:');
         agents.forEach((agent, index) => {
-          console.log(`대리점 #${index + 1}:`, {
-            대상: agent.target,
-            대상앞3글자: getPrefix(agent.target, 3),
+          console.log(`담당자 #${index + 1}:`, {
+            담당자: agent.target,
+            담당자앞3글자: getPrefix(agent.target, 3),
             자격: agent.qualification,
             연락처: agent.contactId,
             매칭여부: getPrefix(selectedStore.manager, 3) === getPrefix(agent.target, 3)
@@ -73,7 +71,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
         // 정확히 앞 3글자만 비교하는 매칭 로직 (VLOOKUP 방식)
         const managerPrefix = getPrefix(selectedStore.manager, 3);
         
-        // 매칭된 대리점 찾기
+        // 매칭된 담당자 연락처 찾기
         const matched = agents.find(agent => {
           if (!agent.target) return false;
           
@@ -82,21 +80,21 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
           
           if (isExactMatch) {
             console.log(`매칭 성공: ${targetPrefix} === ${managerPrefix}`);
-            console.log(`- 담당자: ${selectedStore.manager} / 대리점 대상: ${agent.target}`);
+            console.log(`- 담당자: ${selectedStore.manager} / 연락처 담당자: ${agent.target}`);
           }
           
           return isExactMatch;
         });
         
         if (matched) {
-          console.log(`매칭된 대리점 발견: ${matched.target} (연락처: ${matched.contactId})`);
-          setMatchedAgent(matched);
+          console.log(`매칭된 담당자 연락처 발견: ${matched.target} (연락처: ${matched.contactId})`);
+          setMatchedContact(matched.contactId);
         } else {
-          console.log(`매칭된 대리점 없음 - 담당자 앞 3글자(${managerPrefix})와 일치하는 대리점이 없음`);
-          setMatchedAgent(null);
+          console.log(`매칭된 담당자 연락처 없음 - 담당자 앞 3글자(${managerPrefix})와 일치하는 담당자가 없음`);
+          setMatchedContact(null);
         }
       } catch (error) {
-        console.error('대리점 데이터 로드 실패:', error);
+        console.error('담당자 연락처 데이터 로드 실패:', error);
       } finally {
         setLoading(false);
       }
@@ -123,44 +121,38 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
               <TableRow>
                 <TableCell variant="head">담당자</TableCell>
                 <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                    <span style={{ fontWeight: 'medium' }}>
-                      {selectedStore.manager || '미지정'} 
-                      <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                        (앞3글자: {getPrefix(selectedStore.manager, 3)})
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
+                      <span style={{ fontWeight: 'medium' }}>
+                        {selectedStore.manager || '미지정'} 
+                        <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                          (앞3글자: {getPrefix(selectedStore.manager, 3)})
+                        </Typography>
+                      </span>
+                    </Box>
+                    {loading ? (
+                      <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                        연락처 조회 중...
                       </Typography>
-                    </span>
+                    ) : matchedContact ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, color: 'success.main' }}>
+                        <PhoneIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
+                        <Typography variant="body2">
+                          연락처: {matchedContact}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ mt: 1, color: 'error.main' }}>
+                        연락처를 찾을 수 없습니다
+                      </Typography>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell variant="head">주소</TableCell>
                 <TableCell>{selectedStore.address || '주소 정보 없음'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell variant="head">매칭 결과</TableCell>
-                <TableCell>
-                  {loading ? (
-                    '데이터 로딩 중...'
-                  ) : matchedAgent ? (
-                    <Box sx={{ color: 'success.main' }}>
-                      <Typography variant="body2">
-                        매칭된 대리점: {matchedAgent.target} 
-                        <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                          (앞3글자: {getPrefix(matchedAgent.target, 3)})
-                        </Typography>
-                      </Typography>
-                      <Typography variant="body2">
-                        연락처: {matchedAgent.contactId}
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="error">
-                      매칭 실패: 담당자({selectedStore.manager})와 일치하는 대리점이 없습니다
-                    </Typography>
-                  )}
-                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
