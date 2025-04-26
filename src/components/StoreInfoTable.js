@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Typography,
   Box,
@@ -14,16 +14,55 @@ import {
 import PhoneIcon from '@mui/icons-material/Phone';
 import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
+import { fetchAgentData } from '../api';
 
 /**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
 function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
+  const [matchedAgent, setMatchedAgent] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // 선택된 매장의 담당자와 일치하는 대리점 정보 불러오기
+  useEffect(() => {
+    const loadAgentData = async () => {
+      if (!selectedStore?.manager) return;
+      
+      try {
+        setLoading(true);
+        const agents = await fetchAgentData();
+        
+        // 대리점 대상과 매장 담당자 매칭 (앞 3글자 비교)
+        const matched = agents.find(agent => {
+          if (!agent.target || !selectedStore.manager) return false;
+          
+          // 담당자가 대리점 대상의 앞 3글자를 포함하는지 확인
+          const targetPrefix = agent.target.substring(0, 3);
+          return selectedStore.manager.includes(targetPrefix);
+        });
+        
+        if (matched) {
+          console.log(`매칭된 대리점 발견: ${matched.target}`);
+          setMatchedAgent(matched);
+        } else {
+          console.log('매칭된 대리점 없음');
+          setMatchedAgent(null);
+        }
+      } catch (error) {
+        console.error('대리점 데이터 로드 실패:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadAgentData();
+  }, [selectedStore]);
+
   const handlePhoneCall = () => {
-    // 선택된 매장의 담당자가 현재 로그인한 대리점과 일치하는 경우
-    if (selectedStore?.manager === agentTarget) {
-      // 대리점 연락처로 전화 연결
-      window.location.href = `tel:${agentContactId}`;
+    // 매장의 담당자가 현재 로그인한 대리점과 일치하는 경우
+    if (matchedAgent) {
+      // 매칭된 대리점 연락처로 전화 연결
+      window.location.href = `tel:${matchedAgent.contactId}`;
     } else if (selectedStore?.phone) {
       // 매장 연락처로 전화 연결
       window.location.href = `tel:${selectedStore.phone}`;
@@ -52,6 +91,11 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
                 <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
                   <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
                   {selectedStore.manager || '미지정'}
+                  {matchedAgent && (
+                    <Typography variant="caption" sx={{ ml: 1, color: 'success.main' }}>
+                      (매칭됨)
+                    </Typography>
+                  )}
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -67,8 +111,9 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
                     startIcon={<PhoneIcon />}
                     onClick={handlePhoneCall}
                     size="small"
+                    disabled={loading}
                   >
-                    전화 연결
+                    {matchedAgent ? '대리점 연결' : '매장 연결'}
                   </Button>
                 </TableCell>
               </TableRow>

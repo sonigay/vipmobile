@@ -412,7 +412,8 @@ app.post('/api/login', async (req, res) => {
         manager: storeRow[12] || '',          // M열: 담당자
         address: storeRow[23] || '',          // X열: 주소
         latitude: parseFloat(storeRow[0] || '0'),  // A열: 위도
-        longitude: parseFloat(storeRow[1] || '0')  // B열: 경도
+        longitude: parseFloat(storeRow[1] || '0'),  // B열: 경도
+        phone: storeRow[8] || ''              // I열: 연락처 추가
       };
       
       console.log(`Found store: ${store.name}`);

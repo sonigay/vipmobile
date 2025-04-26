@@ -95,4 +95,25 @@ export async function fetchModels() {
     console.error('Error fetching models:', error);
     return { success: false, error };
   }
-} 
+}
+
+/**
+ * 대리점 정보를 가져오는 함수
+ * @returns {Promise<Array>} 대리점 정보 배열
+ */
+export const fetchAgentData = async () => {
+  try {
+    const response = await fetch('/api/agents');
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch agent data');
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching agent data:', error);
+    return [];
+  }
+}; 
