@@ -4,6 +4,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress } from '@mui/material';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
+import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import { fetchData, fetchModels } from './api';
 import { calculateDistance } from './utils/distanceUtils';
@@ -359,22 +360,20 @@ function App() {
           ) : (
             <>
               {isAgentMode ? (
-                // 관리자 모드일 때 StoreInfoTable과 FilterPanel 모두 표시
+                // 관리자 모드일 때 StoreInfoTable과 AgentFilterPanel 표시
                 <>
                   <StoreInfoTable 
                     selectedStore={selectedStore}
                     agentTarget={agentTarget}
                     agentContactId={agentContactId}
                   />
-                  <FilterPanel
+                  <AgentFilterPanel
                     models={data?.models}
                     colorsByModel={data?.colorsByModel}
                     selectedModel={selectedModel}
                     selectedColor={selectedColor}
-                    selectedRadius={selectedRadius}
                     onModelSelect={handleModelSelect}
                     onColorSelect={handleColorSelect}
-                    onRadiusSelect={handleRadiusSelect}
                   />
                 </>
               ) : (
@@ -388,6 +387,7 @@ function App() {
                   onModelSelect={handleModelSelect}
                   onColorSelect={handleColorSelect}
                   onRadiusSelect={handleRadiusSelect}
+                  isAgentMode={isAgentMode}
                 />
               )}
               <Box sx={{ flex: 1 }}>
