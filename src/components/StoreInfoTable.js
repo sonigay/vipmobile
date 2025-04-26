@@ -36,7 +36,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
         const matched = agents.find(agent => {
           if (!agent.target || !selectedStore.manager) return false;
           
-          // 담당자가 대리점 대상의 앞 3글자를 포함하는지 확인
+          // 담당자가 대리점 대상의 앞 3글자와 일치하는지 확인
           const targetPrefix = agent.target.substring(0, 3);
           return selectedStore.manager.includes(targetPrefix);
         });
@@ -59,15 +59,12 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
   }, [selectedStore]);
 
   const handlePhoneCall = () => {
-    // 매장의 담당자가 현재 로그인한 대리점과 일치하는 경우
+    // 매칭된 대리점이 있는 경우
     if (matchedAgent) {
       // 매칭된 대리점 연락처로 전화 연결
       window.location.href = `tel:${matchedAgent.contactId}`;
-    } else if (selectedStore?.phone) {
-      // 매장 연락처로 전화 연결
-      window.location.href = `tel:${selectedStore.phone}`;
     } else {
-      alert('연락처 정보가 없습니다.');
+      alert('담당자 연락처 정보가 없습니다.');
     }
   };
 
@@ -88,34 +85,33 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
               </TableRow>
               <TableRow>
                 <TableCell variant="head">담당자</TableCell>
-                <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
-                  <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                  {selectedStore.manager || '미지정'}
-                  {matchedAgent && (
-                    <Typography variant="caption" sx={{ ml: 1, color: 'success.main' }}>
-                      (매칭됨)
-                    </Typography>
+                <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
+                    {selectedStore.manager || '미지정'}
+                    {matchedAgent && (
+                      <Typography variant="caption" sx={{ ml: 1, color: 'success.main' }}>
+                        (매칭됨)
+                      </Typography>
+                    )}
+                  </Box>
+                  {selectedStore.manager && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<PhoneIcon />}
+                      onClick={handlePhoneCall}
+                      size="small"
+                      disabled={loading || !matchedAgent}
+                    >
+                      담당자 연결
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell variant="head">주소</TableCell>
                 <TableCell>{selectedStore.address || '주소 정보 없음'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell variant="head">연락처</TableCell>
-                <TableCell>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<PhoneIcon />}
-                    onClick={handlePhoneCall}
-                    size="small"
-                    disabled={loading}
-                  >
-                    {matchedAgent ? '대리점 연결' : '매장 연결'}
-                  </Button>
-                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
