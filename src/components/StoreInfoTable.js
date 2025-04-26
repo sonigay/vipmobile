@@ -7,11 +7,13 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableRow
+  TableRow,
+  Button
 } from '@mui/material';
 import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
+import CallIcon from '@mui/icons-material/Call';
 import { fetchAgentData } from '../api';
 
 /**
@@ -21,6 +23,18 @@ const getPrefix = (str, length = 3) => {
   if (!str) return '';
   // 앞 3글자만 추출 (공백 제거 없이 원본 그대로 사용)
   return str.toString().substring(0, length);
+};
+
+/**
+ * 전화 연결 함수
+ */
+const handleCall = (phoneNumber) => {
+  if (!phoneNumber) return;
+  
+  // 전화 연결 (모바일 디바이스에서 작동)
+  window.location.href = `tel:${phoneNumber}`;
+  
+  console.log(`전화 연결: ${phoneNumber}`);
 };
 
 /**
@@ -125,10 +139,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
                       <span style={{ fontWeight: 'medium' }}>
-                        {selectedStore.manager || '미지정'} 
-                        <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                          (앞3글자: {getPrefix(selectedStore.manager, 3)})
-                        </Typography>
+                        {selectedStore.manager || '미지정'}
                       </span>
                     </Box>
                     {loading ? (
@@ -136,11 +147,17 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
                         연락처 조회 중...
                       </Typography>
                     ) : matchedContact ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, color: 'success.main' }}>
-                        <PhoneIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                        <Typography variant="body2">
-                          연락처: {matchedContact}
-                        </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                        <Button 
+                          variant="contained" 
+                          color="primary" 
+                          startIcon={<CallIcon />}
+                          onClick={() => handleCall(matchedContact)}
+                          size="small"
+                          sx={{ borderRadius: '20px' }}
+                        >
+                          전화 연결하기
+                        </Button>
                       </Box>
                     ) : (
                       <Typography variant="body2" sx={{ mt: 1, color: 'error.main' }}>
