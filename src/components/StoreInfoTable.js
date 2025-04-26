@@ -47,16 +47,19 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
         
         console.log('대리점 정보 로드됨:', agents.length);
         
-        // 대리점 대상과 매장 담당자 매칭 (앞 3글자 비교)
+        // 담당자와 대리점 대상 모두 앞 3글자만 비교
         const matched = agents.find(agent => {
           if (!agent.target || !selectedStore.manager) return false;
           
-          // 담당자가 대리점 대상의 앞 3글자와 일치하는지 확인
+          // 담당자와 대리점 대상 모두 앞 3글자만 추출하여 비교
           const targetPrefix = agent.target.substring(0, 3);
-          const isMatch = selectedStore.manager.includes(targetPrefix);
+          const managerPrefix = selectedStore.manager.substring(0, 3);
+          
+          const isMatch = targetPrefix === managerPrefix;
           
           if (isMatch) {
-            console.log(`대리점 매칭 성공: ${agent.target} 👉 ${selectedStore.manager}`);
+            console.log(`대리점 매칭 성공: ${agent.target.substring(0, 3)} 👉 ${selectedStore.manager.substring(0, 3)}`);
+            console.log(`- 전체 값: ${agent.target} 👉 ${selectedStore.manager}`);
           }
           
           return isMatch;

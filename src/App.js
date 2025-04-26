@@ -359,14 +359,26 @@ function App() {
           ) : (
             <>
               {isAgentMode ? (
-                // 관리자 모드일 때 StoreInfoTable 표시
-                <StoreInfoTable 
-                  selectedStore={selectedStore}
-                  agentTarget={agentTarget}
-                  agentContactId={agentContactId}
-                />
+                // 관리자 모드일 때 StoreInfoTable과 FilterPanel 모두 표시
+                <>
+                  <StoreInfoTable 
+                    selectedStore={selectedStore}
+                    agentTarget={agentTarget}
+                    agentContactId={agentContactId}
+                  />
+                  <FilterPanel
+                    models={data?.models}
+                    colorsByModel={data?.colorsByModel}
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    selectedRadius={selectedRadius}
+                    onModelSelect={handleModelSelect}
+                    onColorSelect={handleColorSelect}
+                    onRadiusSelect={handleRadiusSelect}
+                  />
+                </>
               ) : (
-                // 일반 매장 모드일 때 FilterPanel 표시
+                // 일반 매장 모드일 때 FilterPanel만 표시
                 <FilterPanel
                   models={data?.models}
                   colorsByModel={data?.colorsByModel}
