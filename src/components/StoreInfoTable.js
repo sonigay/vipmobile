@@ -82,10 +82,10 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
   const handlePhoneCall = () => {
     // 매칭된 대리점이 있는 경우
     if (matchedAgent) {
-      // 매칭된 대리점 연락처로 전화 연결
+      console.log(`담당자 ${selectedStore.manager}에 연결: ${matchedAgent.contactId}`);
       window.location.href = `tel:${matchedAgent.contactId}`;
     } else {
-      alert('담당자 연락처 정보가 없습니다.');
+      alert('담당자와 매칭되는 대리점 연락처를 찾을 수 없습니다.');
     }
   };
 
@@ -121,13 +121,13 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
                   {selectedStore.manager && (
                     <Button
                       variant="contained"
-                      color="primary"
+                      color={matchedAgent ? 'primary' : 'secondary'}
                       startIcon={<PhoneIcon />}
                       onClick={handlePhoneCall}
                       size="small"
-                      disabled={loading || !matchedAgent}
+                      disabled={loading}
                     >
-                      담당자 연결
+                      {matchedAgent ? '담당자 연결' : '연결 불가'}
                     </Button>
                   )}
                 </TableCell>
