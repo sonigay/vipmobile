@@ -23,14 +23,29 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
   const [matchedAgent, setMatchedAgent] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 디버깅을 위한 로그 추가
+  useEffect(() => {
+    if (selectedStore) {
+      console.log('선택된 매장 정보:', {
+        이름: selectedStore.name,
+        담당자: selectedStore.manager || '없음'
+      });
+    }
+  }, [selectedStore]);
+
   // 선택된 매장의 담당자와 일치하는 대리점 정보 불러오기
   useEffect(() => {
     const loadAgentData = async () => {
-      if (!selectedStore?.manager) return;
+      if (!selectedStore?.manager) {
+        console.log('담당자 정보가 없어 매칭 안함');
+        return;
+      }
       
       try {
         setLoading(true);
         const agents = await fetchAgentData();
+        
+        console.log('대리점 정보 로드됨:', agents.length);
         
         // 대리점 대상과 매장 담당자 매칭 (앞 3글자 비교)
         const matched = agents.find(agent => {
@@ -38,11 +53,17 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
           
           // 담당자가 대리점 대상의 앞 3글자와 일치하는지 확인
           const targetPrefix = agent.target.substring(0, 3);
-          return selectedStore.manager.includes(targetPrefix);
+          const isMatch = selectedStore.manager.includes(targetPrefix);
+          
+          if (isMatch) {
+            console.log(`대리점 매칭 성공: ${agent.target} 👉 ${selectedStore.manager}`);
+          }
+          
+          return isMatch;
         });
         
         if (matched) {
-          console.log(`매칭된 대리점 발견: ${matched.target}`);
+          console.log(`매칭된 대리점 발견: ${matched.target} (연락처: ${matched.contactId})`);
           setMatchedAgent(matched);
         } else {
           console.log('매칭된 대리점 없음');
@@ -88,7 +109,9 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
                 <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                    {selectedStore.manager || '미지정'}
+                    <span style={{ fontWeight: 'medium' }}>
+                      {selectedStore.manager || '미지정'}
+                    </span>
                     {matchedAgent && (
                       <Typography variant="caption" sx={{ ml: 1, color: 'success.main' }}>
                         (매칭됨)

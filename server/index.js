@@ -216,6 +216,14 @@ app.get('/api/stores', async (req, res) => {
       }
     });
 
+    // 담당자 정보 확인을 위한 로깅
+    console.log('매장 담당자 정보 샘플:');
+    storeRows.slice(0, 5).forEach((row, idx) => {
+      const name = row[5] || ''; // F열: 업체명
+      const manager = row[12] || ''; // M열: 담당자
+      console.log(`[${idx}] ${name}: 담당자 = "${manager}"`);
+    });
+
     // 매장 정보와 재고 정보 결합
     const stores = storeRows
       .filter(row => {
@@ -229,6 +237,8 @@ app.get('/api/stores', async (req, res) => {
         const status = row[3];                         // D열: 거래상태
         const name = row[5].toString().trim();         // F열: 업체명
         const storeId = row[6];                        // G열: 매장 ID
+        const phone = row[8] || '';                    // I열: 연락처
+        const manager = row[12] || '';                 // M열: 담당자 (빈 문자열이 아닌 실제 값 확인)
         const address = (row[23] || '').toString();    // X열: 주소
         
         // 빈 매장 ID 제외
@@ -241,6 +251,7 @@ app.get('/api/stores', async (req, res) => {
         // 재고 데이터 로깅 (특정 매장에 대해서만)
         if (name === "승텔레콤(인천부평)") {
           console.log('Found store:', name);
+          console.log('Store manager:', manager);
           console.log('Inventory data:', JSON.stringify(inventory, null, 2));
         }
 
@@ -248,6 +259,8 @@ app.get('/api/stores', async (req, res) => {
           id: storeId.toString(),
           name,
           address,
+          phone,
+          manager, // 담당자 정보 추가
           latitude,
           longitude,
           // 매장 ID와 업체명을 조합한 고유 식별자 추가
@@ -264,11 +277,11 @@ app.get('/api/stores', async (req, res) => {
       .filter(store => Object.keys(store.inventory).length > 0)
       .map(store => ({
         매장명: store.name,
-        모델수: Object.keys(store.inventory).length,
-        재고현황: store.inventory
+        담당자: store.manager,
+        모델수: Object.keys(store.inventory).length
       }));
     
-    console.log('Inventory summary:', JSON.stringify(inventorySummary, null, 2));
+    console.log('Inventory and manager summary:', JSON.stringify(inventorySummary.slice(0, 10), null, 2));
     
     res.json(stores);
   } catch (error) {
