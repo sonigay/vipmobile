@@ -35,7 +35,8 @@ function FilterPanel({
   selectedRadius,
   onModelSelect, 
   onColorSelect, 
-  onRadiusSelect 
+  onRadiusSelect,
+  isAgentMode = false
 }) {
   const handleModelChange = (event, newValue) => {
     console.log('모델 선택:', newValue);
@@ -67,7 +68,7 @@ function FilterPanel({
         flexDirection: { xs: 'column', md: 'row' },
         gap: 2,
         width: '100%',
-        mb: 3
+        mb: isAgentMode ? 0 : 3
       }}>
         {/* 모델 검색 */}
         <Box sx={{ flexGrow: 1, minWidth: { xs: '100%', md: '60%' } }}>
@@ -112,24 +113,26 @@ function FilterPanel({
         </Box>
       </Box>
 
-      {/* 검색 반경 - 별도 섹션으로 분리 */}
-      <Box sx={{ width: '100%' }}>
-        <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center', fontWeight: 'medium' }}>
-          <LocationOnIcon sx={{ mr: 1, fontSize: 20 }} />
-          검색 반경: {(selectedRadius/1000).toFixed(1)}km
-        </Typography>
-        <Slider
-          value={selectedRadius}
-          onChange={handleRadiusChange}
-          onChangeCommitted={handleRadiusChange}
-          min={1000}
-          max={50000}
-          step={1000}
-          marks={marks}
-          valueLabelDisplay="auto"
-          valueLabelFormat={(value) => `${(value/1000).toFixed(1)}km`}
-        />
-      </Box>
+      {/* 검색 반경 - 관리자 모드가 아닐 때만 표시 */}
+      {!isAgentMode && (
+        <Box sx={{ width: '100%' }}>
+          <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center', fontWeight: 'medium' }}>
+            <LocationOnIcon sx={{ mr: 1, fontSize: 20 }} />
+            검색 반경: {(selectedRadius/1000).toFixed(1)}km
+          </Typography>
+          <Slider
+            value={selectedRadius}
+            onChange={handleRadiusChange}
+            onChangeCommitted={handleRadiusChange}
+            min={1000}
+            max={50000}
+            step={1000}
+            marks={marks}
+            valueLabelDisplay="auto"
+            valueLabelFormat={(value) => `${(value/1000).toFixed(1)}km`}
+          />
+        </Box>
+      )}
     </Paper>
   );
 }
