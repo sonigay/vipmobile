@@ -103,7 +103,7 @@ export async function fetchModels() {
  */
 export const fetchAgentData = async () => {
   try {
-    const response = await fetch('/api/agents');
+    const response = await fetch(`${API_URL}/api/agents`);
     
     if (!response.ok) {
       const errorData = await response.json();
