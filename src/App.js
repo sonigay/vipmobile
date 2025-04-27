@@ -22,17 +22,29 @@ const logActivity = async (activityData) => {
       return;
     }
     
-    console.log('활동 로깅 중:', activityData);
+    console.log('활동 로깅 데이터:', activityData);
     
-    await fetch(`${API_URL}/api/log-activity`, {
+    // 서버로 전송
+    console.log(`로그 전송 URL: ${API_URL}/api/log-activity`);
+    const response = await fetch(`${API_URL}/api/log-activity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(activityData),
     });
+    
+    const data = await response.json();
+    console.log('로그 전송 응답:', data);
+    
+    if (!response.ok) {
+      throw new Error(`서버 응답 오류: ${response.status} ${response.statusText}`);
+    }
+    
+    console.log('활동 로깅 성공!');
   } catch (error) {
     console.error('활동 로깅 실패:', error);
+    console.error('활동 데이터:', activityData);
   }
 };
 
@@ -326,10 +338,10 @@ function App() {
     setSelectedModel(model);
     setSelectedColor('');  // 색상 선택 초기화
     setFilteredStores([]); // 검색 결과 초기화
-    loadData(); // 새로운 데이터 로드
     
     // 모델 검색 로그 전송
     if (loggedInStore) {
+      console.log('모델 선택 로그 전송 시작:', model);
       logActivity({
         userId: loggedInStore.id,
         userType: isAgentMode ? 'agent' : 'store',
@@ -341,16 +353,19 @@ function App() {
         model: model
       });
     }
+    
+    // 데이터 로드는 로그 전송 후 실행
+    loadData();
   }, [loadData, loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleColorSelect = useCallback((color) => {
     console.log('선택된 색상 변경:', color);
     setSelectedColor(color);
     setFilteredStores([]); // 검색 결과 초기화
-    loadData(); // 새로운 데이터 로드
     
     // 색상 검색 로그 전송
     if (loggedInStore && selectedModel) {
+      console.log('색상 선택 로그 전송 시작:', color, '모델:', selectedModel);
       logActivity({
         userId: loggedInStore.id,
         userType: isAgentMode ? 'agent' : 'store',
@@ -363,6 +378,9 @@ function App() {
         colorName: color
       });
     }
+    
+    // 데이터 로드는 로그 전송 후 실행
+    loadData();
   }, [loadData, loggedInStore, selectedModel, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleRadiusSelect = useCallback((radius) => {
