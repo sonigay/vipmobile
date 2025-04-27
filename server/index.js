@@ -926,8 +926,71 @@ const server = app.listen(port, '0.0.0.0', async () => {
 });
 
 // 정상적인 종료 처리
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('Received SIGTERM signal. Shutting down gracefully...');
+  
+  // Discord에 서버 종료 알림 전송
+  if (DISCORD_LOGGING_ENABLED && discordBot && discordBot.isReady()) {
+    try {
+      // 기본 채널에 알림 전송
+      if (DISCORD_CHANNEL_ID) {
+        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+        if (channel) {
+          const shutdownEmbed = new EmbedBuilder()
+            .setTitle('⚠️ 서버 종료 알림')
+            .setColor(15548997) // 빨간색
+            .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
+            .setTimestamp()
+            .setFooter({ text: 'VIP+ 서버 알림' });
+            
+          await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
+          console.log('서버 종료 알림 메시지가 Discord로 전송되었습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('Discord 종료 알림 전송 실패:', error);
+    }
+    
+    // Discord 봇 연결 종료를 기다림
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+// SIGINT 처리 (Ctrl+C)
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT signal. Shutting down gracefully...');
+  
+  // Discord에 서버 종료 알림 전송
+  if (DISCORD_LOGGING_ENABLED && discordBot && discordBot.isReady()) {
+    try {
+      // 기본 채널에 알림 전송
+      if (DISCORD_CHANNEL_ID) {
+        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+        if (channel) {
+          const shutdownEmbed = new EmbedBuilder()
+            .setTitle('⚠️ 서버 종료 알림')
+            .setColor(15548997) // 빨간색
+            .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
+            .setTimestamp()
+            .setFooter({ text: 'VIP+ 서버 알림' });
+            
+          await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
+          console.log('서버 종료 알림 메시지가 Discord로 전송되었습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('Discord 종료 알림 전송 실패:', error);
+    }
+    
+    // Discord 봇 연결 종료를 기다림
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
