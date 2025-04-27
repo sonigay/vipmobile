@@ -40,7 +40,7 @@ const handleCall = (phoneNumber) => {
 /**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
-function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
+function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButtonClick }) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -116,6 +116,23 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId }) {
     
     loadAgentData();
   }, [selectedStore]);
+
+  /**
+   * 전화 연결 함수 (로깅 추가)
+   */
+  const handleCall = (phoneNumber) => {
+    if (!phoneNumber) return;
+    
+    // 전화 연결 (모바일 디바이스에서 작동)
+    window.location.href = `tel:${phoneNumber}`;
+    
+    // 로깅 콜백 호출
+    if (onCallButtonClick) {
+      onCallButtonClick();
+    }
+    
+    console.log(`전화 연결: ${phoneNumber}`);
+  };
 
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>

@@ -11,6 +11,31 @@ import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 
+// Logger 유틸리티
+const logActivity = async (activityData) => {
+  try {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+    const loggingEnabled = process.env.REACT_APP_LOGGING_ENABLED === 'true';
+    
+    if (!loggingEnabled) {
+      console.log('활동 로깅이 비활성화되어 있습니다.');
+      return;
+    }
+    
+    console.log('활동 로깅 중:', activityData);
+    
+    await fetch(`${API_URL}/api/log-activity`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(activityData),
+    });
+  } catch (error) {
+    console.error('활동 로깅 실패:', error);
+  }
+};
+
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -33,6 +58,22 @@ function App() {
   const [agentTarget, setAgentTarget] = useState('');
   const [agentQualification, setAgentQualification] = useState('');
   const [agentContactId, setAgentContactId] = useState('');
+  // 현재 세션의 IP 및 위치 정보
+  const [ipInfo, setIpInfo] = useState(null);
+  const [deviceInfo, setDeviceInfo] = useState(null);
+
+  // 디바이스 및 IP 정보 수집
+  useEffect(() => {
+    // 디바이스 정보 가져오기
+    const userAgent = navigator.userAgent;
+    setDeviceInfo(userAgent);
+    
+    // localStorage에서 IP 정보 가져오기
+    const savedIpInfo = localStorage.getItem('userIpInfo');
+    if (savedIpInfo) {
+      setIpInfo(JSON.parse(savedIpInfo));
+    }
+  }, []);
 
   // 데이터 로딩 함수
   const loadData = useCallback(async () => {
@@ -286,14 +327,43 @@ function App() {
     setSelectedColor('');  // 색상 선택 초기화
     setFilteredStores([]); // 검색 결과 초기화
     loadData(); // 새로운 데이터 로드
-  }, [loadData]);
+    
+    // 모델 검색 로그 전송
+    if (loggedInStore) {
+      logActivity({
+        userId: loggedInStore.id,
+        userType: isAgentMode ? 'agent' : 'store',
+        targetName: isAgentMode ? agentTarget : loggedInStore.name,
+        ipAddress: ipInfo?.ip || 'unknown',
+        location: ipInfo?.location || 'unknown',
+        deviceInfo: deviceInfo || 'unknown',
+        activity: 'search',
+        model: model
+      });
+    }
+  }, [loadData, loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleColorSelect = useCallback((color) => {
     console.log('선택된 색상 변경:', color);
     setSelectedColor(color);
     setFilteredStores([]); // 검색 결과 초기화
     loadData(); // 새로운 데이터 로드
-  }, [loadData]);
+    
+    // 색상 검색 로그 전송
+    if (loggedInStore && selectedModel) {
+      logActivity({
+        userId: loggedInStore.id,
+        userType: isAgentMode ? 'agent' : 'store',
+        targetName: isAgentMode ? agentTarget : loggedInStore.name,
+        ipAddress: ipInfo?.ip || 'unknown',
+        location: ipInfo?.location || 'unknown',
+        deviceInfo: deviceInfo || 'unknown',
+        activity: 'search',
+        model: selectedModel,
+        colorName: color
+      });
+    }
+  }, [loadData, loggedInStore, selectedModel, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleRadiusSelect = useCallback((radius) => {
     console.log('선택된 반경 변경:', radius);
@@ -304,6 +374,23 @@ function App() {
     console.log('선택된 매장:', store);
     setSelectedStore(store);
   }, []);
+
+  // 전화 연결 버튼 클릭 핸들러
+  const handleCallButtonClick = useCallback(() => {
+    if (loggedInStore && isAgentMode) {
+      // 관리자가 전화 연결 버튼을 클릭한 경우 로그 전송
+      logActivity({
+        userId: loggedInStore.id,
+        userType: 'agent',
+        targetName: agentTarget,
+        ipAddress: ipInfo?.ip || 'unknown',
+        location: ipInfo?.location || 'unknown',
+        deviceInfo: deviceInfo || 'unknown',
+        activity: 'call_button',
+        callButton: true
+      });
+    }
+  }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {
@@ -408,6 +495,7 @@ function App() {
                     selectedStore={selectedStore}
                     agentTarget={agentTarget}
                     agentContactId={agentContactId}
+                    onCallButtonClick={handleCallButtonClick}
                   />
                   <AgentFilterPanel
                     models={data?.models}
