@@ -74,6 +74,45 @@ function App() {
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
 
+  // 로그인 상태 복원
+  useEffect(() => {
+    const savedLoginState = localStorage.getItem('loginState');
+    if (savedLoginState) {
+      try {
+        const parsedState = JSON.parse(savedLoginState);
+        setIsLoggedIn(true);
+        setLoggedInStore(parsedState.store);
+        
+        // 관리자 모드 상태 복원
+        if (parsedState.isAgent) {
+          setIsAgentMode(true);
+          setAgentTarget(parsedState.agentTarget || '');
+          setAgentQualification(parsedState.agentQualification || '');
+          setAgentContactId(parsedState.agentContactId || '');
+          
+          // 관리자 모드 위치 설정
+          setUserLocation({
+            lat: 37.5665,
+            lng: 126.9780,
+          });
+          setSelectedRadius(50000);
+        } else if (parsedState.store) {
+          // 일반 매장 모드 위치 설정
+          const store = parsedState.store;
+          if (store.latitude && store.longitude) {
+            setUserLocation({
+              lat: parseFloat(store.latitude),
+              lng: parseFloat(store.longitude)
+            });
+          }
+        }
+      } catch (error) {
+        console.error('저장된 로그인 상태를 복원하는 중 오류 발생:', error);
+        localStorage.removeItem('loginState');
+      }
+    }
+  }, []);
+
   // 디바이스 및 IP 정보 수집
   useEffect(() => {
     // 디바이스 정보 가져오기
@@ -304,6 +343,15 @@ function App() {
       });
       // 검색 반경 최대로 설정 (지도에서 전체 지역 보이도록)
       setSelectedRadius(50000);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isAgent: true,
+        store: store,
+        agentTarget: store.target,
+        agentQualification: store.qualification,
+        agentContactId: store.contactId
+      }));
     } else {
       console.log('로그인: 일반 매장 모드');
       setIsAgentMode(false);
@@ -314,6 +362,12 @@ function App() {
           lng: parseFloat(store.longitude)
         });
       }
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isAgent: false,
+        store: store
+      }));
     }
   };
 
@@ -331,6 +385,9 @@ function App() {
     setAgentTarget('');
     setAgentQualification('');
     setAgentContactId('');
+    
+    // 로그인 상태 삭제
+    localStorage.removeItem('loginState');
   };
 
   const handleModelSelect = useCallback((model) => {
