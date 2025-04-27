@@ -8,7 +8,6 @@ import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import { fetchData, fetchModels } from './api';
 import { calculateDistance } from './utils/distanceUtils';
-import { startMonitoring } from './utils/serverMonitor'; // 서버 모니터링 추가
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 
@@ -125,17 +124,6 @@ function App() {
     if (savedIpInfo) {
       setIpInfo(JSON.parse(savedIpInfo));
     }
-  }, []);
-
-  // 서버 모니터링 시작
-  useEffect(() => {
-    // 서버 모니터링 시작 (Netlify 환경에서만 활성화)
-    const stopMonitoring = startMonitoring();
-    
-    // 클린업 함수
-    return () => {
-      if (stopMonitoring) stopMonitoring();
-    };
   }, []);
 
   // 데이터 로딩 함수
