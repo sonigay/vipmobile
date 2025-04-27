@@ -4,6 +4,7 @@ siljuk-ba9eed4a893c.json
 
 # dependencies
 /node_modules
+/server/node_modules
 /.pnp
 .pnp.js
 
