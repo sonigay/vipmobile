@@ -31,6 +31,9 @@ const defaultOptions = {
   fullscreenControl: true,
 };
 
+// libraries를 상수로 정의하여 경고 방지
+const MAP_LIBRARIES = ['places', 'marker'];
+
 function Map({ 
   userLocation, 
   filteredStores, 
@@ -44,7 +47,7 @@ function Map({
 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries: ['places', 'marker'],
+    libraries: MAP_LIBRARIES
   });
 
   const [map, setMap] = useState(null);
@@ -94,7 +97,9 @@ function Map({
 
   // 반경 원 생성 또는 업데이트
   useEffect(() => {
-    if (map && userLocation && selectedRadius) {
+    if (!isLoaded || !map) return;
+    
+    if (map && userLocation && selectedRadius && !isAgentMode) {
       // 이전 원 제거
       if (circle) {
         circle.setMap(null);
@@ -113,12 +118,23 @@ function Map({
       });
 
       setCircle(newCircle);
-    } else if (circle && (!selectedRadius || !userLocation)) {
+      
+      // 원의 경계도 bounds에 포함
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.union(newCircle.getBounds());
+      
+      // 지도 범위 조정
+      map.fitBounds(bounds);
+      const listener = window.google.maps.event.addListener(map, 'idle', () => {
+        if (map.getZoom() > 15) map.setZoom(15);
+        window.google.maps.event.removeListener(listener);
+      });
+    } else if (circle && (!selectedRadius || !userLocation || isAgentMode)) {
       // selectedRadius가 null이면 원 제거 (관리자 모드)
       circle.setMap(null);
       setCircle(null);
     }
-  }, [map, userLocation, selectedRadius, circle]);
+  }, [map, userLocation, selectedRadius, circle, isLoaded, isAgentMode]);
 
   const getMarkerIcon = useCallback((store) => {
     const isSelected = selectedStore?.id === store.id;
@@ -163,7 +179,7 @@ function Map({
     };
   }, [selectedStore, loggedInStoreId, selectedModel, selectedColor, calculateInventory]);
 
-  // 마커와 원 업데이트
+  // 마커 업데이트
   useEffect(() => {
     if (!isLoaded || !map) return;
 
@@ -173,10 +189,9 @@ function Map({
       선택된색상: selectedColor
     });
 
-    // 기존 마커와 원 제거
+    // 기존 마커 제거
     markers.forEach(marker => marker.setMap(null));
-    if (circle) circle.setMap(null);
-
+    
     const newMarkers = [];
     const bounds = new window.google.maps.LatLngBounds();
 
@@ -221,26 +236,8 @@ function Map({
       bounds.extend(position);
     });
 
-    // 검색 반경 원 생성
-    if (userLocation && selectedRadius) {
-      const newCircle = new window.google.maps.Circle({
-        map,
-        center: userLocation,
-        radius: selectedRadius,
-        fillColor: '#4285F4',
-        fillOpacity: 0.1,
-        strokeColor: '#4285F4',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-      });
-      setCircle(newCircle);
-      
-      // 원의 경계도 bounds에 포함
-      bounds.union(newCircle.getBounds());
-    }
-
-    // 지도 범위 조정
-    if (newMarkers.length > 0 || (userLocation && selectedRadius)) {
+    // 마커가 있고 원이 없을 때만 지도 범위 조정
+    if (newMarkers.length > 0 && !circle) {
       map.fitBounds(bounds);
       const listener = window.google.maps.event.addListener(map, 'idle', () => {
         if (map.getZoom() > 15) map.setZoom(15);
@@ -249,7 +246,7 @@ function Map({
     }
 
     setMarkers(newMarkers);
-  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory, selectedStore]);
+  }, [map, isLoaded, filteredStores, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory, selectedStore, circle]);
 
   if (loadError) {
     return (
