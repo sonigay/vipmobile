@@ -74,8 +74,23 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
 
 // Discord 알림 전송
 async function sendDiscordAlert(online) {
-  if (!DISCORD_LOGGING_ENABLED || !discordBot || !discordBot.isReady()) {
-    console.log('Discord 봇이 준비되지 않았거나 로깅이 비활성화되었습니다.');
+  if (!DISCORD_LOGGING_ENABLED || !discordBot) {
+    console.log('Discord 봇이 초기화되지 않았거나 로깅이 비활성화되었습니다.');
+    return;
+  }
+  
+  // 봇이 준비되지 않았다면 10초까지 대기
+  if (!discordBot.isReady()) {
+    console.log('Discord 봇이 아직 준비되지 않았습니다. 최대 10초 대기...');
+    for (let i = 0; i < 10; i++) {
+      if (discordBot.isReady()) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`대기 중... ${i+1}초 경과`);
+    }
+  }
+  
+  if (!discordBot.isReady()) {
+    console.log('최대 대기 시간을 초과했지만 Discord 봇이 아직 준비되지 않았습니다.');
     return;
   }
   
@@ -96,17 +111,33 @@ async function sendDiscordAlert(online) {
       .addFields({
         name: '마지막 체크 시간',
         value: new Date().toLocaleString()
-      })
-      .setFooter({ text: 'VIP+ 서버 모니터링' });
+      },
+      {
+        name: '서버 URL',
+        value: SERVER_URL
+      });
     
-    await channel.send({ content: '@everyone', embeds: [embed] });
-    console.log(`Discord 알림 전송 성공: 서버 ${online ? '복구' : '다운'}`);
+    if (!online) {
+      embed.addFields({
+        name: '마지막 온라인 시간',
+        value: lastStatus.lastOnline ? new Date(lastStatus.lastOnline).toLocaleString() : '알 수 없음'
+      });
+    }
+    
+    embed.setFooter({ text: 'VIP+ 서버 모니터링' });
+    
+    console.log('Discord 알림 전송 시도 중...');
+    const message = await channel.send({ content: '@everyone', embeds: [embed] });
+    console.log(`Discord 알림 전송 성공: 서버 ${online ? '복구' : '다운'}, 메시지 ID: ${message.id}`);
     
     // 알림 전송 상태 업데이트
     lastStatus.notified = true;
     saveStatus();
+    return true;
   } catch (error) {
     console.error('Discord 알림 전송 실패:', error);
+    console.error('상세 오류:', error.stack);
+    return false;
   }
 }
 

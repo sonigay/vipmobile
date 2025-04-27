@@ -45,14 +45,98 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
 }
 
 // 전역 오류 처리
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', async (error) => {
   console.error('Uncaught Exception:', error);
-  // 치명적인 오류 발생 시 프로세스를 깔끔하게 종료
-  process.exit(1);
+  
+  // Discord에 오류 알림 전송
+  if (DISCORD_LOGGING_ENABLED && discordBot) {
+    try {
+      // 봇이 준비되었는지 확인
+      if (discordBot.isReady()) {
+        if (DISCORD_CHANNEL_ID) {
+          try {
+            const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+            if (channel) {
+              // 에러 정보를 간결하게 정리
+              const errorInfo = {
+                message: error.message,
+                stack: error.stack?.split('\n').slice(0, 5).join('\n') || '스택 정보 없음',
+                time: new Date().toISOString()
+              };
+              
+              const crashEmbed = new EmbedBuilder()
+                .setTitle('🚨 서버 충돌 알림')
+                .setColor(15548997) // 빨간색
+                .setDescription('@everyone\n서버에 치명적인 오류가 발생했습니다. 서비스가 중단되었습니다.')
+                .addFields({
+                  name: '오류 정보',
+                  value: `\`\`\`\n${errorInfo.message}\n${errorInfo.stack}\n\`\`\``
+                })
+                .setTimestamp()
+                .setFooter({ text: 'VIP+ 서버 오류 알림' });
+                
+              console.log('충돌 알림 전송 시도 중...');
+              await channel.send({ content: '@everyone', embeds: [crashEmbed] });
+              console.log('서버 충돌 알림 메시지가 Discord로 전송되었습니다.');
+            }
+          } catch (discordError) {
+            console.error('Discord 충돌 알림 전송 실패:', discordError);
+          }
+        }
+      }
+      
+      // Discord 메시지 전송을 위한 대기
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } catch (discordError) {
+      console.error('Discord 오류 알림 처리 중 추가 오류:', discordError);
+    }
+  }
+  
+  // 3초 후 프로세스 종료 (Discord 메시지 전송 시간 확보)
+  setTimeout(() => {
+    console.error('치명적인 오류로 인한 서버 종료');
+    process.exit(1);
+  }, 3000);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', async (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  
+  // 치명적이지 않은 경우 Discord에 경고 알림만 전송
+  if (DISCORD_LOGGING_ENABLED && discordBot && discordBot.isReady()) {
+    try {
+      if (DISCORD_CHANNEL_ID) {
+        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+        if (channel) {
+          // 오류 정보 정리
+          const errorInfo = {
+            message: reason instanceof Error ? reason.message : String(reason),
+            stack: reason instanceof Error && reason.stack 
+              ? reason.stack.split('\n').slice(0, 5).join('\n') 
+              : '스택 정보 없음',
+            time: new Date().toISOString()
+          };
+          
+          const warningEmbed = new EmbedBuilder()
+            .setTitle('⚠️ 서버 경고 알림')
+            .setColor(16776960) // 노란색
+            .setDescription('서버에서 처리되지 않은 Promise 거부가 발생했습니다.')
+            .addFields({
+              name: '오류 정보',
+              value: `\`\`\`\n${errorInfo.message}\n${errorInfo.stack}\n\`\`\``
+            })
+            .setTimestamp()
+            .setFooter({ text: 'VIP+ 서버 경고 알림' });
+            
+          await channel.send({ embeds: [warningEmbed] });
+          console.log('서버 경고 알림 메시지가 Discord로 전송되었습니다.');
+        }
+      }
+    } catch (discordError) {
+      console.error('Discord 경고 알림 전송 실패:', discordError);
+    }
+  }
+  
   // 처리되지 않은 Promise 거부를 기록하지만 프로세스는 계속 실행
 });
 
@@ -930,69 +1014,111 @@ process.on('SIGTERM', async () => {
   console.log('Received SIGTERM signal. Shutting down gracefully...');
   
   // Discord에 서버 종료 알림 전송
-  if (DISCORD_LOGGING_ENABLED && discordBot && discordBot.isReady()) {
+  if (DISCORD_LOGGING_ENABLED && discordBot) {
     try {
-      // 기본 채널에 알림 전송
-      if (DISCORD_CHANNEL_ID) {
-        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
-        if (channel) {
-          const shutdownEmbed = new EmbedBuilder()
-            .setTitle('⚠️ 서버 종료 알림')
-            .setColor(15548997) // 빨간색
-            .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
-            .setTimestamp()
-            .setFooter({ text: 'VIP+ 서버 알림' });
-            
-          await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
-          console.log('서버 종료 알림 메시지가 Discord로 전송되었습니다.');
+      // 봇 준비 상태 확인
+      if (!discordBot.isReady()) {
+        console.log('Discord 봇이 아직 준비되지 않았습니다. 5초 대기 후 재시도...');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
+      }
+      
+      if (discordBot.isReady()) {
+        // 기본 채널에 알림 전송
+        if (DISCORD_CHANNEL_ID) {
+          try {
+            const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+            if (channel) {
+              const shutdownEmbed = new EmbedBuilder()
+                .setTitle('⚠️ 서버 종료 알림')
+                .setColor(15548997) // 빨간색
+                .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
+                .setTimestamp()
+                .setFooter({ text: 'VIP+ 서버 알림' });
+                
+              console.log('종료 알림 전송 시도 중...');
+              const sentMessage = await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
+              console.log(`서버 종료 알림 메시지가 Discord로 전송되었습니다. 메시지 ID: ${sentMessage.id}`);
+            }
+          } catch (error) {
+            console.error('Discord 채널 접근 또는 메시지 전송 실패:', error);
+          }
         }
+      } else {
+        console.log('Discord 봇이 준비되지 않아 종료 알림을 보낼 수 없습니다.');
       }
     } catch (error) {
       console.error('Discord 종료 알림 전송 실패:', error);
     }
     
-    // Discord 봇 연결 종료를 기다림
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Discord 봇 연결 종료를 기다림 (메시지 전송에 충분한 시간)
+    console.log('Discord 메시지 전송 대기 중... (3초)');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log('대기 완료, 서버 종료 진행');
   }
   
   server.close(() => {
     console.log('Server closed');
-    process.exit(0);
+    // 일정 시간 후 강제 종료 (메시지가 전송되지 않더라도)
+    setTimeout(() => {
+      console.log('강제 종료');
+      process.exit(0);
+    }, 1000);
   });
 });
 
 // SIGINT 처리 (Ctrl+C)
 process.on('SIGINT', async () => {
-  console.log('Received SIGINT signal. Shutting down gracefully...');
+  console.log('Received SIGINT signal (Ctrl+C). Shutting down gracefully...');
   
   // Discord에 서버 종료 알림 전송
-  if (DISCORD_LOGGING_ENABLED && discordBot && discordBot.isReady()) {
+  if (DISCORD_LOGGING_ENABLED && discordBot) {
     try {
-      // 기본 채널에 알림 전송
-      if (DISCORD_CHANNEL_ID) {
-        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
-        if (channel) {
-          const shutdownEmbed = new EmbedBuilder()
-            .setTitle('⚠️ 서버 종료 알림')
-            .setColor(15548997) // 빨간색
-            .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
-            .setTimestamp()
-            .setFooter({ text: 'VIP+ 서버 알림' });
-            
-          await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
-          console.log('서버 종료 알림 메시지가 Discord로 전송되었습니다.');
+      // 봇 준비 상태 확인
+      if (!discordBot.isReady()) {
+        console.log('Discord 봇이 아직 준비되지 않았습니다. 5초 대기 후 재시도...');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
+      }
+      
+      if (discordBot.isReady()) {
+        // 기본 채널에 알림 전송
+        if (DISCORD_CHANNEL_ID) {
+          try {
+            const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+            if (channel) {
+              const shutdownEmbed = new EmbedBuilder()
+                .setTitle('⚠️ 서버 종료 알림')
+                .setColor(15548997) // 빨간색
+                .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
+                .setTimestamp()
+                .setFooter({ text: 'VIP+ 서버 알림' });
+                
+              console.log('종료 알림 전송 시도 중...');
+              const sentMessage = await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
+              console.log(`서버 종료 알림 메시지가 Discord로 전송되었습니다. 메시지 ID: ${sentMessage.id}`);
+            }
+          } catch (error) {
+            console.error('Discord 채널 접근 또는 메시지 전송 실패:', error);
+          }
         }
+      } else {
+        console.log('Discord 봇이 준비되지 않아 종료 알림을 보낼 수 없습니다.');
       }
     } catch (error) {
       console.error('Discord 종료 알림 전송 실패:', error);
     }
     
-    // Discord 봇 연결 종료를 기다림
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Discord 봇 연결 종료를 기다림 (메시지 전송에 충분한 시간)
+    console.log('Discord 메시지 전송 대기 중... (3초)');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log('대기 완료, 서버 종료 진행');
   }
   
   server.close(() => {
     console.log('Server closed');
-    process.exit(0);
+    // 일정 시간 후 강제 종료 (메시지가 전송되지 않더라도)
+    setTimeout(() => {
+      console.log('강제 종료');
+      process.exit(0);
+    }, 1000);
   });
 }); 
