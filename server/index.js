@@ -3,9 +3,32 @@ const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
 const app = express();
 const port = process.env.PORT || 4000;
+
+// Discord 봇 설정
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
+const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
+
+// 디스코드 봇 초기화
+const discordBot = new Client({ 
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] 
+});
+
+// 봇 로그인
+if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
+  discordBot.login(DISCORD_BOT_TOKEN)
+    .then(() => console.log('Discord 봇 연결 성공'))
+    .catch(err => console.error('Discord 봇 연결 실패:', err));
+}
+
+// 봇 준비 이벤트
+discordBot.once('ready', () => {
+  console.log(`봇이 준비되었습니다: ${discordBot.user.tag}`);
+});
 
 // 전역 오류 처리
 process.on('uncaughtException', (error) => {
@@ -82,6 +105,32 @@ async function getSheetValues(sheetName) {
   } catch (error) {
     console.error(`Error fetching sheet ${sheetName}:`, error);
     throw error;
+  }
+}
+
+// Discord로 로그 메시지 전송 함수
+async function sendLogToDiscord(embedData) {
+  if (!DISCORD_LOGGING_ENABLED || !DISCORD_CHANNEL_ID) {
+    console.log('Discord 로깅이 비활성화되었거나 채널 ID가 없습니다.');
+    return;
+  }
+
+  try {
+    const channel = discordBot.channels.cache.get(DISCORD_CHANNEL_ID);
+    if (channel) {
+      const embed = new EmbedBuilder()
+        .setTitle(embedData.title)
+        .setColor(embedData.color)
+        .addFields(embedData.fields)
+        .setTimestamp(embedData.timestamp)
+        .setFooter({ text: embedData.footer.text });
+
+      await channel.send({ embeds: [embed] });
+    } else {
+      console.error('Discord 채널을 찾을 수 없습니다.');
+    }
+  } catch (error) {
+    console.error('Discord 로그 전송 중 오류:', error);
   }
 }
 
@@ -390,10 +439,94 @@ app.get('/api/agents', async (req, res) => {
   }
 });
 
+// 사용자 활동 로깅 API
+app.post('/api/log-activity', async (req, res) => {
+  try {
+    const { 
+      userId, 
+      userType, 
+      targetName, 
+      ipAddress, 
+      location, 
+      deviceInfo, 
+      activity, 
+      model, 
+      colorName,
+      callButton 
+    } = req.body;
+    
+    // 콘솔에 로그 출력
+    console.log('사용자 활동 로그:', JSON.stringify(req.body, null, 2));
+    
+    // 활동 유형에 따른 제목 설정
+    let title = '사용자 활동';
+    let embedColor = 3447003; // 파란색
+    
+    if (activity === 'login') {
+      title = '사용자 로그인';
+      embedColor = 5763719; // 초록색
+    } else if (activity === 'search') {
+      title = '모델 검색';
+      embedColor = 16776960; // 노란색
+    } else if (activity === 'call_button') {
+      title = '전화 연결 버튼 클릭';
+      embedColor = 15548997; // 빨간색
+    }
+    
+    // Embed 데이터 구성
+    const embedData = {
+      title: title,
+      color: embedColor,
+      timestamp: new Date().toISOString(),
+      fields: [
+        {
+          name: '사용자 정보',
+          value: `ID: ${userId}\n종류: ${userType === 'agent' ? '관리자' : '일반'}\n대상: ${targetName || '없음'}`
+        },
+        {
+          name: '접속 정보',
+          value: `IP: ${ipAddress}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+        }
+      ],
+      footer: {
+        text: 'VIP+ 사용자 활동 로그'
+      }
+    };
+    
+    // 검색 정보가 있는 경우 필드 추가
+    if (model) {
+      embedData.fields.push({
+        name: '검색 정보',
+        value: `모델: ${model}${colorName ? `\n색상: ${colorName}` : ''}`
+      });
+    }
+    
+    // 전화 연결 버튼 클릭 정보
+    if (callButton) {
+      embedData.fields.push({
+        name: '전화 연결',
+        value: '전화 연결 버튼이 클릭되었습니다.'
+      });
+    }
+    
+    // Discord로 로그 전송
+    await sendLogToDiscord(embedData);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('활동 로그 처리 중 오류:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '활동 로그 처리 실패', 
+      message: error.message 
+    });
+  }
+});
+
 // 로그인 검증 API 추가
 app.post('/api/login', async (req, res) => {
   try {
-    const { storeId } = req.body;
+    const { storeId, deviceInfo, ipAddress, location } = req.body;
     
     if (!storeId) {
       return res.status(400).json({ 
@@ -412,6 +545,31 @@ app.post('/api/login', async (req, res) => {
       
       if (agent) {
         console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
+        
+        // 디스코드로 로그인 로그 전송
+        if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
+          const embedData = {
+            title: '관리자 로그인',
+            color: 15844367, // 보라색
+            timestamp: new Date().toISOString(),
+            fields: [
+              {
+                name: '관리자 정보',
+                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}`
+              },
+              {
+                name: '접속 정보',
+                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+              }
+            ],
+            footer: {
+              text: 'VIP+ 관리자 로그인'
+            }
+          };
+          
+          await sendLogToDiscord(embedData);
+        }
+        
         return res.json({
           success: true,
           isAgent: true,
@@ -431,7 +589,7 @@ app.post('/api/login', async (req, res) => {
     }
     
     const storeRows = storeValues.slice(1);
-    const storeRow = storeRows.find(row => row[6] === storeId); // G열: 매장 ID
+    const storeRow = storeRows.find(row => row[6] === storeId);
     
     if (storeRow) {
       const store = {
@@ -445,6 +603,31 @@ app.post('/api/login', async (req, res) => {
       };
       
       console.log(`Found store: ${store.name}`);
+      
+      // 디스코드로 로그인 로그 전송
+      if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
+        const embedData = {
+          title: '매장 로그인',
+          color: 5763719, // 초록색
+          timestamp: new Date().toISOString(),
+          fields: [
+            {
+              name: '매장 정보',
+              value: `ID: ${store.id}\n매장명: ${store.name}\n담당자: ${store.manager || '없음'}`
+            },
+            {
+              name: '접속 정보',
+              value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+            }
+          ],
+          footer: {
+            text: 'VIP+ 매장 로그인'
+          }
+        };
+        
+        await sendLogToDiscord(embedData);
+      }
+      
       return res.json({
         success: true,
         isAgent: false,
