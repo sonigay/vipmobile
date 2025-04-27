@@ -15,15 +15,12 @@ const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 
 // 디스코드 봇 초기화
 const discordBot = new Client({ 
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] 
+  intents: [
+    GatewayIntentBits.Guilds, 
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
-
-// 봇 로그인
-if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
-  discordBot.login(DISCORD_BOT_TOKEN)
-    .then(() => console.log('Discord 봇 연결 성공'))
-    .catch(err => console.error('Discord 봇 연결 실패:', err));
-}
 
 // 봇 준비 이벤트
 discordBot.once('ready', () => {
@@ -116,21 +113,37 @@ async function sendLogToDiscord(embedData) {
   }
 
   try {
-    const channel = discordBot.channels.cache.get(DISCORD_CHANNEL_ID);
-    if (channel) {
-      const embed = new EmbedBuilder()
-        .setTitle(embedData.title)
-        .setColor(embedData.color)
-        .addFields(embedData.fields)
-        .setTimestamp(embedData.timestamp)
-        .setFooter({ text: embedData.footer.text });
-
-      await channel.send({ embeds: [embed] });
-    } else {
-      console.error('Discord 채널을 찾을 수 없습니다.');
+    // 봇이 연결되었는지 확인
+    if (!discordBot.isReady()) {
+      console.log('Discord 봇이 아직 준비되지 않았습니다. 메시지를 보낼 수 없습니다.');
+      return;
     }
+
+    console.log('Discord 채널에 메시지 전송 시도...');
+    const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID).catch(error => {
+      console.error(`채널 ID ${DISCORD_CHANNEL_ID} 가져오기 실패:`, error.message);
+      return null;
+    });
+    
+    if (!channel) {
+      console.error(`채널을 찾을 수 없습니다: ${DISCORD_CHANNEL_ID}`);
+      return;
+    }
+
+    console.log('채널 찾음, 메시지 전송 중...');
+    
+    const embed = new EmbedBuilder()
+      .setTitle(embedData.title)
+      .setColor(embedData.color)
+      .addFields(embedData.fields)
+      .setTimestamp(embedData.timestamp)
+      .setFooter({ text: embedData.footer.text });
+
+    await channel.send({ embeds: [embed] });
+    console.log('Discord 메시지 전송 성공');
   } catch (error) {
-    console.error('Discord 로그 전송 중 오류:', error);
+    console.error('Discord 로그 전송 중 오류:', error.message);
+    console.error('자세한 오류 정보:', error);
   }
 }
 
@@ -721,10 +734,43 @@ async function checkAndUpdateAddresses() {
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
-    console.log(`Server is running on http://localhost:${port}`);
+    console.log(`서버가 포트 ${port}에서 실행 중입니다`);
     
-    // 서버 시작 시 첫 업데이트 실행
-    // 주소 변경 시 행 위치에 상관없이 항상 좌표 업데이트
+    // 환경변수 디버깅
+    console.log('Discord 봇 환경변수 상태:');
+    console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
+    console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
+    console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
+    
+    // 봇 로그인 (서버 시작 후)
+    if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
+      console.log('서버 시작 후 Discord 봇 로그인 시도...');
+      try {
+        await discordBot.login(DISCORD_BOT_TOKEN);
+        console.log('Discord 봇 연결 성공!');
+        
+        // 채널 연결 테스트
+        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+        if (channel) {
+          console.log(`채널 '${channel.name}' 연결 성공!`);
+          
+          // 테스트 메시지 전송
+          const testEmbed = new EmbedBuilder()
+            .setTitle('서버 시작 알림')
+            .setColor(5763719)
+            .setDescription('서버가 성공적으로 시작되었습니다.')
+            .setTimestamp()
+            .setFooter({ text: 'VIP+ 서버' });
+            
+          await channel.send({ embeds: [testEmbed] });
+          console.log('서버 시작 알림 메시지 전송됨');
+        }
+      } catch (error) {
+        console.error('서버 시작 시 Discord 봇 초기화 오류:', error.message);
+      }
+    }
+    
+    // 주소 업데이트 함수 호출
     console.log('모든 사용 중인 주소에 대해 위도/경도 값을 업데이트합니다...');
     await checkAndUpdateAddresses();
     
