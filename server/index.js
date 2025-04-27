@@ -11,6 +11,8 @@ const port = process.env.PORT || 4000;
 // Discord 봇 설정
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
+const DISCORD_AGENT_CHANNEL_ID = process.env.DISCORD_AGENT_CHANNEL_ID || DISCORD_CHANNEL_ID; // 관리자 채널 (없으면 기본 채널 사용)
+const DISCORD_STORE_CHANNEL_ID = process.env.DISCORD_STORE_CHANNEL_ID || DISCORD_CHANNEL_ID; // 일반 매장 채널 (없으면 기본 채널 사용)
 const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 
 // 디스코드 봇 및 관련 라이브러리는 필요한 경우에만 초기화
@@ -123,8 +125,8 @@ async function getSheetValues(sheetName) {
 // Discord로 로그 메시지 전송 함수
 async function sendLogToDiscord(embedData) {
   // 필요한 설정이 없으면 로깅 안함
-  if (!DISCORD_LOGGING_ENABLED || !DISCORD_CHANNEL_ID) {
-    console.log('Discord 로깅이 비활성화되었거나 채널 ID가 없습니다.');
+  if (!DISCORD_LOGGING_ENABLED) {
+    console.log('Discord 로깅이 비활성화되었습니다.');
     return;
   }
 
@@ -141,21 +143,39 @@ async function sendLogToDiscord(embedData) {
       return;
     }
 
+    // 사용자 유형에 따라 채널 ID 결정
+    const userType = embedData.userType || 'store'; // 기본값은 일반 매장
+    let channelId = DISCORD_CHANNEL_ID; // 기본 채널
+    
+    if (userType === 'agent') {
+      channelId = DISCORD_AGENT_CHANNEL_ID;
+      console.log('관리자 로그 전송 - 채널 ID:', channelId);
+    } else {
+      channelId = DISCORD_STORE_CHANNEL_ID;
+      console.log('일반 매장 로그 전송 - 채널 ID:', channelId);
+    }
+    
+    // 채널 ID가 없으면 로깅 중단
+    if (!channelId) {
+      console.log(`${userType} 유형의 Discord 채널 ID가 설정되지 않았습니다.`);
+      return;
+    }
+
     console.log('Discord 채널에 메시지 전송 시도...');
-    console.log('Discord 채널 ID:', DISCORD_CHANNEL_ID);
+    console.log('Discord 채널 ID:', channelId);
     
     // 채널 가져오기 시도
     let channel = null;
     try {
-      channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+      channel = await discordBot.channels.fetch(channelId);
     } catch (channelError) {
-      console.error(`채널 ID ${DISCORD_CHANNEL_ID} 가져오기 실패:`, channelError.message);
+      console.error(`채널 ID ${channelId} 가져오기 실패:`, channelError.message);
       console.error('전체 오류:', channelError);
       return;
     }
     
     if (!channel) {
-      console.error(`채널을 찾을 수 없습니다: ${DISCORD_CHANNEL_ID}`);
+      console.error(`채널을 찾을 수 없습니다: ${channelId}`);
       return;
     }
 
@@ -545,7 +565,7 @@ app.post('/api/log-activity', async (req, res) => {
     }
     
     // Discord로 로그 전송 시도
-    if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
+    if (DISCORD_LOGGING_ENABLED) {
       try {
         console.log('디스코드 로그 전송 시도 중...');
         
@@ -554,6 +574,7 @@ app.post('/api/log-activity', async (req, res) => {
           title: title,
           color: embedColor,
           timestamp: new Date().toISOString(),
+          userType: userType || 'store', // userType 정보 추가
           fields: [
             {
               name: '사용자 정보',
@@ -565,7 +586,7 @@ app.post('/api/log-activity', async (req, res) => {
             }
           ],
           footer: {
-            text: 'VIP+ 사용자 활동 로그'
+            text: userType === 'agent' ? 'VIP+ 관리자 활동 로그' : 'VIP+ 매장 활동 로그'
           }
         };
         
@@ -596,9 +617,8 @@ app.post('/api/log-activity', async (req, res) => {
         // 로그 전송 실패는 전체 응답에 영향을 미치지 않음
       }
     } else {
-      console.log('디스코드 로깅이 비활성화되었거나 채널 ID가 없어 로그를 전송하지 않습니다.');
+      console.log('디스코드 로깅이 비활성화되었습니다.');
       console.log('DISCORD_LOGGING_ENABLED:', DISCORD_LOGGING_ENABLED);
-      console.log('DISCORD_CHANNEL_ID 설정됨:', !!DISCORD_CHANNEL_ID);
     }
     
     console.log('========== 사용자 활동 로그 처리 완료 ==========');
@@ -638,12 +658,13 @@ app.post('/api/login', async (req, res) => {
         console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
         
         // 디스코드로 로그인 로그 전송
-        if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
+        if (DISCORD_LOGGING_ENABLED) {
           try {
             const embedData = {
               title: '관리자 로그인',
               color: 15844367, // 보라색
               timestamp: new Date().toISOString(),
+              userType: 'agent', // 관리자 타입 지정
               fields: [
                 {
                   name: '관리자 정보',
@@ -701,12 +722,13 @@ app.post('/api/login', async (req, res) => {
       console.log(`Found store: ${store.name}`);
       
       // 디스코드로 로그인 로그 전송
-      if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
+      if (DISCORD_LOGGING_ENABLED) {
         try {
           const embedData = {
             title: '매장 로그인',
             color: 5763719, // 초록색
             timestamp: new Date().toISOString(),
+            userType: 'store', // 일반 매장 타입 지정
             fields: [
               {
                 name: '매장 정보',
@@ -828,6 +850,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('Discord 봇 환경변수 상태:');
     console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
     console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
+    console.log('- DISCORD_AGENT_CHANNEL_ID 설정됨:', !!process.env.DISCORD_AGENT_CHANNEL_ID);
+    console.log('- DISCORD_STORE_CHANNEL_ID 설정됨:', !!process.env.DISCORD_STORE_CHANNEL_ID);
     console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
     
     // 봇 로그인 (서버 시작 후)
@@ -837,21 +861,47 @@ const server = app.listen(port, '0.0.0.0', async () => {
         await discordBot.login(DISCORD_BOT_TOKEN);
         console.log('Discord 봇 연결 성공!');
         
-        // 채널 연결 테스트
-        const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
-        if (channel) {
-          console.log(`채널 '${channel.name}' 연결 성공!`);
-          
-          // 테스트 메시지 전송
-          const testEmbed = new EmbedBuilder()
-            .setTitle('서버 시작 알림')
-            .setColor(5763719)
-            .setDescription('서버가 성공적으로 시작되었습니다.')
-            .setTimestamp()
-            .setFooter({ text: 'VIP+ 서버' });
+        // 관리자 채널 연결 테스트
+        if (DISCORD_AGENT_CHANNEL_ID) {
+          try {
+            const agentChannel = await discordBot.channels.fetch(DISCORD_AGENT_CHANNEL_ID);
+            if (agentChannel) {
+              console.log(`관리자 채널 '${agentChannel.name}' 연결 성공!`);
+            }
+          } catch (agentChannelError) {
+            console.error('관리자 채널 연결 실패:', agentChannelError.message);
+          }
+        }
+        
+        // 일반 매장 채널 연결 테스트
+        if (DISCORD_STORE_CHANNEL_ID) {
+          try {
+            const storeChannel = await discordBot.channels.fetch(DISCORD_STORE_CHANNEL_ID);
+            if (storeChannel) {
+              console.log(`일반 매장 채널 '${storeChannel.name}' 연결 성공!`);
+            }
+          } catch (storeChannelError) {
+            console.error('일반 매장 채널 연결 실패:', storeChannelError.message);
+          }
+        }
+        
+        // 테스트 메시지 전송 (기본 채널)
+        if (DISCORD_CHANNEL_ID) {
+          const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+          if (channel) {
+            console.log(`채널 '${channel.name}' 연결 성공!`);
             
-          await channel.send({ embeds: [testEmbed] });
-          console.log('서버 시작 알림 메시지 전송됨');
+            // 테스트 메시지 전송
+            const testEmbed = new EmbedBuilder()
+              .setTitle('서버 시작 알림')
+              .setColor(5763719)
+              .setDescription('서버가 성공적으로 시작되었습니다.')
+              .setTimestamp()
+              .setFooter({ text: 'VIP+ 서버' });
+              
+            await channel.send({ embeds: [testEmbed] });
+            console.log('서버 시작 알림 메시지 전송됨');
+          }
         }
       } catch (error) {
         console.error('서버 시작 시 Discord 봇 초기화 오류:', error.message);
