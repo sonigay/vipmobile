@@ -142,30 +142,61 @@ async function sendLogToDiscord(embedData) {
     }
 
     console.log('Discord 채널에 메시지 전송 시도...');
-    const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID).catch(error => {
-      console.error(`채널 ID ${DISCORD_CHANNEL_ID} 가져오기 실패:`, error.message);
-      return null;
-    });
+    console.log('Discord 채널 ID:', DISCORD_CHANNEL_ID);
+    
+    // 채널 가져오기 시도
+    let channel = null;
+    try {
+      channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
+    } catch (channelError) {
+      console.error(`채널 ID ${DISCORD_CHANNEL_ID} 가져오기 실패:`, channelError.message);
+      console.error('전체 오류:', channelError);
+      return;
+    }
     
     if (!channel) {
       console.error(`채널을 찾을 수 없습니다: ${DISCORD_CHANNEL_ID}`);
       return;
     }
 
-    console.log('채널 찾음, 메시지 전송 중...');
+    console.log(`채널 찾음: ${channel.name} (${channel.id}), 메시지 전송 중...`);
     
-    const embed = new EmbedBuilder()
-      .setTitle(embedData.title)
-      .setColor(embedData.color)
-      .addFields(embedData.fields)
-      .setTimestamp(embedData.timestamp)
-      .setFooter({ text: embedData.footer.text });
-
-    await channel.send({ embeds: [embed] });
-    console.log('Discord 메시지 전송 성공');
+    try {
+      // EmbedBuilder 생성
+      const embed = new EmbedBuilder()
+        .setTitle(embedData.title || '알림')
+        .setColor(embedData.color || 0x0099FF);
+      
+      // Fields 추가
+      if (embedData.fields && Array.isArray(embedData.fields)) {
+        embed.addFields(...embedData.fields);
+      }
+      
+      // 타임스탬프 설정
+      if (embedData.timestamp) {
+        embed.setTimestamp(new Date(embedData.timestamp));
+      } else {
+        embed.setTimestamp();
+      }
+      
+      // Footer 설정
+      if (embedData.footer && embedData.footer.text) {
+        embed.setFooter({ text: embedData.footer.text });
+      }
+      
+      // 메시지 전송 시도
+      const sentMessage = await channel.send({ embeds: [embed] });
+      console.log(`Discord 메시지 전송 성공! 메시지 ID: ${sentMessage.id}`);
+      return true;
+    } catch (embedError) {
+      console.error('Embed 생성 또는 전송 중 오류:', embedError.message);
+      console.error('자세한 오류 정보:', embedError);
+      return false;
+    }
   } catch (error) {
     console.error('Discord 로그 전송 중 오류:', error.message);
     console.error('자세한 오류 정보:', error);
+    return false;
   }
 }
 
@@ -490,8 +521,13 @@ app.post('/api/log-activity', async (req, res) => {
       callButton 
     } = req.body;
     
-    // 콘솔에 로그 출력
-    console.log('사용자 활동 로그:', JSON.stringify(req.body, null, 2));
+    // 콘솔에 로그 출력 (더 자세하게)
+    console.log('========== 사용자 활동 로그 API 호출됨 ==========');
+    console.log('요청 본문:', JSON.stringify(req.body, null, 2));
+    console.log('IP 주소:', req.ip || req.connection.remoteAddress);
+    console.log('요청 경로:', req.originalUrl);
+    console.log('요청 메서드:', req.method);
+    console.log('요청 헤더:', JSON.stringify(req.headers, null, 2));
     
     // 활동 유형에 따른 제목 설정
     let title = '사용자 활동';
@@ -511,6 +547,8 @@ app.post('/api/log-activity', async (req, res) => {
     // Discord로 로그 전송 시도
     if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
       try {
+        console.log('디스코드 로그 전송 시도 중...');
+        
         // Embed 데이터 구성
         const embedData = {
           title: title,
@@ -543,21 +581,31 @@ app.post('/api/log-activity', async (req, res) => {
         if (callButton) {
           embedData.fields.push({
             name: '전화 연결',
-            value: '전화 연결 버튼이 클릭되었습니다.'
+            value: `${callButton}`
           });
         }
         
+        console.log('전송할 embedData:', JSON.stringify(embedData, null, 2));
+        
         // Discord로 로그 전송
         await sendLogToDiscord(embedData);
+        console.log('디스코드 로그 전송 성공!');
       } catch (logError) {
         console.error('활동 로그 Discord 전송 오류:', logError.message);
+        console.error('스택 트레이스:', logError.stack);
         // 로그 전송 실패는 전체 응답에 영향을 미치지 않음
       }
+    } else {
+      console.log('디스코드 로깅이 비활성화되었거나 채널 ID가 없어 로그를 전송하지 않습니다.');
+      console.log('DISCORD_LOGGING_ENABLED:', DISCORD_LOGGING_ENABLED);
+      console.log('DISCORD_CHANNEL_ID 설정됨:', !!DISCORD_CHANNEL_ID);
     }
     
+    console.log('========== 사용자 활동 로그 처리 완료 ==========');
     res.json({ success: true });
   } catch (error) {
     console.error('활동 로그 처리 중 오류:', error);
+    console.error('스택 트레이스:', error.stack);
     res.status(500).json({ 
       success: false, 
       error: '활동 로그 처리 실패', 
