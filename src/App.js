@@ -85,6 +85,26 @@ function App() {
     loadData();
   }, [loadData]);
 
+  // 로그인한 매장 정보 업데이트 (재고 정보 포함)
+  useEffect(() => {
+    if (isLoggedIn && data?.stores && loggedInStore) {
+      console.log('로그인 매장 재고 정보 업데이트 시작');
+      
+      // 로그인한 매장의 최신 정보 찾기
+      const updatedStore = data.stores.find(store => store.id === loggedInStore.id);
+      
+      if (updatedStore) {
+        console.log('로그인 매장 최신 정보 발견:', {
+          매장명: updatedStore.name,
+          재고: updatedStore.inventory
+        });
+        
+        // 로그인 매장 정보 업데이트
+        setLoggedInStore(updatedStore);
+      }
+    }
+  }, [isLoggedIn, data, loggedInStore?.id]);
+
   // 위치 정보 가져오기
   useEffect(() => {
     if (!userLocation && isLoggedIn && data?.stores?.length > 0) {
@@ -335,11 +355,33 @@ function App() {
                       <span style={{ marginLeft: '16px', fontSize: '0.6em' }}>
                         {selectedModel} 
                         {selectedColor ? ` ${selectedColor}` : ''} 
-                        재고: {getStoreInventory(loggedInStore)}
+                        재고: {(() => {
+                          if (!loggedInStore.inventory) return 0;
+                          
+                          // 해당 모델과 색상 재고 계산
+                          if (selectedModel && selectedColor && loggedInStore.inventory[selectedModel]) {
+                            return loggedInStore.inventory[selectedModel][selectedColor] || 0;
+                          }
+                          
+                          // 해당 모델 전체 재고 계산
+                          if (selectedModel && loggedInStore.inventory[selectedModel]) {
+                            return Object.values(loggedInStore.inventory[selectedModel])
+                              .reduce((sum, qty) => sum + (Number(qty) || 0), 0);
+                          }
+                          
+                          return 0;
+                        })()}
                       </span>
                     ) : (
                       <span style={{ marginLeft: '16px', fontSize: '0.6em' }}>
-                        총 재고: {getStoreInventory(loggedInStore)}
+                        총 재고: {(() => {
+                          if (!loggedInStore.inventory) return 0;
+                          
+                          // 전체 재고 계산
+                          return Object.entries(loggedInStore.inventory).reduce((total, [model, colors]) => {
+                            return total + Object.values(colors).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
+                          }, 0);
+                        })()}
                       </span>
                     )}
                   </>
