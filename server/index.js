@@ -3,8 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
+// 기본 설정
 const app = express();
 const port = process.env.PORT || 4000;
 
@@ -13,19 +13,34 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 const DISCORD_LOGGING_ENABLED = process.env.DISCORD_LOGGING_ENABLED === 'true';
 
-// 디스코드 봇 초기화
-const discordBot = new Client({ 
-  intents: [
-    GatewayIntentBits.Guilds, 
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
-});
+// 디스코드 봇 및 관련 라이브러리는 필요한 경우에만 초기화
+let discordBot = null;
+let EmbedBuilder = null;
 
-// 봇 준비 이벤트
-discordBot.once('ready', () => {
-  console.log(`봇이 준비되었습니다: ${discordBot.user.tag}`);
-});
+if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
+  try {
+    const { Client, GatewayIntentBits } = require('discord.js');
+    ({ EmbedBuilder } = require('discord.js'));
+    
+    // 디스코드 봇 초기화
+    discordBot = new Client({ 
+      intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+      ]
+    });
+    
+    // 봇 준비 이벤트
+    discordBot.once('ready', () => {
+      console.log(`봇이 준비되었습니다: ${discordBot.user.tag}`);
+    });
+    
+    console.log('디스코드 봇 모듈 로딩 성공');
+  } catch (error) {
+    console.error('디스코드 봇 모듈 로딩 실패:', error.message);
+  }
+}
 
 // 전역 오류 처리
 process.on('uncaughtException', (error) => {
@@ -107,8 +122,15 @@ async function getSheetValues(sheetName) {
 
 // Discord로 로그 메시지 전송 함수
 async function sendLogToDiscord(embedData) {
+  // 필요한 설정이 없으면 로깅 안함
   if (!DISCORD_LOGGING_ENABLED || !DISCORD_CHANNEL_ID) {
     console.log('Discord 로깅이 비활성화되었거나 채널 ID가 없습니다.');
+    return;
+  }
+
+  // 봇 객체가 초기화되지 않은 경우
+  if (!discordBot || !EmbedBuilder) {
+    console.log('Discord 봇이 초기화되지 않았습니다. 로그를 전송할 수 없습니다.');
     return;
   }
 
@@ -486,44 +508,52 @@ app.post('/api/log-activity', async (req, res) => {
       embedColor = 15548997; // 빨간색
     }
     
-    // Embed 데이터 구성
-    const embedData = {
-      title: title,
-      color: embedColor,
-      timestamp: new Date().toISOString(),
-      fields: [
-        {
-          name: '사용자 정보',
-          value: `ID: ${userId}\n종류: ${userType === 'agent' ? '관리자' : '일반'}\n대상: ${targetName || '없음'}`
-        },
-        {
-          name: '접속 정보',
-          value: `IP: ${ipAddress}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+    // Discord로 로그 전송 시도
+    if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
+      try {
+        // Embed 데이터 구성
+        const embedData = {
+          title: title,
+          color: embedColor,
+          timestamp: new Date().toISOString(),
+          fields: [
+            {
+              name: '사용자 정보',
+              value: `ID: ${userId}\n종류: ${userType === 'agent' ? '관리자' : '일반'}\n대상: ${targetName || '없음'}`
+            },
+            {
+              name: '접속 정보',
+              value: `IP: ${ipAddress}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+            }
+          ],
+          footer: {
+            text: 'VIP+ 사용자 활동 로그'
+          }
+        };
+        
+        // 검색 정보가 있는 경우 필드 추가
+        if (model) {
+          embedData.fields.push({
+            name: '검색 정보',
+            value: `모델: ${model}${colorName ? `\n색상: ${colorName}` : ''}`
+          });
         }
-      ],
-      footer: {
-        text: 'VIP+ 사용자 활동 로그'
+        
+        // 전화 연결 버튼 클릭 정보
+        if (callButton) {
+          embedData.fields.push({
+            name: '전화 연결',
+            value: '전화 연결 버튼이 클릭되었습니다.'
+          });
+        }
+        
+        // Discord로 로그 전송
+        await sendLogToDiscord(embedData);
+      } catch (logError) {
+        console.error('활동 로그 Discord 전송 오류:', logError.message);
+        // 로그 전송 실패는 전체 응답에 영향을 미치지 않음
       }
-    };
-    
-    // 검색 정보가 있는 경우 필드 추가
-    if (model) {
-      embedData.fields.push({
-        name: '검색 정보',
-        value: `모델: ${model}${colorName ? `\n색상: ${colorName}` : ''}`
-      });
     }
-    
-    // 전화 연결 버튼 클릭 정보
-    if (callButton) {
-      embedData.fields.push({
-        name: '전화 연결',
-        value: '전화 연결 버튼이 클릭되었습니다.'
-      });
-    }
-    
-    // Discord로 로그 전송
-    await sendLogToDiscord(embedData);
     
     res.json({ success: true });
   } catch (error) {
@@ -561,26 +591,31 @@ app.post('/api/login', async (req, res) => {
         
         // 디스코드로 로그인 로그 전송
         if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
-          const embedData = {
-            title: '관리자 로그인',
-            color: 15844367, // 보라색
-            timestamp: new Date().toISOString(),
-            fields: [
-              {
-                name: '관리자 정보',
-                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}`
-              },
-              {
-                name: '접속 정보',
-                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+          try {
+            const embedData = {
+              title: '관리자 로그인',
+              color: 15844367, // 보라색
+              timestamp: new Date().toISOString(),
+              fields: [
+                {
+                  name: '관리자 정보',
+                  value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}`
+                },
+                {
+                  name: '접속 정보',
+                  value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+                }
+              ],
+              footer: {
+                text: 'VIP+ 관리자 로그인'
               }
-            ],
-            footer: {
-              text: 'VIP+ 관리자 로그인'
-            }
-          };
-          
-          await sendLogToDiscord(embedData);
+            };
+            
+            await sendLogToDiscord(embedData);
+          } catch (logError) {
+            console.error('로그인 로그 전송 실패:', logError.message);
+            // 로그 전송 실패해도 로그인은 허용
+          }
         }
         
         return res.json({
@@ -619,26 +654,31 @@ app.post('/api/login', async (req, res) => {
       
       // 디스코드로 로그인 로그 전송
       if (DISCORD_LOGGING_ENABLED && DISCORD_CHANNEL_ID) {
-        const embedData = {
-          title: '매장 로그인',
-          color: 5763719, // 초록색
-          timestamp: new Date().toISOString(),
-          fields: [
-            {
-              name: '매장 정보',
-              value: `ID: ${store.id}\n매장명: ${store.name}\n담당자: ${store.manager || '없음'}`
-            },
-            {
-              name: '접속 정보',
-              value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+        try {
+          const embedData = {
+            title: '매장 로그인',
+            color: 5763719, // 초록색
+            timestamp: new Date().toISOString(),
+            fields: [
+              {
+                name: '매장 정보',
+                value: `ID: ${store.id}\n매장명: ${store.name}\n담당자: ${store.manager || '없음'}`
+              },
+              {
+                name: '접속 정보',
+                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+              }
+            ],
+            footer: {
+              text: 'VIP+ 매장 로그인'
             }
-          ],
-          footer: {
-            text: 'VIP+ 매장 로그인'
-          }
-        };
-        
-        await sendLogToDiscord(embedData);
+          };
+          
+          await sendLogToDiscord(embedData);
+        } catch (logError) {
+          console.error('로그인 로그 전송 실패:', logError.message);
+          // 로그 전송 실패해도 로그인은 허용
+        }
       }
       
       return res.json({
@@ -736,14 +776,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
   try {
     console.log(`서버가 포트 ${port}에서 실행 중입니다`);
     
-    // 환경변수 디버깅
+    // 환경변수 디버깅 (민감한 정보는 로깅하지 않음)
     console.log('Discord 봇 환경변수 상태:');
     console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
     console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
     console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
     
     // 봇 로그인 (서버 시작 후)
-    if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
+    if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN && discordBot) {
       console.log('서버 시작 후 Discord 봇 로그인 시도...');
       try {
         await discordBot.login(DISCORD_BOT_TOKEN);
@@ -767,7 +807,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
         }
       } catch (error) {
         console.error('서버 시작 시 Discord 봇 초기화 오류:', error.message);
+        console.error('Discord 봇은 비활성화 상태로 서버가 계속 실행됩니다.');
       }
+    } else {
+      console.log('Discord 봇 기능이 비활성화되었거나 설정이 완료되지 않았습니다.');
     }
     
     // 주소 업데이트 함수 호출
@@ -777,10 +820,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
     setInterval(checkAndUpdateAddresses, 3600000);
   } catch (error) {
-    console.error('Error during server startup:', error);
+    console.error('서버 시작 중 오류:', error);
   }
 }).on('error', (error) => {
-  console.error('Failed to start server:', error);
+  console.error('서버 시작 실패:', error);
   process.exit(1);
 });
 
