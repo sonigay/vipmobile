@@ -267,8 +267,8 @@ function Map({
   useEffect(() => {
     if (!map || !isLoaded || !userLocation || !selectedRadius || isAgentMode) return;
     
-    // 반경이 변경된 경우에는 지도 범위를 다시 설정
-    if (circle) {
+    // 반경이 변경된 경우에는 지도 범위를 다시 설정 (초기 로드 또는 사용자 상호작용이 없는 경우에만)
+    if (circle && (initialLoadRef.current || !userInteracted)) {
       const bounds = circle.getBounds();
       map.fitBounds(bounds);
       
@@ -276,7 +276,7 @@ function Map({
         map.setZoom(15);
       }
     }
-  }, [map, isLoaded, selectedRadius, userLocation, circle, isAgentMode]);
+  }, [map, isLoaded, selectedRadius, userLocation, circle, isAgentMode, userInteracted]);
 
   if (loadError) {
     return (
