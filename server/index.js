@@ -184,6 +184,14 @@ app.get('/api/stores', async (req, res) => {
     const inventoryRows = inventoryValues.slice(3);
     const storeRows = storeValues.slice(1);
 
+    // 현재 날짜 기준 3일 전 날짜 계산
+    const today = new Date();
+    const threeDaysAgo = new Date(today);
+    threeDaysAgo.setDate(today.getDate() - 3);
+    
+    console.log(`오늘 날짜: ${today.toISOString().split('T')[0]}`);
+    console.log(`3일 전 날짜: ${threeDaysAgo.toISOString().split('T')[0]}`);
+
     // 매장별 재고 데이터 매핑
     const inventoryMap = {};
     
@@ -194,9 +202,16 @@ app.get('/api/stores', async (req, res) => {
       const storeName = (row[13] || '').toString().trim();  // N열: 매장명
       const model = (row[5] || '').toString().trim();      // F열: 모델
       const color = (row[6] || '').toString().trim();      // G열: 색상
+      const shippingDate = row[14] ? new Date(row[14]) : null;  // O열: 출고일
       
       if (!storeName || !model || !color) {
         console.log(`Skipping row ${index + 4}: Invalid data`, { storeName, model, color });
+        return;
+      }
+
+      // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외
+      if (shippingDate && shippingDate >= threeDaysAgo) {
+        console.log(`Skipping recent inventory: ${model} ${color} at ${storeName}, shipping date: ${shippingDate.toISOString().split('T')[0]}`);
         return;
       }
 
