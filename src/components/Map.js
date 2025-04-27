@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
 import { Paper, Typography, Box, CircularProgress } from '@mui/material';
 
@@ -53,6 +53,13 @@ function Map({
   const [map, setMap] = useState(null);
   const [markers, setMarkers] = useState([]);
   const [circle, setCircle] = useState(null);
+  const [userInteracted, setUserInteracted] = useState(false);
+  
+  // 지도 초기 로드 여부를 트래킹
+  const initialLoadRef = useRef(true);
+  
+  // 선택된 매장이 변경될 때 센터를 이동하기 위한 ref
+  const previousSelectedStoreRef = useRef(null);
 
   const center = useMemo(() => userLocation || defaultCenter, [userLocation]);
 
@@ -83,6 +90,15 @@ function Map({
   const onLoad = useCallback((map) => {
     console.log('지도 로드됨');
     setMap(map);
+    
+    // 사용자 인터랙션 이벤트 리스너 추가
+    map.addListener('dragstart', () => {
+      setUserInteracted(true);
+    });
+    
+    map.addListener('zoom_changed', () => {
+      setUserInteracted(true);
+    });
   }, []);
 
   // 지도 언마운트 핸들러
@@ -93,7 +109,28 @@ function Map({
     setMarkers([]);
     setCircle(null);
     setMap(null);
+    setUserInteracted(false);
+    initialLoadRef.current = true;
   }, [markers, circle]);
+
+  // 선택된 매장으로 지도 이동
+  useEffect(() => {
+    if (!map || !selectedStore || !selectedStore.latitude || !selectedStore.longitude) return;
+    
+    // 이전에 선택된 매장과 다른 경우에만 처리
+    if (previousSelectedStoreRef.current !== selectedStore.id) {
+      const position = {
+        lat: parseFloat(selectedStore.latitude),
+        lng: parseFloat(selectedStore.longitude)
+      };
+      
+      // 지도 센터만 변경하고 줌 레벨은 유지
+      map.panTo(position);
+      
+      // 선택한 매장 ID 저장
+      previousSelectedStoreRef.current = selectedStore.id;
+    }
+  }, [map, selectedStore]);
 
   const getMarkerIcon = useCallback((store) => {
     const isSelected = selectedStore?.id === store.id;
@@ -209,18 +246,37 @@ function Map({
       setCircle(null);
     }
 
-    // 지도 범위 조정
-    if (newMarkers.length > 0 || (userLocation && selectedRadius && !isAgentMode)) {
+    // 초기 로드이고 사용자가 지도를 조작하지 않은 경우에만 지도 범위 자동 조정
+    if ((initialLoadRef.current || !userInteracted) && 
+        (newMarkers.length > 0 || (userLocation && selectedRadius && !isAgentMode))) {
       map.fitBounds(bounds);
       
       // 줌 레벨 조정
       if (map.getZoom() > 15) {
         map.setZoom(15);
       }
+      
+      // 초기 로드 완료 표시
+      initialLoadRef.current = false;
     }
 
     setMarkers(newMarkers);
-  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory, selectedStore, isAgentMode]);
+  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory, selectedStore, isAgentMode, userInteracted]);
+
+  // 반경 변경 시 지도 범위 재설정(사용자 상호작용 여부와 상관없이)
+  useEffect(() => {
+    if (!map || !isLoaded || !userLocation || !selectedRadius || isAgentMode) return;
+    
+    // 반경이 변경된 경우에는 지도 범위를 다시 설정
+    if (circle) {
+      const bounds = circle.getBounds();
+      map.fitBounds(bounds);
+      
+      if (map.getZoom() > 15) {
+        map.setZoom(15);
+      }
+    }
+  }, [map, isLoaded, selectedRadius, userLocation, circle, isAgentMode]);
 
   if (loadError) {
     return (
