@@ -219,22 +219,33 @@ function normalizeAddress(address) {
     .replace(/(\d+)로/g, '$1로')
     .replace(/(\d+)길/g, '$1길');
   
-  // 건물명 제거 (상세 주소에서)
-  normalized = normalized.replace(/\s*\([^)]*\)/g, ''); // 괄호 안 내용 제거
-  normalized = normalized.replace(/\s*[0-9]+층/g, ''); // 층수 제거
-  normalized = normalized.replace(/\s*[0-9]+호/g, ''); // 호수 제거
+  // 상세 주소 정보 제거 (geocoding 정확도 향상을 위해)
+  normalized = normalized
+    .replace(/\s*\([^)]*\)/g, '') // 괄호 안 내용 제거
+    .replace(/\s*[0-9]+층/g, '') // 층수 제거
+    .replace(/\s*[0-9]+호/g, '') // 호수 제거
+    .replace(/\s*[0-9]+~[0-9]+호/g, '') // 호수 범위 제거
+    .replace(/\s*[가-힣]+폰/g, '') // "도매폰" 같은 상호명 제거
+    .replace(/\s*상가동\s*[0-9]+호/g, '') // 상가동 호수 제거
+    .replace(/\s*[0-9]+,\s*[가-힣]+동/g, '') // 번지, 동 제거
+    .replace(/\s*[0-9]+-[0-9]+/g, '') // 번지 제거 (예: 14-53)
+    .replace(/\s*[0-9]+번지/g, '') // 번지 제거
+    .replace(/\s*[0-9]+번/g, ''); // 번 제거
+  
+  // 마지막 정리
+  normalized = normalized.trim();
   
   return normalized;
 }
 
 // Kakao Maps API geocoding 함수 (한국 주소에 특화)
 async function geocodeAddress(address) {
+  // 주소 정규화 (함수 시작 부분에서 선언)
+  const normalizedAddress = normalizeAddress(address);
+  console.log(`원본 주소: ${address}`);
+  console.log(`정규화된 주소: ${normalizedAddress}`);
+  
   try {
-    // 주소 정규화
-    const normalizedAddress = normalizeAddress(address);
-    console.log(`원본 주소: ${address}`);
-    console.log(`정규화된 주소: ${normalizedAddress}`);
-    
     // Kakao Maps API 키 (환경 변수에서 가져오기)
     const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
     
