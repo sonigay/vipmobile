@@ -262,7 +262,7 @@ function Login({ onLogin }) {
           
           <Box className="login-info" sx={{ textAlign: 'center', mt: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-            엘지유플러스 공식 대리점 (주)브이아이피플러스를 이용해 주셔서 진심으로 감사드립니다.
+              엘지유플러스 공식 대리점 (주)브이아이피플러스를 이용해 주셔서 진심으로 감사드립니다.
             서비스 이용에 만족하셨다면 주변에 많은 소개 부탁드리며, 담당 영업사원을 통해 말씀해 주시면 해당 매장에 신속하게 연락드려 더욱 빠르고 친절하게 영업 지원해 드리겠습니다.
             </Typography>
           </Box>
