@@ -245,12 +245,12 @@ async function geocodeAddress(address) {
   console.log(`원본 주소: ${address}`);
   console.log(`정규화된 주소: ${normalizedAddress}`);
   
-  try {
-    // Kakao Maps API 키 (환경 변수에서 가져오기)
-    const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
-    
-    // Kakao API 키가 있으면 Kakao API 사용
-    if (KAKAO_API_KEY) {
+  // Kakao Maps API 키 (환경 변수에서 가져오기)
+  const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
+  
+  // Kakao API 키가 있으면 Kakao API 사용
+  if (KAKAO_API_KEY && KAKAO_API_KEY.trim() !== '') {
+    try {
       const encodedAddress = encodeURIComponent(normalizedAddress);
       const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
       
@@ -281,11 +281,11 @@ async function geocodeAddress(address) {
       }
       
       console.log(`Kakao geocoding 결과 없음: ${normalizedAddress}`);
-    } else {
-      console.log('Kakao API 키가 설정되지 않음, Photon API 사용');
+    } catch (error) {
+      console.error(`Kakao geocoding 오류: ${address}`, error);
     }
-  } catch (error) {
-    console.error(`Kakao geocoding 오류: ${address}`, error);
+  } else {
+    console.log('Kakao API 키가 설정되지 않음, Photon API 사용');
   }
   
   // Kakao API 실패 또는 키가 없는 경우 Photon API로 폴백
