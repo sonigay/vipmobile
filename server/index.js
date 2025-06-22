@@ -176,26 +176,55 @@ const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 
-// 무료 Geocoding 서비스들 (API 키 불필요)
+// 무료 Geocoding 서비스들 (API 키 불필요) - 번지수 정확도 최대화
 async function geocodeAddressWithFreeServices(address) {
-  const normalizedAddress = normalizeAddress(address);
   console.log(`원본 주소: ${address}`);
-  console.log(`정규화된 주소: ${normalizedAddress}`);
   
-  // 1. Photon API (Komoot) - 가장 안정적인 무료 서비스
-  const photonResult = await geocodeAddressWithPhoton(normalizedAddress);
+  // 1. 정확한 주소로 먼저 시도 (번지수 포함)
+  const exactResult = await geocodeAddressWithExactMatch(address);
+  if (exactResult) {
+    return exactResult;
+  }
+  
+  // 2. 정규화된 주소로 시도 (번지수 포함)
+  const normalizedAddress = normalizeAddressWithLotNumber(address);
+  console.log(`정규화된 주소 (번지수 포함): ${normalizedAddress}`);
+  
+  const normalizedResult = await geocodeAddressWithNormalized(normalizedAddress);
+  if (normalizedResult) {
+    return normalizedResult;
+  }
+  
+  // 3. 기본 정규화된 주소로 시도 (번지수 제거)
+  const basicNormalizedAddress = normalizeAddressBasic(address);
+  console.log(`기본 정규화된 주소 (번지수 제거): ${basicNormalizedAddress}`);
+  
+  const basicResult = await geocodeAddressWithBasic(basicNormalizedAddress);
+  if (basicResult) {
+    return basicResult;
+  }
+  
+  return null;
+}
+
+// 정확한 주소 매칭 (번지수 포함)
+async function geocodeAddressWithExactMatch(address) {
+  console.log(`정확한 주소 매칭 시도: ${address}`);
+  
+  // 1. Photon API로 정확한 주소 시도
+  const photonResult = await geocodeAddressWithPhotonExact(address);
   if (photonResult) {
     return photonResult;
   }
   
-  // 2. Nominatim API (OpenStreetMap) - 무료, 정확도 보통
-  const nominatimResult = await geocodeAddressWithNominatim(normalizedAddress);
+  // 2. Nominatim API로 정확한 주소 시도
+  const nominatimResult = await geocodeAddressWithNominatimExact(address);
   if (nominatimResult) {
     return nominatimResult;
   }
   
-  // 3. Pelias API (Mapzen) - 무료, 정확도 보통
-  const peliasResult = await geocodeAddressWithPelias(normalizedAddress);
+  // 3. Pelias API로 정확한 주소 시도
+  const peliasResult = await geocodeAddressWithPeliasExact(address);
   if (peliasResult) {
     return peliasResult;
   }
@@ -203,12 +232,155 @@ async function geocodeAddressWithFreeServices(address) {
   return null;
 }
 
-// Photon API (Komoot) - 가장 안정적인 무료 서비스
-async function geocodeAddressWithPhoton(address) {
+// 정규화된 주소 매칭 (번지수 포함)
+async function geocodeAddressWithNormalized(address) {
+  console.log(`정규화된 주소 매칭 시도: ${address}`);
+  
+  // 1. Photon API로 정규화된 주소 시도
+  const photonResult = await geocodeAddressWithPhotonNormalized(address);
+  if (photonResult) {
+    return photonResult;
+  }
+  
+  // 2. Nominatim API로 정규화된 주소 시도
+  const nominatimResult = await geocodeAddressWithNominatimNormalized(address);
+  if (nominatimResult) {
+    return nominatimResult;
+  }
+  
+  // 3. Pelias API로 정규화된 주소 시도
+  const peliasResult = await geocodeAddressWithPeliasNormalized(address);
+  if (peliasResult) {
+    return peliasResult;
+  }
+  
+  return null;
+}
+
+// 기본 정규화된 주소 매칭 (번지수 제거)
+async function geocodeAddressWithBasic(address) {
+  console.log(`기본 정규화된 주소 매칭 시도: ${address}`);
+  
+  // 1. Photon API (Komoot) - 가장 안정적인 무료 서비스
+  const photonResult = await geocodeAddressWithPhotonBasic(address);
+  if (photonResult) {
+    return photonResult;
+  }
+  
+  // 2. Nominatim API (OpenStreetMap) - 무료, 정확도 보통
+  const nominatimResult = await geocodeAddressWithNominatimBasic(address);
+  if (nominatimResult) {
+    return nominatimResult;
+  }
+  
+  // 3. Pelias API (Mapzen) - 무료, 정확도 보통
+  const peliasResult = await geocodeAddressWithPeliasBasic(address);
+  if (peliasResult) {
+    return peliasResult;
+  }
+  
+  return null;
+}
+
+// Photon API - 정확한 주소 매칭 (번지수 포함)
+async function geocodeAddressWithPhotonExact(address) {
   try {
-    console.log(`Photon API 시도: ${address}`);
+    console.log(`Photon API 정확한 매칭 시도: ${address}`);
     
-    // 여러 시도 방식으로 정확도 향상
+    const attempts = [
+      address,
+      address + ', South Korea',
+      address + ', Korea'
+    ];
+    
+    for (const attempt of attempts) {
+      const encodedAddress = encodeURIComponent(attempt);
+      const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+        }
+      });
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const [longitude, latitude] = feature.geometry.coordinates;
+        
+        console.log(`Photon API 정확한 매칭 성공: ${attempt} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Photon API 정확한 매칭 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Photon API - 정규화된 주소 매칭 (번지수 포함)
+async function geocodeAddressWithPhotonNormalized(address) {
+  try {
+    console.log(`Photon API 정규화된 매칭 시도: ${address}`);
+    
+    const attempts = [
+      address,
+      address.replace(/[0-9]+$/, ''), // 끝의 숫자 제거
+      address.split(' ').slice(0, 6).join(' '), // 앞 6개 단어만
+      address.split(' ').slice(0, 5).join(' '), // 앞 5개 단어만
+      address.split(' ').slice(0, 4).join(' ') // 앞 4개 단어만
+    ];
+    
+    for (const attempt of attempts) {
+      if (!attempt.trim()) continue;
+      
+      const encodedAddress = encodeURIComponent(attempt);
+      const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+        }
+      });
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const [longitude, latitude] = feature.geometry.coordinates;
+        
+        console.log(`Photon API 정규화된 매칭 성공: ${attempt} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Photon API 정규화된 매칭 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Photon API - 기본 매칭 (번지수 제거)
+async function geocodeAddressWithPhotonBasic(address) {
+  try {
+    console.log(`Photon API 기본 매칭 시도: ${address}`);
+    
     const attempts = [
       address,
       address.replace(/[0-9]+$/, ''), // 끝의 숫자 제거
@@ -230,9 +402,7 @@ async function geocodeAddressWithPhoton(address) {
         }
       });
       
-      if (!response.ok) {
-        continue;
-      }
+      if (!response.ok) continue;
       
       const data = await response.json();
       
@@ -240,7 +410,7 @@ async function geocodeAddressWithPhoton(address) {
         const feature = data.features[0];
         const [longitude, latitude] = feature.geometry.coordinates;
         
-        console.log(`Photon API 성공: ${attempt} -> ${latitude}, ${longitude}`);
+        console.log(`Photon API 기본 매칭 성공: ${attempt} -> ${latitude}, ${longitude}`);
         
         return {
           latitude,
@@ -249,18 +419,63 @@ async function geocodeAddressWithPhoton(address) {
       }
     }
     
-    console.log(`Photon API 모든 시도 실패: ${address}`);
     return null;
   } catch (error) {
-    console.error(`Photon API 오류: ${address}`, error);
+    console.error(`Photon API 기본 매칭 오류: ${address}`, error);
     return null;
   }
 }
 
-// Nominatim API (OpenStreetMap) - 무료, 정확도 보통
-async function geocodeAddressWithNominatim(address) {
+// Nominatim API - 정확한 주소 매칭 (번지수 포함)
+async function geocodeAddressWithNominatimExact(address) {
   try {
-    console.log(`Nominatim API 시도: ${address}`);
+    console.log(`Nominatim API 정확한 매칭 시도: ${address}`);
+    
+    const attempts = [
+      address + ', South Korea',
+      address + ', Korea',
+      address
+    ];
+    
+    for (const attempt of attempts) {
+      const encodedAddress = encodeURIComponent(attempt);
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+        }
+      });
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        const latitude = parseFloat(result.lat);
+        const longitude = parseFloat(result.lon);
+        
+        console.log(`Nominatim API 정확한 매칭 성공: ${attempt} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Nominatim API 정확한 매칭 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Nominatim API - 정규화된 주소 매칭 (번지수 포함)
+async function geocodeAddressWithNominatimNormalized(address) {
+  try {
+    console.log(`Nominatim API 정규화된 매칭 시도: ${address}`);
     
     const encodedAddress = encodeURIComponent(address + ', South Korea');
     const url = `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`;
@@ -282,7 +497,7 @@ async function geocodeAddressWithNominatim(address) {
       const latitude = parseFloat(result.lat);
       const longitude = parseFloat(result.lon);
       
-      console.log(`Nominatim API 성공: ${address} -> ${latitude}, ${longitude}`);
+      console.log(`Nominatim API 정규화된 매칭 성공: ${address} -> ${latitude}, ${longitude}`);
       
       return {
         latitude,
@@ -290,18 +505,102 @@ async function geocodeAddressWithNominatim(address) {
       };
     }
     
-    console.log(`Nominatim API 결과 없음: ${address}`);
     return null;
   } catch (error) {
-    console.error(`Nominatim API 오류: ${address}`, error);
+    console.error(`Nominatim API 정규화된 매칭 오류: ${address}`, error);
     return null;
   }
 }
 
-// Pelias API (Mapzen) - 무료, 정확도 보통
-async function geocodeAddressWithPelias(address) {
+// Nominatim API - 기본 매칭 (번지수 제거)
+async function geocodeAddressWithNominatimBasic(address) {
   try {
-    console.log(`Pelias API 시도: ${address}`);
+    console.log(`Nominatim API 기본 매칭 시도: ${address}`);
+    
+    const encodedAddress = encodeURIComponent(address + ', South Korea');
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      const result = data[0];
+      const latitude = parseFloat(result.lat);
+      const longitude = parseFloat(result.lon);
+      
+      console.log(`Nominatim API 기본 매칭 성공: ${address} -> ${latitude}, ${longitude}`);
+      
+      return {
+        latitude,
+        longitude
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Nominatim API 기본 매칭 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Pelias API - 정확한 주소 매칭 (번지수 포함)
+async function geocodeAddressWithPeliasExact(address) {
+  try {
+    console.log(`Pelias API 정확한 매칭 시도: ${address}`);
+    
+    const attempts = [
+      address + ', South Korea',
+      address + ', Korea',
+      address
+    ];
+    
+    for (const attempt of attempts) {
+      const encodedAddress = encodeURIComponent(attempt);
+      const url = `https://api.geocode.earth/v1/search?text=${encodedAddress}&size=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+        }
+      });
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const [longitude, latitude] = feature.geometry.coordinates;
+        
+        console.log(`Pelias API 정확한 매칭 성공: ${attempt} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Pelias API 정확한 매칭 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Pelias API - 정규화된 주소 매칭 (번지수 포함)
+async function geocodeAddressWithPeliasNormalized(address) {
+  try {
+    console.log(`Pelias API 정규화된 매칭 시도: ${address}`);
     
     const encodedAddress = encodeURIComponent(address + ', South Korea');
     const url = `https://api.geocode.earth/v1/search?text=${encodedAddress}&size=1`;
@@ -322,7 +621,7 @@ async function geocodeAddressWithPelias(address) {
       const feature = data.features[0];
       const [longitude, latitude] = feature.geometry.coordinates;
       
-      console.log(`Pelias API 성공: ${address} -> ${latitude}, ${longitude}`);
+      console.log(`Pelias API 정규화된 매칭 성공: ${address} -> ${latitude}, ${longitude}`);
       
       return {
         latitude,
@@ -330,16 +629,54 @@ async function geocodeAddressWithPelias(address) {
       };
     }
     
-    console.log(`Pelias API 결과 없음: ${address}`);
     return null;
   } catch (error) {
-    console.error(`Pelias API 오류: ${address}`, error);
+    console.error(`Pelias API 정규화된 매칭 오류: ${address}`, error);
     return null;
   }
 }
 
-// 주소 정규화 함수 개선 (더 정확한 무료 geocoding을 위해)
-function normalizeAddress(address) {
+// Pelias API - 기본 매칭 (번지수 제거)
+async function geocodeAddressWithPeliasBasic(address) {
+  try {
+    console.log(`Pelias API 기본 매칭 시도: ${address}`);
+    
+    const encodedAddress = encodeURIComponent(address + ', South Korea');
+    const url = `https://api.geocode.earth/v1/search?text=${encodedAddress}&size=1`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const [longitude, latitude] = feature.geometry.coordinates;
+      
+      console.log(`Pelias API 기본 매칭 성공: ${address} -> ${latitude}, ${longitude}`);
+      
+      return {
+        latitude,
+        longitude
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Pelias API 기본 매칭 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// 주소 정규화 함수 - 번지수 포함 (최대 정확도)
+function normalizeAddressWithLotNumber(address) {
   if (!address) return '';
   
   let normalized = address.toString().trim();
@@ -347,7 +684,7 @@ function normalizeAddress(address) {
   // 불필요한 공백 제거
   normalized = normalized.replace(/\s+/g, ' ');
   
-  // 한국 주소 패턴 정규화 (무료 API에 최적화)
+  // 한국 주소 패턴 정규화 (번지수 보존)
   normalized = normalized
     .replace(/^서울특별시\s*/, '서울 ')
     .replace(/^서울시\s*/, '서울 ')
@@ -374,7 +711,62 @@ function normalizeAddress(address) {
     .replace(/^세종시\s*/, '세종 ')
     .replace(/^세종\s*/, '세종 ');
   
-  // 상세 주소 정보 제거 (무료 API 정확도 향상을 위해)
+  // 상세 주소 정보 제거 (번지수는 보존)
+  normalized = normalized
+    .replace(/\s*\([^)]*\)/g, '') // 괄호 안 내용 제거
+    .replace(/\s*[0-9]+층/g, '') // 층수 제거
+    .replace(/\s*[0-9]+호/g, '') // 호수 제거
+    .replace(/\s*[0-9]+~[0-9]+호/g, '') // 호수 범위 제거
+    .replace(/\s*[가-힣]+폰/g, '') // "도매폰" 같은 상호명 제거
+    .replace(/\s*상가동\s*[0-9]+호/g, '') // 상가동 호수 제거
+    .replace(/\s*[가-힣]+센터/g, '') // "센터" 제거
+    .replace(/\s*[가-힣]+마트/g, '') // "마트" 제거
+    .replace(/\s*[가-힣]+빌딩/g, '') // "빌딩" 제거
+    .replace(/\s*[가-힣]+타워/g, ''); // "타워" 제거
+  
+  // 마지막 정리
+  normalized = normalized.trim();
+  
+  return normalized;
+}
+
+// 기본 주소 정규화 함수 (번지수 제거)
+function normalizeAddressBasic(address) {
+  if (!address) return '';
+  
+  let normalized = address.toString().trim();
+  
+  // 불필요한 공백 제거
+  normalized = normalized.replace(/\s+/g, ' ');
+  
+  // 한국 주소 패턴 정규화
+  normalized = normalized
+    .replace(/^서울특별시\s*/, '서울 ')
+    .replace(/^서울시\s*/, '서울 ')
+    .replace(/^서울\s*/, '서울 ')
+    .replace(/^부산광역시\s*/, '부산 ')
+    .replace(/^부산시\s*/, '부산 ')
+    .replace(/^부산\s*/, '부산 ')
+    .replace(/^대구광역시\s*/, '대구 ')
+    .replace(/^대구시\s*/, '대구 ')
+    .replace(/^대구\s*/, '대구 ')
+    .replace(/^인천광역시\s*/, '인천 ')
+    .replace(/^인천시\s*/, '인천 ')
+    .replace(/^인천\s*/, '인천 ')
+    .replace(/^광주광역시\s*/, '광주 ')
+    .replace(/^광주시\s*/, '광주 ')
+    .replace(/^광주\s*/, '광주 ')
+    .replace(/^대전광역시\s*/, '대전 ')
+    .replace(/^대전시\s*/, '대전 ')
+    .replace(/^대전\s*/, '대전 ')
+    .replace(/^울산광역시\s*/, '울산 ')
+    .replace(/^울산시\s*/, '울산 ')
+    .replace(/^울산\s*/, '울산 ')
+    .replace(/^세종특별자치시\s*/, '세종 ')
+    .replace(/^세종시\s*/, '세종 ')
+    .replace(/^세종\s*/, '세종 ');
+  
+  // 상세 주소 정보 제거 (번지수 포함)
   normalized = normalized
     .replace(/\s*\([^)]*\)/g, '') // 괄호 안 내용 제거
     .replace(/\s*[0-9]+층/g, '') // 층수 제거
@@ -397,7 +789,7 @@ function normalizeAddress(address) {
   return normalized;
 }
 
-// 메인 geocoding 함수 (무료 서비스들만 사용)
+// 메인 geocoding 함수 (무료 서비스들만 사용, 번지수 정확도 최대화)
 async function geocodeAddress(address) {
   return await geocodeAddressWithFreeServices(address);
 }
