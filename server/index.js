@@ -238,6 +238,54 @@ function normalizeAddress(address) {
   return normalized;
 }
 
+// Naver Maps API geocoding 함수 (한국 주소에 특화)
+async function geocodeAddressWithNaver(address) {
+  try {
+    const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID;
+    const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
+    
+    if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+      console.log('Naver API 키가 설정되지 않음');
+      return null;
+    }
+    
+    const encodedAddress = encodeURIComponent(address);
+    const url = `https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=${encodedAddress}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'X-NCP-APIGW-API-KEY-ID': NAVER_CLIENT_ID,
+        'X-NCP-APIGW-API-KEY': NAVER_CLIENT_SECRET
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.addresses && data.addresses.length > 0) {
+      const addressInfo = data.addresses[0];
+      const latitude = parseFloat(addressInfo.y);
+      const longitude = parseFloat(addressInfo.x);
+      
+      console.log(`Naver geocoding 결과: ${address} -> ${latitude}, ${longitude}`);
+      
+      return {
+        latitude,
+        longitude
+      };
+    }
+    
+    console.log(`Naver geocoding 결과 없음: ${address}`);
+    return null;
+  } catch (error) {
+    console.error(`Naver geocoding 오류: ${address}`, error);
+    return null;
+  }
+}
+
 // Kakao Maps API geocoding 함수 (한국 주소에 특화)
 async function geocodeAddress(address) {
   // 주소 정규화 (함수 시작 부분에서 선언)
@@ -245,14 +293,30 @@ async function geocodeAddress(address) {
   console.log(`원본 주소: ${address}`);
   console.log(`정규화된 주소: ${normalizedAddress}`);
   
-  // Kakao Maps API 키 (환경 변수에서 가져오기)
+  // 1. Naver Maps API 시도 (가장 정확한 한국 주소)
+  const naverResult = await geocodeAddressWithNaver(normalizedAddress);
+  if (naverResult) {
+    return naverResult;
+  }
+  
+  // 2. Kakao Maps API 시도
   const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
   
-  // 디버깅: 환경 변수 상태 확인
-  console.log(`Kakao API 키 상태: ${KAKAO_API_KEY ? '설정됨' : '설정되지 않음'}`);
-  if (KAKAO_API_KEY) {
-    console.log(`Kakao API 키 길이: ${KAKAO_API_KEY.length}`);
-    console.log(`Kakao API 키 (처음 10자): ${KAKAO_API_KEY.substring(0, 10)}...`);
+  // Kakao API 키 상태 확인
+  console.log('Kakao API 환경변수 상태:');
+  console.log('- KAKAO_API_KEY 설정됨:', !!process.env.KAKAO_API_KEY);
+  if (process.env.KAKAO_API_KEY) {
+    console.log('- KAKAO_API_KEY 길이:', process.env.KAKAO_API_KEY.length);
+    console.log('- KAKAO_API_KEY (처음 10자):', process.env.KAKAO_API_KEY.substring(0, 10) + '...');
+  }
+  
+  // Naver API 키 상태 확인
+  console.log('Naver API 환경변수 상태:');
+  console.log('- NAVER_CLIENT_ID 설정됨:', !!process.env.NAVER_CLIENT_ID);
+  console.log('- NAVER_CLIENT_SECRET 설정됨:', !!process.env.NAVER_CLIENT_SECRET);
+  if (process.env.NAVER_CLIENT_ID) {
+    console.log('- NAVER_CLIENT_ID 길이:', process.env.NAVER_CLIENT_ID.length);
+    console.log('- NAVER_CLIENT_ID (처음 10자):', process.env.NAVER_CLIENT_ID.substring(0, 10) + '...');
   }
   
   // Kakao API 키가 있으면 Kakao API 사용
@@ -297,35 +361,47 @@ async function geocodeAddress(address) {
     console.log('Kakao API 키가 설정되지 않음, Photon API 사용');
   }
   
-  // Kakao API 실패 또는 키가 없는 경우 Photon API로 폴백
+  // 3. Photon API로 폴백 (가장 안정적)
   try {
     console.log(`Photon API로 폴백 시도: ${normalizedAddress}`);
-    const encodedAddress = encodeURIComponent(normalizedAddress);
-    const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+    // Photon API에서 더 나은 결과를 위해 여러 시도
+    const attempts = [
+      normalizedAddress,
+      normalizedAddress.replace(/[0-9]+$/, ''), // 끝의 숫자 제거
+      normalizedAddress.split(' ').slice(0, 4).join(' ') // 앞 4개 단어만
+    ];
+    
+    for (const attempt of attempts) {
+      const encodedAddress = encodeURIComponent(attempt);
+      const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+        }
+      });
+      
+      if (!response.ok) {
+        continue; // 다음 시도로
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const [longitude, latitude] = feature.geometry.coordinates;
+        
+        console.log(`Photon 폴백 결과: ${attempt} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
     }
     
-    const data = await response.json();
-    
-    if (data.features && data.features.length > 0) {
-      const feature = data.features[0];
-      const [longitude, latitude] = feature.geometry.coordinates;
-      
-      console.log(`Photon 폴백 결과: ${normalizedAddress} -> ${latitude}, ${longitude}`);
-      
-      return {
-        latitude,
-        longitude
-      };
-    }
+    console.log(`Photon API 모든 시도 실패: ${normalizedAddress}`);
   } catch (photonError) {
     console.error(`Photon 폴백도 실패: ${normalizedAddress}`, photonError);
   }
@@ -1103,6 +1179,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
     if (process.env.KAKAO_API_KEY) {
       console.log('- KAKAO_API_KEY 길이:', process.env.KAKAO_API_KEY.length);
       console.log('- KAKAO_API_KEY (처음 10자):', process.env.KAKAO_API_KEY.substring(0, 10) + '...');
+    }
+    
+    // Naver API 키 상태 확인
+    console.log('Naver API 환경변수 상태:');
+    console.log('- NAVER_CLIENT_ID 설정됨:', !!process.env.NAVER_CLIENT_ID);
+    console.log('- NAVER_CLIENT_SECRET 설정됨:', !!process.env.NAVER_CLIENT_SECRET);
+    if (process.env.NAVER_CLIENT_ID) {
+      console.log('- NAVER_CLIENT_ID 길이:', process.env.NAVER_CLIENT_ID.length);
+      console.log('- NAVER_CLIENT_ID (처음 10자):', process.env.NAVER_CLIENT_ID.substring(0, 10) + '...');
     }
     
     // 봇 로그인 (서버 시작 후)
