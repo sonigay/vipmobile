@@ -176,7 +176,169 @@ const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 
-// 주소 정규화 함수 (더 정확한 geocoding을 위해)
+// 무료 Geocoding 서비스들 (API 키 불필요)
+async function geocodeAddressWithFreeServices(address) {
+  const normalizedAddress = normalizeAddress(address);
+  console.log(`원본 주소: ${address}`);
+  console.log(`정규화된 주소: ${normalizedAddress}`);
+  
+  // 1. Photon API (Komoot) - 가장 안정적인 무료 서비스
+  const photonResult = await geocodeAddressWithPhoton(normalizedAddress);
+  if (photonResult) {
+    return photonResult;
+  }
+  
+  // 2. Nominatim API (OpenStreetMap) - 무료, 정확도 보통
+  const nominatimResult = await geocodeAddressWithNominatim(normalizedAddress);
+  if (nominatimResult) {
+    return nominatimResult;
+  }
+  
+  // 3. Pelias API (Mapzen) - 무료, 정확도 보통
+  const peliasResult = await geocodeAddressWithPelias(normalizedAddress);
+  if (peliasResult) {
+    return peliasResult;
+  }
+  
+  return null;
+}
+
+// Photon API (Komoot) - 가장 안정적인 무료 서비스
+async function geocodeAddressWithPhoton(address) {
+  try {
+    console.log(`Photon API 시도: ${address}`);
+    
+    // 여러 시도 방식으로 정확도 향상
+    const attempts = [
+      address,
+      address.replace(/[0-9]+$/, ''), // 끝의 숫자 제거
+      address.split(' ').slice(0, 4).join(' '), // 앞 4개 단어만
+      address.replace(/[0-9]+-[0-9]+/g, ''), // 번지 제거
+      address.replace(/[가-힣]+동\s*[0-9]+호/g, ''), // 동 호수 제거
+      address.split(' ').slice(0, 3).join(' ') // 앞 3개 단어만
+    ];
+    
+    for (const attempt of attempts) {
+      if (!attempt.trim()) continue;
+      
+      const encodedAddress = encodeURIComponent(attempt);
+      const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+        }
+      });
+      
+      if (!response.ok) {
+        continue;
+      }
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const [longitude, latitude] = feature.geometry.coordinates;
+        
+        console.log(`Photon API 성공: ${attempt} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
+    }
+    
+    console.log(`Photon API 모든 시도 실패: ${address}`);
+    return null;
+  } catch (error) {
+    console.error(`Photon API 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Nominatim API (OpenStreetMap) - 무료, 정확도 보통
+async function geocodeAddressWithNominatim(address) {
+  try {
+    console.log(`Nominatim API 시도: ${address}`);
+    
+    const encodedAddress = encodeURIComponent(address + ', South Korea');
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      const result = data[0];
+      const latitude = parseFloat(result.lat);
+      const longitude = parseFloat(result.lon);
+      
+      console.log(`Nominatim API 성공: ${address} -> ${latitude}, ${longitude}`);
+      
+      return {
+        latitude,
+        longitude
+      };
+    }
+    
+    console.log(`Nominatim API 결과 없음: ${address}`);
+    return null;
+  } catch (error) {
+    console.error(`Nominatim API 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// Pelias API (Mapzen) - 무료, 정확도 보통
+async function geocodeAddressWithPelias(address) {
+  try {
+    console.log(`Pelias API 시도: ${address}`);
+    
+    const encodedAddress = encodeURIComponent(address + ', South Korea');
+    const url = `https://api.geocode.earth/v1/search?text=${encodedAddress}&size=1`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const [longitude, latitude] = feature.geometry.coordinates;
+      
+      console.log(`Pelias API 성공: ${address} -> ${latitude}, ${longitude}`);
+      
+      return {
+        latitude,
+        longitude
+      };
+    }
+    
+    console.log(`Pelias API 결과 없음: ${address}`);
+    return null;
+  } catch (error) {
+    console.error(`Pelias API 오류: ${address}`, error);
+    return null;
+  }
+}
+
+// 주소 정규화 함수 개선 (더 정확한 무료 geocoding을 위해)
 function normalizeAddress(address) {
   if (!address) return '';
   
@@ -185,7 +347,7 @@ function normalizeAddress(address) {
   // 불필요한 공백 제거
   normalized = normalized.replace(/\s+/g, ' ');
   
-  // 한국 주소 패턴 정규화
+  // 한국 주소 패턴 정규화 (무료 API에 최적화)
   normalized = normalized
     .replace(/^서울특별시\s*/, '서울 ')
     .replace(/^서울시\s*/, '서울 ')
@@ -212,14 +374,7 @@ function normalizeAddress(address) {
     .replace(/^세종시\s*/, '세종 ')
     .replace(/^세종\s*/, '세종 ');
   
-  // 구/군 패턴 정규화
-  normalized = normalized
-    .replace(/(\d+)동/g, '$1동')
-    .replace(/(\d+)가/g, '$1가')
-    .replace(/(\d+)로/g, '$1로')
-    .replace(/(\d+)길/g, '$1길');
-  
-  // 상세 주소 정보 제거 (geocoding 정확도 향상을 위해)
+  // 상세 주소 정보 제거 (무료 API 정확도 향상을 위해)
   normalized = normalized
     .replace(/\s*\([^)]*\)/g, '') // 괄호 안 내용 제거
     .replace(/\s*[0-9]+층/g, '') // 층수 제거
@@ -230,7 +385,11 @@ function normalizeAddress(address) {
     .replace(/\s*[0-9]+,\s*[가-힣]+동/g, '') // 번지, 동 제거
     .replace(/\s*[0-9]+-[0-9]+/g, '') // 번지 제거 (예: 14-53)
     .replace(/\s*[0-9]+번지/g, '') // 번지 제거
-    .replace(/\s*[0-9]+번/g, ''); // 번 제거
+    .replace(/\s*[0-9]+번/g, '') // 번 제거
+    .replace(/\s*[가-힣]+센터/g, '') // "센터" 제거
+    .replace(/\s*[가-힣]+마트/g, '') // "마트" 제거
+    .replace(/\s*[가-힣]+빌딩/g, '') // "빌딩" 제거
+    .replace(/\s*[가-힣]+타워/g, ''); // "타워" 제거
   
   // 마지막 정리
   normalized = normalized.trim();
@@ -238,175 +397,9 @@ function normalizeAddress(address) {
   return normalized;
 }
 
-// Naver Maps API geocoding 함수 (한국 주소에 특화)
-async function geocodeAddressWithNaver(address) {
-  try {
-    const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID;
-    const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
-    
-    if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
-      console.log('Naver API 키가 설정되지 않음');
-      return null;
-    }
-    
-    const encodedAddress = encodeURIComponent(address);
-    const url = `https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=${encodedAddress}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'X-NCP-APIGW-API-KEY-ID': NAVER_CLIENT_ID,
-        'X-NCP-APIGW-API-KEY': NAVER_CLIENT_SECRET
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.addresses && data.addresses.length > 0) {
-      const addressInfo = data.addresses[0];
-      const latitude = parseFloat(addressInfo.y);
-      const longitude = parseFloat(addressInfo.x);
-      
-      console.log(`Naver geocoding 결과: ${address} -> ${latitude}, ${longitude}`);
-      
-      return {
-        latitude,
-        longitude
-      };
-    }
-    
-    console.log(`Naver geocoding 결과 없음: ${address}`);
-    return null;
-  } catch (error) {
-    console.error(`Naver geocoding 오류: ${address}`, error);
-    return null;
-  }
-}
-
-// Kakao Maps API geocoding 함수 (한국 주소에 특화)
+// 메인 geocoding 함수 (무료 서비스들만 사용)
 async function geocodeAddress(address) {
-  // 주소 정규화 (함수 시작 부분에서 선언)
-  const normalizedAddress = normalizeAddress(address);
-  console.log(`원본 주소: ${address}`);
-  console.log(`정규화된 주소: ${normalizedAddress}`);
-  
-  // 1. Naver Maps API 시도 (가장 정확한 한국 주소)
-  const naverResult = await geocodeAddressWithNaver(normalizedAddress);
-  if (naverResult) {
-    return naverResult;
-  }
-  
-  // 2. Kakao Maps API 시도
-  const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
-  
-  // Kakao API 키 상태 확인
-  console.log('Kakao API 환경변수 상태:');
-  console.log('- KAKAO_API_KEY 설정됨:', !!process.env.KAKAO_API_KEY);
-  if (process.env.KAKAO_API_KEY) {
-    console.log('- KAKAO_API_KEY 길이:', process.env.KAKAO_API_KEY.length);
-    console.log('- KAKAO_API_KEY (처음 10자):', process.env.KAKAO_API_KEY.substring(0, 10) + '...');
-  }
-  
-  // Naver API 키 상태 확인
-  console.log('Naver API 환경변수 상태:');
-  console.log('- NAVER_CLIENT_ID 설정됨:', !!process.env.NAVER_CLIENT_ID);
-  console.log('- NAVER_CLIENT_SECRET 설정됨:', !!process.env.NAVER_CLIENT_SECRET);
-  if (process.env.NAVER_CLIENT_ID) {
-    console.log('- NAVER_CLIENT_ID 길이:', process.env.NAVER_CLIENT_ID.length);
-    console.log('- NAVER_CLIENT_ID (처음 10자):', process.env.NAVER_CLIENT_ID.substring(0, 10) + '...');
-  }
-  
-  // Kakao API 키가 있으면 Kakao API 사용
-  if (KAKAO_API_KEY && KAKAO_API_KEY.trim() !== '') {
-    try {
-      const encodedAddress = encodeURIComponent(normalizedAddress);
-      const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
-      
-      console.log(`Kakao API 요청 URL: ${url}`);
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.documents && data.documents.length > 0) {
-        const document = data.documents[0];
-        const latitude = parseFloat(document.y);
-        const longitude = parseFloat(document.x);
-        
-        console.log(`Kakao geocoding 결과: ${normalizedAddress} -> ${latitude}, ${longitude}`);
-        
-        return {
-          latitude,
-          longitude
-        };
-      }
-      
-      console.log(`Kakao geocoding 결과 없음: ${normalizedAddress}`);
-    } catch (error) {
-      console.error(`Kakao geocoding 오류: ${address}`, error);
-    }
-  } else {
-    console.log('Kakao API 키가 설정되지 않음, Photon API 사용');
-  }
-  
-  // 3. Photon API로 폴백 (가장 안정적)
-  try {
-    console.log(`Photon API로 폴백 시도: ${normalizedAddress}`);
-    
-    // Photon API에서 더 나은 결과를 위해 여러 시도
-    const attempts = [
-      normalizedAddress,
-      normalizedAddress.replace(/[0-9]+$/, ''), // 끝의 숫자 제거
-      normalizedAddress.split(' ').slice(0, 4).join(' ') // 앞 4개 단어만
-    ];
-    
-    for (const attempt of attempts) {
-      const encodedAddress = encodeURIComponent(attempt);
-      const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
-        }
-      });
-      
-      if (!response.ok) {
-        continue; // 다음 시도로
-      }
-      
-      const data = await response.json();
-      
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0];
-        const [longitude, latitude] = feature.geometry.coordinates;
-        
-        console.log(`Photon 폴백 결과: ${attempt} -> ${latitude}, ${longitude}`);
-        
-        return {
-          latitude,
-          longitude
-        };
-      }
-    }
-    
-    console.log(`Photon API 모든 시도 실패: ${normalizedAddress}`);
-  } catch (photonError) {
-    console.error(`Photon 폴백도 실패: ${normalizedAddress}`, photonError);
-  }
-  
-  return null;
+  return await geocodeAddressWithFreeServices(address);
 }
 
 // Geocoder 설정 (기존 코드와 호환성을 위해 유지)
@@ -1189,6 +1182,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('- NAVER_CLIENT_ID 길이:', process.env.NAVER_CLIENT_ID.length);
       console.log('- NAVER_CLIENT_ID (처음 10자):', process.env.NAVER_CLIENT_ID.substring(0, 10) + '...');
     }
+    
+    // 무료 Geocoding 서비스 상태
+    console.log('무료 Geocoding 서비스 상태:');
+    console.log('- Photon API (Komoot): 사용 가능 (무료)');
+    console.log('- Nominatim API (OpenStreetMap): 사용 가능 (무료)');
+    console.log('- Pelias API (Mapzen): 사용 가능 (무료)');
+    console.log('- 총 3개 무료 서비스로 정확도 향상');
     
     // 봇 로그인 (서버 시작 후)
     if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN && discordBot) {
