@@ -176,10 +176,111 @@ const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 
-// Photon geocoding 함수 (API 키 불필요)
+// 주소 정규화 함수 (더 정확한 geocoding을 위해)
+function normalizeAddress(address) {
+  if (!address) return '';
+  
+  let normalized = address.toString().trim();
+  
+  // 불필요한 공백 제거
+  normalized = normalized.replace(/\s+/g, ' ');
+  
+  // 한국 주소 패턴 정규화
+  normalized = normalized
+    .replace(/^서울특별시\s*/, '서울 ')
+    .replace(/^서울시\s*/, '서울 ')
+    .replace(/^서울\s*/, '서울 ')
+    .replace(/^부산광역시\s*/, '부산 ')
+    .replace(/^부산시\s*/, '부산 ')
+    .replace(/^부산\s*/, '부산 ')
+    .replace(/^대구광역시\s*/, '대구 ')
+    .replace(/^대구시\s*/, '대구 ')
+    .replace(/^대구\s*/, '대구 ')
+    .replace(/^인천광역시\s*/, '인천 ')
+    .replace(/^인천시\s*/, '인천 ')
+    .replace(/^인천\s*/, '인천 ')
+    .replace(/^광주광역시\s*/, '광주 ')
+    .replace(/^광주시\s*/, '광주 ')
+    .replace(/^광주\s*/, '광주 ')
+    .replace(/^대전광역시\s*/, '대전 ')
+    .replace(/^대전시\s*/, '대전 ')
+    .replace(/^대전\s*/, '대전 ')
+    .replace(/^울산광역시\s*/, '울산 ')
+    .replace(/^울산시\s*/, '울산 ')
+    .replace(/^울산\s*/, '울산 ')
+    .replace(/^세종특별자치시\s*/, '세종 ')
+    .replace(/^세종시\s*/, '세종 ')
+    .replace(/^세종\s*/, '세종 ');
+  
+  // 구/군 패턴 정규화
+  normalized = normalized
+    .replace(/(\d+)동/g, '$1동')
+    .replace(/(\d+)가/g, '$1가')
+    .replace(/(\d+)로/g, '$1로')
+    .replace(/(\d+)길/g, '$1길');
+  
+  // 건물명 제거 (상세 주소에서)
+  normalized = normalized.replace(/\s*\([^)]*\)/g, ''); // 괄호 안 내용 제거
+  normalized = normalized.replace(/\s*[0-9]+층/g, ''); // 층수 제거
+  normalized = normalized.replace(/\s*[0-9]+호/g, ''); // 호수 제거
+  
+  return normalized;
+}
+
+// Kakao Maps API geocoding 함수 (한국 주소에 특화)
 async function geocodeAddress(address) {
   try {
-    const encodedAddress = encodeURIComponent(address + ', 대한민국');
+    // 주소 정규화
+    const normalizedAddress = normalizeAddress(address);
+    console.log(`원본 주소: ${address}`);
+    console.log(`정규화된 주소: ${normalizedAddress}`);
+    
+    // Kakao Maps API 키 (환경 변수에서 가져오기)
+    const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
+    
+    // Kakao API 키가 있으면 Kakao API 사용
+    if (KAKAO_API_KEY) {
+      const encodedAddress = encodeURIComponent(normalizedAddress);
+      const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.documents && data.documents.length > 0) {
+        const document = data.documents[0];
+        const latitude = parseFloat(document.y);
+        const longitude = parseFloat(document.x);
+        
+        console.log(`Kakao geocoding 결과: ${normalizedAddress} -> ${latitude}, ${longitude}`);
+        
+        return {
+          latitude,
+          longitude
+        };
+      }
+      
+      console.log(`Kakao geocoding 결과 없음: ${normalizedAddress}`);
+    } else {
+      console.log('Kakao API 키가 설정되지 않음, Photon API 사용');
+    }
+  } catch (error) {
+    console.error(`Kakao geocoding 오류: ${address}`, error);
+  }
+  
+  // Kakao API 실패 또는 키가 없는 경우 Photon API로 폴백
+  try {
+    console.log(`Photon API로 폴백 시도: ${normalizedAddress}`);
+    const encodedAddress = encodeURIComponent(normalizedAddress);
     const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
     
     const response = await fetch(url, {
@@ -198,17 +299,18 @@ async function geocodeAddress(address) {
       const feature = data.features[0];
       const [longitude, latitude] = feature.geometry.coordinates;
       
+      console.log(`Photon 폴백 결과: ${normalizedAddress} -> ${latitude}, ${longitude}`);
+      
       return {
         latitude,
         longitude
       };
     }
-    
-    return null;
-  } catch (error) {
-    console.error(`Error geocoding address: ${address}`, error);
-    return null;
+  } catch (photonError) {
+    console.error(`Photon 폴백도 실패: ${normalizedAddress}`, photonError);
   }
+  
+  return null;
 }
 
 // Geocoder 설정 (기존 코드와 호환성을 위해 유지)
