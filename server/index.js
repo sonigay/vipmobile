@@ -248,11 +248,20 @@ async function geocodeAddress(address) {
   // Kakao Maps API 키 (환경 변수에서 가져오기)
   const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
   
+  // 디버깅: 환경 변수 상태 확인
+  console.log(`Kakao API 키 상태: ${KAKAO_API_KEY ? '설정됨' : '설정되지 않음'}`);
+  if (KAKAO_API_KEY) {
+    console.log(`Kakao API 키 길이: ${KAKAO_API_KEY.length}`);
+    console.log(`Kakao API 키 (처음 10자): ${KAKAO_API_KEY.substring(0, 10)}...`);
+  }
+  
   // Kakao API 키가 있으면 Kakao API 사용
   if (KAKAO_API_KEY && KAKAO_API_KEY.trim() !== '') {
     try {
       const encodedAddress = encodeURIComponent(normalizedAddress);
       const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
+      
+      console.log(`Kakao API 요청 URL: ${url}`);
       
       const response = await fetch(url, {
         headers: {
@@ -1087,6 +1096,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('- DISCORD_AGENT_CHANNEL_ID 설정됨:', !!process.env.DISCORD_AGENT_CHANNEL_ID);
     console.log('- DISCORD_STORE_CHANNEL_ID 설정됨:', !!process.env.DISCORD_STORE_CHANNEL_ID);
     console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
+    
+    // Kakao API 키 상태 확인
+    console.log('Kakao API 환경변수 상태:');
+    console.log('- KAKAO_API_KEY 설정됨:', !!process.env.KAKAO_API_KEY);
+    if (process.env.KAKAO_API_KEY) {
+      console.log('- KAKAO_API_KEY 길이:', process.env.KAKAO_API_KEY.length);
+      console.log('- KAKAO_API_KEY (처음 10자):', process.env.KAKAO_API_KEY.substring(0, 10) + '...');
+    }
     
     // 봇 로그인 (서버 시작 후)
     if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN && discordBot) {
