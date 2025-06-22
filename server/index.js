@@ -948,33 +948,35 @@ app.post('/api/update-coordinates', async (req, res) => {
       const address = row[3]; // X열: 주소
       const status = row[4];   // D열: 거래상태
       
-      // 사용 중인 매장만 처리
-      if (!address || status !== "사용") continue;
-
-      try {
-        // Photon geocoding 함수 호출
-        const result = await geocodeAddress(address);
-        
-        if (result) {
-          const { latitude, longitude } = result;
-          
-          // A열(1번째)과 B열(2번째)에 위도/경도 업데이트
-          updates.push({
-            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
-            values: [[latitude, longitude]]
-          });
-
-          console.log(`Updated coordinates for address: ${address}`);
-          console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
-        } else {
-          console.log(`No results found for address: ${address}`);
+      if (status === "사용") {
+        if (!address) continue;
+        // 기존 위도/경도 값이 있더라도 무조건 새로 geocoding하여 덮어씀
+        try {
+          const result = await geocodeAddress(address);
+          if (result) {
+            const { latitude, longitude } = result;
+            updates.push({
+              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+              values: [[latitude, longitude]]
+            });
+            console.log(`Updated coordinates for address: ${address}`);
+            console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+          } else {
+            console.log(`No results found for address: ${address}`);
+          }
+        } catch (error) {
+          console.error(`Error geocoding address: ${address}`, error);
         }
-      } catch (error) {
-        console.error(`Error geocoding address: ${address}`, error);
+      } else {
+        // 미사용 매장은 위도/경도 값을 빈 값으로 비움
+        updates.push({
+          range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+          values: [["", ""]]
+        });
+        console.log(`Cleared coordinates for unused store at row ${i + 2}`);
       }
-
-      // API 할당량 제한을 피하기 위한 지연
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // API 할당량 제한을 피하기 위한 지연 (사용 매장만)
+      if (status === "사용") await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // 일괄 업데이트 실행
@@ -1498,33 +1500,35 @@ async function checkAndUpdateAddresses() {
       const address = row[3];  // X열: 주소
       const status = row[4];    // D열: 거래상태
       
-      // 사용 중인 매장만 처리
-      if (!address || status !== "사용") continue;
-
-      try {
-        // Photon geocoding 함수 호출
-        const result = await geocodeAddress(address);
-        
-        if (result) {
-          const { latitude, longitude } = result;
-          
-          // A열과 B열에 위도/경도 업데이트
-          updates.push({
-            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
-            values: [[latitude, longitude]]
-          });
-
-          console.log(`Updated coordinates for address: ${address}`);
-          console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
-        } else {
-          console.log(`No results found for address: ${address}`);
+      if (status === "사용") {
+        if (!address) continue;
+        // 기존 위도/경도 값이 있더라도 무조건 새로 geocoding하여 덮어씀
+        try {
+          const result = await geocodeAddress(address);
+          if (result) {
+            const { latitude, longitude } = result;
+            updates.push({
+              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+              values: [[latitude, longitude]]
+            });
+            console.log(`Updated coordinates for address: ${address}`);
+            console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+          } else {
+            console.log(`No results found for address: ${address}`);
+          }
+        } catch (error) {
+          console.error(`Error geocoding address: ${address}`, error);
         }
-      } catch (error) {
-        console.error(`Error geocoding address: ${address}`, error);
+      } else {
+        // 미사용 매장은 위도/경도 값을 빈 값으로 비움
+        updates.push({
+          range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+          values: [["", ""]]
+        });
+        console.log(`Cleared coordinates for unused store at row ${i + 2}`);
       }
-
-      // API 할당량 제한을 피하기 위한 지연
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // API 할당량 제한을 피하기 위한 지연 (사용 매장만)
+      if (status === "사용") await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // 일괄 업데이트 실행

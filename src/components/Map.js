@@ -183,7 +183,7 @@ function Map({
     if (!filteredStores.length && !userLocation) return null;
     
     const bounds = L.latLngBounds();
-    
+
     // 매장 위치 추가
     filteredStores.forEach(store => {
       if (store.latitude && store.longitude) {
@@ -198,7 +198,7 @@ function Map({
     
     return bounds;
   }, [filteredStores, userLocation]);
-
+      
   // 초기 로드 시 지도 범위 설정
   useEffect(() => {
     if (map && mapBounds && (initialLoadRef.current || !userInteracted)) {
@@ -290,7 +290,7 @@ function Map({
               opacity: 0.8,
               weight: 2
             }}
-          />
+      />
         )}
       </MapContainer>
     </Paper>
