@@ -246,6 +246,17 @@ function App() {
             console.log(`매장 [${store.name}] - ${selectedModel} 전체 재고: ${totalQuantity}`);
           }
         }
+      } else {
+        // 모델이 선택되지 않은 경우: 모든 재고 합계 확인
+        if (store.inventory) {
+          Object.entries(store.inventory).forEach(([model, colors]) => {
+            Object.values(colors).forEach(qty => {
+              totalQuantity += qty;
+            });
+          });
+          hasInventory = totalQuantity > 0;
+          console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
+        }
       }
       
       store.totalQuantity = totalQuantity;
