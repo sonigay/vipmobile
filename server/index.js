@@ -178,8 +178,7 @@ const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관
 
 // Geocoder 설정
 const geocoder = NodeGeocoder({
-  provider: 'google',
-  apiKey: process.env.GOOGLE_MAPS_API_KEY // Google Maps API 키 필요
+  provider: 'openstreetmap'
 });
 
 // Google API 인증 설정

@@ -1,6 +1,16 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
-import { Paper, Typography, Box, CircularProgress } from '@mui/material';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { Paper } from '@mui/material';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Leaflet 마커 아이콘 설정 (기본 아이콘 경로 문제 해결)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 const containerStyle = {
   width: '100%',
@@ -22,17 +32,23 @@ const defaultCenter = {
   lng: 126.9780
 };
 
-const defaultOptions = {
-  gestureHandling: 'greedy',
-  disableDefaultUI: false,
-  zoomControl: true,
-  mapTypeControl: false,
-  streetViewControl: false,
-  fullscreenControl: true,
-};
-
-// libraries를 상수로 정의하여 경고 방지
-const MAP_LIBRARIES = ['places', 'marker'];
+// 지도 뷰 업데이트를 위한 컴포넌트
+function MapUpdater({ center, bounds, zoom }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (bounds) {
+      map.fitBounds(bounds);
+      if (map.getZoom() > 15) {
+        map.setZoom(15);
+      }
+    } else if (center) {
+      map.setView([center.lat, center.lng], zoom || 12);
+    }
+  }, [map, center, bounds, zoom]);
+  
+  return null;
+}
 
 function Map({ 
   userLocation, 
@@ -45,20 +61,9 @@ function Map({
   onStoreSelect,
   isAgentMode
 }) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries: MAP_LIBRARIES
-  });
-
   const [map, setMap] = useState(null);
-  const [markers, setMarkers] = useState([]);
-  const [circle, setCircle] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
-  
-  // 지도 초기 로드 여부를 트래킹
   const initialLoadRef = useRef(true);
-  
-  // 선택된 매장이 변경될 때 센터를 이동하기 위한 ref
   const previousSelectedStoreRef = useRef(null);
 
   const center = useMemo(() => userLocation || defaultCenter, [userLocation]);
@@ -86,32 +91,73 @@ function Map({
     return store.inventory[selectedModel][selectedColor] || 0;
   }, [selectedModel, selectedColor]);
 
+  // 마커 아이콘 생성 함수
+  const createMarkerIcon = useCallback((store) => {
+    const isSelected = selectedStore?.id === store.id;
+    const isLoggedInStore = loggedInStoreId === store.id;
+    const inventoryCount = calculateInventory(store);
+    const hasInventory = inventoryCount > 0;
+
+    let fillColor, strokeColor, radius;
+
+    // 1. 선택된 매장
+    if (isSelected) {
+      fillColor = '#2196f3';
+      strokeColor = '#1976d2';
+      radius = 16;
+    }
+    // 2. 로그인한 매장
+    else if (isLoggedInStore) {
+      fillColor = '#9c27b0';
+      strokeColor = '#7b1fa2';
+      radius = 16;
+    }
+    // 3. 일반 매장
+    else {
+      fillColor = hasInventory ? '#4caf50' : '#f44336';
+      strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+      radius = hasInventory ? 14 : 10;
+    }
+
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `
+        <div style="
+          width: ${radius * 2}px;
+          height: ${radius * 2}px;
+          background-color: ${fillColor};
+          border: 2px solid ${strokeColor};
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: ${radius > 12 ? '12px' : '10px'};
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        ">
+          ${inventoryCount > 0 ? inventoryCount : ''}
+        </div>
+      `,
+      iconSize: [radius * 2, radius * 2],
+      iconAnchor: [radius, radius]
+    });
+  }, [selectedStore, loggedInStoreId, calculateInventory]);
+
   // 지도 로드 핸들러
-  const onLoad = useCallback((map) => {
+  const onMapLoad = useCallback((mapInstance) => {
     console.log('지도 로드됨');
-    setMap(map);
+    setMap(mapInstance);
     
     // 사용자 인터랙션 이벤트 리스너 추가
-    map.addListener('dragstart', () => {
+    mapInstance.on('dragstart', () => {
       setUserInteracted(true);
     });
     
-    map.addListener('zoom_changed', () => {
+    mapInstance.on('zoomstart', () => {
       setUserInteracted(true);
     });
   }, []);
-
-  // 지도 언마운트 핸들러
-  const onUnmount = useCallback(() => {
-    console.log('지도 언마운트');
-    markers.forEach(marker => marker.setMap(null));
-    if (circle) circle.setMap(null);
-    setMarkers([]);
-    setCircle(null);
-    setMap(null);
-    setUserInteracted(false);
-    initialLoadRef.current = true;
-  }, [markers, circle]);
 
   // 선택된 매장으로 지도 이동
   useEffect(() => {
@@ -125,189 +171,128 @@ function Map({
       };
       
       // 지도 센터만 변경하고 줌 레벨은 유지
-      map.panTo(position);
+      map.panTo([position.lat, position.lng]);
       
       // 선택한 매장 ID 저장
       previousSelectedStoreRef.current = selectedStore.id;
     }
   }, [map, selectedStore]);
 
-  const getMarkerIcon = useCallback((store) => {
-    const isSelected = selectedStore?.id === store.id;
-    const isLoggedInStore = loggedInStoreId === store.id;
+  // 지도 범위 계산
+  const mapBounds = useMemo(() => {
+    if (!filteredStores.length && !userLocation) return null;
     
-    const inventoryCount = calculateInventory(store);
-    const hasInventory = inventoryCount > 0;
-
-    // 1. 선택된 매장
-    if (isSelected) {
-      return {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        fillColor: '#2196f3',
-        fillOpacity: 1,
-        strokeColor: '#1976d2',
-        strokeWeight: 2,
-        scale: 16
-      };
-    }
-
-    // 2. 로그인한 매장
-    if (isLoggedInStore) {
-      return {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        fillColor: '#9c27b0',
-        fillOpacity: 1,
-        strokeColor: '#7b1fa2',
-        strokeWeight: 2,
-        scale: 16
-      };
-    }
-
-    // 3. 일반 매장
-    return {
-      path: window.google.maps.SymbolPath.CIRCLE,
-      fillColor: hasInventory ? '#4caf50' : '#f44336',
-      fillOpacity: 1,
-      strokeColor: hasInventory ? '#388e3c' : '#d32f2f',
-      strokeWeight: 2,
-      scale: hasInventory ? 14 : 10
-    };
-  }, [selectedStore, loggedInStoreId, calculateInventory]);
-
-  // 마커와 원 업데이트
-  useEffect(() => {
-    if (!isLoaded || !map) return;
-
-    // 기존 마커와 원 제거
-    markers.forEach(marker => marker.setMap(null));
-    if (circle) circle.setMap(null);
-
-    const newMarkers = [];
-    const bounds = new window.google.maps.LatLngBounds();
-
-    // 매장 마커 생성
+    const bounds = L.latLngBounds();
+    
+    // 매장 위치 추가
     filteredStores.forEach(store => {
-      if (!store.latitude || !store.longitude) return;
-
-      const position = {
-        lat: parseFloat(store.latitude),
-        lng: parseFloat(store.longitude)
-      };
-      
-      const inventoryCount = calculateInventory(store);
-      const isSelected = selectedStore?.id === store.id;
-      const isLoggedInStore = loggedInStoreId === store.id;
-      
-      let labelOptions = null;
-      
-      if (inventoryCount > 0) {
-        labelOptions = {
-          text: String(inventoryCount),
-          color: isSelected || isLoggedInStore ? '#FFEB3B' : '#FFFFFF',
-          fontSize: isSelected || isLoggedInStore ? '14px' : '13px',
-          fontWeight: 'bold'
-        };
+      if (store.latitude && store.longitude) {
+        bounds.extend([parseFloat(store.latitude), parseFloat(store.longitude)]);
       }
-      
-      const marker = new window.google.maps.Marker({
-        map,
-        position,
-        title: store.name,
-        icon: getMarkerIcon(store),
-        label: labelOptions,
-        zIndex: isSelected ? 30 : (isLoggedInStore ? 20 : (inventoryCount > 0 ? 10 : 1))
-      });
-
-      marker.addListener('click', () => {
-        onStoreSelect(store);
-      });
-
-      newMarkers.push(marker);
-      bounds.extend(position);
     });
-
-    // 검색 반경 원 생성 (관리자 모드가 아닐 때만)
-    if (userLocation && selectedRadius && !isAgentMode) {
-      const newCircle = new window.google.maps.Circle({
-        map,
-        center: userLocation,
-        radius: selectedRadius,
-        fillColor: '#4285F4',
-        fillOpacity: 0.1,
-        strokeColor: '#4285F4',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-      });
-      setCircle(newCircle);
-      
-      // 원의 경계도 bounds에 포함
-      bounds.union(newCircle.getBounds());
-    } else {
-      setCircle(null);
+    
+    // 사용자 위치 추가
+    if (userLocation) {
+      bounds.extend([userLocation.lat, userLocation.lng]);
     }
+    
+    return bounds;
+  }, [filteredStores, userLocation]);
 
-    // 초기 로드이고 사용자가 지도를 조작하지 않은 경우에만 지도 범위 자동 조정
-    if ((initialLoadRef.current || !userInteracted) && 
-        (newMarkers.length > 0 || (userLocation && selectedRadius && !isAgentMode))) {
-      map.fitBounds(bounds);
-      
-      // 줌 레벨 조정
+  // 초기 로드 시 지도 범위 설정
+  useEffect(() => {
+    if (map && mapBounds && (initialLoadRef.current || !userInteracted)) {
+      map.fitBounds(mapBounds);
       if (map.getZoom() > 15) {
         map.setZoom(15);
       }
-      
-      // 초기 로드 완료 표시
       initialLoadRef.current = false;
     }
+  }, [map, mapBounds, userInteracted]);
 
-    setMarkers(newMarkers);
-  }, [map, isLoaded, filteredStores, userLocation, selectedRadius, loggedInStoreId, selectedModel, selectedColor, onStoreSelect, getMarkerIcon, calculateInventory, selectedStore, isAgentMode, userInteracted]);
-
-  // 반경 변경 시 지도 범위 재설정(사용자 상호작용 여부와 상관없이)
+  // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
-    if (!map || !isLoaded || !userLocation || !selectedRadius || isAgentMode) return;
+    if (!map || !userLocation || !selectedRadius || isAgentMode) return;
     
-    // 반경이 변경된 경우에는 지도 범위를 다시 설정 (초기 로드 또는 사용자 상호작용이 없는 경우에만)
-    if (circle && (initialLoadRef.current || !userInteracted)) {
-      const bounds = circle.getBounds();
+    if (initialLoadRef.current || !userInteracted) {
+      const bounds = L.latLngBounds([
+        [userLocation.lat - selectedRadius / 111000, userLocation.lng - selectedRadius / (111000 * Math.cos(userLocation.lat * Math.PI / 180))],
+        [userLocation.lat + selectedRadius / 111000, userLocation.lng + selectedRadius / (111000 * Math.cos(userLocation.lat * Math.PI / 180))]
+      ]);
       map.fitBounds(bounds);
-      
       if (map.getZoom() > 15) {
         map.setZoom(15);
       }
     }
-  }, [map, isLoaded, selectedRadius, userLocation, circle, isAgentMode, userInteracted]);
-
-  if (loadError) {
-    return (
-      <Paper sx={mapContainerStyle}>
-        <Box sx={{ p: 2 }}>
-          <Typography color="error">지도를 불러오는데 실패했습니다.</Typography>
-        </Box>
-      </Paper>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <Paper sx={mapContainerStyle}>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-          <CircularProgress />
-        </Box>
-      </Paper>
-    );
-  }
+  }, [map, selectedRadius, userLocation, isAgentMode, userInteracted]);
 
   return (
     <Paper sx={mapContainerStyle}>
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        center={center}
+      <MapContainer
+        center={[center.lat, center.lng]}
         zoom={12}
-        options={defaultOptions}
-        onLoad={onLoad}
-        onUnmount={onUnmount}
-      />
+        style={containerStyle}
+        whenCreated={onMapLoad}
+        zoomControl={true}
+        attributionControl={false}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        
+        {/* 지도 뷰 업데이트 */}
+        <MapUpdater 
+          center={center} 
+          bounds={mapBounds} 
+          zoom={12}
+        />
+        
+        {/* 매장 마커들 */}
+        {filteredStores.map((store) => {
+          if (!store.latitude || !store.longitude) return null;
+          
+          const inventoryCount = calculateInventory(store);
+          const isSelected = selectedStore?.id === store.id;
+          const isLoggedInStore = loggedInStoreId === store.id;
+          
+          return (
+            <Marker
+              key={store.id}
+              position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
+              icon={createMarkerIcon(store)}
+              eventHandlers={{
+                click: () => onStoreSelect(store)
+              }}
+            >
+              <Popup>
+                <div>
+                  <h3>{store.name}</h3>
+                  <p>재고: {inventoryCount}개</p>
+                  {store.address && <p>주소: {store.address}</p>}
+                  {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold'}}>✓ 선택됨</p>}
+                  {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+        
+        {/* 검색 반경 원 (관리자 모드가 아닐 때만) */}
+        {userLocation && selectedRadius && !isAgentMode && (
+          <Circle
+            center={[userLocation.lat, userLocation.lng]}
+            radius={selectedRadius}
+            pathOptions={{
+              fillColor: '#4285F4',
+              fillOpacity: 0.1,
+              color: '#4285F4',
+              opacity: 0.8,
+              weight: 2
+            }}
+          />
+        )}
+      </MapContainer>
     </Paper>
   );
 }
