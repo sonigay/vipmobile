@@ -176,10 +176,48 @@ const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 
-// Geocoder 설정
-const geocoder = NodeGeocoder({
-  provider: 'photon'
-});
+// Photon geocoding 함수 (API 키 불필요)
+async function geocodeAddress(address) {
+  try {
+    const encodedAddress = encodeURIComponent(address + ', 대한민국');
+    const url = `https://photon.komoot.io/api/?q=${encodedAddress}&limit=1`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'VIPMap/1.0 (vipmap@vipmap.com)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const [longitude, latitude] = feature.geometry.coordinates;
+      
+      return {
+        latitude,
+        longitude
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Error geocoding address: ${address}`, error);
+    return null;
+  }
+}
+
+// Geocoder 설정 (기존 코드와 호환성을 위해 유지)
+const geocoder = {
+  geocode: async (address) => {
+    const result = await geocodeAddress(address);
+    return result ? [result] : [];
+  }
+};
 
 // Google API 인증 설정
 const auth = new google.auth.JWT({
@@ -331,11 +369,11 @@ app.post('/api/update-coordinates', async (req, res) => {
       if (!address || status !== "사용") continue;
 
       try {
-        // OpenStreetMap Geocoding API 호출
-        const results = await geocoder.geocode(address + ', 대한민국');
+        // Photon geocoding 함수 호출
+        const result = await geocodeAddress(address);
         
-        if (results && results[0]) {
-          const { latitude, longitude } = results[0];
+        if (result) {
+          const { latitude, longitude } = result;
           
           // A열(1번째)과 B열(2번째)에 위도/경도 업데이트
           updates.push({
@@ -881,11 +919,11 @@ async function checkAndUpdateAddresses() {
       if (!address || status !== "사용") continue;
 
       try {
-        // OpenStreetMap Geocoding API 호출
-        const results = await geocoder.geocode(address + ', 대한민국');
+        // Photon geocoding 함수 호출
+        const result = await geocodeAddress(address);
         
-        if (results && results[0]) {
-          const { latitude, longitude } = results[0];
+        if (result) {
+          const { latitude, longitude } = result;
           
           // A열과 B열에 위도/경도 업데이트
           updates.push({
