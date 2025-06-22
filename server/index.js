@@ -178,7 +178,7 @@ const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관
 
 // Geocoder 설정
 const geocoder = NodeGeocoder({
-  provider: 'openstreetmap'
+  provider: 'photon'
 });
 
 // Google API 인증 설정
@@ -337,9 +337,9 @@ app.post('/api/update-coordinates', async (req, res) => {
         if (results && results[0]) {
           const { latitude, longitude } = results[0];
           
-          // AC열(29번째)과 AD열(30번째)에 위도/경도 업데이트
+          // A열(1번째)과 B열(2번째)에 위도/경도 업데이트
           updates.push({
-            range: `${STORE_SHEET_NAME}!AC${i + 2}:AD${i + 2}`,
+            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
             values: [[latitude, longitude]]
           });
 
@@ -881,7 +881,7 @@ async function checkAndUpdateAddresses() {
       if (!address || status !== "사용") continue;
 
       try {
-        // Google Geocoding API 호출
+        // OpenStreetMap Geocoding API 호출
         const results = await geocoder.geocode(address + ', 대한민국');
         
         if (results && results[0]) {
