@@ -826,17 +826,17 @@ app.post('/api/login', async (req, res) => {
     }
     
     const storeRows = storeValues.slice(1);
-    const storeRow = storeRows.find(row => row[6] === storeId);
+    const foundStoreRow = storeRows.find(row => row[7] === storeId); // G열: 매장 ID로 수정
     
-    if (storeRow) {
+    if (foundStoreRow) {
       const store = {
-        id: storeRow[7],                      // G열: 매장 ID
-        name: storeRow[6],                    // F열: 업체명
-        manager: storeRow[13] || '',          // M열: 담당자
-        address: storeRow[3] || '',          // X열: 주소
-        latitude: parseFloat(storeRow[0] || '0'),  // A열: 위도
-        longitude: parseFloat(storeRow[1] || '0'),  // B열: 경도
-        phone: storeRow[11] || ''              // I열: 연락처 추가
+        id: foundStoreRow[7],                      // G열: 매장 ID
+        name: foundStoreRow[6],                    // F열: 업체명
+        manager: foundStoreRow[13] || '',          // M열: 담당자
+        address: foundStoreRow[3] || '',          // X열: 주소
+        latitude: parseFloat(foundStoreRow[0] || '0'),  // A열: 위도
+        longitude: parseFloat(foundStoreRow[1] || '0'),  // B열: 경도
+        phone: foundStoreRow[11] || ''              // I열: 연락처 추가
       };
       
       console.log(`Found store: ${store.name}`);
