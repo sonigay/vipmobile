@@ -224,21 +224,15 @@ ${model} ${color} 모델이 재고에 있는지 확인 부탁드립니다.
                             }
                           }}
                           startIcon={
-                            <span style={{ 
-                              fontSize: '0.8rem', 
-                              fontWeight: 'bold',
-                              color: '#3C1E1E',
-                              backgroundColor: '#FFE812',
-                              borderRadius: '50%',
-                              width: '20px',
-                              height: '20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginRight: '4px'
-                            }}>
-                              T
-                            </span>
+                            <img 
+                              src="/kakao-logo.png" 
+                              alt="KakaoTalk" 
+                              style={{ 
+                                width: '16px', 
+                                height: '16px',
+                                marginRight: '4px'
+                              }}
+                            />
                           }
                           onClick={() => handleKakaoTalk(selectedStore, selectedModel, selectedColor)}
                           size="small"
