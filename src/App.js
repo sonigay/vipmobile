@@ -76,6 +76,7 @@ function App() {
   // 재고요청점 검색 관련 상태 추가
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [forceZoomToStore, setForceZoomToStore] = useState(null); // 강제 확대 상태 추가
   // 현재 세션의 IP 및 위치 정보
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -581,20 +582,17 @@ function App() {
     setSearchQuery('');
     setSearchResults([]);
     
-    // 선택된 매장으로 지도 이동 (더 확대된 줌 레벨)
+    // 선택된 매장으로 지도 이동 (강제 확대)
     if (store.latitude && store.longitude) {
-      setUserLocation({
-        lat: parseFloat(store.latitude),
-        lng: parseFloat(store.longitude)
-      });
+      const lat = parseFloat(store.latitude);
+      const lng = parseFloat(store.longitude);
       
-      // 지도 확대를 위해 강제로 줌 레벨 설정
+      setUserLocation({ lat, lng });
+      setForceZoomToStore({ lat, lng });
+      
+      // 강제 확대 상태 초기화 (다음 렌더링에서 실행)
       setTimeout(() => {
-        const mapElement = document.querySelector('.leaflet-container');
-        if (mapElement && mapElement._leaflet_map) {
-          const map = mapElement._leaflet_map;
-          map.setView([parseFloat(store.latitude), parseFloat(store.longitude)], 16);
-        }
+        setForceZoomToStore(null);
       }, 100);
     }
   }, []);
@@ -874,6 +872,7 @@ function App() {
                   selectedColor={selectedColor}
                   loggedInStoreId={loggedInStore?.id}
                   isAgentMode={isAgentMode}
+                  forceZoomToStore={forceZoomToStore}
                 />
               </Box>
             </>

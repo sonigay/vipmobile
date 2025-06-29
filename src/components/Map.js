@@ -59,13 +59,15 @@ function Map({
   selectedColor,
   loggedInStoreId,
   onStoreSelect,
-  isAgentMode
+  isAgentMode,
+  forceZoomToStore
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const initialLoadRef = useRef(true);
   const previousSelectedStoreRef = useRef(null);
+  const mapRef = useRef(null);
 
   const center = useMemo(() => userLocation || defaultCenter, [userLocation]);
 
@@ -180,6 +182,7 @@ function Map({
   const onMapLoad = useCallback((mapInstance) => {
     console.log('지도 로드됨');
     setMap(mapInstance);
+    mapRef.current = mapInstance; // ref 설정
     
     // 지도가 완전히 로드될 때까지 대기
     setTimeout(() => {
@@ -227,6 +230,23 @@ function Map({
       previousSelectedStoreRef.current = selectedStore.id;
     }
   }, [map, selectedStore, safeMapOperation, isAgentMode]);
+
+  // 강제 확대 (검색 결과 선택 시)
+  useEffect(() => {
+    if (forceZoomToStore && mapRef.current && isMapReady) {
+      const { lat, lng } = forceZoomToStore;
+      console.log('강제 확대 실행:', lat, lng);
+      
+      try {
+        mapRef.current.setView([lat, lng], 16, {
+          animate: true,
+          duration: 1
+        });
+      } catch (error) {
+        console.error('강제 확대 중 오류:', error);
+      }
+    }
+  }, [forceZoomToStore, isMapReady]);
 
   // 지도 범위 계산
   const mapBounds = useMemo(() => {
@@ -290,6 +310,7 @@ function Map({
         whenCreated={onMapLoad}
         zoomControl={true}
         attributionControl={false}
+        ref={mapRef}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
