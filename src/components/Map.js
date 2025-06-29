@@ -33,19 +33,19 @@ const defaultCenter = {
 };
 
 // 지도 뷰 업데이트를 위한 컴포넌트
-function MapUpdater({ center, bounds, zoom }) {
+function MapUpdater({ center, bounds, zoom, isAgentMode }) {
   const map = useMap();
   
   useEffect(() => {
     if (bounds) {
       map.fitBounds(bounds);
-      if (map.getZoom() > 15) {
-        map.setZoom(15);
+      if (map.getZoom() > (isAgentMode ? 12 : 15)) {
+        map.setZoom(isAgentMode ? 12 : 15);
       }
     } else if (center) {
-      map.setView([center.lat, center.lng], zoom || 12);
+      map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
     }
-  }, [map, center, bounds, zoom]);
+  }, [map, center, bounds, zoom, isAgentMode]);
   
   return null;
 }
@@ -254,13 +254,13 @@ function Map({
     if (mapBounds && (initialLoadRef.current || !userInteracted)) {
       safeMapOperation(() => {
         map.fitBounds(mapBounds);
-        if (map.getZoom() > 15) {
-          map.setZoom(15);
+        if (map.getZoom() > (isAgentMode ? 12 : 15)) {
+          map.setZoom(isAgentMode ? 12 : 15);
         }
       });
       initialLoadRef.current = false;
     }
-  }, [map, mapBounds, userInteracted, safeMapOperation]);
+  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode]);
 
   // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
@@ -274,8 +274,8 @@ function Map({
       
       safeMapOperation(() => {
         map.fitBounds(bounds);
-        if (map.getZoom() > 15) {
-          map.setZoom(15);
+        if (map.getZoom() > (isAgentMode ? 12 : 15)) {
+          map.setZoom(isAgentMode ? 12 : 15);
         }
       });
     }
@@ -285,7 +285,7 @@ function Map({
     <Paper sx={mapContainerStyle}>
       <MapContainer
         center={[center.lat, center.lng]}
-        zoom={12}
+        zoom={isAgentMode ? 9 : 12}
         style={containerStyle}
         whenCreated={onMapLoad}
         zoomControl={true}
@@ -300,7 +300,8 @@ function Map({
         <MapUpdater 
           center={center} 
           bounds={mapBounds} 
-          zoom={12}
+          zoom={isAgentMode ? 9 : 12}
+          isAgentMode={isAgentMode}
         />
         
         {/* 매장 마커들 */}

@@ -116,12 +116,12 @@ function App() {
           setAgentQualification(parsedState.agentQualification || '');
           setAgentContactId(parsedState.agentContactId || '');
           
-          // 관리자 모드 위치 설정
+          // 관리자 모드 위치 설정 (안산지역 중심)
           setUserLocation({
-            lat: 37.5665,
-            lng: 126.9780,
+            lat: 37.3215,  // 안산지역 중심
+            lng: 126.8309,
           });
-          setSelectedRadius(50000);
+          setSelectedRadius(80000);
         } else if (parsedState.isInventory) {
           // 재고모드 상태 복원
           setIsInventoryMode(true);
@@ -429,13 +429,13 @@ function App() {
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
       
-      // 관리자 모드에서는 서울시청을 중심으로 전체 지역 보기
+      // 관리자 모드에서는 안산지역을 중심으로 인천-평택 지역 보기
       setUserLocation({
-        lat: 37.5665,
-        lng: 126.9780,
+        lat: 37.3215,  // 안산지역 중심
+        lng: 126.8309,
       });
-      // 검색 반경 최대로 설정 (지도에서 전체 지역 보이도록)
-      setSelectedRadius(50000);
+      // 검색 반경을 더 넓게 설정 (인천-평택 지역까지 보이도록)
+      setSelectedRadius(80000);
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
