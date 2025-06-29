@@ -43,8 +43,8 @@ function ForceZoomUpdater({ forceZoomToStore }) {
       
       if (map) {
         try {
-          // 즉시 확대
-          map.setView([lat, lng], 16, {
+          // 적당한 확대 (줌 레벨 14)
+          map.setView([lat, lng], 14, {
             animate: true,
             duration: 1
           });
@@ -286,7 +286,7 @@ function Map({
       
       try {
         const mapInstance = mapRef.current;
-        mapInstance.setView([lat, lng], 16, {
+        mapInstance.setView([lat, lng], 14, {
           animate: true,
           duration: 1
         });

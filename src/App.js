@@ -602,7 +602,7 @@ function App() {
         setTimeout(() => {
           console.log('강제 확대 상태 초기화');
           setForceZoomToStore(null);
-        }, 1000);
+        }, 5000); // 5초로 증가하여 확대 완료 보장
       }, 100);
     }
   }, []);
