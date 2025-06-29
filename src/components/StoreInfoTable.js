@@ -146,9 +146,9 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
 
     const message = `📱 앱 전송 메시지
 
-안녕하세요! ${store.name} 매장입니다.
+안녕하세요! ${store.name}에서
 
-${model} ${color} 모델이 재고에 있는지 확인 부탁드립니다.
+${model} / ${color} 모델
 
 사용 가능한지 확인 부탁드립니다. 감사합니다.`;
 
