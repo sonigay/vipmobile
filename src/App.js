@@ -561,20 +561,51 @@ function App() {
   const getStoreInventory = useCallback((store) => {
     if (!store || !store.inventory) return 0;
     
-    // 모델과 색상 모두 선택된 경우
-    if (selectedModel && selectedColor && store.inventory[selectedModel]) {
-      return store.inventory[selectedModel][selectedColor] || 0;
+    // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
+    let totalInventory = 0;
+    
+    if (selectedModel && selectedColor) {
+      // 특정 모델과 색상의 재고 확인
+      Object.values(store.inventory).forEach(category => {
+        if (category[selectedModel]) {
+          Object.values(category[selectedModel]).forEach(status => {
+            if (status[selectedColor]) {
+              totalInventory += status[selectedColor] || 0;
+            }
+          });
+        }
+      });
+    } else if (selectedModel) {
+      // 특정 모델의 전체 재고 확인
+      Object.values(store.inventory).forEach(category => {
+        if (category[selectedModel]) {
+          Object.values(category[selectedModel]).forEach(status => {
+            Object.values(status).forEach(qty => {
+              totalInventory += qty || 0;
+            });
+          });
+        }
+      });
+    } else {
+      // 전체 재고 계산
+      Object.values(store.inventory).forEach(category => {
+        if (typeof category === 'object' && category !== null) {
+          Object.values(category).forEach(model => {
+            if (typeof model === 'object' && model !== null) {
+              Object.values(model).forEach(status => {
+                if (typeof status === 'object' && status !== null) {
+                  Object.values(status).forEach(qty => {
+                    totalInventory += qty || 0;
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
     }
     
-    // 모델만 선택된 경우
-    if (selectedModel && store.inventory[selectedModel]) {
-      return Object.values(store.inventory[selectedModel]).reduce((sum, qty) => sum + qty, 0);
-    }
-    
-    // 아무것도 선택되지 않은 경우: 총 재고 계산
-    return Object.entries(store.inventory).reduce((total, [model, colors]) => {
-      return total + Object.values(colors).reduce((sum, qty) => sum + qty, 0);
-    }, 0);
+    return totalInventory;
   }, [selectedModel, selectedColor]);
 
   if (!isLoggedIn) {
@@ -620,18 +651,34 @@ function App() {
                         재고: {(() => {
                           if (!loggedInStore.inventory) return 0;
                           
-                          // 해당 모델과 색상 재고 계산
-                          if (selectedModel && selectedColor && loggedInStore.inventory[selectedModel]) {
-                            return loggedInStore.inventory[selectedModel][selectedColor] || 0;
+                          // 새로운 데이터 구조에 맞게 재고 계산
+                          let totalInventory = 0;
+                          
+                          if (selectedModel && selectedColor) {
+                            // 특정 모델과 색상의 재고 확인
+                            Object.values(loggedInStore.inventory).forEach(category => {
+                              if (category[selectedModel]) {
+                                Object.values(category[selectedModel]).forEach(status => {
+                                  if (status[selectedColor]) {
+                                    totalInventory += status[selectedColor] || 0;
+                                  }
+                                });
+                              }
+                            });
+                          } else if (selectedModel) {
+                            // 특정 모델의 전체 재고 확인
+                            Object.values(loggedInStore.inventory).forEach(category => {
+                              if (category[selectedModel]) {
+                                Object.values(category[selectedModel]).forEach(status => {
+                                  Object.values(status).forEach(qty => {
+                                    totalInventory += qty || 0;
+                                  });
+                                });
+                              }
+                            });
                           }
                           
-                          // 해당 모델 전체 재고 계산
-                          if (selectedModel && loggedInStore.inventory[selectedModel]) {
-                            return Object.values(loggedInStore.inventory[selectedModel])
-                              .reduce((sum, qty) => sum + (Number(qty) || 0), 0);
-                          }
-                          
-                          return 0;
+                          return totalInventory;
                         })()}
                       </span>
                     ) : (
@@ -639,10 +686,25 @@ function App() {
                         총 재고: {(() => {
                           if (!loggedInStore.inventory) return 0;
                           
-                          // 전체 재고 계산
-                          return Object.entries(loggedInStore.inventory).reduce((total, [model, colors]) => {
-                            return total + Object.values(colors).reduce((sum, qty) => sum + (Number(qty) || 0), 0);
-                          }, 0);
+                          // 새로운 데이터 구조에 맞게 전체 재고 계산
+                          let totalInventory = 0;
+                          Object.values(loggedInStore.inventory).forEach(category => {
+                            if (typeof category === 'object' && category !== null) {
+                              Object.values(category).forEach(model => {
+                                if (typeof model === 'object' && model !== null) {
+                                  Object.values(model).forEach(status => {
+                                    if (typeof status === 'object' && status !== null) {
+                                      Object.values(status).forEach(qty => {
+                                        totalInventory += qty || 0;
+                                      });
+                                    }
+                                  });
+                                }
+                              });
+                            }
+                          });
+                          
+                          return totalInventory;
                         })()}
                       </span>
                     )}
