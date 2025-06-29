@@ -145,7 +145,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
     const storeName = storeInfo.name;
     
     // 메시지 템플릿 구성
-    const message = `<어플전송메시지>\n${manager}님 안녕하세요!\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
+    const message = `📱 앱 전송 메시지\n${manager}님 안녕하세요!\n${storeName}에서 ${selectedModel} / ${selectedColor}\n사용 가능한지 확인 부탁드립니다. 감사합니다`;
     
     // 클립보드에 메시지 복사
     navigator.clipboard.writeText(message).then(() => {
@@ -161,35 +161,51 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
         // 모바일: 여러 방법으로 카카오톡 앱 연결 시도
         const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}&autoJoin=true`;
         
+        console.log('모바일 환경 감지됨');
+        console.log('카카오톡 URL:', kakaoUrl);
+        console.log('User Agent:', navigator.userAgent);
+        
         // 방법 1: window.open 시도
-        const newWindow = window.open(kakaoUrl, '_blank');
-        
-        // 방법 2: window.open이 실패하면 window.location.href 시도
-        setTimeout(() => {
-          if (!newWindow || newWindow.closed) {
-            console.log('window.open 실패, window.location.href 시도');
-            window.location.href = kakaoUrl;
-          }
-        }, 1000);
-        
-        // 방법 3: iframe으로 시도 (브라우저 정책 우회)
-        setTimeout(() => {
-          try {
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = kakaoUrl;
-            document.body.appendChild(iframe);
-            setTimeout(() => {
-              if (document.body.contains(iframe)) {
-                document.body.removeChild(iframe);
+        try {
+          const newWindow = window.open(kakaoUrl, '_blank');
+          console.log('window.open 결과:', newWindow);
+          
+          // 방법 2: window.open이 실패하면 window.location.href 시도
+          setTimeout(() => {
+            if (!newWindow || newWindow.closed) {
+              console.log('window.open 실패, window.location.href 시도');
+              try {
+                window.location.href = kakaoUrl;
+              } catch (error) {
+                console.error('window.location.href 실패:', error);
               }
-            }, 2000);
-          } catch (error) {
-            console.log('iframe 방법도 실패:', error);
-          }
-        }, 2000);
+            }
+          }, 1000);
+          
+          // 방법 3: iframe으로 시도 (브라우저 정책 우회)
+          setTimeout(() => {
+            try {
+              console.log('iframe 방법 시도');
+              const iframe = document.createElement('iframe');
+              iframe.style.display = 'none';
+              iframe.src = kakaoUrl;
+              document.body.appendChild(iframe);
+              setTimeout(() => {
+                if (document.body.contains(iframe)) {
+                  document.body.removeChild(iframe);
+                  console.log('iframe 제거됨');
+                }
+              }, 2000);
+            } catch (error) {
+              console.error('iframe 방법 실패:', error);
+            }
+          }, 2000);
+          
+        } catch (error) {
+          console.error('카카오톡 앱 연결 시도 중 오류:', error);
+        }
         
-        console.log('모바일 환경: 카카오톡 앱 연결 시도');
+        console.log('모바일 환경: 카카오톡 앱 연결 시도 완료');
       } else {
         // 데스크톱: 웹 브라우저에서 카카오톡 열기
         window.open(openChatUrl, '_blank');
@@ -201,14 +217,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
         onKakaoTalkButtonClick();
       }
       
-      // 사용자에게 개선된 안내
-      setTimeout(() => {
-        if (isMobile) {
-          alert('메시지가 클립보드에 복사되었습니다.\n\n1. 카카오톡 앱이 열리지 않으면 수동으로 카카오톡 실행\n2. 오픈채팅방으로 이동\n3. 붙여넣기 후 담당자명 앞에 @ 추가하여 태그\n4. 전송');
-        } else {
-          alert('메시지가 클립보드에 복사되었습니다.\n\n1. 카카오톡에서 붙여넣기\n2. 담당자명 앞에 @ 추가하여 태그\n3. 전송');
-        }
-      }, 1000);
+      // 팝업창 제거 - 사용자가 직접 카카오톡에서 확인하도록 함
     }).catch(err => {
       console.error('클립보드 복사 실패:', err);
       alert('클립보드 복사에 실패했습니다.');
