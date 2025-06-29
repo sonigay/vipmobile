@@ -145,7 +145,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
     const storeName = storeInfo.name;
     
     // 메시지 템플릿 구성
-    const message = `<어플전송메시지>\n@${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
+    const message = `<어플전송메시지>\n${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
     
     // 클립보드에 메시지 복사
     navigator.clipboard.writeText(message).then(() => {
@@ -158,9 +158,9 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
       const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
       if (isMobile) {
-        // 모바일: 카카오톡 앱 전용 링크 (더 안정적)
+        // 모바일: window.open 사용 (더 안정적)
         const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}&autoJoin=true`;
-        window.location.href = kakaoUrl;
+        window.open(kakaoUrl, '_blank');
         console.log('모바일 환경: 카카오톡 앱으로 연결');
       } else {
         // 데스크톱: 웹 브라우저에서 카카오톡 열기
@@ -173,9 +173,9 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
         onKakaoTalkButtonClick();
       }
       
-      // 사용자에게 안내
+      // 사용자에게 개선된 안내
       setTimeout(() => {
-        alert('메시지가 클립보드에 복사되었습니다.\n붙여넣기 후 전송해주세요.');
+        alert('메시지가 클립보드에 복사되었습니다.\n\n1. 카카오톡에서 붙여넣기\n2. 담당자명 앞에 @ 추가하여 태그\n3. 전송');
       }, 1000);
     }).catch(err => {
       console.error('클립보드 복사 실패:', err);
