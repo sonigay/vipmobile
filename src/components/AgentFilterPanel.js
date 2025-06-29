@@ -85,8 +85,15 @@ function AgentFilterPanel({
         
         {/* 검색 결과 목록 */}
         {searchResults.length > 0 && (
-          <Paper elevation={3} sx={{ mt: 1, maxHeight: 200, overflow: 'auto' }}>
+          <Paper elevation={3} sx={{ mt: 1, maxHeight: 300, overflow: 'auto' }}>
             <List dense>
+              <ListItem sx={{ backgroundColor: 'primary.light', color: 'white' }}>
+                <ListItemText
+                  primary={`검색 결과: ${searchResults.length}개`}
+                  primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 'bold' }}
+                />
+              </ListItem>
+              <Divider />
               {searchResults.map((store, index) => (
                 <React.Fragment key={store.id}>
                   <ListItem disablePadding>

@@ -569,6 +569,9 @@ function App() {
       return storeName.includes(searchTerm) || managerName.includes(searchTerm);
     });
     
+    console.log(`검색어: "${query}" - 검색 결과: ${filtered.length}개`);
+    console.log('검색된 매장들:', filtered.map(s => ({ name: s.name, manager: s.manager })));
+    
     setSearchResults(filtered);
   }, [data?.stores]);
 
@@ -578,12 +581,21 @@ function App() {
     setSearchQuery('');
     setSearchResults([]);
     
-    // 선택된 매장으로 지도 이동
+    // 선택된 매장으로 지도 이동 (더 확대된 줌 레벨)
     if (store.latitude && store.longitude) {
       setUserLocation({
         lat: parseFloat(store.latitude),
         lng: parseFloat(store.longitude)
       });
+      
+      // 지도 확대를 위해 강제로 줌 레벨 설정
+      setTimeout(() => {
+        const mapElement = document.querySelector('.leaflet-container');
+        if (mapElement && mapElement._leaflet_map) {
+          const map = mapElement._leaflet_map;
+          map.setView([parseFloat(store.latitude), parseFloat(store.longitude)], 16);
+        }
+      }, 100);
     }
   }, []);
 

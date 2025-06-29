@@ -219,8 +219,8 @@ function Map({
       };
       
       safeMapOperation(() => {
-        // 선택된 매장으로 지도 이동 및 줌 레벨 조정
-        map.setView([position.lat, position.lng], isAgentMode ? 14 : 15);
+        // 선택된 매장으로 지도 이동 및 줌 레벨 조정 (더 확대)
+        map.setView([position.lat, position.lng], isAgentMode ? 16 : 15);
       });
       
       // 선택한 매장 ID 저장
