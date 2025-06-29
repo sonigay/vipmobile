@@ -597,12 +597,6 @@ function App() {
       setTimeout(() => {
         console.log('강제 확대 상태 설정');
         setForceZoomToStore({ lat, lng });
-        
-        // 강제 확대 상태 초기화 (더 긴 지연 시간)
-        setTimeout(() => {
-          console.log('강제 확대 상태 초기화');
-          setForceZoomToStore(null);
-        }, 5000); // 5초로 증가하여 확대 완료 보장
       }, 100);
     }
   }, []);

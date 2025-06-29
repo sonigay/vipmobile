@@ -67,9 +67,9 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
   const map = useMap();
   
   useEffect(() => {
-    // 강제 확대가 진행 중이면 MapUpdater 비활성화
+    // 강제 확대가 진행 중이면 MapUpdater 비활성화 (지도 위치 유지)
     if (forceZoomToStore) {
-      console.log('MapUpdater 비활성화 - 강제 확대 진행 중');
+      console.log('MapUpdater 비활성화 - 강제 확대 상태 유지 중');
       return;
     }
     
