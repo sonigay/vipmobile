@@ -63,6 +63,7 @@ function Map({
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
   const initialLoadRef = useRef(true);
   const previousSelectedStoreRef = useRef(null);
 
@@ -180,6 +181,11 @@ function Map({
     console.log('지도 로드됨');
     setMap(mapInstance);
     
+    // 지도가 완전히 로드될 때까지 대기
+    setTimeout(() => {
+      setIsMapReady(true);
+    }, 100);
+    
     // 사용자 인터랙션 이벤트 리스너 추가
     mapInstance.on('dragstart', () => {
       setUserInteracted(true);
@@ -190,9 +196,20 @@ function Map({
     });
   }, []);
 
+  // 안전한 지도 조작 함수
+  const safeMapOperation = useCallback((operation) => {
+    if (map && isMapReady && map._loaded) {
+      try {
+        operation();
+      } catch (error) {
+        console.warn('지도 조작 중 오류 발생:', error);
+      }
+    }
+  }, [map, isMapReady]);
+
   // 선택된 매장으로 지도 이동
   useEffect(() => {
-    if (!map || !selectedStore || !selectedStore.latitude || !selectedStore.longitude) return;
+    if (!selectedStore || !selectedStore.latitude || !selectedStore.longitude) return;
     
     // 이전에 선택된 매장과 다른 경우에만 처리
     if (previousSelectedStoreRef.current !== selectedStore.id) {
@@ -201,13 +218,15 @@ function Map({
         lng: parseFloat(selectedStore.longitude)
       };
       
-      // 지도 센터만 변경하고 줌 레벨은 유지
-      map.panTo([position.lat, position.lng]);
+      safeMapOperation(() => {
+        // 지도 센터만 변경하고 줌 레벨은 유지
+        map.panTo([position.lat, position.lng]);
+      });
       
       // 선택한 매장 ID 저장
       previousSelectedStoreRef.current = selectedStore.id;
     }
-  }, [map, selectedStore]);
+  }, [map, selectedStore, safeMapOperation]);
 
   // 지도 범위 계산
   const mapBounds = useMemo(() => {
@@ -232,30 +251,35 @@ function Map({
       
   // 초기 로드 시 지도 범위 설정
   useEffect(() => {
-    if (map && mapBounds && (initialLoadRef.current || !userInteracted)) {
-      map.fitBounds(mapBounds);
-      if (map.getZoom() > 15) {
-        map.setZoom(15);
-      }
+    if (mapBounds && (initialLoadRef.current || !userInteracted)) {
+      safeMapOperation(() => {
+        map.fitBounds(mapBounds);
+        if (map.getZoom() > 15) {
+          map.setZoom(15);
+        }
+      });
       initialLoadRef.current = false;
     }
-  }, [map, mapBounds, userInteracted]);
+  }, [map, mapBounds, userInteracted, safeMapOperation]);
 
   // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
-    if (!map || !userLocation || !selectedRadius || isAgentMode) return;
+    if (!userLocation || !selectedRadius || isAgentMode) return;
     
     if (initialLoadRef.current || !userInteracted) {
       const bounds = L.latLngBounds([
         [userLocation.lat - selectedRadius / 111000, userLocation.lng - selectedRadius / (111000 * Math.cos(userLocation.lat * Math.PI / 180))],
         [userLocation.lat + selectedRadius / 111000, userLocation.lng + selectedRadius / (111000 * Math.cos(userLocation.lat * Math.PI / 180))]
       ]);
-      map.fitBounds(bounds);
-      if (map.getZoom() > 15) {
-        map.setZoom(15);
-      }
+      
+      safeMapOperation(() => {
+        map.fitBounds(bounds);
+        if (map.getZoom() > 15) {
+          map.setZoom(15);
+        }
+      });
     }
-  }, [map, selectedRadius, userLocation, isAgentMode, userInteracted]);
+  }, [map, selectedRadius, userLocation, isAgentMode, userInteracted, safeMapOperation]);
 
   return (
     <Paper sx={mapContainerStyle}>
