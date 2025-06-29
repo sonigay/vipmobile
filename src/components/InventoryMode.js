@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import {
   Box,
   Paper,
@@ -31,7 +31,8 @@ import {
   AccordionSummary,
   AccordionDetails,
   Tabs,
-  Tab
+  Tab,
+  Skeleton
 } from '@mui/material';
 import {
   Inventory as InventoryIcon,
@@ -57,16 +58,42 @@ import {
 } from '@mui/icons-material';
 import { fetchData } from '../api';
 
+// 지연 로딩 컴포넌트들
+const InventoryAuditScreen = lazy(() => import('./screens/InventoryAuditScreen'));
+const MasterInventoryScreen = lazy(() => import('./screens/MasterInventoryScreen'));
+const DuplicateCasesScreen = lazy(() => import('./screens/DuplicateCasesScreen'));
+const InventoryAssignmentScreen = lazy(() => import('./screens/InventoryAssignmentScreen'));
+
+// 로딩 스켈레톤 컴포넌트
+const LoadingSkeleton = () => (
+  <Box sx={{ p: 3 }}>
+    <Skeleton variant="rectangular" height={60} sx={{ mb: 2 }} />
+    <Grid container spacing={2}>
+      <Grid item xs={12} md={4}>
+        <Skeleton variant="rectangular" height={120} />
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <Skeleton variant="rectangular" height={120} />
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <Skeleton variant="rectangular" height={120} />
+      </Grid>
+    </Grid>
+    <Skeleton variant="rectangular" height={400} sx={{ mt: 2 }} />
+  </Box>
+);
+
 function InventoryMode({ onLogout, loggedInStore }) {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedMenu, setSelectedMenu] = useState(null);
-  const [currentScreen, setCurrentScreen] = useState('main'); // main, inventory, master, duplicate, assignment
+  const [currentScreen, setCurrentScreen] = useState('main');
+  const [preloadedScreens, setPreloadedScreens] = useState(new Set());
   
   // 검색 관련 상태
-  const [searchType, setSearchType] = useState('store'); // 'store' 또는 'manager'
+  const [searchType, setSearchType] = useState('store');
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredData, setFilteredData] = useState(null);
   
@@ -77,55 +104,55 @@ function InventoryMode({ onLogout, loggedInStore }) {
   // 탭 상태
   const [tabValue, setTabValue] = useState(0);
 
-  // 데이터 로딩
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetchData();
-        if (response.success) {
-          setData(response.data);
-          setFilteredData(response.data);
-        } else {
-          setError('데이터를 불러오는데 실패했습니다.');
-        }
-      } catch (error) {
-        console.error('데이터 로딩 오류:', error);
-        setError('서버 연결에 실패했습니다.');
-      } finally {
-        setIsLoading(false);
+  // 데이터 로딩 (메모이제이션 적용)
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetchData();
+      if (response.success) {
+        setData(response.data);
+        setFilteredData(response.data);
+      } else {
+        setError('데이터를 불러오는데 실패했습니다.');
       }
-    };
-
-    loadData();
+    } catch (error) {
+      console.error('데이터 로딩 오류:', error);
+      setError('서버 연결에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // 검색 필터링
   useEffect(() => {
-    if (!data) return;
+    loadData();
+  }, [loadData]);
+
+  // 검색 필터링 (메모이제이션 적용)
+  const filteredDataMemo = useMemo(() => {
+    if (!data) return null;
 
     if (!searchTerm.trim()) {
-      setFilteredData(data);
-      return;
+      return data;
     }
 
-    const filtered = data.filter(store => {
-      const term = searchTerm.toLowerCase();
-      
+    const term = searchTerm.toLowerCase();
+    
+    return data.filter(store => {
       if (searchType === 'store') {
         return store.name.toLowerCase().includes(term);
       } else if (searchType === 'manager') {
         return store.manager && store.manager.toLowerCase().includes(term);
       }
-      
       return false;
     });
-
-    setFilteredData(filtered);
   }, [data, searchTerm, searchType]);
 
-  // 재고 통계 계산
-  const calculateStats = () => {
+  useEffect(() => {
+    setFilteredData(filteredDataMemo);
+  }, [filteredDataMemo]);
+
+  // 재고 통계 계산 (메모이제이션 적용)
+  const stats = useMemo(() => {
     if (!filteredData) return { totalStores: 0, totalInventory: 0, storesWithInventory: 0 };
 
     let totalInventory = 0;
@@ -146,10 +173,10 @@ function InventoryMode({ onLogout, loggedInStore }) {
       totalInventory,
       storesWithInventory
     };
-  };
+  }, [filteredData]);
 
-  // 담당자별 통계 계산
-  const calculateManagerStats = () => {
+  // 담당자별 통계 계산 (메모이제이션 적용)
+  const managerStats = useMemo(() => {
     if (!filteredData) return [];
 
     const managerMap = new Map();
@@ -176,10 +203,10 @@ function InventoryMode({ onLogout, loggedInStore }) {
     });
 
     return Array.from(managerMap.values()).sort((a, b) => b.totalInventory - a.totalInventory);
-  };
+  }, [filteredData]);
 
-  // 총 재고 수량 계산
-  const getTotalInventory = (store) => {
+  // 총 재고 수량 계산 (메모이제이션 적용)
+  const getTotalInventory = useCallback((store) => {
     if (!store.inventory) return 0;
     
     let total = 0;
@@ -194,10 +221,75 @@ function InventoryMode({ onLogout, loggedInStore }) {
     });
     
     return total;
+  }, []);
+
+  // 화면 사전 로딩 함수
+  const preloadScreen = useCallback((screenName) => {
+    if (!preloadedScreens.has(screenName)) {
+      setPreloadedScreens(prev => new Set([...prev, screenName]));
+      console.log(`화면 사전 로딩: ${screenName}`);
+    }
+  }, [preloadedScreens]);
+
+  // 메뉴 호버 시 화면 사전 로딩
+  const handleMenuHover = useCallback((menuType, subMenu) => {
+    const screenName = `${menuType}_${subMenu}`;
+    preloadScreen(screenName);
+  }, [preloadScreen]);
+
+  // 체크박스 핸들러
+  const handleStoreSelect = (storeId) => {
+    setSelectedStores(prev => {
+      if (prev.includes(storeId)) {
+        return prev.filter(id => id !== storeId);
+      } else {
+        if (prev.length >= 5) {
+          alert('최대 5개 매장까지만 선택할 수 있습니다.');
+          return prev;
+        }
+        return [...prev, storeId];
+      }
+    });
   };
 
-  // 매장별 재고 정보 정리
-  const getStoreInventorySummary = (store) => {
+  // 메뉴 핸들러 (최적화)
+  const handleMenuClick = useCallback((event, menuType) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedMenu(menuType);
+  }, []);
+
+  const handleMenuClose = useCallback(() => {
+    setAnchorEl(null);
+    setSelectedMenu(null);
+  }, []);
+
+  const handleSubMenuClick = useCallback((subMenu) => {
+    console.log(`${selectedMenu} - ${subMenu} 메뉴 클릭`);
+    const screenName = `${selectedMenu}_${subMenu}`;
+    
+    // 화면 전환 시 즉시 로딩 상태 표시
+    setCurrentScreen('loading');
+    
+    // 다음 틱에서 실제 화면 전환 (UI 블로킹 방지)
+    setTimeout(() => {
+      setCurrentScreen(screenName);
+      handleMenuClose();
+    }, 0);
+  }, [selectedMenu, handleMenuClose]);
+
+  // 탭 변경 핸들러 (최적화)
+  const handleTabChange = useCallback((event, newValue) => {
+    setTabValue(newValue);
+  }, []);
+
+  // 메인 화면으로 돌아가기 (최적화)
+  const handleBackToMain = useCallback(() => {
+    setCurrentScreen('main');
+    setTabValue(0);
+  }, []);
+
+  // 매장별 재고 정보 정리 (메모이제이션 적용)
+  const getStoreInventorySummary = useCallback((store) => {
     if (!store.inventory) return { 
       total: 0, 
       phones: { normal: 0, history: 0, defective: 0 }, 
@@ -259,10 +351,10 @@ function InventoryMode({ onLogout, loggedInStore }) {
     });
 
     return summary;
-  };
+  }, []);
 
-  // 매장 상태 판단 (상태별 재고 기준)
-  const getStoreStatus = (store) => {
+  // 매장 상태 판단 (메모이제이션 적용)
+  const getStoreStatus = useCallback((store) => {
     const inventorySummary = getStoreInventorySummary(store);
     
     // 정상 재고가 있는지 확인
@@ -286,53 +378,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
     } else {
       return { status: '이력재고', color: 'warning', icon: <HistoryIcon /> };
     }
-  };
-
-  // 체크박스 핸들러
-  const handleStoreSelect = (storeId) => {
-    setSelectedStores(prev => {
-      if (prev.includes(storeId)) {
-        return prev.filter(id => id !== storeId);
-      } else {
-        if (prev.length >= 5) {
-          alert('최대 5개 매장까지만 선택할 수 있습니다.');
-          return prev;
-        }
-        return [...prev, storeId];
-      }
-    });
-  };
-
-  // 메뉴 핸들러
-  const handleMenuClick = (event, menuType) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedMenu(menuType);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedMenu(null);
-  };
-
-  const handleSubMenuClick = (subMenu) => {
-    console.log(`${selectedMenu} - ${subMenu} 메뉴 클릭`);
-    setCurrentScreen(`${selectedMenu}_${subMenu}`);
-    handleMenuClose();
-  };
-
-  // 탭 변경 핸들러
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  // 메인 화면으로 돌아가기
-  const handleBackToMain = () => {
-    setCurrentScreen('main');
-    setTabValue(0);
-  };
-
-  const stats = calculateStats();
-  const managerStats = calculateManagerStats();
+  }, [getStoreInventorySummary]);
 
   if (isLoading) {
     return (
@@ -367,6 +413,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
               <Button 
                 color="inherit" 
                 onClick={(e) => handleMenuClick(e, 'inventory')}
+                onMouseEnter={() => handleMenuHover('inventory', 'inventory')}
                 endIcon={<ExpandMoreIcon />}
               >
                 재고실사
@@ -375,6 +422,10 @@ function InventoryMode({ onLogout, loggedInStore }) {
               <Button 
                 color="inherit" 
                 onClick={(e) => handleMenuClick(e, 'master')}
+                onMouseEnter={() => {
+                  handleMenuHover('master', 'phone');
+                  handleMenuHover('master', 'sim');
+                }}
                 endIcon={<ExpandMoreIcon />}
               >
                 마스터재고매칭
@@ -383,6 +434,10 @@ function InventoryMode({ onLogout, loggedInStore }) {
               <Button 
                 color="inherit" 
                 onClick={(e) => handleMenuClick(e, 'duplicate')}
+                onMouseEnter={() => {
+                  handleMenuHover('duplicate', 'phone');
+                  handleMenuHover('duplicate', 'sim');
+                }}
                 endIcon={<ExpandMoreIcon />}
               >
                 폰클중복건
@@ -391,6 +446,10 @@ function InventoryMode({ onLogout, loggedInStore }) {
               <Button 
                 color="inherit" 
                 onClick={(e) => handleMenuClick(e, 'assignment')}
+                onMouseEnter={() => {
+                  handleMenuHover('assignment', 'office');
+                  handleMenuHover('assignment', 'sales');
+                }}
                 endIcon={<ExpandMoreIcon />}
               >
                 재고배정
@@ -907,7 +966,83 @@ function InventoryMode({ onLogout, loggedInStore }) {
     );
   }
 
-  // 다른 화면들 (임시)
+  // 다른 화면들 (지연 로딩 적용)
+  if (currentScreen === 'loading') {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <AppBar position="static">
+          <Toolbar>
+            <Button color="inherit" onClick={handleBackToMain} sx={{ mr: 2 }}>
+              ← 뒤로가기
+            </Button>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              화면 로딩 중...
+            </Typography>
+            <Button color="inherit" onClick={onLogout}>
+              로그아웃
+            </Button>
+          </Toolbar>
+        </AppBar>
+        
+        <LoadingSkeleton />
+      </Box>
+    );
+  }
+
+  // 지연 로딩 화면들
+  if (currentScreen.startsWith('inventory_')) {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <InventoryAuditScreen 
+          data={data}
+          onBack={handleBackToMain}
+          onLogout={onLogout}
+          screenType={currentScreen}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen.startsWith('master_')) {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <MasterInventoryScreen 
+          data={data}
+          onBack={handleBackToMain}
+          onLogout={onLogout}
+          screenType={currentScreen}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen.startsWith('duplicate_')) {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <DuplicateCasesScreen 
+          data={data}
+          onBack={handleBackToMain}
+          onLogout={onLogout}
+          screenType={currentScreen}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen.startsWith('assignment_')) {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <InventoryAssignmentScreen 
+          data={data}
+          onBack={handleBackToMain}
+          onLogout={onLogout}
+          screenType={currentScreen}
+        />
+      </Suspense>
+    );
+  }
+
+  // 기본 화면 (임시)
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppBar position="static">

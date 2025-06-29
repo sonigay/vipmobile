@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress } from '@mui/material';
+import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress, Chip } from '@mui/material';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
-import { fetchData, fetchModels } from './api';
+import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
@@ -76,9 +76,29 @@ function App() {
   // 현재 세션의 IP 및 위치 정보
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
+  // 캐시 상태
+  const [cacheStatus, setCacheStatus] = useState(null);
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
+
+  // 캐시 상태 업데이트 함수
+  const updateCacheStatus = useCallback(() => {
+    const status = cacheManager.getStatus();
+    setCacheStatus(status);
+  }, []);
+
+  // 캐시 정리 함수
+  const handleCacheCleanup = useCallback(() => {
+    cacheManager.cleanup();
+    updateCacheStatus();
+  }, [updateCacheStatus]);
+
+  // 전체 캐시 삭제 함수
+  const handleCacheClearAll = useCallback(() => {
+    cacheManager.clearAll();
+    updateCacheStatus();
+  }, [updateCacheStatus]);
 
   // 로그인 상태 복원
   useEffect(() => {
@@ -192,6 +212,13 @@ function App() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 캐시 상태 주기적 업데이트
+  useEffect(() => {
+    updateCacheStatus();
+    const interval = setInterval(updateCacheStatus, 30000); // 30초마다 업데이트
+    return () => clearInterval(interval);
+  }, [updateCacheStatus]);
 
   // 로그인한 매장 정보 업데이트 (재고 정보 포함)
   useEffect(() => {
@@ -712,6 +739,27 @@ function App() {
                 )}
                 {!loggedInStore && '가까운 가용재고 조회'}
               </Typography>
+              
+              {/* 캐시 상태 표시 */}
+              {cacheStatus && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
+                  <Chip 
+                    label={`캐시: ${cacheStatus.memory.valid}/${cacheStatus.memory.total}`}
+                    size="small"
+                    color={cacheStatus.memory.valid > 0 ? "success" : "default"}
+                    variant="outlined"
+                    sx={{ fontSize: '0.7em' }}
+                  />
+                  <Chip 
+                    label={`LS: ${cacheStatus.localStorage.total}`}
+                    size="small"
+                    color={cacheStatus.localStorage.total > 0 ? "info" : "default"}
+                    variant="outlined"
+                    sx={{ fontSize: '0.7em' }}
+                  />
+                </Box>
+              )}
+              
               {isLoggedIn && (
                 <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
                   로그아웃

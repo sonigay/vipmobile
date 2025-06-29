@@ -8,6 +8,90 @@ const NodeGeocoder = require('node-geocoder');
 const app = express();
 const port = process.env.PORT || 4000;
 
+// 캐싱 시스템 설정
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5분 (5 * 60 * 1000ms)
+const MAX_CACHE_SIZE = 100; // 최대 캐시 항목 수
+
+// 캐시 유틸리티 함수들
+const cacheUtils = {
+  // 캐시에 데이터 저장
+  set: (key, data, ttl = CACHE_TTL) => {
+    const now = Date.now();
+    cache.set(key, {
+      data,
+      timestamp: now,
+      ttl: now + ttl
+    });
+    
+    // 캐시 크기 제한 확인
+    if (cache.size > MAX_CACHE_SIZE) {
+      const firstKey = cache.keys().next().value;
+      cache.delete(firstKey);
+    }
+    
+    console.log(`캐시 저장: ${key} (TTL: ${new Date(now + ttl).toLocaleTimeString()})`);
+  },
+  
+  // 캐시에서 데이터 가져오기
+  get: (key) => {
+    const item = cache.get(key);
+    if (!item) {
+      console.log(`캐시 미스: ${key}`);
+      return null;
+    }
+    
+    const now = Date.now();
+    if (now > item.ttl) {
+      cache.delete(key);
+      console.log(`캐시 만료: ${key}`);
+      return null;
+    }
+    
+    console.log(`캐시 히트: ${key}`);
+    return item.data;
+  },
+  
+  // 캐시 삭제
+  delete: (key) => {
+    cache.delete(key);
+    console.log(`캐시 삭제: ${key}`);
+  },
+  
+  // 캐시 전체 정리 (만료된 항목들)
+  cleanup: () => {
+    const now = Date.now();
+    let deletedCount = 0;
+    
+    for (const [key, item] of cache.entries()) {
+      if (now > item.ttl) {
+        cache.delete(key);
+        deletedCount++;
+      }
+    }
+    
+    if (deletedCount > 0) {
+      console.log(`캐시 정리 완료: ${deletedCount}개 항목 삭제`);
+    }
+  },
+  
+  // 캐시 상태 확인
+  status: () => {
+    const now = Date.now();
+    const validItems = Array.from(cache.entries()).filter(([key, item]) => now <= item.ttl);
+    return {
+      total: cache.size,
+      valid: validItems.length,
+      expired: cache.size - validItems.length
+    };
+  }
+};
+
+// 주기적 캐시 정리 (5분마다)
+setInterval(() => {
+  cacheUtils.cleanup();
+}, 5 * 60 * 1000);
+
 // Discord 봇 설정
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
@@ -226,14 +310,29 @@ const auth = new google.auth.JWT({
 // Google Sheets API 초기화
 const sheets = google.sheets({ version: 'v4', auth });
 
-// 데이터 시트에서 값 가져오기
+// 데이터 시트에서 값 가져오기 (캐싱 적용)
 async function getSheetValues(sheetName) {
+  const cacheKey = `sheet_${sheetName}`;
+  
+  // 캐시에서 먼저 확인
+  const cachedData = cacheUtils.get(cacheKey);
+  if (cachedData) {
+    return cachedData;
+  }
+  
   try {
+    console.log(`Google Sheets API 호출: ${sheetName}`);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: sheetName
     });
-    return response.data.values || [];
+    
+    const data = response.data.values || [];
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, data);
+    
+    return data;
   } catch (error) {
     console.error(`Error fetching sheet ${sheetName}:`, error);
     throw error;
@@ -343,6 +442,7 @@ app.get('/', (req, res) => {
   res.json({ 
     status: 'Server is running',
     timestamp: new Date().toISOString(),
+    cache: cacheUtils.status(),
     env: {
       SHEET_ID: SPREADSHEET_ID ? 'SET' : 'NOT SET',
       GOOGLE_SERVICE_ACCOUNT_EMAIL: GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'SET' : 'NOT SET',
@@ -350,6 +450,38 @@ app.get('/', (req, res) => {
       PORT: process.env.PORT || 4000
     }
   });
+});
+
+// 캐시 상태 확인용 엔드포인트
+app.get('/api/cache-status', (req, res) => {
+  res.json({
+    status: 'success',
+    cache: cacheUtils.status(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 캐시 강제 새로고침 엔드포인트
+app.post('/api/cache-refresh', (req, res) => {
+  const { sheet } = req.body;
+  
+  if (sheet) {
+    // 특정 시트 캐시만 삭제
+    cacheUtils.delete(`sheet_${sheet}`);
+    res.json({
+      status: 'success',
+      message: `캐시 새로고침 완료: ${sheet}`,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    // 전체 캐시 정리
+    cacheUtils.cleanup();
+    res.json({
+      status: 'success',
+      message: '전체 캐시 새로고침 완료',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // 주소를 위도/경도로 변환하여 시트에 업데이트
@@ -430,10 +562,20 @@ app.post('/api/update-coordinates', async (req, res) => {
   }
 });
 
-// 스토어 데이터 가져오기
+// 스토어 데이터 가져오기 (캐싱 적용)
 app.get('/api/stores', async (req, res) => {
+  const cacheKey = 'processed_stores_data';
+  
+  // 캐시에서 먼저 확인
+  const cachedStores = cacheUtils.get(cacheKey);
+  if (cachedStores) {
+    console.log('캐시된 매장 데이터 반환');
+    return res.json(cachedStores);
+  }
+  
   try {
-    console.log('Fetching store data...');
+    console.log('매장 데이터 처리 시작...');
+    const startTime = Date.now();
     
     const [inventoryValues, storeValues] = await Promise.all([
       getSheetValues(INVENTORY_SHEET_NAME),
@@ -452,14 +594,10 @@ app.get('/api/stores', async (req, res) => {
     const today = new Date();
     const threeDaysAgo = new Date(today);
     threeDaysAgo.setDate(today.getDate() - 3);
-    
-    console.log(`오늘 날짜: ${today.toISOString().split('T')[0]}`);
-    console.log(`3일 전 날짜: ${threeDaysAgo.toISOString().split('T')[0]}`);
 
     // 매장별 재고 데이터 매핑
     const inventoryMap = {};
     
-    console.log('Processing inventory data...');
     inventoryRows.forEach((row, index) => {
       if (!row || row.length < 15) return; // 최소 O열까지 데이터가 있어야 함
       
@@ -470,16 +608,10 @@ app.get('/api/stores', async (req, res) => {
       const type = (row[4] || '').toString().trim();       // E열: 종류 (단말기, 웨어러블, 스마트기기, 유심)
       const shippingDate = row[14] ? new Date(row[14]) : null;  // O열: 출고일
       
-      if (!storeName || !model || !color) {
-        console.log(`Skipping row ${index + 4}: Invalid data`, { storeName, model, color });
-        return;
-      }
+      if (!storeName || !model || !color) return;
 
       // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외
-      if (shippingDate && shippingDate >= threeDaysAgo) {
-        console.log(`Skipping recent inventory: ${model} ${color} at ${storeName}, shipping date: ${shippingDate.toISOString().split('T')[0]}`);
-        return;
-      }
+      if (shippingDate && shippingDate >= threeDaysAgo) return;
 
       // 매장별 재고 데이터 구조 생성
       if (!inventoryMap[storeName]) {
@@ -518,14 +650,6 @@ app.get('/api/stores', async (req, res) => {
       }
     });
 
-    // 담당자 정보 확인을 위한 로깅
-    console.log('매장 담당자 정보 샘플:');
-    storeRows.slice(0, 5).forEach((row, idx) => {
-      const name = row[6] || ''; // F열: 업체명
-      const manager = row[13] || ''; // M열: 담당자
-      console.log(`[${idx}] ${name}: 담당자 = "${manager}"`);
-    });
-
     // 매장 정보와 재고 정보 결합
     const stores = storeRows
       .filter(row => {
@@ -540,7 +664,7 @@ app.get('/api/stores', async (req, res) => {
         const name = row[6].toString().trim();         // F열: 업체명
         const storeId = row[7];                        // G열: 매장 ID
         const phone = row[9] || '';                    // I열: 연락처
-        const manager = row[13] || '';                 // M열: 담당자 (빈 문자열이 아닌 실제 값 확인)
+        const manager = row[13] || '';                 // M열: 담당자
         const address = (row[3] || '').toString();    // X열: 주소
         
         // 빈 매장 ID 제외
@@ -549,41 +673,26 @@ app.get('/api/stores', async (req, res) => {
         }
 
         const inventory = inventoryMap[name] || {};
-        
-        // 재고 데이터 로깅 (특정 매장에 대해서만)
-        if (name === "승텔레콤(인천부평)") {
-          console.log('Found store:', name);
-          console.log('Store manager:', manager);
-          console.log('Inventory data:', JSON.stringify(inventory, null, 2));
-        }
 
         return {
           id: storeId.toString(),
           name,
           address,
           phone,
-          manager, // 담당자 정보 추가
+          manager,
           latitude,
           longitude,
-          // 매장 ID와 업체명을 조합한 고유 식별자 추가
           uniqueId: `${storeId}_${name}`,
           inventory: inventory
         };
       })
       .filter(store => store !== null); // null 값 제거
 
-    console.log(`Returning ${stores.length} stores with inventory data`);
+    const processingTime = Date.now() - startTime;
+    console.log(`매장 데이터 처리 완료: ${stores.length}개 매장, ${processingTime}ms 소요`);
     
-    // 전체 재고 현황 요약 로깅
-    const inventorySummary = stores
-      .filter(store => Object.keys(store.inventory).length > 0)
-      .map(store => ({
-        매장명: store.name,
-        담당자: store.manager,
-        모델수: Object.keys(store.inventory).length
-      }));
-    
-    console.log('Inventory and manager summary:', JSON.stringify(inventorySummary.slice(0, 10), null, 2));
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, stores);
     
     res.json(stores);
   } catch (error) {
@@ -595,10 +704,20 @@ app.get('/api/stores', async (req, res) => {
   }
 });
 
-// 모델과 색상 데이터 가져오기
+// 모델과 색상 데이터 가져오기 (캐싱 적용)
 app.get('/api/models', async (req, res) => {
+  const cacheKey = 'processed_models_data';
+  
+  // 캐시에서 먼저 확인
+  const cachedModels = cacheUtils.get(cacheKey);
+  if (cachedModels) {
+    console.log('캐시된 모델 데이터 반환');
+    return res.json(cachedModels);
+  }
+  
   try {
-    console.log('Fetching model and color data...');
+    console.log('모델 데이터 처리 시작...');
+    const startTime = Date.now();
     
     const inventoryValues = await getSheetValues(INVENTORY_SHEET_NAME);
     
@@ -637,7 +756,12 @@ app.get('/api/models', async (req, res) => {
       return acc;
     }, {});
 
-    console.log(`Returning model and color data with ${Object.keys(result).length} models`);
+    const processingTime = Date.now() - startTime;
+    console.log(`모델 데이터 처리 완료: ${Object.keys(result).length}개 모델, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, result);
+    
     res.json(result);
   } catch (error) {
     console.error('Error fetching model and color data:', error);
@@ -648,10 +772,20 @@ app.get('/api/models', async (req, res) => {
   }
 });
 
-// 대리점 ID 정보 가져오기
+// 대리점 ID 정보 가져오기 (캐싱 적용)
 app.get('/api/agents', async (req, res) => {
+  const cacheKey = 'processed_agents_data';
+  
+  // 캐시에서 먼저 확인
+  const cachedAgents = cacheUtils.get(cacheKey);
+  if (cachedAgents) {
+    console.log('캐시된 대리점 데이터 반환');
+    return res.json(cachedAgents);
+  }
+  
   try {
-    console.log('Fetching agent data...');
+    console.log('대리점 데이터 처리 시작...');
+    const startTime = Date.now();
     
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
     
@@ -671,7 +805,12 @@ app.get('/api/agents', async (req, res) => {
       };
     }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
     
-    console.log(`Returning ${agents.length} agent records`);
+    const processingTime = Date.now() - startTime;
+    console.log(`대리점 데이터 처리 완료: ${agents.length}개 대리점, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, agents);
+    
     res.json(agents);
   } catch (error) {
     console.error('Error fetching agent data:', error);
@@ -682,124 +821,103 @@ app.get('/api/agents', async (req, res) => {
   }
 });
 
-// 사용자 활동 로깅 API
+// 사용자 활동 로깅 API (비동기 처리)
 app.post('/api/log-activity', async (req, res) => {
-  try {
-    const { 
-      userId, 
-      userType, 
-      targetName, 
-      ipAddress, 
-      location, 
-      deviceInfo, 
-      activity, 
-      model, 
-      colorName,
-      callButton 
-    } = req.body;
-    
-    // 콘솔에 로그 출력 (더 자세하게)
-    console.log('========== 사용자 활동 로그 API 호출됨 ==========');
-    console.log('요청 본문:', JSON.stringify(req.body, null, 2));
-    console.log('IP 주소:', req.ip || req.connection.remoteAddress);
-    console.log('요청 경로:', req.originalUrl);
-    console.log('요청 메서드:', req.method);
-    console.log('요청 헤더:', JSON.stringify(req.headers, null, 2));
-    
-    // 활동 유형에 따른 제목 설정
-    let title = '사용자 활동';
-    let embedColor = 3447003; // 파란색
-    
-    if (activity === 'login') {
-      title = '사용자 로그인';
-      embedColor = 5763719; // 초록색
-    } else if (activity === 'search') {
-      title = '모델 검색';
-      embedColor = 16776960; // 노란색
-    } else if (activity === 'call_button') {
-      title = '전화 연결 버튼 클릭';
-      embedColor = 15548997; // 빨간색
-    } else if (activity === 'kakao_button') {
-      title = '카톡문구 생성';
-      embedColor = 16776960; // 노란색 (카카오톡 색상)
-    }
-    
-    // Discord로 로그 전송 시도
-    if (DISCORD_LOGGING_ENABLED) {
-      try {
-        console.log('디스코드 로그 전송 시도 중...');
-        
-        // Embed 데이터 구성
-        const embedData = {
-          title: title,
-          color: embedColor,
-          timestamp: new Date().toISOString(),
-          userType: userType || 'store', // userType 정보 추가
-          fields: [
-            {
-              name: '사용자 정보',
-              value: `ID: ${userId}\n종류: ${userType === 'agent' ? '관리자' : '일반'}\n대상: ${targetName || '없음'}`
-            },
-            {
-              name: '접속 정보',
-              value: `IP: ${ipAddress}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
-            }
-          ],
-          footer: {
-            text: userType === 'agent' ? 'VIP+ 관리자 활동 로그' : 'VIP+ 매장 활동 로그'
-          }
-        };
-        
-        // 검색 정보가 있는 경우 필드 추가
-        if (model) {
-          embedData.fields.push({
-            name: '검색 정보',
-            value: `모델: ${model}${colorName ? `\n색상: ${colorName}` : ''}`
-          });
-        }
-        
-        // 전화 연결 버튼 클릭 정보
-        if (callButton) {
-          embedData.fields.push({
-            name: '전화 연결',
-            value: `${callButton}`
-          });
-        }
-        
-        // 카톡문구 생성 버튼 클릭 정보
-        if (req.body.kakaoButton) {
-          embedData.fields.push({
-            name: '카톡문구 생성',
-            value: `카카오톡 메시지 템플릿이 클립보드에 복사되었습니다.`
-          });
-        }
-        
-        console.log('전송할 embedData:', JSON.stringify(embedData, null, 2));
-        
-        // Discord로 로그 전송
-        await sendLogToDiscord(embedData);
-        console.log('디스코드 로그 전송 성공!');
-      } catch (logError) {
-        console.error('활동 로그 Discord 전송 오류:', logError.message);
-        console.error('스택 트레이스:', logError.stack);
-        // 로그 전송 실패는 전체 응답에 영향을 미치지 않음
+  // 즉시 응답 반환
+  res.json({ success: true });
+  
+  // 로깅 처리를 비동기로 실행
+  setImmediate(async () => {
+    try {
+      const { 
+        userId, 
+        userType, 
+        targetName, 
+        ipAddress, 
+        location, 
+        deviceInfo, 
+        activity, 
+        model, 
+        colorName,
+        callButton 
+      } = req.body;
+      
+      // 활동 유형에 따른 제목 설정
+      let title = '사용자 활동';
+      let embedColor = 3447003; // 파란색
+      
+      if (activity === 'login') {
+        title = '사용자 로그인';
+        embedColor = 5763719; // 초록색
+      } else if (activity === 'search') {
+        title = '모델 검색';
+        embedColor = 16776960; // 노란색
+      } else if (activity === 'call_button') {
+        title = '전화 연결 버튼 클릭';
+        embedColor = 15548997; // 빨간색
+      } else if (activity === 'kakao_button') {
+        title = '카톡문구 생성';
+        embedColor = 16776960; // 노란색 (카카오톡 색상)
       }
-    } else {
-      console.log('디스코드 로깅이 비활성화되었습니다.');
-      console.log('DISCORD_LOGGING_ENABLED:', DISCORD_LOGGING_ENABLED);
+      
+      // Discord로 로그 전송 시도
+      if (DISCORD_LOGGING_ENABLED) {
+        try {
+          // Embed 데이터 구성
+          const embedData = {
+            title: title,
+            color: embedColor,
+            timestamp: new Date().toISOString(),
+            userType: userType || 'store',
+            fields: [
+              {
+                name: '사용자 정보',
+                value: `ID: ${userId}\n종류: ${userType === 'agent' ? '관리자' : '일반'}\n대상: ${targetName || '없음'}`
+              },
+              {
+                name: '접속 정보',
+                value: `IP: ${ipAddress}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+              }
+            ],
+            footer: {
+              text: userType === 'agent' ? 'VIP+ 관리자 활동 로그' : 'VIP+ 매장 활동 로그'
+            }
+          };
+          
+          // 검색 정보가 있는 경우 필드 추가
+          if (model) {
+            embedData.fields.push({
+              name: '검색 정보',
+              value: `모델: ${model}${colorName ? `\n색상: ${colorName}` : ''}`
+            });
+          }
+          
+          // 전화 연결 버튼 클릭 정보
+          if (callButton) {
+            embedData.fields.push({
+              name: '전화 연결',
+              value: `${callButton}`
+            });
+          }
+          
+          // 카톡문구 생성 버튼 클릭 정보
+          if (req.body.kakaoButton) {
+            embedData.fields.push({
+              name: '카톡문구 생성',
+              value: `카카오톡 메시지 템플릿이 클립보드에 복사되었습니다.`
+            });
+          }
+          
+          // Discord로 로그 전송
+          await sendLogToDiscord(embedData);
+        } catch (logError) {
+          console.error('활동 로그 Discord 전송 오류:', logError.message);
+        }
+      }
+    } catch (error) {
+      console.error('활동 로그 처리 중 오류:', error);
     }
-    
-    console.log('========== 사용자 활동 로그 처리 완료 ==========');
-    res.json({ success: true });
-  } catch (error) {
-    console.error('활동 로그 처리 중 오류:', error);
-    console.error('스택 트레이스:', error.stack);
-    res.status(500).json({ 
-      success: false, 
-      error: '활동 로그 처리 실패', 
-      message: error.message 
-    });
-  }
+  });
 });
 
 // 로그인 검증 API 추가
