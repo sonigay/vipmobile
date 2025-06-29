@@ -187,7 +187,8 @@ function Map({
     // 지도가 완전히 로드될 때까지 대기
     setTimeout(() => {
       setIsMapReady(true);
-    }, 100);
+      console.log('지도 준비 완료');
+    }, 200); // 더 긴 대기 시간
     
     // 사용자 인터랙션 이벤트 리스너 추가
     mapInstance.on('dragstart', () => {
@@ -235,16 +236,44 @@ function Map({
   useEffect(() => {
     if (forceZoomToStore && mapRef.current && isMapReady) {
       const { lat, lng } = forceZoomToStore;
-      console.log('강제 확대 실행:', lat, lng);
+      console.log('강제 확대 실행:', lat, lng, '지도 상태:', mapRef.current);
       
-      try {
-        mapRef.current.setView([lat, lng], 16, {
-          animate: true,
-          duration: 1
-        });
-      } catch (error) {
-        console.error('강제 확대 중 오류:', error);
-      }
+      const performZoom = () => {
+        try {
+          const map = mapRef.current;
+          if (!map) {
+            console.error('지도 인스턴스가 없습니다');
+            return;
+          }
+          
+          // 즉시 확대
+          map.setView([lat, lng], 16, {
+            animate: true,
+            duration: 1
+          });
+          
+          console.log('강제 확대 완료 - setView');
+          
+          // 추가로 flyTo도 실행 (더 부드러운 애니메이션)
+          setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.flyTo([lat, lng], 16, {
+                duration: 1.5
+              });
+              console.log('강제 확대 완료 - flyTo');
+            }
+          }, 200);
+          
+        } catch (error) {
+          console.error('강제 확대 중 오류:', error);
+        }
+      };
+      
+      // 즉시 실행
+      performZoom();
+      
+      // 추가로 약간의 지연 후 다시 시도
+      setTimeout(performZoom, 100);
     }
   }, [forceZoomToStore, isMapReady]);
 
