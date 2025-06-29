@@ -208,7 +208,7 @@ ${model} / ${color} 모델
                             backgroundColor: '#FEE500',
                             color: '#3C1E1E',
                             fontWeight: 'bold',
-                            fontSize: '0.75rem',
+                            fontSize: '0.7rem',
                             textTransform: 'none',
                             boxShadow: '0 2px 8px rgba(254, 229, 0, 0.3)',
                             '&:hover': {
@@ -225,8 +225,8 @@ ${model} / ${color} 모델
                               src="/kakao-logo.png" 
                               alt="KakaoTalk" 
                               style={{ 
-                                width: '14px', 
-                                height: '14px',
+                                width: '18px', 
+                                height: '18px',
                                 marginRight: '4px'
                               }}
                             />
