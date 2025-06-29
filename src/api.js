@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = process.env.REACT_APP_API_URL || 'https://port-0-jegomap-m9sqvpptbf26e8e5.sel4.cloudtype.app';
 
 export async function fetchData() {
   try {
