@@ -138,32 +138,28 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
   /**
    * 카카오톡 보내기 함수
    */
-  const handleKakaoTalk = (storeInfo, selectedModel, selectedColor) => {
-    if (!storeInfo) return;
-    
-    const manager = storeInfo.manager || '담당자';
-    const storeName = storeInfo.name;
-    
-    // 메시지 템플릿 구성
-    const message = `📱 앱 전송 메시지\n${manager}님 안녕하세요!\n${storeName}에서 ${selectedModel} / ${selectedColor}\n사용 가능한지 확인 부탁드립니다. 감사합니다`;
-    
-    // 클립보드에 메시지 복사
+  const handleKakaoTalk = (store, model, color) => {
+    if (!store || !model || !color) {
+      alert('모델과 색상을 모두 선택해주세요.');
+      return;
+    }
+
+    const message = `📱 앱 전송 메시지
+
+안녕하세요! ${store.name} 매장입니다.
+
+${model} ${color} 모델이 재고에 있는지 확인 부탁드립니다.
+
+사용 가능한지 확인 부탁드립니다. 감사합니다.`;
+
+    // 클립보드에 복사
     navigator.clipboard.writeText(message).then(() => {
-      console.log('메시지가 클립보드에 복사되었습니다:', message);
-      
-      // 로깅 콜백 호출
-      if (onKakaoTalkButtonClick) {
-        onKakaoTalkButtonClick();
-      }
-      
-      // 간단한 성공 알림
-      console.log('카카오톡 문구가 클립보드에 복사되었습니다.');
+      console.log('카카오톡 메시지가 클립보드에 복사되었습니다:', message);
+      alert('카카오톡 문구가 클립보드에 복사되었습니다!');
     }).catch(err => {
       console.error('클립보드 복사 실패:', err);
       alert('클립보드 복사에 실패했습니다.');
     });
-    
-    console.log(`카카오톡 문구 생성: ${storeName} - ${selectedModel} / ${selectedColor}`);
   };
 
   return (
@@ -203,17 +199,49 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
                           startIcon={<CallIcon />}
                           onClick={() => handleCall(matchedContact)}
                           size="small"
-                          sx={{ borderRadius: '20px' }}
+                          sx={{ borderRadius: '20px', minWidth: '100px' }}
                         >
                           전화걸기
                         </Button>
                         <Button 
                           variant="contained" 
-                          color="warning" 
-                          startIcon={<span style={{ fontSize: '1.2rem' }}>💬</span>}
+                          sx={{ 
+                            borderRadius: '20px', 
+                            minWidth: '100px',
+                            backgroundColor: '#FEE500',
+                            color: '#3C1E1E',
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem',
+                            textTransform: 'none',
+                            boxShadow: '0 2px 8px rgba(254, 229, 0, 0.3)',
+                            '&:hover': {
+                              backgroundColor: '#FDD835',
+                              boxShadow: '0 4px 12px rgba(254, 229, 0, 0.4)'
+                            },
+                            '&:disabled': {
+                              backgroundColor: '#F5F5F5',
+                              color: '#999'
+                            }
+                          }}
+                          startIcon={
+                            <span style={{ 
+                              fontSize: '0.8rem', 
+                              fontWeight: 'bold',
+                              color: '#3C1E1E',
+                              backgroundColor: '#FFE812',
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: '4px'
+                            }}>
+                              T
+                            </span>
+                          }
                           onClick={() => handleKakaoTalk(selectedStore, selectedModel, selectedColor)}
                           size="small"
-                          sx={{ borderRadius: '20px' }}
                           disabled={!selectedModel || !selectedColor}
                           title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡 문구 생성'}
                         >
