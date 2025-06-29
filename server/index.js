@@ -882,13 +882,28 @@ app.post('/api/login', async (req, res) => {
     console.log('Step 9: Store sheet data fetched, rows:', storeValues ? storeValues.length : 0);
     
     if (!storeValues) {
+      console.log('Step 9.5: Store sheet data is null or empty');
       throw new Error('Failed to fetch data from store sheet');
     }
     
     const storeRows = storeValues.slice(1);
     console.log('Step 10: Store rows (excluding header):', storeRows.length);
     
-    const foundStoreRow = storeRows.find(row => row[7] === storeId); // G열: 매장 ID로 수정
+    // 매장 ID 검색을 위한 디버깅 로그 추가
+    console.log('Step 10.5: Searching for store ID:', storeId);
+    console.log('Step 10.6: First few store IDs for comparison:');
+    storeRows.slice(0, 5).forEach((row, index) => {
+      console.log(`  Row ${index + 1}: "${row[7]}" (type: ${typeof row[7]})`);
+    });
+    
+    const foundStoreRow = storeRows.find(row => {
+      const rowId = row[7];
+      const match = rowId === storeId;
+      if (match) {
+        console.log(`Step 10.7: Found matching store ID: "${rowId}"`);
+      }
+      return match;
+    }); // G열: 매장 ID로 수정
     console.log('Step 11: Store search result:', foundStoreRow ? 'Found' : 'Not found');
     
     if (foundStoreRow) {
