@@ -151,6 +151,24 @@ function InventoryMode({ onLogout, loggedInStore }) {
     setFilteredData(filteredDataMemo);
   }, [filteredDataMemo]);
 
+  // 총 재고 수량 계산 (메모이제이션 적용)
+  const getTotalInventory = useCallback((store) => {
+    if (!store.inventory) return 0;
+    
+    let total = 0;
+    Object.values(store.inventory).forEach(category => {
+      Object.values(category).forEach(model => {
+        Object.values(model).forEach(status => {
+          Object.values(status).forEach(qty => {
+            total += qty || 0;
+          });
+        });
+      });
+    });
+    
+    return total;
+  }, []);
+
   // 재고 통계 계산 (메모이제이션 적용)
   const stats = useMemo(() => {
     if (!filteredData) return { totalStores: 0, totalInventory: 0, storesWithInventory: 0 };
@@ -173,7 +191,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
       totalInventory,
       storesWithInventory
     };
-  }, [filteredData]);
+  }, [filteredData, getTotalInventory]);
 
   // 담당자별 통계 계산 (메모이제이션 적용)
   const managerStats = useMemo(() => {
@@ -203,25 +221,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
     });
 
     return Array.from(managerMap.values()).sort((a, b) => b.totalInventory - a.totalInventory);
-  }, [filteredData]);
-
-  // 총 재고 수량 계산 (메모이제이션 적용)
-  const getTotalInventory = useCallback((store) => {
-    if (!store.inventory) return 0;
-    
-    let total = 0;
-    Object.values(store.inventory).forEach(category => {
-      Object.values(category).forEach(model => {
-        Object.values(model).forEach(status => {
-          Object.values(status).forEach(qty => {
-            total += qty || 0;
-          });
-        });
-      });
-    });
-    
-    return total;
-  }, []);
+  }, [filteredData, getTotalInventory]);
 
   // 화면 사전 로딩 함수
   const preloadScreen = useCallback((screenName) => {
