@@ -9,23 +9,54 @@ const StoreList = ({ stores, selectedStore, onStoreSelect, selectedModel, select
   const calculateInventory = (store) => {
     if (!store.inventory) return 0;
     
-    // 모델과 색상 모두 선택되지 않은 경우: 총 재고
-    if (!selectedModel) {
-      return Object.entries(store.inventory).reduce((total, [model, colors]) => {
-        return total + Object.values(colors).reduce((sum, quantity) => sum + quantity, 0);
-      }, 0);
+    // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
+    let totalInventory = 0;
+    
+    // 모든 카테고리의 재고를 합산
+    Object.values(store.inventory).forEach(category => {
+      if (typeof category === 'object' && category !== null) {
+        Object.values(category).forEach(model => {
+          if (typeof model === 'object' && model !== null) {
+            Object.values(model).forEach(status => {
+              if (typeof status === 'object' && status !== null) {
+                Object.values(status).forEach(quantity => {
+                  totalInventory += quantity || 0;
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    // 모델과 색상이 선택된 경우 필터링
+    if (selectedModel) {
+      let filteredInventory = 0;
+      
+      Object.values(store.inventory).forEach(category => {
+        if (category[selectedModel]) {
+          if (selectedColor) {
+            // 특정 모델과 색상의 재고
+            Object.values(category[selectedModel]).forEach(status => {
+              if (status[selectedColor]) {
+                filteredInventory += status[selectedColor] || 0;
+              }
+            });
+          } else {
+            // 특정 모델의 전체 재고
+            Object.values(category[selectedModel]).forEach(status => {
+              Object.values(status).forEach(quantity => {
+                filteredInventory += quantity || 0;
+              });
+            });
+          }
+        }
+      });
+      
+      return filteredInventory;
     }
     
-    // 해당 모델의 재고가 없는 경우
-    if (!store.inventory[selectedModel]) return 0;
-    
-    // 모델만 선택된 경우: 해당 모델의 전체 재고
-    if (!selectedColor) {
-      return Object.values(store.inventory[selectedModel]).reduce((sum, quantity) => sum + quantity, 0);
-    }
-    
-    // 모델과 색상 모두 선택된 경우: 해당 모델/색상의 재고
-    return store.inventory[selectedModel][selectedColor] || 0;
+    return totalInventory;
   };
 
   // 매장 정렬 함수

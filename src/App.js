@@ -246,29 +246,47 @@ function App() {
       let hasInventory = false;
       let totalQuantity = 0;
       
-      if (store.inventory && selectedModel) {
-        if (store.inventory[selectedModel]) {
-          if (selectedColor) {
-            // 특정 모델과 색상의 재고 확인
-            totalQuantity = store.inventory[selectedModel][selectedColor] || 0;
-            hasInventory = totalQuantity > 0;
-            console.log(`매장 [${store.name}] - ${selectedModel} ${selectedColor} 재고: ${totalQuantity}`);
-          } else {
-            // 특정 모델의 전체 재고 확인
-            Object.values(store.inventory[selectedModel]).forEach(qty => {
-              totalQuantity += qty;
-            });
-            hasInventory = totalQuantity > 0;
-            console.log(`매장 [${store.name}] - ${selectedModel} 전체 재고: ${totalQuantity}`);
-          }
-        }
-      } else {
-        // 모델이 선택되지 않은 경우: 모든 재고 합계 확인
-        if (store.inventory) {
-          Object.entries(store.inventory).forEach(([model, colors]) => {
-            Object.values(colors).forEach(qty => {
-              totalQuantity += qty;
-            });
+      if (store.inventory) {
+        // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
+        if (selectedModel) {
+          // 특정 모델의 재고 확인
+          Object.values(store.inventory).forEach(category => {
+            if (category[selectedModel]) {
+              if (selectedColor) {
+                // 특정 모델과 색상의 재고 확인
+                Object.values(category[selectedModel]).forEach(status => {
+                  if (status[selectedColor]) {
+                    totalQuantity += status[selectedColor] || 0;
+                  }
+                });
+              } else {
+                // 특정 모델의 전체 재고 확인
+                Object.values(category[selectedModel]).forEach(status => {
+                  Object.values(status).forEach(qty => {
+                    totalQuantity += qty || 0;
+                  });
+                });
+              }
+            }
+          });
+          hasInventory = totalQuantity > 0;
+          console.log(`매장 [${store.name}] - ${selectedModel}${selectedColor ? ` ${selectedColor}` : ''} 재고: ${totalQuantity}`);
+        } else {
+          // 모델이 선택되지 않은 경우: 모든 재고 합계 확인
+          Object.values(store.inventory).forEach(category => {
+            if (typeof category === 'object' && category !== null) {
+              Object.values(category).forEach(model => {
+                if (typeof model === 'object' && model !== null) {
+                  Object.values(model).forEach(status => {
+                    if (typeof status === 'object' && status !== null) {
+                      Object.values(status).forEach(qty => {
+                        totalQuantity += qty || 0;
+                      });
+                    }
+                  });
+                }
+              });
+            }
           });
           hasInventory = totalQuantity > 0;
           console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);

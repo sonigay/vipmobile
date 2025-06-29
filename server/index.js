@@ -597,19 +597,24 @@ app.get('/api/models', async (req, res) => {
       throw new Error('Failed to fetch data from inventory sheet');
     }
 
-    // 헤더 제거
-    const inventoryRows = inventoryValues.slice(1);
+    // 헤더 제거 (첫 3행은 제외)
+    const inventoryRows = inventoryValues.slice(3);
 
     // 모델과 색상 데이터 추출
     const modelColorMap = {};
     
     inventoryRows.forEach(row => {
-      if (row.length < 7) return;
+      if (row.length < 8) return;
       
-      const model = row[5];    // F열: 모델
-      const color = row[6];    // G열: 색상
+      const model = (row[5] || '').toString().trim();    // F열: 모델
+      const color = (row[6] || '').toString().trim();    // G열: 색상
+      const status = (row[7] || '').toString().trim();   // H열: 상태
+      const type = (row[4] || '').toString().trim();     // E열: 종류
       
       if (!model || !color) return;
+      
+      // 상태가 '정상'인 것만 포함 (필터링)
+      if (status !== '정상') return;
       
       if (!modelColorMap[model]) {
         modelColorMap[model] = new Set();
@@ -619,7 +624,7 @@ app.get('/api/models', async (req, res) => {
 
     // Set을 배열로 변환
     const result = Object.entries(modelColorMap).reduce((acc, [model, colors]) => {
-      acc[model] = Array.from(colors);
+      acc[model] = Array.from(colors).sort();
       return acc;
     }, {});
 
