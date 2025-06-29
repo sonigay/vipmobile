@@ -153,7 +153,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
       
       // 오픈채팅방 링크로 카카오톡 연결
       const openChatUrl = process.env.REACT_APP_KAKAO_OPEN_CHAT_URL || 'https://open.kakao.com/o/g2N1EjEh';
-      const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}`;
+      const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}&autoJoin=true`;
       
       // 카카오톡 앱 열기
       window.open(kakaoUrl, '_blank');
