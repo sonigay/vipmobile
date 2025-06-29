@@ -6,6 +6,7 @@ import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
+import InventoryMode from './components/InventoryMode';
 import { fetchData, fetchModels } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
@@ -70,9 +71,14 @@ function App() {
   const [agentTarget, setAgentTarget] = useState('');
   const [agentQualification, setAgentQualification] = useState('');
   const [agentContactId, setAgentContactId] = useState('');
+  // 재고모드 관련 상태 추가
+  const [isInventoryMode, setIsInventoryMode] = useState(false);
   // 현재 세션의 IP 및 위치 정보
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
+
+  // 재고모드 ID 목록
+  const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
 
   // 로그인 상태 복원
   useEffect(() => {
@@ -91,6 +97,16 @@ function App() {
           setAgentContactId(parsedState.agentContactId || '');
           
           // 관리자 모드 위치 설정
+          setUserLocation({
+            lat: 37.5665,
+            lng: 126.9780,
+          });
+          setSelectedRadius(50000);
+        } else if (parsedState.isInventory) {
+          // 재고모드 상태 복원
+          setIsInventoryMode(true);
+          
+          // 재고모드 위치 설정 (전체 지역 보기)
           setUserLocation({
             lat: 37.5665,
             lng: 126.9780,
@@ -339,10 +355,31 @@ function App() {
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
+    // 재고모드인지 확인
+    if (INVENTORY_MODE_IDS.includes(store.id)) {
+      console.log('로그인: 재고모드');
+      setIsInventoryMode(true);
+      setIsAgentMode(false);
+      
+      // 재고모드에서는 서울시청을 중심으로 전체 지역 보기
+      setUserLocation({
+        lat: 37.5665,
+        lng: 126.9780,
+      });
+      setSelectedRadius(50000);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isInventory: true,
+        isAgent: false,
+        store: store
+      }));
+    }
     // 관리자 모드인지 확인
-    if (store.isAgent) {
+    else if (store.isAgent) {
       console.log('로그인: 관리자 모드');
       setIsAgentMode(true);
+      setIsInventoryMode(false);
       setAgentTarget(store.target);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
@@ -358,6 +395,7 @@ function App() {
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isAgent: true,
+        isInventory: false,
         store: store,
         agentTarget: store.target,
         agentQualification: store.qualification,
@@ -366,6 +404,7 @@ function App() {
     } else {
       console.log('로그인: 일반 매장 모드');
       setIsAgentMode(false);
+      setIsInventoryMode(false);
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -377,6 +416,7 @@ function App() {
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
         isAgent: false,
+        isInventory: false,
         store: store
       }));
     }
@@ -396,6 +436,8 @@ function App() {
     setAgentTarget('');
     setAgentQualification('');
     setAgentContactId('');
+    // 재고모드 상태 초기화
+    setIsInventoryMode(false);
     
     // 로그인 상태 삭제
     localStorage.removeItem('loginState');
@@ -522,6 +564,16 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Login onLogin={handleLogin} />
+      </ThemeProvider>
+    );
+  }
+
+  // 재고모드일 때는 별도 화면 렌더링
+  if (isInventoryMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <InventoryMode onLogout={handleLogout} loggedInStore={loggedInStore} />
       </ThemeProvider>
     );
   }
