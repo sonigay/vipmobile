@@ -373,8 +373,8 @@ function App() {
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
-    // 재고모드인지 확인
-    if (INVENTORY_MODE_IDS.includes(store.id)) {
+    // 재고모드인지 확인 (백엔드 응답의 isInventory 플래그 우선 확인)
+    if (store.isInventory || INVENTORY_MODE_IDS.includes(store.id)) {
       console.log('로그인: 재고모드');
       setIsInventoryMode(true);
       setIsAgentMode(false);

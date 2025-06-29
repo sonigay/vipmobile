@@ -817,6 +817,59 @@ app.post('/api/login', async (req, res) => {
     console.log(`Login attempt with ID: ${storeId}`);
     console.log('Step 1: Starting login process...');
     
+    // 재고모드 전용 ID 목록
+    const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
+    
+    // 재고모드 ID인지 먼저 확인
+    if (INVENTORY_MODE_IDS.includes(storeId)) {
+      console.log(`Step 1.5: Inventory mode ID detected: ${storeId}`);
+      
+      // 디스코드로 로그인 로그 전송
+      if (DISCORD_LOGGING_ENABLED) {
+        try {
+          const embedData = {
+            title: '재고모드 로그인',
+            color: 16776960, // 노란색
+            timestamp: new Date().toISOString(),
+            userType: 'inventory', // 재고모드 타입 지정
+            fields: [
+              {
+                name: '재고모드 정보',
+                value: `ID: ${storeId}\n모드: 재고관리 전용`
+              },
+              {
+                name: '접속 정보',
+                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+              }
+            ],
+            footer: {
+              text: 'VIP+ 재고모드 로그인'
+            }
+          };
+          
+          await sendLogToDiscord(embedData);
+        } catch (logError) {
+          console.error('재고모드 로그인 로그 전송 실패:', logError.message);
+        }
+      }
+      
+      console.log('Step 1.6: Inventory mode login successful, sending response...');
+      return res.json({
+        success: true,
+        isAgent: false,
+        isInventory: true,
+        storeInfo: {
+          id: storeId,
+          name: '재고관리 모드',
+          manager: '재고관리자',
+          address: '',
+          latitude: 37.5665,
+          longitude: 126.9780,
+          phone: ''
+        }
+      });
+    }
+    
     // 1. 먼저 대리점 관리자 ID인지 확인
     console.log('Step 2: Checking if ID is agent...');
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
