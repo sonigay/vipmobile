@@ -14,6 +14,7 @@ import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CallIcon from '@mui/icons-material/Call';
+import ChatIcon from '@mui/icons-material/Chat';
 import { fetchAgentData } from '../api';
 
 /**
@@ -38,9 +39,49 @@ const handleCall = (phoneNumber) => {
 };
 
 /**
+ * 카카오톡 보내기 함수
+ */
+const handleKakaoTalk = (storeInfo, selectedModel, selectedColor) => {
+  if (!storeInfo) return;
+  
+  const manager = storeInfo.manager || '담당자';
+  const storeName = storeInfo.name;
+  
+  // 메시지 템플릿 구성
+  const message = `@${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
+  
+  // 클립보드에 메시지 복사
+  navigator.clipboard.writeText(message).then(() => {
+    console.log('메시지가 클립보드에 복사되었습니다:', message);
+    
+    // 오픈채팅방 링크로 카카오톡 연결
+    const openChatUrl = process.env.REACT_APP_KAKAO_OPEN_CHAT_URL || 'https://open.kakao.com/o/g2N1EjEh';
+    const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}`;
+    
+    // 카카오톡 앱 열기
+    window.open(kakaoUrl, '_blank');
+    
+    // 로깅 콜백 호출
+    if (onKakaoTalkButtonClick) {
+      onKakaoTalkButtonClick();
+    }
+    
+    // 사용자에게 안내
+    setTimeout(() => {
+      alert('메시지가 클립보드에 복사되었습니다.\n붙여넣기 후 전송해주세요.');
+    }, 1000);
+  }).catch(err => {
+    console.error('클립보드 복사 실패:', err);
+    alert('클립보드 복사에 실패했습니다.');
+  });
+  
+  console.log(`카카오톡 연결: ${storeName} - ${selectedModel} / ${selectedColor}`);
+};
+
+/**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
-function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButtonClick }) {
+function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor }) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -164,7 +205,7 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
                         연락처 조회 중...
                       </Typography>
                     ) : matchedContact ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
                         <Button 
                           variant="contained" 
                           color="primary" 
@@ -174,6 +215,18 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
                           sx={{ borderRadius: '20px' }}
                         >
                           전화 연결하기
+                        </Button>
+                        <Button 
+                          variant="contained" 
+                          color="secondary" 
+                          startIcon={<ChatIcon />}
+                          onClick={() => handleKakaoTalk(selectedStore, selectedModel, selectedColor)}
+                          size="small"
+                          sx={{ borderRadius: '20px' }}
+                          disabled={!selectedModel || !selectedColor}
+                          title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡으로 메시지 보내기'}
+                        >
+                          카카오톡 보내기
                         </Button>
                       </Box>
                     ) : (

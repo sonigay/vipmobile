@@ -478,6 +478,23 @@ function App() {
     }
   }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
+  // 카카오톡 보내기 버튼 클릭 핸들러
+  const handleKakaoTalkButtonClick = useCallback(() => {
+    if (loggedInStore && isAgentMode) {
+      // 관리자가 카카오톡 보내기 버튼을 클릭한 경우 로그 전송
+      logActivity({
+        userId: loggedInStore.id,
+        userType: 'agent',
+        targetName: agentTarget,
+        ipAddress: ipInfo?.ip || 'unknown',
+        location: ipInfo?.location || 'unknown',
+        deviceInfo: deviceInfo || 'unknown',
+        activity: 'kakao_button',
+        kakaoButton: true
+      });
+    }
+  }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
+
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {
     if (!store || !store.inventory) return 0;
@@ -582,6 +599,9 @@ function App() {
                     agentTarget={agentTarget}
                     agentContactId={agentContactId}
                     onCallButtonClick={handleCallButtonClick}
+                    onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
                   />
                   <AgentFilterPanel
                     models={data?.models}
