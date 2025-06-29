@@ -73,6 +73,9 @@ function App() {
   const [agentContactId, setAgentContactId] = useState('');
   // 재고모드 관련 상태 추가
   const [isInventoryMode, setIsInventoryMode] = useState(false);
+  // 재고요청점 검색 관련 상태 추가
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
   // 현재 세션의 IP 및 위치 정보
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -548,6 +551,42 @@ function App() {
     setSelectedStore(store);
   }, []);
 
+  // 재고요청점 검색 함수
+  const handleStoreSearch = useCallback((query) => {
+    setSearchQuery(query);
+    
+    if (!query.trim() || !data?.stores) {
+      setSearchResults([]);
+      return;
+    }
+    
+    // 매장명 또는 담당자명으로 검색 (대소문자 구분 없이)
+    const filtered = data.stores.filter(store => {
+      const storeName = store.name?.toLowerCase() || '';
+      const managerName = store.manager?.toLowerCase() || '';
+      const searchTerm = query.toLowerCase();
+      
+      return storeName.includes(searchTerm) || managerName.includes(searchTerm);
+    });
+    
+    setSearchResults(filtered);
+  }, [data?.stores]);
+
+  // 검색된 매장으로 지도 이동
+  const handleSearchResultSelect = useCallback((store) => {
+    setSelectedStore(store);
+    setSearchQuery('');
+    setSearchResults([]);
+    
+    // 선택된 매장으로 지도 이동
+    if (store.latitude && store.longitude) {
+      setUserLocation({
+        lat: parseFloat(store.latitude),
+        lng: parseFloat(store.longitude)
+      });
+    }
+  }, []);
+
   // 전화 연결 버튼 클릭 핸들러
   const handleCallButtonClick = useCallback(() => {
     if (loggedInStore && isAgentMode) {
@@ -792,6 +831,10 @@ function App() {
                     selectedColor={selectedColor}
                     onModelSelect={handleModelSelect}
                     onColorSelect={handleColorSelect}
+                    searchQuery={searchQuery}
+                    searchResults={searchResults}
+                    onStoreSearch={handleStoreSearch}
+                    onSearchResultSelect={handleSearchResultSelect}
                   />
                 </>
               ) : (

@@ -219,14 +219,14 @@ function Map({
       };
       
       safeMapOperation(() => {
-        // 지도 센터만 변경하고 줌 레벨은 유지
-        map.panTo([position.lat, position.lng]);
+        // 선택된 매장으로 지도 이동 및 줌 레벨 조정
+        map.setView([position.lat, position.lng], isAgentMode ? 14 : 15);
       });
       
       // 선택한 매장 ID 저장
       previousSelectedStoreRef.current = selectedStore.id;
     }
-  }, [map, selectedStore, safeMapOperation]);
+  }, [map, selectedStore, safeMapOperation, isAgentMode]);
 
   // 지도 범위 계산
   const mapBounds = useMemo(() => {
