@@ -236,7 +236,7 @@ ${model} / ${color} 모델
                           disabled={!selectedModel || !selectedColor}
                           title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡 문구 생성'}
                         >
-                          카톡문구 생성
+                          카톡문구생성
                         </Button>
                       </Box>
                     ) : (
