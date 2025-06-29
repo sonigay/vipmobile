@@ -490,10 +490,12 @@ function App() {
         location: ipInfo?.location || 'unknown',
         deviceInfo: deviceInfo || 'unknown',
         activity: 'kakao_button',
-        kakaoButton: true
+        kakaoButton: true,
+        model: selectedModel,
+        colorName: selectedColor
       });
     }
-  }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
+  }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo, selectedModel, selectedColor]);
 
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {

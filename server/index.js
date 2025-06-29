@@ -682,6 +682,9 @@ app.post('/api/log-activity', async (req, res) => {
     } else if (activity === 'call_button') {
       title = '전화 연결 버튼 클릭';
       embedColor = 15548997; // 빨간색
+    } else if (activity === 'kakao_button') {
+      title = '카톡문구 생성';
+      embedColor = 16776960; // 노란색 (카카오톡 색상)
     }
     
     // Discord로 로그 전송 시도
@@ -723,6 +726,14 @@ app.post('/api/log-activity', async (req, res) => {
           embedData.fields.push({
             name: '전화 연결',
             value: `${callButton}`
+          });
+        }
+        
+        // 카톡문구 생성 버튼 클릭 정보
+        if (req.body.kakaoButton) {
+          embedData.fields.push({
+            name: '카톡문구 생성',
+            value: `카카오톡 메시지 템플릿이 클립보드에 복사되었습니다.`
           });
         }
         
