@@ -145,11 +145,8 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
     }
 
     const message = `📱 앱 전송 메시지
-
 안녕하세요! ${store.name}에서
-
 ${model} / ${color} 모델
-
 사용 가능한지 확인 부탁드립니다. 감사합니다.`;
 
     // 클립보드에 복사
@@ -211,7 +208,7 @@ ${model} / ${color} 모델
                             backgroundColor: '#FEE500',
                             color: '#3C1E1E',
                             fontWeight: 'bold',
-                            fontSize: '0.85rem',
+                            fontSize: '0.75rem',
                             textTransform: 'none',
                             boxShadow: '0 2px 8px rgba(254, 229, 0, 0.3)',
                             '&:hover': {
@@ -228,8 +225,8 @@ ${model} / ${color} 모델
                               src="/kakao-logo.png" 
                               alt="KakaoTalk" 
                               style={{ 
-                                width: '16px', 
-                                height: '16px',
+                                width: '14px', 
+                                height: '14px',
                                 marginRight: '4px'
                               }}
                             />
