@@ -340,7 +340,16 @@ async function sendLogToDiscord(embedData) {
 
 // 서버 상태 확인용 엔드포인트
 app.get('/', (req, res) => {
-  res.json({ status: 'Server is running' });
+  res.json({ 
+    status: 'Server is running',
+    timestamp: new Date().toISOString(),
+    env: {
+      SHEET_ID: SPREADSHEET_ID ? 'SET' : 'NOT SET',
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'SET' : 'NOT SET',
+      GOOGLE_PRIVATE_KEY: GOOGLE_PRIVATE_KEY ? 'SET' : 'NOT SET',
+      PORT: process.env.PORT || 4000
+    }
+  });
 });
 
 // 주소를 위도/경도로 변환하여 시트에 업데이트
