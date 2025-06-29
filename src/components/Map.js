@@ -32,6 +32,32 @@ const defaultCenter = {
   lng: 126.9780
 };
 
+// 강제 확대를 위한 별도 컴포넌트
+function ForceZoomUpdater({ forceZoomToStore, isMapReady }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (forceZoomToStore && isMapReady) {
+      const { lat, lng } = forceZoomToStore;
+      console.log('ForceZoomUpdater 실행:', lat, lng);
+      
+      try {
+        // 즉시 확대
+        map.setView([lat, lng], 16, {
+          animate: true,
+          duration: 1
+        });
+        
+        console.log('ForceZoomUpdater 확대 완료');
+      } catch (error) {
+        console.error('ForceZoomUpdater 오류:', error);
+      }
+    }
+  }, [forceZoomToStore, isMapReady, map]);
+  
+  return null;
+}
+
 // 지도 뷰 업데이트를 위한 컴포넌트
 function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
   const map = useMap();
@@ -248,38 +274,6 @@ function Map({
     }
   }, [map, selectedStore, safeMapOperation, isAgentMode]);
 
-  // 강제 확대 (검색 결과 선택 시)
-  useEffect(() => {
-    if (forceZoomToStore && isMapReady) {
-      const { lat, lng } = forceZoomToStore;
-      console.log('강제 확대 실행 - 상태 변경:', lat, lng);
-      
-      // 지도 중심점과 줌 레벨을 직접 변경
-      setMapCenter({ lat, lng });
-      setMapZoom(16);
-      
-      // 지도를 강제로 다시 렌더링
-      setMapKey(prev => prev + 1);
-      
-      // MapUpdater가 방해하지 않도록 직접 지도 조작
-      if (mapRef.current) {
-        setTimeout(() => {
-          try {
-            console.log('직접 지도 조작 실행');
-            mapRef.current.setView([lat, lng], 16, {
-              animate: true,
-              duration: 1
-            });
-          } catch (error) {
-            console.error('직접 지도 조작 오류:', error);
-          }
-        }, 50);
-      }
-      
-      console.log('지도 상태 변경 완료 - 중심점:', { lat, lng }, '줌:', 16, '새 key:', mapKey + 1);
-    }
-  }, [forceZoomToStore, isMapReady]);
-
   // 지도 범위 계산
   const mapBounds = useMemo(() => {
     if (!filteredStores.length && !userLocation) return null;
@@ -303,7 +297,7 @@ function Map({
       
   // 초기 로드 시 지도 범위 설정
   useEffect(() => {
-    if (mapBounds && (initialLoadRef.current || !userInteracted)) {
+    if (mapBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
       safeMapOperation(() => {
         map.fitBounds(mapBounds);
         if (map.getZoom() > (isAgentMode ? 12 : 15)) {
@@ -312,7 +306,7 @@ function Map({
       });
       initialLoadRef.current = false;
     }
-  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode]);
+  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode, forceZoomToStore]);
 
   // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
@@ -357,6 +351,12 @@ function Map({
           zoom={mapZoom}
           isAgentMode={isAgentMode}
           forceZoomToStore={forceZoomToStore}
+        />
+        
+        {/* 강제 확대 업데이트 */}
+        <ForceZoomUpdater 
+          forceZoomToStore={forceZoomToStore}
+          isMapReady={isMapReady}
         />
         
         {/* 매장 마커들 */}
