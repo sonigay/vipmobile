@@ -153,10 +153,20 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
       
       // 오픈채팅방 링크로 카카오톡 연결
       const openChatUrl = process.env.REACT_APP_KAKAO_OPEN_CHAT_URL || 'https://open.kakao.com/o/g2N1EjEh';
-      const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}&autoJoin=true`;
       
-      // 카카오톡 앱 열기
-      window.open(kakaoUrl, '_blank');
+      // 모바일 환경 감지
+      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // 모바일: 카카오톡 앱 전용 링크 (더 안정적)
+        const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}&autoJoin=true`;
+        window.location.href = kakaoUrl;
+        console.log('모바일 환경: 카카오톡 앱으로 연결');
+      } else {
+        // 데스크톱: 웹 브라우저에서 카카오톡 열기
+        window.open(openChatUrl, '_blank');
+        console.log('데스크톱 환경: 웹 브라우저에서 카카오톡 열기');
+      }
       
       // 로깅 콜백 호출
       if (onKakaoTalkButtonClick) {
