@@ -39,46 +39,6 @@ const handleCall = (phoneNumber) => {
 };
 
 /**
- * 카카오톡 보내기 함수
- */
-const handleKakaoTalk = (storeInfo, selectedModel, selectedColor) => {
-  if (!storeInfo) return;
-  
-  const manager = storeInfo.manager || '담당자';
-  const storeName = storeInfo.name;
-  
-  // 메시지 템플릿 구성
-  const message = `<어플전송메시지>\n@${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
-  
-  // 클립보드에 메시지 복사
-  navigator.clipboard.writeText(message).then(() => {
-    console.log('메시지가 클립보드에 복사되었습니다:', message);
-    
-    // 오픈채팅방 링크로 카카오톡 연결
-    const openChatUrl = process.env.REACT_APP_KAKAO_OPEN_CHAT_URL || 'https://open.kakao.com/o/g2N1EjEh';
-    const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}`;
-    
-    // 카카오톡 앱 열기
-    window.open(kakaoUrl, '_blank');
-    
-    // 로깅 콜백 호출
-    if (onKakaoTalkButtonClick) {
-      onKakaoTalkButtonClick();
-    }
-    
-    // 사용자에게 안내
-    setTimeout(() => {
-      alert('메시지가 클립보드에 복사되었습니다.\n붙여넣기 후 전송해주세요.');
-    }, 1000);
-  }).catch(err => {
-    console.error('클립보드 복사 실패:', err);
-    alert('클립보드 복사에 실패했습니다.');
-  });
-  
-  console.log(`카카오톡 연결: ${storeName} - ${selectedModel} / ${selectedColor}`);
-};
-
-/**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
 function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor }) {
@@ -173,6 +133,46 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
     }
     
     console.log(`전화 연결: ${phoneNumber}`);
+  };
+
+  /**
+   * 카카오톡 보내기 함수
+   */
+  const handleKakaoTalk = (storeInfo, selectedModel, selectedColor) => {
+    if (!storeInfo) return;
+    
+    const manager = storeInfo.manager || '담당자';
+    const storeName = storeInfo.name;
+    
+    // 메시지 템플릿 구성
+    const message = `<어플전송메시지>\n@${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
+    
+    // 클립보드에 메시지 복사
+    navigator.clipboard.writeText(message).then(() => {
+      console.log('메시지가 클립보드에 복사되었습니다:', message);
+      
+      // 오픈채팅방 링크로 카카오톡 연결
+      const openChatUrl = process.env.REACT_APP_KAKAO_OPEN_CHAT_URL || 'https://open.kakao.com/o/g2N1EjEh';
+      const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}`;
+      
+      // 카카오톡 앱 열기
+      window.open(kakaoUrl, '_blank');
+      
+      // 로깅 콜백 호출
+      if (onKakaoTalkButtonClick) {
+        onKakaoTalkButtonClick();
+      }
+      
+      // 사용자에게 안내
+      setTimeout(() => {
+        alert('메시지가 클립보드에 복사되었습니다.\n붙여넣기 후 전송해주세요.');
+      }, 1000);
+    }).catch(err => {
+      console.error('클립보드 복사 실패:', err);
+      alert('클립보드 복사에 실패했습니다.');
+    });
+    
+    console.log(`카카오톡 연결: ${storeName} - ${selectedModel} / ${selectedColor}`);
   };
 
   return (
