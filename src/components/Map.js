@@ -33,10 +33,16 @@ const defaultCenter = {
 };
 
 // 지도 뷰 업데이트를 위한 컴포넌트
-function MapUpdater({ center, bounds, zoom, isAgentMode }) {
+function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
   const map = useMap();
   
   useEffect(() => {
+    // 강제 확대가 진행 중이면 MapUpdater 비활성화
+    if (forceZoomToStore) {
+      console.log('MapUpdater 비활성화 - 강제 확대 진행 중');
+      return;
+    }
+    
     if (bounds) {
       map.fitBounds(bounds);
       if (map.getZoom() > (isAgentMode ? 12 : 15)) {
@@ -45,7 +51,7 @@ function MapUpdater({ center, bounds, zoom, isAgentMode }) {
     } else if (center) {
       map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
     }
-  }, [map, center, bounds, zoom, isAgentMode]);
+  }, [map, center, bounds, zoom, isAgentMode, forceZoomToStore]);
   
   return null;
 }
@@ -255,6 +261,21 @@ function Map({
       // 지도를 강제로 다시 렌더링
       setMapKey(prev => prev + 1);
       
+      // MapUpdater가 방해하지 않도록 직접 지도 조작
+      if (mapRef.current) {
+        setTimeout(() => {
+          try {
+            console.log('직접 지도 조작 실행');
+            mapRef.current.setView([lat, lng], 16, {
+              animate: true,
+              duration: 1
+            });
+          } catch (error) {
+            console.error('직접 지도 조작 오류:', error);
+          }
+        }, 50);
+      }
+      
       console.log('지도 상태 변경 완료 - 중심점:', { lat, lng }, '줌:', 16, '새 key:', mapKey + 1);
     }
   }, [forceZoomToStore, isMapReady]);
@@ -335,6 +356,7 @@ function Map({
           bounds={mapBounds} 
           zoom={mapZoom}
           isAgentMode={isAgentMode}
+          forceZoomToStore={forceZoomToStore}
         />
         
         {/* 매장 마커들 */}
