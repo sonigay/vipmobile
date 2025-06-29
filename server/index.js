@@ -452,11 +452,13 @@ app.get('/api/stores', async (req, res) => {
     
     console.log('Processing inventory data...');
     inventoryRows.forEach((row, index) => {
-      if (!row || row.length < 14) return; // 최소 N열까지 데이터가 있어야 함
+      if (!row || row.length < 15) return; // 최소 O열까지 데이터가 있어야 함
       
       const storeName = (row[13] || '').toString().trim();  // N열: 매장명
       const model = (row[5] || '').toString().trim();      // F열: 모델
       const color = (row[6] || '').toString().trim();      // G열: 색상
+      const status = (row[7] || '').toString().trim();     // H열: 상태 (정상, 이력, 불량)
+      const type = (row[4] || '').toString().trim();       // E열: 종류 (단말기, 웨어러블, 스마트기기, 유심)
       const shippingDate = row[14] ? new Date(row[14]) : null;  // O열: 출고일
       
       if (!storeName || !model || !color) {
@@ -472,17 +474,38 @@ app.get('/api/stores', async (req, res) => {
 
       // 매장별 재고 데이터 구조 생성
       if (!inventoryMap[storeName]) {
-        inventoryMap[storeName] = {};
-      }
-      if (!inventoryMap[storeName][model]) {
-        inventoryMap[storeName][model] = {};
+        inventoryMap[storeName] = {
+          phones: {},    // 단말기
+          sims: {},      // 유심
+          wearables: {}, // 웨어러블
+          smartDevices: {} // 스마트기기
+        };
       }
       
-      // 같은 모델/색상 조합의 수량을 증가
-      if (!inventoryMap[storeName][model][color]) {
-        inventoryMap[storeName][model][color] = 1;
+      // 종류에 따라 분류
+      let category = 'phones'; // 기본값
+      if (type === '유심') {
+        category = 'sims';
+      } else if (type === '웨어러블') {
+        category = 'wearables';
+      } else if (type === '스마트기기') {
+        category = 'smartDevices';
+      }
+      
+      if (!inventoryMap[storeName][category][model]) {
+        inventoryMap[storeName][category][model] = {};
+      }
+      
+      // 상태별로 수량 관리
+      if (!inventoryMap[storeName][category][model][status]) {
+        inventoryMap[storeName][category][model][status] = {};
+      }
+      
+      // 같은 모델/색상/상태 조합의 수량을 증가
+      if (!inventoryMap[storeName][category][model][status][color]) {
+        inventoryMap[storeName][category][model][status][color] = 1;
       } else {
-        inventoryMap[storeName][model][color]++;
+        inventoryMap[storeName][category][model][status][color]++;
       }
     });
 

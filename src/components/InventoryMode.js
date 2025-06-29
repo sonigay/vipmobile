@@ -27,10 +27,11 @@ import {
   InputLabel,
   Select,
   Checkbox,
-  FormControlLabel,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Inventory as InventoryIcon,
@@ -49,7 +50,10 @@ import {
   ExpandMore as ExpandMoreIcon,
   Search as SearchIcon,
   Compare as CompareIcon,
-  ExpandMore as ExpandMoreIcon2
+  Warning as WarningIcon,
+  History as HistoryIcon,
+  Watch as WatchIcon,
+  Tablet as TabletIcon
 } from '@mui/icons-material';
 import { fetchData } from '../api';
 
@@ -59,6 +63,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
   const [error, setError] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedMenu, setSelectedMenu] = useState(null);
+  const [currentScreen, setCurrentScreen] = useState('main'); // main, inventory, master, duplicate, assignment
   
   // 검색 관련 상태
   const [searchType, setSearchType] = useState('store'); // 'store' 또는 'manager'
@@ -68,6 +73,9 @@ function InventoryMode({ onLogout, loggedInStore }) {
   // 체크박스 선택 관련 상태
   const [selectedStores, setSelectedStores] = useState([]);
   const [showComparison, setShowComparison] = useState(false);
+  
+  // 탭 상태
+  const [tabValue, setTabValue] = useState(0);
 
   // 데이터 로딩
   useEffect(() => {
@@ -125,10 +133,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
 
     filteredData.forEach(store => {
       if (store.inventory) {
-        const storeInventory = Object.entries(store.inventory).reduce((sum, [model, colors]) => {
-          return sum + Object.values(colors).reduce((modelSum, qty) => modelSum + (qty || 0), 0);
-        }, 0);
-        
+        const storeInventory = getTotalInventory(store);
         totalInventory += storeInventory;
         if (storeInventory > 0) {
           storesWithInventory++;
@@ -143,40 +148,143 @@ function InventoryMode({ onLogout, loggedInStore }) {
     };
   };
 
-  // 매장별 재고 정보 정리
-  const getStoreInventorySummary = (store) => {
-    if (!store.inventory) return { total: 0, models: [], phones: [], sims: [] };
+  // 담당자별 통계 계산
+  const calculateManagerStats = () => {
+    if (!filteredData) return [];
 
-    const phones = [];
-    const sims = [];
+    const managerMap = new Map();
 
-    Object.entries(store.inventory).forEach(([model, colors]) => {
-      const total = Object.values(colors).reduce((sum, qty) => sum + (qty || 0), 0);
-      
-      // 모델명으로 단말기와 유심 구분 (임시 로직)
-      if (model.toLowerCase().includes('sim') || model.toLowerCase().includes('유심')) {
-        sims.push({ model, total, colors });
-      } else {
-        phones.push({ model, total, colors });
+    filteredData.forEach(store => {
+      const manager = store.manager || '미지정';
+      if (!managerMap.has(manager)) {
+        managerMap.set(manager, {
+          manager,
+          storeCount: 0,
+          totalInventory: 0,
+          stores: []
+        });
+      }
+
+      const managerData = managerMap.get(manager);
+      managerData.storeCount++;
+      managerData.stores.push(store);
+
+      if (store.inventory) {
+        const storeInventory = getTotalInventory(store);
+        managerData.totalInventory += storeInventory;
       }
     });
 
-    const total = phones.reduce((sum, item) => sum + item.total, 0) + 
-                  sims.reduce((sum, item) => sum + item.total, 0);
-
-    return { total, phones, sims };
+    return Array.from(managerMap.values()).sort((a, b) => b.totalInventory - a.totalInventory);
   };
 
-  // 매장 상태 판단
+  // 총 재고 수량 계산
+  const getTotalInventory = (store) => {
+    if (!store.inventory) return 0;
+    
+    let total = 0;
+    Object.values(store.inventory).forEach(category => {
+      Object.values(category).forEach(model => {
+        Object.values(model).forEach(status => {
+          Object.values(status).forEach(qty => {
+            total += qty || 0;
+          });
+        });
+      });
+    });
+    
+    return total;
+  };
+
+  // 매장별 재고 정보 정리
+  const getStoreInventorySummary = (store) => {
+    if (!store.inventory) return { 
+      total: 0, 
+      phones: { normal: 0, history: 0, defective: 0 }, 
+      sims: { normal: 0, history: 0, defective: 0 },
+      wearables: { normal: 0, history: 0, defective: 0 },
+      smartDevices: { normal: 0, history: 0, defective: 0 }
+    };
+
+    const summary = {
+      total: 0,
+      phones: { normal: 0, history: 0, defective: 0 },
+      sims: { normal: 0, history: 0, defective: 0 },
+      wearables: { normal: 0, history: 0, defective: 0 },
+      smartDevices: { normal: 0, history: 0, defective: 0 }
+    };
+
+    // 단말기
+    Object.values(store.inventory.phones || {}).forEach(model => {
+      Object.entries(model).forEach(([status, colors]) => {
+        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        if (status === '정상') summary.phones.normal += qty;
+        else if (status === '이력') summary.phones.history += qty;
+        else if (status === '불량') summary.phones.defective += qty;
+        summary.total += qty;
+      });
+    });
+
+    // 유심
+    Object.values(store.inventory.sims || {}).forEach(model => {
+      Object.entries(model).forEach(([status, colors]) => {
+        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        if (status === '정상') summary.sims.normal += qty;
+        else if (status === '이력') summary.sims.history += qty;
+        else if (status === '불량') summary.sims.defective += qty;
+        summary.total += qty;
+      });
+    });
+
+    // 웨어러블
+    Object.values(store.inventory.wearables || {}).forEach(model => {
+      Object.entries(model).forEach(([status, colors]) => {
+        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        if (status === '정상') summary.wearables.normal += qty;
+        else if (status === '이력') summary.wearables.history += qty;
+        else if (status === '불량') summary.wearables.defective += qty;
+        summary.total += qty;
+      });
+    });
+
+    // 스마트기기
+    Object.values(store.inventory.smartDevices || {}).forEach(model => {
+      Object.entries(model).forEach(([status, colors]) => {
+        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        if (status === '정상') summary.smartDevices.normal += qty;
+        else if (status === '이력') summary.smartDevices.history += qty;
+        else if (status === '불량') summary.smartDevices.defective += qty;
+        summary.total += qty;
+      });
+    });
+
+    return summary;
+  };
+
+  // 매장 상태 판단 (상태별 재고 기준)
   const getStoreStatus = (store) => {
     const inventorySummary = getStoreInventorySummary(store);
     
+    // 정상 재고가 있는지 확인
+    const hasNormalInventory = inventorySummary.phones.normal > 0 || 
+                              inventorySummary.sims.normal > 0 ||
+                              inventorySummary.wearables.normal > 0 ||
+                              inventorySummary.smartDevices.normal > 0;
+    
+    // 불량 재고가 있는지 확인
+    const hasDefectiveInventory = inventorySummary.phones.defective > 0 || 
+                                 inventorySummary.sims.defective > 0 ||
+                                 inventorySummary.wearables.defective > 0 ||
+                                 inventorySummary.smartDevices.defective > 0;
+    
     if (inventorySummary.total === 0) {
       return { status: '재고없음', color: 'error', icon: <CancelIcon /> };
-    } else if (inventorySummary.total > 10) {
-      return { status: '재고충분', color: 'success', icon: <CheckCircleIcon /> };
+    } else if (hasDefectiveInventory) {
+      return { status: '불량재고', color: 'error', icon: <WarningIcon /> };
+    } else if (hasNormalInventory) {
+      return { status: '정상재고', color: 'success', icon: <CheckCircleIcon /> };
     } else {
-      return { status: '재고부족', color: 'warning', icon: <HelpIcon /> };
+      return { status: '이력재고', color: 'warning', icon: <HistoryIcon /> };
     }
   };
 
@@ -208,11 +316,23 @@ function InventoryMode({ onLogout, loggedInStore }) {
 
   const handleSubMenuClick = (subMenu) => {
     console.log(`${selectedMenu} - ${subMenu} 메뉴 클릭`);
-    // 여기에 각 서브메뉴별 화면 전환 로직 추가
+    setCurrentScreen(`${selectedMenu}_${subMenu}`);
     handleMenuClose();
   };
 
+  // 탭 변경 핸들러
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  // 메인 화면으로 돌아가기
+  const handleBackToMain = () => {
+    setCurrentScreen('main');
+    setTabValue(0);
+  };
+
   const stats = calculateStats();
+  const managerStats = calculateManagerStats();
 
   if (isLoading) {
     return (
@@ -230,407 +350,584 @@ function InventoryMode({ onLogout, loggedInStore }) {
     );
   }
 
+  // 메인 화면
+  if (currentScreen === 'main') {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {/* 헤더 */}
+        <AppBar position="static">
+          <Toolbar>
+            <InventoryIcon sx={{ mr: 2 }} />
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              재고 관리 시스템
+            </Typography>
+            
+            {/* 2차 메뉴 */}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button 
+                color="inherit" 
+                onClick={(e) => handleMenuClick(e, 'inventory')}
+                endIcon={<ExpandMoreIcon />}
+              >
+                재고실사
+              </Button>
+              
+              <Button 
+                color="inherit" 
+                onClick={(e) => handleMenuClick(e, 'master')}
+                endIcon={<ExpandMoreIcon />}
+              >
+                마스터재고매칭
+              </Button>
+              
+              <Button 
+                color="inherit" 
+                onClick={(e) => handleMenuClick(e, 'duplicate')}
+                endIcon={<ExpandMoreIcon />}
+              >
+                폰클중복건
+              </Button>
+              
+              <Button 
+                color="inherit" 
+                onClick={(e) => handleMenuClick(e, 'assignment')}
+                endIcon={<ExpandMoreIcon />}
+              >
+                재고배정
+              </Button>
+            </Box>
+            
+            <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
+              로그아웃
+            </Button>
+          </Toolbar>
+        </AppBar>
+
+        {/* 드롭다운 메뉴 */}
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={handleMenuClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+        >
+          {selectedMenu === 'master' && (
+            <>
+              <MenuItem onClick={() => handleSubMenuClick('phone')}>
+                <ListItemIcon>
+                  <PhoneAndroidIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>단말기</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSubMenuClick('sim')}>
+                <ListItemIcon>
+                  <SimCardIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>유심</ListItemText>
+              </MenuItem>
+            </>
+          )}
+          
+          {selectedMenu === 'duplicate' && (
+            <>
+              <MenuItem onClick={() => handleSubMenuClick('phone')}>
+                <ListItemIcon>
+                  <PhoneAndroidIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>단말기</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSubMenuClick('sim')}>
+                <ListItemIcon>
+                  <SimCardIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>유심</ListItemText>
+              </MenuItem>
+            </>
+          )}
+          
+          {selectedMenu === 'assignment' && (
+            <>
+              <MenuItem onClick={() => handleSubMenuClick('office')}>
+                <ListItemIcon>
+                  <BusinessIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>사무실배정</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSubMenuClick('sales')}>
+                <ListItemIcon>
+                  <PersonAddIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>영업사원배정</ListItemText>
+              </MenuItem>
+            </>
+          )}
+          
+          {selectedMenu === 'inventory' && (
+            <MenuItem onClick={() => handleSubMenuClick('inventory')}>
+              <ListItemIcon>
+                <AssignmentIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>재고실사</ListItemText>
+            </MenuItem>
+          )}
+        </Menu>
+
+        {/* 메인 콘텐츠 */}
+        <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+          {/* 검색 및 필터 */}
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>검색 유형</InputLabel>
+                  <Select
+                    value={searchType}
+                    onChange={(e) => setSearchType(e.target.value)}
+                    label="검색 유형"
+                  >
+                    <MenuItem value="store">매장명</MenuItem>
+                    <MenuItem value="manager">담당자</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder={`${searchType === 'store' ? '매장명' : '담당자'}을 입력하세요`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedStores([]);
+                      setShowComparison(false);
+                    }}
+                    size="small"
+                  >
+                    초기화
+                  </Button>
+                  {selectedStores.length > 0 && (
+                    <Button
+                      variant="contained"
+                      startIcon={<CompareIcon />}
+                      onClick={() => setShowComparison(!showComparison)}
+                      size="small"
+                    >
+                      비교 ({selectedStores.length}/5)
+                    </Button>
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* 선택된 매장 비교 */}
+          {showComparison && selectedStores.length > 0 && (
+            <Accordion sx={{ mb: 3 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CompareIcon sx={{ mr: 1 }} />
+                  선택된 매장 비교 ({selectedStores.length}개)
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Grid container spacing={2}>
+                  {selectedStores.map(storeId => {
+                    const store = filteredData?.find(s => s.id === storeId);
+                    if (!store) return null;
+                    
+                    const inventorySummary = getStoreInventorySummary(store);
+                    const status = getStoreStatus(store);
+                    
+                    return (
+                      <Grid item xs={12} md={6} lg={4} key={storeId}>
+                        <Card>
+                          <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                              {store.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              담당자: {store.manager || '미지정'}
+                            </Typography>
+                            <Chip
+                              icon={status.icon}
+                              label={status.status}
+                              color={status.color}
+                              size="small"
+                              sx={{ mb: 1 }}
+                            />
+                            <Typography variant="body2">
+                              총 재고: {inventorySummary.total}개
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              정상: {inventorySummary.phones.normal + inventorySummary.sims.normal}개
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              불량: {inventorySummary.phones.defective + inventorySummary.sims.defective}개
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
+          )}
+
+          {/* 탭 */}
+          <Paper sx={{ mb: 3 }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="재고 관리 탭">
+              <Tab label="매장별 재고" />
+              <Tab label="담당자별 분석" />
+            </Tabs>
+          </Paper>
+
+          {/* 매장별 재고 탭 */}
+          {tabValue === 0 && (
+            <>
+              {/* 통계 카드 */}
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <StoreIcon sx={{ mr: 2, color: 'primary.main' }} />
+                        <Box>
+                          <Typography variant="h4">{stats.totalStores}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {searchTerm ? '검색된 매장' : '전체 매장'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <InventoryIcon sx={{ mr: 2, color: 'success.main' }} />
+                        <Box>
+                          <Typography variant="h4">{stats.totalInventory}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            총 재고량
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <InventoryIcon sx={{ mr: 2, color: 'warning.main' }} />
+                        <Box>
+                          <Typography variant="h4">{stats.storesWithInventory}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            재고 보유 매장
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* 매장 목록 테이블 */}
+              <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+                <TableContainer sx={{ maxHeight: 'calc(100vh - 500px)' }}>
+                  <Table stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            indeterminate={selectedStores.length > 0 && selectedStores.length < filteredData?.length}
+                            checked={selectedStores.length === filteredData?.length && filteredData?.length > 0}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const allIds = filteredData?.map(store => store.id).slice(0, 5) || [];
+                                setSelectedStores(allIds);
+                              } else {
+                                setSelectedStores([]);
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>매장명</TableCell>
+                        <TableCell>담당자</TableCell>
+                        <TableCell align="center">상태</TableCell>
+                        <TableCell align="center">총 재고</TableCell>
+                        <TableCell>단말기 (정상/이력/불량)</TableCell>
+                        <TableCell>유심 (정상/이력/불량)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredData?.map((store) => {
+                        const inventorySummary = getStoreInventorySummary(store);
+                        const status = getStoreStatus(store);
+                        const isSelected = selectedStores.includes(store.id);
+                        
+                        return (
+                          <TableRow key={store.id} hover selected={isSelected}>
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() => handleStoreSelect(store.id)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <StoreIcon sx={{ mr: 1, fontSize: 20 }} />
+                                <Typography variant="body2" fontWeight="medium">
+                                  {store.name}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              {store.manager ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <PersonIcon sx={{ mr: 1, fontSize: 16 }} />
+                                  {store.manager}
+                                </Box>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  미지정
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                icon={status.icon}
+                                label={status.status}
+                                color={status.color}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={`${inventorySummary.total}개`}
+                                color={inventorySummary.total > 0 ? 'success' : 'default'}
+                                variant={inventorySummary.total > 0 ? 'filled' : 'outlined'}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Chip
+                                  label={`정상: ${inventorySummary.phones.normal}`}
+                                  size="small"
+                                  color="success"
+                                  variant="outlined"
+                                />
+                                <Chip
+                                  label={`이력: ${inventorySummary.phones.history}`}
+                                  size="small"
+                                  color="warning"
+                                  variant="outlined"
+                                />
+                                <Chip
+                                  label={`불량: ${inventorySummary.phones.defective}`}
+                                  size="small"
+                                  color="error"
+                                  variant="outlined"
+                                />
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                <Chip
+                                  label={`정상: ${inventorySummary.sims.normal}`}
+                                  size="small"
+                                  color="success"
+                                  variant="outlined"
+                                />
+                                <Chip
+                                  label={`이력: ${inventorySummary.sims.history}`}
+                                  size="small"
+                                  color="warning"
+                                  variant="outlined"
+                                />
+                                <Chip
+                                  label={`불량: ${inventorySummary.sims.defective}`}
+                                  size="small"
+                                  color="error"
+                                  variant="outlined"
+                                />
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </>
+          )}
+
+          {/* 담당자별 분석 탭 */}
+          {tabValue === 1 && (
+            <>
+              {/* 담당자별 통계 카드 */}
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <PersonIcon sx={{ mr: 2, color: 'primary.main' }} />
+                        <Box>
+                          <Typography variant="h4">{managerStats.length}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            담당자 수
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <StoreIcon sx={{ mr: 2, color: 'success.main' }} />
+                        <Box>
+                          <Typography variant="h4">
+                            {managerStats.reduce((sum, mgr) => sum + mgr.storeCount, 0)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            거래처 총수
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <InventoryIcon sx={{ mr: 2, color: 'warning.main' }} />
+                        <Box>
+                          <Typography variant="h4">
+                            {managerStats.reduce((sum, mgr) => sum + mgr.totalInventory, 0)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            총재고 합계
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* 담당자별 목록 테이블 */}
+              <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+                <TableContainer sx={{ maxHeight: 'calc(100vh - 500px)' }}>
+                  <Table stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>담당자</TableCell>
+                        <TableCell align="center">거래처 수</TableCell>
+                        <TableCell align="center">총 재고</TableCell>
+                        <TableCell>담당 매장</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {managerStats.map((manager) => (
+                        <TableRow key={manager.manager} hover>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+                              <Typography variant="body2" fontWeight="medium">
+                                {manager.manager}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={`${manager.storeCount}개`}
+                              color="primary"
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={`${manager.totalInventory}개`}
+                              color={manager.totalInventory > 0 ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {manager.stores.slice(0, 3).map((store) => (
+                                <Chip
+                                  key={store.id}
+                                  label={store.name}
+                                  size="small"
+                                  variant="outlined"
+                                  icon={<StoreIcon />}
+                                />
+                              ))}
+                              {manager.stores.length > 3 && (
+                                <Chip
+                                  label={`+${manager.stores.length - 3}개`}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  // 다른 화면들 (임시)
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* 헤더 */}
       <AppBar position="static">
         <Toolbar>
-          <InventoryIcon sx={{ mr: 2 }} />
+          <Button color="inherit" onClick={handleBackToMain} sx={{ mr: 2 }}>
+            ← 뒤로가기
+          </Button>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            재고 관리 시스템
+            {currentScreen.replace('_', ' - ')}
           </Typography>
-          
-          {/* 2차 메뉴 */}
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button 
-              color="inherit" 
-              onClick={(e) => handleMenuClick(e, 'inventory')}
-              endIcon={<ExpandMoreIcon />}
-            >
-              재고실사
-            </Button>
-            
-            <Button 
-              color="inherit" 
-              onClick={(e) => handleMenuClick(e, 'master')}
-              endIcon={<ExpandMoreIcon />}
-            >
-              마스터재고매칭
-            </Button>
-            
-            <Button 
-              color="inherit" 
-              onClick={(e) => handleMenuClick(e, 'duplicate')}
-              endIcon={<ExpandMoreIcon />}
-            >
-              폰클중복건
-            </Button>
-            
-            <Button 
-              color="inherit" 
-              onClick={(e) => handleMenuClick(e, 'assignment')}
-              endIcon={<ExpandMoreIcon />}
-            >
-              재고배정
-            </Button>
-          </Box>
-          
-          <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
+          <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
         </Toolbar>
       </AppBar>
-
-      {/* 드롭다운 메뉴 */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-      >
-        {selectedMenu === 'master' && (
-          <>
-            <MenuItem onClick={() => handleSubMenuClick('phone')}>
-              <ListItemIcon>
-                <PhoneAndroidIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>단말기</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleSubMenuClick('sim')}>
-              <ListItemIcon>
-                <SimCardIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>유심</ListItemText>
-            </MenuItem>
-          </>
-        )}
-        
-        {selectedMenu === 'duplicate' && (
-          <>
-            <MenuItem onClick={() => handleSubMenuClick('phone')}>
-              <ListItemIcon>
-                <PhoneAndroidIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>단말기</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleSubMenuClick('sim')}>
-              <ListItemIcon>
-                <SimCardIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>유심</ListItemText>
-            </MenuItem>
-          </>
-        )}
-        
-        {selectedMenu === 'assignment' && (
-          <>
-            <MenuItem onClick={() => handleSubMenuClick('office')}>
-              <ListItemIcon>
-                <BusinessIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>사무실배정</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => handleSubMenuClick('sales')}>
-              <ListItemIcon>
-                <PersonAddIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>영업사원배정</ListItemText>
-            </MenuItem>
-          </>
-        )}
-        
-        {selectedMenu === 'inventory' && (
-          <MenuItem onClick={() => handleSubMenuClick('inventory')}>
-            <ListItemIcon>
-              <AssignmentIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>재고실사</ListItemText>
-          </MenuItem>
-        )}
-      </Menu>
-
-      {/* 메인 콘텐츠 */}
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-        {/* 검색 및 필터 */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth size="small">
-                <InputLabel>검색 유형</InputLabel>
-                <Select
-                  value={searchType}
-                  onChange={(e) => setSearchType(e.target.value)}
-                  label="검색 유형"
-                >
-                  <MenuItem value="store">매장명</MenuItem>
-                  <MenuItem value="manager">담당자</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder={`${searchType === 'store' ? '매장명' : '담당자'}을 입력하세요`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedStores([]);
-                    setShowComparison(false);
-                  }}
-                  size="small"
-                >
-                  초기화
-                </Button>
-                {selectedStores.length > 0 && (
-                  <Button
-                    variant="contained"
-                    startIcon={<CompareIcon />}
-                    onClick={() => setShowComparison(!showComparison)}
-                    size="small"
-                  >
-                    비교 ({selectedStores.length}/5)
-                  </Button>
-                )}
-              </Box>
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* 선택된 매장 비교 */}
-        {showComparison && selectedStores.length > 0 && (
-          <Accordion sx={{ mb: 3 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon2 />}>
-              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-                <CompareIcon sx={{ mr: 1 }} />
-                선택된 매장 비교 ({selectedStores.length}개)
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Grid container spacing={2}>
-                {selectedStores.map(storeId => {
-                  const store = filteredData?.find(s => s.id === storeId);
-                  if (!store) return null;
-                  
-                  const inventorySummary = getStoreInventorySummary(store);
-                  const status = getStoreStatus(store);
-                  
-                  return (
-                    <Grid item xs={12} md={6} lg={4} key={storeId}>
-                      <Card>
-                        <CardContent>
-                          <Typography variant="h6" gutterBottom>
-                            {store.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" gutterBottom>
-                            담당자: {store.manager || '미지정'}
-                          </Typography>
-                          <Chip
-                            icon={status.icon}
-                            label={status.status}
-                            color={status.color}
-                            size="small"
-                            sx={{ mb: 1 }}
-                          />
-                          <Typography variant="body2">
-                            총 재고: {inventorySummary.total}개
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            단말기: {inventorySummary.phones.reduce((sum, item) => sum + item.total, 0)}개
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            유심: {inventorySummary.sims.reduce((sum, item) => sum + item.total, 0)}개
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  );
-                })}
-              </Grid>
-            </AccordionDetails>
-          </Accordion>
-        )}
-
-        {/* 통계 카드 */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <StoreIcon sx={{ mr: 2, color: 'primary.main' }} />
-                  <Box>
-                    <Typography variant="h4">{stats.totalStores}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {searchTerm ? '검색된 매장' : '전체 매장'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <InventoryIcon sx={{ mr: 2, color: 'success.main' }} />
-                  <Box>
-                    <Typography variant="h4">{stats.totalInventory}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      총 재고량
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <InventoryIcon sx={{ mr: 2, color: 'warning.main' }} />
-                  <Box>
-                    <Typography variant="h4">{stats.storesWithInventory}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      재고 보유 매장
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* 매장 목록 테이블 */}
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 'calc(100vh - 400px)' }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      indeterminate={selectedStores.length > 0 && selectedStores.length < filteredData?.length}
-                      checked={selectedStores.length === filteredData?.length && filteredData?.length > 0}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          const allIds = filteredData?.map(store => store.id).slice(0, 5) || [];
-                          setSelectedStores(allIds);
-                        } else {
-                          setSelectedStores([]);
-                        }
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>매장명</TableCell>
-                  <TableCell>담당자</TableCell>
-                  <TableCell align="center">상태</TableCell>
-                  <TableCell align="center">총 재고</TableCell>
-                  <TableCell>단말기 재고</TableCell>
-                  <TableCell>유심 재고</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredData?.map((store) => {
-                  const inventorySummary = getStoreInventorySummary(store);
-                  const status = getStoreStatus(store);
-                  const isSelected = selectedStores.includes(store.id);
-                  
-                  return (
-                    <TableRow key={store.id} hover selected={isSelected}>
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => handleStoreSelect(store.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <StoreIcon sx={{ mr: 1, fontSize: 20 }} />
-                          <Typography variant="body2" fontWeight="medium">
-                            {store.name}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {store.manager ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <PersonIcon sx={{ mr: 1, fontSize: 16 }} />
-                            {store.manager}
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            미지정
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          icon={status.icon}
-                          label={status.status}
-                          color={status.color}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={`${inventorySummary.total}개`}
-                          color={inventorySummary.total > 0 ? 'success' : 'default'}
-                          variant={inventorySummary.total > 0 ? 'filled' : 'outlined'}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {inventorySummary.phones
-                            .filter(item => item.total > 0)
-                            .map((item) => (
-                              <Chip
-                                key={item.model}
-                                label={`${item.model}: ${item.total}`}
-                                size="small"
-                                variant="outlined"
-                                icon={<PhoneAndroidIcon />}
-                              />
-                            ))}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {inventorySummary.sims
-                            .filter(item => item.total > 0)
-                            .map((item) => (
-                              <Chip
-                                key={item.model}
-                                label={`${item.model}: ${item.total}`}
-                                size="small"
-                                variant="outlined"
-                                icon={<SimCardIcon />}
-                              />
-                            ))}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+      
+      <Box sx={{ flex: 1, p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Typography variant="h4" color="text.secondary">
+          {currentScreen} 화면 개발 중...
+        </Typography>
       </Box>
     </Box>
   );
