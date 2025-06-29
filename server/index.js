@@ -815,15 +815,23 @@ app.post('/api/login', async (req, res) => {
     }
     
     console.log(`Login attempt with ID: ${storeId}`);
+    console.log('Step 1: Starting login process...');
     
     // 1. 먼저 대리점 관리자 ID인지 확인
+    console.log('Step 2: Checking if ID is agent...');
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    console.log('Step 3: Agent sheet data fetched, rows:', agentValues ? agentValues.length : 0);
+    
     if (agentValues) {
       const agentRows = agentValues.slice(1);
+      console.log('Step 4: Agent rows (excluding header):', agentRows.length);
+      
       const agent = agentRows.find(row => row[2] === storeId); // C열: 연락처(아이디)
+      console.log('Step 5: Agent search result:', agent ? 'Found' : 'Not found');
       
       if (agent) {
         console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
+        console.log('Step 6: Processing agent login...');
         
         // 디스코드로 로그인 로그 전송
         if (DISCORD_LOGGING_ENABLED) {
@@ -855,6 +863,7 @@ app.post('/api/login', async (req, res) => {
           }
         }
         
+        console.log('Step 7: Agent login successful, sending response...');
         return res.json({
           success: true,
           isAgent: true,
@@ -868,13 +877,19 @@ app.post('/api/login', async (req, res) => {
     }
     
     // 2. 대리점 관리자가 아닌 경우 일반 매장으로 검색
+    console.log('Step 8: Not an agent, checking if ID is store...');
     const storeValues = await getSheetValues(STORE_SHEET_NAME);
+    console.log('Step 9: Store sheet data fetched, rows:', storeValues ? storeValues.length : 0);
+    
     if (!storeValues) {
       throw new Error('Failed to fetch data from store sheet');
     }
     
     const storeRows = storeValues.slice(1);
+    console.log('Step 10: Store rows (excluding header):', storeRows.length);
+    
     const foundStoreRow = storeRows.find(row => row[7] === storeId); // G열: 매장 ID로 수정
+    console.log('Step 11: Store search result:', foundStoreRow ? 'Found' : 'Not found');
     
     if (foundStoreRow) {
       const store = {
@@ -888,6 +903,7 @@ app.post('/api/login', async (req, res) => {
       };
       
       console.log(`Found store: ${store.name}`);
+      console.log('Step 12: Processing store login...');
       
       // 디스코드로 로그인 로그 전송
       if (DISCORD_LOGGING_ENABLED) {
@@ -919,6 +935,7 @@ app.post('/api/login', async (req, res) => {
         }
       }
       
+      console.log('Step 13: Store login successful, sending response...');
       return res.json({
         success: true,
         isAgent: false,
@@ -927,6 +944,7 @@ app.post('/api/login', async (req, res) => {
     }
     
     // 3. 매장 ID도 아닌 경우
+    console.log('Step 14: ID not found in either agent or store sheets');
     return res.status(404).json({
       success: false,
       error: 'Store not found'
@@ -934,6 +952,7 @@ app.post('/api/login', async (req, res) => {
     
   } catch (error) {
     console.error('Error in login:', error);
+    console.error('Login error stack:', error.stack);
     res.status(500).json({ 
       success: false, 
       error: 'Login failed', 
