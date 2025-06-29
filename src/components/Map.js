@@ -65,11 +65,20 @@ function Map({
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
+  const [mapZoom, setMapZoom] = useState(isAgentMode ? 9 : 12);
   const initialLoadRef = useRef(true);
   const previousSelectedStoreRef = useRef(null);
   const mapRef = useRef(null);
 
   const center = useMemo(() => userLocation || defaultCenter, [userLocation]);
+
+  // userLocation이 변경될 때 mapCenter 업데이트
+  useEffect(() => {
+    if (userLocation) {
+      setMapCenter(userLocation);
+    }
+  }, [userLocation]);
 
   // 재고 수량 계산 함수
   const calculateInventory = useCallback((store) => {
@@ -234,46 +243,15 @@ function Map({
 
   // 강제 확대 (검색 결과 선택 시)
   useEffect(() => {
-    if (forceZoomToStore && mapRef.current && isMapReady) {
+    if (forceZoomToStore && isMapReady) {
       const { lat, lng } = forceZoomToStore;
-      console.log('강제 확대 실행:', lat, lng, '지도 상태:', mapRef.current);
+      console.log('강제 확대 실행 - 상태 변경:', lat, lng);
       
-      const performZoom = () => {
-        try {
-          const map = mapRef.current;
-          if (!map) {
-            console.error('지도 인스턴스가 없습니다');
-            return;
-          }
-          
-          // 즉시 확대
-          map.setView([lat, lng], 16, {
-            animate: true,
-            duration: 1
-          });
-          
-          console.log('강제 확대 완료 - setView');
-          
-          // 추가로 flyTo도 실행 (더 부드러운 애니메이션)
-          setTimeout(() => {
-            if (mapRef.current) {
-              mapRef.current.flyTo([lat, lng], 16, {
-                duration: 1.5
-              });
-              console.log('강제 확대 완료 - flyTo');
-            }
-          }, 200);
-          
-        } catch (error) {
-          console.error('강제 확대 중 오류:', error);
-        }
-      };
+      // 지도 중심점과 줌 레벨을 직접 변경
+      setMapCenter({ lat, lng });
+      setMapZoom(16);
       
-      // 즉시 실행
-      performZoom();
-      
-      // 추가로 약간의 지연 후 다시 시도
-      setTimeout(performZoom, 100);
+      console.log('지도 상태 변경 완료 - 중심점:', { lat, lng }, '줌:', 16);
     }
   }, [forceZoomToStore, isMapReady]);
 
@@ -333,8 +311,8 @@ function Map({
   return (
     <Paper sx={mapContainerStyle}>
       <MapContainer
-        center={[center.lat, center.lng]}
-        zoom={isAgentMode ? 9 : 12}
+        center={[mapCenter.lat, mapCenter.lng]}
+        zoom={mapZoom}
         style={containerStyle}
         whenCreated={onMapLoad}
         zoomControl={true}
@@ -348,9 +326,9 @@ function Map({
         
         {/* 지도 뷰 업데이트 */}
         <MapUpdater 
-          center={center} 
+          center={mapCenter} 
           bounds={mapBounds} 
-          zoom={isAgentMode ? 9 : 12}
+          zoom={mapZoom}
           isAgentMode={isAgentMode}
         />
         
