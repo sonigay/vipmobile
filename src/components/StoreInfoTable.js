@@ -48,7 +48,7 @@ const handleKakaoTalk = (storeInfo, selectedModel, selectedColor) => {
   const storeName = storeInfo.name;
   
   // 메시지 템플릿 구성
-  const message = `@${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
+  const message = `<어플전송메시지>\n@${manager}\n${storeName}에서 ${selectedModel} / ${selectedColor}\n한대 사진 부탁드립니다. 감사합니다`;
   
   // 클립보드에 메시지 복사
   navigator.clipboard.writeText(message).then(() => {
