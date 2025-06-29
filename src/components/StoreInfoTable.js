@@ -151,79 +151,19 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
     navigator.clipboard.writeText(message).then(() => {
       console.log('메시지가 클립보드에 복사되었습니다:', message);
       
-      // 오픈채팅방 링크로 카카오톡 연결
-      const openChatUrl = process.env.REACT_APP_KAKAO_OPEN_CHAT_URL || 'https://open.kakao.com/o/g2N1EjEh';
-      
-      // 모바일 환경 감지
-      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        // 모바일: 여러 방법으로 카카오톡 앱 연결 시도
-        const kakaoUrl = `kakaotalk://open?url=${encodeURIComponent(openChatUrl)}&autoJoin=true`;
-        
-        console.log('모바일 환경 감지됨');
-        console.log('카카오톡 URL:', kakaoUrl);
-        console.log('User Agent:', navigator.userAgent);
-        
-        // 방법 1: window.open 시도
-        try {
-          const newWindow = window.open(kakaoUrl, '_blank');
-          console.log('window.open 결과:', newWindow);
-          
-          // 방법 2: window.open이 실패하면 window.location.href 시도
-          setTimeout(() => {
-            if (!newWindow || newWindow.closed) {
-              console.log('window.open 실패, window.location.href 시도');
-              try {
-                window.location.href = kakaoUrl;
-              } catch (error) {
-                console.error('window.location.href 실패:', error);
-              }
-            }
-          }, 1000);
-          
-          // 방법 3: iframe으로 시도 (브라우저 정책 우회)
-          setTimeout(() => {
-            try {
-              console.log('iframe 방법 시도');
-              const iframe = document.createElement('iframe');
-              iframe.style.display = 'none';
-              iframe.src = kakaoUrl;
-              document.body.appendChild(iframe);
-              setTimeout(() => {
-                if (document.body.contains(iframe)) {
-                  document.body.removeChild(iframe);
-                  console.log('iframe 제거됨');
-                }
-              }, 2000);
-            } catch (error) {
-              console.error('iframe 방법 실패:', error);
-            }
-          }, 2000);
-          
-        } catch (error) {
-          console.error('카카오톡 앱 연결 시도 중 오류:', error);
-        }
-        
-        console.log('모바일 환경: 카카오톡 앱 연결 시도 완료');
-      } else {
-        // 데스크톱: 웹 브라우저에서 카카오톡 열기
-        window.open(openChatUrl, '_blank');
-        console.log('데스크톱 환경: 웹 브라우저에서 카카오톡 열기');
-      }
-      
       // 로깅 콜백 호출
       if (onKakaoTalkButtonClick) {
         onKakaoTalkButtonClick();
       }
       
-      // 팝업창 제거 - 사용자가 직접 카카오톡에서 확인하도록 함
+      // 간단한 성공 알림
+      console.log('카카오톡 문구가 클립보드에 복사되었습니다.');
     }).catch(err => {
       console.error('클립보드 복사 실패:', err);
       alert('클립보드 복사에 실패했습니다.');
     });
     
-    console.log(`카카오톡 연결: ${storeName} - ${selectedModel} / ${selectedColor}`);
+    console.log(`카카오톡 문구 생성: ${storeName} - ${selectedModel} / ${selectedColor}`);
   };
 
   return (
@@ -265,19 +205,19 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
                           size="small"
                           sx={{ borderRadius: '20px' }}
                         >
-                          전화 연결하기
+                          전화걸기
                         </Button>
                         <Button 
                           variant="contained" 
-                          color="secondary" 
-                          startIcon={<ChatIcon />}
+                          color="warning" 
+                          startIcon={<span style={{ fontSize: '1.2rem' }}>💬</span>}
                           onClick={() => handleKakaoTalk(selectedStore, selectedModel, selectedColor)}
                           size="small"
                           sx={{ borderRadius: '20px' }}
                           disabled={!selectedModel || !selectedColor}
-                          title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡으로 메시지 보내기'}
+                          title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡 문구 생성'}
                         >
-                          카카오톡 보내기
+                          카톡문구 생성
                         </Button>
                       </Box>
                     ) : (
