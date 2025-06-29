@@ -33,27 +33,31 @@ const defaultCenter = {
 };
 
 // 강제 확대를 위한 별도 컴포넌트
-function ForceZoomUpdater({ forceZoomToStore, isMapReady }) {
+function ForceZoomUpdater({ forceZoomToStore }) {
   const map = useMap();
   
   useEffect(() => {
-    if (forceZoomToStore && isMapReady) {
+    if (forceZoomToStore) {
       const { lat, lng } = forceZoomToStore;
-      console.log('ForceZoomUpdater 실행:', lat, lng);
+      console.log('ForceZoomUpdater 실행:', lat, lng, '지도 인스턴스:', map);
       
-      try {
-        // 즉시 확대
-        map.setView([lat, lng], 16, {
-          animate: true,
-          duration: 1
-        });
-        
-        console.log('ForceZoomUpdater 확대 완료');
-      } catch (error) {
-        console.error('ForceZoomUpdater 오류:', error);
+      if (map) {
+        try {
+          // 즉시 확대
+          map.setView([lat, lng], 16, {
+            animate: true,
+            duration: 1
+          });
+          
+          console.log('ForceZoomUpdater 확대 완료');
+        } catch (error) {
+          console.error('ForceZoomUpdater 오류:', error);
+        }
+      } else {
+        console.error('ForceZoomUpdater: 지도 인스턴스가 없습니다');
       }
     }
-  }, [forceZoomToStore, isMapReady, map]);
+  }, [forceZoomToStore, map]);
   
   return null;
 }
@@ -274,6 +278,25 @@ function Map({
     }
   }, [map, selectedStore, safeMapOperation, isAgentMode]);
 
+  // 강제 확대 (검색 결과 선택 시) - 직접 지도 조작
+  useEffect(() => {
+    if (forceZoomToStore && mapRef.current) {
+      const { lat, lng } = forceZoomToStore;
+      console.log('강제 확대 직접 조작:', lat, lng);
+      
+      try {
+        const mapInstance = mapRef.current;
+        mapInstance.setView([lat, lng], 16, {
+          animate: true,
+          duration: 1
+        });
+        console.log('강제 확대 직접 조작 완료');
+      } catch (error) {
+        console.error('강제 확대 직접 조작 오류:', error);
+      }
+    }
+  }, [forceZoomToStore]);
+
   // 지도 범위 계산
   const mapBounds = useMemo(() => {
     if (!filteredStores.length && !userLocation) return null;
@@ -356,7 +379,6 @@ function Map({
         {/* 강제 확대 업데이트 */}
         <ForceZoomUpdater 
           forceZoomToStore={forceZoomToStore}
-          isMapReady={isMapReady}
         />
         
         {/* 매장 마커들 */}
