@@ -590,16 +590,20 @@ function App() {
       
       console.log('지도 이동 좌표:', lat, lng);
       
+      // 먼저 userLocation 변경
       setUserLocation({ lat, lng });
       
-      // 강제 확대 실행
-      setForceZoomToStore({ lat, lng });
-      
-      // 강제 확대 상태 초기화 (더 긴 지연 시간)
+      // 강제 확대 실행 (약간의 지연 후)
       setTimeout(() => {
-        console.log('강제 확대 상태 초기화');
-        setForceZoomToStore(null);
-      }, 500);
+        console.log('강제 확대 상태 설정');
+        setForceZoomToStore({ lat, lng });
+        
+        // 강제 확대 상태 초기화 (더 긴 지연 시간)
+        setTimeout(() => {
+          console.log('강제 확대 상태 초기화');
+          setForceZoomToStore(null);
+        }, 1000);
+      }, 100);
     }
   }, []);
 

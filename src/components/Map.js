@@ -67,6 +67,7 @@ function Map({
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
   const [mapZoom, setMapZoom] = useState(isAgentMode ? 9 : 12);
+  const [mapKey, setMapKey] = useState(0);
   const initialLoadRef = useRef(true);
   const previousSelectedStoreRef = useRef(null);
   const mapRef = useRef(null);
@@ -251,7 +252,10 @@ function Map({
       setMapCenter({ lat, lng });
       setMapZoom(16);
       
-      console.log('지도 상태 변경 완료 - 중심점:', { lat, lng }, '줌:', 16);
+      // 지도를 강제로 다시 렌더링
+      setMapKey(prev => prev + 1);
+      
+      console.log('지도 상태 변경 완료 - 중심점:', { lat, lng }, '줌:', 16, '새 key:', mapKey + 1);
     }
   }, [forceZoomToStore, isMapReady]);
 
@@ -311,6 +315,7 @@ function Map({
   return (
     <Paper sx={mapContainerStyle}>
       <MapContainer
+        key={mapKey}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={mapZoom}
         style={containerStyle}
