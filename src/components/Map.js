@@ -90,6 +90,7 @@ function Map({
   userLocation, 
   filteredStores, 
   selectedStore,
+  requestedStore,
   selectedRadius,
   selectedModel,
   selectedColor,
@@ -175,28 +176,39 @@ function Map({
   const createMarkerIcon = useCallback((store) => {
     const isSelected = selectedStore?.id === store.id;
     const isLoggedInStore = loggedInStoreId === store.id;
+    const isRequestedStore = requestedStore?.id === store.id;
     const inventoryCount = calculateInventory(store);
     const hasInventory = inventoryCount > 0;
 
-    let fillColor, strokeColor, radius;
+    let fillColor, strokeColor, radius, iconStyle;
 
-    // 1. 선택된 매장
-    if (isSelected) {
+    // 1. 요청점 (최우선)
+    if (isRequestedStore) {
+      fillColor = '#ff9800';
+      strokeColor = '#f57c00';
+      radius = 18;
+      iconStyle = 'border: 3px solid #ff9800; box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3);';
+    }
+    // 2. 선택된 매장
+    else if (isSelected) {
       fillColor = '#2196f3';
       strokeColor = '#1976d2';
       radius = 16;
+      iconStyle = '';
     }
-    // 2. 로그인한 매장
+    // 3. 로그인한 매장
     else if (isLoggedInStore) {
       fillColor = '#9c27b0';
       strokeColor = '#7b1fa2';
       radius = 16;
+      iconStyle = '';
     }
-    // 3. 일반 매장
+    // 4. 일반 매장
     else {
       fillColor = hasInventory ? '#4caf50' : '#f44336';
       strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
       radius = hasInventory ? 14 : 10;
+      iconStyle = '';
     }
 
     return L.divIcon({
@@ -215,6 +227,7 @@ function Map({
           font-weight: bold;
           font-size: ${radius > 12 ? '12px' : '10px'};
           box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          ${iconStyle}
         ">
           ${inventoryCount > 0 ? inventoryCount : ''}
         </div>

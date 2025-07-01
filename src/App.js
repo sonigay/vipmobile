@@ -77,6 +77,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [forceZoomToStore, setForceZoomToStore] = useState(null); // 강제 확대 상태 추가
+  const [requestedStore, setRequestedStore] = useState(null); // 요청점검색으로 선택된 매장
   // 현재 세션의 IP 및 위치 정보
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -580,6 +581,7 @@ function App() {
   const handleSearchResultSelect = useCallback((store) => {
     console.log('검색 결과 선택:', store);
     setSelectedStore(store);
+    setRequestedStore(store); // 요청점검색으로 선택된 매장 저장
     setSearchQuery('');
     setSearchResults([]);
     
@@ -831,6 +833,7 @@ function App() {
                 <>
                   <StoreInfoTable 
                     selectedStore={selectedStore}
+                    requestedStore={requestedStore}
                     agentTarget={agentTarget}
                     agentContactId={agentContactId}
                     onCallButtonClick={handleCallButtonClick}
@@ -870,6 +873,7 @@ function App() {
                   userLocation={userLocation}
                   filteredStores={filteredStores}
                   selectedStore={selectedStore}
+                  requestedStore={requestedStore}
                   onStoreSelect={handleStoreSelect}
                   selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
                   selectedModel={selectedModel}

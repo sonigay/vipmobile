@@ -15,6 +15,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CallIcon from '@mui/icons-material/Call';
 import ChatIcon from '@mui/icons-material/Chat';
+import SearchIcon from '@mui/icons-material/Search';
 import { fetchAgentData } from '../api';
 
 /**
@@ -41,7 +42,7 @@ const handleCall = (phoneNumber) => {
 /**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
-function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor }) {
+function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor }) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -144,10 +145,25 @@ function StoreInfoTable({ selectedStore, agentTarget, agentContactId, onCallButt
       return;
     }
 
-    const message = `📱 앱 전송 메시지
+    let message;
+
+    // 요청점이 선택된 경우
+    if (requestedStore) {
+      message = `📱 앱 전송 메시지
 안녕하세요! ${store.name}에서
 ${model} / ${color} 모델
-사용 가능한지 확인 부탁드립니다. 감사합니다.`;
+사용 가능한지 확인 부탁드립니다
+"${requestedStore.name}"으로 이동 예정입니다.
+감사합니다.`;
+    } else {
+      // 요청점이 선택되지 않은 경우
+      message = `📱 앱 전송 메시지
+안녕하세요! ${store.name}에서
+${model} / ${color} 모델
+사용 가능한지 확인 부탁드립니다
+요청점이 확인되지 않아 어디로 이동할지는 별도로 말씀드리겠습니다.
+감사합니다.`;
+    }
 
     // 클립보드에 복사
     navigator.clipboard.writeText(message).then(() => {
@@ -251,6 +267,19 @@ ${model} / ${color} 모델
                 <TableCell variant="head">주소</TableCell>
                 <TableCell>{selectedStore.address || '주소 정보 없음'}</TableCell>
               </TableRow>
+              {requestedStore && (
+                <TableRow>
+                  <TableCell variant="head">요청점</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SearchIcon sx={{ mr: 1, fontSize: '1.2rem', color: 'primary.main' }} />
+                      <span style={{ fontWeight: 'medium', color: 'primary.main' }}>
+                        {requestedStore.name}
+                      </span>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
