@@ -168,7 +168,7 @@ ${model} / ${color} 모델
     // 클립보드에 복사
     navigator.clipboard.writeText(message).then(() => {
       console.log('카카오톡 메시지가 클립보드에 복사되었습니다:', message);
-      alert('카카오톡 문구가 클립보드에 복사되었습니다!\n\n담당자에게 @태그를 추가하고\n이동처는 직접 입력해주세요.');
+      alert('카카오톡 문구가 복사되었습니다!\n\n담당자에게 @태그는 직접 추가해주세요!');
     }).catch(err => {
       console.error('클립보드 복사 실패:', err);
       alert('클립보드 복사에 실패했습니다.');
