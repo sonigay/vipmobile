@@ -1027,6 +1027,7 @@ function App() {
                   selectedColor={selectedColor}
                   loggedInStoreId={loggedInStore?.id}
                   isAgentMode={isAgentMode}
+                  currentView={currentView}
                   forceZoomToStore={forceZoomToStore}
                 />
               </Box>

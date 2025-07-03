@@ -97,6 +97,7 @@ function Map({
   loggedInStoreId,
   onStoreSelect,
   isAgentMode,
+  currentView,
   forceZoomToStore
 }) {
   const [map, setMap] = useState(null);
@@ -414,10 +415,62 @@ function Map({
               <Popup>
                 <div>
                   <h3>{store.name}</h3>
-                  <p>재고: {inventoryCount}개</p>
-                  {store.address && <p>주소: {store.address}</p>}
-                  {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold'}}>✓ 선택됨</p>}
-                  {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                  
+                  {/* 담당재고확인 모드일 때만 모델별 재고 표시 */}
+                  {isAgentMode && currentView === 'assigned' ? (
+                    <div>
+                      {store.inventory && (
+                        <div>
+                          {Object.entries(store.inventory).map(([category, models]) => {
+                            if (!models || typeof models !== 'object') return null;
+                            
+                            return Object.entries(models).map(([model, statuses]) => {
+                              if (!statuses || typeof statuses !== 'object') return null;
+                              
+                              // 해당 모델의 총 재고 계산
+                              let modelTotal = 0;
+                              const colorDetails = [];
+                              
+                              Object.entries(statuses).forEach(([status, colors]) => {
+                                if (colors && typeof colors === 'object') {
+                                  Object.entries(colors).forEach(([color, quantity]) => {
+                                    if (quantity && quantity > 0) {
+                                      modelTotal += quantity;
+                                      colorDetails.push(`${color}: ${quantity}개`);
+                                    }
+                                  });
+                                }
+                              });
+                              
+                              if (modelTotal > 0) {
+                                return (
+                                  <div key={model} style={{ marginBottom: '8px' }}>
+                                    <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', color: '#2196f3' }}>
+                                      {model}: {modelTotal}개
+                                    </p>
+                                    <div style={{ fontSize: '0.9em', color: '#666', marginLeft: '8px' }}>
+                                      {colorDetails.join(', ')}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            });
+                          })}
+                        </div>
+                      )}
+                      {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
+                      {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                    </div>
+                  ) : (
+                    /* 기존 말풍선 내용 (전체재고확인 및 일반 모드) */
+                    <div>
+                      <p>재고: {inventoryCount}개</p>
+                      {store.address && <p>주소: {store.address}</p>}
+                      {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold'}}>✓ 선택됨</p>}
+                      {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>
