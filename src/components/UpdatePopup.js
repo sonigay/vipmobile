@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -12,7 +12,9 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 import {
   Update as UpdateIcon,
@@ -24,9 +26,11 @@ import {
 import { formatUpdateContent } from '../utils/updateHistory';
 
 const UpdatePopup = ({ open, onClose, updates, onMarkAsRead }) => {
+  const [hideToday, setHideToday] = useState(false);
+
   const handleClose = () => {
     if (onMarkAsRead) {
-      onMarkAsRead();
+      onMarkAsRead(hideToday);
     }
     onClose();
   };
@@ -167,7 +171,18 @@ const UpdatePopup = ({ open, onClose, updates, onMarkAsRead }) => {
         )}
       </DialogContent>
       
-      <DialogActions sx={{ p: 3, pt: 0 }}>
+      <DialogActions sx={{ p: 3, pt: 0, flexDirection: 'column', alignItems: 'stretch' }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={hideToday}
+              onChange={(e) => setHideToday(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="오늘 하루 보지 않기"
+          sx={{ alignSelf: 'flex-start', mb: 2 }}
+        />
         <Button 
           onClick={handleClose}
           variant="contained"

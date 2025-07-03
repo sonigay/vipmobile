@@ -12,7 +12,7 @@ import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import UpdatePopup from './components/UpdatePopup';
-import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion } from './utils/updateHistory';
+import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -185,11 +185,15 @@ function App() {
   // 업데이트 확인 및 팝업 표시
   useEffect(() => {
     if (isLoggedIn) {
-      // 로그인할 때마다 업데이트 팝업 무조건 표시
-      const updates = getAllUpdates();
-      setUnreadUpdates(updates);
-      setShowUpdatePopup(true);
-      console.log('로그인 시 업데이트 팝업 표시:', updates.length, '개');
+      // 새로운 업데이트가 있을 때만 팝업 표시
+      if (hasNewUpdates()) {
+        const updates = getUnreadUpdates();
+        setUnreadUpdates(updates);
+        setShowUpdatePopup(true);
+        console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
+      } else {
+        console.log('새로운 업데이트가 없습니다.');
+      }
     }
   }, [isLoggedIn]);
 
@@ -736,13 +740,23 @@ function App() {
   }, []);
 
   // 업데이트 팝업 닫기 핸들러
-  const handleUpdatePopupClose = useCallback(() => {
+  const handleUpdatePopupClose = useCallback((hideToday = false) => {
     setShowUpdatePopup(false);
-    // 마지막 업데이트 버전을 현재 버전으로 설정
-    if (unreadUpdates.length > 0) {
-      const latestVersion = unreadUpdates[0].version;
-      setLastUpdateVersion(latestVersion);
-      console.log('업데이트 확인 완료:', latestVersion);
+    
+    if (hideToday) {
+      // 오늘 하루 보지 않기 설정
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0); // 다음날 자정으로 설정
+      setHideUntilDate(tomorrow);
+      console.log('오늘 하루 보지 않기 설정 완료:', tomorrow);
+    } else {
+      // 마지막 업데이트 버전을 현재 버전으로 설정
+      if (unreadUpdates.length > 0) {
+        const latestVersion = unreadUpdates[0].version;
+        setLastUpdateVersion(latestVersion);
+        console.log('업데이트 확인 완료:', latestVersion);
+      }
     }
   }, [unreadUpdates]);
 

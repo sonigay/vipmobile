@@ -29,6 +29,7 @@ export const UPDATE_HISTORY = [
 // 로컬 스토리지 키
 const LAST_UPDATE_KEY = 'lastUpdateVersion';
 const UPDATE_HISTORY_KEY = 'updateHistory';
+const HIDE_UNTIL_DATE_KEY = 'hideUpdateUntilDate';
 
 // 마지막으로 본 업데이트 버전 가져오기
 export const getLastUpdateVersion = () => {
@@ -49,8 +50,35 @@ export const setLastUpdateVersion = (version) => {
   }
 };
 
+// 오늘 하루 보지 않기 설정 가져오기
+export const getHideUntilDate = () => {
+  try {
+    const hideUntil = localStorage.getItem(HIDE_UNTIL_DATE_KEY);
+    return hideUntil ? new Date(hideUntil) : null;
+  } catch (error) {
+    console.error('오늘 하루 보지 않기 설정 조회 실패:', error);
+    return null;
+  }
+};
+
+// 오늘 하루 보지 않기 설정 저장
+export const setHideUntilDate = (date) => {
+  try {
+    localStorage.setItem(HIDE_UNTIL_DATE_KEY, date.toISOString());
+  } catch (error) {
+    console.error('오늘 하루 보지 않기 설정 저장 실패:', error);
+  }
+};
+
 // 새로운 업데이트가 있는지 확인
 export const hasNewUpdates = () => {
+  // 오늘 하루 보지 않기 설정 확인
+  const hideUntil = getHideUntilDate();
+  if (hideUntil && new Date() < hideUntil) {
+    console.log('오늘 하루 보지 않기 설정으로 인해 업데이트 팝업 숨김');
+    return false;
+  }
+
   const lastVersion = getLastUpdateVersion();
   const latestVersion = UPDATE_HISTORY[0]?.version || '0.0.0';
   
