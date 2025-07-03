@@ -195,6 +195,31 @@ function App() {
     }
   }, [isLoggedIn]);
 
+  // 담당자별 재고 필터링 함수 (useEffect보다 먼저 정의)
+  const filterStoresByAgent = useCallback((stores, agentTarget) => {
+    if (!stores || !Array.isArray(stores) || !agentTarget) {
+      return stores || [];
+    }
+
+    console.log(`담당자별 재고 필터링 시작: ${agentTarget}`);
+    
+    return stores.filter(store => {
+      if (!store.manager) return false;
+      
+      // 담당자명 앞 3글자 비교 (기존 로직과 동일)
+      const managerPrefix = store.manager.toString().substring(0, 3);
+      const agentPrefix = agentTarget.toString().substring(0, 3);
+      
+      const isMatch = managerPrefix === agentPrefix;
+      
+      if (isMatch) {
+        console.log(`담당자 매칭: ${store.manager} (${store.name})`);
+      }
+      
+      return isMatch;
+    });
+  }, []);
+
   // 재고 필터링 함수 (상태 변수들 뒤에 정의)
   const filterStores = useCallback((stores, selectedModel, selectedColor, userLocation, searchRadius) => {
     console.log('재고 필터링 시작:', { selectedModel, selectedColor });
@@ -723,30 +748,7 @@ function App() {
     }
   }, [unreadUpdates]);
 
-  // 담당자별 재고 필터링 함수
-  const filterStoresByAgent = useCallback((stores, agentTarget) => {
-    if (!stores || !Array.isArray(stores) || !agentTarget) {
-      return stores || [];
-    }
 
-    console.log(`담당자별 재고 필터링 시작: ${agentTarget}`);
-    
-    return stores.filter(store => {
-      if (!store.manager) return false;
-      
-      // 담당자명 앞 3글자 비교 (기존 로직과 동일)
-      const managerPrefix = store.manager.toString().substring(0, 3);
-      const agentPrefix = agentTarget.toString().substring(0, 3);
-      
-      const isMatch = managerPrefix === agentPrefix;
-      
-      if (isMatch) {
-        console.log(`담당자 매칭: ${store.manager} (${store.name})`);
-      }
-      
-      return isMatch;
-    });
-  }, []);
 
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {
