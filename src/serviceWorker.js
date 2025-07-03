@@ -27,6 +27,8 @@ function registerValidSW(swUrl, config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      console.log('Service Worker 등록 성공:', registration);
+      
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker == null) {
@@ -35,7 +37,13 @@ function registerValidSW(swUrl, config) {
         installingWorker.onstatechange = () => {
           if (installingWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
-              console.log('새로운 컨텐츠가 사용 가능합니다.');
+              console.log('새로운 컨텐츠가 사용 가능합니다. 자동 새로고침을 시작합니다.');
+              
+              // 자동 새로고침 실행
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+              
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
               }
@@ -48,6 +56,13 @@ function registerValidSW(swUrl, config) {
           }
         };
       };
+      
+      // Service Worker 메시지 리스너 추가
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'CACHE_CLEARED') {
+          console.log('Service Worker 캐시 정리 완료');
+        }
+      });
     })
     .catch((error) => {
       console.error('서비스 워커 등록 중 에러 발생:', error);

@@ -11,6 +11,8 @@ import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
+import UpdatePopup from './components/UpdatePopup';
+import { hasNewUpdates, getUnreadUpdates, setLastUpdateVersion } from './utils/updateHistory';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -85,6 +87,9 @@ function App() {
   const [deviceInfo, setDeviceInfo] = useState(null);
   // 캐시 상태
   const [cacheStatus, setCacheStatus] = useState(null);
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [unreadUpdates, setUnreadUpdates] = useState([]);
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
@@ -106,6 +111,26 @@ function App() {
     cacheManager.clearAll();
     updateCacheStatus();
   }, [updateCacheStatus]);
+
+  // 캐시 클릭 핸들러 (자동 캐시 정리 + 새로고침)
+  const handleCacheClick = useCallback(() => {
+    console.log('캐시 정리 및 새로고침 시작');
+    
+    // Service Worker에 캐시 정리 메시지 전송
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CLEAR_CACHE'
+      });
+    }
+    
+    // 클라이언트 캐시도 정리
+    cacheManager.clearAll();
+    
+    // 잠시 후 페이지 새로고침
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  }, []);
 
   // 로그인 상태 복원
   useEffect(() => {
@@ -156,6 +181,19 @@ function App() {
       }
     }
   }, []);
+
+  // 업데이트 확인 및 팝업 표시
+  useEffect(() => {
+    if (isLoggedIn) {
+      // 새로운 업데이트가 있는지 확인
+      if (hasNewUpdates()) {
+        const updates = getUnreadUpdates();
+        setUnreadUpdates(updates);
+        setShowUpdatePopup(true);
+        console.log('새로운 업데이트 발견:', updates.length, '개');
+      }
+    }
+  }, [isLoggedIn]);
 
   // 디바이스 및 IP 정보 수집
   useEffect(() => {
@@ -671,6 +709,17 @@ function App() {
     }
   }, []);
 
+  // 업데이트 팝업 닫기 핸들러
+  const handleUpdatePopupClose = useCallback(() => {
+    setShowUpdatePopup(false);
+    // 마지막 업데이트 버전을 현재 버전으로 설정
+    if (unreadUpdates.length > 0) {
+      const latestVersion = unreadUpdates[0].version;
+      setLastUpdateVersion(latestVersion);
+      console.log('업데이트 확인 완료:', latestVersion);
+    }
+  }, [unreadUpdates]);
+
   // 담당자별 재고 필터링 함수
   const filterStoresByAgent = useCallback((stores, agentTarget) => {
     if (!stores || !Array.isArray(stores) || !agentTarget) {
@@ -861,6 +910,9 @@ function App() {
                     color={cacheStatus.memory.valid > 0 ? "success" : "default"}
                     variant="outlined"
                     sx={{ fontSize: '0.7em' }}
+                    onClick={handleCacheClick}
+                    style={{ cursor: 'pointer' }}
+                    title="클릭하여 캐시 정리 및 새로고침"
                   />
                   <Chip 
                     label={`LS: ${cacheStatus.localStorage.total}`}
@@ -977,6 +1029,14 @@ function App() {
           )}
         </Box>
       </Container>
+      
+      {/* 업데이트 팝업 */}
+      <UpdatePopup
+        open={showUpdatePopup}
+        onClose={handleUpdatePopupClose}
+        updates={unreadUpdates}
+        onMarkAsRead={handleUpdatePopupClose}
+      />
     </ThemeProvider>
   );
 }
