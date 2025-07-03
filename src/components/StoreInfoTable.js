@@ -42,7 +42,7 @@ const handleCall = (phoneNumber) => {
 /**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
-function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor }) {
+function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor, currentView }) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -177,9 +177,20 @@ ${model} / ${color} 모델
 
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <StoreIcon sx={{ mr: 1 }} />
-        선택된 업체 정보
+      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <StoreIcon sx={{ mr: 1 }} />
+          선택된 업체 정보
+        </Box>
+        {currentView && (
+          <Chip 
+            label={currentView === 'all' ? '전체재고확인' : '담당재고확인'}
+            size="small"
+            color={currentView === 'all' ? 'primary' : 'secondary'}
+            variant="outlined"
+            sx={{ fontSize: '0.7em' }}
+          />
+        )}
       </Typography>
 
       {selectedStore ? (

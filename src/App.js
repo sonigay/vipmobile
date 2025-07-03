@@ -78,6 +78,8 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [forceZoomToStore, setForceZoomToStore] = useState(null); // 강제 확대 상태 추가
   const [requestedStore, setRequestedStore] = useState(null); // 요청점검색으로 선택된 매장
+  // 관리자 모드 재고 확인 뷰 상태 추가
+  const [currentView, setCurrentView] = useState('all'); // 'all' | 'assigned'
   // 현재 세션의 IP 및 위치 정보
   const [ipInfo, setIpInfo] = useState(null);
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -120,6 +122,7 @@ function App() {
           setAgentTarget(parsedState.agentTarget || '');
           setAgentQualification(parsedState.agentQualification || '');
           setAgentContactId(parsedState.agentContactId || '');
+          setCurrentView(parsedState.currentView || 'all');
           
           // 관리자 모드 위치 설정 (안산지역 중심)
           setUserLocation({
@@ -353,7 +356,8 @@ function App() {
 
     console.log('필터링 시작:', {
       총매장수: data.stores.length,
-      관리자모드: isAgentMode
+      관리자모드: isAgentMode,
+      현재뷰: currentView
     });
 
     try {
@@ -363,7 +367,13 @@ function App() {
         distance: null
       }));
 
-      // 2. 거리 계산
+      // 2. 관리자 모드에서 담당자별 필터링 적용
+      if (isAgentMode && currentView === 'assigned' && agentTarget) {
+        filtered = filterStoresByAgent(filtered, agentTarget);
+        console.log(`담당자별 필터링 결과: ${filtered.length}개 매장`);
+      }
+
+      // 3. 거리 계산
       if (userLocation) {
         filtered = filtered.map(store => {
           if (!store.latitude || !store.longitude) {
@@ -386,12 +396,13 @@ function App() {
         }
       }
 
-      // 3. 결과 로깅
+      // 4. 결과 로깅
       console.log('필터링 결과:', {
         총매장수: data.stores.length,
         필터링된매장수: filtered.length,
         검색반경: selectedRadius ? `${selectedRadius/1000}km` : '없음',
-        관리자모드: isAgentMode
+        관리자모드: isAgentMode,
+        현재뷰: currentView
       });
 
       setFilteredStores(filtered);
@@ -399,7 +410,7 @@ function App() {
       console.error('필터링 중 오류 발생:', error);
       setFilteredStores([]);
     }
-  }, [data, selectedRadius, userLocation, isAgentMode]);
+  }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget, filterStoresByAgent]);
 
   const handleLogin = (store) => {
     setIsLoggedIn(true);
@@ -449,7 +460,8 @@ function App() {
         store: store,
         agentTarget: store.target,
         agentQualification: store.qualification,
-        agentContactId: store.contactId
+        agentContactId: store.contactId,
+        currentView: 'all'
       }));
     } else {
       console.log('로그인: 일반 매장 모드');
@@ -488,6 +500,8 @@ function App() {
     setAgentContactId('');
     // 재고모드 상태 초기화
     setIsInventoryMode(false);
+    // 재고 확인 뷰 상태 초기화
+    setCurrentView('all');
     
     // 로그인 상태 삭제
     localStorage.removeItem('loginState');
@@ -638,6 +652,49 @@ function App() {
       });
     }
   }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo, selectedModel, selectedColor]);
+
+  // 재고 확인 뷰 변경 핸들러
+  const handleViewChange = useCallback((view) => {
+    setCurrentView(view);
+    console.log(`재고 확인 뷰 변경: ${view}`);
+    
+    // 로컬 스토리지에 현재 뷰 상태 저장
+    const savedLoginState = localStorage.getItem('loginState');
+    if (savedLoginState) {
+      try {
+        const parsedState = JSON.parse(savedLoginState);
+        parsedState.currentView = view;
+        localStorage.setItem('loginState', JSON.stringify(parsedState));
+      } catch (error) {
+        console.error('로그인 상태 업데이트 실패:', error);
+      }
+    }
+  }, []);
+
+  // 담당자별 재고 필터링 함수
+  const filterStoresByAgent = useCallback((stores, agentTarget) => {
+    if (!stores || !Array.isArray(stores) || !agentTarget) {
+      return stores || [];
+    }
+
+    console.log(`담당자별 재고 필터링 시작: ${agentTarget}`);
+    
+    return stores.filter(store => {
+      if (!store.manager) return false;
+      
+      // 담당자명 앞 3글자 비교 (기존 로직과 동일)
+      const managerPrefix = store.manager.toString().substring(0, 3);
+      const agentPrefix = agentTarget.toString().substring(0, 3);
+      
+      const isMatch = managerPrefix === agentPrefix;
+      
+      if (isMatch) {
+        console.log(`담당자 매칭: ${store.manager} (${store.name})`);
+      }
+      
+      return isMatch;
+    });
+  }, []);
 
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {
@@ -815,6 +872,38 @@ function App() {
                 </Box>
               )}
               
+              {/* 관리자 모드 재고 확인 메뉴 */}
+              {isLoggedIn && isAgentMode && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
+                  <Button 
+                    color="inherit" 
+                    onClick={() => handleViewChange('all')}
+                    sx={{ 
+                      fontSize: '0.8em',
+                      backgroundColor: currentView === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)'
+                      }
+                    }}
+                  >
+                    전체재고확인
+                  </Button>
+                  <Button 
+                    color="inherit" 
+                    onClick={() => handleViewChange('assigned')}
+                    sx={{ 
+                      fontSize: '0.8em',
+                      backgroundColor: currentView === 'assigned' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)'
+                      }
+                    }}
+                  >
+                    담당재고확인
+                  </Button>
+                </Box>
+              )}
+              
               {isLoggedIn && (
                 <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
                   로그아웃
@@ -840,6 +929,7 @@ function App() {
                     onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
                     selectedModel={selectedModel}
                     selectedColor={selectedColor}
+                    currentView={currentView}
                   />
                   <AgentFilterPanel
                     models={data?.models}
