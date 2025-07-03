@@ -195,6 +195,86 @@ function App() {
     }
   }, [isLoggedIn]);
 
+  // 재고 필터링 함수 (상태 변수들 뒤에 정의)
+  const filterStores = useCallback((stores, selectedModel, selectedColor, userLocation, searchRadius) => {
+    console.log('재고 필터링 시작:', { selectedModel, selectedColor });
+    
+    if (!stores || !Array.isArray(stores)) {
+      console.log('매장 데이터가 없거나 유효하지 않음');
+      return [];
+    }
+
+    return stores.filter(store => {
+      // 1. 재고 확인
+      let hasInventory = false;
+      let totalQuantity = 0;
+      
+      if (store.inventory) {
+        // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
+        if (selectedModel) {
+          // 특정 모델의 재고 확인
+          Object.values(store.inventory).forEach(category => {
+            if (category[selectedModel]) {
+              if (selectedColor) {
+                // 특정 모델과 색상의 재고 확인
+                Object.values(category[selectedModel]).forEach(status => {
+                  if (status[selectedColor]) {
+                    totalQuantity += status[selectedColor] || 0;
+                  }
+                });
+              } else {
+                // 특정 모델의 전체 재고 확인
+                Object.values(category[selectedModel]).forEach(status => {
+                  Object.values(status).forEach(qty => {
+                    totalQuantity += qty || 0;
+                  });
+                });
+              }
+            }
+          });
+          hasInventory = totalQuantity > 0;
+          console.log(`매장 [${store.name}] - ${selectedModel}${selectedColor ? ` ${selectedColor}` : ''} 재고: ${totalQuantity}`);
+        } else {
+          // 모델이 선택되지 않은 경우: 모든 재고 합계 확인
+          Object.values(store.inventory).forEach(category => {
+            if (typeof category === 'object' && category !== null) {
+              Object.values(category).forEach(model => {
+                if (typeof model === 'object' && model !== null) {
+                  Object.values(model).forEach(status => {
+                    if (typeof status === 'object' && status !== null) {
+                      Object.values(status).forEach(qty => {
+                        totalQuantity += qty || 0;
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          });
+          hasInventory = totalQuantity > 0;
+          console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
+        }
+      }
+      
+      store.totalQuantity = totalQuantity;
+      store.hasInventory = hasInventory;
+
+      // 2. 위치 기반 필터링
+      if (userLocation && searchRadius) {
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          parseFloat(store.latitude),
+          parseFloat(store.longitude)
+        );
+        store.distance = distance;
+        return distance <= searchRadius && hasInventory;
+      }
+      
+      return hasInventory;
+    });
+  }, []);
+
   // 디바이스 및 IP 정보 수집
   useEffect(() => {
     // 디바이스 정보 가져오기
@@ -306,84 +386,7 @@ function App() {
     }
   }, [isLoggedIn, data, userLocation]);
 
-  const filterStores = useCallback((stores, selectedModel, selectedColor, userLocation, searchRadius) => {
-    console.log('재고 필터링 시작:', { selectedModel, selectedColor });
-    
-    if (!stores || !Array.isArray(stores)) {
-      console.log('매장 데이터가 없거나 유효하지 않음');
-      return [];
-    }
 
-    return stores.filter(store => {
-      // 1. 재고 확인
-      let hasInventory = false;
-      let totalQuantity = 0;
-      
-      if (store.inventory) {
-        // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
-        if (selectedModel) {
-          // 특정 모델의 재고 확인
-          Object.values(store.inventory).forEach(category => {
-            if (category[selectedModel]) {
-              if (selectedColor) {
-                // 특정 모델과 색상의 재고 확인
-                Object.values(category[selectedModel]).forEach(status => {
-                  if (status[selectedColor]) {
-                    totalQuantity += status[selectedColor] || 0;
-                  }
-                });
-              } else {
-                // 특정 모델의 전체 재고 확인
-                Object.values(category[selectedModel]).forEach(status => {
-                  Object.values(status).forEach(qty => {
-                    totalQuantity += qty || 0;
-                  });
-                });
-              }
-            }
-          });
-          hasInventory = totalQuantity > 0;
-          console.log(`매장 [${store.name}] - ${selectedModel}${selectedColor ? ` ${selectedColor}` : ''} 재고: ${totalQuantity}`);
-        } else {
-          // 모델이 선택되지 않은 경우: 모든 재고 합계 확인
-          Object.values(store.inventory).forEach(category => {
-            if (typeof category === 'object' && category !== null) {
-              Object.values(category).forEach(model => {
-                if (typeof model === 'object' && model !== null) {
-                  Object.values(model).forEach(status => {
-                    if (typeof status === 'object' && status !== null) {
-                      Object.values(status).forEach(qty => {
-                        totalQuantity += qty || 0;
-                      });
-                    }
-                  });
-                }
-              });
-            }
-          });
-          hasInventory = totalQuantity > 0;
-          console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
-        }
-      }
-      
-      store.totalQuantity = totalQuantity;
-      store.hasInventory = hasInventory;
-
-      // 2. 위치 기반 필터링
-      if (userLocation && searchRadius) {
-        const distance = calculateDistance(
-          userLocation.lat,
-          userLocation.lng,
-          parseFloat(store.latitude),
-          parseFloat(store.longitude)
-        );
-        store.distance = distance;
-        return distance <= searchRadius && hasInventory;
-      }
-      
-      return hasInventory;
-    });
-  }, []);
 
   // 매장 필터링
   useEffect(() => {
