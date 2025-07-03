@@ -12,7 +12,7 @@ import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import UpdatePopup from './components/UpdatePopup';
-import { hasNewUpdates, getUnreadUpdates, setLastUpdateVersion } from './utils/updateHistory';
+import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion } from './utils/updateHistory';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -185,13 +185,11 @@ function App() {
   // 업데이트 확인 및 팝업 표시
   useEffect(() => {
     if (isLoggedIn) {
-      // 새로운 업데이트가 있는지 확인
-      if (hasNewUpdates()) {
-        const updates = getUnreadUpdates();
-        setUnreadUpdates(updates);
-        setShowUpdatePopup(true);
-        console.log('새로운 업데이트 발견:', updates.length, '개');
-      }
+      // 로그인할 때마다 업데이트 팝업 무조건 표시
+      const updates = getAllUpdates();
+      setUnreadUpdates(updates);
+      setShowUpdatePopup(true);
+      console.log('로그인 시 업데이트 팝업 표시:', updates.length, '개');
     }
   }, [isLoggedIn]);
 
