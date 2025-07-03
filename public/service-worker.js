@@ -1,10 +1,9 @@
-// 버전 관리를 위한 캐시 이름 (날짜 기반)
+// 버전 관리를 위한 캐시 이름 (빌드 시점 기반)
 const getCacheName = () => {
-  const today = new Date();
-  const dateStr = today.getFullYear() + 
-    String(today.getMonth() + 1).padStart(2, '0') + 
-    String(today.getDate()).padStart(2, '0');
-  return `vipmap-cache-v${dateStr}`;
+  // 빌드 시점의 타임스탬프를 사용하여 고유한 캐시 이름 생성
+  const buildTime = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  return `vipmap-cache-v${buildTime}-${randomSuffix}`;
 };
 
 const CACHE_NAME = getCacheName();
@@ -33,34 +32,59 @@ self.addEventListener('install', event => {
     }).then(cache => {
       console.log(`새 캐시 생성: ${CACHE_NAME}`);
       return cache.addAll(urlsToCache);
+    }).then(() => {
+      // 강제로 새로운 서비스 워커 활성화
+      return self.skipWaiting();
     })
   );
 });
 
-// 네트워크 우선, 캐시 폴백 전략
+// 네트워크 우선, 캐시 폴백 전략 (강화된 캐시 무효화)
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // 네트워크 응답이 성공하면 캐시에 저장
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // 네트워크 실패 시 캐시에서 가져오기
-        return caches.match(event.request);
-      })
-  );
+  // HTML 파일과 JS 파일은 항상 네트워크에서 가져오기
+  if (event.request.url.includes('/index.html') || 
+      event.request.url.includes('/static/js/') ||
+      event.request.url.includes('/static/css/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // 네트워크 응답이 성공하면 캐시에 저장
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // 네트워크 실패 시 캐시에서 가져오기
+          return caches.match(event.request);
+        })
+    );
+  } else {
+    // 다른 리소스는 기존 전략 유지
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+  }
 });
 
-// 활성화 시 이전 캐시 정리
+// 활성화 시 이전 캐시 정리 및 페이지 제어
 self.addEventListener('activate', event => {
-  console.log('Service Worker 활성화 - 이전 캐시 정리');
+  console.log('Service Worker 활성화 - 이전 캐시 정리 및 페이지 제어');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -71,6 +95,9 @@ self.addEventListener('activate', event => {
           }
         })
       );
+    }).then(() => {
+      // 모든 클라이언트 페이지에 새로고침 요청
+      return self.clients.claim();
     })
   );
 });
