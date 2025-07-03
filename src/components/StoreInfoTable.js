@@ -8,7 +8,8 @@ import {
   TableCell,
   TableContainer,
   TableRow,
-  Button
+  Button,
+  Chip
 } from '@mui/material';
 import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
