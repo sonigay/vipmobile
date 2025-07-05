@@ -399,7 +399,7 @@ function Map({
 
   // 안전한 지도 조작 함수
   const safeMapOperation = useCallback((operation) => {
-    if (map && isMapReady && map._loaded) {
+    if (map && isMapReady && map._loaded && map._mapPane) {
       try {
         operation();
       } catch (error) {
@@ -431,17 +431,19 @@ function Map({
 
   // 강제 확대 (검색 결과 선택 시) - 직접 지도 조작
   useEffect(() => {
-    if (forceZoomToStore && mapRef.current) {
+    if (forceZoomToStore && mapRef.current && mapRef.current._mapPane) {
       const { lat, lng } = forceZoomToStore;
       console.log('강제 확대 직접 조작:', lat, lng);
       
       try {
         const mapInstance = mapRef.current;
-        mapInstance.setView([lat, lng], 14, {
-          animate: true,
-          duration: 1
-        });
-        console.log('강제 확대 직접 조작 완료');
+        if (mapInstance._loaded && mapInstance._mapPane) {
+          mapInstance.setView([lat, lng], 14, {
+            animate: true,
+            duration: 1
+          });
+          console.log('강제 확대 직접 조작 완료');
+        }
       } catch (error) {
         console.error('강제 확대 직접 조작 오류:', error);
       }

@@ -42,6 +42,12 @@ self.addEventListener('install', event => {
 
 // 네트워크 우선, 캐시 폴백 전략 (강화된 캐시 무효화)
 self.addEventListener('fetch', event => {
+  // POST 요청은 캐시하지 않음
+  if (event.request.method === 'POST') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
   // HTML 파일과 JS 파일은 항상 네트워크에서 가져오기
   if (event.request.url.includes('/index.html') || 
       event.request.url.includes('/static/js/') ||
