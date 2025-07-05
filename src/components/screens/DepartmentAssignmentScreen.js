@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAssignmentSettings, calculateFullAssignment } from '../../utils/assignmentUtils';
 import {
   Box,
   AppBar,
@@ -51,52 +52,41 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
 
   // 배정 설정 로드
   useEffect(() => {
-    const savedSettings = localStorage.getItem('assignmentSettings');
-    if (savedSettings) {
-      setAssignmentSettings(JSON.parse(savedSettings));
-    }
+    const settings = getAssignmentSettings();
+    setAssignmentSettings(settings);
   }, []);
 
-  // 소속별 통계 계산
+  // 소속별 통계 계산 (새로운 배정 로직 적용)
   const departmentStats = useMemo(() => {
     if (!agents.length || !assignmentSettings.models) return {};
 
-    const stats = {};
+    // 전체 배정 계산
+    const fullAssignment = calculateFullAssignment(agents, assignmentSettings);
     
-    // 소속별 담당자 그룹화
-    agents.forEach(agent => {
-      const department = agent.department || '미지정';
-      if (!stats[department]) {
-        stats[department] = {
-          department,
-          agentCount: 0,
-          agents: [],
-          totalAssignment: 0,
-          models: {}
-        };
-      }
-      stats[department].agentCount++;
-      stats[department].agents.push(agent);
-    });
-
-    // 각 소속별 배정 수량 계산
-    Object.entries(stats).forEach(([department, deptData]) => {
-      const agentCount = deptData.agentCount;
+    // 소속별 통계 변환
+    const stats = {};
+    Object.entries(fullAssignment.departments).forEach(([department, deptData]) => {
+      stats[department] = {
+        department: deptData.department,
+        agentCount: deptData.agentCount,
+        agents: deptData.agents,
+        totalAssignment: deptData.totalQuantity,
+        models: {}
+      };
       
+      // 모델별 배정량 계산
       Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
-        if (!deptData.models[modelName]) {
-          deptData.models[modelName] = {
-            name: modelName,
-            colors: modelData.colors,
-            totalQuantity: modelData.quantity,
-            assignedQuantity: 0
-          };
-        }
+        const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
+        const deptModelQuantity = Object.values(modelAssignments)
+          .filter(assignment => assignment.department === department)
+          .reduce((sum, assignment) => sum + assignment.quantity, 0);
         
-        // 배정 로직에 따른 수량 계산 (간단한 비례 배분)
-        const assignedQuantity = Math.round(modelData.quantity * (agentCount / agents.length));
-        deptData.models[modelName].assignedQuantity = assignedQuantity;
-        deptData.totalAssignment += assignedQuantity;
+        stats[department].models[modelName] = {
+          name: modelName,
+          colors: modelData.colors,
+          totalQuantity: modelData.quantity,
+          assignedQuantity: deptModelQuantity
+        };
       });
     });
 

@@ -27,7 +27,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Alert
+  Alert,
+  Checkbox
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -35,7 +36,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Save as SaveIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon
 } from '@mui/icons-material';
 
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
@@ -47,7 +50,12 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       remainingInventory: 25, // 잔여재고 25%
       salesVolume: 20      // 판매량 20%
     },
-    models: {}
+    models: {},
+    targets: {
+      offices: {},
+      departments: {},
+      agents: {}
+    }
   });
   
   const [editingAgent, setEditingAgent] = useState(null);
@@ -78,6 +86,48 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setAssignmentSettings(JSON.parse(savedSettings));
     }
   }, []);
+
+  // 담당자 데이터가 로드되면 배정 대상 초기화
+  useEffect(() => {
+    if (agents.length > 0) {
+      setAssignmentSettings(prev => {
+        const newSettings = { ...prev };
+        
+        // 사무실별 배정 대상 초기화
+        const offices = new Set();
+        agents.forEach(agent => {
+          if (agent.office) offices.add(agent.office);
+        });
+        
+        offices.forEach(office => {
+          if (!newSettings.targets.offices.hasOwnProperty(office)) {
+            newSettings.targets.offices[office] = true; // 기본값: 선택됨
+          }
+        });
+
+        // 소속별 배정 대상 초기화
+        const departments = new Set();
+        agents.forEach(agent => {
+          if (agent.department) departments.add(agent.department);
+        });
+        
+        departments.forEach(department => {
+          if (!newSettings.targets.departments.hasOwnProperty(department)) {
+            newSettings.targets.departments[department] = true; // 기본값: 선택됨
+          }
+        });
+
+        // 영업사원별 배정 대상 초기화
+        agents.forEach(agent => {
+          if (!newSettings.targets.agents.hasOwnProperty(agent.contactId)) {
+            newSettings.targets.agents[agent.contactId] = true; // 기본값: 선택됨
+          }
+        });
+
+        return newSettings;
+      });
+    }
+  }, [agents]);
 
   // 설정 저장
   const saveSettings = () => {
@@ -137,6 +187,34 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       const newModels = { ...prev.models };
       delete newModels[modelName];
       return { ...prev, models: newModels };
+    });
+  };
+
+  // 배정 대상 변경
+  const handleTargetChange = (type, target, checked) => {
+    setAssignmentSettings(prev => ({
+      ...prev,
+      targets: {
+        ...prev.targets,
+        [type]: {
+          ...prev.targets[type],
+          [target]: checked
+        }
+      }
+    }));
+  };
+
+  // 전체 선택/해제
+  const handleSelectAll = (type, checked) => {
+    setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      Object.keys(newTargets[type]).forEach(key => {
+        newTargets[type][key] = checked;
+      });
+      return {
+        ...prev,
+        targets: newTargets
+      };
     });
   };
 
@@ -293,6 +371,121 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     설정 저장
                   </Button>
                 </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 배정 대상 선택 */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  배정 대상 선택
+                </Typography>
+                
+                <Grid container spacing={3}>
+                  {/* 사무실별 배정 대상 */}
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          사무실별 배정
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => handleSelectAll('offices', true)}
+                        >
+                          전체선택
+                        </Button>
+                      </Box>
+                      <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                        {Object.entries(assignmentSettings.targets.offices).map(([office, checked]) => (
+                          <Box key={office} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Checkbox
+                              checked={checked}
+                              onChange={(e) => handleTargetChange('offices', office, e.target.checked)}
+                              icon={<CheckBoxOutlineBlankIcon />}
+                              checkedIcon={<CheckBoxIcon />}
+                              size="small"
+                            />
+                            <Typography variant="body2">
+                              {office}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  {/* 소속별 배정 대상 */}
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          소속별 배정
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => handleSelectAll('departments', true)}
+                        >
+                          전체선택
+                        </Button>
+                      </Box>
+                      <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                        {Object.entries(assignmentSettings.targets.departments).map(([department, checked]) => (
+                          <Box key={department} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Checkbox
+                              checked={checked}
+                              onChange={(e) => handleTargetChange('departments', department, e.target.checked)}
+                              icon={<CheckBoxOutlineBlankIcon />}
+                              checkedIcon={<CheckBoxIcon />}
+                              size="small"
+                            />
+                            <Typography variant="body2">
+                              {department}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  {/* 영업사원별 배정 대상 */}
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          영업사원별 배정
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => handleSelectAll('agents', true)}
+                        >
+                          전체선택
+                        </Button>
+                      </Box>
+                      <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                        {Object.entries(assignmentSettings.targets.agents).map(([agentId, checked]) => {
+                          const agent = agents.find(a => a.contactId === agentId);
+                          return (
+                            <Box key={agentId} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <Checkbox
+                                checked={checked}
+                                onChange={(e) => handleTargetChange('agents', agentId, e.target.checked)}
+                                icon={<CheckBoxOutlineBlankIcon />}
+                                checkedIcon={<CheckBoxIcon />}
+                                size="small"
+                              />
+                              <Typography variant="body2">
+                                {agent ? agent.target : agentId}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
           </Grid>
