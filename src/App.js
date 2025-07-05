@@ -278,16 +278,18 @@ function App() {
       });
     });
     
-    // 전월 데이터도 계산 (모델별로 정확히 매칭)
+    // 전월 데이터도 계산 (전체 개통량 기준으로 비율 계산)
     Object.values(filteredData).forEach(storeData => {
-      const { previousMonth, models } = storeData;
+      const { currentMonth, previousMonth, models } = storeData;
       
       Object.entries(models).forEach(([modelKey, count]) => {
         const modelName = modelKey.split(' (')[0];
         
-        if (modelStats[modelName]) {
-          // 전월 데이터도 같은 모델에 추가
-          modelStats[modelName].previousMonth += count;
+        if (modelStats[modelName] && currentMonth > 0 && previousMonth > 0) {
+          // 해당 모델의 당월 비율을 계산하여 전월 데이터 추정
+          const modelRatio = count / currentMonth;
+          const estimatedPrevious = Math.round(modelRatio * previousMonth);
+          modelStats[modelName].previousMonth += estimatedPrevious;
         }
       });
     });
@@ -335,14 +337,11 @@ function App() {
         }
       });
       
-      // 전월 데이터도 계산 (해당 모델의 실제 전월 데이터 사용)
-      Object.entries(models).forEach(([modelKey, count]) => {
-        if (modelKey.startsWith(modelName + ' (')) {
-          // 전월 데이터는 이미 activationData에 포함되어 있음
-          // 비율 계산 대신 실제 데이터 사용
-          modelPrevious += count; // 전월 데이터도 같은 모델에 추가
-        }
-      });
+      // 전월 데이터도 계산 (전체 개통량 기준으로 비율 계산)
+      if (currentMonth > 0 && previousMonth > 0) {
+        const modelRatio = modelCurrent / currentMonth;
+        modelPrevious = Math.round(modelRatio * previousMonth);
+      }
       
       if (modelCurrent > 0) {
         storeStats.push({
