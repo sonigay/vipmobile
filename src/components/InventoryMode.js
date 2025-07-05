@@ -203,7 +203,12 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
       Object.values(category).forEach(model => {
         Object.values(model).forEach(status => {
           Object.values(status).forEach(qty => {
-            total += qty || 0;
+            // qty가 객체인 경우 quantity 속성을 확인
+            if (typeof qty === 'object' && qty !== null && qty.quantity) {
+              total += qty.quantity || 0;
+            } else if (typeof qty === 'number') {
+              total += qty || 0;
+            }
           });
         });
       });
