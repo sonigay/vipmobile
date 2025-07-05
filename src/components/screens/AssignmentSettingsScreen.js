@@ -92,8 +92,27 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
         // 매장 데이터에서 사용 가능한 모델 추출
         if (data && Array.isArray(data)) {
+          console.log('매장 데이터:', data.length, '개');
           const models = extractAvailableModels(data);
+          console.log('추출된 모델:', models);
           setAvailableModels(models);
+        } else {
+          console.log('매장 데이터가 없거나 배열이 아님:', data);
+          // 데이터가 없으면 API에서 직접 가져오기
+          try {
+            const storeResponse = await fetch('/api/data');
+            if (storeResponse.ok) {
+              const storeData = await storeResponse.json();
+              console.log('API에서 가져온 매장 데이터:', storeData.stores?.length || 0, '개');
+              if (storeData.stores && Array.isArray(storeData.stores)) {
+                const models = extractAvailableModels(storeData.stores);
+                console.log('API에서 추출된 모델:', models);
+                setAvailableModels(models);
+              }
+            }
+          } catch (apiError) {
+            console.error('API에서 데이터 가져오기 실패:', apiError);
+          }
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);

@@ -1515,7 +1515,7 @@ function App() {
   // 재고배정 모드일 때는 별도 화면 렌더링
   if (isAssignmentMode && assignmentScreen) {
     const assignmentScreens = {
-      settings: <AssignmentSettingsScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
+      settings: <AssignmentSettingsScreen data={data?.stores} onBack={handleAssignmentBack} onLogout={handleLogout} />,
       department: <DepartmentAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
       office: <OfficeAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
       sales: <SalesAgentAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />

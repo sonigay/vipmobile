@@ -7,16 +7,24 @@ export const extractAvailableModels = (data) => {
   const modelColors = new Map(); // 모델별 사용 가능한 색상
 
   if (!data || !Array.isArray(data)) {
+    console.log('extractAvailableModels: 데이터가 없거나 배열이 아님');
     return { models: [], colors: [], modelColors: new Map() };
   }
 
-  data.forEach(store => {
+  console.log('extractAvailableModels: 데이터 처리 시작, 매장 수:', data.length);
+
+  data.forEach((store, index) => {
     if (store.inventory) {
+      console.log(`매장 ${index + 1} (${store.name || store.id}): inventory 존재`);
+      
       // 각 카테고리별로 모델과 색상 추출
       Object.entries(store.inventory).forEach(([category, categoryData]) => {
         if (categoryData && typeof categoryData === 'object') {
+          console.log(`  카테고리 ${category}:`, Object.keys(categoryData));
+          
           Object.entries(categoryData).forEach(([model, modelData]) => {
             models.add(model);
+            console.log(`    모델 추가: ${model}`);
             
             if (modelData && typeof modelData === 'object') {
               Object.entries(modelData).forEach(([status, statusData]) => {
@@ -29,6 +37,7 @@ export const extractAvailableModels = (data) => {
                       modelColors.set(model, new Set());
                     }
                     modelColors.get(model).add(color);
+                    console.log(`      색상 추가: ${model} - ${color}`);
                   });
                 }
               });
@@ -36,10 +45,12 @@ export const extractAvailableModels = (data) => {
           });
         }
       });
+    } else {
+      console.log(`매장 ${index + 1} (${store.name || store.id}): inventory 없음`);
     }
   });
 
-  return {
+  const result = {
     models: Array.from(models).sort(),
     colors: Array.from(colors).sort(),
     modelColors: new Map(
@@ -49,6 +60,9 @@ export const extractAvailableModels = (data) => {
       ])
     )
   };
+
+  console.log('extractAvailableModels 결과:', result);
+  return result;
 };
 
 // 특정 모델의 사용 가능한 색상 가져오기
