@@ -106,8 +106,8 @@ setInterval(() => {
   clientCacheUtils.cleanup();
 }, 5 * 60 * 1000);
 
-export async function fetchData() {
-  const cacheKey = 'stores_data';
+export async function fetchData(includeShipped = true) {
+  const cacheKey = `stores_data_${includeShipped}`;
   
   // 캐시에서 먼저 확인
   const cachedData = clientCacheUtils.get(cacheKey);
@@ -120,7 +120,7 @@ export async function fetchData() {
     console.log('서버에서 매장 데이터 요청 중...');
     const startTime = Date.now();
     
-    const response = await fetch(`${API_URL}/api/stores`);
+    const response = await fetch(`${API_URL}/api/stores?includeShipped=${includeShipped}`);
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;

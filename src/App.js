@@ -357,8 +357,12 @@ function App() {
     setIsLoading(true);
     try {
       console.log('데이터 로딩 시작');
+      
+      // 관리자모드의 담당재고확인에서는 출고 제외 없이 모든 재고 표시
+      const includeShipped = isAgentMode && currentView === 'assigned' ? false : true;
+      
       const [storesResponse, modelsResponse] = await Promise.all([
-        fetchData(),
+        fetchData(includeShipped),
         fetchModels()
       ]);
 
@@ -772,7 +776,13 @@ function App() {
         console.error('로그인 상태 업데이트 실패:', error);
       }
     }
-  }, []);
+    
+    // 관리자모드에서 뷰가 변경되면 데이터 다시 로드
+    if (isAgentMode && isLoggedIn) {
+      console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
+      loadData();
+    }
+  }, [isAgentMode, isLoggedIn, loadData]);
 
   // 업데이트 팝업 닫기 핸들러
   const handleUpdatePopupClose = useCallback((hideToday = false) => {

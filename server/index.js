@@ -585,7 +585,8 @@ app.post('/api/update-coordinates', async (req, res) => {
 
 // 스토어 데이터 가져오기 (캐싱 적용)
 app.get('/api/stores', async (req, res) => {
-  const cacheKey = 'processed_stores_data';
+  const { includeShipped = 'true' } = req.query; // 쿼리 파라미터로 출고 제외 여부 제어
+  const cacheKey = `processed_stores_data_${includeShipped}`;
   
   // 캐시에서 먼저 확인
   const cachedStores = cacheUtils.get(cacheKey);
@@ -611,10 +612,13 @@ app.get('/api/stores', async (req, res) => {
     const inventoryRows = inventoryValues.slice(3);
     const storeRows = storeValues.slice(1);
 
-    // 현재 날짜 기준 3일 전 날짜 계산
-    const today = new Date();
-    const threeDaysAgo = new Date(today);
-    threeDaysAgo.setDate(today.getDate() - 3);
+    // 출고 제외 로직 (includeShipped가 'false'일 때만 적용)
+    let threeDaysAgo = null;
+    if (includeShipped === 'false') {
+      const today = new Date();
+      threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(today.getDate() - 3);
+    }
 
     // 매장별 재고 데이터 매핑
     const inventoryMap = {};
@@ -631,8 +635,8 @@ app.get('/api/stores', async (req, res) => {
       
       if (!storeName || !model || !color) return;
 
-      // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외
-      if (shippingDate && shippingDate >= threeDaysAgo) return;
+      // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)
+      if (includeShipped === 'false' && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) return;
 
       // 매장별 재고 데이터 구조 생성
       if (!inventoryMap[storeName]) {
