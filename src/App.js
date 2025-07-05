@@ -217,7 +217,7 @@ function App() {
     }
   }, []);
 
-  // 업데이트 확인 및 팝업 표시
+  // 업데이트 확인 및 팝업 표시 (한 번만 실행)
   useEffect(() => {
     if (isLoggedIn) {
       // 새로운 업데이트가 있는지 확인
@@ -227,11 +227,8 @@ function App() {
         setUnreadUpdates(updates);
         setShowUpdatePopup(true);
         console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
-      } else {
-        // 최신 버전인 경우 팝업 표시
-        setShowUpdateProgressPopup(true);
-        console.log('최신 버전 확인');
       }
+      // 최신 버전인 경우는 자동으로 팝업 표시하지 않음
     }
   }, [isLoggedIn]);
 
@@ -808,6 +805,20 @@ function App() {
     }
   }, [unreadUpdates]);
 
+  // 업데이트 확인 핸들러
+  const handleCheckUpdate = useCallback(() => {
+    const hasNew = hasNewUpdates();
+    if (hasNew) {
+      const updates = getUnreadUpdates();
+      setUnreadUpdates(updates);
+      setShowUpdatePopup(true);
+      console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
+    } else {
+      setShowUpdateProgressPopup(true);
+      console.log('업데이트 확인 - 최신 버전입니다');
+    }
+  }, []);
+
   // 업데이트 진행 팝업 닫기 핸들러
   const handleUpdateProgressPopupClose = useCallback(() => {
     setShowUpdateProgressPopup(false);
@@ -1027,9 +1038,23 @@ function App() {
               )}
               
               {isLoggedIn && (
-                <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
-                  로그아웃
-                </Button>
+                <>
+                  <Button 
+                    color="inherit" 
+                    onClick={handleCheckUpdate}
+                    sx={{ 
+                      fontSize: '0.8em',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: 1,
+                      mr: 1
+                    }}
+                  >
+                    업데이트 확인
+                  </Button>
+                  <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
+                    로그아웃
+                  </Button>
+                </>
               )}
             </Toolbar>
           </AppBar>
