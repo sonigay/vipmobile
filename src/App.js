@@ -223,6 +223,19 @@ function App() {
       setActivationData(filteredData);
       console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
       console.log('날짜 비교 데이터:', filteredData);
+      
+      // 전월 데이터 디버깅
+      const storesWithPreviousData = Object.values(filteredData).filter(store => store.previousMonth > 0);
+      console.log(`프론트엔드 - 전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
+      if (storesWithPreviousData.length > 0) {
+        console.log('프론트엔드 - 전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
+          storeName: store.storeName,
+          previousMonth: store.previousMonth,
+          currentMonth: store.currentMonth
+        })));
+      } else {
+        console.log('프론트엔드 - 전월 데이터가 있는 매장이 없습니다.');
+      }
     } catch (error) {
       console.error(`특정 날짜 개통실적 데이터 로딩 실패: ${date}`, error);
       setActivationData(null);

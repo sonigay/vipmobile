@@ -1314,7 +1314,17 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
     });
     
     // 전월 데이터 처리 (같은 날짜)
-    previousMonthRows.forEach(row => {
+    console.log(`전월 데이터 처리 시작 - 요청 날짜: ${date}`);
+    console.log(`전월 데이터 행 수: ${previousMonthRows.length}`);
+    
+    const targetDate = new Date(date);
+    targetDate.setFullYear(targetDate.getFullYear() - 1);
+    const previousYearDate = targetDate.toISOString().split('T')[0];
+    console.log(`전월 비교 대상 날짜: ${previousYearDate}`);
+    
+    let processedPreviousCount = 0;
+    
+    previousMonthRows.forEach((row, index) => {
       if (row[6] === '선불개통') return; // 선불개통 제외
       
       const store = row[6] || '미지정'; // G열: 출고처
@@ -1344,11 +1354,12 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
       }
       
       // 특정 날짜만 처리 (전월의 같은 날짜)
-      const targetDate = new Date(date);
-      targetDate.setFullYear(targetDate.getFullYear() - 1);
-      const previousYearDate = targetDate.toISOString().split('T')[0];
-      
       if (normalizedDate !== previousYearDate) return;
+      
+      processedPreviousCount++;
+      if (processedPreviousCount <= 5) { // 처음 5개만 로그 출력
+        console.log(`전월 데이터 매칭: ${store} - ${activationDate} -> ${normalizedDate}`);
+      }
       
       if (!comparisonData[store]) {
         comparisonData[store] = {
@@ -1377,6 +1388,16 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
     
     const processingTime = Date.now() - startTime;
     console.log(`날짜 비교 데이터 처리 완료: ${date}, ${Object.keys(comparisonData).length}개 매장, ${processingTime}ms 소요`);
+    
+    // 전월 데이터 요약 로그
+    const storesWithPreviousData = Object.values(comparisonData).filter(store => store.previousMonth > 0);
+    console.log(`전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
+    if (storesWithPreviousData.length > 0) {
+      console.log('전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
+        storeName: store.storeName,
+        previousMonth: store.previousMonth
+      })));
+    }
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, comparisonData);
