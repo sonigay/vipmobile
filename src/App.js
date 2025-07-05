@@ -221,13 +221,21 @@ function App() {
   // 업데이트 확인 및 팝업 표시 (앱 시작 시 한 번만 실행)
   useEffect(() => {
     // 로그인 상태와 관계없이 앱 시작 시 업데이트 체크
-    const hasNew = hasNewUpdates();
-    if (hasNew) {
-      const updates = getUnreadUpdates();
-      setUnreadUpdates(updates);
-      setShowUpdatePopup(true);
-      console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
-    }
+    const checkForUpdates = async () => {
+      try {
+        const hasNew = await hasNewUpdates();
+        if (hasNew) {
+          const updates = await getUnreadUpdates();
+          setUnreadUpdates(updates);
+          setShowUpdatePopup(true);
+          console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
+        }
+      } catch (error) {
+        console.error('업데이트 확인 중 오류:', error);
+      }
+    };
+    
+    checkForUpdates();
   }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
 
   // 담당자별 재고 필터링 함수 (useEffect보다 먼저 정의)
@@ -812,18 +820,23 @@ function App() {
   }, [unreadUpdates]);
 
   // 업데이트 확인 핸들러
-  const handleCheckUpdate = useCallback(() => {
-    const hasNew = hasNewUpdates();
-    if (hasNew) {
-      const updates = getUnreadUpdates();
-      setUnreadUpdates(updates);
-      setShowUpdatePopup(true);
-      console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
-    } else {
-      // 최신 버전인 경우 업데이트 진행 팝업을 표시하지 않고 바로 닫기
-      console.log('업데이트 확인 - 최신 버전입니다');
-      // 최신 버전임을 알리는 간단한 알림만 표시
-      alert('현재 최신 버전을 사용하고 있습니다.');
+  const handleCheckUpdate = useCallback(async () => {
+    try {
+      const hasNew = await hasNewUpdates();
+      if (hasNew) {
+        const updates = await getUnreadUpdates();
+        setUnreadUpdates(updates);
+        setShowUpdatePopup(true);
+        console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
+      } else {
+        // 최신 버전인 경우 업데이트 진행 팝업을 표시하지 않고 바로 닫기
+        console.log('업데이트 확인 - 최신 버전입니다');
+        // 최신 버전임을 알리는 간단한 알림만 표시
+        alert('현재 최신 버전을 사용하고 있습니다.');
+      }
+    } catch (error) {
+      console.error('업데이트 확인 중 오류:', error);
+      alert('업데이트 확인 중 오류가 발생했습니다.');
     }
   }, []);
 
@@ -1144,7 +1157,7 @@ function App() {
       <UpdateProgressPopup
         open={showUpdateProgressPopup}
         onClose={handleUpdateProgressPopupClose}
-        isLatestVersion={!hasNewUpdates()}
+        isLatestVersion={false}
       />
     </ThemeProvider>
   );

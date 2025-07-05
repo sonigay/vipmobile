@@ -1,43 +1,59 @@
-// 업데이트 내용 관리 시스템
-export const UPDATE_HISTORY = [
-  {
-    version: '2024.12.20',
-    date: '2024-12-20',
-    title: '출고일 기준 재고 분류 기능 추가',
-    changes: [
-      '마커 아이콘에 출고일 상태 표시 (30일/60일/60일+)',
-      '출고일 기준 색상 구분 (초록/노랑/주황)',
-      '우상단 긴급도 아이콘 추가 (✅/⚡/⚠️)',
-      '팝업에 출고일별 재고 상세 정보 표시',
-      '백엔드 데이터 구조 개선으로 출고일 정보 보존'
-    ],
-    type: 'feature'
-  },
-  {
-    version: '2024.12.19',
-    date: '2024-12-19',
-    title: '관리자 모드 재고 확인 기능 추가',
-    changes: [
-      '담당재고확인/전체재고확인 메뉴 추가',
-      '담당자별 재고 필터링 기능 구현',
-      '화면 전환 시 상태 저장 기능',
-      '카톡 복사 팝업 메시지 개선'
-    ],
-    type: 'feature'
-  },
-  {
-    version: '2024.12.18',
-    date: '2024-12-18',
-    title: '자동 캐시 관리 시스템 구축',
-    changes: [
-      'Service Worker 기반 자동 캐시 무효화',
-      '업데이트 내용 팝업 시스템',
-      '캐시 상태 실시간 모니터링',
-      '자동 업데이트 알림 기능'
-    ],
-    type: 'system'
+// 동적 업데이트 내용 관리 시스템
+let cachedUpdateHistory = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
+
+// 서버에서 업데이트 히스토리 가져오기
+export const fetchUpdateHistory = async () => {
+  const now = Date.now();
+  
+  // 캐시가 유효한 경우 캐시된 데이터 반환
+  if (cachedUpdateHistory && (now - lastFetchTime) < CACHE_DURATION) {
+    return cachedUpdateHistory;
   }
-];
+  
+  try {
+    const response = await fetch('/api/updates');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    if (result.success && result.data) {
+      cachedUpdateHistory = result.data;
+      lastFetchTime = now;
+      return result.data;
+    } else {
+      throw new Error('Invalid response format');
+    }
+  } catch (error) {
+    console.error('업데이트 히스토리 가져오기 실패:', error);
+    // 에러 시 기본 업데이트 정보 반환
+    return getDefaultUpdateHistory();
+  }
+};
+
+// 기본 업데이트 히스토리 (서버 연결 실패 시 사용)
+const getDefaultUpdateHistory = () => {
+  const currentDate = new Date();
+  const formattedDate = currentDate.toISOString().split('T')[0];
+  
+  return [
+    {
+      version: `${currentDate.getFullYear()}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${String(currentDate.getDate()).padStart(2, '0')}`,
+      date: formattedDate,
+      title: '동적 업데이트 시스템 구축',
+      changes: [
+        '서버 기반 동적 업데이트 시스템 구현',
+        '실시간 업데이트 내용 가져오기',
+        '캐시 시스템으로 성능 최적화',
+        '오프라인 시 기본 업데이트 정보 제공'
+      ],
+      type: 'system',
+      timestamp: currentDate.getTime()
+    }
+  ];
+};
 
 // 로컬 스토리지 키
 const LAST_UPDATE_KEY = 'lastUpdateVersion';
@@ -83,8 +99,8 @@ export const setHideUntilDate = (date) => {
   }
 };
 
-// 새로운 업데이트가 있는지 확인
-export const hasNewUpdates = () => {
+// 새로운 업데이트가 있는지 확인 (동적)
+export const hasNewUpdates = async () => {
   // 오늘 하루 보지 않기 설정 확인
   const hideUntil = getHideUntilDate();
   if (hideUntil && new Date() < hideUntil) {
@@ -92,10 +108,16 @@ export const hasNewUpdates = () => {
     return false;
   }
 
-  const lastVersion = getLastUpdateVersion();
-  const latestVersion = UPDATE_HISTORY[0]?.version || '0.0.0';
-  
-  return compareVersions(latestVersion, lastVersion) > 0;
+  try {
+    const updateHistory = await fetchUpdateHistory();
+    const lastVersion = getLastUpdateVersion();
+    const latestVersion = updateHistory[0]?.version || '0.0.0';
+    
+    return compareVersions(latestVersion, lastVersion) > 0;
+  } catch (error) {
+    console.error('업데이트 확인 실패:', error);
+    return false;
+  }
 };
 
 // 버전 비교 함수
@@ -114,18 +136,29 @@ const compareVersions = (version1, version2) => {
   return 0;
 };
 
-// 확인하지 않은 업데이트 목록 가져오기
-export const getUnreadUpdates = () => {
-  const lastVersion = getLastUpdateVersion();
-  
-  return UPDATE_HISTORY.filter(update => 
-    compareVersions(update.version, lastVersion) > 0
-  );
+// 확인하지 않은 업데이트 목록 가져오기 (동적)
+export const getUnreadUpdates = async () => {
+  try {
+    const updateHistory = await fetchUpdateHistory();
+    const lastVersion = getLastUpdateVersion();
+    
+    return updateHistory.filter(update => 
+      compareVersions(update.version, lastVersion) > 0
+    );
+  } catch (error) {
+    console.error('미읽 업데이트 목록 가져오기 실패:', error);
+    return [];
+  }
 };
 
-// 모든 업데이트 내용 가져오기
-export const getAllUpdates = () => {
-  return UPDATE_HISTORY;
+// 모든 업데이트 내용 가져오기 (동적)
+export const getAllUpdates = async () => {
+  try {
+    return await fetchUpdateHistory();
+  } catch (error) {
+    console.error('전체 업데이트 목록 가져오기 실패:', error);
+    return getDefaultUpdateHistory();
+  }
 };
 
 // 업데이트 내용을 텍스트로 변환

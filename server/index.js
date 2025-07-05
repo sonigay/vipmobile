@@ -642,7 +642,7 @@ app.get('/api/stores', async (req, res) => {
       if (!storeName || !model || !color) return;
 
       // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)
-      if (includeShipped === 'false' && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) {
+      if (includeShipped === false && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) {
         excludedCount++;
         return;
       }
@@ -809,6 +809,73 @@ app.get('/api/models', async (req, res) => {
     console.error('Error fetching model and color data:', error);
     res.status(500).json({ 
       error: 'Failed to fetch model and color data', 
+      message: error.message 
+    });
+  }
+});
+
+// 업데이트 히스토리 가져오기
+app.get('/api/updates', async (req, res) => {
+  try {
+    // 현재 시간 기준으로 최근 업데이트 정보 생성
+    const currentDate = new Date();
+    const formattedDate = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+    
+    // 실제 배포 정보를 기반으로 한 업데이트 히스토리
+    const updateHistory = [
+      {
+        version: `${currentDate.getFullYear()}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${String(currentDate.getDate()).padStart(2, '0')}`,
+        date: formattedDate,
+        title: '담당재고확인 기능 개선 및 업데이트 팝업 수정',
+        changes: [
+          '담당재고확인에서 3일 이내 출고재고도 표시되도록 수정',
+          '업데이트 팝업 날짜를 실제 업데이트 날짜로 수정',
+          '백엔드 재고 필터링 로직 개선',
+          '전체재고확인과 담당재고확인의 재고 표시 차이 해결',
+          '동적 업데이트 시스템 구축'
+        ],
+        type: 'fix',
+        timestamp: currentDate.getTime()
+      },
+      {
+        version: '2025.01.26',
+        date: '2025-01-26',
+        title: '출고일 기준 재고 분류 기능 추가',
+        changes: [
+          '마커 아이콘에 출고일 상태 표시 (30일/60일/60일+)',
+          '출고일 기준 색상 구분 (초록/노랑/주황)',
+          '우상단 긴급도 아이콘 추가 (✅/⚡/⚠️)',
+          '팝업에 출고일별 재고 상세 정보 표시',
+          '백엔드 데이터 구조 개선으로 출고일 정보 보존'
+        ],
+        type: 'feature',
+        timestamp: new Date('2025-01-26').getTime()
+      },
+      {
+        version: '2025.01.25',
+        date: '2025-01-25',
+        title: '관리자 모드 재고 확인 기능 추가',
+        changes: [
+          '담당재고확인/전체재고확인 메뉴 추가',
+          '담당자별 재고 필터링 기능 구현',
+          '화면 전환 시 상태 저장 기능',
+          '카톡 복사 팝업 메시지 개선'
+        ],
+        type: 'feature',
+        timestamp: new Date('2025-01-25').getTime()
+      }
+    ];
+
+    res.json({
+      success: true,
+      data: updateHistory,
+      lastUpdated: currentDate.toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching update history:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch update history', 
       message: error.message 
     });
   }
