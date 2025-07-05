@@ -500,8 +500,8 @@ app.post('/api/update-coordinates', async (req, res) => {
 
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[3]; // X열: 주소
-      const status = row[4];   // D열: 거래상태
+      const address = row[3]; // D열: 주소
+      const status = row[4];   // E열: 거래상태
       
       if (status === "사용") {
         if (!address || address.toString().trim() === '') {
@@ -695,19 +695,19 @@ app.get('/api/stores', async (req, res) => {
     // 매장 정보와 재고 정보 결합
     const stores = storeRows
       .filter(row => {
-        const name = (row[6] || '').toString().trim();  // F열: 업체명
-        const status = row[4];                          // D열: 거래상태
+        const name = (row[6] || '').toString().trim();  // G열: 업체명
+        const status = row[4];                          // E열: 거래상태
         return name && status === "사용";
       })
       .map(row => {
         const latitude = parseFloat(row[0] || '0');    // A열: 위도
         const longitude = parseFloat(row[1] || '0');   // B열: 경도
-        const status = row[4];                         // D열: 거래상태
-        const name = row[6].toString().trim();         // F열: 업체명
-        const storeId = row[7];                        // G열: 매장 ID
-        const phone = row[9] || '';                    // I열: 연락처
-        const manager = row[13] || '';                 // M열: 담당자
-        const address = (row[3] || '').toString();    // X열: 주소
+        const status = row[4];                         // E열: 거래상태
+        const name = row[6].toString().trim();         // G열: 업체명
+        const storeId = row[7];                        // H열: 매장 ID
+        const phone = row[9] || '';                    // J열: 연락처
+        const manager = row[13] || '';                 // N열: 담당자
+        const address = (row[3] || '').toString();    // D열: 주소
         
         // 빈 매장 ID 제외
         if (!storeId || storeId.toString().trim() === '') {
@@ -1188,13 +1188,13 @@ app.post('/api/login', async (req, res) => {
     
     if (foundStoreRow) {
       const store = {
-        id: foundStoreRow[7],                      // G열: 매장 ID
-        name: foundStoreRow[6],                    // F열: 업체명
-        manager: foundStoreRow[13] || '',          // M열: 담당자
-        address: foundStoreRow[3] || '',          // X열: 주소
+        id: foundStoreRow[7],                      // H열: 매장 ID
+        name: foundStoreRow[6],                    // G열: 업체명
+        manager: foundStoreRow[13] || '',          // N열: 담당자
+        address: foundStoreRow[3] || '',          // D열: 주소
         latitude: parseFloat(foundStoreRow[0] || '0'),  // A열: 위도
         longitude: parseFloat(foundStoreRow[1] || '0'),  // B열: 경도
-        phone: foundStoreRow[11] || ''              // I열: 연락처 추가
+        phone: foundStoreRow[11] || ''              // L열: 연락처 추가
       };
       
       console.log(`Found store: ${store.name}`);
@@ -1273,8 +1273,8 @@ async function checkAndUpdateAddresses() {
     // 모든 주소에 대해 좌표 업데이트 (행 위치가 변경되어도 항상 처리)
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[3];  // X열: 주소
-      const status = row[4];    // D열: 거래상태
+      const address = row[3];  // D열: 주소
+      const status = row[4];    // E열: 거래상태
       
       if (status === "사용") {
         if (!address || address.toString().trim() === '') {
