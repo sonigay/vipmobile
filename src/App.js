@@ -187,7 +187,17 @@ function App() {
     
     const modelStats = {};
     
-    Object.values(activationData).forEach(storeData => {
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = isAgentMode && agentTarget 
+      ? Object.entries(activationData).filter(([storeName, storeData]) => {
+          return storeData.agents && storeData.agents.includes(agentTarget);
+        }).reduce((acc, [storeName, storeData]) => {
+          acc[storeName] = storeData;
+          return acc;
+        }, {})
+      : activationData;
+    
+    Object.values(filteredData).forEach(storeData => {
       const { currentMonth, models } = storeData;
       
       Object.entries(models).forEach(([modelKey, count]) => {
@@ -208,7 +218,7 @@ function App() {
     });
     
     // 전월 데이터도 계산
-    Object.values(activationData).forEach(storeData => {
+    Object.values(filteredData).forEach(storeData => {
       const { previousMonth, models } = storeData;
       
       Object.entries(models).forEach(([modelKey, count]) => {
@@ -230,7 +240,7 @@ function App() {
           : stat.currentMonth > 0 ? '100.0' : '0.0'
       }))
       .sort((a, b) => b.currentMonth - a.currentMonth);
-  }, [activationData]);
+  }, [activationData, isAgentMode, agentTarget]);
 
   // 개통실적 특정 모델의 매장별 통계
   const getActivationStoreStats = useCallback((modelName) => {
@@ -238,7 +248,17 @@ function App() {
     
     const storeStats = [];
     
-    Object.values(activationData).forEach(storeData => {
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = isAgentMode && agentTarget 
+      ? Object.entries(activationData).filter(([storeName, storeData]) => {
+          return storeData.agents && storeData.agents.includes(agentTarget);
+        }).reduce((acc, [storeName, storeData]) => {
+          acc[storeName] = storeData;
+          return acc;
+        }, {})
+      : activationData;
+    
+    Object.values(filteredData).forEach(storeData => {
       const { storeName, currentMonth, previousMonth, models } = storeData;
       
       let modelCurrent = 0;
@@ -273,7 +293,7 @@ function App() {
     
     // 판매량 내림차순 정렬
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
-  }, [activationData]);
+  }, [activationData, isAgentMode, agentTarget]);
 
   // 개통실적 날짜별 통계 계산
   const getActivationDateStats = useCallback(() => {
@@ -281,7 +301,17 @@ function App() {
     
     const dateStats = {};
     
-    Object.values(activationData).forEach(storeData => {
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = isAgentMode && agentTarget 
+      ? Object.entries(activationData).filter(([storeName, storeData]) => {
+          return storeData.agents && storeData.agents.includes(agentTarget);
+        }).reduce((acc, [storeName, storeData]) => {
+          acc[storeName] = storeData;
+          return acc;
+        }, {})
+      : activationData;
+    
+    Object.values(filteredData).forEach(storeData => {
       const { currentMonth, previousMonth, models, lastActivationDate } = storeData;
       
       // 날짜별로 그룹화 (당월 마지막 개통일 기준)
@@ -326,7 +356,149 @@ function App() {
         const dateB = new Date(b.date);
         return dateB - dateA;
       });
-  }, [activationData]);
+  }, [activationData, isAgentMode, agentTarget]);
+
+  // 개통실적 날짜 옵션 생성 (지난 날짜들 포함)
+  const getActivationDateOptions = useCallback(() => {
+    if (!activationData) return [];
+    
+    const dateOptions = [];
+    const today = new Date();
+    
+    // 오늘부터 과거 30일까지의 날짜 옵션 생성
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateKey = date.toLocaleDateString();
+      
+      // 실제 데이터가 있는 날짜인지 확인
+      const hasData = Object.values(activationData).some(storeData => {
+        if (isAgentMode && agentTarget) {
+          return storeData.agents && storeData.agents.includes(agentTarget) && 
+                 storeData.lastActivationDate.toLocaleDateString() === dateKey;
+        }
+        return storeData.lastActivationDate.toLocaleDateString() === dateKey;
+      });
+      
+      if (hasData) {
+        dateOptions.push({
+          value: dateKey,
+          label: dateKey,
+          isToday: i === 0
+        });
+      }
+    }
+    
+    return dateOptions;
+  }, [activationData, isAgentMode, agentTarget]);
+
+  // 담당자별 총 개통실적 계산 (카테고리별)
+  const getAgentTotalActivation = useCallback(() => {
+    if (!activationData || !isAgentMode || !agentTarget) return null;
+    
+    const totalStats = {
+      phones: 0,
+      wearables: 0,
+      tablets: 0
+    };
+    
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = Object.entries(activationData).filter(([storeName, storeData]) => {
+      return storeData.agents && storeData.agents.includes(agentTarget);
+    });
+    
+    filteredData.forEach(([storeName, storeData]) => {
+      const { models } = storeData;
+      
+      Object.entries(models).forEach(([modelKey, count]) => {
+        const modelName = modelKey.split(' (')[0];
+        
+        // 모델명으로 카테고리 판단 (간단한 키워드 매칭)
+        if (modelName.toLowerCase().includes('iphone') || 
+            modelName.toLowerCase().includes('galaxy') ||
+            modelName.toLowerCase().includes('갤럭시') ||
+            modelName.toLowerCase().includes('아이폰')) {
+          totalStats.phones += count;
+        } else if (modelName.toLowerCase().includes('watch') || 
+                   modelName.toLowerCase().includes('갤럭시워치') ||
+                   modelName.toLowerCase().includes('애플워치') ||
+                   modelName.toLowerCase().includes('버즈') ||
+                   modelName.toLowerCase().includes('buds')) {
+          totalStats.wearables += count;
+        } else if (modelName.toLowerCase().includes('ipad') || 
+                   modelName.toLowerCase().includes('갤럭시탭') ||
+                   modelName.toLowerCase().includes('태블릿')) {
+          totalStats.tablets += count;
+        } else {
+          // 기본적으로 휴대폰으로 분류
+          totalStats.phones += count;
+        }
+      });
+    });
+    
+    return totalStats;
+  }, [activationData, isAgentMode, agentTarget]);
+
+  // 담당자별 총 재고 계산 (카테고리별)
+  const getAgentTotalInventory = useCallback(() => {
+    if (!data || !isAgentMode || !agentTarget) return null;
+    
+    const totalStats = {
+      phones: 0,
+      wearables: 0,
+      tablets: 0
+    };
+    
+    // 담당자별 필터링된 매장들
+    const agentStores = filterStoresByAgent(data.stores, agentTarget);
+    
+    agentStores.forEach(store => {
+      if (!store.inventory) return;
+      
+      // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
+      Object.entries(store.inventory).forEach(([category, categoryData]) => {
+        if (typeof categoryData === 'object' && categoryData !== null) {
+          Object.entries(categoryData).forEach(([modelName, modelData]) => {
+            if (typeof modelData === 'object' && modelData !== null) {
+              Object.values(modelData).forEach(status => {
+                if (typeof status === 'object' && status !== null) {
+                  Object.values(status).forEach(item => {
+                    let quantity = 0;
+                    if (typeof item === 'object' && item && item.quantity) {
+                      quantity = item.quantity || 0;
+                    } else if (typeof item === 'number') {
+                      quantity = item || 0;
+                    }
+                    
+                    // 카테고리별 분류
+                    if (category === 'phones') {
+                      totalStats.phones += quantity;
+                    } else if (category === 'wearables') {
+                      totalStats.wearables += quantity;
+                    } else if (category === 'smartDevices') {
+                      // 태블릿은 smartDevices에 포함될 가능성이 높음
+                      if (modelName.toLowerCase().includes('ipad') || 
+                          modelName.toLowerCase().includes('갤럭시탭') ||
+                          modelName.toLowerCase().includes('태블릿')) {
+                        totalStats.tablets += quantity;
+                      } else {
+                        totalStats.wearables += quantity;
+                      }
+                    } else {
+                      // 기타 카테고리는 휴대폰으로 분류
+                      totalStats.phones += quantity;
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    });
+    
+    return totalStats;
+  }, [data, isAgentMode, agentTarget]);
 
   // 개통실적 특정 날짜의 매장별 통계
   const getActivationDateStoreStats = useCallback((dateKey) => {
@@ -334,7 +506,17 @@ function App() {
     
     const storeStats = [];
     
-    Object.values(activationData).forEach(storeData => {
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = isAgentMode && agentTarget 
+      ? Object.entries(activationData).filter(([storeName, storeData]) => {
+          return storeData.agents && storeData.agents.includes(agentTarget);
+        }).reduce((acc, [storeName, storeData]) => {
+          acc[storeName] = storeData;
+          return acc;
+        }, {})
+      : activationData;
+    
+    Object.values(filteredData).forEach(storeData => {
       const { storeName, currentMonth, previousMonth, models, lastActivationDate } = storeData;
       
       // 해당 날짜의 데이터만 필터링
@@ -353,7 +535,7 @@ function App() {
     
     // 판매량 내림차순 정렬
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
-  }, [activationData]);
+  }, [activationData, isAgentMode, agentTarget]);
 
   // 로그인 상태 복원 및 새로운 배포 감지
   useEffect(() => {
@@ -1336,19 +1518,65 @@ function App() {
                 // 관리자 모드일 때 StoreInfoTable과 AgentFilterPanel 표시
                 <>
                   {currentView === 'activation' ? (
-                    // 담당개통확인 모드
+                    // 담당개통확인 모드 - 지도를 위로, 테이블을 아래로
                     <>
+                      <Box sx={{ flex: 1, mb: 2 }}>
+                        <Map
+                          userLocation={userLocation}
+                          filteredStores={filteredStores}
+                          selectedStore={selectedStore}
+                          requestedStore={requestedStore}
+                          onStoreSelect={handleStoreSelect}
+                          selectedRadius={isAgentMode ? null : selectedRadius}
+                          selectedModel={selectedModel}
+                          selectedColor={selectedColor}
+                          loggedInStoreId={loggedInStore?.id}
+                          isAgentMode={isAgentMode}
+                          currentView={currentView}
+                          forceZoomToStore={forceZoomToStore}
+                          activationData={activationData}
+                          showActivationMarkers={currentView === 'activation'}
+                          activationModelSearch={activationModelSearch}
+                          activationDateSearch={activationDateSearch}
+                        />
+                      </Box>
+                      
                       <Box sx={{ 
                         backgroundColor: 'white', 
                         borderRadius: 1, 
-                        p: 2, 
-                        mb: 2,
-                        boxShadow: 1
+                        p: 2,
+                        boxShadow: 1,
+                        maxHeight: '400px',
+                        overflowY: 'auto'
                       }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                             담당개통확인
                           </Typography>
+                          {getAgentTotalActivation() && (
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 2, 
+                              p: 1, 
+                              backgroundColor: '#f5f5f5', 
+                              borderRadius: 1,
+                              fontSize: '14px'
+                            }}>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
+                                이번달 총개통실적:
+                              </Typography>
+                              <span style={{ color: '#4caf50' }}>
+                                휴대폰: {getAgentTotalActivation().phones}개
+                              </span>
+                              <span style={{ color: '#ff9800' }}>
+                                웨어러블: {getAgentTotalActivation().wearables}개
+                              </span>
+                              <span style={{ color: '#9c27b0' }}>
+                                태블릿: {getAgentTotalActivation().tablets}개
+                              </span>
+                            </Box>
+                          )}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Typography variant="body2" color="text.secondary">
@@ -1393,9 +1621,9 @@ function App() {
                                 }}
                               >
                                 <option value="">전체 날짜</option>
-                                {getActivationDateStats().map(stat => (
-                                  <option key={stat.date} value={stat.date}>
-                                    {stat.date}
+                                {getActivationDateOptions().map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.isToday ? `${option.label} (오늘)` : option.label}
                                   </option>
                                 ))}
                               </select>
@@ -1551,6 +1779,7 @@ function App() {
                         selectedModel={selectedModel}
                         selectedColor={selectedColor}
                         currentView={currentView}
+                        agentTotalInventory={getAgentTotalInventory()}
                       />
                       <AgentFilterPanel
                         models={data?.models}
@@ -1581,26 +1810,28 @@ function App() {
                   isAgentMode={isAgentMode}
                 />
               )}
-              <Box sx={{ flex: 1 }}>
-                <Map
-                  userLocation={userLocation}
-                  filteredStores={filteredStores}
-                  selectedStore={selectedStore}
-                  requestedStore={requestedStore}
-                  onStoreSelect={handleStoreSelect}
-                  selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
-                  selectedModel={selectedModel}
-                  selectedColor={selectedColor}
-                  loggedInStoreId={loggedInStore?.id}
-                  isAgentMode={isAgentMode}
-                  currentView={currentView}
-                  forceZoomToStore={forceZoomToStore}
-                  activationData={activationData}
-                  showActivationMarkers={currentView === 'activation'}
-                  activationModelSearch={activationModelSearch}
-                  activationDateSearch={activationDateSearch}
-                />
-              </Box>
+              {currentView !== 'activation' && (
+                <Box sx={{ flex: 1 }}>
+                  <Map
+                    userLocation={userLocation}
+                    filteredStores={filteredStores}
+                    selectedStore={selectedStore}
+                    requestedStore={requestedStore}
+                    onStoreSelect={handleStoreSelect}
+                    selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    loggedInStoreId={loggedInStore?.id}
+                    isAgentMode={isAgentMode}
+                    currentView={currentView}
+                    forceZoomToStore={forceZoomToStore}
+                    activationData={activationData}
+                    showActivationMarkers={currentView === 'activation'}
+                    activationModelSearch={activationModelSearch}
+                    activationDateSearch={activationDateSearch}
+                  />
+                </Box>
+              )}
             </>
           )}
         </Box>

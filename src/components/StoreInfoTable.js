@@ -43,7 +43,7 @@ const handleCall = (phoneNumber) => {
 /**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
-function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor, currentView }) {
+function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor, currentView, agentTotalInventory }) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -193,6 +193,33 @@ ${model} / ${color} 모델
           />
         )}
       </Typography>
+
+      {/* 담당재고확인 모드에서 총 재고 정보 표시 */}
+      {currentView === 'assigned' && agentTotalInventory && (
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2, 
+          p: 1, 
+          backgroundColor: '#f5f5f5', 
+          borderRadius: 1,
+          fontSize: '14px',
+          mb: 2
+        }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
+            보유중인 총재고:
+          </Typography>
+          <span style={{ color: '#4caf50' }}>
+            휴대폰: {agentTotalInventory.phones}개
+          </span>
+          <span style={{ color: '#ff9800' }}>
+            웨어러블: {agentTotalInventory.wearables}개
+          </span>
+          <span style={{ color: '#9c27b0' }}>
+            태블릿: {agentTotalInventory.tablets}개
+          </span>
+        </Box>
+      )}
 
       {selectedStore ? (
         <TableContainer component={Paper} variant="outlined">
