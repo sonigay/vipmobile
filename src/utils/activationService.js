@@ -85,6 +85,20 @@ export async function fetchActivationDataByDate() {
   }
 }
 
+// 특정 날짜의 당월/전월 개통실적 비교 데이터 가져오기
+export async function fetchActivationDateComparison(date) {
+  try {
+    const response = await fetch(`${API_URL}/api/activation-data/date-comparison/${date}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch activation date comparison data:', error);
+    throw error;
+  }
+}
+
 // 매장별 개통실적 비교 데이터 생성 (지도용)
 export function generateStoreActivationComparison(currentMonthData, previousMonthData) {
   // 당월 마지막 개통일 찾기

@@ -697,12 +697,8 @@ function Map({
               displayPrevious = Math.round((displayCurrent / currentMonth) * previousMonth);
             }
           } else if (activationDateSearch) {
-            // 날짜 검색이 있는 경우 해당 날짜의 데이터만 필터링
-            // ISO 형식으로 비교 (YYYY-MM-DD)
-            const activationDateISO = lastActivationDate.toISOString().split('T')[0];
-            if (activationDateISO !== activationDateSearch) {
-              return null; // 해당 날짜가 아니면 마커 표시 안함
-            }
+            // 날짜 검색이 있는 경우 - 이미 해당 날짜의 데이터만 필터링되어 있음
+            // 추가 필터링 불필요 (백엔드에서 이미 처리됨)
           }
           
           // 개통실적이 있는 경우에만 마커 표시
@@ -783,7 +779,10 @@ function Map({
                       <span style={{ color: '#64748b' }}>전월: {displayPrevious}개</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
-                      기준일: {lastActivationDate.toLocaleDateString('ko-KR')}
+                      기준일: {activationDateSearch ? 
+                        new Date(activationDateSearch).toLocaleDateString('ko-KR') : 
+                        lastActivationDate.toLocaleDateString('ko-KR')
+                      }
                     </div>
                   </div>
                   

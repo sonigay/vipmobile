@@ -13,6 +13,7 @@ import {
   fetchCurrentMonthData, 
   fetchPreviousMonthData, 
   fetchActivationDataByDate,
+  fetchActivationDateComparison,
   generateStoreActivationComparison, 
   filterActivationByAgent 
 } from './utils/activationService';
@@ -186,6 +187,40 @@ function App() {
       console.error('개통실적 데이터 로딩 실패:', error);
       setActivationData(null);
       setActivationDataByDate(null);
+    }
+  }, [isAgentMode, agentTarget]);
+
+  // 특정 날짜의 개통실적 데이터 로드 함수
+  const loadActivationDataForDate = useCallback(async (date) => {
+    try {
+      console.log(`특정 날짜 개통실적 데이터 로딩 시작: ${date}`);
+      
+      const dateComparisonData = await fetchActivationDateComparison(date);
+      
+      // 담당자 필터링 적용
+      let filteredData = dateComparisonData;
+      if (isAgentMode && agentTarget) {
+        filteredData = {};
+        Object.entries(dateComparisonData).forEach(([storeName, storeData]) => {
+          const hasMatchingAgent = storeData.agents.some(agent => {
+            if (!agent || !agentTarget) return false;
+            const agentPrefix = agent.toString().substring(0, 3);
+            const targetPrefix = agentTarget.toString().substring(0, 3);
+            return agentPrefix === targetPrefix;
+          });
+          
+          if (hasMatchingAgent) {
+            filteredData[storeName] = storeData;
+          }
+        });
+      }
+      
+      setActivationData(filteredData);
+      console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
+      console.log('날짜 비교 데이터:', filteredData);
+    } catch (error) {
+      console.error(`특정 날짜 개통실적 데이터 로딩 실패: ${date}`, error);
+      setActivationData(null);
     }
   }, [isAgentMode, agentTarget]);
 
@@ -1671,8 +1706,13 @@ function App() {
                               <select
                                 value={activationModelSearch}
                                 onChange={(e) => {
-                                  setActivationModelSearch(e.target.value);
-                                  if (e.target.value) setActivationDateSearch(''); // 모델 선택시 날짜 검색 초기화
+                                  const selectedModel = e.target.value;
+                                  setActivationModelSearch(selectedModel);
+                                  if (selectedModel) {
+                                    setActivationDateSearch(''); // 모델 선택시 날짜 검색 초기화
+                                    // 모델 선택 시 기존 데이터 로드 (전체 날짜 기준)
+                                    loadActivationData();
+                                  }
                                 }}
                                 style={{
                                   padding: '4px 8px',
@@ -1696,8 +1736,16 @@ function App() {
                               <select
                                 value={activationDateSearch}
                                 onChange={(e) => {
-                                  setActivationDateSearch(e.target.value);
-                                  if (e.target.value) setActivationModelSearch(''); // 날짜 선택시 모델 검색 초기화
+                                  const selectedDate = e.target.value;
+                                  setActivationDateSearch(selectedDate);
+                                  if (selectedDate) {
+                                    setActivationModelSearch(''); // 날짜 선택시 모델 검색 초기화
+                                    // 특정 날짜 선택 시 해당 날짜의 당월/전월 데이터 로드
+                                    loadActivationDataForDate(selectedDate);
+                                  } else {
+                                    // 전체 날짜 선택 시 기존 데이터 로드
+                                    loadActivationData();
+                                  }
                                 }}
                                 style={{
                                   padding: '4px 8px',

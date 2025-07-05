@@ -1227,6 +1227,170 @@ app.get('/api/activation-data/by-date', async (req, res) => {
   }
 });
 
+// 특정 날짜의 당월/전월 개통실적 데이터 가져오기 (새로운 API)
+app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
+  const { date } = req.params;
+  const cacheKey = `activation_date_comparison_${date}`;
+  
+  // 캐시에서 먼저 확인
+  const cachedData = cacheUtils.get(cacheKey);
+  if (cachedData) {
+    console.log(`캐시된 날짜 비교 데이터 반환: ${date}`);
+    return res.json(cachedData);
+  }
+  
+  try {
+    console.log(`날짜 비교 데이터 처리 시작: ${date}`);
+    const startTime = Date.now();
+    
+    // 당월과 전월 데이터 모두 가져오기
+    const [currentMonthValues, previousMonthValues] = await Promise.all([
+      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME),
+      getSheetValues(PREVIOUS_MONTH_ACTIVATION_SHEET_NAME)
+    ]);
+    
+    if (!currentMonthValues || !previousMonthValues) {
+      throw new Error('Failed to fetch activation data from sheets');
+    }
+
+    // 헤더 제거
+    const currentMonthRows = currentMonthValues.slice(1);
+    const previousMonthRows = previousMonthValues.slice(1);
+    
+    // 날짜별 당월/전월 데이터 구성
+    const comparisonData = {};
+    
+    // 당월 데이터 처리
+    currentMonthRows.forEach(row => {
+      if (row[6] === '선불개통') return; // 선불개통 제외
+      
+      const store = row[6] || '미지정'; // G열: 출고처
+      const agent = row[0] || '미지정'; // A열: 담당자
+      const activationDate = row[1] || ''; // B열: 개통일
+      const model = row[13] || '미지정'; // N열: 모델명
+      const color = row[14] || '미지정'; // O열: 색상
+      
+      if (!activationDate) return;
+      
+      // 날짜 형식 정규화
+      let normalizedDate = activationDate;
+      if (activationDate.match(/^\d{1,2}\/\d{1,2}$/)) {
+        const currentYear = new Date().getFullYear();
+        normalizedDate = `${activationDate}/${currentYear}`;
+      }
+      
+      // ISO 형식으로 변환
+      try {
+        const dateObj = new Date(normalizedDate);
+        if (!isNaN(dateObj.getTime())) {
+          normalizedDate = dateObj.toISOString().split('T')[0];
+        }
+      } catch (error) {
+        console.warn('날짜 변환 실패:', normalizedDate, error);
+        return;
+      }
+      
+      // 특정 날짜만 처리
+      if (normalizedDate !== date) return;
+      
+      if (!comparisonData[store]) {
+        comparisonData[store] = {
+          storeName: store,
+          currentMonth: 0,
+          previousMonth: 0,
+          agents: new Set(),
+          models: {}
+        };
+      }
+      
+      comparisonData[store].currentMonth++;
+      comparisonData[store].agents.add(agent);
+      
+      const modelKey = `${model} (${color})`;
+      if (!comparisonData[store].models[modelKey]) {
+        comparisonData[store].models[modelKey] = 0;
+      }
+      comparisonData[store].models[modelKey]++;
+    });
+    
+    // 전월 데이터 처리 (같은 날짜)
+    previousMonthRows.forEach(row => {
+      if (row[6] === '선불개통') return; // 선불개통 제외
+      
+      const store = row[6] || '미지정'; // G열: 출고처
+      const agent = row[0] || '미지정'; // A열: 담당자
+      const activationDate = row[1] || ''; // B열: 개통일
+      const model = row[13] || '미지정'; // N열: 모델명
+      const color = row[14] || '미지정'; // O열: 색상
+      
+      if (!activationDate) return;
+      
+      // 날짜 형식 정규화
+      let normalizedDate = activationDate;
+      if (activationDate.match(/^\d{1,2}\/\d{1,2}$/)) {
+        const previousYear = new Date().getFullYear() - 1;
+        normalizedDate = `${activationDate}/${previousYear}`;
+      }
+      
+      // ISO 형식으로 변환
+      try {
+        const dateObj = new Date(normalizedDate);
+        if (!isNaN(dateObj.getTime())) {
+          normalizedDate = dateObj.toISOString().split('T')[0];
+        }
+      } catch (error) {
+        console.warn('날짜 변환 실패:', normalizedDate, error);
+        return;
+      }
+      
+      // 특정 날짜만 처리 (전월의 같은 날짜)
+      const targetDate = new Date(date);
+      targetDate.setFullYear(targetDate.getFullYear() - 1);
+      const previousYearDate = targetDate.toISOString().split('T')[0];
+      
+      if (normalizedDate !== previousYearDate) return;
+      
+      if (!comparisonData[store]) {
+        comparisonData[store] = {
+          storeName: store,
+          currentMonth: 0,
+          previousMonth: 0,
+          agents: new Set(),
+          models: {}
+        };
+      }
+      
+      comparisonData[store].previousMonth++;
+      comparisonData[store].agents.add(agent);
+      
+      const modelKey = `${model} (${color})`;
+      if (!comparisonData[store].models[modelKey]) {
+        comparisonData[store].models[modelKey] = 0;
+      }
+      comparisonData[store].models[modelKey]++;
+    });
+    
+    // Set을 배열로 변환
+    Object.keys(comparisonData).forEach(store => {
+      comparisonData[store].agents = Array.from(comparisonData[store].agents);
+    });
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`날짜 비교 데이터 처리 완료: ${date}, ${Object.keys(comparisonData).length}개 매장, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, comparisonData);
+    
+    res.json(comparisonData);
+  } catch (error) {
+    console.error('Error fetching activation date comparison data:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch activation date comparison data', 
+      message: error.message 
+    });
+  }
+});
+
 // 사용자 활동 로깅 API (비동기 처리)
 app.post('/api/log-activity', async (req, res) => {
   // 즉시 응답 반환
