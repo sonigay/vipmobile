@@ -13,14 +13,25 @@ export const fetchUpdateHistory = async () => {
   }
   
   try {
-    const response = await fetch('/api/updates');
+    // API 엔드포인트가 존재하지 않을 수 있으므로 더 안전한 처리
+    const response = await fetch('/api/updates', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // 404나 다른 오류 시 기본 데이터 반환
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.log(`업데이트 API 응답 오류: ${response.status} - 기본 데이터 사용`);
+      return getDefaultUpdateHistory();
     }
     
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Response is not JSON');
+      console.log('업데이트 API가 JSON을 반환하지 않음 - 기본 데이터 사용');
+      return getDefaultUpdateHistory();
     }
     
     const result = await response.json();
@@ -29,11 +40,12 @@ export const fetchUpdateHistory = async () => {
       lastFetchTime = now;
       return result.data;
     } else {
-      throw new Error('Invalid response format');
+      console.log('업데이트 API 응답 형식이 올바르지 않음 - 기본 데이터 사용');
+      return getDefaultUpdateHistory();
     }
   } catch (error) {
-    console.error('업데이트 히스토리 가져오기 실패:', error);
-    // 에러 시 기본 업데이트 정보 반환
+    // 네트워크 오류나 기타 예외 시 기본 데이터 반환
+    console.log('업데이트 API 호출 실패 - 기본 데이터 사용:', error.message);
     return getDefaultUpdateHistory();
   }
 };
@@ -47,14 +59,16 @@ const getDefaultUpdateHistory = () => {
     {
       version: `${currentDate.getFullYear()}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${String(currentDate.getDate()).padStart(2, '0')}`,
       date: formattedDate,
-      title: '동적 업데이트 시스템 구축',
+      title: '배정 히스토리 시스템 구축',
       changes: [
-        '서버 기반 동적 업데이트 시스템 구현',
-        '실시간 업데이트 내용 가져오기',
-        '캐시 시스템으로 성능 최적화',
-        '오프라인 시 기본 업데이트 정보 제공'
+        '배정 히스토리 관리 기능 구현',
+        '배정 설정 및 결과 저장/비교 기능',
+        '히스토리 내보내기/가져오기 기능',
+        '배정 통계 및 트렌드 분석 기능',
+        'localStorage 용량 관리 최적화',
+        'Leaflet 지도 안정성 개선'
       ],
-      type: 'system',
+      type: 'feature',
       timestamp: currentDate.getTime()
     }
   ];
