@@ -54,7 +54,9 @@ import {
   Warning as WarningIcon,
   History as HistoryIcon,
   Watch as WatchIcon,
-  Tablet as TabletIcon
+  Tablet as TabletIcon,
+  Settings as SettingsIcon,
+  AccountTree as AccountTreeIcon
 } from '@mui/icons-material';
 import { fetchData } from '../api';
 import UpdateProgressPopup from './UpdateProgressPopup';
@@ -65,6 +67,8 @@ const InventoryAuditScreen = lazy(() => import('./screens/InventoryAuditScreen')
 const MasterInventoryScreen = lazy(() => import('./screens/MasterInventoryScreen'));
 const DuplicateCasesScreen = lazy(() => import('./screens/DuplicateCasesScreen'));
 const InventoryAssignmentScreen = lazy(() => import('./screens/InventoryAssignmentScreen'));
+const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
+const DepartmentAssignmentScreen = lazy(() => import('./screens/DepartmentAssignmentScreen'));
 
 // 로딩 스켈레톤 컴포넌트
 const LoadingSkeleton = () => (
@@ -555,6 +559,12 @@ function InventoryMode({ onLogout, loggedInStore }) {
           
           {selectedMenu === 'assignment' && (
             <>
+              <MenuItem onClick={() => handleSubMenuClick('settings')}>
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>배정셋팅</ListItemText>
+              </MenuItem>
               <MenuItem onClick={() => handleSubMenuClick('office')}>
                 <ListItemIcon>
                   <BusinessIcon fontSize="small" />
@@ -566,6 +576,12 @@ function InventoryMode({ onLogout, loggedInStore }) {
                   <PersonAddIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>영업사원배정</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSubMenuClick('department')}>
+                <ListItemIcon>
+                  <AccountTreeIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>소속배정</ListItemText>
               </MenuItem>
             </>
           )}
@@ -1067,6 +1083,30 @@ function InventoryMode({ onLogout, loggedInStore }) {
           onBack={handleBackToMain}
           onLogout={onLogout}
           screenType={currentScreen}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen === 'assignment_settings') {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <AssignmentSettingsScreen 
+          data={data}
+          onBack={handleBackToMain}
+          onLogout={onLogout}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen === 'assignment_department') {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <DepartmentAssignmentScreen 
+          data={data}
+          onBack={handleBackToMain}
+          onLogout={onLogout}
         />
       </Suspense>
     );
