@@ -504,8 +504,17 @@ app.post('/api/update-coordinates', async (req, res) => {
       const status = row[4];   // D열: 거래상태
       
       if (status === "사용") {
-        if (!address) continue;
-        // 기존 위도/경도 값이 있더라도 무조건 새로 geocoding하여 덮어씀
+        if (!address || address.toString().trim() === '') {
+          // 사용 상태이지만 주소가 없는 경우 좌표 삭제
+          updates.push({
+            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+            values: [["", ""]]
+          });
+          console.log(`Cleared coordinates for store without address at row ${i + 2}`);
+          continue;
+        }
+        
+        // 주소가 있는 경우 geocoding 실행
         try {
           const result = await geocodeAddress(address);
           if (result) {
@@ -518,9 +527,21 @@ app.post('/api/update-coordinates', async (req, res) => {
             console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
           } else {
             console.log(`No results found for address: ${address}`);
+            // geocoding 실패 시 기존 좌표 삭제
+            updates.push({
+              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+              values: [["", ""]]
+            });
+            console.log(`Cleared coordinates for failed geocoding at row ${i + 2}`);
           }
         } catch (error) {
           console.error(`Error geocoding address: ${address}`, error);
+          // geocoding 오류 시 기존 좌표 삭제
+          updates.push({
+            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+            values: [["", ""]]
+          });
+          console.log(`Cleared coordinates for geocoding error at row ${i + 2}`);
         }
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
@@ -1168,8 +1189,17 @@ async function checkAndUpdateAddresses() {
       const status = row[4];    // D열: 거래상태
       
       if (status === "사용") {
-        if (!address) continue;
-        // 기존 위도/경도 값이 있더라도 무조건 새로 geocoding하여 덮어씀
+        if (!address || address.toString().trim() === '') {
+          // 사용 상태이지만 주소가 없는 경우 좌표 삭제
+          updates.push({
+            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+            values: [["", ""]]
+          });
+          console.log(`Cleared coordinates for store without address at row ${i + 2}`);
+          continue;
+        }
+        
+        // 주소가 있는 경우 geocoding 실행
         try {
           const result = await geocodeAddress(address);
           if (result) {
@@ -1182,9 +1212,21 @@ async function checkAndUpdateAddresses() {
             console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
           } else {
             console.log(`No results found for address: ${address}`);
+            // geocoding 실패 시 기존 좌표 삭제
+            updates.push({
+              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+              values: [["", ""]]
+            });
+            console.log(`Cleared coordinates for failed geocoding at row ${i + 2}`);
           }
         } catch (error) {
           console.error(`Error geocoding address: ${address}`, error);
+          // geocoding 오류 시 기존 좌표 삭제
+          updates.push({
+            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+            values: [["", ""]]
+          });
+          console.log(`Cleared coordinates for geocoding error at row ${i + 2}`);
         }
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
