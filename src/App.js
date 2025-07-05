@@ -278,7 +278,7 @@ function App() {
       });
     });
     
-    // 전월 데이터도 계산
+    // 전월 데이터도 계산 (모델별로 정확히 매칭)
     Object.values(filteredData).forEach(storeData => {
       const { previousMonth, models } = storeData;
       
@@ -286,6 +286,7 @@ function App() {
         const modelName = modelKey.split(' (')[0];
         
         if (modelStats[modelName]) {
+          // 전월 데이터도 같은 모델에 추가
           modelStats[modelName].previousMonth += count;
         }
       });
@@ -334,10 +335,14 @@ function App() {
         }
       });
       
-      // 전월 데이터도 계산 (전체 개통량 기준으로 비율 계산)
-      if (currentMonth > 0 && previousMonth > 0) {
-        modelPrevious = Math.round((modelCurrent / currentMonth) * previousMonth);
-      }
+      // 전월 데이터도 계산 (해당 모델의 실제 전월 데이터 사용)
+      Object.entries(models).forEach(([modelKey, count]) => {
+        if (modelKey.startsWith(modelName + ' (')) {
+          // 전월 데이터는 이미 activationData에 포함되어 있음
+          // 비율 계산 대신 실제 데이터 사용
+          modelPrevious += count; // 전월 데이터도 같은 모델에 추가
+        }
+      });
       
       if (modelCurrent > 0) {
         storeStats.push({
@@ -356,11 +361,18 @@ function App() {
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
   }, [activationData, isAgentMode, agentTarget]);
 
-  // 개통실적 날짜별 통계 계산
+  // 개통실적 전체 통계 계산 (전체 날짜 선택 시)
   const getActivationDateStats = useCallback(() => {
     if (!activationData) return [];
     
-    const dateStats = {};
+    // 전체 데이터를 하나의 통계로 집계
+    const totalStats = {
+      date: '전체',
+      currentMonth: 0,
+      previousMonth: 0,
+      storeCount: new Set(),
+      models: {}
+    };
     
     // 담당자별 필터링된 데이터 사용
     const filteredData = isAgentMode && agentTarget 
@@ -373,50 +385,30 @@ function App() {
       : activationData;
     
     Object.values(filteredData).forEach(storeData => {
-      const { currentMonth, previousMonth, models, lastActivationDate } = storeData;
+      const { currentMonth, previousMonth, models } = storeData;
       
-      // 날짜별로 그룹화 (당월 마지막 개통일 기준)
-      const dateKey = lastActivationDate.toLocaleDateString();
-      
-      if (!dateStats[dateKey]) {
-        dateStats[dateKey] = {
-          date: dateKey,
-          currentMonth: 0,
-          previousMonth: 0,
-          storeCount: new Set(),
-          models: {}
-        };
-      }
-      
-      dateStats[dateKey].currentMonth += currentMonth;
-      dateStats[dateKey].previousMonth += previousMonth;
-      dateStats[dateKey].storeCount.add(storeData.storeName);
+      totalStats.currentMonth += currentMonth;
+      totalStats.previousMonth += previousMonth;
+      totalStats.storeCount.add(storeData.storeName);
       
       // 모델별 집계
       Object.entries(models).forEach(([modelKey, count]) => {
         const modelName = modelKey.split(' (')[0];
-        if (!dateStats[dateKey].models[modelName]) {
-          dateStats[dateKey].models[modelName] = 0;
+        if (!totalStats.models[modelName]) {
+          totalStats.models[modelName] = 0;
         }
-        dateStats[dateKey].models[modelName] += count;
+        totalStats.models[modelName] += count;
       });
     });
     
-    // 배열로 변환하고 날짜 내림차순 정렬
-    return Object.values(dateStats)
-      .map(stat => ({
-        ...stat,
-        storeCount: stat.storeCount.size,
-        changeRate: stat.previousMonth > 0 
-          ? ((stat.currentMonth - stat.previousMonth) / stat.previousMonth * 100).toFixed(1)
-          : stat.currentMonth > 0 ? '100.0' : '0.0'
-      }))
-      .sort((a, b) => {
-        // 날짜 형식 변환 (MM/DD/YYYY -> YYYY-MM-DD)
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA;
-      });
+    // 배열로 변환
+    return [{
+      ...totalStats,
+      storeCount: totalStats.storeCount.size,
+      changeRate: totalStats.previousMonth > 0 
+        ? ((totalStats.currentMonth - totalStats.previousMonth) / totalStats.previousMonth * 100).toFixed(1)
+        : totalStats.currentMonth > 0 ? '100.0' : '0.0'
+    }];
   }, [activationData, isAgentMode, agentTarget]);
 
   // 개통실적 날짜 옵션 생성 (지난 날짜들 포함)
@@ -1775,7 +1767,7 @@ function App() {
                                 <option value="">전체 날짜</option>
                                 {getActivationDateOptions().map(option => (
                                   <option key={option.value} value={option.value}>
-                                    {option.isToday ? `${option.label} (오늘)` : option.label}
+                                    {option.isToday ? `${option.label} (전일)` : option.label}
                                   </option>
                                 ))}
                               </select>
