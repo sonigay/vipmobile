@@ -533,6 +533,9 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
             vertical: 'top',
             horizontal: 'left',
           }}
+          disablePortal={false}
+          keepMounted={false}
+          autoFocus={false}
         >
           {selectedMenu === 'master' && (
             <>
