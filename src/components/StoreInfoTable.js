@@ -183,42 +183,15 @@ ${model} / ${color} 모델
           <StoreIcon sx={{ mr: 1 }} />
           선택된 업체 정보
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {currentView && (
-            <Chip 
-              label={currentView === 'all' ? '전체재고확인' : '담당재고확인'}
-              size="small"
-              color={currentView === 'all' ? 'primary' : 'secondary'}
-              variant="outlined"
-              sx={{ fontSize: '0.7em' }}
-            />
-          )}
-          {/* 담당재고확인 모드에서 총 재고 정보 표시 */}
-          {currentView === 'assigned' && agentTotalInventory && (
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 2, 
-              p: 1, 
-              backgroundColor: '#f5f5f5', 
-              borderRadius: 1,
-              fontSize: '14px'
-            }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
-                보유중인 총재고:
-              </Typography>
-              <span style={{ color: '#4caf50' }}>
-                휴대폰: {agentTotalInventory.phones}개
-              </span>
-              <span style={{ color: '#ff9800' }}>
-                웨어러블: {agentTotalInventory.wearables}개
-              </span>
-              <span style={{ color: '#9c27b0' }}>
-                태블릿: {agentTotalInventory.tablets}개
-              </span>
-            </Box>
-          )}
-        </Box>
+        {currentView && (
+          <Chip 
+            label={currentView === 'all' ? '전체재고확인' : '담당재고확인'}
+            size="small"
+            color={currentView === 'all' ? 'primary' : 'secondary'}
+            variant="outlined"
+            sx={{ fontSize: '0.7em' }}
+          />
+        )}
       </Typography>
 
       {selectedStore ? (

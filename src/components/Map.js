@@ -102,7 +102,8 @@ function Map({
   activationData, // 개통실적 데이터 추가
   showActivationMarkers, // 개통실적 마커 표시 여부
   activationModelSearch, // 개통실적 모델 검색
-  activationDateSearch // 개통실적 날짜 검색
+  activationDateSearch, // 개통실적 날짜 검색
+  agentTarget // 담당자 정보 추가
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -661,6 +662,13 @@ function Map({
         
         {/* 개통실적 마커들 (담당개통확인 화면에서만 표시) */}
         {showActivationMarkers && activationData && Object.entries(activationData).map(([storeName, data]) => {
+          // 담당자 필터링 (담당개통확인 모드에서만)
+          if (currentView === 'activation' && isAgentMode && agentTarget) {
+            if (!data.agents || !data.agents.includes(agentTarget)) {
+              return null; // 해당 담당자가 담당하지 않는 매장은 마커 표시 안함
+            }
+          }
+          
           // 해당 매장의 위치 정보 찾기
           const storeLocation = filteredStores.find(store => store.name === storeName);
           if (!storeLocation || !storeLocation.latitude || !storeLocation.longitude) return null;

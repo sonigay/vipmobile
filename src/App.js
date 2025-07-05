@@ -380,11 +380,13 @@ function App() {
         return storeData.lastActivationDate.toLocaleDateString() === dateKey;
       });
       
-      if (hasData) {
+      // 데이터가 있거나 오늘 날짜인 경우 추가
+      if (hasData || i === 0) {
         dateOptions.push({
           value: dateKey,
           label: dateKey,
-          isToday: i === 0
+          isToday: i === 0,
+          hasData: hasData
         });
       }
     }
@@ -499,6 +501,52 @@ function App() {
     
     return totalStats;
   }, [data, isAgentMode, agentTarget]);
+
+  // 선택한 모델의 총 개통수 계산
+  const getSelectedModelTotalActivation = useCallback(() => {
+    if (!activationData || !activationModelSearch || !isAgentMode || !agentTarget) return 0;
+    
+    let totalCount = 0;
+    
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = Object.entries(activationData).filter(([storeName, storeData]) => {
+      return storeData.agents && storeData.agents.includes(agentTarget);
+    });
+    
+    filteredData.forEach(([storeName, storeData]) => {
+      const { models } = storeData;
+      
+      Object.entries(models).forEach(([modelKey, count]) => {
+        if (modelKey.startsWith(activationModelSearch + ' (')) {
+          totalCount += count;
+        }
+      });
+    });
+    
+    return totalCount;
+  }, [activationData, activationModelSearch, isAgentMode, agentTarget]);
+
+  // 선택한 날짜의 총 개통수 계산
+  const getSelectedDateTotalActivation = useCallback(() => {
+    if (!activationData || !activationDateSearch || !isAgentMode || !agentTarget) return 0;
+    
+    let totalCount = 0;
+    
+    // 담당자별 필터링된 데이터 사용
+    const filteredData = Object.entries(activationData).filter(([storeName, storeData]) => {
+      return storeData.agents && storeData.agents.includes(agentTarget);
+    });
+    
+    filteredData.forEach(([storeName, storeData]) => {
+      const { currentMonth, lastActivationDate } = storeData;
+      
+      if (lastActivationDate.toLocaleDateString() === activationDateSearch) {
+        totalCount += currentMonth;
+      }
+    });
+    
+    return totalCount;
+  }, [activationData, activationDateSearch, isAgentMode, agentTarget]);
 
   // 개통실적 특정 날짜의 매장별 통계
   const getActivationDateStoreStats = useCallback((dateKey) => {
@@ -1343,9 +1391,53 @@ function App() {
               <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
                 {isAgentMode ? (
                   // 관리자 모드일 때 대리점 정보 표시
-                  <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
-                    {agentTarget} ({agentQualification})
-                  </span>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
+                      {agentTarget} ({agentQualification})
+                    </span>
+                    {currentView === 'activation' && getAgentTotalActivation() && (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1, 
+                        p: 0.5, 
+                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        borderRadius: 1,
+                        fontSize: '0.6em'
+                      }}>
+                        <span style={{ color: '#4caf50' }}>
+                          휴대폰: {getAgentTotalActivation().phones}개
+                        </span>
+                        <span style={{ color: '#ff9800' }}>
+                          웨어러블: {getAgentTotalActivation().wearables}개
+                        </span>
+                        <span style={{ color: '#9c27b0' }}>
+                          태블릿: {getAgentTotalActivation().tablets}개
+                        </span>
+                      </Box>
+                    )}
+                    {currentView === 'assigned' && getAgentTotalInventory() && (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1, 
+                        p: 0.5, 
+                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        borderRadius: 1,
+                        fontSize: '0.6em'
+                      }}>
+                        <span style={{ color: '#4caf50' }}>
+                          휴대폰: {getAgentTotalInventory().phones}개
+                        </span>
+                        <span style={{ color: '#ff9800' }}>
+                          웨어러블: {getAgentTotalInventory().wearables}개
+                        </span>
+                        <span style={{ color: '#9c27b0' }}>
+                          태블릿: {getAgentTotalInventory().tablets}개
+                        </span>
+                      </Box>
+                    )}
+                  </Box>
                 ) : loggedInStore && (
                   // 일반 매장 모드일 때 기존 정보 표시
                   <>
@@ -1538,6 +1630,7 @@ function App() {
                           showActivationMarkers={currentView === 'activation'}
                           activationModelSearch={activationModelSearch}
                           activationDateSearch={activationDateSearch}
+                          agentTarget={agentTarget}
                         />
                       </Box>
                       
@@ -1548,35 +1641,9 @@ function App() {
                         boxShadow: 1
                       }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                              담당개통확인
-                            </Typography>
-                            {getAgentTotalActivation() && (
-                              <Box sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: 2, 
-                                p: 1, 
-                                backgroundColor: '#f5f5f5', 
-                                borderRadius: 1,
-                                fontSize: '14px'
-                              }}>
-                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
-                                  이번달 총개통실적:
-                                </Typography>
-                                <span style={{ color: '#4caf50' }}>
-                                  휴대폰: {getAgentTotalActivation().phones}개
-                                </span>
-                                <span style={{ color: '#ff9800' }}>
-                                  웨어러블: {getAgentTotalActivation().wearables}개
-                                </span>
-                                <span style={{ color: '#9c27b0' }}>
-                                  태블릿: {getAgentTotalActivation().tablets}개
-                                </span>
-                              </Box>
-                            )}
-                          </Box>
+                          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                            담당개통확인
+                          </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Typography variant="body2" color="text.secondary">
@@ -1634,6 +1701,23 @@ function App() {
                         {activationModelSearch ? (
                           // 특정 모델의 매장별 통계
                           <Box>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 2, 
+                              p: 1, 
+                              backgroundColor: '#e3f2fd', 
+                              borderRadius: 1,
+                              fontSize: '14px',
+                              mb: 2
+                            }}>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                                {activationModelSearch} 당월 총개통:
+                              </Typography>
+                              <span style={{ color: '#2196f3', fontWeight: 'bold', fontSize: '16px' }}>
+                                {getSelectedModelTotalActivation()}개
+                              </span>
+                            </Box>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#f5f5f5' }}>
@@ -1678,6 +1762,23 @@ function App() {
                         ) : activationDateSearch ? (
                           // 특정 날짜의 매장별 통계
                           <Box>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 2, 
+                              p: 1, 
+                              backgroundColor: '#e8f5e8', 
+                              borderRadius: 1,
+                              fontSize: '14px',
+                              mb: 2
+                            }}>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                                {activationDateSearch} 총개통:
+                              </Typography>
+                              <span style={{ color: '#4caf50', fontWeight: 'bold', fontSize: '16px' }}>
+                                {getSelectedDateTotalActivation()}개
+                              </span>
+                            </Box>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#f5f5f5' }}>
@@ -1829,6 +1930,7 @@ function App() {
                     showActivationMarkers={currentView === 'activation'}
                     activationModelSearch={activationModelSearch}
                     activationDateSearch={activationDateSearch}
+                    agentTarget={agentTarget}
                   />
                 </Box>
               )}
