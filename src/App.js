@@ -1545,38 +1545,38 @@ function App() {
                         backgroundColor: 'white', 
                         borderRadius: 1, 
                         p: 2,
-                        boxShadow: 1,
-                        maxHeight: '400px',
-                        overflowY: 'auto'
+                        boxShadow: 1
                       }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                            담당개통확인
-                          </Typography>
-                          {getAgentTotalActivation() && (
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: 2, 
-                              p: 1, 
-                              backgroundColor: '#f5f5f5', 
-                              borderRadius: 1,
-                              fontSize: '14px'
-                            }}>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
-                                이번달 총개통실적:
-                              </Typography>
-                              <span style={{ color: '#4caf50' }}>
-                                휴대폰: {getAgentTotalActivation().phones}개
-                              </span>
-                              <span style={{ color: '#ff9800' }}>
-                                웨어러블: {getAgentTotalActivation().wearables}개
-                              </span>
-                              <span style={{ color: '#9c27b0' }}>
-                                태블릿: {getAgentTotalActivation().tablets}개
-                              </span>
-                            </Box>
-                          )}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                              담당개통확인
+                            </Typography>
+                            {getAgentTotalActivation() && (
+                              <Box sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 2, 
+                                p: 1, 
+                                backgroundColor: '#f5f5f5', 
+                                borderRadius: 1,
+                                fontSize: '14px'
+                              }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
+                                  이번달 총개통실적:
+                                </Typography>
+                                <span style={{ color: '#4caf50' }}>
+                                  휴대폰: {getAgentTotalActivation().phones}개
+                                </span>
+                                <span style={{ color: '#ff9800' }}>
+                                  웨어러블: {getAgentTotalActivation().wearables}개
+                                </span>
+                                <span style={{ color: '#9c27b0' }}>
+                                  태블릿: {getAgentTotalActivation().tablets}개
+                                </span>
+                              </Box>
+                            )}
+                          </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Typography variant="body2" color="text.secondary">
@@ -1633,7 +1633,7 @@ function App() {
                         
                         {activationModelSearch ? (
                           // 특정 모델의 매장별 통계
-                          <Box sx={{ overflowX: 'auto' }}>
+                          <Box>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#f5f5f5' }}>
@@ -1677,7 +1677,7 @@ function App() {
                           </Box>
                         ) : activationDateSearch ? (
                           // 특정 날짜의 매장별 통계
-                          <Box sx={{ overflowX: 'auto' }}>
+                          <Box>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#f5f5f5' }}>
@@ -1721,7 +1721,7 @@ function App() {
                           </Box>
                         ) : (
                           // 전체 모델별 통계
-                          <Box sx={{ overflowX: 'auto' }}>
+                          <Box>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#f5f5f5' }}>
