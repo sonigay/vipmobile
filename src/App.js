@@ -534,10 +534,14 @@ function App() {
     });
     
     filteredData.forEach(([storeName, storeData]) => {
-      const { currentMonth, lastActivationDate } = storeData;
+      const { models, lastActivationDate } = storeData;
       
+      // 해당 날짜의 데이터만 필터링
       if (lastActivationDate.toLocaleDateString() === activationDateSearch) {
-        totalCount += currentMonth;
+        // 해당 날짜의 모든 모델 개통수 합산
+        Object.values(models).forEach(count => {
+          totalCount += count;
+        });
       }
     });
     
@@ -1397,17 +1401,18 @@ function App() {
                         alignItems: 'center', 
                         gap: 1, 
                         p: 0.5, 
-                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        backgroundColor: 'rgba(255,255,255,0.8)', 
                         borderRadius: 1,
-                        fontSize: '0.6em'
+                        fontSize: '0.6em',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
                       }}>
-                        <span style={{ color: '#4caf50' }}>
+                        <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
                           휴대폰: {getAgentTotalActivation().phones}개
                         </span>
-                        <span style={{ color: '#ff9800' }}>
+                        <span style={{ color: '#f57c00', fontWeight: 'bold' }}>
                           웨어러블: {getAgentTotalActivation().wearables}개
                         </span>
-                        <span style={{ color: '#9c27b0' }}>
+                        <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}>
                           태블릿: {getAgentTotalActivation().tablets}개
                         </span>
                       </Box>
@@ -1418,17 +1423,18 @@ function App() {
                         alignItems: 'center', 
                         gap: 1, 
                         p: 0.5, 
-                        backgroundColor: 'rgba(255,255,255,0.1)', 
+                        backgroundColor: 'rgba(255,255,255,0.8)', 
                         borderRadius: 1,
-                        fontSize: '0.6em'
+                        fontSize: '0.6em',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
                       }}>
-                        <span style={{ color: '#4caf50' }}>
+                        <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
                           휴대폰: {getAgentTotalInventory().phones}개
                         </span>
-                        <span style={{ color: '#ff9800' }}>
+                        <span style={{ color: '#f57c00', fontWeight: 'bold' }}>
                           웨어러블: {getAgentTotalInventory().wearables}개
                         </span>
-                        <span style={{ color: '#9c27b0' }}>
+                        <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}>
                           태블릿: {getAgentTotalInventory().tablets}개
                         </span>
                       </Box>

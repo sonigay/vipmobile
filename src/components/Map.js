@@ -532,8 +532,8 @@ function Map({
           forceZoomToStore={forceZoomToStore}
         />
         
-        {/* 매장 마커들 */}
-        {filteredStores.map((store) => {
+        {/* 매장 마커들 (담당개통확인 모드에서는 재고 마커 숨김) */}
+        {currentView !== 'activation' && filteredStores.map((store) => {
           if (!store.latitude || !store.longitude) return null;
           
           const inventoryCount = calculateInventory(store);
