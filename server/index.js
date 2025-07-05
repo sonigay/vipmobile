@@ -1170,12 +1170,12 @@ app.get('/api/activation-data/by-date', async (req, res) => {
         normalizedDate = `${activationDate}/${currentYear}`;
       }
       
-      // Date 객체로 변환하여 toLocaleDateString 형식으로 통일
+      // Date 객체로 변환하여 ISO 형식으로 통일
       try {
         const dateObj = new Date(normalizedDate);
         if (!isNaN(dateObj.getTime())) {
-          // 한국 로케일로 날짜 형식 통일
-          normalizedDate = dateObj.toLocaleDateString('ko-KR');
+          // ISO 형식으로 통일 (재고 데이터와 동일)
+          normalizedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD 형식
         }
       } catch (error) {
         console.warn('날짜 변환 실패:', normalizedDate, error);

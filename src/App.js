@@ -381,7 +381,7 @@ function App() {
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      const dateKey = date.toLocaleDateString('ko-KR');
+      const dateKey = date.toISOString().split('T')[0]; // ISO 형식 (YYYY-MM-DD)
       
       // 해당 날짜에 데이터가 있는지 확인
       const hasData = activationDataByDate[dateKey] && Object.keys(activationDataByDate[dateKey]).length > 0;
@@ -390,9 +390,13 @@ function App() {
       
       // 데이터가 있거나 오늘 날짜인 경우 추가
       if (hasData || i === 0) {
+        // 표시용 한국 형식 날짜 생성
+        const displayDate = new Date(dateKey);
+        const displayLabel = displayDate.toLocaleDateString('ko-KR');
+        
         dateOptions.push({
           value: dateKey,
-          label: dateKey,
+          label: displayLabel,
           isToday: i === 0,
           hasData: hasData
         });

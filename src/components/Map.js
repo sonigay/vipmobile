@@ -698,7 +698,9 @@ function Map({
             }
           } else if (activationDateSearch) {
             // 날짜 검색이 있는 경우 해당 날짜의 데이터만 필터링
-            if (lastActivationDate.toLocaleDateString() !== activationDateSearch) {
+            // ISO 형식으로 비교 (YYYY-MM-DD)
+            const activationDateISO = lastActivationDate.toISOString().split('T')[0];
+            if (activationDateISO !== activationDateSearch) {
               return null; // 해당 날짜가 아니면 마커 표시 안함
             }
           }
@@ -781,7 +783,7 @@ function Map({
                       <span style={{ color: '#64748b' }}>전월: {displayPrevious}개</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
-                      기준일: {lastActivationDate.toLocaleDateString()}
+                      기준일: {lastActivationDate.toLocaleDateString('ko-KR')}
                     </div>
                   </div>
                   
