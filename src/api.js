@@ -16,13 +16,42 @@ const clientCacheUtils = {
     
     // localStorage에도 저장 (브라우저 새로고침 시에도 유지)
     try {
+      // localStorage 용량 제한 확인 및 정리
+      const dataSize = JSON.stringify(data).length;
+      const maxSize = 5 * 1024 * 1024; // 5MB 제한
+      
+      if (dataSize > maxSize) {
+        console.warn(`캐시 데이터가 너무 큽니다 (${(dataSize / 1024 / 1024).toFixed(2)}MB). localStorage 저장을 건너뜁니다.`);
+        return;
+      }
+      
+      // 기존 캐시 정리 (용량 부족 시)
+      if (localStorage.length > 100) { // 100개 이상이면 정리
+        clientCacheUtils.cleanup();
+      }
+      
       localStorage.setItem(`cache_${key}`, JSON.stringify({
         data,
         timestamp: now,
         ttl: now + ttl
       }));
     } catch (error) {
-      console.warn('localStorage 저장 실패:', error);
+      if (error.name === 'QuotaExceededError') {
+        console.warn('localStorage 용량 초과. 캐시를 정리합니다.');
+        clientCacheUtils.cleanup();
+        // 다시 시도
+        try {
+          localStorage.setItem(`cache_${key}`, JSON.stringify({
+            data,
+            timestamp: now,
+            ttl: now + ttl
+          }));
+        } catch (retryError) {
+          console.warn('localStorage 저장 재시도 실패:', retryError);
+        }
+      } else {
+        console.warn('localStorage 저장 실패:', error);
+      }
     }
   },
   

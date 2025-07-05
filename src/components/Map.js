@@ -37,24 +37,25 @@ function ForceZoomUpdater({ forceZoomToStore }) {
   const map = useMap();
   
   useEffect(() => {
-    if (forceZoomToStore) {
+    if (forceZoomToStore && map) {
       const { lat, lng } = forceZoomToStore;
       console.log('ForceZoomUpdater 실행:', lat, lng, '지도 인스턴스:', map);
       
-      if (map) {
-        try {
-          // 적당한 확대 (줌 레벨 14)
-          map.setView([lat, lng], 14, {
-            animate: true,
-            duration: 1
-          });
-          
-          console.log('ForceZoomUpdater 확대 완료');
-        } catch (error) {
-          console.error('ForceZoomUpdater 오류:', error);
-        }
-      } else {
-        console.error('ForceZoomUpdater: 지도 인스턴스가 없습니다');
+      try {
+        // 지도가 완전히 로드된 후에 확대 실행
+        const timer = setTimeout(() => {
+          if (map && map._loaded) {
+            map.setView([lat, lng], 14, {
+              animate: true,
+              duration: 1
+            });
+            console.log('ForceZoomUpdater 확대 완료');
+          }
+        }, 100);
+        
+        return () => clearTimeout(timer);
+      } catch (error) {
+        console.error('ForceZoomUpdater 오류:', error);
       }
     }
   }, [forceZoomToStore, map]);
@@ -73,13 +74,15 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
       return;
     }
     
-    if (bounds) {
-      map.fitBounds(bounds);
-      if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-        map.setZoom(isAgentMode ? 12 : 15);
+    if (map && map._loaded) {
+      if (bounds) {
+        map.fitBounds(bounds);
+        if (map.getZoom() > (isAgentMode ? 12 : 15)) {
+          map.setZoom(isAgentMode ? 12 : 15);
+        }
+      } else if (center) {
+        map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
       }
-    } else if (center) {
-      map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
     }
   }, [map, center, bounds, zoom, isAgentMode, forceZoomToStore]);
   
