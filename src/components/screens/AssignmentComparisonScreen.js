@@ -54,7 +54,7 @@ import {
   COMPARISON_TYPES,
   assignmentComparisonManager
 } from '../../utils/assignmentComparisonUtils';
-import { loadAssignmentHistory, exportComparisonReport } from '../../utils/assignmentHistoryUtils';
+import { loadAssignmentHistory, exportComparisonReport } from '../../utils/assignmentHistory';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 function AssignmentComparisonScreen({ onBack, onLogout }) {
