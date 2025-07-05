@@ -198,20 +198,132 @@ export const compareHistoryItems = (historyId1, historyId2) => {
 };
 
 // 히스토리 내보내기 (JSON)
-export const exportHistory = (historyIds = null) => {
-  const history = getAssignmentHistory();
-  const targetHistory = historyIds 
-    ? history.filter(item => historyIds.includes(item.id))
-    : history;
-  
-  const exportData = {
-    exportDate: new Date().toISOString(),
-    version: '1.0',
-    history: targetHistory
-  };
-  
-  return JSON.stringify(exportData, null, 2);
+export const exportHistory = (selectedItems = null) => {
+  try {
+    const history = getAssignmentHistory();
+    const exportData = selectedItems ? 
+      history.filter(item => selectedItems.includes(item.id)) : 
+      history;
+    
+    return JSON.stringify(exportData, null, 2);
+  } catch (error) {
+    console.error('히스토리 내보내기 실패:', error);
+    return null;
+  }
 };
+
+// 비교 리포트 내보내기
+export const exportComparisonReport = async (report) => {
+  try {
+    const { jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    
+    const doc = new jsPDF();
+    
+    // 제목
+    doc.setFontSize(20);
+    doc.text(report.title, 20, 20);
+    
+    // 부제목
+    doc.setFontSize(14);
+    doc.text(report.subtitle, 20, 35);
+    
+    // 생성 시간
+    doc.setFontSize(10);
+    doc.text(`생성 시간: ${new Date(report.timestamp).toLocaleString('ko-KR')}`, 20, 45);
+    
+    let yPosition = 60;
+    
+    // 요약 정보
+    doc.setFontSize(16);
+    doc.text('비교 요약', 20, yPosition);
+    yPosition += 10;
+    
+    const { summary } = report.comparison;
+    const summaryData = [
+      ['지표', '이전', '현재', '변화', '변화율'],
+      [
+        '총 배정 수량',
+        summary.totalQuantity.history1.toString(),
+        summary.totalQuantity.history2.toString(),
+        `${summary.totalQuantity.change > 0 ? '+' : ''}${summary.totalQuantity.change}`,
+        `${summary.totalQuantity.changePercent > 0 ? '+' : ''}${summary.totalQuantity.changePercent.toFixed(1)}%`
+      ],
+      [
+        '영업사원 수',
+        summary.totalAgents.history1.toString(),
+        summary.totalAgents.history2.toString(),
+        `${summary.totalAgents.change > 0 ? '+' : ''}${summary.totalAgents.change}`,
+        '-'
+      ],
+      [
+        '모델 수',
+        summary.totalModels.history1.toString(),
+        summary.totalModels.history2.toString(),
+        `${summary.totalModels.change > 0 ? '+' : ''}${summary.totalModels.change}`,
+        '-'
+      ]
+    ];
+    
+    autoTable(doc, {
+      head: [summaryData[0]],
+      body: summaryData.slice(1),
+      startY: yPosition,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+    
+    yPosition = doc.lastAutoTable.finalY + 20;
+    
+    // 인사이트 및 권장사항
+    if (report.recommendations && report.recommendations.length > 0) {
+      doc.setFontSize(16);
+      doc.text('인사이트 및 권장사항', 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      report.recommendations.forEach((recommendation, index) => {
+        const lines = doc.splitTextToSize(`${index + 1}. ${recommendation}`, 170);
+        lines.forEach(line => {
+          if (yPosition > 280) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          doc.text(line, 20, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 5;
+      });
+    }
+    
+    // 파일 저장
+    const fileName = `assignment_comparison_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    
+    return true;
+  } catch (error) {
+    console.error('비교 리포트 내보내기 실패:', error);
+    
+    // PDF 생성 실패 시 JSON으로 대체
+    try {
+      const jsonData = JSON.stringify(report, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `assignment_comparison_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (jsonError) {
+      console.error('JSON 내보내기도 실패:', jsonError);
+      return false;
+    }
+  }
+};
+// 중복된 exportHistory 함수 제거
 
 // 히스토리 가져오기 (JSON)
 export const importHistory = (jsonData) => {

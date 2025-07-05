@@ -56,6 +56,7 @@ import {
   exportHistory,
   importHistory
 } from '../../utils/assignmentHistory';
+import AssignmentComparisonScreen from './AssignmentComparisonScreen';
 
 function AssignmentHistoryScreen({ onBack, onLogout }) {
   const [history, setHistory] = useState([]);
@@ -65,6 +66,7 @@ function AssignmentHistoryScreen({ onBack, onLogout }) {
   const [importDialog, setImportDialog] = useState(false);
   const [importData, setImportData] = useState('');
   const [stats, setStats] = useState(null);
+  const [showComparisonScreen, setShowComparisonScreen] = useState(false);
 
   // 히스토리 로드
   useEffect(() => {
@@ -91,6 +93,11 @@ function AssignmentHistoryScreen({ onBack, onLogout }) {
         loadHistory();
       }
     }
+  };
+
+  // 고급 비교 화면 열기
+  const handleOpenComparisonScreen = () => {
+    setShowComparisonScreen(true);
   };
 
   // 히스토리 비교
@@ -238,7 +245,16 @@ function AssignmentHistoryScreen({ onBack, onLogout }) {
                 disabled={selectedItems.length !== 2}
                 startIcon={<CompareIcon />}
               >
-                비교 ({selectedItems.length}/2)
+                간단 비교 ({selectedItems.length}/2)
+              </Button>
+            </Grid>
+            <Grid item>
+              <Button
+                variant="contained"
+                onClick={handleOpenComparisonScreen}
+                startIcon={<CompareIcon />}
+              >
+                고급 비교 및 분석
               </Button>
             </Grid>
             <Grid item>
@@ -450,6 +466,14 @@ function AssignmentHistoryScreen({ onBack, onLogout }) {
           <Button onClick={handleImportHistory} variant="contained">가져오기</Button>
         </DialogActions>
       </Dialog>
+
+      {/* 고급 비교 화면 */}
+      {showComparisonScreen && (
+        <AssignmentComparisonScreen
+          onBack={() => setShowComparisonScreen(false)}
+          onLogout={onLogout}
+        />
+      )}
     </Box>
   );
 }
