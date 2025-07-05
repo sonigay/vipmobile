@@ -180,6 +180,8 @@ function App() {
       setActivationData(filteredData);
       setActivationDataByDate(dateData);
       console.log('개통실적 데이터 로딩 완료');
+      console.log('날짜별 데이터:', dateData);
+      console.log('날짜별 데이터 키들:', Object.keys(dateData || {}));
     } catch (error) {
       console.error('개통실적 데이터 로딩 실패:', error);
       setActivationData(null);
@@ -368,6 +370,10 @@ function App() {
   const getActivationDateOptions = useCallback(() => {
     if (!activationDataByDate) return [];
     
+    console.log('=== 날짜 옵션 생성 디버깅 ===');
+    console.log('activationDataByDate:', activationDataByDate);
+    console.log('사용 가능한 날짜들:', Object.keys(activationDataByDate));
+    
     const dateOptions = [];
     const today = new Date();
     
@@ -380,6 +386,8 @@ function App() {
       // 해당 날짜에 데이터가 있는지 확인
       const hasData = activationDataByDate[dateKey] && Object.keys(activationDataByDate[dateKey]).length > 0;
       
+      console.log(`날짜 ${dateKey}: 데이터 있음 = ${hasData}`);
+      
       // 데이터가 있거나 오늘 날짜인 경우 추가
       if (hasData || i === 0) {
         dateOptions.push({
@@ -391,6 +399,7 @@ function App() {
       }
     }
     
+    console.log('최종 날짜 옵션:', dateOptions);
     return dateOptions;
   }, [activationDataByDate]);
 
