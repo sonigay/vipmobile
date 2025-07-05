@@ -100,7 +100,9 @@ function Map({
   currentView,
   forceZoomToStore,
   activationData, // 개통실적 데이터 추가
-  showActivationMarkers // 개통실적 마커 표시 여부
+  showActivationMarkers, // 개통실적 마커 표시 여부
+  activationModelSearch, // 개통실적 모델 검색
+  activationDateSearch // 개통실적 날짜 검색
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -665,14 +667,42 @@ function Map({
           
           const { currentMonth, previousMonth, models, agents, lastActivationDate } = data;
           
+          // 모델 검색이 있는 경우 해당 모델의 판매량만 계산
+          let displayCurrent = currentMonth;
+          let displayPrevious = previousMonth;
+          let displayModels = models;
+          
+          if (activationModelSearch) {
+            displayCurrent = 0;
+            displayPrevious = 0;
+            displayModels = {};
+            
+            Object.entries(models).forEach(([modelKey, count]) => {
+              if (modelKey.startsWith(activationModelSearch + ' (')) {
+                displayCurrent += count;
+                displayModels[modelKey] = count;
+              }
+            });
+            
+            // 전월 데이터도 비율로 계산
+            if (currentMonth > 0 && previousMonth > 0) {
+              displayPrevious = Math.round((displayCurrent / currentMonth) * previousMonth);
+            }
+          } else if (activationDateSearch) {
+            // 날짜 검색이 있는 경우 해당 날짜의 데이터만 필터링
+            if (lastActivationDate.toLocaleDateString() !== activationDateSearch) {
+              return null; // 해당 날짜가 아니면 마커 표시 안함
+            }
+          }
+          
           // 개통실적이 있는 경우에만 마커 표시
-          if (currentMonth === 0 && previousMonth === 0) return null;
+          if (displayCurrent === 0 && displayPrevious === 0) return null;
           
           // 비교 결과에 따른 색상 결정
           let markerColor = '#FF9800'; // 동일 (주황색)
-          if (currentMonth > previousMonth) {
+          if (displayCurrent > displayPrevious) {
             markerColor = '#4CAF50'; // 증가 (초록색)
-          } else if (currentMonth < previousMonth) {
+          } else if (displayCurrent < displayPrevious) {
             markerColor = '#F44336'; // 감소 (빨간색)
           }
           
@@ -697,8 +727,8 @@ function Map({
                 text-align: center;
                 line-height: 1.2;
               ">
-                <div style="font-size: 12px;">${currentMonth}</div>
-                <div style="font-size: 8px; opacity: 0.8;">${previousMonth}</div>
+                <div style="font-size: 12px;">${displayCurrent}</div>
+                <div style="font-size: 8px; opacity: 0.8;">${displayPrevious}</div>
               </div>
             `,
             iconSize: [40, 40],
@@ -731,14 +761,16 @@ function Map({
                       fontSize: '14px',
                       fontWeight: 'bold'
                     }}>
-                      <span style={{ color: '#0ea5e9' }}>당월: {currentMonth}개</span>
+                      <span style={{ color: '#0ea5e9' }}>
+                        {activationModelSearch ? `${activationModelSearch}: ` : ''}당월: {displayCurrent}개
+                      </span>
                       <span style={{ 
                         color: markerColor,
                         fontSize: '16px'
                       }}>
-                        {currentMonth > previousMonth ? '↗️' : currentMonth < previousMonth ? '↘️' : '→'}
+                        {displayCurrent > displayPrevious ? '↗️' : displayCurrent < displayPrevious ? '↘️' : '→'}
                       </span>
-                      <span style={{ color: '#64748b' }}>전월: {previousMonth}개</span>
+                      <span style={{ color: '#64748b' }}>전월: {displayPrevious}개</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
                       기준일: {lastActivationDate.toLocaleDateString()}
@@ -764,9 +796,11 @@ function Map({
                   </div>
                   
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#374151' }}>모델별 실적</h4>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#374151' }}>
+                      {activationModelSearch ? `${activationModelSearch} 상세` : '모델별 실적'}
+                    </h4>
                     <div style={{ fontSize: '11px' }}>
-                      {Object.entries(models).map(([model, count]) => (
+                      {Object.entries(displayModels).map(([model, count]) => (
                         <div key={model} style={{
                           display: 'flex',
                           justifyContent: 'space-between',

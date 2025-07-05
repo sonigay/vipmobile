@@ -7,7 +7,6 @@ import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
-import ActivationScreen from './components/ActivationScreen';
 import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import { 
@@ -101,10 +100,12 @@ function App() {
   const [unreadUpdates, setUnreadUpdates] = useState([]);
   // 새로운 업데이트 진행 팝업 상태
   const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
-  // 담당개통확인 화면 상태
-  const [showActivationScreen, setShowActivationScreen] = useState(false);
   // 개통실적 데이터 상태
   const [activationData, setActivationData] = useState(null);
+  // 개통실적 모델 검색 상태
+  const [activationModelSearch, setActivationModelSearch] = useState('');
+  // 개통실적 날짜 검색 상태
+  const [activationDateSearch, setActivationDateSearch] = useState('');
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
@@ -179,6 +180,180 @@ function App() {
       setActivationData(null);
     }
   }, [isAgentMode, agentTarget]);
+
+  // 개통실적 모델별 통계 계산
+  const getActivationModelStats = useCallback(() => {
+    if (!activationData) return [];
+    
+    const modelStats = {};
+    
+    Object.values(activationData).forEach(storeData => {
+      const { currentMonth, models } = storeData;
+      
+      Object.entries(models).forEach(([modelKey, count]) => {
+        const modelName = modelKey.split(' (')[0]; // "iPhone 15 (블랙)" -> "iPhone 15"
+        
+        if (!modelStats[modelName]) {
+          modelStats[modelName] = {
+            modelName,
+            currentMonth: 0,
+            previousMonth: 0,
+            storeCount: new Set()
+          };
+        }
+        
+        modelStats[modelName].currentMonth += count;
+        modelStats[modelName].storeCount.add(storeData.storeName);
+      });
+    });
+    
+    // 전월 데이터도 계산
+    Object.values(activationData).forEach(storeData => {
+      const { previousMonth, models } = storeData;
+      
+      Object.entries(models).forEach(([modelKey, count]) => {
+        const modelName = modelKey.split(' (')[0];
+        
+        if (modelStats[modelName]) {
+          modelStats[modelName].previousMonth += count;
+        }
+      });
+    });
+    
+    // 배열로 변환하고 판매량 내림차순 정렬
+    return Object.values(modelStats)
+      .map(stat => ({
+        ...stat,
+        storeCount: stat.storeCount.size,
+        changeRate: stat.previousMonth > 0 
+          ? ((stat.currentMonth - stat.previousMonth) / stat.previousMonth * 100).toFixed(1)
+          : stat.currentMonth > 0 ? '100.0' : '0.0'
+      }))
+      .sort((a, b) => b.currentMonth - a.currentMonth);
+  }, [activationData]);
+
+  // 개통실적 특정 모델의 매장별 통계
+  const getActivationStoreStats = useCallback((modelName) => {
+    if (!activationData || !modelName) return [];
+    
+    const storeStats = [];
+    
+    Object.values(activationData).forEach(storeData => {
+      const { storeName, currentMonth, previousMonth, models } = storeData;
+      
+      let modelCurrent = 0;
+      let modelPrevious = 0;
+      const colorDetails = {};
+      
+      Object.entries(models).forEach(([modelKey, count]) => {
+        if (modelKey.startsWith(modelName + ' (')) {
+          modelCurrent += count;
+          const color = modelKey.match(/\(([^)]+)\)/)?.[1] || '미지정';
+          colorDetails[color] = (colorDetails[color] || 0) + count;
+        }
+      });
+      
+      // 전월 데이터도 계산 (전체 개통량 기준으로 비율 계산)
+      if (currentMonth > 0 && previousMonth > 0) {
+        modelPrevious = Math.round((modelCurrent / currentMonth) * previousMonth);
+      }
+      
+      if (modelCurrent > 0) {
+        storeStats.push({
+          storeName,
+          currentMonth: modelCurrent,
+          previousMonth: modelPrevious,
+          changeRate: modelPrevious > 0 
+            ? ((modelCurrent - modelPrevious) / modelPrevious * 100).toFixed(1)
+            : '100.0',
+          colorDetails
+        });
+      }
+    });
+    
+    // 판매량 내림차순 정렬
+    return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
+  }, [activationData]);
+
+  // 개통실적 날짜별 통계 계산
+  const getActivationDateStats = useCallback(() => {
+    if (!activationData) return [];
+    
+    const dateStats = {};
+    
+    Object.values(activationData).forEach(storeData => {
+      const { currentMonth, previousMonth, models, lastActivationDate } = storeData;
+      
+      // 날짜별로 그룹화 (당월 마지막 개통일 기준)
+      const dateKey = lastActivationDate.toLocaleDateString();
+      
+      if (!dateStats[dateKey]) {
+        dateStats[dateKey] = {
+          date: dateKey,
+          currentMonth: 0,
+          previousMonth: 0,
+          storeCount: new Set(),
+          models: {}
+        };
+      }
+      
+      dateStats[dateKey].currentMonth += currentMonth;
+      dateStats[dateKey].previousMonth += previousMonth;
+      dateStats[dateKey].storeCount.add(storeData.storeName);
+      
+      // 모델별 집계
+      Object.entries(models).forEach(([modelKey, count]) => {
+        const modelName = modelKey.split(' (')[0];
+        if (!dateStats[dateKey].models[modelName]) {
+          dateStats[dateKey].models[modelName] = 0;
+        }
+        dateStats[dateKey].models[modelName] += count;
+      });
+    });
+    
+    // 배열로 변환하고 날짜 내림차순 정렬
+    return Object.values(dateStats)
+      .map(stat => ({
+        ...stat,
+        storeCount: stat.storeCount.size,
+        changeRate: stat.previousMonth > 0 
+          ? ((stat.currentMonth - stat.previousMonth) / stat.previousMonth * 100).toFixed(1)
+          : stat.currentMonth > 0 ? '100.0' : '0.0'
+      }))
+      .sort((a, b) => {
+        // 날짜 형식 변환 (MM/DD/YYYY -> YYYY-MM-DD)
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA;
+      });
+  }, [activationData]);
+
+  // 개통실적 특정 날짜의 매장별 통계
+  const getActivationDateStoreStats = useCallback((dateKey) => {
+    if (!activationData || !dateKey) return [];
+    
+    const storeStats = [];
+    
+    Object.values(activationData).forEach(storeData => {
+      const { storeName, currentMonth, previousMonth, models, lastActivationDate } = storeData;
+      
+      // 해당 날짜의 데이터만 필터링
+      if (lastActivationDate.toLocaleDateString() === dateKey) {
+        storeStats.push({
+          storeName,
+          currentMonth,
+          previousMonth,
+          changeRate: previousMonth > 0 
+            ? ((currentMonth - previousMonth) / previousMonth * 100).toFixed(1)
+            : currentMonth > 0 ? '100.0' : '0.0',
+          models
+        });
+      }
+    });
+    
+    // 판매량 내림차순 정렬
+    return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
+  }, [activationData]);
 
   // 로그인 상태 복원 및 새로운 배포 감지
   useEffect(() => {
@@ -974,21 +1149,7 @@ function App() {
     );
   }
 
-  // 담당개통확인 화면일 때는 별도 화면 렌더링
-  if (showActivationScreen) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <ActivationScreen 
-          userInfo={{
-            userType: isAgentMode ? 'agent' : 'store',
-            targetName: isAgentMode ? agentTarget : (loggedInStore?.name || '')
-          }}
-          onBack={() => setShowActivationScreen(false)}
-        />
-      </ThemeProvider>
-    );
-  }
+
 
   return (
     <ThemeProvider theme={theme}>
@@ -1130,10 +1291,10 @@ function App() {
                   </Button>
                   <Button 
                     color="inherit" 
-                    onClick={() => setShowActivationScreen(true)}
+                    onClick={() => handleViewChange('activation')}
                     sx={{ 
                       fontSize: '0.8em',
-                      backgroundColor: showActivationScreen ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      backgroundColor: currentView === 'activation' ? 'rgba(255,255,255,0.1)' : 'transparent',
                       '&:hover': {
                         backgroundColor: 'rgba(255,255,255,0.2)'
                       }
@@ -1174,29 +1335,237 @@ function App() {
               {isAgentMode ? (
                 // 관리자 모드일 때 StoreInfoTable과 AgentFilterPanel 표시
                 <>
-                  <StoreInfoTable 
-                    selectedStore={selectedStore}
-                    requestedStore={requestedStore}
-                    agentTarget={agentTarget}
-                    agentContactId={agentContactId}
-                    onCallButtonClick={handleCallButtonClick}
-                    onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
-                    selectedModel={selectedModel}
-                    selectedColor={selectedColor}
-                    currentView={currentView}
-                  />
-                  <AgentFilterPanel
-                    models={data?.models}
-                    colorsByModel={data?.colorsByModel}
-                    selectedModel={selectedModel}
-                    selectedColor={selectedColor}
-                    onModelSelect={handleModelSelect}
-                    onColorSelect={handleColorSelect}
-                    searchQuery={searchQuery}
-                    searchResults={searchResults}
-                    onStoreSearch={handleStoreSearch}
-                    onSearchResultSelect={handleSearchResultSelect}
-                  />
+                  {currentView === 'activation' ? (
+                    // 담당개통확인 모드
+                    <>
+                      <Box sx={{ 
+                        backgroundColor: 'white', 
+                        borderRadius: 1, 
+                        p: 2, 
+                        mb: 2,
+                        boxShadow: 1
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                            담당개통확인
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                모델 검색:
+                              </Typography>
+                              <select
+                                value={activationModelSearch}
+                                onChange={(e) => {
+                                  setActivationModelSearch(e.target.value);
+                                  if (e.target.value) setActivationDateSearch(''); // 모델 선택시 날짜 검색 초기화
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                  fontSize: '14px'
+                                }}
+                              >
+                                <option value="">전체 모델</option>
+                                {getActivationModelStats().map(stat => (
+                                  <option key={stat.modelName} value={stat.modelName}>
+                                    {stat.modelName}
+                                  </option>
+                                ))}
+                              </select>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                날짜 검색:
+                              </Typography>
+                              <select
+                                value={activationDateSearch}
+                                onChange={(e) => {
+                                  setActivationDateSearch(e.target.value);
+                                  if (e.target.value) setActivationModelSearch(''); // 날짜 선택시 모델 검색 초기화
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                  fontSize: '14px'
+                                }}
+                              >
+                                <option value="">전체 날짜</option>
+                                {getActivationDateStats().map(stat => (
+                                  <option key={stat.date} value={stat.date}>
+                                    {stat.date}
+                                  </option>
+                                ))}
+                              </select>
+                            </Box>
+                          </Box>
+                        </Box>
+                        
+                        {activationModelSearch ? (
+                          // 특정 모델의 매장별 통계
+                          <Box sx={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                                  <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #ddd' }}>매장명</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>당월개통</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>전월개통</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>증감률</th>
+                                  <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #ddd' }}>색상별</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {getActivationStoreStats(activationModelSearch).map((store, index) => (
+                                  <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                    <td style={{ padding: '8px', border: '1px solid #ddd' }}>{store.storeName}</td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd', fontWeight: 'bold', color: '#2196f3' }}>
+                                      {store.currentMonth}개
+                                    </td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
+                                      {store.previousMonth}개
+                                    </td>
+                                    <td style={{ 
+                                      padding: '8px', 
+                                      textAlign: 'center', 
+                                      border: '1px solid #ddd',
+                                      color: parseFloat(store.changeRate) > 0 ? '#4caf50' : parseFloat(store.changeRate) < 0 ? '#f44336' : '#ff9800',
+                                      fontWeight: 'bold'
+                                    }}>
+                                      {parseFloat(store.changeRate) > 0 ? '+' : ''}{store.changeRate}%
+                                    </td>
+                                    <td style={{ padding: '8px', border: '1px solid #ddd', fontSize: '12px' }}>
+                                      {Object.entries(store.colorDetails).map(([color, count]) => (
+                                        <span key={color} style={{ marginRight: '8px' }}>
+                                          {color}: {count}개
+                                        </span>
+                                      ))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </Box>
+                        ) : activationDateSearch ? (
+                          // 특정 날짜의 매장별 통계
+                          <Box sx={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                                  <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #ddd' }}>매장명</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>당월개통</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>전월개통</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>증감률</th>
+                                  <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #ddd' }}>모델별</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {getActivationDateStoreStats(activationDateSearch).map((store, index) => (
+                                  <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                    <td style={{ padding: '8px', border: '1px solid #ddd' }}>{store.storeName}</td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd', fontWeight: 'bold', color: '#2196f3' }}>
+                                      {store.currentMonth}개
+                                    </td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
+                                      {store.previousMonth}개
+                                    </td>
+                                    <td style={{ 
+                                      padding: '8px', 
+                                      textAlign: 'center', 
+                                      border: '1px solid #ddd',
+                                      color: parseFloat(store.changeRate) > 0 ? '#4caf50' : parseFloat(store.changeRate) < 0 ? '#f44336' : '#ff9800',
+                                      fontWeight: 'bold'
+                                    }}>
+                                      {parseFloat(store.changeRate) > 0 ? '+' : ''}{store.changeRate}%
+                                    </td>
+                                    <td style={{ padding: '8px', border: '1px solid #ddd', fontSize: '12px' }}>
+                                      {Object.entries(store.models).map(([model, count]) => (
+                                        <span key={model} style={{ marginRight: '8px' }}>
+                                          {model}: {count}개
+                                        </span>
+                                      ))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </Box>
+                        ) : (
+                          // 전체 모델별 통계
+                          <Box sx={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                                  <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #ddd' }}>
+                                    {activationDateSearch ? '날짜' : '모델명'}
+                                  </th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>당월개통</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>전월개통</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>증감률</th>
+                                  <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>매장수</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(activationDateSearch ? getActivationDateStats() : getActivationModelStats()).map((stat, index) => (
+                                  <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                                    <td style={{ padding: '8px', border: '1px solid #ddd' }}>
+                                      {activationDateSearch ? stat.date : stat.modelName}
+                                    </td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd', fontWeight: 'bold', color: '#2196f3' }}>
+                                      {stat.currentMonth}개
+                                    </td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
+                                      {stat.previousMonth}개
+                                    </td>
+                                    <td style={{ 
+                                      padding: '8px', 
+                                      textAlign: 'center', 
+                                      border: '1px solid #ddd',
+                                      color: parseFloat(stat.changeRate) > 0 ? '#4caf50' : parseFloat(stat.changeRate) < 0 ? '#f44336' : '#ff9800',
+                                      fontWeight: 'bold'
+                                    }}>
+                                      {parseFloat(stat.changeRate) > 0 ? '+' : ''}{stat.changeRate}%
+                                    </td>
+                                    <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #ddd' }}>
+                                      {stat.storeCount}개
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </Box>
+                        )}
+                      </Box>
+                    </>
+                  ) : (
+                    // 기존 재고확인 모드
+                    <>
+                      <StoreInfoTable 
+                        selectedStore={selectedStore}
+                        requestedStore={requestedStore}
+                        agentTarget={agentTarget}
+                        agentContactId={agentContactId}
+                        onCallButtonClick={handleCallButtonClick}
+                        onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
+                        selectedModel={selectedModel}
+                        selectedColor={selectedColor}
+                        currentView={currentView}
+                      />
+                      <AgentFilterPanel
+                        models={data?.models}
+                        colorsByModel={data?.colorsByModel}
+                        selectedModel={selectedModel}
+                        selectedColor={selectedColor}
+                        onModelSelect={handleModelSelect}
+                        onColorSelect={handleColorSelect}
+                        searchQuery={searchQuery}
+                        searchResults={searchResults}
+                        onStoreSearch={handleStoreSearch}
+                        onSearchResultSelect={handleSearchResultSelect}
+                      />
+                    </>
+                  )}
                 </>
               ) : (
                 // 일반 매장 모드일 때 FilterPanel만 표시
@@ -1227,7 +1596,9 @@ function App() {
                   currentView={currentView}
                   forceZoomToStore={forceZoomToStore}
                   activationData={activationData}
-                  showActivationMarkers={showActivationScreen}
+                  showActivationMarkers={currentView === 'activation'}
+                  activationModelSearch={activationModelSearch}
+                  activationDateSearch={activationDateSearch}
                 />
               </Box>
             </>
