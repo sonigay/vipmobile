@@ -69,6 +69,7 @@ const DuplicateCasesScreen = lazy(() => import('./screens/DuplicateCasesScreen')
 const InventoryAssignmentScreen = lazy(() => import('./screens/InventoryAssignmentScreen'));
 const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
 const DepartmentAssignmentScreen = lazy(() => import('./screens/DepartmentAssignmentScreen'));
+const AssignmentHistoryScreen = lazy(() => import('./screens/AssignmentHistoryScreen'));
 
 // 로딩 스켈레톤 컴포넌트
 const LoadingSkeleton = () => (
@@ -592,6 +593,12 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
                   <AccountTreeIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>소속배정</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => setCurrentScreen('assignment_history')}>
+                <ListItemIcon>
+                  <HistoryIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>배정 히스토리</ListItemText>
               </MenuItem>
             </>
           )}
@@ -1130,6 +1137,17 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
           onBack={handleBackToMain}
           onLogout={onLogout}
           screenType={currentScreen}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen === 'assignment_history') {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <AssignmentHistoryScreen
+          onBack={handleBackToMain}
+          onLogout={onLogout}
         />
       </Suspense>
     );

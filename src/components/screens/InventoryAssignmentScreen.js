@@ -33,6 +33,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon
 } from '@mui/icons-material';
+import { saveAssignmentHistory, createHistoryItem } from '../../utils/assignmentHistory';
 
 function InventoryAssignmentScreen({ data, onBack, onLogout, screenType }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,6 +208,35 @@ function InventoryAssignmentScreen({ data, onBack, onLogout, screenType }) {
             </Card>
           </Grid>
         </Grid>
+
+        {/* 히스토리 저장 버튼 */}
+        <Box sx={{ mb: 3 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              const historyItem = createHistoryItem(
+                { models: data }, // 실제 assignmentData 구조에 맞게 조정 필요
+                { ratios: {} }, // 현재 설정값 전달 필요 (예시)
+                data.map(store => ({
+                  contactId: store.managerId || store.manager || store.id,
+                  target: store.manager,
+                  office: store.office,
+                  department: store.department
+                })),
+                { screenType }
+              );
+              const result = saveAssignmentHistory(historyItem);
+              if (result) {
+                alert('배정 히스토리가 저장되었습니다.');
+              } else {
+                alert('히스토리 저장에 실패했습니다.');
+              }
+            }}
+          >
+            배정 히스토리 저장
+          </Button>
+        </Box>
 
         {/* 검색 */}
         <Paper sx={{ p: 2, mb: 3 }}>
