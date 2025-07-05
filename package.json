@@ -10,14 +10,18 @@
     "axios": "^1.6.5",
     "concurrently": "^9.1.2",
     "discord.js": "^14.19.1",
+    "file-saver": "^2.0.5",
     "google-spreadsheet": "^4.1.1",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
     "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
     "react-scripts": "5.0.1",
-    "recharts": "^3.0.2"
+    "recharts": "^3.0.2",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "node server/index.js",

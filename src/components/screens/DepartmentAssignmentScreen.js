@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getAssignmentSettings, calculateFullAssignment } from '../../utils/assignmentUtils';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import {
   Box,
   AppBar,
@@ -20,18 +21,25 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Menu,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   AccountTree as AccountTreeIcon,
   Business as BusinessIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Download as DownloadIcon,
+  PictureAsPdf as PdfIcon,
+  TableChart as ExcelIcon
 } from '@mui/icons-material';
 
 function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
   const [assignmentSettings, setAssignmentSettings] = useState({});
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -119,6 +127,17 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
     return departmentStats[selectedDepartment] ? [departmentStats[selectedDepartment]] : [];
   }, [departmentStats, selectedDepartment]);
 
+  // 내보내기 함수들
+  const handleExportExcel = () => {
+    exportToExcel.departmentAssignment(departmentStats, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF.departmentAssignment(departmentStats, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
   // 소속 목록
   const departments = useMemo(() => {
     const deptSet = new Set();
@@ -140,6 +159,14 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             소속배정
           </Typography>
+          <Button
+            color="inherit"
+            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+            startIcon={<DownloadIcon />}
+            sx={{ mr: 2 }}
+          >
+            내보내기
+          </Button>
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
@@ -346,6 +373,26 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
             </CardContent>
           </Card>
         ))}
+
+        {/* 내보내기 메뉴 */}
+        <Menu
+          anchorEl={exportMenuAnchor}
+          open={Boolean(exportMenuAnchor)}
+          onClose={() => setExportMenuAnchor(null)}
+        >
+          <MenuItem onClick={handleExportExcel}>
+            <ListItemIcon>
+              <ExcelIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Excel로 내보내기</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={handleExportPDF}>
+            <ListItemIcon>
+              <PdfIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>PDF로 내보내기</ListItemText>
+          </MenuItem>
+        </Menu>
       </Box>
     </Box>
   );

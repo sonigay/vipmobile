@@ -19,18 +19,26 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Menu,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   Business as BusinessIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Download as DownloadIcon,
+  PictureAsPdf as PdfIcon,
+  TableChart as ExcelIcon
 } from '@mui/icons-material';
 import { getAssignmentSettings, calculateFullAssignment } from '../../utils/assignmentUtils';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 function OfficeAssignmentScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
   const [assignmentSettings, setAssignmentSettings] = useState({});
   const [selectedOffice, setSelectedOffice] = useState('all');
+  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -118,6 +126,17 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
     return officeStats[selectedOffice] ? [officeStats[selectedOffice]] : [];
   }, [officeStats, selectedOffice]);
 
+  // 내보내기 함수들
+  const handleExportExcel = () => {
+    exportToExcel.officeAssignment(officeStats, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF.officeAssignment(officeStats, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
   // 사무실 목록
   const offices = useMemo(() => {
     const officeSet = new Set();
@@ -139,6 +158,14 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             사무실배정
           </Typography>
+          <Button
+            color="inherit"
+            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+            startIcon={<DownloadIcon />}
+            sx={{ mr: 2 }}
+          >
+            내보내기
+          </Button>
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
@@ -345,6 +372,26 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
             </CardContent>
           </Card>
         ))}
+
+        {/* 내보내기 메뉴 */}
+        <Menu
+          anchorEl={exportMenuAnchor}
+          open={Boolean(exportMenuAnchor)}
+          onClose={() => setExportMenuAnchor(null)}
+        >
+          <MenuItem onClick={handleExportExcel}>
+            <ListItemIcon>
+              <ExcelIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Excel로 내보내기</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={handleExportPDF}>
+            <ListItemIcon>
+              <PdfIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>PDF로 내보내기</ListItemText>
+          </MenuItem>
+        </Menu>
       </Box>
     </Box>
   );

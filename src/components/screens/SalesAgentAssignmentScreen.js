@@ -20,14 +20,21 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  TextField
+  TextField,
+  Menu,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   PersonAdd as PersonAddIcon,
   Business as BusinessIcon,
-  AccountTree as AccountTreeIcon
+  AccountTree as AccountTreeIcon,
+  Download as DownloadIcon,
+  PictureAsPdf as PdfIcon,
+  TableChart as ExcelIcon
 } from '@mui/icons-material';
 import { getAssignmentSettings, calculateFullAssignment } from '../../utils/assignmentUtils';
+import { exportToExcel, exportToPDF, exportToCSV } from '../../utils/exportUtils';
 
 function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
@@ -35,6 +42,7 @@ function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
   const [selectedOffice, setSelectedOffice] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -131,6 +139,22 @@ function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
     return Array.from(deptSet).sort();
   }, [agents]);
 
+  // 내보내기 함수들
+  const handleExportExcel = () => {
+    exportToExcel.salesAgentAssignment(filteredAgents, agentAssignments, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF.salesAgentAssignment(filteredAgents, agentAssignments, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV.salesAgentAssignment(filteredAgents, agentAssignments, assignmentSettings);
+    setExportMenuAnchor(null);
+  };
+
   // 영업사원별 총 배정량 계산
   const getAgentTotalAssignment = (agentId) => {
     const assignment = agentAssignments[agentId];
@@ -154,6 +178,14 @@ function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             영업사원배정
           </Typography>
+          <Button
+            color="inherit"
+            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+            startIcon={<DownloadIcon />}
+            sx={{ mr: 2 }}
+          >
+            내보내기
+          </Button>
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
@@ -362,6 +394,32 @@ function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
             </CardContent>
           </Card>
         )}
+
+        {/* 내보내기 메뉴 */}
+        <Menu
+          anchorEl={exportMenuAnchor}
+          open={Boolean(exportMenuAnchor)}
+          onClose={() => setExportMenuAnchor(null)}
+        >
+          <MenuItem onClick={handleExportExcel}>
+            <ListItemIcon>
+              <ExcelIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Excel로 내보내기</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={handleExportPDF}>
+            <ListItemIcon>
+              <PdfIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>PDF로 내보내기</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={handleExportCSV}>
+            <ListItemIcon>
+              <DownloadIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>CSV로 내보내기</ListItemText>
+          </MenuItem>
+        </Menu>
       </Box>
     </Box>
   );
