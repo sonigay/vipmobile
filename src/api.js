@@ -106,14 +106,22 @@ setInterval(() => {
   clientCacheUtils.cleanup();
 }, 5 * 60 * 1000);
 
-export async function fetchData(includeShipped = true) {
-  const cacheKey = `stores_data_${includeShipped}`;
+// 전역 객체로 노출 (디버깅용)
+if (typeof window !== 'undefined') {
+  window.clientCacheUtils = clientCacheUtils;
+}
+
+export async function fetchData(includeShipped = true, timestamp = null) {
+  // 타임스탬프가 있으면 캐시 무효화
+  const cacheKey = timestamp ? `stores_data_${includeShipped}_${timestamp}` : `stores_data_${includeShipped}`;
   
-  // 캐시에서 먼저 확인
-  const cachedData = clientCacheUtils.get(cacheKey);
-  if (cachedData) {
-    console.log('캐시된 매장 데이터 사용');
-    return { success: true, data: cachedData };
+  // 타임스탬프가 없는 경우에만 캐시 확인
+  if (!timestamp) {
+    const cachedData = clientCacheUtils.get(cacheKey);
+    if (cachedData) {
+      console.log('캐시된 매장 데이터 사용');
+      return { success: true, data: cachedData };
+    }
   }
   
   try {

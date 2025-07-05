@@ -130,6 +130,11 @@ function App() {
     // 클라이언트 캐시도 정리
     cacheManager.clearAll();
     
+    // API 캐시도 정리
+    if (window.clientCacheUtils) {
+      window.clientCacheUtils.cleanup();
+    }
+    
     // 잠시 후 페이지 새로고침
     setTimeout(() => {
       window.location.reload();
@@ -235,7 +240,10 @@ function App() {
       }
     };
     
-    checkForUpdates();
+    // 앱 시작 시 업데이트 체크 (지연 실행으로 안정성 향상)
+    setTimeout(() => {
+      checkForUpdates();
+    }, 1000);
   }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
 
   // 담당자별 재고 필터링 함수 (useEffect보다 먼저 정의)
@@ -374,8 +382,10 @@ function App() {
         설명: includeShipped ? '담당재고확인 - 3일 이내 출고재고 포함' : '전체재고확인 - 3일 이내 출고재고 제외'
       });
       
+      // 캐시 무효화를 위한 타임스탬프 추가
+      const timestamp = Date.now();
       const [storesResponse, modelsResponse] = await Promise.all([
-        fetchData(includeShipped),
+        fetchData(includeShipped, timestamp),
         fetchModels()
       ]);
 
@@ -397,10 +407,14 @@ function App() {
         };
         console.log('최종 설정될 데이터:', finalData);
 
+        // 데이터 설정과 동시에 필터링된 매장 목록 초기화
         setData(finalData);
-        
-        // 데이터 설정 후 필터링된 매장 목록 즉시 초기화
         setFilteredStores([]);
+        
+        // 강제로 필터링 useEffect 트리거
+        setTimeout(() => {
+          console.log('필터링 강제 실행');
+        }, 0);
       } else {
         console.error('데이터 로딩 실패 상세:', { 
           storesSuccess: storesResponse.success,

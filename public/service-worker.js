@@ -97,17 +97,7 @@ self.addEventListener('activate', event => {
         })
       );
     }).then(() => {
-      // 새로운 배포 감지 시 모든 클라이언트에게 알림
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          client.postMessage({
-            type: 'AUTO_LOGOUT_REQUIRED',
-            buildVersion: BUILD_VERSION
-          });
-        });
-      });
-      
-      // 모든 클라이언트 페이지에 새로고침 요청
+      // 모든 클라이언트 페이지에 새로고침 요청 (자동 로그아웃 제거)
       return self.clients.claim();
     })
   );
