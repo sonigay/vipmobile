@@ -39,9 +39,11 @@ import {
   Cancel as CancelIcon,
   CheckBox as CheckBoxIcon,
   CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
-  Preview as PreviewIcon
+  Preview as PreviewIcon,
+  BarChart as BarChartIcon
 } from '@mui/icons-material';
 import { calculateFullAssignment } from '../../utils/assignmentUtils';
+import AssignmentVisualization from '../AssignmentVisualization';
 
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
@@ -65,6 +67,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [newModel, setNewModel] = useState({ name: '', color: '', quantity: 0 });
   const [previewData, setPreviewData] = useState(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0: 설정, 1: 미리보기, 2: 시각화
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -258,9 +261,40 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         </Toolbar>
       </AppBar>
 
+      {/* 탭 네비게이션 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'background.paper' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Button
+            variant={activeTab === 0 ? 'contained' : 'text'}
+            onClick={() => setActiveTab(0)}
+            startIcon={<SettingsIcon />}
+            sx={{ mx: 1 }}
+          >
+            설정
+          </Button>
+          <Button
+            variant={activeTab === 1 ? 'contained' : 'text'}
+            onClick={() => setActiveTab(1)}
+            startIcon={<PreviewIcon />}
+            sx={{ mx: 1 }}
+          >
+            미리보기
+          </Button>
+          <Button
+            variant={activeTab === 2 ? 'contained' : 'text'}
+            onClick={() => setActiveTab(2)}
+            startIcon={<BarChartIcon />}
+            sx={{ mx: 1 }}
+          >
+            시각화
+          </Button>
+        </Box>
+      </Box>
+
       {/* 콘텐츠 */}
       <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-        <Grid container spacing={3}>
+        {activeTab === 0 && (
+          <Grid container spacing={3}>
           
           {/* 담당자 관리 */}
           <Grid item xs={12} md={6}>
@@ -566,107 +600,144 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             </Card>
           </Grid>
 
-          {/* 배정 미리보기 결과 */}
-          {previewData && (
-            <Grid item xs={12}>
+
+        </Grid>
+        )}
+
+        {/* 미리보기 탭 */}
+        {activeTab === 1 && (
+          <Box>
+            {!previewData ? (
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
-                    배정 미리보기 결과
+                    배정 미리보기
                   </Typography>
-                  
-                  {/* 모델별 배정 현황 */}
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      모델별 배정 현황
-                    </Typography>
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>모델명</TableCell>
-                            <TableCell align="center">전체 수량</TableCell>
-                            <TableCell align="center">배정 수량</TableCell>
-                            <TableCell align="center">배정률</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {Object.values(previewData.models).map((model) => (
-                            <TableRow key={model.name}>
-                              <TableCell>{model.name}</TableCell>
-                              <TableCell align="center">{model.totalQuantity}개</TableCell>
-                              <TableCell align="center">{model.assignedQuantity}개</TableCell>
-                              <TableCell align="center">
-                                {model.totalQuantity > 0 
-                                  ? Math.round((model.assignedQuantity / model.totalQuantity) * 100)
-                                  : 0}%
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-
-                  {/* 영업사원별 배정 현황 */}
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      영업사원별 배정 현황 (상위 10명)
-                    </Typography>
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>영업사원</TableCell>
-                            <TableCell>사무실</TableCell>
-                            <TableCell>소속</TableCell>
-                            <TableCell align="center">총 배정량</TableCell>
-                            <TableCell align="center">배정 점수</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {Object.entries(previewData.agents)
-                            .sort(([,a], [,b]) => {
-                              const aTotal = Object.values(a).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                              const bTotal = Object.values(b).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                              return bTotal - aTotal;
-                            })
-                            .slice(0, 10)
-                            .map(([agentId, agentData]) => {
-                              const agent = agents.find(a => a.contactId === agentId);
-                              const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                              const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.score || 0), 0) / Object.keys(agentData).length;
-                              
-                              return (
-                                <TableRow key={agentId}>
-                                  <TableCell>{agent?.target || agentId}</TableCell>
-                                  <TableCell>{agent?.office || '미지정'}</TableCell>
-                                  <TableCell>{agent?.department || '미지정'}</TableCell>
-                                  <TableCell align="center">{totalQuantity}개</TableCell>
-                                  <TableCell align="center">{Math.round(avgScore)}점</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-
-                  {/* 새로운 배정 비율 설명 */}
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    <Typography variant="body2">
-                      <strong>새로운 배정 비율 계산 방식:</strong><br/>
-                      • 모델별회전율 = (당월실적+전월실적)/(보유재고+당월실적+전월실적)<br/>
-                      • 거래처수 = 담당자별로 보유중인 매장수<br/>
-                      • 잔여재고 = 보유재고<br/>
-                      • 판매량 = 당월실적+전월실적
-                    </Typography>
-                  </Alert>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    배정 설정을 완료한 후 미리보기를 실행하세요.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={handlePreviewAssignment}
+                    startIcon={<PreviewIcon />}
+                    disabled={isLoadingPreview}
+                  >
+                    {isLoadingPreview ? '계산중...' : '배정 미리보기 실행'}
+                  </Button>
                 </CardContent>
               </Card>
-            </Grid>
-          )}
-        </Grid>
+            ) : (
+              <Grid container spacing={3}>
+                {/* 기존 미리보기 결과 내용 */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        배정 미리보기 결과
+                      </Typography>
+                      
+                      {/* 모델별 배정 현황 */}
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          모델별 배정 현황
+                        </Typography>
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>모델명</TableCell>
+                                <TableCell align="center">전체 수량</TableCell>
+                                <TableCell align="center">배정 수량</TableCell>
+                                <TableCell align="center">배정률</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {Object.values(previewData.models).map((model) => (
+                                <TableRow key={model.name}>
+                                  <TableCell>{model.name}</TableCell>
+                                  <TableCell align="center">{model.totalQuantity}개</TableCell>
+                                  <TableCell align="center">{model.assignedQuantity}개</TableCell>
+                                  <TableCell align="center">
+                                    {model.totalQuantity > 0 
+                                      ? Math.round((model.assignedQuantity / model.totalQuantity) * 100)
+                                      : 0}%
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+
+                      {/* 영업사원별 배정 현황 */}
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          영업사원별 배정 현황 (상위 10명)
+                        </Typography>
+                        <TableContainer component={Paper} variant="outlined">
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>영업사원</TableCell>
+                                <TableCell>사무실</TableCell>
+                                <TableCell>소속</TableCell>
+                                <TableCell align="center">총 배정량</TableCell>
+                                <TableCell align="center">배정 점수</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {Object.entries(previewData.agents)
+                                .sort(([,a], [,b]) => {
+                                  const aTotal = Object.values(a).reduce((sum, val) => sum + (val.quantity || 0), 0);
+                                  const bTotal = Object.values(b).reduce((sum, val) => sum + (val.quantity || 0), 0);
+                                  return bTotal - aTotal;
+                                })
+                                .slice(0, 10)
+                                .map(([agentId, agentData]) => {
+                                  const agent = agents.find(a => a.contactId === agentId);
+                                  const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
+                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.score || 0), 0) / Object.keys(agentData).length;
+                                  
+                                  return (
+                                    <TableRow key={agentId}>
+                                      <TableCell>{agent?.target || agentId}</TableCell>
+                                      <TableCell>{agent?.office || '미지정'}</TableCell>
+                                      <TableCell>{agent?.department || '미지정'}</TableCell>
+                                      <TableCell align="center">{totalQuantity}개</TableCell>
+                                      <TableCell align="center">{Math.round(avgScore)}점</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+
+                      {/* 새로운 배정 비율 설명 */}
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        <Typography variant="body2">
+                          <strong>새로운 배정 비율 계산 방식:</strong><br/>
+                          • 모델별회전율 = (당월실적+전월실적)/(보유재고+당월실적+전월실적)<br/>
+                          • 거래처수 = 담당자별로 보유중인 매장수<br/>
+                          • 잔여재고 = 보유재고<br/>
+                          • 판매량 = 당월실적+전월실적
+                        </Typography>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            )}
+          </Box>
+        )}
+
+        {/* 시각화 탭 */}
+        {activeTab === 2 && (
+          <AssignmentVisualization 
+            assignmentData={previewData} 
+            agents={agents}
+          />
+        )}
       </Box>
 
       {/* 모델 추가 다이얼로그 */}
