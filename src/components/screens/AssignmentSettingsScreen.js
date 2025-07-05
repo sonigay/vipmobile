@@ -28,7 +28,9 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  Checkbox
+  Checkbox,
+  LinearProgress,
+  CircularProgress
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -40,9 +42,10 @@ import {
   CheckBox as CheckBoxIcon,
   CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
   Preview as PreviewIcon,
-  BarChart as BarChartIcon
+  BarChart as BarChartIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { calculateFullAssignment } from '../../utils/assignmentUtils';
+import { calculateFullAssignment, clearAssignmentCache } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
 
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
@@ -68,6 +71,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [previewData, setPreviewData] = useState(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0: 설정, 1: 미리보기, 2: 시각화
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -144,20 +149,85 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 배정 미리보기
   const handlePreviewAssignment = async () => {
     setIsLoadingPreview(true);
+    setProgress(0);
+    setProgressMessage('배정 계산을 시작합니다...');
+    
     try {
+      // 진행률 업데이트
+      setProgress(10);
+      setProgressMessage('매장 데이터를 로드하는 중...');
+      
       // 매장 데이터 가져오기 (재고 정보용)
       const storeResponse = await fetch('/api/data');
       const storeData = await storeResponse.json();
       
+      setProgress(30);
+      setProgressMessage('개통실적 데이터를 로드하는 중...');
+      
       // 새로운 배정 로직으로 계산
       const preview = await calculateFullAssignment(agents, assignmentSettings, storeData);
+      
+      setProgress(90);
+      setProgressMessage('결과를 정리하는 중...');
+      
       setPreviewData(preview);
+      
+      setProgress(100);
+      setProgressMessage('배정 계산이 완료되었습니다!');
+      
+      // 1초 후 진행률 초기화
+      setTimeout(() => {
+        setProgress(0);
+        setProgressMessage('');
+      }, 1000);
+      
     } catch (error) {
       console.error('배정 미리보기 실패:', error);
+      setProgressMessage('배정 계산 중 오류가 발생했습니다.');
     } finally {
       setIsLoadingPreview(false);
     }
   };
+
+  // 캐시 정리
+  const handleClearCache = () => {
+    clearAssignmentCache();
+    setPreviewData(null);
+  };
+
+  // 키보드 단축키 처리
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Ctrl/Cmd + S: 설정 저장
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        saveSettings();
+      }
+      
+      // Ctrl/Cmd + P: 배정 미리보기
+      if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
+        event.preventDefault();
+        if (!isLoadingPreview) {
+          handlePreviewAssignment();
+        }
+      }
+      
+      // Ctrl/Cmd + R: 캐시 정리
+      if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault();
+        handleClearCache();
+      }
+      
+      // 숫자 키로 탭 전환
+      if (event.key >= '1' && event.key <= '3') {
+        const tabIndex = parseInt(event.key) - 1;
+        setActiveTab(tabIndex);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isLoadingPreview]);
 
   // 담당자 정보 수정
   const handleAgentEdit = (agent) => {
@@ -263,12 +333,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
       {/* 탭 네비게이션 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'background.paper' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1 }}>
           <Button
             variant={activeTab === 0 ? 'contained' : 'text'}
             onClick={() => setActiveTab(0)}
             startIcon={<SettingsIcon />}
             sx={{ mx: 1 }}
+            title="키보드 단축키: 1"
           >
             설정
           </Button>
@@ -277,6 +348,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             onClick={() => setActiveTab(1)}
             startIcon={<PreviewIcon />}
             sx={{ mx: 1 }}
+            title="키보드 단축키: 2"
           >
             미리보기
           </Button>
@@ -285,9 +357,17 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             onClick={() => setActiveTab(2)}
             startIcon={<BarChartIcon />}
             sx={{ mx: 1 }}
+            title="키보드 단축키: 3"
           >
             시각화
           </Button>
+          
+          {/* 키보드 단축키 안내 */}
+          <Box sx={{ ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              단축키: Ctrl+S(저장) | Ctrl+P(미리보기) | Ctrl+R(캐시정리) | 1,2,3(탭전환)
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
@@ -418,6 +498,25 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     sx={{ mb: 3 }}
                   />
                   
+                  {/* 진행률 표시 */}
+                  {isLoadingPreview && (
+                    <Box sx={{ mt: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {progressMessage}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {progress}%
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={progress} 
+                        sx={{ height: 8, borderRadius: 4 }}
+                      />
+                    </Box>
+                  )}
+
                   <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                     <Button
                       variant="contained"
@@ -430,11 +529,24 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     <Button
                       variant="outlined"
                       onClick={handlePreviewAssignment}
-                      startIcon={<PreviewIcon />}
+                      startIcon={isLoadingPreview ? <CircularProgress size={16} /> : <PreviewIcon />}
                       disabled={isLoadingPreview}
                       sx={{ flex: 1 }}
                     >
                       {isLoadingPreview ? '계산중...' : '배정 미리보기'}
+                    </Button>
+                  </Box>
+
+                  {/* 캐시 관리 */}
+                  <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                    <Button
+                      variant="text"
+                      onClick={handleClearCache}
+                      startIcon={<RefreshIcon />}
+                      size="small"
+                      sx={{ flex: 1 }}
+                    >
+                      캐시 정리
                     </Button>
                   </Box>
                 </Box>
