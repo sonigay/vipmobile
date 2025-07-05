@@ -156,6 +156,7 @@ function App() {
     // 새로운 배포 체크
     checkForNewDeployment();
 
+    // 로그인 상태 복원
     const savedLoginState = localStorage.getItem('loginState');
     if (savedLoginState) {
       try {
@@ -217,20 +218,17 @@ function App() {
     }
   }, []);
 
-  // 업데이트 확인 및 팝업 표시 (한 번만 실행)
+  // 업데이트 확인 및 팝업 표시 (앱 시작 시 한 번만 실행)
   useEffect(() => {
-    if (isLoggedIn) {
-      // 새로운 업데이트가 있는지 확인
-      const hasNew = hasNewUpdates();
-      if (hasNew) {
-        const updates = getUnreadUpdates();
-        setUnreadUpdates(updates);
-        setShowUpdatePopup(true);
-        console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
-      }
-      // 최신 버전인 경우는 자동으로 팝업 표시하지 않음
+    // 로그인 상태와 관계없이 앱 시작 시 업데이트 체크
+    const hasNew = hasNewUpdates();
+    if (hasNew) {
+      const updates = getUnreadUpdates();
+      setUnreadUpdates(updates);
+      setShowUpdatePopup(true);
+      console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
     }
-  }, [isLoggedIn]);
+  }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
 
   // 담당자별 재고 필터링 함수 (useEffect보다 먼저 정의)
   const filterStoresByAgent = useCallback((stores, agentTarget) => {
@@ -360,6 +358,13 @@ function App() {
       
       // 전체재고확인에서는 3일 이내 출고재고 제외, 담당재고확인에서는 모든 재고 포함
       const includeShipped = isAgentMode && currentView === 'assigned' ? true : false;
+      
+      console.log('재고 데이터 요청 설정:', {
+        isAgentMode,
+        currentView,
+        includeShipped,
+        설명: includeShipped ? '담당재고확인 - 3일 이내 출고재고 포함' : '전체재고확인 - 3일 이내 출고재고 제외'
+      });
       
       const [storesResponse, modelsResponse] = await Promise.all([
         fetchData(includeShipped),
@@ -815,8 +820,10 @@ function App() {
       setShowUpdatePopup(true);
       console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
     } else {
-      setShowUpdateProgressPopup(true);
+      // 최신 버전인 경우 업데이트 진행 팝업을 표시하지 않고 바로 닫기
       console.log('업데이트 확인 - 최신 버전입니다');
+      // 최신 버전임을 알리는 간단한 알림만 표시
+      alert('현재 최신 버전을 사용하고 있습니다.');
     }
   }, []);
 

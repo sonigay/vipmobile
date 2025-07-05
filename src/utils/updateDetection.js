@@ -70,16 +70,16 @@ export const performAutoLogout = async () => {
     // 로그인 상태 삭제
     localStorage.removeItem('loginState');
     
-    // 기타 관련 데이터 삭제
+    // 기타 관련 데이터 삭제 (업데이트 버전 정보는 보존)
     localStorage.removeItem('userIpInfo');
-    localStorage.removeItem('lastUpdateVersion');
-    localStorage.removeItem('hideUpdateUntilDate');
+    // localStorage.removeItem('lastUpdateVersion'); // 업데이트 버전 정보 보존
+    // localStorage.removeItem('hideUpdateUntilDate'); // 업데이트 숨김 설정 보존
     
     // 현재 빌드 버전 저장
     const currentVersion = await getCurrentBuildVersion();
     setStoredBuildVersion(currentVersion);
     
-    console.log('자동 로그아웃 완료');
+    console.log('자동 로그아웃 완료 (업데이트 버전 정보 보존)');
     return true;
   } catch (error) {
     console.error('자동 로그아웃 실패:', error);
