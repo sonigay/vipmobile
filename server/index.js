@@ -1163,11 +1163,21 @@ app.get('/api/activation-data/by-date', async (req, res) => {
       
       if (!activationDate) return;
       
-      // 날짜 형식 정규화 (MM/DD -> MM/DD/YYYY)
+      // 날짜 형식 정규화 (MM/DD -> MM/DD/YYYY -> toLocaleDateString 형식)
       let normalizedDate = activationDate;
       if (activationDate.match(/^\d{1,2}\/\d{1,2}$/)) {
         const currentYear = new Date().getFullYear();
         normalizedDate = `${activationDate}/${currentYear}`;
+      }
+      
+      // Date 객체로 변환하여 toLocaleDateString 형식으로 통일
+      try {
+        const dateObj = new Date(normalizedDate);
+        if (!isNaN(dateObj.getTime())) {
+          normalizedDate = dateObj.toLocaleDateString();
+        }
+      } catch (error) {
+        console.warn('날짜 변환 실패:', normalizedDate, error);
       }
       
       if (!dateStats[normalizedDate]) {
