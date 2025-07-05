@@ -38,8 +38,10 @@ import {
   Save as SaveIcon,
   Cancel as CancelIcon,
   CheckBox as CheckBoxIcon,
-  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  Preview as PreviewIcon
 } from '@mui/icons-material';
+import { calculateFullAssignment } from '../../utils/assignmentUtils';
 
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
@@ -61,6 +63,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [editingAgent, setEditingAgent] = useState(null);
   const [showModelDialog, setShowModelDialog] = useState(false);
   const [newModel, setNewModel] = useState({ name: '', color: '', quantity: 0 });
+  const [previewData, setPreviewData] = useState(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -132,6 +136,24 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 설정 저장
   const saveSettings = () => {
     localStorage.setItem('assignmentSettings', JSON.stringify(assignmentSettings));
+  };
+
+  // 배정 미리보기
+  const handlePreviewAssignment = async () => {
+    setIsLoadingPreview(true);
+    try {
+      // 매장 데이터 가져오기 (재고 정보용)
+      const storeResponse = await fetch('/api/data');
+      const storeData = await storeResponse.json();
+      
+      // 새로운 배정 로직으로 계산
+      const preview = await calculateFullAssignment(agents, assignmentSettings, storeData);
+      setPreviewData(preview);
+    } catch (error) {
+      console.error('배정 미리보기 실패:', error);
+    } finally {
+      setIsLoadingPreview(false);
+    }
   };
 
   // 담당자 정보 수정
@@ -362,14 +384,25 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     sx={{ mb: 3 }}
                   />
                   
-                  <Button
-                    variant="contained"
-                    onClick={saveSettings}
-                    startIcon={<SaveIcon />}
-                    fullWidth
-                  >
-                    설정 저장
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={saveSettings}
+                      startIcon={<SaveIcon />}
+                      sx={{ flex: 1 }}
+                    >
+                      설정 저장
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={handlePreviewAssignment}
+                      startIcon={<PreviewIcon />}
+                      disabled={isLoadingPreview}
+                      sx={{ flex: 1 }}
+                    >
+                      {isLoadingPreview ? '계산중...' : '배정 미리보기'}
+                    </Button>
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
@@ -532,6 +565,107 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </CardContent>
             </Card>
           </Grid>
+
+          {/* 배정 미리보기 결과 */}
+          {previewData && (
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    배정 미리보기 결과
+                  </Typography>
+                  
+                  {/* 모델별 배정 현황 */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      모델별 배정 현황
+                    </Typography>
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>모델명</TableCell>
+                            <TableCell align="center">전체 수량</TableCell>
+                            <TableCell align="center">배정 수량</TableCell>
+                            <TableCell align="center">배정률</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {Object.values(previewData.models).map((model) => (
+                            <TableRow key={model.name}>
+                              <TableCell>{model.name}</TableCell>
+                              <TableCell align="center">{model.totalQuantity}개</TableCell>
+                              <TableCell align="center">{model.assignedQuantity}개</TableCell>
+                              <TableCell align="center">
+                                {model.totalQuantity > 0 
+                                  ? Math.round((model.assignedQuantity / model.totalQuantity) * 100)
+                                  : 0}%
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+
+                  {/* 영업사원별 배정 현황 */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      영업사원별 배정 현황 (상위 10명)
+                    </Typography>
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>영업사원</TableCell>
+                            <TableCell>사무실</TableCell>
+                            <TableCell>소속</TableCell>
+                            <TableCell align="center">총 배정량</TableCell>
+                            <TableCell align="center">배정 점수</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {Object.entries(previewData.agents)
+                            .sort(([,a], [,b]) => {
+                              const aTotal = Object.values(a).reduce((sum, val) => sum + (val.quantity || 0), 0);
+                              const bTotal = Object.values(b).reduce((sum, val) => sum + (val.quantity || 0), 0);
+                              return bTotal - aTotal;
+                            })
+                            .slice(0, 10)
+                            .map(([agentId, agentData]) => {
+                              const agent = agents.find(a => a.contactId === agentId);
+                              const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
+                              const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.score || 0), 0) / Object.keys(agentData).length;
+                              
+                              return (
+                                <TableRow key={agentId}>
+                                  <TableCell>{agent?.target || agentId}</TableCell>
+                                  <TableCell>{agent?.office || '미지정'}</TableCell>
+                                  <TableCell>{agent?.department || '미지정'}</TableCell>
+                                  <TableCell align="center">{totalQuantity}개</TableCell>
+                                  <TableCell align="center">{Math.round(avgScore)}점</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+
+                  {/* 새로운 배정 비율 설명 */}
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    <Typography variant="body2">
+                      <strong>새로운 배정 비율 계산 방식:</strong><br/>
+                      • 모델별회전율 = (당월실적+전월실적)/(보유재고+당월실적+전월실적)<br/>
+                      • 거래처수 = 담당자별로 보유중인 매장수<br/>
+                      • 잔여재고 = 보유재고<br/>
+                      • 판매량 = 당월실적+전월실적
+                    </Typography>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
       </Box>
 
