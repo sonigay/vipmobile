@@ -188,7 +188,7 @@ function Map({
     return totalInventory;
   }, [selectedModel, selectedColor]);
 
-  // 출고일 기준 재고 분류 함수
+  // 출고일 기준 재고 분류 함수 (검색된 재고 또는 총재고 기준)
   const getInventoryByAge = useCallback((store) => {
     const now = new Date();
     const result = {
@@ -199,13 +199,23 @@ function Map({
 
     if (!store.inventory) return result;
 
+    // 검색된 모델/색상이 있는지 확인
+    const hasSearchFilter = selectedModel || selectedColor;
+
     Object.values(store.inventory).forEach(category => {
       if (!category || typeof category !== 'object') return;
       Object.values(category).forEach(model => {
         if (!model || typeof model !== 'object') return;
+        
+        // 검색 필터가 있고, 해당 모델이 선택되지 않은 경우 스킵
+        if (hasSearchFilter && selectedModel && model !== selectedModel) return;
+        
         Object.values(model).forEach(status => {
           if (!status || typeof status !== 'object') return;
-          Object.values(status).forEach(item => {
+          Object.entries(status).forEach(([color, item]) => {
+            // 검색 필터가 있고, 해당 색상이 선택되지 않은 경우 스킵
+            if (hasSearchFilter && selectedColor && color !== selectedColor) return;
+            
             // 새로운 구조: { quantity: number, shippedDate: string }
             if (typeof item === 'object' && item && item.shippedDate && item.quantity) {
               const days = Math.floor((now - new Date(item.shippedDate)) / (1000 * 60 * 60 * 24));
@@ -223,7 +233,7 @@ function Map({
     });
 
     return result;
-  }, []);
+  }, [selectedModel, selectedColor]);
 
   // 마커 아이콘 생성 함수
   const createMarkerIcon = useCallback((store) => {
@@ -236,13 +246,22 @@ function Map({
 
     let fillColor, strokeColor, radius, iconStyle, urgencyIcon = '';
 
-    // 출고일 기준 긴급도 아이콘 결정
-    if (inventoryByAge.over60 > 0) {
-      urgencyIcon = '⚠️';
-    } else if (inventoryByAge.within60 > 0) {
-      urgencyIcon = '⚡';
-    } else if (inventoryByAge.within30 > 0) {
-      urgencyIcon = '✅';
+    // 출고일 기준 긴급도 아이콘 결정 (비중 기준)
+    const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
+    
+    if (totalFilteredInventory > 0) {
+      // 비중이 가장 높은 카테고리로 결정
+      const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
+      const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
+      const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
+      
+      if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
+        urgencyIcon = '⚠️';
+      } else if (within60Ratio >= within30Ratio) {
+        urgencyIcon = '⚡';
+      } else {
+        urgencyIcon = '✅';
+      }
     }
 
     // 1. 요청점 (최우선)
@@ -266,18 +285,31 @@ function Map({
       radius = 16;
       iconStyle = '';
     }
-    // 4. 일반 매장 - 출고일 기준 색상 조정
+    // 4. 일반 매장 - 출고일 기준 색상 조정 (비중 기준)
     else {
-      if (inventoryByAge.over60 > 0) {
-        // 60일 이상: 주황색
-        fillColor = hasInventory ? '#ff9800' : '#f44336';
-        strokeColor = hasInventory ? '#f57c00' : '#d32f2f';
-      } else if (inventoryByAge.within60 > 0) {
-        // 30-60일: 노란색
-        fillColor = hasInventory ? '#ffc107' : '#f44336';
-        strokeColor = hasInventory ? '#ff8f00' : '#d32f2f';
+      const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
+      
+      if (totalFilteredInventory > 0) {
+        // 비중이 가장 높은 카테고리로 색상 결정
+        const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
+        const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
+        const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
+        
+        if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
+          // 60일 이상 비중이 높음: 주황색
+          fillColor = hasInventory ? '#ff9800' : '#f44336';
+          strokeColor = hasInventory ? '#f57c00' : '#d32f2f';
+        } else if (within60Ratio >= within30Ratio) {
+          // 30-60일 비중이 높음: 노란색
+          fillColor = hasInventory ? '#ffc107' : '#f44336';
+          strokeColor = hasInventory ? '#ff8f00' : '#d32f2f';
+        } else {
+          // 30일 이내 비중이 높음: 초록색
+          fillColor = hasInventory ? '#4caf50' : '#f44336';
+          strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+        }
       } else {
-        // 30일 이내: 초록색
+        // 출고일 정보가 없는 경우 기본 색상
         fillColor = hasInventory ? '#4caf50' : '#f44336';
         strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
       }
