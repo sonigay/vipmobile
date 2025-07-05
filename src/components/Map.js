@@ -204,11 +204,11 @@ function Map({
 
     Object.values(store.inventory).forEach(category => {
       if (!category || typeof category !== 'object') return;
-      Object.values(category).forEach(model => {
+      Object.entries(category).forEach(([modelName, model]) => {
         if (!model || typeof model !== 'object') return;
         
         // 검색 필터가 있고, 해당 모델이 선택되지 않은 경우 스킵
-        if (hasSearchFilter && selectedModel && model !== selectedModel) return;
+        if (hasSearchFilter && selectedModel && modelName !== selectedModel) return;
         
         Object.values(model).forEach(status => {
           if (!status || typeof status !== 'object') return;
@@ -231,6 +231,16 @@ function Map({
         });
       });
     });
+
+    // 디버깅 로그
+    if (hasSearchFilter && (result.within30 > 0 || result.within60 > 0 || result.over60 > 0)) {
+      console.log(`[${store.name}] 검색 필터 적용 결과:`, {
+        selectedModel,
+        selectedColor,
+        result,
+        hasSearchFilter
+      });
+    }
 
     return result;
   }, [selectedModel, selectedColor]);
