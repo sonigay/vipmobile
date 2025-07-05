@@ -47,6 +47,7 @@ import {
 } from '@mui/icons-material';
 import { calculateFullAssignment, clearAssignmentCache } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
+import { extractAvailableModels, getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
 
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
@@ -68,28 +69,38 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [editingAgent, setEditingAgent] = useState(null);
   const [showModelDialog, setShowModelDialog] = useState(false);
   const [newModel, setNewModel] = useState({ name: '', color: '', quantity: 0 });
+  const [availableModels, setAvailableModels] = useState({ models: [], colors: [], modelColors: new Map() });
+  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0: 설정, 1: 미리보기, 2: 시각화
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
 
-  // 담당자 데이터 로드
+  // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
-    const loadAgents = async () => {
+    const loadData = async () => {
       try {
-        const response = await fetch('/api/agents');
-        if (response.ok) {
-          const agentData = await response.json();
+        // 담당자 데이터 로드
+        const agentResponse = await fetch('/api/agents');
+        if (agentResponse.ok) {
+          const agentData = await agentResponse.json();
           setAgents(agentData);
         }
+
+        // 매장 데이터에서 사용 가능한 모델 추출
+        if (data && Array.isArray(data)) {
+          const models = extractAvailableModels(data);
+          setAvailableModels(models);
+        }
       } catch (error) {
-        console.error('담당자 데이터 로드 실패:', error);
+        console.error('데이터 로드 실패:', error);
       }
     };
     
-    loadAgents();
-  }, []);
+    loadData();
+  }, [data]);
 
   // 로컬 스토리지에서 설정 로드
   useEffect(() => {
@@ -853,24 +864,118 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       </Box>
 
       {/* 모델 추가 다이얼로그 */}
-      <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>모델 추가</DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {/* 기존 보유 모델 선택 */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" gutterBottom>
+                기존 보유 모델 선택
+              </Typography>
+              <FormControl fullWidth>
+                <InputLabel>모델명</InputLabel>
+                <Select
+                  value={selectedModel}
+                  onChange={(e) => {
+                    setSelectedModel(e.target.value);
+                    setSelectedColor('');
+                    setNewModel(prev => ({ ...prev, name: e.target.value, color: '' }));
+                  }}
+                  label="모델명"
+                >
+                  <MenuItem value="">
+                    <em>모델을 선택하세요</em>
+                  </MenuItem>
+                  {availableModels.models.map((model) => (
+                    <MenuItem key={model} value={model}>
+                      {model}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* 선택된 모델의 색상 선택 */}
+            {selectedModel && (
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>색상</InputLabel>
+                  <Select
+                    value={selectedColor}
+                    onChange={(e) => {
+                      setSelectedColor(e.target.value);
+                      setNewModel(prev => ({ ...prev, color: e.target.value }));
+                    }}
+                    label="색상"
+                  >
+                    <MenuItem value="">
+                      <em>색상을 선택하세요</em>
+                    </MenuItem>
+                    {getColorsForModel(availableModels.modelColors, selectedModel).map((color) => (
+                      <MenuItem key={color} value={color}>
+                        {color}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
+
+            {/* 선택된 모델/색상의 재고 현황 */}
+            {selectedModel && selectedColor && (
+              <Grid item xs={12}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle2" gutterBottom>
+                      {selectedModel} - {selectedColor} 재고 현황
+                    </Typography>
+                    {(() => {
+                      const summary = getModelInventorySummary(data, selectedModel, selectedColor);
+                      return (
+                        <Box>
+                          <Typography variant="body2">
+                            총 수량: {summary.totalQuantity}개
+                          </Typography>
+                          <Typography variant="body2">
+                            보유 매장: {summary.storeCount}개
+                          </Typography>
+                          {summary.stores.length > 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              주요 보유 매장: {summary.stores.slice(0, 3).map(s => s.name).join(', ')}
+                              {summary.stores.length > 3 && ` 외 ${summary.stores.length - 3}개`}
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* 수동 입력 (기존 방식) */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" gutterBottom>
+                또는 수동 입력
+              </Typography>
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="모델명"
+                label="모델명 (수동)"
                 value={newModel.name}
                 onChange={(e) => setNewModel(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="직접 모델명을 입력하세요"
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="색상"
+                label="색상 (수동)"
                 value={newModel.color}
                 onChange={(e) => setNewModel(prev => ({ ...prev, color: e.target.value }))}
+                placeholder="직접 색상을 입력하세요"
               />
             </Grid>
             <Grid item xs={12}>
@@ -885,8 +990,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowModelDialog(false)}>취소</Button>
-          <Button onClick={handleAddModel} variant="contained">추가</Button>
+          <Button onClick={() => {
+            setShowModelDialog(false);
+            setSelectedModel('');
+            setSelectedColor('');
+            setNewModel({ name: '', color: '', quantity: 0 });
+          }}>
+            취소
+          </Button>
+          <Button 
+            onClick={handleAddModel} 
+            variant="contained"
+            disabled={!newModel.name || !newModel.color || newModel.quantity <= 0}
+          >
+            추가
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
