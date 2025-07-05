@@ -365,18 +365,14 @@ function App() {
     const dateOptions = [];
     const today = new Date();
     
-    // 오늘부터 과거 30일까지의 날짜 옵션 생성
+    // 오늘부터 과거 30일까지의 날짜 옵션 생성 (담당자 필터링 없이 모든 날짜 표시)
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateKey = date.toLocaleDateString();
       
-      // 실제 데이터가 있는 날짜인지 확인
+      // 실제 데이터가 있는 날짜인지 확인 (담당자 필터링 없이)
       const hasData = Object.values(activationData).some(storeData => {
-        if (isAgentMode && agentTarget) {
-          return storeData.agents && storeData.agents.includes(agentTarget) && 
-                 storeData.lastActivationDate.toLocaleDateString() === dateKey;
-        }
         return storeData.lastActivationDate.toLocaleDateString() === dateKey;
       });
       
@@ -392,7 +388,7 @@ function App() {
     }
     
     return dateOptions;
-  }, [activationData, isAgentMode, agentTarget]);
+  }, [activationData]);
 
   // 담당자별 총 개통실적 계산 (카테고리별)
   const getAgentTotalActivation = useCallback(() => {
@@ -1615,7 +1611,7 @@ function App() {
                       <Box sx={{ flex: 1, mb: 2 }}>
                         <Map
                           userLocation={userLocation}
-                          filteredStores={filteredStores}
+                          filteredStores={isAgentMode && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
                           selectedStore={selectedStore}
                           requestedStore={requestedStore}
                           onStoreSelect={handleStoreSelect}
