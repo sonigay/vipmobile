@@ -7,6 +7,10 @@ import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
+import AssignmentSettingsScreen from './components/screens/AssignmentSettingsScreen';
+import DepartmentAssignmentScreen from './components/screens/DepartmentAssignmentScreen';
+import OfficeAssignmentScreen from './components/screens/OfficeAssignmentScreen';
+import SalesAgentAssignmentScreen from './components/screens/SalesAgentAssignmentScreen';
 import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import { 
@@ -85,6 +89,9 @@ function App() {
   const [agentContactId, setAgentContactId] = useState('');
   // 재고모드 관련 상태 추가
   const [isInventoryMode, setIsInventoryMode] = useState(false);
+  // 재고배정 모드 관련 상태 추가
+  const [isAssignmentMode, setIsAssignmentMode] = useState(false);
+  const [assignmentScreen, setAssignmentScreen] = useState(null); // 'settings' | 'department' | 'office' | 'sales'
   // 재고요청점 검색 관련 상태 추가
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -113,6 +120,19 @@ function App() {
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
+  
+  // 재고배정 모드 핸들러
+  const handleAssignmentMode = (screen) => {
+    setIsAssignmentMode(true);
+    setAssignmentScreen(screen);
+    setCurrentView('assignment');
+  };
+  
+  const handleAssignmentBack = () => {
+    setIsAssignmentMode(false);
+    setAssignmentScreen(null);
+    setCurrentView('all');
+  };
 
   // 캐시 상태 업데이트 함수
   const updateCacheStatus = useCallback(() => {
@@ -1435,7 +1455,28 @@ function App() {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <InventoryMode onLogout={handleLogout} loggedInStore={loggedInStore} />
+        <InventoryMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onAssignmentMode={handleAssignmentMode}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 재고배정 모드일 때는 별도 화면 렌더링
+  if (isAssignmentMode && assignmentScreen) {
+    const assignmentScreens = {
+      settings: <AssignmentSettingsScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
+      department: <DepartmentAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
+      office: <OfficeAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
+      sales: <SalesAgentAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />
+    };
+
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {assignmentScreens[assignmentScreen]}
       </ThemeProvider>
     );
   }

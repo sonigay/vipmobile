@@ -89,7 +89,7 @@ const LoadingSkeleton = () => (
   </Box>
 );
 
-function InventoryMode({ onLogout, loggedInStore }) {
+function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -307,6 +307,16 @@ function InventoryMode({ onLogout, loggedInStore }) {
 
   const handleSubMenuClick = useCallback((subMenu) => {
     console.log(`${selectedMenu} - ${subMenu} 메뉴 클릭`);
+    
+    // 재고배정 메뉴 처리
+    if (selectedMenu === 'assignment') {
+      if (onAssignmentMode) {
+        onAssignmentMode(subMenu);
+      }
+      handleMenuClose();
+      return;
+    }
+    
     const screenName = `${selectedMenu}_${subMenu}`;
     
     // 화면 전환 시 즉시 로딩 상태 표시
@@ -317,7 +327,7 @@ function InventoryMode({ onLogout, loggedInStore }) {
       setCurrentScreen(screenName);
       handleMenuClose();
     }, 0);
-  }, [selectedMenu, handleMenuClose]);
+  }, [selectedMenu, handleMenuClose, onAssignmentMode]);
 
   // 탭 변경 핸들러 (최적화)
   const handleTabChange = useCallback((event, newValue) => {
