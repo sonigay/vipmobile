@@ -682,7 +682,7 @@ app.get('/api/stores', async (req, res) => {
       if (!storeName || !model || !color) return;
 
       // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)
-      if (includeShipped === false && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) {
+      if (includeShipped === 'false' && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) {
         excludedCount++;
         return;
       }
