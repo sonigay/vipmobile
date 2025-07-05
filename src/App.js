@@ -27,6 +27,9 @@ import UpdatePopup from './components/UpdatePopup';
 import UpdateProgressPopup from './components/UpdateProgressPopup';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
+import NotificationButton from './components/NotificationButton';
+import AnnouncementBanner from './components/AnnouncementBanner';
+import { notificationManager } from './utils/notificationUtils';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -117,10 +120,27 @@ function App() {
   const [activationModelSearch, setActivationModelSearch] = useState('');
   // 개통실적 날짜 검색 상태
   const [activationDateSearch, setActivationDateSearch] = useState('');
+  // 알림 시스템 초기화
+  const [notificationInitialized, setNotificationInitialized] = useState(false);
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
   
+  // 알림 시스템 초기화
+  useEffect(() => {
+    if (!notificationInitialized) {
+      // 알림 권한 요청
+      notificationManager.requestNotificationPermission();
+      
+      // 오래된 알림 및 공지사항 정리
+      notificationManager.cleanupOldNotifications();
+      notificationManager.cleanupExpiredAnnouncements();
+      
+      // 초기화 완료
+      setNotificationInitialized(true);
+    }
+  }, [notificationInitialized]);
+
   // 재고배정 모드 핸들러
   const handleAssignmentMode = (screen) => {
     setIsAssignmentMode(true);
@@ -2070,6 +2090,10 @@ function App() {
         onClose={handleUpdateProgressPopupClose}
         isLatestVersion={false}
       />
+
+      {/* 알림 시스템 */}
+      {isLoggedIn && <NotificationButton />}
+      <AnnouncementBanner />
     </ThemeProvider>
   );
 }

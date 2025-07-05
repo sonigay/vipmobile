@@ -48,6 +48,7 @@ import {
 import { calculateFullAssignment, clearAssignmentCache } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
 import { extractAvailableModels, getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
+import { addAssignmentCompletedNotification, addSettingsChangedNotification } from '../../utils/notificationUtils';
 
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
@@ -155,6 +156,17 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 설정 저장
   const saveSettings = () => {
     localStorage.setItem('assignmentSettings', JSON.stringify(assignmentSettings));
+    
+    // 설정 변경 알림 추가
+    addSettingsChangedNotification({
+      ratios: assignmentSettings.ratios,
+      modelCount: Object.keys(assignmentSettings.models).length,
+      targetCount: {
+        offices: Object.keys(assignmentSettings.targets.offices).filter(key => assignmentSettings.targets.offices[key]).length,
+        departments: Object.keys(assignmentSettings.targets.departments).filter(key => assignmentSettings.targets.departments[key]).length,
+        agents: Object.keys(assignmentSettings.targets.agents).filter(key => assignmentSettings.targets.agents[key]).length
+      }
+    });
   };
 
   // 배정 미리보기
@@ -182,6 +194,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgressMessage('결과를 정리하는 중...');
       
       setPreviewData(preview);
+      
+      // 배정 완료 알림 추가
+      const totalAgents = Object.keys(preview.agents).length;
+      const totalQuantity = Object.values(preview.agents).reduce((sum, agent) => sum + (agent.quantity || 0), 0);
+      const models = Object.keys(assignmentSettings.models);
+      
+      addAssignmentCompletedNotification({
+        totalAgents,
+        totalQuantity,
+        models,
+        preview
+      });
       
       setProgress(100);
       setProgressMessage('배정 계산이 완료되었습니다!');
