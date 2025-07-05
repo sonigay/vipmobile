@@ -1125,6 +1125,97 @@ app.get('/api/activation-data/previous-month', async (req, res) => {
   }
 });
 
+// 날짜별 개통실적 데이터 가져오기 (새로운 API)
+app.get('/api/activation-data/by-date', async (req, res) => {
+  const cacheKey = 'activation_data_by_date';
+  
+  // 캐시에서 먼저 확인
+  const cachedData = cacheUtils.get(cacheKey);
+  if (cachedData) {
+    console.log('캐시된 날짜별 개통실적 데이터 반환');
+    return res.json(cachedData);
+  }
+  
+  try {
+    console.log('날짜별 개통실적 데이터 처리 시작...');
+    const startTime = Date.now();
+    
+    const activationValues = await getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
+    
+    if (!activationValues) {
+      throw new Error('Failed to fetch data from current month activation sheet');
+    }
+
+    // 헤더 제거
+    const activationRows = activationValues.slice(1);
+    
+    // 날짜별 개통실적 데이터 구성
+    const dateStats = {};
+    
+    activationRows.forEach(row => {
+      if (row[6] === '선불개통') return; // 선불개통 제외
+      
+      const store = row[6] || '미지정'; // G열: 출고처
+      const agent = row[0] || '미지정'; // A열: 담당자
+      const activationDate = row[1] || ''; // B열: 개통일
+      const model = row[13] || '미지정'; // N열: 모델명
+      const color = row[14] || '미지정'; // O열: 색상
+      
+      if (!activationDate) return;
+      
+      // 날짜 형식 정규화 (MM/DD -> MM/DD/YYYY)
+      let normalizedDate = activationDate;
+      if (activationDate.match(/^\d{1,2}\/\d{1,2}$/)) {
+        const currentYear = new Date().getFullYear();
+        normalizedDate = `${activationDate}/${currentYear}`;
+      }
+      
+      if (!dateStats[normalizedDate]) {
+        dateStats[normalizedDate] = {};
+      }
+      
+      if (!dateStats[normalizedDate][store]) {
+        dateStats[normalizedDate][store] = {
+          storeName: store,
+          totalCount: 0,
+          agents: new Set(),
+          models: {}
+        };
+      }
+      
+      dateStats[normalizedDate][store].totalCount++;
+      dateStats[normalizedDate][store].agents.add(agent);
+      
+      const modelKey = `${model} (${color})`;
+      if (!dateStats[normalizedDate][store].models[modelKey]) {
+        dateStats[normalizedDate][store].models[modelKey] = 0;
+      }
+      dateStats[normalizedDate][store].models[modelKey]++;
+    });
+    
+    // Set을 배열로 변환
+    Object.keys(dateStats).forEach(date => {
+      Object.keys(dateStats[date]).forEach(store => {
+        dateStats[date][store].agents = Array.from(dateStats[date][store].agents);
+      });
+    });
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`날짜별 개통실적 데이터 처리 완료: ${Object.keys(dateStats).length}개 날짜, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, dateStats);
+    
+    res.json(dateStats);
+  } catch (error) {
+    console.error('Error fetching activation data by date:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch activation data by date', 
+      message: error.message 
+    });
+  }
+});
+
 // 사용자 활동 로깅 API (비동기 처리)
 app.post('/api/log-activity', async (req, res) => {
   // 즉시 응답 반환

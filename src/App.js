@@ -12,8 +12,9 @@ import { calculateDistance } from './utils/distanceUtils';
 import { 
   fetchCurrentMonthData, 
   fetchPreviousMonthData, 
-  generateStoreActivationComparison,
-  filterActivationByAgent
+  fetchActivationDataByDate,
+  generateStoreActivationComparison, 
+  filterActivationByAgent 
 } from './utils/activationService';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
@@ -102,6 +103,8 @@ function App() {
   const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
   // 개통실적 데이터 상태
   const [activationData, setActivationData] = useState(null);
+  // 개통실적 날짜별 데이터 상태
+  const [activationDataByDate, setActivationDataByDate] = useState(null);
   // 개통실적 모델 검색 상태
   const [activationModelSearch, setActivationModelSearch] = useState('');
   // 개통실적 날짜 검색 상태
@@ -158,10 +161,11 @@ function App() {
     try {
       console.log('개통실적 데이터 로딩 시작...');
       
-      // 당월 및 전월 데이터 병렬 로드
-      const [currentData, previousData] = await Promise.all([
+      // 당월, 전월, 날짜별 데이터 병렬 로드
+      const [currentData, previousData, dateData] = await Promise.all([
         fetchCurrentMonthData(),
-        fetchPreviousMonthData()
+        fetchPreviousMonthData(),
+        fetchActivationDataByDate()
       ]);
 
       // 매장별 비교 데이터 생성
@@ -174,10 +178,12 @@ function App() {
       }
       
       setActivationData(filteredData);
+      setActivationDataByDate(dateData);
       console.log('개통실적 데이터 로딩 완료');
     } catch (error) {
       console.error('개통실적 데이터 로딩 실패:', error);
       setActivationData(null);
+      setActivationDataByDate(null);
     }
   }, [isAgentMode, agentTarget]);
 
@@ -360,21 +366,19 @@ function App() {
 
   // 개통실적 날짜 옵션 생성 (지난 날짜들 포함)
   const getActivationDateOptions = useCallback(() => {
-    if (!activationData) return [];
+    if (!activationDataByDate) return [];
     
     const dateOptions = [];
     const today = new Date();
     
-    // 오늘부터 과거 30일까지의 날짜 옵션 생성 (담당자 필터링 없이 모든 날짜 표시)
+    // 오늘부터 과거 30일까지의 날짜 옵션 생성
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateKey = date.toLocaleDateString();
       
-      // 실제 데이터가 있는 날짜인지 확인 (담당자 필터링 없이)
-      const hasData = Object.values(activationData).some(storeData => {
-        return storeData.lastActivationDate.toLocaleDateString() === dateKey;
-      });
+      // 해당 날짜에 데이터가 있는지 확인
+      const hasData = activationDataByDate[dateKey] && Object.keys(activationDataByDate[dateKey]).length > 0;
       
       // 데이터가 있거나 오늘 날짜인 경우 추가
       if (hasData || i === 0) {
@@ -388,7 +392,7 @@ function App() {
     }
     
     return dateOptions;
-  }, [activationData]);
+  }, [activationDataByDate]);
 
   // 담당자별 총 개통실적 계산 (카테고리별)
   const getAgentTotalActivation = useCallback(() => {
@@ -524,66 +528,66 @@ function App() {
 
   // 선택한 날짜의 총 개통수 계산
   const getSelectedDateTotalActivation = useCallback(() => {
-    if (!activationData || !activationDateSearch || !isAgentMode || !agentTarget) return 0;
+    if (!activationDataByDate || !activationDateSearch || !isAgentMode || !agentTarget) return 0;
     
     let totalCount = 0;
     
-    // 담당자별 필터링된 데이터 사용
-    const filteredData = Object.entries(activationData).filter(([storeName, storeData]) => {
-      return storeData.agents && storeData.agents.includes(agentTarget);
-    });
+    // 해당 날짜의 데이터 확인
+    const dateData = activationDataByDate[activationDateSearch];
+    if (!dateData) return 0;
     
-    filteredData.forEach(([storeName, storeData]) => {
-      const { models, lastActivationDate } = storeData;
+    // 담당자별 필터링
+    Object.values(dateData).forEach(storeData => {
+      const hasMatchingAgent = storeData.agents.some(agent => {
+        if (!agent || !agentTarget) return false;
+        const agentPrefix = agent.toString().substring(0, 3);
+        const targetPrefix = agentTarget.toString().substring(0, 3);
+        return agentPrefix === targetPrefix;
+      });
       
-      // 해당 날짜의 데이터만 필터링
-      if (lastActivationDate.toLocaleDateString() === activationDateSearch) {
-        // 해당 날짜의 모든 모델 개통수 합산
-        Object.values(models).forEach(count => {
-          totalCount += count;
-        });
+      if (hasMatchingAgent) {
+        totalCount += storeData.totalCount;
       }
     });
     
     return totalCount;
-  }, [activationData, activationDateSearch, isAgentMode, agentTarget]);
+  }, [activationDataByDate, activationDateSearch, isAgentMode, agentTarget]);
 
   // 개통실적 특정 날짜의 매장별 통계
   const getActivationDateStoreStats = useCallback((dateKey) => {
-    if (!activationData || !dateKey) return [];
+    if (!activationDataByDate || !dateKey) return [];
     
     const storeStats = [];
     
-    // 담당자별 필터링된 데이터 사용
-    const filteredData = isAgentMode && agentTarget 
-      ? Object.entries(activationData).filter(([storeName, storeData]) => {
-          return storeData.agents && storeData.agents.includes(agentTarget);
-        }).reduce((acc, [storeName, storeData]) => {
-          acc[storeName] = storeData;
-          return acc;
-        }, {})
-      : activationData;
+    // 해당 날짜의 데이터 확인
+    const dateData = activationDataByDate[dateKey];
+    if (!dateData) return [];
     
-    Object.values(filteredData).forEach(storeData => {
-      const { storeName, currentMonth, previousMonth, models, lastActivationDate } = storeData;
-      
-      // 해당 날짜의 데이터만 필터링
-      if (lastActivationDate.toLocaleDateString() === dateKey) {
-        storeStats.push({
-          storeName,
-          currentMonth,
-          previousMonth,
-          changeRate: previousMonth > 0 
-            ? ((currentMonth - previousMonth) / previousMonth * 100).toFixed(1)
-            : currentMonth > 0 ? '100.0' : '0.0',
-          models
+    Object.values(dateData).forEach(storeData => {
+      // 담당자 필터링
+      if (isAgentMode && agentTarget) {
+        const hasMatchingAgent = storeData.agents.some(agent => {
+          if (!agent || !agentTarget) return false;
+          const agentPrefix = agent.toString().substring(0, 3);
+          const targetPrefix = agentTarget.toString().substring(0, 3);
+          return agentPrefix === targetPrefix;
         });
+        
+        if (!hasMatchingAgent) return;
       }
+      
+      storeStats.push({
+        storeName: storeData.storeName,
+        currentMonth: storeData.totalCount,
+        previousMonth: 0, // 전월 데이터는 별도 계산 필요
+        changeRate: '0.0',
+        models: storeData.models
+      });
     });
     
     // 판매량 내림차순 정렬
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
-  }, [activationData, isAgentMode, agentTarget]);
+  }, [activationDataByDate, isAgentMode, agentTarget]);
 
   // 로그인 상태 복원 및 새로운 배포 감지
   useEffect(() => {

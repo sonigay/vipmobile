@@ -71,6 +71,20 @@ export async function fetchPreviousMonthData() {
   }
 }
 
+// 날짜별 개통실적 데이터 가져오기
+export async function fetchActivationDataByDate() {
+  try {
+    const response = await fetch(`${API_URL}/api/activation-data/by-date`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch activation data by date:', error);
+    throw error;
+  }
+}
+
 // 매장별 개통실적 비교 데이터 생성 (지도용)
 export function generateStoreActivationComparison(currentMonthData, previousMonthData) {
   // 당월 마지막 개통일 찾기
