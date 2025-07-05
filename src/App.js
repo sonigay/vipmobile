@@ -37,6 +37,8 @@ import {
   optimizePerformance,
   isMobile 
 } from './utils/mobileUtils';
+import { realtimeDashboardManager } from './utils/realtimeDashboardUtils';
+import RealtimeDashboardScreen from './components/screens/RealtimeDashboardScreen';
 import './mobile.css';
 
 // Logger 유틸리티
@@ -103,6 +105,8 @@ function App() {
   // 재고배정 모드 관련 상태 추가
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
   const [assignmentScreen, setAssignmentScreen] = useState(null); // 'settings' | 'department' | 'office' | 'sales'
+  // 실시간 대시보드 모드 관련 상태 추가
+  const [isRealtimeDashboardMode, setIsRealtimeDashboardMode] = useState(false);
   // 재고요청점 검색 관련 상태 추가
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -164,6 +168,17 @@ function App() {
   const handleAssignmentBack = () => {
     setIsAssignmentMode(false);
     setAssignmentScreen(null);
+    setCurrentView('all');
+  };
+
+  // 실시간 대시보드 모드 핸들러
+  const handleRealtimeDashboardMode = () => {
+    setIsRealtimeDashboardMode(true);
+    setCurrentView('dashboard');
+  };
+  
+  const handleRealtimeDashboardBack = () => {
+    setIsRealtimeDashboardMode(false);
     setCurrentView('all');
   };
 
@@ -1514,6 +1529,19 @@ function App() {
     );
   }
 
+  // 실시간 대시보드 모드일 때는 별도 화면 렌더링
+  if (isRealtimeDashboardMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <RealtimeDashboardScreen 
+          onBack={handleRealtimeDashboardBack} 
+          onLogout={handleLogout} 
+        />
+      </ThemeProvider>
+    );
+  }
+
 
 
   return (
@@ -1729,6 +1757,13 @@ function App() {
                     }}
                   >
                     업데이트 확인
+                  </Button>
+                  <Button 
+                    color="inherit" 
+                    onClick={handleRealtimeDashboardMode} 
+                    sx={{ fontSize: '0.8em', mr: 1 }}
+                  >
+                    실시간 대시보드
                   </Button>
                   <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
                     로그아웃
