@@ -12,7 +12,9 @@ import { calculateDistance } from './utils/distanceUtils';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import UpdatePopup from './components/UpdatePopup';
+import UpdateProgressPopup from './components/UpdateProgressPopup';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
+import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -90,6 +92,8 @@ function App() {
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [unreadUpdates, setUnreadUpdates] = useState([]);
+  // 새로운 업데이트 진행 팝업 상태
+  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
@@ -132,8 +136,26 @@ function App() {
     }, 500);
   }, []);
 
-  // 로그인 상태 복원
+  // 로그인 상태 복원 및 새로운 배포 감지
   useEffect(() => {
+    const checkForNewDeployment = async () => {
+      // 새로운 배포가 있는지 확인
+      if (shouldCheckForUpdates()) {
+        const hasNew = await hasNewDeployment();
+        if (hasNew) {
+          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+          await performAutoLogout();
+          // 업데이트 진행 팝업 표시
+          setShowUpdateProgressPopup(true);
+          return;
+        }
+        setLastUpdateCheck();
+      }
+    };
+
+    // 새로운 배포 체크
+    checkForNewDeployment();
+
     const savedLoginState = localStorage.getItem('loginState');
     if (savedLoginState) {
       try {
@@ -179,6 +201,19 @@ function App() {
         console.error('저장된 로그인 상태를 복원하는 중 오류 발생:', error);
         localStorage.removeItem('loginState');
       }
+    }
+  }, []);
+
+  // Service Worker 메시지 리스너
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
+          console.log('Service Worker에서 자동 로그아웃 요청 받음');
+          performAutoLogout();
+          setShowUpdateProgressPopup(true);
+        }
+      });
     }
   }, []);
 
@@ -760,6 +795,11 @@ function App() {
     }
   }, [unreadUpdates]);
 
+  // 업데이트 진행 팝업 닫기 핸들러
+  const handleUpdateProgressPopupClose = useCallback(() => {
+    setShowUpdateProgressPopup(false);
+  }, []);
+
 
 
   // 매장 재고 계산 함수 추가
@@ -1054,6 +1094,12 @@ function App() {
         onClose={handleUpdatePopupClose}
         updates={unreadUpdates}
         onMarkAsRead={handleUpdatePopupClose}
+      />
+      
+      {/* 업데이트 진행 팝업 */}
+      <UpdateProgressPopup
+        open={showUpdateProgressPopup}
+        onClose={handleUpdateProgressPopupClose}
       />
     </ThemeProvider>
   );

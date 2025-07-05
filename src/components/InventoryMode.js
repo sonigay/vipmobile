@@ -57,6 +57,8 @@ import {
   Tablet as TabletIcon
 } from '@mui/icons-material';
 import { fetchData } from '../api';
+import UpdateProgressPopup from './UpdateProgressPopup';
+import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
 
 // 지연 로딩 컴포넌트들
 const InventoryAuditScreen = lazy(() => import('./screens/InventoryAuditScreen'));
@@ -103,6 +105,8 @@ function InventoryMode({ onLogout, loggedInStore }) {
   
   // 탭 상태
   const [tabValue, setTabValue] = useState(0);
+  // 업데이트 진행 팝업 상태
+  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
 
   // 데이터 로딩 (메모이제이션 적용)
   const loadData = useCallback(async () => {
@@ -120,6 +124,40 @@ function InventoryMode({ onLogout, loggedInStore }) {
       setError('서버 연결에 실패했습니다.');
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  // 새로운 배포 감지
+  useEffect(() => {
+    const checkForNewDeployment = async () => {
+      // 새로운 배포가 있는지 확인
+      if (shouldCheckForUpdates()) {
+        const hasNew = await hasNewDeployment();
+        if (hasNew) {
+          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+          await performAutoLogout();
+          // 업데이트 진행 팝업 표시
+          setShowUpdateProgressPopup(true);
+          return;
+        }
+        setLastUpdateCheck();
+      }
+    };
+
+    // 새로운 배포 체크
+    checkForNewDeployment();
+  }, []);
+
+  // Service Worker 메시지 리스너
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
+          console.log('Service Worker에서 자동 로그아웃 요청 받음');
+          performAutoLogout();
+          setShowUpdateProgressPopup(true);
+        }
+      });
     }
   }, []);
 
@@ -286,6 +324,11 @@ function InventoryMode({ onLogout, loggedInStore }) {
   const handleBackToMain = useCallback(() => {
     setCurrentScreen('main');
     setTabValue(0);
+  }, []);
+
+  // 업데이트 진행 팝업 닫기 핸들러
+  const handleUpdateProgressPopupClose = useCallback(() => {
+    setShowUpdateProgressPopup(false);
   }, []);
 
   // 매장별 재고 정보 정리 (메모이제이션 적용)
@@ -1064,6 +1107,12 @@ function InventoryMode({ onLogout, loggedInStore }) {
           {currentScreen} 화면 개발 중...
         </Typography>
       </Box>
+      
+      {/* 업데이트 진행 팝업 */}
+      <UpdateProgressPopup
+        open={showUpdateProgressPopup}
+        onClose={handleUpdateProgressPopupClose}
+      />
     </Box>
   );
 }

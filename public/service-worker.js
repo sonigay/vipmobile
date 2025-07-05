@@ -7,6 +7,7 @@ const getCacheName = () => {
 };
 
 const CACHE_NAME = getCacheName();
+const BUILD_VERSION = Date.now().toString(); // 빌드 버전 정보
 const urlsToCache = [
   '/',
   '/index.html',
@@ -96,6 +97,16 @@ self.addEventListener('activate', event => {
         })
       );
     }).then(() => {
+      // 새로운 배포 감지 시 모든 클라이언트에게 알림
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'AUTO_LOGOUT_REQUIRED',
+            buildVersion: BUILD_VERSION
+          });
+        });
+      });
+      
       // 모든 클라이언트 페이지에 새로고침 요청
       return self.clients.claim();
     })
@@ -118,5 +129,23 @@ self.addEventListener('message', event => {
         );
       })
     );
+  }
+  
+  // 빌드 버전 정보 요청
+  if (event.data && event.data.type === 'GET_BUILD_VERSION') {
+    event.ports[0].postMessage({ version: BUILD_VERSION });
+  }
+  
+  // 새로운 배포 감지 시 자동 로그아웃
+  if (event.data && event.data.type === 'NEW_DEPLOYMENT_DETECTED') {
+    // 모든 클라이언트에게 새 배포 알림
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'AUTO_LOGOUT_REQUIRED',
+          buildVersion: BUILD_VERSION
+        });
+      });
+    });
   }
 }); 

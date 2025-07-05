@@ -14,6 +14,8 @@ import {
   Divider
 } from '@mui/material';
 import axios from 'axios';
+import UpdateProgressPopup from './UpdateProgressPopup';
+import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
 
 function Login({ onLogin }) {
   const [storeId, setStoreId] = useState('');
@@ -24,6 +26,7 @@ function Login({ onLogin }) {
   const [userConsent, setUserConsent] = useState(false);
   const [showConsentForm, setShowConsentForm] = useState(false);
   const [storedIpInfo, setStoredIpInfo] = useState(null);
+  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
 
   // 사용자 기기 정보 수집
   useEffect(() => {
@@ -40,8 +43,26 @@ function Login({ onLogin }) {
     collectDeviceInfo();
   }, []);
 
-  // 사용자 IP 및 위치 정보 수집
+  // 새로운 배포 감지 및 IP 정보 수집
   useEffect(() => {
+    const checkForNewDeployment = async () => {
+      // 새로운 배포가 있는지 확인
+      if (shouldCheckForUpdates()) {
+        const hasNew = await hasNewDeployment();
+        if (hasNew) {
+          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+          await performAutoLogout();
+          // 업데이트 진행 팝업 표시
+          setShowUpdateProgressPopup(true);
+          return;
+        }
+        setLastUpdateCheck();
+      }
+    };
+
+    // 새로운 배포 체크
+    checkForNewDeployment();
+
     const fetchIPInfo = async () => {
       try {
         const response = await axios.get('https://ipapi.co/json/');
@@ -112,6 +133,24 @@ function Login({ onLogin }) {
     if (userAgent.includes('iOS') || userAgent.includes('iPhone') || userAgent.includes('iPad')) return 'iOS';
     if (userAgent.includes('Linux')) return 'Linux';
     return 'Unknown OS';
+  };
+
+  // Service Worker 메시지 리스너
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
+          console.log('Service Worker에서 자동 로그아웃 요청 받음');
+          performAutoLogout();
+          setShowUpdateProgressPopup(true);
+        }
+      });
+    }
+  }, []);
+
+  // 업데이트 진행 팝업 닫기 핸들러
+  const handleUpdateProgressPopupClose = () => {
+    setShowUpdateProgressPopup(false);
   };
 
   const handleSubmit = async (e) => {
@@ -268,6 +307,12 @@ function Login({ onLogin }) {
           </Box>
         </Paper>
       </Box>
+      
+      {/* 업데이트 진행 팝업 */}
+      <UpdateProgressPopup
+        open={showUpdateProgressPopup}
+        onClose={handleUpdateProgressPopupClose}
+      />
     </Container>
   );
 }
