@@ -65,6 +65,17 @@ export const getAssignmentHistory = () => {
   }
 };
 
+// 히스토리 로드 (비동기 버전)
+export const loadAssignmentHistory = async () => {
+  try {
+    const history = localStorage.getItem(HISTORY_STORAGE_KEY);
+    return history ? JSON.parse(history) : [];
+  } catch (error) {
+    console.error('히스토리 로드 실패:', error);
+    return [];
+  }
+};
+
 // 특정 히스토리 조회
 export const getHistoryItem = (historyId) => {
   const history = getAssignmentHistory();
