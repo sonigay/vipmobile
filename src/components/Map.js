@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, Tooltip } from 'react-leaflet';
 import { Paper } from '@mui/material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -172,6 +172,43 @@ function Map({
     
     return totalInventory;
   }, [selectedModel, selectedColor]);
+
+  // 출고일 기준 재고 분류 함수
+  const getInventoryByAge = useCallback((store) => {
+    const now = new Date();
+    const result = {
+      within30: 0,    // 30일 이내
+      within60: 0,    // 30-60일
+      over60: 0       // 60일 이상
+    };
+
+    if (!store.inventory) return result;
+
+    Object.values(store.inventory).forEach(category => {
+      if (!category || typeof category !== 'object') return;
+      Object.values(category).forEach(model => {
+        if (!model || typeof model !== 'object') return;
+        Object.values(model).forEach(status => {
+          if (!status || typeof status !== 'object') return;
+          Object.values(status).forEach(item => {
+            // item이 숫자(수량)만 있는 경우는 패스
+            if (typeof item === 'object' && item && item.shippedDate) {
+              const days = Math.floor((now - new Date(item.shippedDate)) / (1000 * 60 * 60 * 24));
+              if (days <= 30) {
+                result.within30++;
+              } else if (days <= 60) {
+                result.within60++;
+              } else {
+                result.over60++;
+              }
+            }
+          });
+        });
+      });
+    });
+
+    return result;
+  }, []);
 
   // 마커 아이콘 생성 함수
   const createMarkerIcon = useCallback((store) => {
@@ -400,6 +437,7 @@ function Map({
           if (!store.latitude || !store.longitude) return null;
           
           const inventoryCount = calculateInventory(store);
+          const inventoryByAge = getInventoryByAge(store);
           const isSelected = selectedStore?.id === store.id;
           const isLoggedInStore = loggedInStoreId === store.id;
           
@@ -412,6 +450,30 @@ function Map({
                 click: () => onStoreSelect(store)
               }}
             >
+              {/* 출고일 기준 재고 정보 라벨 */}
+              {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                <Tooltip permanent direction="bottom" offset={[0, 10]}>
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    whiteSpace: 'nowrap',
+                    textAlign: 'center'
+                  }}>
+                    {inventoryByAge.over60 > 0 && (
+                      <span style={{ color: '#ff9800' }}>⚠️ {inventoryByAge.over60}개</span>
+                    )}
+                    {inventoryByAge.within60 > 0 && (
+                      <span style={{ color: '#ffc107', marginLeft: '4px' }}>⚡ {inventoryByAge.within60}개</span>
+                    )}
+                    {inventoryByAge.within30 > 0 && (
+                      <span style={{ color: '#4caf50', marginLeft: '4px' }}>✅ {inventoryByAge.within30}개</span>
+                    )}
+                  </div>
+                </Tooltip>
+              )}
               <Popup>
                 <div>
                   <h3>{store.name}</h3>
@@ -459,6 +521,25 @@ function Map({
                           })}
                         </div>
                       )}
+                      
+                      {/* 출고일 기준 재고 정보 */}
+                      {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                        <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
+                          <div style={{ fontSize: '0.85em' }}>
+                            {inventoryByAge.over60 > 0 && (
+                              <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                            )}
+                            {inventoryByAge.within60 > 0 && (
+                              <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                            )}
+                            {inventoryByAge.within30 > 0 && (
+                              <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
                       {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
                     </div>
@@ -466,6 +547,25 @@ function Map({
                     /* 기존 말풍선 내용 (전체재고확인 및 일반 모드) */
                     <div>
                       <p>재고: {inventoryCount}개</p>
+                      
+                      {/* 출고일 기준 재고 정보 */}
+                      {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                        <div style={{ marginTop: '8px', padding: '6px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                          <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '0.85em' }}>출고일 기준:</p>
+                          <div style={{ fontSize: '0.8em' }}>
+                            {inventoryByAge.over60 > 0 && (
+                              <span style={{ color: '#ff9800', marginRight: '8px' }}>⚠️ {inventoryByAge.over60}개</span>
+                            )}
+                            {inventoryByAge.within60 > 0 && (
+                              <span style={{ color: '#ffc107', marginRight: '8px' }}>⚡ {inventoryByAge.within60}개</span>
+                            )}
+                            {inventoryByAge.within30 > 0 && (
+                              <span style={{ color: '#4caf50' }}>✅ {inventoryByAge.within30}개</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       {store.address && <p>주소: {store.address}</p>}
                       {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold'}}>✓ 선택됨</p>}
                       {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
