@@ -1,0 +1,645 @@
+/* 모바일 UI 최적화 스타일 */
+
+/* 모바일 최적화 클래스 */
+.mobile-optimized {
+  /* 기본 모바일 최적화 */
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 터치 타겟 최적화 */
+.touch-target {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+}
+
+/* 스크롤 최적화 */
+.scrollable {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* 하단 네비게이션 바 */
+.bottom-navigation {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0;
+  z-index: 1000;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.bottom-navigation .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+}
+
+.bottom-navigation .nav-item:hover {
+  background-color: #f5f5f5;
+}
+
+.bottom-navigation .nav-item.active {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.bottom-navigation .nav-item i {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.bottom-navigation .nav-item span {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 모바일 헤더 최적화 */
+.mobile-header {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  z-index: 999;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-header .header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.mobile-header .header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 모바일 카드 최적화 */
+.mobile-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.mobile-card .card-header {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-card .card-content {
+  padding: 16px;
+}
+
+.mobile-card .card-actions {
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* 모바일 버튼 최적화 */
+.mobile-button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mobile-button.primary {
+  background: #1976d2;
+  color: #ffffff;
+}
+
+.mobile-button.primary:hover {
+  background: #1565c0;
+}
+
+.mobile-button.secondary {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.mobile-button.secondary:hover {
+  background: #e0e0e0;
+}
+
+.mobile-button.danger {
+  background: #f44336;
+  color: #ffffff;
+}
+
+.mobile-button.danger:hover {
+  background: #d32f2f;
+}
+
+/* 모바일 입력 필드 최적화 */
+.mobile-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  background: #ffffff;
+  transition: border-color 0.2s;
+}
+
+.mobile-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+/* 모바일 테이블 최적화 */
+.mobile-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.mobile-table th,
+.mobile-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+  color: #333;
+}
+
+.mobile-table tr:hover {
+  background: #f9f9f9;
+}
+
+/* 모바일 리스트 최적화 */
+.mobile-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.mobile-list-item {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobile-list-item:hover {
+  background: #f5f5f5;
+}
+
+.mobile-list-item:last-child {
+  border-bottom: none;
+}
+
+/* 모바일 모달 최적화 */
+.mobile-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.mobile-modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-modal-body {
+  padding: 16px;
+}
+
+.mobile-modal-footer {
+  padding: 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* 모바일 드로어 최적화 */
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: #ffffff;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 1500;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+
+.mobile-drawer-header {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-drawer-content {
+  flex: 1;
+  overflow: auto;
+}
+
+/* 모바일 탭 최적화 */
+.mobile-tabs {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  background: #ffffff;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-tab {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mobile-tab.active {
+  border-bottom-color: #1976d2;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.mobile-tab:hover {
+  background: #f5f5f5;
+}
+
+/* 모바일 칩 최적화 */
+.mobile-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #e3f2fd;
+  color: #1976d2;
+  margin: 2px;
+  min-height: 32px;
+}
+
+.mobile-chip.success {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.mobile-chip.warning {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.mobile-chip.error {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+/* 모바일 로딩 최적화 */
+.mobile-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: #666;
+}
+
+.mobile-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #f0f0f0;
+  border-top: 2px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 모바일 알림 최적화 */
+.mobile-notification {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  z-index: 3000;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+.mobile-notification.show {
+  transform: translateY(0);
+}
+
+.mobile-notification.success {
+  border-left: 4px solid #4caf50;
+}
+
+.mobile-notification.error {
+  border-left: 4px solid #f44336;
+}
+
+.mobile-notification.warning {
+  border-left: 4px solid #ff9800;
+}
+
+.mobile-notification.info {
+  border-left: 4px solid #2196f3;
+}
+
+/* 모바일 그리드 최적화 */
+.mobile-grid {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.mobile-grid.cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.mobile-grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.mobile-grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* 모바일 플렉스 최적화 */
+.mobile-flex {
+  display: flex;
+  align-items: center;
+}
+
+.mobile-flex.column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mobile-flex.space-between {
+  justify-content: space-between;
+}
+
+.mobile-flex.center {
+  justify-content: center;
+}
+
+.mobile-flex.wrap {
+  flex-wrap: wrap;
+}
+
+/* 모바일 간격 최적화 */
+.mobile-spacing {
+  margin: 8px 0;
+}
+
+.mobile-spacing.small {
+  margin: 4px 0;
+}
+
+.mobile-spacing.large {
+  margin: 16px 0;
+}
+
+.mobile-padding {
+  padding: 8px;
+}
+
+.mobile-padding.small {
+  padding: 4px;
+}
+
+.mobile-padding.large {
+  padding: 16px;
+}
+
+/* 모바일 텍스트 최적화 */
+.mobile-text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+}
+
+.mobile-text.small {
+  font-size: 14px;
+}
+
+.mobile-text.large {
+  font-size: 18px;
+}
+
+.mobile-text.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.mobile-text.subtitle {
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+/* 모바일 아이콘 최적화 */
+.mobile-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-icon.small {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-icon.large {
+  width: 32px;
+  height: 32px;
+}
+
+/* 모바일 애니메이션 최적화 */
+.mobile-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.mobile-slide-up {
+  animation: slideUp 0.3s ease;
+}
+
+.mobile-scale-in {
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 모바일 반응형 유틸리티 */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none !important;
+  }
+  
+  .mobile-visible {
+    display: block !important;
+  }
+  
+  .mobile-full-width {
+    width: 100% !important;
+  }
+  
+  .mobile-full-height {
+    height: 100% !important;
+  }
+  
+  .mobile-text-center {
+    text-align: center !important;
+  }
+  
+  .mobile-text-left {
+    text-align: left !important;
+  }
+  
+  .mobile-text-right {
+    text-align: right !important;
+  }
+}
+
+/* 모바일 방향별 최적화 */
+.portrait-mode .mobile-landscape-hidden {
+  display: none !important;
+}
+
+.landscape-mode .mobile-portrait-hidden {
+  display: none !important;
+}
+
+/* 모바일 접근성 최적화 */
+.mobile-focus-visible:focus {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+.mobile-reduced-motion {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* 모바일 다크 모드 지원 */
+@media (prefers-color-scheme: dark) {
+  .mobile-dark-mode {
+    background: #121212;
+    color: #ffffff;
+  }
+  
+  .mobile-dark-mode .mobile-card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+  }
+  
+  .mobile-dark-mode .mobile-button.secondary {
+    background: #333;
+    color: #ffffff;
+  }
+  
+  .mobile-dark-mode .mobile-input {
+    background: #1e1e1e;
+    border-color: #333;
+    color: #ffffff;
+  }
+} 

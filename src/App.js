@@ -30,6 +30,14 @@ import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpda
 import NotificationButton from './components/NotificationButton';
 import AnnouncementBanner from './components/AnnouncementBanner';
 import { notificationManager } from './utils/notificationUtils';
+import { 
+  mobileOptimizationManager, 
+  applyMobileOptimizations, 
+  optimizeMobileNavigation, 
+  optimizePerformance,
+  isMobile 
+} from './utils/mobileUtils';
+import './mobile.css';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -126,7 +134,7 @@ function App() {
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
   
-  // 알림 시스템 초기화
+  // 알림 시스템 및 모바일 최적화 초기화
   useEffect(() => {
     if (!notificationInitialized) {
       // 알림 권한 요청
@@ -135,6 +143,11 @@ function App() {
       // 오래된 알림 및 공지사항 정리
       notificationManager.cleanupOldNotifications();
       notificationManager.cleanupExpiredAnnouncements();
+      
+      // 모바일 최적화 적용
+      applyMobileOptimizations();
+      optimizeMobileNavigation();
+      optimizePerformance();
       
       // 초기화 완료
       setNotificationInitialized(true);
