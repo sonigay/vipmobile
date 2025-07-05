@@ -622,15 +622,12 @@ function App() {
 
   // 개통실적 특정 날짜의 매장별 통계
   const getActivationDateStoreStats = useCallback((dateKey) => {
-    if (!activationDataByDate || !dateKey) return [];
+    if (!activationData || !dateKey) return [];
     
     const storeStats = [];
     
-    // 해당 날짜의 데이터 확인
-    const dateData = activationDataByDate[dateKey];
-    if (!dateData) return [];
-    
-    Object.values(dateData).forEach(storeData => {
+    // activationData에서 해당 날짜의 데이터 사용 (전월 비교 데이터 포함)
+    Object.entries(activationData).forEach(([storeName, storeData]) => {
       // 담당자 필터링
       if (isAgentMode && agentTarget) {
         const hasMatchingAgent = storeData.agents.some(agent => {
@@ -645,16 +642,18 @@ function App() {
       
       storeStats.push({
         storeName: storeData.storeName,
-        currentMonth: storeData.totalCount,
-        previousMonth: 0, // 전월 데이터는 별도 계산 필요
-        changeRate: '0.0',
+        currentMonth: storeData.currentMonth,
+        previousMonth: storeData.previousMonth,
+        changeRate: storeData.previousMonth > 0 
+          ? ((storeData.currentMonth - storeData.previousMonth) / storeData.previousMonth * 100).toFixed(1)
+          : storeData.currentMonth > 0 ? '100.0' : '0.0',
         models: storeData.models
       });
     });
     
     // 판매량 내림차순 정렬
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
-  }, [activationDataByDate, isAgentMode, agentTarget]);
+  }, [activationData, isAgentMode, agentTarget]);
 
   // 로그인 상태 복원 및 새로운 배포 감지
   useEffect(() => {
