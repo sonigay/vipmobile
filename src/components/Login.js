@@ -43,25 +43,8 @@ function Login({ onLogin }) {
     collectDeviceInfo();
   }, []);
 
-  // 새로운 배포 감지 및 IP 정보 수집
+  // IP 정보 수집
   useEffect(() => {
-    const checkForNewDeployment = async () => {
-      // 새로운 배포가 있는지 확인
-      if (shouldCheckForUpdates()) {
-        const hasNew = await hasNewDeployment();
-        if (hasNew) {
-          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
-          await performAutoLogout();
-          // 업데이트 진행 팝업 표시
-          setShowUpdateProgressPopup(true);
-          return;
-        }
-        setLastUpdateCheck();
-      }
-    };
-
-    // 새로운 배포 체크
-    checkForNewDeployment();
 
     const fetchIPInfo = async () => {
       try {
@@ -135,18 +118,7 @@ function Login({ onLogin }) {
     return 'Unknown OS';
   };
 
-  // Service Worker 메시지 리스너
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
-          console.log('Service Worker에서 자동 로그아웃 요청 받음');
-          performAutoLogout();
-          setShowUpdateProgressPopup(true);
-        }
-      });
-    }
-  }, []);
+
 
   // 업데이트 진행 팝업 닫기 핸들러
   const handleUpdateProgressPopupClose = () => {

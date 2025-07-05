@@ -15,7 +15,7 @@ import {
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 
-const UpdateProgressPopup = ({ open, onClose, onUpdate }) => {
+const UpdateProgressPopup = ({ open, onClose, onUpdate, isLatestVersion = false }) => {
   const [progress, setProgress] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateStep, setUpdateStep] = useState('');
@@ -92,25 +92,33 @@ const UpdateProgressPopup = ({ open, onClose, onUpdate }) => {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        backgroundColor: 'primary.main',
+        backgroundColor: isLatestVersion ? 'success.main' : 'primary.main',
         color: 'white',
         textAlign: 'center'
       }}>
-        <UpdateIcon sx={{ mr: 1 }} />
+        {isLatestVersion ? (
+          <CheckCircleIcon sx={{ mr: 1 }} />
+        ) : (
+          <UpdateIcon sx={{ mr: 1 }} />
+        )}
         <Typography variant="h6">
-          업데이트 진행
+          {isLatestVersion ? '최신버전입니다' : '업데이트 진행'}
         </Typography>
       </DialogTitle>
       
       <DialogContent sx={{ p: 3, textAlign: 'center' }}>
         {!isUpdating ? (
           <Box>
-            <UpdateIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
+            {isLatestVersion ? (
+              <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
+            ) : (
+              <UpdateIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
+            )}
             <Typography variant="h6" sx={{ mb: 2 }}>
-              간단한 업데이트 내용이 있습니다
+              {isLatestVersion ? '현재 최신 버전을 사용 중입니다' : '적용 안된 업데이트 내용이 있습니다'}
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              업데이트를 진행하시겠습니까?
+              {isLatestVersion ? '모든 기능이 최신 상태로 업데이트되어 있습니다.' : '업데이트를 진행하시겠습니까?'}
             </Typography>
           </Box>
         ) : (

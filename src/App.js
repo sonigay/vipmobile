@@ -220,14 +220,17 @@ function App() {
   // 업데이트 확인 및 팝업 표시
   useEffect(() => {
     if (isLoggedIn) {
-      // 새로운 업데이트가 있을 때만 팝업 표시
-      if (hasNewUpdates()) {
+      // 새로운 업데이트가 있는지 확인
+      const hasNew = hasNewUpdates();
+      if (hasNew) {
         const updates = getUnreadUpdates();
         setUnreadUpdates(updates);
         setShowUpdatePopup(true);
         console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
       } else {
-        console.log('새로운 업데이트가 없습니다.');
+        // 최신 버전인 경우 팝업 표시
+        setShowUpdateProgressPopup(true);
+        console.log('최신 버전 확인');
       }
     }
   }, [isLoggedIn]);
@@ -1110,6 +1113,7 @@ function App() {
       <UpdateProgressPopup
         open={showUpdateProgressPopup}
         onClose={handleUpdateProgressPopupClose}
+        isLatestVersion={!hasNewUpdates()}
       />
     </ThemeProvider>
   );
