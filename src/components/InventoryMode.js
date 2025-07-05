@@ -309,15 +309,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
   const handleSubMenuClick = useCallback((subMenu) => {
     console.log(`${selectedMenu} - ${subMenu} 메뉴 클릭`);
     
-    // 재고배정 메뉴 처리
-    if (selectedMenu === 'assignment') {
-      if (onAssignmentMode) {
-        onAssignmentMode(subMenu);
-      }
-      handleMenuClose();
-      return;
-    }
-    
     const screenName = `${selectedMenu}_${subMenu}`;
     
     // 화면 전환 시 즉시 로딩 상태 표시
@@ -328,7 +319,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
       setCurrentScreen(screenName);
       handleMenuClose();
     }, 0);
-  }, [selectedMenu, handleMenuClose, onAssignmentMode]);
+  }, [selectedMenu, handleMenuClose]);
 
   // 탭 변경 핸들러 (최적화)
   const handleTabChange = useCallback((event, newValue) => {
@@ -1017,7 +1008,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
                               {manager.stores.slice(0, 3).map((store) => (
                                 <Chip
                                   key={store.id}
-                                  label={store.name}
+                                  label={store.name || '알 수 없음'}
                                   size="small"
                                   variant="outlined"
                                   icon={<StoreIcon />}
