@@ -1290,8 +1290,10 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
         return;
       }
       
-      // 특정 날짜만 처리
-      if (normalizedDate !== date) return;
+      // 특정 날짜만 처리 (일자만 비교)
+      const currentDay = new Date(normalizedDate).getDate();
+      const targetDay = new Date(date).getDate();
+      if (currentDay !== targetDay) return;
       
       if (!comparisonData[store]) {
         comparisonData[store] = {
@@ -1313,14 +1315,12 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
       comparisonData[store].models[modelKey]++;
     });
     
-    // 전월 데이터 처리 (같은 날짜)
+    // 전월 데이터 처리 (같은 일자)
     console.log(`전월 데이터 처리 시작 - 요청 날짜: ${date}`);
     console.log(`전월 데이터 행 수: ${previousMonthRows.length}`);
     
-    const targetDate = new Date(date);
-    targetDate.setFullYear(targetDate.getFullYear() - 1);
-    const previousYearDate = targetDate.toISOString().split('T')[0];
-    console.log(`전월 비교 대상 날짜: ${previousYearDate}`);
+    const targetDay = new Date(date).getDate();
+    console.log(`전월 비교 대상 일자: ${targetDay}일`);
     
     let processedPreviousCount = 0;
     
@@ -1353,12 +1353,15 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
         return;
       }
       
-      // 특정 날짜만 처리 (전월의 같은 날짜)
-      if (normalizedDate !== previousYearDate) return;
+      // 특정 날짜만 처리 (전월의 같은 일자)
+      const previousDay = new Date(normalizedDate).getDate();
+      const targetDay = new Date(date).getDate();
+      if (previousDay !== targetDay) return;
       
       processedPreviousCount++;
       if (processedPreviousCount <= 5) { // 처음 5개만 로그 출력
-        console.log(`전월 데이터 매칭: ${store} - ${activationDate} -> ${normalizedDate}`);
+        const day = new Date(normalizedDate).getDate();
+        console.log(`전월 데이터 매칭: ${store} - ${activationDate} -> ${day}일`);
       }
       
       if (!comparisonData[store]) {

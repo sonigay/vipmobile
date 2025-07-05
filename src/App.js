@@ -443,9 +443,10 @@ function App() {
       
       // 데이터가 있거나 오늘 날짜인 경우 추가
       if (hasData || i === 0) {
-        // 표시용 한국 형식 날짜 생성
+        // 표시용 일자만 생성 (예: "25일")
         const displayDate = new Date(dateKey);
-        const displayLabel = displayDate.toLocaleDateString('ko-KR');
+        const day = displayDate.getDate();
+        const displayLabel = `${day}일`;
         
         dateOptions.push({
           value: dateKey,
