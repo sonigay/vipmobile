@@ -60,14 +60,31 @@ function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
   }, []);
 
   // 영업사원별 배정 데이터 계산
-  const agentAssignments = useMemo(() => {
-    if (!agents.length || !assignmentSettings.models) return {};
+  const [agentAssignments, setAgentAssignments] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-    // 전체 배정 계산
-    const fullAssignment = calculateFullAssignment(agents, assignmentSettings);
-    
-    return fullAssignment.agents;
-  }, [agents, assignmentSettings]);
+  // 배정 데이터 로드
+  useEffect(() => {
+    const loadAssignmentData = async () => {
+      if (!agents.length || !assignmentSettings.models || Object.keys(assignmentSettings.models).length === 0) {
+        setAgentAssignments({});
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const fullAssignment = await calculateFullAssignment(agents, assignmentSettings, data);
+        setAgentAssignments(fullAssignment.agents || {});
+      } catch (error) {
+        console.error('배정 데이터 로드 실패:', error);
+        setAgentAssignments({});
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAssignmentData();
+  }, [agents, assignmentSettings, data]);
 
   // 필터링된 영업사원 목록
   const filteredAgents = useMemo(() => {
@@ -197,95 +214,140 @@ function SalesAgentAssignmentScreen({ data, onBack, onLogout }) {
           </Grid>
         </Paper>
 
+        {/* 로딩 상태 */}
+        {isLoading && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" align="center" color="primary">
+                배정 데이터를 계산 중입니다...
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+
         {/* 영업사원별 배정 현황 */}
-        <Grid container spacing={3}>
-          {filteredAgents.map((agent) => {
-            const totalAssignment = getAgentTotalAssignment(agent.contactId);
-            const agentAssignment = agentAssignments[agent.contactId];
-            
-            return (
-              <Grid item xs={12} md={6} lg={4} key={agent.contactId}>
-                <Card>
-                  <CardContent>
-                    {/* 영업사원 정보 */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <PersonAddIcon sx={{ mr: 2, color: 'primary.main' }} />
-                      <Box>
-                        <Typography variant="h6" fontWeight="bold">
-                          {agent.target}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {agent.qualification || '미지정'}
-                        </Typography>
-                      </Box>
-                    </Box>
+        {!isLoading && (
+          <>
+            {/* 요약 정보 */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 영업사원: {filteredAgents.length}명
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    배정 대상: {Object.keys(agentAssignments).length}명
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 배정량: {Object.values(agentAssignments).reduce((sum, assignment) => {
+                      return sum + (assignment.quantity || 0);
+                    }, 0)}개
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    모델 수: {assignmentSettings.models ? Object.keys(assignmentSettings.models).length : 0}개
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Paper>
 
-                    {/* 사무실/소속 정보 */}
-                    <Box sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <BusinessIcon sx={{ mr: 1, fontSize: 16 }} />
-                        <Typography variant="body2">
-                          {agent.office || '미지정'}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <AccountTreeIcon sx={{ mr: 1, fontSize: 16 }} />
-                        <Typography variant="body2">
-                          {agent.department || '미지정'}
-                        </Typography>
-                      </Box>
-                    </Box>
+            {/* 영업사원별 배정 카드 */}
+            <Grid container spacing={3}>
+              {filteredAgents.map((agent) => {
+                const agentAssignment = agentAssignments[agent.contactId];
+                const totalAssignment = agentAssignment ? agentAssignment.quantity || 0 : 0;
+                
+                return (
+                  <Grid item xs={12} md={6} lg={4} key={agent.contactId}>
+                    <Card>
+                      <CardContent>
+                        {/* 영업사원 정보 */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                          <PersonAddIcon sx={{ mr: 2, color: 'primary.main' }} />
+                          <Box>
+                            <Typography variant="h6" fontWeight="bold">
+                              {agent.target}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {agent.qualification || '미지정'}
+                            </Typography>
+                          </Box>
+                        </Box>
 
-                    {/* 총 배정량 */}
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="h5" color="primary" gutterBottom>
-                        {totalAssignment}개
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        총 배정 수량
-                      </Typography>
-                    </Box>
+                        {/* 사무실/소속 정보 */}
+                        <Box sx={{ mb: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <BusinessIcon sx={{ mr: 1, fontSize: 16 }} />
+                            <Typography variant="body2">
+                              {agent.office || '미지정'}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <AccountTreeIcon sx={{ mr: 1, fontSize: 16 }} />
+                            <Typography variant="body2">
+                              {agent.department || '미지정'}
+                            </Typography>
+                          </Box>
+                        </Box>
 
-                    {/* 모델별 배정 상세 */}
-                    {agentAssignment && Object.keys(agentAssignment).length > 0 ? (
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          모델별 배정:
-                        </Typography>
-                        {Object.entries(agentAssignment).map(([modelName, assignment]) => (
-                          <Box key={modelName} sx={{ mb: 1 }}>
-                            <Typography variant="body2" fontWeight="medium">
-                              {modelName}
+                        {/* 총 배정량 */}
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="h5" color="primary" gutterBottom>
+                            {totalAssignment}개
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            총 배정 수량
+                          </Typography>
+                        </Box>
+
+                        {/* 배정 점수 정보 */}
+                        {agentAssignment && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              배정 점수: {agentAssignment.score ? Math.round(agentAssignment.score) : 0}점
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              배정 비율: {agentAssignment.ratio ? Math.round(agentAssignment.ratio * 100) : 0}%
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {/* 모델별 배정 상세 */}
+                        {agentAssignment && agentAssignment.colors && agentAssignment.colors.length > 0 ? (
+                          <Box>
+                            <Typography variant="subtitle2" gutterBottom>
+                              배정 모델:
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.5 }}>
-                              {assignment.colors.map((color, index) => (
+                              {agentAssignment.colors.map((color, index) => (
                                 <Chip
                                   key={index}
                                   label={color}
                                   size="small"
                                   variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
                                 />
                               ))}
                             </Box>
-                            <Chip
-                              label={`${assignment.quantity}개`}
-                              color="primary"
-                              size="small"
-                            />
                           </Box>
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        배정된 모델이 없습니다.
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            배정된 모델이 없습니다.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </>
+        )}
 
         {/* 배정된 영업사원이 없는 경우 */}
         {filteredAgents.length === 0 && (

@@ -57,41 +57,59 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
   }, []);
 
   // 소속별 통계 계산 (새로운 배정 로직 적용)
-  const departmentStats = useMemo(() => {
-    if (!agents.length || !assignmentSettings.models) return {};
+  const [departmentStats, setDepartmentStats] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-    // 전체 배정 계산
-    const fullAssignment = calculateFullAssignment(agents, assignmentSettings);
-    
-    // 소속별 통계 변환
-    const stats = {};
-    Object.entries(fullAssignment.departments).forEach(([department, deptData]) => {
-      stats[department] = {
-        department: deptData.department,
-        agentCount: deptData.agentCount,
-        agents: deptData.agents,
-        totalAssignment: deptData.totalQuantity,
-        models: {}
-      };
-      
-      // 모델별 배정량 계산
-      Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
-        const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
-        const deptModelQuantity = Object.values(modelAssignments)
-          .filter(assignment => assignment.department === department)
-          .reduce((sum, assignment) => sum + assignment.quantity, 0);
+  // 배정 데이터 로드
+  useEffect(() => {
+    const loadAssignmentData = async () => {
+      if (!agents.length || !assignmentSettings.models || Object.keys(assignmentSettings.models).length === 0) {
+        setDepartmentStats({});
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const fullAssignment = await calculateFullAssignment(agents, assignmentSettings, data);
         
-        stats[department].models[modelName] = {
-          name: modelName,
-          colors: modelData.colors,
-          totalQuantity: modelData.quantity,
-          assignedQuantity: deptModelQuantity
-        };
-      });
-    });
+        // 소속별 통계 변환
+        const stats = {};
+        Object.entries(fullAssignment.departments || {}).forEach(([department, deptData]) => {
+          stats[department] = {
+            department: deptData.department,
+            agentCount: deptData.agentCount,
+            agents: deptData.agents,
+            totalAssignment: deptData.totalQuantity,
+            models: {}
+          };
+          
+          // 모델별 배정량 계산
+          Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
+            const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
+            const deptModelQuantity = Object.values(modelAssignments)
+              .filter(assignment => assignment.department === department)
+              .reduce((sum, assignment) => sum + assignment.quantity, 0);
+            
+            stats[department].models[modelName] = {
+              name: modelName,
+              colors: modelData.colors,
+              totalQuantity: modelData.quantity,
+              assignedQuantity: deptModelQuantity
+            };
+          });
+        });
 
-    return stats;
-  }, [agents, assignmentSettings]);
+        setDepartmentStats(stats);
+      } catch (error) {
+        console.error('배정 데이터 로드 실패:', error);
+        setDepartmentStats({});
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAssignmentData();
+  }, [agents, assignmentSettings, data]);
 
   // 선택된 소속의 데이터
   const selectedDepartmentData = useMemo(() => {
@@ -157,38 +175,80 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
           </Grid>
         </Paper>
 
+        {/* 로딩 상태 */}
+        {isLoading && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" align="center" color="primary">
+                배정 데이터를 계산 중입니다...
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+
         {/* 소속별 통계 카드 */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {selectedDepartmentData.map((deptData) => (
-            <Grid item xs={12} md={4} key={deptData.department}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <AccountTreeIcon sx={{ mr: 2, color: 'primary.main' }} />
-                    <Typography variant="h6">
-                      {deptData.department}
-                    </Typography>
-                  </Box>
-                  <Typography variant="h4" color="primary" gutterBottom>
-                    {deptData.agentCount}명
+        {!isLoading && (
+          <>
+            {/* 요약 정보 */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 소속: {Object.keys(departmentStats).length}개
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    담당자 수
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 담당자: {Object.values(departmentStats).reduce((sum, dept) => sum + dept.agentCount, 0)}명
                   </Typography>
-                  <Typography variant="h5" color="secondary" gutterBottom>
-                    {deptData.totalAssignment}개
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 배정량: {Object.values(departmentStats).reduce((sum, dept) => sum + dept.totalAssignment, 0)}개
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    총 배정 수량
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    모델 수: {assignmentSettings.models ? Object.keys(assignmentSettings.models).length : 0}개
                   </Typography>
-                </CardContent>
-              </Card>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* 소속별 통계 카드 */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              {selectedDepartmentData.map((deptData) => (
+                <Grid item xs={12} md={4} key={deptData.department}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <AccountTreeIcon sx={{ mr: 2, color: 'primary.main' }} />
+                        <Typography variant="h6">
+                          {deptData.department}
+                        </Typography>
+                      </Box>
+                      <Typography variant="h4" color="primary" gutterBottom>
+                        {deptData.agentCount}명
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        담당자 수
+                      </Typography>
+                      <Typography variant="h5" color="secondary" gutterBottom>
+                        {deptData.totalAssignment}개
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        총 배정 수량
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
+          </>
+        )}
 
         {/* 소속별 상세 테이블 */}
-        {selectedDepartmentData.map((deptData) => (
+        {!isLoading && selectedDepartmentData.map((deptData) => (
           <Card key={deptData.department} sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
@@ -222,6 +282,7 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
                                 label={color}
                                 size="small"
                                 variant="outlined"
+                                sx={{ fontSize: '0.7rem' }}
                               />
                             ))}
                           </Box>
@@ -255,7 +316,7 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
         ))}
 
         {/* 담당자 목록 */}
-        {selectedDepartmentData.map((deptData) => (
+        {!isLoading && selectedDepartmentData.map((deptData) => (
           <Card key={`${deptData.department}-agents`}>
             <CardContent>
               <Typography variant="h6" gutterBottom>

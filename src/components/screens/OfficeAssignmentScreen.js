@@ -56,41 +56,59 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
   }, []);
 
   // 사무실별 통계 계산 (새로운 배정 로직 적용)
-  const officeStats = useMemo(() => {
-    if (!agents.length || !assignmentSettings.models) return {};
+  const [officeStats, setOfficeStats] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-    // 전체 배정 계산
-    const fullAssignment = calculateFullAssignment(agents, assignmentSettings);
-    
-    // 사무실별 통계 변환
-    const stats = {};
-    Object.entries(fullAssignment.offices).forEach(([office, officeData]) => {
-      stats[office] = {
-        office: officeData.office,
-        agentCount: officeData.agentCount,
-        agents: officeData.agents,
-        totalAssignment: officeData.totalQuantity,
-        models: {}
-      };
-      
-      // 모델별 배정량 계산
-      Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
-        const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
-        const officeModelQuantity = Object.values(modelAssignments)
-          .filter(assignment => assignment.office === office)
-          .reduce((sum, assignment) => sum + assignment.quantity, 0);
+  // 배정 데이터 로드
+  useEffect(() => {
+    const loadAssignmentData = async () => {
+      if (!agents.length || !assignmentSettings.models || Object.keys(assignmentSettings.models).length === 0) {
+        setOfficeStats({});
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const fullAssignment = await calculateFullAssignment(agents, assignmentSettings, data);
         
-        stats[office].models[modelName] = {
-          name: modelName,
-          colors: modelData.colors,
-          totalQuantity: modelData.quantity,
-          assignedQuantity: officeModelQuantity
-        };
-      });
-    });
+        // 사무실별 통계 변환
+        const stats = {};
+        Object.entries(fullAssignment.offices || {}).forEach(([office, officeData]) => {
+          stats[office] = {
+            office: officeData.office,
+            agentCount: officeData.agentCount,
+            agents: officeData.agents,
+            totalAssignment: officeData.totalQuantity,
+            models: {}
+          };
+          
+          // 모델별 배정량 계산
+          Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
+            const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
+            const officeModelQuantity = Object.values(modelAssignments)
+              .filter(assignment => assignment.office === office)
+              .reduce((sum, assignment) => sum + assignment.quantity, 0);
+            
+            stats[office].models[modelName] = {
+              name: modelName,
+              colors: modelData.colors,
+              totalQuantity: modelData.quantity,
+              assignedQuantity: officeModelQuantity
+            };
+          });
+        });
 
-    return stats;
-  }, [agents, assignmentSettings]);
+        setOfficeStats(stats);
+      } catch (error) {
+        console.error('배정 데이터 로드 실패:', error);
+        setOfficeStats({});
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAssignmentData();
+  }, [agents, assignmentSettings, data]);
 
   // 선택된 사무실의 데이터
   const selectedOfficeData = useMemo(() => {
@@ -156,38 +174,80 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
           </Grid>
         </Paper>
 
+        {/* 로딩 상태 */}
+        {isLoading && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" align="center" color="primary">
+                배정 데이터를 계산 중입니다...
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+
         {/* 사무실별 통계 카드 */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {selectedOfficeData.map((officeData) => (
-            <Grid item xs={12} md={4} key={officeData.office}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <BusinessIcon sx={{ mr: 2, color: 'primary.main' }} />
-                    <Typography variant="h6">
-                      {officeData.office}
-                    </Typography>
-                  </Box>
-                  <Typography variant="h4" color="primary" gutterBottom>
-                    {officeData.agentCount}명
+        {!isLoading && (
+          <>
+            {/* 요약 정보 */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 사무실: {Object.keys(officeStats).length}개
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    영업사원 수
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 영업사원: {Object.values(officeStats).reduce((sum, office) => sum + office.agentCount, 0)}명
                   </Typography>
-                  <Typography variant="h5" color="secondary" gutterBottom>
-                    {officeData.totalAssignment}개
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    총 배정량: {Object.values(officeStats).reduce((sum, office) => sum + office.totalAssignment, 0)}개
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    총 배정 수량
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="h6" color="primary">
+                    모델 수: {assignmentSettings.models ? Object.keys(assignmentSettings.models).length : 0}개
                   </Typography>
-                </CardContent>
-              </Card>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* 사무실별 통계 카드 */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              {selectedOfficeData.map((officeData) => (
+                <Grid item xs={12} md={4} key={officeData.office}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <BusinessIcon sx={{ mr: 2, color: 'primary.main' }} />
+                        <Typography variant="h6">
+                          {officeData.office}
+                        </Typography>
+                      </Box>
+                      <Typography variant="h4" color="primary" gutterBottom>
+                        {officeData.agentCount}명
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        영업사원 수
+                      </Typography>
+                      <Typography variant="h5" color="secondary" gutterBottom>
+                        {officeData.totalAssignment}개
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        총 배정 수량
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
+          </>
+        )}
 
         {/* 사무실별 상세 테이블 */}
-        {selectedOfficeData.map((officeData) => (
+        {!isLoading && selectedOfficeData.map((officeData) => (
           <Card key={officeData.office} sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
@@ -221,6 +281,7 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
                                 label={color}
                                 size="small"
                                 variant="outlined"
+                                sx={{ fontSize: '0.7rem' }}
                               />
                             ))}
                           </Box>
@@ -254,7 +315,7 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
         ))}
 
         {/* 영업사원 목록 */}
-        {selectedOfficeData.map((officeData) => (
+        {!isLoading && selectedOfficeData.map((officeData) => (
           <Card key={`${officeData.office}-agents`}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
