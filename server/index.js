@@ -991,7 +991,9 @@ app.get('/api/agents', async (req, res) => {
       return {
         target: row[0] || '',       // A열: 대상
         qualification: row[1] || '', // B열: 자격
-        contactId: row[2] || ''      // C열: 연락처(아이디)
+        contactId: row[2] || '',     // C열: 연락처(아이디)
+        office: row[3] || '',        // D열: 사무실 (새로 추가)
+        department: row[4] || ''     // E열: 소속 (새로 추가)
       };
     }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
     
@@ -1636,7 +1638,9 @@ app.post('/api/login', async (req, res) => {
           agentInfo: {
             target: agent[0] || '',       // A열: 대상
             qualification: agent[1] || '', // B열: 자격
-            contactId: agent[2] || ''      // C열: 연락처(아이디)
+            contactId: agent[2] || '',     // C열: 연락처(아이디)
+            office: agent[3] || '',        // D열: 사무실 (새로 추가)
+            department: agent[4] || ''     // E열: 소속 (새로 추가)
           }
         });
       }
