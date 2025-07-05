@@ -358,8 +358,8 @@ function App() {
     try {
       console.log('데이터 로딩 시작');
       
-      // 관리자모드의 담당재고확인에서는 출고 제외 없이 모든 재고 표시
-      const includeShipped = isAgentMode && currentView === 'assigned' ? false : true;
+      // 전체재고확인에서는 3일 이내 출고재고 제외, 담당재고확인에서는 모든 재고 포함
+      const includeShipped = isAgentMode && currentView === 'assigned' ? true : false;
       
       const [storesResponse, modelsResponse] = await Promise.all([
         fetchData(includeShipped),
@@ -398,7 +398,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isAgentMode, currentView]);
 
   // 초기 데이터 로딩
   useEffect(() => {
@@ -451,8 +451,6 @@ function App() {
       }
     }
   }, [isLoggedIn, data, userLocation]);
-
-
 
   // 매장 필터링
   useEffect(() => {
@@ -777,10 +775,13 @@ function App() {
       }
     }
     
-    // 관리자모드에서 뷰가 변경되면 데이터 다시 로드
+    // 관리자모드에서 뷰가 변경되면 데이터 다시 로드 (캐시 무효화)
     if (isAgentMode && isLoggedIn) {
       console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
-      loadData();
+      // 캐시 무효화를 위해 약간의 지연 후 데이터 로드
+      setTimeout(() => {
+        loadData();
+      }, 100);
     }
   }, [isAgentMode, isLoggedIn, loadData]);
 
@@ -823,8 +824,6 @@ function App() {
   const handleUpdateProgressPopupClose = useCallback(() => {
     setShowUpdateProgressPopup(false);
   }, []);
-
-
 
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {

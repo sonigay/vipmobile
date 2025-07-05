@@ -117,14 +117,14 @@ export async function fetchData(includeShipped = true) {
   }
   
   try {
-    console.log('서버에서 매장 데이터 요청 중...');
+    console.log(`서버에서 매장 데이터 요청 중... (includeShipped: ${includeShipped})`);
     const startTime = Date.now();
     
     const response = await fetch(`${API_URL}/api/stores?includeShipped=${includeShipped}`);
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
-    console.log(`매장 데이터 요청 완료: ${fetchTime}ms`);
+    console.log(`매장 데이터 요청 완료: ${fetchTime}ms, 받은 매장 수: ${data.length}개`);
     
     console.log('\n=== 서버 응답 데이터 전체 구조 ===');
     console.log('매장 데이터 예시:', data[0]);
