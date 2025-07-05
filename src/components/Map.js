@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import { Paper } from '@mui/material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -216,9 +216,19 @@ function Map({
     const isLoggedInStore = loggedInStoreId === store.id;
     const isRequestedStore = requestedStore?.id === store.id;
     const inventoryCount = calculateInventory(store);
+    const inventoryByAge = getInventoryByAge(store);
     const hasInventory = inventoryCount > 0;
 
-    let fillColor, strokeColor, radius, iconStyle;
+    let fillColor, strokeColor, radius, iconStyle, urgencyIcon = '';
+
+    // 출고일 기준 긴급도 아이콘 결정
+    if (inventoryByAge.over60 > 0) {
+      urgencyIcon = '⚠️';
+    } else if (inventoryByAge.within60 > 0) {
+      urgencyIcon = '⚡';
+    } else if (inventoryByAge.within30 > 0) {
+      urgencyIcon = '✅';
+    }
 
     // 1. 요청점 (최우선)
     if (isRequestedStore) {
@@ -241,10 +251,21 @@ function Map({
       radius = 16;
       iconStyle = '';
     }
-    // 4. 일반 매장
+    // 4. 일반 매장 - 출고일 기준 색상 조정
     else {
-      fillColor = hasInventory ? '#4caf50' : '#f44336';
-      strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+      if (inventoryByAge.over60 > 0) {
+        // 60일 이상: 주황색
+        fillColor = hasInventory ? '#ff9800' : '#f44336';
+        strokeColor = hasInventory ? '#f57c00' : '#d32f2f';
+      } else if (inventoryByAge.within60 > 0) {
+        // 30-60일: 노란색
+        fillColor = hasInventory ? '#ffc107' : '#f44336';
+        strokeColor = hasInventory ? '#ff8f00' : '#d32f2f';
+      } else {
+        // 30일 이내: 초록색
+        fillColor = hasInventory ? '#4caf50' : '#f44336';
+        strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+      }
       radius = hasInventory ? 14 : 10;
       iconStyle = '';
     }
@@ -266,14 +287,31 @@ function Map({
           font-size: ${radius > 12 ? '12px' : '10px'};
           box-shadow: 0 2px 4px rgba(0,0,0,0.3);
           ${iconStyle}
+          position: relative;
         ">
           ${inventoryCount > 0 ? inventoryCount : ''}
+          ${urgencyIcon && (
+            `<div style="
+              position: absolute;
+              top: -8px;
+              right: -8px;
+              background: rgba(0,0,0,0.8);
+              border-radius: 50%;
+              width: 16px;
+              height: 16px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 10px;
+              color: white;
+            ">${urgencyIcon}</div>`
+          )}
         </div>
       `,
       iconSize: [radius * 2, radius * 2],
       iconAnchor: [radius, radius]
     });
-  }, [selectedStore, loggedInStoreId, calculateInventory]);
+  }, [selectedStore, loggedInStoreId, calculateInventory, getInventoryByAge]);
 
   // 지도 로드 핸들러
   const onMapLoad = useCallback((mapInstance) => {
@@ -450,30 +488,7 @@ function Map({
                 click: () => onStoreSelect(store)
               }}
             >
-              {/* 출고일 기준 재고 정보 라벨 */}
-              {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
-                <Tooltip permanent direction="bottom" offset={[0, 10]}>
-                  <div style={{
-                    background: 'rgba(0, 0, 0, 0.8)',
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    whiteSpace: 'nowrap',
-                    textAlign: 'center'
-                  }}>
-                    {inventoryByAge.over60 > 0 && (
-                      <span style={{ color: '#ff9800' }}>⚠️ {inventoryByAge.over60}개</span>
-                    )}
-                    {inventoryByAge.within60 > 0 && (
-                      <span style={{ color: '#ffc107', marginLeft: '4px' }}>⚡ {inventoryByAge.within60}개</span>
-                    )}
-                    {inventoryByAge.within30 > 0 && (
-                      <span style={{ color: '#4caf50', marginLeft: '4px' }}>✅ {inventoryByAge.within30}개</span>
-                    )}
-                  </div>
-                </Tooltip>
-              )}
+
               <Popup>
                 <div>
                   <h3>{store.name}</h3>
