@@ -260,31 +260,78 @@ const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 
-// Kakao geocoding 함수
-async function geocodeAddressWithKakao(address) {
+// Kakao geocoding 함수 (개선된 버전)
+async function geocodeAddressWithKakao(address, retryCount = 0) {
   const apiKey = process.env.KAKAO_API_KEY;
   if (!apiKey) {
     throw new Error('KAKAO_API_KEY 환경변수가 설정되어 있지 않습니다.');
   }
-  const encodedAddress = encodeURIComponent(address);
+  
+  // 주소 전처리
+  const cleanAddress = address.toString().trim();
+  if (!cleanAddress) {
+    console.log('빈 주소로 geocoding 시도 중단');
+    return null;
+  }
+  
+  // 주소에 "시" 또는 "구"가 포함되어 있지 않으면 기본 지역 추가
+  let processedAddress = cleanAddress;
+  if (!cleanAddress.includes('시') && !cleanAddress.includes('구') && !cleanAddress.includes('군')) {
+    processedAddress = `경기도 ${cleanAddress}`;
+    console.log(`주소 전처리: "${cleanAddress}" → "${processedAddress}"`);
+  }
+  
+  const encodedAddress = encodeURIComponent(processedAddress);
   const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `KakaoAK ${apiKey}`
+  
+  try {
+    console.log(`Geocoding 시도 (${retryCount + 1}/3): ${processedAddress}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `KakaoAK ${apiKey}`
+      },
+      timeout: 10000 // 10초 타임아웃
+    });
+    
+    if (!response.ok) {
+      if (response.status === 429) {
+        // 할당량 초과
+        console.log('Kakao API 할당량 초과, 5초 대기 후 재시도');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        if (retryCount < 2) {
+          return await geocodeAddressWithKakao(address, retryCount + 1);
+        }
+      }
+      throw new Error(`Kakao geocoding API 오류: ${response.status} - ${response.statusText}`);
     }
-  });
-  if (!response.ok) {
-    throw new Error(`Kakao geocoding API 오류: ${response.status}`);
+    
+    const data = await response.json();
+    
+    if (data.documents && data.documents.length > 0) {
+      const doc = data.documents[0];
+      const result = {
+        latitude: parseFloat(doc.y),
+        longitude: parseFloat(doc.x)
+      };
+      console.log(`Geocoding 성공: ${processedAddress} → (${result.latitude}, ${result.longitude})`);
+      return result;
+    } else {
+      console.log(`Geocoding 결과 없음: ${processedAddress}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`Geocoding 오류 (${retryCount + 1}/3): ${processedAddress}`, error.message);
+    
+    // 네트워크 오류나 일시적 오류인 경우 재시도
+    if (retryCount < 2 && (error.message.includes('fetch') || error.message.includes('timeout'))) {
+      console.log('네트워크 오류로 인한 재시도...');
+      await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1))); // 지수 백오프
+      return await geocodeAddressWithKakao(address, retryCount + 1);
+    }
+    
+    throw error;
   }
-  const data = await response.json();
-  if (data.documents && data.documents.length > 0) {
-    const doc = data.documents[0];
-    return {
-      latitude: parseFloat(doc.y),
-      longitude: parseFloat(doc.x)
-    };
-  }
-  return null;
 }
 
 // 메인 geocoding 함수 (Kakao만 사용)
@@ -500,8 +547,8 @@ app.post('/api/update-coordinates', async (req, res) => {
 
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[3]; // D열: 주소
-      const status = row[4];   // E열: 거래상태
+      const address = row[3];  // D열: 주소
+      const status = row[4];    // E열: 거래상태
       
       if (status === "사용") {
         if (!address || address.toString().trim() === '') {
@@ -516,6 +563,7 @@ app.post('/api/update-coordinates', async (req, res) => {
         
         // 주소가 있는 경우 geocoding 실행
         try {
+          console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
@@ -523,25 +571,17 @@ app.post('/api/update-coordinates', async (req, res) => {
               range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
               values: [[latitude, longitude]]
             });
-            console.log(`Updated coordinates for address: ${address}`);
-            console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+            console.log(`✅ 좌표 업데이트 성공: ${address}`);
+            console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
           } else {
-            console.log(`No results found for address: ${address}`);
-            // geocoding 실패 시 기존 좌표 삭제
-            updates.push({
-              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
-              values: [["", ""]]
-            });
-            console.log(`Cleared coordinates for failed geocoding at row ${i + 2}`);
+            console.log(`❌ Geocoding 결과 없음: ${address}`);
+            // geocoding 실패 시 기존 좌표 유지 (삭제하지 않음)
+            console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
           }
         } catch (error) {
-          console.error(`Error geocoding address: ${address}`, error);
-          // geocoding 오류 시 기존 좌표 삭제
-          updates.push({
-            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
-            values: [["", ""]]
-          });
-          console.log(`Cleared coordinates for geocoding error at row ${i + 2}`);
+          console.error(`❌ Geocoding 오류: ${address}`, error.message);
+          // geocoding 오류 시 기존 좌표 유지 (삭제하지 않음)
+          console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
         }
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
@@ -1077,6 +1117,7 @@ app.post('/api/login', async (req, res) => {
           await sendLogToDiscord(embedData);
         } catch (logError) {
           console.error('재고모드 로그인 로그 전송 실패:', logError.message);
+          // 로그 전송 실패해도 로그인은 허용
         }
       }
       
@@ -1289,6 +1330,7 @@ async function checkAndUpdateAddresses() {
         
         // 주소가 있는 경우 geocoding 실행
         try {
+          console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
@@ -1296,25 +1338,17 @@ async function checkAndUpdateAddresses() {
               range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
               values: [[latitude, longitude]]
             });
-            console.log(`Updated coordinates for address: ${address}`);
-            console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+            console.log(`✅ 좌표 업데이트 성공: ${address}`);
+            console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
           } else {
-            console.log(`No results found for address: ${address}`);
-            // geocoding 실패 시 기존 좌표 삭제
-            updates.push({
-              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
-              values: [["", ""]]
-            });
-            console.log(`Cleared coordinates for failed geocoding at row ${i + 2}`);
+            console.log(`❌ Geocoding 결과 없음: ${address}`);
+            // geocoding 실패 시 기존 좌표 유지 (삭제하지 않음)
+            console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
           }
         } catch (error) {
-          console.error(`Error geocoding address: ${address}`, error);
-          // geocoding 오류 시 기존 좌표 삭제
-          updates.push({
-            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
-            values: [["", ""]]
-          });
-          console.log(`Cleared coordinates for geocoding error at row ${i + 2}`);
+          console.error(`❌ Geocoding 오류: ${address}`, error.message);
+          // geocoding 오류 시 기존 좌표 유지 (삭제하지 않음)
+          console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
         }
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
