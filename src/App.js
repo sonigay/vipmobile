@@ -398,6 +398,9 @@ function App() {
         console.log('최종 설정될 데이터:', finalData);
 
         setData(finalData);
+        
+        // 데이터 설정 후 필터링된 매장 목록 즉시 초기화
+        setFilteredStores([]);
       } else {
         console.error('데이터 로딩 실패 상세:', { 
           storesSuccess: storesResponse.success,
@@ -528,7 +531,7 @@ function App() {
       console.error('필터링 중 오류 발생:', error);
       setFilteredStores([]);
     }
-  }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget, filterStoresByAgent]);
+  }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget]);
 
   const handleLogin = (store) => {
     setIsLoggedIn(true);

@@ -854,62 +854,101 @@ app.get('/api/models', async (req, res) => {
   }
 });
 
+// Git 커밋 히스토리를 기반으로 업데이트 내용 생성
+async function getGitUpdateHistory() {
+  try {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execAsync = util.promisify(exec);
+    
+    // 최근 30일간의 커밋 히스토리 가져오기
+    const { stdout } = await execAsync('git log --since="30 days ago" --pretty=format:"%h|%ad|%s" --date=short', { 
+      cwd: process.cwd(),
+      timeout: 10000 
+    });
+    
+    if (!stdout.trim()) {
+      return [];
+    }
+    
+    const commits = stdout.trim().split('\n').map(line => {
+      const [hash, date, message] = line.split('|');
+      return { hash, date, message };
+    });
+    
+    // 날짜별로 그룹화
+    const groupedByDate = {};
+    commits.forEach(commit => {
+      if (!groupedByDate[commit.date]) {
+        groupedByDate[commit.date] = [];
+      }
+      groupedByDate[commit.date].push(commit);
+    });
+    
+    // 업데이트 히스토리 생성
+    const updateHistory = Object.entries(groupedByDate)
+      .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 날짜순 정렬
+      .slice(0, 10) // 최근 10일만 표시
+      .map(([date, dayCommits]) => {
+        const changes = dayCommits.map(commit => {
+          // 커밋 메시지에서 불필요한 접두사 제거
+          let cleanMessage = commit.message;
+          if (cleanMessage.startsWith('fix: ')) {
+            cleanMessage = cleanMessage.substring(5);
+          } else if (cleanMessage.startsWith('feat: ')) {
+            cleanMessage = cleanMessage.substring(6);
+          } else if (cleanMessage.startsWith('update: ')) {
+            cleanMessage = cleanMessage.substring(8);
+          }
+          return cleanMessage;
+        });
+        
+        // 날짜 형식 변환
+        const [year, month, day] = date.split('-');
+        const version = `${year}.${month}.${day}`;
+        
+        // 제목 생성 (가장 중요한 커밋 메시지 사용)
+        const title = dayCommits.length > 0 ? 
+          dayCommits[0].message.replace(/^(fix|feat|update):\s*/, '') : 
+          '업데이트';
+        
+        return {
+          version,
+          date,
+          title,
+          changes,
+          type: 'feature',
+          timestamp: new Date(date).getTime()
+        };
+      });
+    
+    return updateHistory;
+  } catch (error) {
+    console.error('Git 히스토리 가져오기 실패:', error);
+    // Git 히스토리를 가져올 수 없는 경우 기본 업데이트 정보 반환
+    const currentDate = new Date();
+    const formattedDate = currentDate.toISOString().split('T')[0];
+    
+    return [{
+      version: `${currentDate.getFullYear()}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${String(currentDate.getDate()).padStart(2, '0')}`,
+      date: formattedDate,
+      title: '시스템 업데이트',
+      changes: ['최신 업데이트가 적용되었습니다.'],
+      type: 'feature',
+      timestamp: currentDate.getTime()
+    }];
+  }
+}
+
 // 업데이트 히스토리 가져오기
 app.get('/api/updates', async (req, res) => {
   try {
-    // 현재 시간 기준으로 최근 업데이트 정보 생성
-    const currentDate = new Date();
-    const formattedDate = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+    const updateHistory = await getGitUpdateHistory();
     
-    // 실제 배포 정보를 기반으로 한 업데이트 히스토리
-    const updateHistory = [
-      {
-        version: `${currentDate.getFullYear()}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${String(currentDate.getDate()).padStart(2, '0')}`,
-        date: formattedDate,
-        title: '담당재고확인 기능 개선 및 업데이트 팝업 수정',
-        changes: [
-          '담당재고확인에서 3일 이내 출고재고도 표시되도록 수정',
-          '업데이트 팝업 날짜를 실제 업데이트 날짜로 수정',
-          '백엔드 재고 필터링 로직 개선',
-          '전체재고확인과 담당재고확인의 재고 표시 차이 해결',
-          '동적 업데이트 시스템 구축'
-        ],
-        type: 'fix',
-        timestamp: currentDate.getTime()
-      },
-      {
-        version: '2025.01.26',
-        date: '2025-01-26',
-        title: '출고일 기준 재고 분류 기능 추가',
-        changes: [
-          '마커 아이콘에 출고일 상태 표시 (30일/60일/60일+)',
-          '출고일 기준 색상 구분 (초록/노랑/주황)',
-          '우상단 긴급도 아이콘 추가 (✅/⚡/⚠️)',
-          '팝업에 출고일별 재고 상세 정보 표시',
-          '백엔드 데이터 구조 개선으로 출고일 정보 보존'
-        ],
-        type: 'feature',
-        timestamp: new Date('2025-01-26').getTime()
-      },
-      {
-        version: '2025.01.25',
-        date: '2025-01-25',
-        title: '관리자 모드 재고 확인 기능 추가',
-        changes: [
-          '담당재고확인/전체재고확인 메뉴 추가',
-          '담당자별 재고 필터링 기능 구현',
-          '화면 전환 시 상태 저장 기능',
-          '카톡 복사 팝업 메시지 개선'
-        ],
-        type: 'feature',
-        timestamp: new Date('2025-01-25').getTime()
-      }
-    ];
-
     res.json({
       success: true,
       data: updateHistory,
-      lastUpdated: currentDate.toISOString()
+      lastUpdated: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error fetching update history:', error);
