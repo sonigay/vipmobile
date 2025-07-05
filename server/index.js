@@ -1174,7 +1174,8 @@ app.get('/api/activation-data/by-date', async (req, res) => {
       try {
         const dateObj = new Date(normalizedDate);
         if (!isNaN(dateObj.getTime())) {
-          normalizedDate = dateObj.toLocaleDateString();
+          // 한국 로케일로 날짜 형식 통일
+          normalizedDate = dateObj.toLocaleDateString('ko-KR');
         }
       } catch (error) {
         console.warn('날짜 변환 실패:', normalizedDate, error);

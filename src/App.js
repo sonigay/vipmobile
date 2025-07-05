@@ -381,7 +381,7 @@ function App() {
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      const dateKey = date.toLocaleDateString();
+      const dateKey = date.toLocaleDateString('ko-KR');
       
       // 해당 날짜에 데이터가 있는지 확인
       const hasData = activationDataByDate[dateKey] && Object.keys(activationDataByDate[dateKey]).length > 0;
