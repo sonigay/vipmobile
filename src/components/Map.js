@@ -781,7 +781,7 @@ function Map({
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
                       기준일: {activationDateSearch ? 
                         new Date(activationDateSearch).toLocaleDateString('ko-KR') : 
-                        lastActivationDate.toLocaleDateString('ko-KR')
+                        (lastActivationDate ? lastActivationDate.toLocaleDateString('ko-KR') : '날짜 정보 없음')
                       }
                     </div>
                   </div>

@@ -215,6 +215,11 @@ function App() {
         });
       }
       
+      // lastActivationDate 필드 추가 (Map 컴포넌트 호환성을 위해)
+      Object.keys(filteredData).forEach(storeName => {
+        filteredData[storeName].lastActivationDate = new Date(date);
+      });
+      
       setActivationData(filteredData);
       console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
       console.log('날짜 비교 데이터:', filteredData);
