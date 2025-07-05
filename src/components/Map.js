@@ -133,8 +133,14 @@ function Map({
           if (typeof model === 'object' && model !== null) {
             Object.values(model).forEach(status => {
               if (typeof status === 'object' && status !== null) {
-                Object.values(status).forEach(quantity => {
-                  totalInventory += quantity || 0;
+                Object.values(status).forEach(item => {
+                  // 새로운 구조: { quantity: number, shippedDate: string }
+                  if (typeof item === 'object' && item && item.quantity) {
+                    totalInventory += item.quantity || 0;
+                  } else if (typeof item === 'number') {
+                    // 기존 구조 호환성
+                    totalInventory += item || 0;
+                  }
                 });
               }
             });
@@ -153,14 +159,23 @@ function Map({
             // 특정 모델과 색상의 재고
             Object.values(category[selectedModel]).forEach(status => {
               if (status[selectedColor]) {
-                filteredInventory += status[selectedColor] || 0;
+                const item = status[selectedColor];
+                if (typeof item === 'object' && item && item.quantity) {
+                  filteredInventory += item.quantity || 0;
+                } else if (typeof item === 'number') {
+                  filteredInventory += item || 0;
+                }
               }
             });
           } else {
             // 특정 모델의 전체 재고
             Object.values(category[selectedModel]).forEach(status => {
-              Object.values(status).forEach(quantity => {
-                filteredInventory += quantity || 0;
+              Object.values(status).forEach(item => {
+                if (typeof item === 'object' && item && item.quantity) {
+                  filteredInventory += item.quantity || 0;
+                } else if (typeof item === 'number') {
+                  filteredInventory += item || 0;
+                }
               });
             });
           }
@@ -191,15 +206,15 @@ function Map({
         Object.values(model).forEach(status => {
           if (!status || typeof status !== 'object') return;
           Object.values(status).forEach(item => {
-            // item이 숫자(수량)만 있는 경우는 패스
-            if (typeof item === 'object' && item && item.shippedDate) {
+            // 새로운 구조: { quantity: number, shippedDate: string }
+            if (typeof item === 'object' && item && item.shippedDate && item.quantity) {
               const days = Math.floor((now - new Date(item.shippedDate)) / (1000 * 60 * 60 * 24));
               if (days <= 30) {
-                result.within30++;
+                result.within30 += item.quantity;
               } else if (days <= 60) {
-                result.within60++;
+                result.within60 += item.quantity;
               } else {
-                result.over60++;
+                result.over60 += item.quantity;
               }
             }
           });
@@ -510,7 +525,13 @@ function Map({
                               
                               Object.entries(statuses).forEach(([status, colors]) => {
                                 if (colors && typeof colors === 'object') {
-                                  Object.entries(colors).forEach(([color, quantity]) => {
+                                  Object.entries(colors).forEach(([color, item]) => {
+                                    let quantity = 0;
+                                    if (typeof item === 'object' && item && item.quantity) {
+                                      quantity = item.quantity;
+                                    } else if (typeof item === 'number') {
+                                      quantity = item;
+                                    }
                                     if (quantity && quantity > 0) {
                                       modelTotal += quantity;
                                       colorDetails.push(`${color}: ${quantity}개`);

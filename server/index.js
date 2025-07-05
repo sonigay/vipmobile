@@ -676,11 +676,19 @@ app.get('/api/stores', async (req, res) => {
         inventoryMap[storeName][category][model][status] = {};
       }
       
-      // 같은 모델/색상/상태 조합의 수량을 증가
+      // 같은 모델/색상/상태 조합의 수량과 출고일 정보 관리
       if (!inventoryMap[storeName][category][model][status][color]) {
-        inventoryMap[storeName][category][model][status][color] = 1;
+        inventoryMap[storeName][category][model][status][color] = {
+          quantity: 1,
+          shippedDate: shippingDate ? shippingDate.toISOString() : null
+        };
       } else {
-        inventoryMap[storeName][category][model][status][color]++;
+        inventoryMap[storeName][category][model][status][color].quantity++;
+        // 출고일이 더 오래된 것으로 업데이트 (가장 오래된 재고 기준)
+        if (shippingDate && (!inventoryMap[storeName][category][model][status][color].shippedDate || 
+            shippingDate < new Date(inventoryMap[storeName][category][model][status][color].shippedDate))) {
+          inventoryMap[storeName][category][model][status][color].shippedDate = shippingDate.toISOString();
+        }
       }
     });
 
