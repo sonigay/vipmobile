@@ -259,6 +259,8 @@ if (!GOOGLE_PRIVATE_KEY) {
 const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
+const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터';  // 당월 개통실적 데이터
+const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터(전월)';  // 전월 개통실적 데이터
 
 // Kakao geocoding 함수 (개선된 버전)
 async function geocodeAddressWithKakao(address, retryCount = 0) {
@@ -1004,6 +1006,120 @@ app.get('/api/agents', async (req, res) => {
     console.error('Error fetching agent data:', error);
     res.status(500).json({ 
       error: 'Failed to fetch agent data', 
+      message: error.message 
+    });
+  }
+});
+
+// 당월 개통실적 데이터 가져오기
+app.get('/api/activation-data/current-month', async (req, res) => {
+  const cacheKey = 'current_month_activation_data';
+  
+  // 캐시에서 먼저 확인
+  const cachedData = cacheUtils.get(cacheKey);
+  if (cachedData) {
+    console.log('캐시된 당월 개통실적 데이터 반환');
+    return res.json(cachedData);
+  }
+  
+  try {
+    console.log('당월 개통실적 데이터 처리 시작...');
+    const startTime = Date.now();
+    
+    const activationValues = await getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
+    
+    if (!activationValues) {
+      throw new Error('Failed to fetch data from current month activation sheet');
+    }
+
+    // 헤더 제거
+    const activationRows = activationValues.slice(1);
+    
+    // 개통실적 데이터 구성 (선불개통 제외)
+    const activationData = activationRows
+      .filter(row => row[6] !== '선불개통') // L열: 개통 (선불개통 제외)
+      .map(row => {
+        return {
+          '담당자': row[0] || '',        // A열: 담당자
+          '개통일': row[1] || '',        // B열: 개통일
+          '개통시': row[2] || '',        // C열: 개통시
+          '개통분': row[3] || '',        // D열: 개통분
+          '출고처': row[6] || '',        // G열: 출고처
+          '개통': row[11] || '',         // L열: 개통
+          '모델명': row[13] || '',       // N열: 모델명
+          '색상': row[14] || '',         // O열: 색상
+          '일련번호': row[15] || ''      // P열: 일련번호
+        };
+      });
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`당월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, activationData);
+    
+    res.json(activationData);
+  } catch (error) {
+    console.error('Error fetching current month activation data:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch current month activation data', 
+      message: error.message 
+    });
+  }
+});
+
+// 전월 개통실적 데이터 가져오기
+app.get('/api/activation-data/previous-month', async (req, res) => {
+  const cacheKey = 'previous_month_activation_data';
+  
+  // 캐시에서 먼저 확인
+  const cachedData = cacheUtils.get(cacheKey);
+  if (cachedData) {
+    console.log('캐시된 전월 개통실적 데이터 반환');
+    return res.json(cachedData);
+  }
+  
+  try {
+    console.log('전월 개통실적 데이터 처리 시작...');
+    const startTime = Date.now();
+    
+    const activationValues = await getSheetValues(PREVIOUS_MONTH_ACTIVATION_SHEET_NAME);
+    
+    if (!activationValues) {
+      throw new Error('Failed to fetch data from previous month activation sheet');
+    }
+
+    // 헤더 제거
+    const activationRows = activationValues.slice(1);
+    
+    // 개통실적 데이터 구성 (선불개통 제외)
+    const activationData = activationRows
+      .filter(row => row[6] !== '선불개통') // L열: 개통 (선불개통 제외)
+      .map(row => {
+        return {
+          '담당자': row[0] || '',        // A열: 담당자
+          '개통일': row[1] || '',        // B열: 개통일
+          '개통시': row[2] || '',        // C열: 개통시
+          '개통분': row[3] || '',        // D열: 개통분
+          '출고처': row[6] || '',        // G열: 출고처
+          '개통': row[11] || '',         // L열: 개통
+          '모델명': row[13] || '',       // N열: 모델명
+          '색상': row[14] || '',         // O열: 색상
+          '일련번호': row[15] || ''      // P열: 일련번호
+        };
+      });
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`전월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, activationData);
+    
+    res.json(activationData);
+  } catch (error) {
+    console.error('Error fetching previous month activation data:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch previous month activation data', 
       message: error.message 
     });
   }

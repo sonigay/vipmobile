@@ -7,8 +7,15 @@ import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
+import ActivationScreen from './components/ActivationScreen';
 import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
+import { 
+  fetchCurrentMonthData, 
+  fetchPreviousMonthData, 
+  generateStoreActivationComparison,
+  filterActivationByAgent
+} from './utils/activationService';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import UpdatePopup from './components/UpdatePopup';
@@ -94,6 +101,10 @@ function App() {
   const [unreadUpdates, setUnreadUpdates] = useState([]);
   // 새로운 업데이트 진행 팝업 상태
   const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+  // 담당개통확인 화면 상태
+  const [showActivationScreen, setShowActivationScreen] = useState(false);
+  // 개통실적 데이터 상태
+  const [activationData, setActivationData] = useState(null);
 
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
@@ -140,6 +151,34 @@ function App() {
       window.location.reload();
     }, 500);
   }, []);
+
+  // 개통실적 데이터 로드 함수
+  const loadActivationData = useCallback(async () => {
+    try {
+      console.log('개통실적 데이터 로딩 시작...');
+      
+      // 당월 및 전월 데이터 병렬 로드
+      const [currentData, previousData] = await Promise.all([
+        fetchCurrentMonthData(),
+        fetchPreviousMonthData()
+      ]);
+
+      // 매장별 비교 데이터 생성
+      const comparisonData = generateStoreActivationComparison(currentData, previousData);
+      
+      // 담당자 필터링 적용
+      let filteredData = comparisonData;
+      if (isAgentMode && agentTarget) {
+        filteredData = filterActivationByAgent(comparisonData, agentTarget);
+      }
+      
+      setActivationData(filteredData);
+      console.log('개통실적 데이터 로딩 완료');
+    } catch (error) {
+      console.error('개통실적 데이터 로딩 실패:', error);
+      setActivationData(null);
+    }
+  }, [isAgentMode, agentTarget]);
 
   // 로그인 상태 복원 및 새로운 배포 감지
   useEffect(() => {
@@ -598,6 +637,9 @@ function App() {
         agentContactId: store.contactId,
         currentView: 'all'
       }));
+
+      // 관리자 모드일 때 개통실적 데이터 로드
+      loadActivationData();
     } else {
       console.log('로그인: 일반 매장 모드');
       setIsAgentMode(false);
@@ -932,6 +974,22 @@ function App() {
     );
   }
 
+  // 담당개통확인 화면일 때는 별도 화면 렌더링
+  if (showActivationScreen) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ActivationScreen 
+          userInfo={{
+            userType: isAgentMode ? 'agent' : 'store',
+            targetName: isAgentMode ? agentTarget : (loggedInStore?.name || '')
+          }}
+          onBack={() => setShowActivationScreen(false)}
+        />
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -1070,6 +1128,19 @@ function App() {
                   >
                     담당재고확인
                   </Button>
+                  <Button 
+                    color="inherit" 
+                    onClick={() => setShowActivationScreen(true)}
+                    sx={{ 
+                      fontSize: '0.8em',
+                      backgroundColor: showActivationScreen ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)'
+                      }
+                    }}
+                  >
+                    담당개통확인
+                  </Button>
                 </Box>
               )}
               
@@ -1155,6 +1226,8 @@ function App() {
                   isAgentMode={isAgentMode}
                   currentView={currentView}
                   forceZoomToStore={forceZoomToStore}
+                  activationData={activationData}
+                  showActivationMarkers={showActivationScreen}
                 />
               </Box>
             </>

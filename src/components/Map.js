@@ -98,7 +98,9 @@ function Map({
   onStoreSelect,
   isAgentMode,
   currentView,
-  forceZoomToStore
+  forceZoomToStore,
+  activationData, // 개통실적 데이터 추가
+  showActivationMarkers // 개통실적 마커 표시 여부
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -649,6 +651,133 @@ function Map({
                       {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
                     </div>
                   )}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+        
+        {/* 개통실적 마커들 (담당개통확인 화면에서만 표시) */}
+        {showActivationMarkers && activationData && Object.entries(activationData).map(([storeName, data]) => {
+          // 해당 매장의 위치 정보 찾기
+          const storeLocation = filteredStores.find(store => store.name === storeName);
+          if (!storeLocation || !storeLocation.latitude || !storeLocation.longitude) return null;
+          
+          const { currentMonth, previousMonth, models, agents, lastActivationDate } = data;
+          
+          // 개통실적이 있는 경우에만 마커 표시
+          if (currentMonth === 0 && previousMonth === 0) return null;
+          
+          // 비교 결과에 따른 색상 결정
+          let markerColor = '#FF9800'; // 동일 (주황색)
+          if (currentMonth > previousMonth) {
+            markerColor = '#4CAF50'; // 증가 (초록색)
+          } else if (currentMonth < previousMonth) {
+            markerColor = '#F44336'; // 감소 (빨간색)
+          }
+          
+          // 개통실적 마커 아이콘 생성
+          const activationIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `
+              <div style="
+                background-color: ${markerColor};
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 3px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 10px;
+                text-align: center;
+                line-height: 1.2;
+              ">
+                <div style="font-size: 12px;">${currentMonth}</div>
+                <div style="font-size: 8px; opacity: 0.8;">${previousMonth}</div>
+              </div>
+            `,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -20]
+          });
+          
+          return (
+            <Marker
+              key={`activation-${storeName}`}
+              position={[parseFloat(storeLocation.latitude), parseFloat(storeLocation.longitude)]}
+              icon={activationIcon}
+              eventHandlers={{
+                click: () => {
+                  // 개통실적 상세 정보 팝업 표시
+                  console.log('개통실적 마커 클릭:', storeName, data);
+                }
+              }}
+            >
+              <Popup>
+                <div style={{ minWidth: '200px' }}>
+                  <h3 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>{storeName}</h3>
+                  
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      marginBottom: '4px',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}>
+                      <span style={{ color: '#0ea5e9' }}>당월: {currentMonth}개</span>
+                      <span style={{ 
+                        color: markerColor,
+                        fontSize: '16px'
+                      }}>
+                        {currentMonth > previousMonth ? '↗️' : currentMonth < previousMonth ? '↘️' : '→'}
+                      </span>
+                      <span style={{ color: '#64748b' }}>전월: {previousMonth}개</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      기준일: {lastActivationDate.toLocaleDateString()}
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#374151' }}>담당자</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {agents.map((agent, idx) => (
+                        <span key={idx} style={{
+                          background: '#e0f2fe',
+                          color: '#0277bd',
+                          padding: '2px 6px',
+                          borderRadius: '8px',
+                          fontSize: '10px',
+                          fontWeight: '500'
+                        }}>
+                          {agent}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#374151' }}>모델별 실적</h4>
+                    <div style={{ fontSize: '11px' }}>
+                      {Object.entries(models).map(([model, count]) => (
+                        <div key={model} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '2px 0'
+                        }}>
+                          <span style={{ color: '#1e293b' }}>{model}</span>
+                          <span style={{ color: '#0ea5e9', fontWeight: '600' }}>{count}개</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </Popup>
             </Marker>
