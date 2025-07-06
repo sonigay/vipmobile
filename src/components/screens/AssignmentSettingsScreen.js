@@ -953,9 +953,38 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
     try {
       // 실제 배정 데이터에서 대상자 정보 추출
+      console.log('previewData 구조 확인:', previewData);
+      console.log('previewData.agents 구조 확인:', previewData.agents);
+      
       const targetOffices = Object.keys(previewData.offices || {});
-      const targetDepartments = [...new Set(Object.values(previewData.agents || {}).map(agent => agent.department).filter(Boolean))];
-      const targetAgents = Object.values(previewData.agents || {}).map(agent => agent.agentName).filter(Boolean);
+      
+      // agents 구조에 따라 department와 agentName 추출 방식 수정
+      let targetDepartments = [];
+      let targetAgents = [];
+      
+      if (previewData.agents) {
+        Object.values(previewData.agents).forEach(agent => {
+          // agent가 객체인 경우
+          if (typeof agent === 'object' && agent !== null) {
+            if (agent.department) {
+              targetDepartments.push(agent.department);
+            }
+            if (agent.agentName) {
+              targetAgents.push(agent.agentName);
+            }
+          }
+        });
+      }
+      
+      // 중복 제거
+      targetDepartments = [...new Set(targetDepartments)];
+      targetAgents = [...new Set(targetAgents)];
+      
+      console.log('추출된 대상자 정보:', {
+        targetOffices,
+        targetDepartments,
+        targetAgents
+      });
       
       // 배정된 총 수량 계산
       const totalAssignedQuantity = Object.values(previewData.agents || {}).reduce((sum, agent) => {
