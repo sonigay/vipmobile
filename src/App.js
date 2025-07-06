@@ -1636,6 +1636,8 @@ function App() {
             inventoryUserName={inventoryUserName}
             isInventoryMode={isInventoryMode}
             currentUserId={loggedInStore?.id}
+            onLogout={handleLogout}
+            loggedInStore={loggedInStore}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Switch, FormControlLabel, Alert } from '@mui/material';
-import { Update as UpdateIcon, Person as PersonIcon, Notifications as NotificationsIcon, NotificationsOff as NotificationsOffIcon } from '@mui/icons-material';
+import { Update as UpdateIcon, Person as PersonIcon, Notifications as NotificationsIcon, NotificationsOff as NotificationsOffIcon, Logout as LogoutIcon } from '@mui/icons-material';
 import { 
   subscribeToPushNotifications, 
   unsubscribeFromPushNotifications, 
@@ -10,7 +10,7 @@ import {
   sendTestPushNotification
 } from '../utils/pushNotificationUtils';
 
-function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId }) {
+function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -129,7 +129,20 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          재고 조회 시스템
+          {isInventoryMode ? '재고 조회 시스템' : '재고 조회 시스템'}
+          {loggedInStore && !isInventoryMode && (
+            <Chip
+              icon={<PersonIcon />}
+              label={`${loggedInStore.name} : ${loggedInStore.inventory || 0}대`}
+              size="small"
+              sx={{ 
+                ml: 2, 
+                backgroundColor: 'rgba(255,255,255,0.2)', 
+                color: 'white',
+                '& .MuiChip-icon': { color: 'white' }
+              }}
+            />
+          )}
           {isInventoryMode && inventoryUserName && (
             <Chip
               icon={<PersonIcon />}
@@ -171,6 +184,22 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
               }}
             >
               업데이트 확인
+            </Button>
+          )}
+          
+          {/* 로그아웃 버튼 */}
+          {onLogout && (
+            <Button
+              color="inherit"
+              startIcon={<LogoutIcon />}
+              onClick={onLogout}
+              sx={{ 
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 2,
+                px: 2
+              }}
+            >
+              로그아웃
             </Button>
           )}
         </Box>
