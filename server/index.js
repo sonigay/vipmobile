@@ -2108,6 +2108,9 @@ app.get('/api/assignment/history', async (req, res) => {
 });
 
 app.post('/api/assignment/complete', async (req, res) => {
+  console.log('=== 배정 완료 API 호출됨 ===');
+  console.log('요청 본문:', JSON.stringify(req.body, null, 2));
+  
   try {
     const {
       assigner,
@@ -2314,6 +2317,10 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     targetOffices: targetOffices || [],
     targetDepartments: targetDepartments || [],
     targetAgents: targetAgents || []
+  });
+  console.log('현재 푸시 구독 상태:', {
+    totalSubscriptions: pushSubscriptions.size,
+    subscriptions: Array.from(pushSubscriptions.keys())
   });
   
   // 배정 대상자 필터링

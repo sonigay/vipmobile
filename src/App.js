@@ -1576,6 +1576,12 @@ function App() {
   // 실시간 알림 수신 설정
   useEffect(() => {
     if (isAgentMode && loggedInStore) {
+      console.log('SSE 연결 시도:', {
+        userId: loggedInStore.id,
+        userName: loggedInStore.name,
+        isAgentMode
+      });
+      
       const eventSource = new EventSource(`${process.env.REACT_APP_API_URL}/api/notifications/stream?user_id=${loggedInStore.id}`);
       
       eventSource.onmessage = (event) => {
