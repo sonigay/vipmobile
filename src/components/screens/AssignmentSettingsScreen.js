@@ -83,39 +83,141 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('AssignmentSettingsScreen: 데이터 로드 시작');
+        
         // 담당자 데이터 로드
-        const agentResponse = await fetch('/api/agents');
-        if (agentResponse.ok) {
-          const agentData = await agentResponse.json();
-          setAgents(agentData);
+        console.log('담당자 데이터 로드 중...');
+        let agentDataLoaded = false;
+        
+        try {
+          const agentResponse = await fetch('http://localhost:4000/api/agents');
+          console.log('담당자 API 응답 상태:', agentResponse.status);
+          console.log('담당자 API 응답 헤더:', agentResponse.headers.get('content-type'));
+          
+          if (agentResponse.ok) {
+            const contentType = agentResponse.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const agentData = await agentResponse.json();
+              console.log('담당자 데이터 로드 완료:', agentData.length, '명');
+              console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
+              
+              if (agentData && Array.isArray(agentData) && agentData.length > 0) {
+                setAgents(agentData);
+                agentDataLoaded = true;
+                console.log('✅ 실제 담당자 데이터 로드 성공');
+              } else {
+                console.warn('담당자 데이터가 비어있거나 유효하지 않음');
+              }
+            } else {
+              console.error('담당자 API가 JSON이 아닌 응답을 반환:', contentType);
+              const responseText = await agentResponse.text();
+              console.error('응답 내용:', responseText.substring(0, 200));
+            }
+          } else {
+            console.error('담당자 API 응답 실패:', agentResponse.status, agentResponse.statusText);
+            const responseText = await agentResponse.text();
+            console.error('에러 응답 내용:', responseText.substring(0, 200));
+          }
+        } catch (agentError) {
+          console.error('담당자 API 호출 실패:', agentError);
+          console.error('네트워크 에러 상세:', agentError.message);
+        }
+        
+        // 실제 데이터 로드에 실패한 경우에만 샘플 데이터 사용
+        if (!agentDataLoaded) {
+          console.warn('⚠️ 실제 담당자 데이터 로드 실패, 샘플 데이터 사용');
+          const sampleAgents = [
+            { target: '김영업', contactId: 'kim001', office: '서울지사', department: '영업1팀' },
+            { target: '이매니저', contactId: 'lee002', office: '부산지사', department: '영업2팀' },
+            { target: '박대리', contactId: 'park003', office: '대구지사', department: '영업3팀' }
+          ];
+          setAgents(sampleAgents);
         }
 
         // 매장 데이터에서 사용 가능한 모델 추출
+        let storeData = null;
+        let storeDataLoaded = false;
+        
         if (data && Array.isArray(data)) {
-          console.log('매장 데이터:', data.length, '개');
-          const models = extractAvailableModels(data);
-          console.log('추출된 모델:', models);
-          setAvailableModels(models);
+          console.log('Props로 받은 매장 데이터:', data.length, '개');
+          storeData = data;
+          storeDataLoaded = true;
+          console.log('✅ Props로 받은 매장 데이터 사용');
         } else {
-          console.log('매장 데이터가 없거나 배열이 아님:', data);
+          console.log('Props로 받은 데이터가 없거나 배열이 아님, API에서 가져오기 시도');
           // 데이터가 없으면 API에서 직접 가져오기
           try {
-            const storeResponse = await fetch('/api/data');
+            const storeResponse = await fetch('http://localhost:4000/api/data');
+            console.log('매장 API 응답 상태:', storeResponse.status);
+            console.log('매장 API 응답 헤더:', storeResponse.headers.get('content-type'));
+            
             if (storeResponse.ok) {
-              const storeData = await storeResponse.json();
-              console.log('API에서 가져온 매장 데이터:', storeData.stores?.length || 0, '개');
-              if (storeData.stores && Array.isArray(storeData.stores)) {
-                const models = extractAvailableModels(storeData.stores);
-                console.log('API에서 추출된 모델:', models);
-                setAvailableModels(models);
+              const contentType = storeResponse.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const responseData = await storeResponse.json();
+                console.log('API에서 가져온 매장 데이터:', responseData.stores?.length || 0, '개');
+                if (responseData.stores && Array.isArray(responseData.stores)) {
+                  storeData = responseData.stores;
+                  storeDataLoaded = true;
+                  console.log('✅ API에서 매장 데이터 로드 성공');
+                } else {
+                  console.error('API 응답에 stores 배열이 없음:', responseData);
+                }
+              } else {
+                console.error('매장 API가 JSON이 아닌 응답을 반환:', contentType);
+                const responseText = await storeResponse.text();
+                console.error('응답 내용:', responseText.substring(0, 200));
               }
+            } else {
+              console.error('매장 API 응답 실패:', storeResponse.status, storeResponse.statusText);
+              const responseText = await storeResponse.text();
+              console.error('에러 응답 내용:', responseText.substring(0, 200));
             }
           } catch (apiError) {
             console.error('API에서 데이터 가져오기 실패:', apiError);
+            console.error('네트워크 에러 상세:', apiError.message);
           }
+        }
+        
+        // 모델 추출
+        if (storeData && Array.isArray(storeData)) {
+          console.log('모델 추출 시작, 매장 수:', storeData.length);
+          const models = extractAvailableModels(storeData);
+          console.log('추출된 모델 결과:', models);
+          console.log('사용 가능한 모델 수:', models.models.length);
+          console.log('사용 가능한 색상 수:', models.colors.length);
+          setAvailableModels(models);
+          console.log('✅ 실제 모델 데이터 설정 완료');
+        } else {
+          console.warn('⚠️ 매장 데이터가 없어 모델 추출 불가, 샘플 모델 사용');
+          // 샘플 모델 데이터 사용
+          const sampleModels = {
+            models: ['Galaxy S24', 'Galaxy A55', 'iPhone 15', 'iPhone 14'],
+            colors: ['블랙', '화이트', '블루', '그린', '레드'],
+            modelColors: new Map([
+              ['Galaxy S24', ['블랙', '화이트', '블루']],
+              ['Galaxy A55', ['블랙', '화이트', '그린']],
+              ['iPhone 15', ['블랙', '화이트', '레드']],
+              ['iPhone 14', ['블랙', '화이트', '블루']]
+            ])
+          };
+          setAvailableModels(sampleModels);
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);
+        // 전체 에러 시에도 기본 데이터 설정
+        setAgents([
+          { target: '김영업', contactId: 'kim001', office: '서울지사', department: '영업1팀' },
+          { target: '이매니저', contactId: 'lee002', office: '부산지사', department: '영업2팀' }
+        ]);
+        setAvailableModels({
+          models: ['Galaxy S24', 'Galaxy A55'],
+          colors: ['블랙', '화이트'],
+          modelColors: new Map([
+            ['Galaxy S24', ['블랙', '화이트']],
+            ['Galaxy A55', ['블랙', '화이트']]
+          ])
+        });
       }
     };
     
@@ -208,7 +310,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgressMessage('매장 데이터를 로드하는 중...');
       
       // 매장 데이터 가져오기 (재고 정보용)
-      const storeResponse = await fetch('/api/data');
+      const storeResponse = await fetch('http://localhost:4000/api/data');
       const storeData = await storeResponse.json();
       
       setProgress(30);
@@ -472,9 +574,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {agents
-                        .filter(agent => agent.office && agent.office.trim() !== '' && agent.department && agent.department.trim() !== '')
-                        .map((agent) => (
+                      {(() => {
+                        const validAgents = agents.filter(agent => 
+                          agent.office && agent.office.trim() !== '' && 
+                          agent.department && agent.department.trim() !== ''
+                        );
+                        console.log('담당자 테이블 렌더링:', {
+                          total: agents.length,
+                          valid: validAgents.length,
+                          agents: agents.slice(0, 3),
+                          validAgents: validAgents.slice(0, 3)
+                        });
+                        return validAgents.map((agent) => (
                           <TableRow key={agent.contactId}>
                             <TableCell>{agent.target}</TableCell>
                             <TableCell>
@@ -522,7 +633,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                               )}
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ));
+                      })()}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -970,21 +1082,37 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   <MenuItem value="">
                     <em>모델을 선택하세요</em>
                   </MenuItem>
-                  {availableModels.models
-                    .sort()
-                    .map((model) => (
-                      <MenuItem key={model} value={model}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
-                          <span>{model}</span>
-                          <Chip 
-                            size="small" 
-                            label={getColorsForModel(availableModels.modelColors, model).length} 
-                            color="primary" 
-                            variant="outlined"
-                          />
-                        </Box>
-                      </MenuItem>
-                    ))}
+                  {(() => {
+                    console.log('모델 선택 다이얼로그 렌더링:', {
+                      availableModels,
+                      modelsCount: availableModels.models.length,
+                      colorsCount: availableModels.colors.length
+                    });
+                    
+                    if (availableModels.models.length === 0) {
+                      return (
+                        <MenuItem disabled>
+                          <em>사용 가능한 모델이 없습니다. 매장 데이터를 확인해주세요.</em>
+                        </MenuItem>
+                      );
+                    }
+                    
+                    return availableModels.models
+                      .sort()
+                      .map((model) => (
+                        <MenuItem key={model} value={model}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                            <span>{model}</span>
+                            <Chip 
+                              size="small" 
+                              label={getColorsForModel(availableModels.modelColors, model).length} 
+                              color="primary" 
+                              variant="outlined"
+                            />
+                          </Box>
+                        </MenuItem>
+                      ));
+                  })()}
                 </Select>
               </FormControl>
               
