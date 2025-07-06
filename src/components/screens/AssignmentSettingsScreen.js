@@ -418,8 +418,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 기본 설정으로 초기화
       setDefaultSettings();
       
-      // 담당자 데이터는 서버에서 다시 로드
-      loadData();
+      // 담당자 데이터는 컴포넌트 마운트 시 자동으로 로드되므로 별도 호출 불필요
       
       alert('모든 배정 설정이 초기화되었습니다.');
     }
