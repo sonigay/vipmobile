@@ -111,7 +111,10 @@ self.addEventListener('activate', event => {
 
 // 푸시 알림 수신 처리
 self.addEventListener('push', event => {
-  console.log('푸시 알림 수신:', event);
+  console.log('푸시 알림 수신 시작:', {
+    hasData: !!event.data,
+    dataType: event.data ? typeof event.data : 'none'
+  });
   
   let notificationData = {
     title: '새로운 알림',
@@ -129,14 +132,24 @@ self.addEventListener('push', event => {
   if (event.data) {
     try {
       const data = event.data.json();
+      console.log('푸시 데이터 파싱 성공:', data);
       notificationData = {
         ...notificationData,
         ...data
       };
     } catch (error) {
       console.error('푸시 데이터 파싱 오류:', error);
+      // 파싱 실패 시 텍스트로 읽기 시도
+      try {
+        const textData = event.data.text();
+        console.log('푸시 데이터 텍스트:', textData);
+      } catch (textError) {
+        console.error('푸시 데이터 텍스트 읽기 실패:', textError);
+      }
     }
   }
+  
+  console.log('최종 알림 데이터:', notificationData);
   
   // 사운드 알림 재생
   const playNotificationSound = () => {
@@ -163,8 +176,9 @@ self.addEventListener('push', event => {
         badge: notificationData.badge,
         tag: notificationData.tag,
         data: notificationData.data,
-        requireInteraction: true, // 사용자가 직접 닫을 때까지 유지
+        requireInteraction: false, // 자동으로 사라지도록 변경
         silent: false, // 기본 브라우저 알림음도 재생
+        vibrate: [200, 100, 200], // 진동 추가
         actions: [
           {
             action: 'view',
@@ -176,6 +190,10 @@ self.addEventListener('push', event => {
             title: '닫기'
           }
         ]
+      }).then(() => {
+        console.log('알림 표시 완료');
+      }).catch(error => {
+        console.error('알림 표시 실패:', error);
       })
     ])
   );

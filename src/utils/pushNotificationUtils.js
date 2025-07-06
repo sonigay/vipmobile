@@ -197,6 +197,8 @@ export async function sendTestPushNotification(userId) {
       throw new Error('API URL이 설정되지 않았습니다.');
     }
     
+    console.log('테스트 푸시 알림 전송 시작 - userId:', userId);
+    
     const response = await fetch(`${API_URL}/api/push/send`, {
       method: 'POST',
       headers: {
@@ -208,14 +210,26 @@ export async function sendTestPushNotification(userId) {
           title: '테스트 알림',
           message: '푸시 알림이 정상적으로 작동합니다!',
           data: {
-            type: 'test'
+            type: 'test',
+            timestamp: Date.now()
           }
         }
       })
     });
     
+    console.log('테스트 알림 서버 응답 상태:', response.status);
+    
     if (!response.ok) {
-      throw new Error('테스트 알림 전송 실패');
+      const errorText = await response.text();
+      console.error('테스트 알림 서버 응답 오류:', errorText);
+      throw new Error(`테스트 알림 전송 실패: ${response.status} ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('테스트 알림 서버 응답:', result);
+    
+    if (!result.success) {
+      throw new Error(result.error || '테스트 알림 전송 실패');
     }
     
     console.log('테스트 푸시 알림 전송 완료');
@@ -224,5 +238,49 @@ export async function sendTestPushNotification(userId) {
   } catch (error) {
     console.error('테스트 푸시 알림 전송 실패:', error);
     throw error;
+  }
+}
+
+// 푸시 알림 디버깅 정보 출력
+export async function debugPushNotificationStatus() {
+  try {
+    console.log('=== 푸시 알림 디버깅 정보 ===');
+    
+    // 1. 브라우저 지원 확인
+    console.log('1. 브라우저 지원 확인:');
+    console.log('- Service Worker 지원:', 'serviceWorker' in navigator);
+    console.log('- Push Manager 지원:', 'PushManager' in window);
+    console.log('- Notification 지원:', 'Notification' in window);
+    
+    // 2. 권한 상태 확인
+    console.log('2. 권한 상태:');
+    console.log('- Notification 권한:', Notification.permission);
+    
+    // 3. Service Worker 상태 확인
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      console.log('3. Service Worker 상태:');
+      console.log('- 등록됨:', !!registration);
+      console.log('- 활성 상태:', registration.active ? '활성' : '비활성');
+      
+      // 4. 구독 상태 확인
+      const subscription = await registration.pushManager.getSubscription();
+      console.log('4. 푸시 구독 상태:');
+      console.log('- 구독됨:', !!subscription);
+      if (subscription) {
+        console.log('- 구독 정보:', {
+          endpoint: subscription.endpoint,
+          keys: subscription.keys ? Object.keys(subscription.keys) : 'none'
+        });
+      }
+    }
+    
+    // 5. API URL 확인
+    console.log('5. API URL:', API_URL);
+    
+    console.log('=== 디버깅 정보 완료 ===');
+    
+  } catch (error) {
+    console.error('푸시 알림 디버깅 실패:', error);
   }
 } 

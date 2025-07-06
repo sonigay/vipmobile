@@ -17,7 +17,8 @@ import {
   checkPushNotificationPermission, 
   requestPushNotificationPermission,
   getPushSubscriptionStatus,
-  sendTestPushNotification
+  sendTestPushNotification,
+  debugPushNotificationStatus
 } from '../utils/pushNotificationUtils';
 
 function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data }) {
@@ -322,6 +323,15 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
     }
   };
 
+  // 푸시 알림 디버깅
+  const handleDebugPushNotifications = async () => {
+    try {
+      await debugPushNotificationStatus();
+    } catch (error) {
+      console.error('푸시 알림 디버깅 실패:', error);
+    }
+  };
+
   // 메뉴 핸들러
   const handleMenuOpen = (event) => {
     setMenuAnchorEl(event.currentTarget);
@@ -578,7 +588,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
           />
 
           {pushEnabled && (
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Button
                 variant="outlined"
                 onClick={handleTestNotification}
@@ -586,6 +596,15 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
                 fullWidth
               >
                 테스트 알림 전송
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleDebugPushNotifications}
+                disabled={loading}
+                fullWidth
+                size="small"
+              >
+                디버깅 정보 출력
               </Button>
             </Box>
           )}
