@@ -406,6 +406,19 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 키보드 단축키 처리
   useEffect(() => {
     const handleKeyPress = (event) => {
+      // 입력 필드나 다이얼로그가 활성화된 경우 단축키 비활성화
+      const activeElement = document.activeElement;
+      const isInputField = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'SELECT' ||
+        activeElement.contentEditable === 'true'
+      );
+      
+      if (isInputField) {
+        return;
+      }
+      
       // Ctrl/Cmd + S: 설정 저장
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
         event.preventDefault();
@@ -426,7 +439,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         handleClearCache();
       }
       
-      // 숫자 키로 탭 전환
+      // 숫자 키로 탭 전환 (입력 필드가 아닌 경우에만)
       if (event.key >= '1' && event.key <= '3') {
         const tabIndex = parseInt(event.key) - 1;
         setActiveTab(tabIndex);
@@ -1026,7 +1039,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       {/* 영업사원별 배정 현황 */}
                       <Box sx={{ mb: 3 }}>
                         <Typography variant="subtitle1" gutterBottom>
-                          영업사원별 배정 현황 (상위 10명)
+                          영업사원별 배정 현황 (전체 {Object.keys(previewData.agents).length}명)
                         </Typography>
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
@@ -1036,7 +1049,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 <TableCell>사무실</TableCell>
                                 <TableCell>소속</TableCell>
                                 <TableCell align="center">총 배정량</TableCell>
-                                <TableCell align="center">배정 점수</TableCell>
+                                <TableCell align="center">평균 배정 점수</TableCell>
+                                <TableCell align="center">배정 모델 수</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -1046,11 +1060,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   const bTotal = Object.values(b).reduce((sum, val) => sum + (val.quantity || 0), 0);
                                   return bTotal - aTotal;
                                 })
-                                .slice(0, 10)
                                 .map(([agentId, agentData]) => {
                                   const agent = agents.find(a => a.contactId === agentId);
                                   const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
                                   const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.score || 0), 0) / Object.keys(agentData).length;
+                                  const modelCount = Object.keys(agentData).length;
                                   
                                   return (
                                     <TableRow key={agentId}>
@@ -1059,6 +1073,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       <TableCell>{agent?.department || '미지정'}</TableCell>
                                       <TableCell align="center">{totalQuantity}개</TableCell>
                                       <TableCell align="center">{Math.round(avgScore)}점</TableCell>
+                                      <TableCell align="center">{modelCount}개</TableCell>
                                     </TableRow>
                                   );
                                 })}

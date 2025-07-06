@@ -183,12 +183,29 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
     const storeCount = agentCurrentData.length; // 거래처수 = 담당자별로 보유중인 매장수
     const salesVolume = totalSales; // 판매량 = 당월실적+전월실적
     
-    const score = (
-      turnoverRate * (ratios.turnoverRate / 100) +
-      storeCount * (ratios.storeCount / 100) +
-      remainingInventory * (ratios.remainingInventory / 100) +
-      salesVolume * (ratios.salesVolume / 100)
-    );
+    // 기본 점수 계산 (개통실적 데이터가 없는 경우에도 기본값 제공)
+    let score = 0;
+    
+    if (totalSales > 0 || remainingInventory > 0 || storeCount > 0) {
+      // 실제 데이터가 있는 경우
+      score = (
+        turnoverRate * (ratios.turnoverRate / 100) +
+        storeCount * (ratios.storeCount / 100) +
+        remainingInventory * (ratios.remainingInventory / 100) +
+        salesVolume * (ratios.salesVolume / 100)
+      );
+    } else {
+      // 데이터가 없는 경우 기본 점수 (균등 배정을 위한 최소 점수)
+      score = 50;
+    }
+    
+    console.log(`배정 점수 계산 - ${agent.target} (${model}):`, {
+      turnoverRate: Math.round(turnoverRate * 100) / 100,
+      storeCount,
+      remainingInventory,
+      salesVolume,
+      score: Math.round(score * 100) / 100
+    });
     
     // 결과 캐싱
     setCache(cacheKey, score);
@@ -223,11 +240,27 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
   const totalScore = agentScores.reduce((sum, item) => sum + item.score, 0);
   
   const assignments = {};
+  let remainingQuantity = totalQuantity;
   
-  // 점수 비율에 따른 배정량 계산
-  agentScores.forEach(({ agent, score }) => {
+  // 점수 비율에 따른 배정량 계산 (100% 배정 보장)
+  agentScores.forEach(({ agent, score }, index) => {
     const ratio = totalScore > 0 ? score / totalScore : 1 / eligibleAgents.length;
-    const assignedQuantity = Math.round(totalQuantity * ratio);
+    
+    let assignedQuantity;
+    if (index === agentScores.length - 1) {
+      // 마지막 영업사원에게 남은 수량 모두 배정
+      assignedQuantity = remainingQuantity;
+    } else {
+      // 비율에 따른 배정량 계산
+      assignedQuantity = Math.round(totalQuantity * ratio);
+      // 남은 수량을 초과하지 않도록 조정
+      assignedQuantity = Math.min(assignedQuantity, remainingQuantity);
+    }
+    
+    // 최소 1개는 배정 (수량이 있는 경우)
+    if (remainingQuantity > 0 && assignedQuantity === 0) {
+      assignedQuantity = 1;
+    }
     
     assignments[agent.contactId] = {
       agentName: agent.target,
@@ -238,6 +271,15 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
       score: score,
       ratio: ratio
     };
+    
+    remainingQuantity -= assignedQuantity;
+  });
+  
+  console.log(`모델 ${modelName} 배정 완료:`, {
+    totalQuantity,
+    assignedQuantity: totalQuantity - remainingQuantity,
+    remainingQuantity,
+    agentCount: eligibleAgents.length
   });
   
   return assignments;
@@ -260,9 +302,10 @@ export const aggregateOfficeAssignment = (assignments, eligibleAgents) => {
     officeStats[agent.office].agentCount++;
     officeStats[agent.office].agents.push(agent);
     
-    // 해당 영업사원의 배정량 추가
+    // 해당 영업사원의 배정량 추가 (모든 모델의 합계)
     if (assignments[agent.contactId]) {
-      officeStats[agent.office].totalQuantity += assignments[agent.contactId].quantity;
+      const agentTotalQuantity = Object.values(assignments[agent.contactId]).reduce((sum, assignment) => sum + assignment.quantity, 0);
+      officeStats[agent.office].totalQuantity += agentTotalQuantity;
     }
   });
   
@@ -286,9 +329,10 @@ export const aggregateDepartmentAssignment = (assignments, eligibleAgents) => {
     departmentStats[agent.department].agentCount++;
     departmentStats[agent.department].agents.push(agent);
     
-    // 해당 영업사원의 배정량 추가
+    // 해당 영업사원의 배정량 추가 (모든 모델의 합계)
     if (assignments[agent.contactId]) {
-      departmentStats[agent.department].totalQuantity += assignments[agent.contactId].quantity;
+      const agentTotalQuantity = Object.values(assignments[agent.contactId]).reduce((sum, assignment) => sum + assignment.quantity, 0);
+      departmentStats[agent.department].totalQuantity += agentTotalQuantity;
     }
   });
   
@@ -320,10 +364,15 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
   
   const modelResults = await Promise.all(modelPromises);
   
-  // 결과 통합
+  // 결과 통합 - 영업사원별로 모델별 배정 결과 그룹화
   modelResults.forEach(({ modelName, modelAssignments, modelData }) => {
-    // 영업사원별 배정 결과 저장
-    Object.assign(results.agents, modelAssignments);
+    // 영업사원별 배정 결과를 모델별로 그룹화하여 저장
+    Object.entries(modelAssignments).forEach(([contactId, assignment]) => {
+      if (!results.agents[contactId]) {
+        results.agents[contactId] = {};
+      }
+      results.agents[contactId][modelName] = assignment;
+    });
     
     // 모델별 결과 저장
     results.models[modelName] = {
