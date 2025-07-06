@@ -183,6 +183,10 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
     const storeCount = agentCurrentData.length; // 거래처수 = 담당자별로 보유중인 매장수
     const salesVolume = totalSales; // 판매량 = 당월실적+전월실적
     
+    // 잔여재고 점수 계산 (재고가 적을수록 높은 점수)
+    // 재고가 0이면 최고점(100), 재고가 많을수록 점수 감소
+    const inventoryScore = remainingInventory === 0 ? 100 : Math.max(0, 100 - (remainingInventory * 10));
+    
     // 기본 점수 계산 (개통실적 데이터가 없는 경우에도 기본값 제공)
     let score = 0;
     
@@ -191,7 +195,7 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
       score = (
         turnoverRate * (ratios.turnoverRate / 100) +
         storeCount * (ratios.storeCount / 100) +
-        remainingInventory * (ratios.remainingInventory / 100) +
+        inventoryScore * (ratios.remainingInventory / 100) + // 잔여재고 점수 사용
         salesVolume * (ratios.salesVolume / 100)
       );
     } else {
@@ -203,6 +207,7 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
       turnoverRate: Math.round(turnoverRate * 100) / 100,
       storeCount,
       remainingInventory,
+      inventoryScore: Math.round(inventoryScore * 100) / 100,
       salesVolume,
       score: Math.round(score * 100) / 100
     });
@@ -223,7 +228,8 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     return {};
   }
   
-  const totalQuantity = modelData.quantity;
+  // 색상별 수량의 총합 계산
+  const totalQuantity = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
   
   // 병렬로 모든 영업사원의 배정 점수 계산
   const scorePromises = eligibleAgents.map(async (agent) => {
@@ -247,19 +253,21 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     const ratio = totalScore > 0 ? score / totalScore : 1 / eligibleAgents.length;
     
     let assignedQuantity;
+    
     if (index === agentScores.length - 1) {
       // 마지막 영업사원에게 남은 수량 모두 배정
       assignedQuantity = remainingQuantity;
     } else {
       // 비율에 따른 배정량 계산
       assignedQuantity = Math.round(totalQuantity * ratio);
+      
       // 남은 수량을 초과하지 않도록 조정
       assignedQuantity = Math.min(assignedQuantity, remainingQuantity);
-    }
-    
-    // 최소 1개는 배정 (수량이 있는 경우)
-    if (remainingQuantity > 0 && assignedQuantity === 0) {
-      assignedQuantity = 1;
+      
+      // 최소 1개는 배정 (수량이 있는 경우)
+      if (remainingQuantity > 0 && assignedQuantity === 0) {
+        assignedQuantity = 1;
+      }
     }
     
     assignments[agent.contactId] = {
@@ -267,7 +275,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
       office: agent.office,
       department: agent.department,
       quantity: assignedQuantity,
-      colors: modelData.colors,
+      colors: modelData.colors.map(color => color.name), // 색상명 배열
       score: score,
       ratio: ratio
     };
@@ -279,8 +287,21 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     totalQuantity,
     assignedQuantity: totalQuantity - remainingQuantity,
     remainingQuantity,
-    agentCount: eligibleAgents.length
+    agentCount: eligibleAgents.length,
+    colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`)
   });
+  
+  // 100% 배정 확인
+  if (remainingQuantity > 0) {
+    console.warn(`⚠️ 모델 ${modelName}에서 ${remainingQuantity}개가 남았습니다. 마지막 영업사원에게 추가 배정합니다.`);
+    
+    // 마지막 영업사원에게 남은 수량 추가 배정
+    const lastAgentId = agentScores[agentScores.length - 1].agent.contactId;
+    if (assignments[lastAgentId]) {
+      assignments[lastAgentId].quantity += remainingQuantity;
+      console.log(`✅ ${lastAgentId}에게 추가 ${remainingQuantity}개 배정 완료`);
+    }
+  }
   
   return assignments;
 };
@@ -377,9 +398,10 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
     // 모델별 결과 저장
     results.models[modelName] = {
       name: modelName,
-      totalQuantity: modelData.quantity,
+      totalQuantity: modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0),
       assignedQuantity: Object.values(modelAssignments).reduce((sum, assignment) => sum + assignment.quantity, 0),
-      assignments: modelAssignments
+      assignments: modelAssignments,
+      colors: modelData.colors // 색상별 수량 정보 포함
     };
   });
   

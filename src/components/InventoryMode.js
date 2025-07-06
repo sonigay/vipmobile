@@ -646,24 +646,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
                 </ListItemIcon>
                 <ListItemText>배정셋팅</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => handleSubMenuClick('office')}>
-                <ListItemIcon>
-                  <BusinessIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>사무실배정</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSubMenuClick('sales')}>
-                <ListItemIcon>
-                  <PersonAddIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>영업사원배정</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSubMenuClick('department')}>
-                <ListItemIcon>
-                  <AccountTreeIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>소속배정</ListItemText>
-              </MenuItem>
               <MenuItem onClick={() => setCurrentScreen('assignment_history')}>
                 <ListItemIcon>
                   <HistoryIcon fontSize="small" />
