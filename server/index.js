@@ -2294,9 +2294,10 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
       agents = agentData.slice(1).map((row, index) => {
         const agent = {
           target: row[0], // 담당자명
-          contactId: row[1], // 연락처 ID (아이디)
-          office: row[2], // 사무실
-          department: row[3] // 부서
+          contactId: row[1], // 연락처 ID (전화번호)
+          role: row[2], // 역할 (영업사원, 스탭, 이사 등)
+          office: row[3], // 사무실
+          department: row[4] // 부서
         };
         
         console.log(`담당자 데이터 파싱 ${index + 1}:`, agent);
@@ -2311,7 +2312,7 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     console.error('담당자 데이터 로드 실패:', error);
   }
   
-  console.log('사용 가능한 담당자 목록:', agents.map(a => `${a.target}(${a.contactId}) - ${a.office} ${a.department}`));
+  console.log('사용 가능한 담당자 목록:', agents.map(a => `${a.target}(${a.contactId}) - ${a.role} - ${a.office} ${a.department}`));
   console.log('현재 연결된 클라이언트:', Array.from(connectedClients.entries()).map(([id, client]) => `${id}:${client.user_id}`));
   console.log('배정 대상자 정보:', {
     targetOffices: targetOffices || [],
@@ -2451,13 +2452,15 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   const isTarget = offices.includes(userAgent.office) || 
                    departments.includes(userAgent.department) || 
                    targetAgentsList.includes(userAgent.target) ||
-                   targetAgentsList.includes(userAgent.contactId);
+                   targetAgentsList.includes(userAgent.contactId) ||
+                   targetAgentsList.includes(userAgent.role);
   
   console.log(`${userId} 대상자 여부:`, isTarget, {
     officeMatch: offices.includes(userAgent.office),
     departmentMatch: departments.includes(userAgent.department),
     targetMatch: targetAgentsList.includes(userAgent.target),
-    contactIdMatch: targetAgentsList.includes(userAgent.contactId)
+    contactIdMatch: targetAgentsList.includes(userAgent.contactId),
+    roleMatch: targetAgentsList.includes(userAgent.role)
   });
   
   return isTarget;
