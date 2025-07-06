@@ -963,14 +963,25 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       let targetAgents = [];
       
       if (previewData.agents) {
-        Object.values(previewData.agents).forEach(agent => {
+        Object.entries(previewData.agents).forEach(([contactId, agent]) => {
+          console.log(`담당자 정보 확인 - contactId: ${contactId}, agent:`, agent);
+          
           // agent가 객체인 경우
           if (typeof agent === 'object' && agent !== null) {
-            if (agent.department) {
-              targetDepartments.push(agent.department);
+            // agent 객체의 모든 키 확인
+            console.log(`agent 객체의 키들:`, Object.keys(agent));
+            
+            // department와 agentName을 찾기 위해 다양한 가능한 키 확인
+            const department = agent.department || agent.departmentName || agent.소속 || agent.부서;
+            const agentName = agent.agentName || agent.name || agent.target || agent.담당자;
+            
+            if (department) {
+              targetDepartments.push(department);
+              console.log(`부서 추가: ${department}`);
             }
-            if (agent.agentName) {
-              targetAgents.push(agent.agentName);
+            if (agentName) {
+              targetAgents.push(agentName);
+              console.log(`담당자 추가: ${agentName}`);
             }
           }
         });
