@@ -432,18 +432,24 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 모델 추가
   const handleAddModel = () => {
-    if (newModel.name && newModel.color && newModel.quantity > 0) {
+    // 선택된 모델과 색상이 있으면 그것을 사용, 없으면 수동 입력된 값을 사용
+    const modelName = selectedModel || newModel.name;
+    const modelColor = selectedColor || newModel.color;
+    
+    if (modelName && modelColor && newModel.quantity > 0) {
       setAssignmentSettings(prev => ({
         ...prev,
         models: {
           ...prev.models,
-          [newModel.name]: {
-            colors: [newModel.color],
+          [modelName]: {
+            colors: [modelColor],
             quantity: newModel.quantity
           }
         }
       }));
       setNewModel({ name: '', color: '', quantity: 0 });
+      setSelectedModel('');
+      setSelectedColor('');
       setShowModelDialog(false);
     }
   };
@@ -1254,6 +1260,29 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </Grid>
             )}
 
+            {/* 선택된 모델/색상의 입고수량 입력 */}
+            {selectedModel && selectedColor && (
+              <Grid item xs={12}>
+                <Card variant="outlined" sx={{ backgroundColor: '#e3f2fd' }}>
+                  <CardContent>
+                    <Typography variant="subtitle2" gutterBottom color="primary">
+                      📦 {selectedModel} - {selectedColor} 입고수량 설정
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="입고 수량"
+                      value={newModel.quantity}
+                      onChange={(e) => setNewModel(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                      placeholder="입고할 수량을 입력하세요"
+                      inputProps={{ min: 1 }}
+                      helperText="선택된 모델과 색상에 대한 입고 수량을 입력하세요"
+                    />
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
             {/* 수동 입력 섹션 */}
             <Grid item xs={12}>
               <Card variant="outlined">
@@ -1314,7 +1343,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <Button 
             onClick={handleAddModel} 
             variant="contained"
-            disabled={!newModel.name || !newModel.color || newModel.quantity <= 0}
+            disabled={!((selectedModel && selectedColor && newModel.quantity > 0) || (newModel.name && newModel.color && newModel.quantity > 0))}
             startIcon={<AddIcon />}
           >
             모델 추가
