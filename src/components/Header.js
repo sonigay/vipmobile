@@ -133,7 +133,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
           {loggedInStore && !isInventoryMode && (
             <Chip
               icon={<PersonIcon />}
-              label={`${loggedInStore.name} : ${loggedInStore.inventory || 0}대`}
+              label={`${loggedInStore.name} : ${typeof loggedInStore.inventory === 'object' ? Object.values(loggedInStore.inventory).reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0) : (loggedInStore.inventory || 0)}대`}
               size="small"
               sx={{ 
                 ml: 2, 
