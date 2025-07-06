@@ -58,7 +58,15 @@ function MasterInventoryScreen({ data, onBack, onLogout, screenType }) {
           }
 
           Object.entries(statusData).forEach(([status, colors]) => {
-            const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+            const qty = Object.values(colors).reduce((sum, val) => {
+              // val이 객체인 경우 quantity 필드 확인
+              if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+                return sum + (val.quantity || 0);
+              } else if (typeof val === 'number') {
+                return sum + (val || 0);
+              }
+              return sum;
+            }, 0);
             master.phones[model].total += qty;
             
             if (status === '정상') master.phones[model].normal += qty;
@@ -86,7 +94,15 @@ function MasterInventoryScreen({ data, onBack, onLogout, screenType }) {
           }
 
           Object.entries(statusData).forEach(([status, colors]) => {
-            const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+            const qty = Object.values(colors).reduce((sum, val) => {
+              // val이 객체인 경우 quantity 필드 확인
+              if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+                return sum + (val.quantity || 0);
+              } else if (typeof val === 'number') {
+                return sum + (val || 0);
+              }
+              return sum;
+            }, 0);
             master.sims[model].total += qty;
             
             if (status === '정상') master.sims[model].normal += qty;

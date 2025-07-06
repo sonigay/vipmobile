@@ -233,18 +233,24 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     
     let total = 0;
     Object.values(store.inventory).forEach(category => {
-      Object.values(category).forEach(model => {
-        Object.values(model).forEach(status => {
-          Object.values(status).forEach(qty => {
-            // qty가 객체인 경우 quantity 속성을 확인
-            if (typeof qty === 'object' && qty !== null && qty.quantity) {
-              total += qty.quantity || 0;
-            } else if (typeof qty === 'number') {
-              total += qty || 0;
-            }
-          });
+      if (typeof category === 'object' && category !== null) {
+        Object.values(category).forEach(model => {
+          if (typeof model === 'object' && model !== null) {
+            Object.values(model).forEach(status => {
+              if (typeof status === 'object' && status !== null) {
+                Object.values(status).forEach(qty => {
+                  // qty가 객체인 경우 quantity 속성을 확인
+                  if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
+                    total += qty.quantity || 0;
+                  } else if (typeof qty === 'number') {
+                    total += qty || 0;
+                  }
+                });
+              }
+            });
+          }
         });
-      });
+      }
     });
     
     return total;
@@ -396,7 +402,15 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     // 단말기
     Object.values(store.inventory.phones || {}).forEach(model => {
       Object.entries(model).forEach(([status, colors]) => {
-        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        const qty = Object.values(colors).reduce((sum, val) => {
+          // val이 객체인 경우 quantity 필드 확인
+          if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+            return sum + (val.quantity || 0);
+          } else if (typeof val === 'number') {
+            return sum + (val || 0);
+          }
+          return sum;
+        }, 0);
         if (status === '정상') summary.phones.normal += qty;
         else if (status === '이력') summary.phones.history += qty;
         else if (status === '불량') summary.phones.defective += qty;
@@ -407,7 +421,15 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     // 유심
     Object.values(store.inventory.sims || {}).forEach(model => {
       Object.entries(model).forEach(([status, colors]) => {
-        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        const qty = Object.values(colors).reduce((sum, val) => {
+          // val이 객체인 경우 quantity 필드 확인
+          if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+            return sum + (val.quantity || 0);
+          } else if (typeof val === 'number') {
+            return sum + (val || 0);
+          }
+          return sum;
+        }, 0);
         if (status === '정상') summary.sims.normal += qty;
         else if (status === '이력') summary.sims.history += qty;
         else if (status === '불량') summary.sims.defective += qty;
@@ -418,7 +440,15 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     // 웨어러블
     Object.values(store.inventory.wearables || {}).forEach(model => {
       Object.entries(model).forEach(([status, colors]) => {
-        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        const qty = Object.values(colors).reduce((sum, val) => {
+          // val이 객체인 경우 quantity 필드 확인
+          if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+            return sum + (val.quantity || 0);
+          } else if (typeof val === 'number') {
+            return sum + (val || 0);
+          }
+          return sum;
+        }, 0);
         if (status === '정상') summary.wearables.normal += qty;
         else if (status === '이력') summary.wearables.history += qty;
         else if (status === '불량') summary.wearables.defective += qty;
@@ -429,7 +459,15 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     // 스마트기기
     Object.values(store.inventory.smartDevices || {}).forEach(model => {
       Object.entries(model).forEach(([status, colors]) => {
-        const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+        const qty = Object.values(colors).reduce((sum, val) => {
+          // val이 객체인 경우 quantity 필드 확인
+          if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+            return sum + (val.quantity || 0);
+          } else if (typeof val === 'number') {
+            return sum + (val || 0);
+          }
+          return sum;
+        }, 0);
         if (status === '정상') summary.smartDevices.normal += qty;
         else if (status === '이력') summary.smartDevices.history += qty;
         else if (status === '불량') summary.smartDevices.defective += qty;

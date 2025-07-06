@@ -57,7 +57,15 @@ function InventoryAuditScreen({ data, onBack, onLogout, screenType }) {
       Object.values(store.inventory).forEach(category => {
         Object.values(category).forEach(model => {
           Object.entries(model).forEach(([status, colors]) => {
-            const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+            const qty = Object.values(colors).reduce((sum, val) => {
+              // val이 객체인 경우 quantity 필드 확인
+              if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+                return sum + (val.quantity || 0);
+              } else if (typeof val === 'number') {
+                return sum + (val || 0);
+              }
+              return sum;
+            }, 0);
             if (qty > 0) {
               if (status === '정상') hasNormal = true;
               else if (status === '이력') hasHistory = true;
@@ -98,7 +106,15 @@ function InventoryAuditScreen({ data, onBack, onLogout, screenType }) {
       Object.values(store.inventory).forEach(category => {
         Object.values(category).forEach(model => {
           Object.entries(model).forEach(([status, colors]) => {
-            const qty = Object.values(colors).reduce((sum, val) => sum + (val || 0), 0);
+            const qty = Object.values(colors).reduce((sum, val) => {
+              // val이 객체인 경우 quantity 필드 확인
+              if (typeof val === 'object' && val !== null && val.quantity !== undefined) {
+                return sum + (val.quantity || 0);
+              } else if (typeof val === 'number') {
+                return sum + (val || 0);
+              }
+              return sum;
+            }, 0);
             if (qty > 0) {
               if (status === '정상') hasNormal = true;
               else if (status === '이력') hasHistory = true;
