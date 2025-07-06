@@ -29,6 +29,39 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
   const [error, setError] = useState('');
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
+  // 매장 재고 계산 함수
+  const getStoreInventory = (store) => {
+    if (!store || !store.inventory) return 0;
+    
+    // 새로운 데이터 구조: { phones: {}, sims: {}, wearables: {}, smartDevices: {} }
+    let totalInventory = 0;
+    
+    // 모든 카테고리의 재고를 합산
+    Object.values(store.inventory).forEach(category => {
+      if (typeof category === 'object' && category !== null) {
+        Object.values(category).forEach(model => {
+          if (typeof model === 'object' && model !== null) {
+            Object.values(model).forEach(status => {
+              if (typeof status === 'object' && status !== null) {
+                Object.values(status).forEach(item => {
+                  // 새로운 구조: { quantity: number, shippedDate: string }
+                  if (typeof item === 'object' && item && item.quantity) {
+                    totalInventory += item.quantity || 0;
+                  } else if (typeof item === 'number') {
+                    // 기존 구조 호환성
+                    totalInventory += item || 0;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    return totalInventory;
+  };
+
   // 푸시 알림 상태 초기화
   useEffect(() => {
     const initializePushNotifications = async () => {
@@ -160,7 +193,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
           {loggedInStore && !isInventoryMode && (
             <Chip
               icon={<PersonIcon />}
-              label={`${loggedInStore.name} : ${typeof loggedInStore.inventory === 'object' ? Object.values(loggedInStore.inventory).reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0) : (loggedInStore.inventory || 0)}대`}
+              label={`${loggedInStore.name} : ${getStoreInventory(loggedInStore)}대`}
               size="small"
               sx={{ 
                 ml: 2, 
