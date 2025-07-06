@@ -29,7 +29,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
   const [error, setError] = useState('');
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
-  // 매장 재고 계산 함수
+  // 매장 재고 계산 함수 (일반모드용)
   const getStoreInventory = (store) => {
     if (!store || !store.inventory) return 0;
     
@@ -60,6 +60,78 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
     });
     
     return totalInventory;
+  };
+
+  // 관리자모드용 카테고리별 재고 계산 함수
+  const getAgentInventoryByCategory = (store) => {
+    if (!store || !store.inventory) {
+      return { phones: 0, wearables: 0, tablets: 0 };
+    }
+    
+    const categories = {
+      phones: 0,      // 휴대폰
+      wearables: 0,   // 웨어러블
+      tablets: 0      // 테블릿 (smartDevices)
+    };
+    
+    // phones 카테고리 (휴대폰)
+    if (store.inventory.phones) {
+      Object.values(store.inventory.phones).forEach(model => {
+        if (typeof model === 'object' && model !== null) {
+          Object.values(model).forEach(status => {
+            if (typeof status === 'object' && status !== null) {
+              Object.values(status).forEach(item => {
+                if (typeof item === 'object' && item && item.quantity) {
+                  categories.phones += item.quantity || 0;
+                } else if (typeof item === 'number') {
+                  categories.phones += item || 0;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    // wearables 카테고리 (웨어러블)
+    if (store.inventory.wearables) {
+      Object.values(store.inventory.wearables).forEach(model => {
+        if (typeof model === 'object' && model !== null) {
+          Object.values(model).forEach(status => {
+            if (typeof status === 'object' && status !== null) {
+              Object.values(status).forEach(item => {
+                if (typeof item === 'object' && item && item.quantity) {
+                  categories.wearables += item.quantity || 0;
+                } else if (typeof item === 'number') {
+                  categories.wearables += item || 0;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    // smartDevices 카테고리 (테블릿)
+    if (store.inventory.smartDevices) {
+      Object.values(store.inventory.smartDevices).forEach(model => {
+        if (typeof model === 'object' && model !== null) {
+          Object.values(model).forEach(status => {
+            if (typeof status === 'object' && status !== null) {
+              Object.values(status).forEach(item => {
+                if (typeof item === 'object' && item && item.quantity) {
+                  categories.tablets += item.quantity || 0;
+                } else if (typeof item === 'number') {
+                  categories.tablets += item || 0;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    return categories;
   };
 
   // 푸시 알림 상태 초기화
@@ -190,7 +262,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           {isInventoryMode ? '재고 조회 시스템' : '재고 조회 시스템'}
-          {loggedInStore && !isInventoryMode && (
+          {loggedInStore && !isInventoryMode && !isAgentMode && (
             <Chip
               icon={<PersonIcon />}
               label={`${loggedInStore.name} : ${getStoreInventory(loggedInStore)}대`}
@@ -215,6 +287,100 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
                 '& .MuiChip-icon': { color: 'white' }
               }}
             />
+          )}
+          {isAgentMode && loggedInStore && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+              <Chip
+                icon={<PersonIcon />}
+                label={`${loggedInStore.name}`}
+                size="small"
+                sx={{ 
+                  backgroundColor: 'rgba(255,255,255,0.2)', 
+                  color: 'white',
+                  '& .MuiChip-icon': { color: 'white' }
+                }}
+              />
+              {currentView === 'all' && (
+                <Chip
+                  label="전체재고확인"
+                  size="small"
+                  sx={{ 
+                    backgroundColor: 'rgba(255,255,255,0.15)', 
+                    color: 'white',
+                    fontSize: '0.75rem'
+                  }}
+                />
+              )}
+              {currentView === 'assigned' && (
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Chip
+                    label="담당재고확인"
+                    size="small"
+                    sx={{ 
+                      backgroundColor: 'rgba(255,255,255,0.15)', 
+                      color: 'white',
+                      fontSize: '0.75rem'
+                    }}
+                  />
+                  {(() => {
+                    const categories = getAgentInventoryByCategory(loggedInStore);
+                    return (
+                      <>
+                        <Chip
+                          label={`휴대폰:${categories.phones}대`}
+                          size="small"
+                          sx={{ 
+                            backgroundColor: 'rgba(76, 175, 80, 0.3)', 
+                            color: 'white',
+                            fontSize: '0.7rem'
+                          }}
+                        />
+                        <Chip
+                          label={`웨어러블:${categories.wearables}대`}
+                          size="small"
+                          sx={{ 
+                            backgroundColor: 'rgba(255, 152, 0, 0.3)', 
+                            color: 'white',
+                            fontSize: '0.7rem'
+                          }}
+                        />
+                        <Chip
+                          label={`테블릿:${categories.tablets}대`}
+                          size="small"
+                          sx={{ 
+                            backgroundColor: 'rgba(156, 39, 176, 0.3)', 
+                            color: 'white',
+                            fontSize: '0.7rem'
+                          }}
+                        />
+                      </>
+                    );
+                  })()}
+                </Box>
+              )}
+              {currentView === 'activation' && (
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Chip
+                    label="담당개통확인"
+                    size="small"
+                    sx={{ 
+                      backgroundColor: 'rgba(255,255,255,0.15)', 
+                      color: 'white',
+                      fontSize: '0.75rem'
+                    }}
+                  />
+                  <Chip
+                    label="총개통수량 확인 중..."
+                    size="small"
+                    sx={{ 
+                      backgroundColor: 'rgba(33, 150, 243, 0.3)', 
+                      color: 'white',
+                      fontSize: '0.7rem'
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
           )}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
