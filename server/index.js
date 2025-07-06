@@ -157,7 +157,7 @@ process.on('uncaughtException', async (error) => {
                   value: `\`\`\`\n${errorInfo.message}\n${errorInfo.stack}\n\`\`\``
                 })
                 .setTimestamp()
-                .setFooter({ text: 'VIP+ 서버 오류 알림' });
+                .setFooter({ text: '(주)브이아이피플러스 서버 오류 알림' });
                 
               console.log('충돌 알림 전송 시도 중...');
               await channel.send({ content: '@everyone', embeds: [crashEmbed] });
@@ -210,7 +210,7 @@ process.on('unhandledRejection', async (reason, promise) => {
               value: `\`\`\`\n${errorInfo.message}\n${errorInfo.stack}\n\`\`\``
             })
             .setTimestamp()
-            .setFooter({ text: 'VIP+ 서버 경고 알림' });
+            .setFooter({ text: '(주)브이아이피플러스 서버 경고 알림' });
             
           await channel.send({ embeds: [warningEmbed] });
           console.log('서버 경고 알림 메시지가 Discord로 전송되었습니다.');
@@ -1476,7 +1476,7 @@ app.post('/api/log-activity', async (req, res) => {
               }
             ],
             footer: {
-              text: userType === 'agent' ? 'VIP+ 관리자 활동 로그' : 'VIP+ 매장 활동 로그'
+              text: userType === 'agent' ? '(주)브이아이피플러스 관리자 활동 로그' : '(주)브이아이피플러스 매장 활동 로그'
             }
           };
           
@@ -1557,7 +1557,7 @@ app.post('/api/login', async (req, res) => {
               }
             ],
             footer: {
-              text: 'VIP+ 재고모드 로그인'
+              text: '(주)브이아이피플러스 재고모드 로그인'
             }
           };
           
@@ -1620,7 +1620,7 @@ app.post('/api/login', async (req, res) => {
                 }
               ],
               footer: {
-                text: 'VIP+ 관리자 로그인'
+                text: '(주)브이아이피플러스 관리자 로그인'
               }
             };
             
@@ -1709,7 +1709,7 @@ app.post('/api/login', async (req, res) => {
               }
             ],
             footer: {
-              text: 'VIP+ 매장 로그인'
+              text: '(주)브이아이피플러스 매장 로그인'
             }
           };
           
@@ -1892,7 +1892,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
               .setColor(5763719)
               .setDescription('서버가 성공적으로 시작되었습니다.')
               .setTimestamp()
-              .setFooter({ text: 'VIP+ 서버' });
+              .setFooter({ text: '(주)브이아이피플러스 서버' });
               
             await channel.send({ embeds: [testEmbed] });
             console.log('서버 시작 알림 메시지 전송됨');
@@ -1944,7 +1944,7 @@ process.on('SIGTERM', async () => {
                 .setColor(15548997) // 빨간색
                 .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
                 .setTimestamp()
-                .setFooter({ text: 'VIP+ 서버 알림' });
+                .setFooter({ text: '(주)브이아이피플러스 서버 알림' });
                 
               console.log('종료 알림 전송 시도 중...');
               const sentMessage = await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
@@ -2001,7 +2001,7 @@ process.on('SIGINT', async () => {
                 .setColor(15548997) // 빨간색
                 .setDescription('@everyone\n서버가 종료되었습니다. 서비스 이용이 불가능할 수 있습니다.')
                 .setTimestamp()
-                .setFooter({ text: 'VIP+ 서버 알림' });
+                .setFooter({ text: '(주)브이아이피플러스 서버 알림' });
                 
               console.log('종료 알림 전송 시도 중...');
               const sentMessage = await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });

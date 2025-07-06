@@ -1511,7 +1511,7 @@ function App() {
                     )}
                   </Box>
                 ) : (
-                  'VIP+ 가용재고 조회 서비스'
+                  '(주)브이아이피플러스'
                 )}
               </Typography>
               

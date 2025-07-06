@@ -215,9 +215,13 @@ function Login({ onLogin }) {
           
           <Box sx={{ textAlign: 'center', mb: 3 }}>
             <img 
-              src="/login.png" 
-              alt="VIP+" 
-              style={{ maxWidth: '150px', margin: '0 auto' }}
+              src={process.env.PUBLIC_URL + '/kakao-logo.png'} 
+              alt="(주)브이아이피플러스"
+              style={{ 
+                width: '120px', 
+                height: 'auto',
+                marginBottom: '20px'
+              }} 
             />
           </Box>
 

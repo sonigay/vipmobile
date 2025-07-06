@@ -124,7 +124,7 @@ async function sendDiscordAlert(online) {
       });
     }
     
-    embed.setFooter({ text: 'VIP+ 서버 모니터링' });
+    embed.setFooter({ text: '(주)브이아이피플러스 서버 모니터링' });
     
     console.log('Discord 알림 전송 시도 중...');
     const message = await channel.send({ content: '@everyone', embeds: [embed] });
