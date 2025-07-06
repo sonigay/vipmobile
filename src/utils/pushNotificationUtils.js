@@ -19,22 +19,45 @@ function urlBase64ToUint8Array(base64String) {
 // 푸시 알림 구독
 export async function subscribeToPushNotifications(userId) {
   try {
-    // 1. VAPID 공개키 가져오기
-    const response = await fetch('/api/push/vapid-public-key');
-    const { publicKey } = await response.json();
+    console.log('푸시 알림 구독 시작 - userId:', userId);
     
-    if (!publicKey) {
+    if (!userId) {
+      throw new Error('사용자 ID가 제공되지 않았습니다.');
+    }
+    
+    // 1. VAPID 공개키 가져오기
+    console.log('VAPID 공개키 요청 중...');
+    const response = await fetch('/api/push/vapid-public-key');
+    
+    if (!response.ok) {
+      throw new Error(`VAPID 공개키 요청 실패: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('VAPID 응답:', data);
+    
+    if (!data.success || !data.publicKey) {
       throw new Error('VAPID 공개키를 가져올 수 없습니다.');
     }
     
+    const { publicKey } = data;
+    console.log('VAPID 공개키 획득 성공');
+    
     // 2. Service Worker 등록 확인
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (!('serviceWorker' in navigator)) {
+      throw new Error('이 브라우저는 Service Worker를 지원하지 않습니다.');
+    }
+    
+    if (!('PushManager' in window)) {
       throw new Error('이 브라우저는 푸시 알림을 지원하지 않습니다.');
     }
     
+    console.log('Service Worker 등록 중...');
     const registration = await navigator.serviceWorker.ready;
+    console.log('Service Worker 등록 완료:', registration);
     
     // 3. 기존 구독 확인
+    console.log('기존 구독 확인 중...');
     let subscription = await registration.pushManager.getSubscription();
     
     if (subscription) {
@@ -43,12 +66,19 @@ export async function subscribeToPushNotifications(userId) {
     }
     
     // 4. 새 구독 생성
+    console.log('새 구독 생성 중...');
+    const applicationServerKey = urlBase64ToUint8Array(publicKey);
+    console.log('Application Server Key 변환 완료');
+    
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey)
+      applicationServerKey: applicationServerKey
     });
     
+    console.log('브라우저 푸시 구독 생성 완료:', subscription);
+    
     // 5. 서버에 구독 정보 전송
+    console.log('서버에 구독 정보 전송 중...');
     const subscribeResponse = await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: {
@@ -60,8 +90,19 @@ export async function subscribeToPushNotifications(userId) {
       })
     });
     
+    console.log('서버 응답 상태:', subscribeResponse.status);
+    
     if (!subscribeResponse.ok) {
-      throw new Error('서버에 구독 정보를 저장할 수 없습니다.');
+      const errorText = await subscribeResponse.text();
+      console.error('서버 응답 오류:', errorText);
+      throw new Error(`서버에 구독 정보를 저장할 수 없습니다: ${subscribeResponse.status} ${subscribeResponse.statusText}`);
+    }
+    
+    const subscribeResult = await subscribeResponse.json();
+    console.log('서버 구독 응답:', subscribeResult);
+    
+    if (!subscribeResult.success) {
+      throw new Error(subscribeResult.error || '서버 구독 등록 실패');
     }
     
     console.log('푸시 알림 구독 완료');
@@ -69,6 +110,11 @@ export async function subscribeToPushNotifications(userId) {
     
   } catch (error) {
     console.error('푸시 알림 구독 실패:', error);
+    console.error('오류 상세 정보:', {
+      message: error.message,
+      stack: error.stack,
+      userId: userId
+    });
     throw error;
   }
 }

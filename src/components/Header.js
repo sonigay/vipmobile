@@ -179,8 +179,12 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
 
   // 푸시 알림 구독
   const handleSubscribe = async () => {
+    console.log('푸시 알림 구독 시도 - currentUserId:', currentUserId);
+    
     if (!currentUserId) {
-      setError('사용자 ID가 필요합니다.');
+      const errorMsg = '사용자 ID가 필요합니다.';
+      console.error(errorMsg);
+      setError(errorMsg);
       return;
     }
 
@@ -188,12 +192,16 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
       setLoading(true);
       setError('');
       
+      console.log('푸시 알림 구독 함수 호출...');
       await subscribeToPushNotifications(currentUserId);
+      console.log('푸시 알림 구독 성공!');
+      
       setPushSubscribed(true);
       setPushEnabled(true);
     } catch (error) {
-      setError('푸시 알림 구독에 실패했습니다.');
+      const errorMsg = `푸시 알림 구독에 실패했습니다: ${error.message}`;
       console.error('푸시 알림 구독 실패:', error);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
