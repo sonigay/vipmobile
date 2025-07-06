@@ -3,10 +3,32 @@ const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
+const webpush = require('web-push');
 
 // 기본 설정
 const app = express();
 const port = process.env.PORT || 4000;
+
+// VAPID 키 설정 (환경변수에서 가져오거나 생성)
+const vapidKeys = process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY 
+  ? {
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY
+    }
+  : webpush.generateVAPIDKeys();
+
+// web-push 설정
+webpush.setVapidDetails(
+  'mailto:admin@vipmap.com', // 관리자 이메일 (실제 이메일로 변경 필요)
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
+
+// 푸시 구독 저장소 (실제로는 데이터베이스 사용 권장)
+const pushSubscriptions = new Map();
+
+console.log('VAPID Public Key:', vapidKeys.publicKey);
+console.log('VAPID Private Key:', vapidKeys.privateKey);
 
 // 캐싱 시스템 설정
 const cache = new Map();
@@ -1845,6 +1867,7 @@ async function checkAndUpdateAddresses() {
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
     console.log(`서버가 포트 ${port}에서 실행 중입니다`);
+    console.log(`VAPID Public Key: ${vapidKeys.publicKey}`);
     
     // 환경변수 디버깅 (민감한 정보는 로깅하지 않음)
     console.log('Discord 봇 환경변수 상태:');
@@ -2268,12 +2291,16 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
   
   console.log('사용 가능한 담당자 목록:', agents.map(a => `${a.target}(${a.contactId}) - ${a.office} ${a.department}`));
   
+  // SSE 실시간 알림 전송
   connectedClients.forEach((client, clientId) => {
     try {
       // 클라이언트가 배정 대상자인지 확인
       if (isTargetAgent(client.user_id, targetOffices, targetDepartments, targetAgents, agents)) {
         client.res.write(`data: ${JSON.stringify(notification)}\n\n`);
-        console.log(`알림 전송 완료: 클라이언트 ${clientId} (${client.user_id})`);
+        console.log(`SSE 알림 전송 완료: 클라이언트 ${clientId} (${client.user_id})`);
+        
+        // 푸시 알림도 함께 전송
+        sendPushNotificationToUser(client.user_id, notification);
       } else {
         console.log(`클라이언트 ${clientId} (${client.user_id})는 배정 대상자가 아님`);
       }
@@ -2282,6 +2309,52 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
       connectedClients.delete(clientId);
     }
   });
+  
+  // 오프라인 사용자를 위한 푸시 알림 전송
+  agents.forEach(agent => {
+    if (isTargetAgent(agent.contactId, targetOffices, targetDepartments, targetAgents, agents)) {
+      // 현재 온라인 상태가 아닌 사용자에게만 푸시 알림 전송
+      const isOnline = Array.from(connectedClients.values()).some(client => client.user_id === agent.contactId);
+      if (!isOnline) {
+        sendPushNotificationToUser(agent.contactId, notification);
+      }
+    }
+  });
+}
+
+// 푸시 알림 전송 함수
+async function sendPushNotificationToUser(userId, notification) {
+  try {
+    const subscription = pushSubscriptions.get(userId);
+    if (!subscription) {
+      console.log(`사용자 ${userId}의 푸시 구독이 없습니다.`);
+      return;
+    }
+    
+    const payload = JSON.stringify({
+      title: notification.title || '새로운 배정 완료',
+      body: notification.message || '새로운 배정이 완료되었습니다.',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: 'assignment-notification',
+      data: {
+        url: '/',
+        timestamp: Date.now(),
+        ...notification.data
+      }
+    });
+    
+    await webpush.sendNotification(subscription, payload);
+    console.log(`푸시 알림 전송 완료: ${userId}`);
+  } catch (error) {
+    console.error(`푸시 알림 전송 실패 (${userId}):`, error);
+    
+    // 구독이 만료된 경우 삭제
+    if (error.statusCode === 410) {
+      pushSubscriptions.delete(userId);
+      console.log(`만료된 구독 삭제: ${userId}`);
+    }
+  }
 }
 
 // 대상자 확인 함수
@@ -2309,4 +2382,176 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   
   console.log(`${userId} 대상자 여부:`, isTarget);
   return isTarget;
-} 
+}
+
+// 푸시 알림 관련 API
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ 
+    success: true, 
+    publicKey: vapidKeys.publicKey 
+  });
+});
+
+// 푸시 구독 등록
+app.post('/api/push/subscribe', async (req, res) => {
+  try {
+    const { subscription, userId } = req.body;
+    
+    if (!subscription || !userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '구독 정보와 사용자 ID가 필요합니다.' 
+      });
+    }
+    
+    // 구독 정보 저장
+    pushSubscriptions.set(userId, subscription);
+    console.log(`푸시 구독 등록: ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('푸시 구독 등록 오류:', error);
+    res.status(500).json({ success: false, error: '구독 등록 실패' });
+  }
+});
+
+// 푸시 구독 해제
+app.post('/api/push/unsubscribe', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '사용자 ID가 필요합니다.' 
+      });
+    }
+    
+    // 구독 정보 삭제
+    pushSubscriptions.delete(userId);
+    console.log(`푸시 구독 해제: ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('푸시 구독 해제 오류:', error);
+    res.status(500).json({ success: false, error: '구독 해제 실패' });
+  }
+});
+
+// 푸시 알림 전송 (특정 사용자)
+app.post('/api/push/send', async (req, res) => {
+  try {
+    const { userId, notification } = req.body;
+    
+    if (!userId || !notification) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '사용자 ID와 알림 정보가 필요합니다.' 
+      });
+    }
+    
+    const subscription = pushSubscriptions.get(userId);
+    if (!subscription) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '사용자의 푸시 구독을 찾을 수 없습니다.' 
+      });
+    }
+    
+    const payload = JSON.stringify({
+      title: notification.title || '새로운 알림',
+      body: notification.message || '새로운 알림이 도착했습니다.',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: 'assignment-notification',
+      data: {
+        url: '/',
+        timestamp: Date.now(),
+        ...notification.data
+      }
+    });
+    
+    await webpush.sendNotification(subscription, payload);
+    console.log(`푸시 알림 전송 완료: ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('푸시 알림 전송 오류:', error);
+    
+    // 구독이 만료된 경우 삭제
+    if (error.statusCode === 410) {
+      const { userId } = req.body;
+      pushSubscriptions.delete(userId);
+      console.log(`만료된 구독 삭제: ${userId}`);
+    }
+    
+    res.status(500).json({ success: false, error: '푸시 알림 전송 실패' });
+  }
+});
+
+// 푸시 알림 전송 (모든 구독자)
+app.post('/api/push/send-all', async (req, res) => {
+  try {
+    const { notification } = req.body;
+    
+    if (!notification) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '알림 정보가 필요합니다.' 
+      });
+    }
+    
+    const payload = JSON.stringify({
+      title: notification.title || '새로운 알림',
+      body: notification.message || '새로운 알림이 도착했습니다.',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: 'assignment-notification',
+      data: {
+        url: '/',
+        timestamp: Date.now(),
+        ...notification.data
+      }
+    });
+    
+    const results = [];
+    const expiredSubscriptions = [];
+    
+    for (const [userId, subscription] of pushSubscriptions.entries()) {
+      try {
+        await webpush.sendNotification(subscription, payload);
+        results.push({ userId, success: true });
+        console.log(`푸시 알림 전송 완료: ${userId}`);
+      } catch (error) {
+        console.error(`푸시 알림 전송 실패 (${userId}):`, error);
+        results.push({ userId, success: false, error: error.message });
+        
+        // 구독이 만료된 경우 삭제
+        if (error.statusCode === 410) {
+          expiredSubscriptions.push(userId);
+        }
+      }
+    }
+    
+    // 만료된 구독 삭제
+    expiredSubscriptions.forEach(userId => {
+      pushSubscriptions.delete(userId);
+      console.log(`만료된 구독 삭제: ${userId}`);
+    });
+    
+    res.json({ 
+      success: true, 
+      results,
+      expiredCount: expiredSubscriptions.length
+    });
+  } catch (error) {
+    console.error('푸시 알림 전송 오류:', error);
+    res.status(500).json({ success: false, error: '푸시 알림 전송 실패' });
+  }
+});
+
+// 서버 시작
+app.listen(port, () => {
+  console.log(`서버가 포트 ${port}에서 실행 중입니다.`);
+  console.log(`VAPID Public Key: ${vapidKeys.publicKey}`);
+}); 

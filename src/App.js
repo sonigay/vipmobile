@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress, Chip, IconButton } from '@mui/material';
+import { Container, Box, Typography, Button, CircularProgress, Chip, IconButton } from '@mui/material';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
+import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
@@ -43,7 +44,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import RealtimeDashboard from './components/RealtimeDashboard';
+
 import { addNotification, addAssignmentCompletedNotification, addSettingsChangedNotification } from './utils/notificationUtils';
 
 // Logger 유틸리티
@@ -143,7 +144,8 @@ function App() {
   const [toastNotifications, setToastNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [showRealtimeDashboard, setShowRealtimeDashboard] = useState(false);
+  const [notificationList, setNotificationList] = useState([]);
+
 
   // 재고모드 접속 아이디 목록
   const INVENTORY_MODE_IDS = [
@@ -1529,6 +1531,18 @@ function App() {
     playNotificationSound();
     setUnreadNotifications(prev => prev + 1);
     
+    // 알림 목록에 추가
+    const newNotification = {
+      id: Date.now(),
+      title: notification.title || '새로운 배정 완료',
+      message: notification.message || '새로운 배정이 완료되었습니다.',
+      timestamp: new Date(),
+      isRead: false,
+      data: notification.data || {}
+    };
+    
+    setNotificationList(prev => [newNotification, ...prev]);
+    
     // 토스트 알림 추가
     const toastId = Date.now();
     const newToast = {
@@ -1617,212 +1631,12 @@ function App() {
         }
       }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
-          <AppBar position="static">
-            <Toolbar>
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                {isAgentMode ? (
-                  // 관리자 모드일 때 접속자 이름과 직급 표시
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
-                      {agentTarget} ({agentQualification})
-                    </span>
-                    {currentView === 'assigned' && getAgentTotalInventory() && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 1, 
-                        p: 0.5, 
-                        backgroundColor: 'rgba(255,255,255,0.8)', 
-                        borderRadius: 1,
-                        fontSize: '0.6em',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}>
-                        <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                          총보유재고: {getAgentTotalInventory().phones + getAgentTotalInventory().wearables + getAgentTotalInventory().tablets}개
-                        </span>
-                      </Box>
-                    )}
-                    {currentView === 'activation' && getAgentTotalActivation() && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 1, 
-                        p: 0.5, 
-                        backgroundColor: 'rgba(255,255,255,0.8)', 
-                        borderRadius: 1,
-                        fontSize: '0.6em',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}>
-                        <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                          휴대폰: {getAgentTotalActivation().phones}개
-                        </span>
-                        <span style={{ color: '#f57c00', fontWeight: 'bold' }}>
-                          웨어러블: {getAgentTotalActivation().wearables}개
-                        </span>
-                        <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}>
-                          태블릿: {getAgentTotalActivation().tablets}개
-                        </span>
-                      </Box>
-                    )}
-                  </Box>
-                ) : isInventoryMode ? (
-                  // 재고모드일 때 접속자 이름 표시
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
-                      재고 관리 시스템
-                    </span>
-                    {inventoryUserName && (
-                      <Chip
-                        icon={<PersonIcon />}
-                        label={`접속자: ${inventoryUserName}`}
-                        size="small"
-                        sx={{ 
-                          backgroundColor: 'rgba(255,255,255,0.2)', 
-                          color: 'white',
-                          fontSize: '0.6em',
-                          '& .MuiChip-icon': { color: 'white', fontSize: '0.8em' }
-                        }}
-                      />
-                    )}
-                  </Box>
-                ) : (
-                  // 일반 매장 모드일 때 업체명과 보유재고 표시
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
-                      {loggedInStore?.name || '(주)브이아이피플러스'}
-                    </span>
-                    {loggedInStore && (
-                      <Chip
-                        label={`보유재고: ${getStoreInventory(loggedInStore)}개`}
-                        size="small"
-                        sx={{ 
-                          backgroundColor: 'rgba(255,255,255,0.2)', 
-                          color: 'white',
-                          fontSize: '0.6em'
-                        }}
-                      />
-                    )}
-                  </Box>
-                )}
-              </Typography>
-              
-              {cacheStatus && (
-                <Box className="cache-info" sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
-                  <Chip 
-                    label={`캐시: ${cacheStatus.memory.valid}/${cacheStatus.memory.total}`}
-                    size="small"
-                    color={cacheStatus.memory.valid > 0 ? "success" : "default"}
-                    variant="outlined"
-                    sx={{ fontSize: '0.7em' }}
-                    onClick={handleCacheClick}
-                    style={{ cursor: 'pointer' }}
-                    title="클릭하여 캐시 정리 및 새로고침"
-                  />
-                  <Chip 
-                    label={`LS: ${cacheStatus.localStorage.total}`}
-                    size="small"
-                    color={cacheStatus.localStorage.total > 0 ? "info" : "default"}
-                    variant="outlined"
-                    sx={{ fontSize: '0.7em' }}
-                  />
-                </Box>
-              )}
-              
-              {/* 관리자 모드 재고 확인 메뉴 */}
-              {isLoggedIn && isAgentMode && (
-                <Box className="admin-mode-buttons" sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
-                  <Button 
-                    color="inherit" 
-                    onClick={() => handleViewChange('all')}
-                    sx={{ 
-                      fontSize: '0.8em',
-                      backgroundColor: currentView === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.2)'
-                      }
-                    }}
-                  >
-                    전체재고확인
-                  </Button>
-                  <Button 
-                    color="inherit" 
-                    onClick={() => handleViewChange('assigned')}
-                    sx={{ 
-                      fontSize: '0.8em',
-                      backgroundColor: currentView === 'assigned' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.2)'
-                      }
-                    }}
-                  >
-                    담당재고확인
-                  </Button>
-                  <Button 
-                    color="inherit" 
-                    onClick={() => handleViewChange('activation')}
-                    sx={{ 
-                      fontSize: '0.8em',
-                      backgroundColor: currentView === 'activation' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.2)'
-                      }
-                    }}
-                  >
-                    담당개통확인
-                  </Button>
-                  <Button 
-                    color="inherit" 
-                    onClick={() => setShowRealtimeDashboard(true)}
-                    sx={{ 
-                      fontSize: '0.8em',
-                      backgroundColor: showRealtimeDashboard ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.2)'
-                      }
-                    }}
-                  >
-                    실시간대시보드
-                  </Button>
-                </Box>
-              )}
-              
-              <Button color="inherit" onClick={handleLogout}>
-                로그아웃
-              </Button>
-              
-              {/* 관리자모드 알림 아이콘 */}
-              {isAgentMode && (
-                <Box sx={{ position: 'relative', ml: 1 }}>
-                  <IconButton 
-                    color="inherit" 
-                    onClick={() => {
-                      setShowNotificationModal(true);
-                      // 알림 아이콘 클릭 시 읽음 처리
-                      setUnreadNotifications(0);
-                    }}
-                    sx={{ position: 'relative' }}
-                  >
-                    <NotificationsIcon />
-                    {unreadNotifications > 0 && (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          width: 12,
-                          height: 12,
-                          backgroundColor: '#ff4444',
-                          borderRadius: '50%',
-                          border: '2px solid white',
-                          animation: 'pulse 2s infinite'
-                        }}
-                      />
-                    )}
-                  </IconButton>
-                </Box>
-              )}
-            </Toolbar>
-          </AppBar>
+          <Header 
+            onCheckUpdate={handleCheckUpdate}
+            inventoryUserName={inventoryUserName}
+            isInventoryMode={isInventoryMode}
+            currentUserId={loggedInStore?.id}
+          />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
               <CircularProgress />
@@ -2229,15 +2043,35 @@ function App() {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ minHeight: '300px' }}>
-            <Typography variant="body1" gutterBottom>
-              새로운 배정이 완료되었습니다.
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              경수님이 iPhone 15 Pro (블랙) 50대를 경인사무소 영업1팀에 배정했습니다.
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              2024-01-15 10:30
-            </Typography>
+            {notificationList.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                새로운 알림이 없습니다.
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {notificationList.map((notification) => (
+                  <Box 
+                    key={notification.id} 
+                    sx={{ 
+                      p: 2, 
+                      border: '1px solid #e0e0e0', 
+                      borderRadius: 1,
+                      backgroundColor: notification.isRead ? '#fafafa' : '#fff3e0'
+                    }}
+                  >
+                    <Typography variant="body1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      {notification.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      {notification.message}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {notification.timestamp.toLocaleString()}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -2263,14 +2097,6 @@ function App() {
           </div>
         </Box>
       ))}
-
-      {/* 실시간 대시보드 */}
-      {showRealtimeDashboard && (
-        <RealtimeDashboard
-          onClose={() => setShowRealtimeDashboard(false)}
-          data={data}
-        />
-      )}
 
       {/* 알림 시스템 */}
                     {/* 알림 시스템 제거 (재고 모드로 이동) */}

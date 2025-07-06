@@ -579,6 +579,13 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
               >
                 재고배정
               </Button>
+              
+              <Button 
+                color="inherit" 
+                onClick={() => setCurrentScreen('realtime_dashboard')}
+              >
+                실시간대시보드
+              </Button>
             </Box>
             
             <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
@@ -672,12 +679,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
                   <HistoryIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>배정 히스토리</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => setCurrentScreen('realtime_dashboard')}>
-                <ListItemIcon>
-                  <WatchIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>실시간 대시보드</ListItemText>
               </MenuItem>
             </>
           )}

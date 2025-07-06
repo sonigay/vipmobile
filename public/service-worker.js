@@ -109,6 +109,121 @@ self.addEventListener('activate', event => {
   );
 });
 
+// 푸시 알림 수신 처리
+self.addEventListener('push', event => {
+  console.log('푸시 알림 수신:', event);
+  
+  let notificationData = {
+    title: '새로운 알림',
+    body: '새로운 알림이 도착했습니다.',
+    icon: '/logo192.png',
+    badge: '/logo192.png',
+    tag: 'assignment-notification',
+    data: {
+      url: '/',
+      timestamp: Date.now()
+    }
+  };
+  
+  // 푸시 데이터가 있으면 파싱
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      notificationData = {
+        ...notificationData,
+        ...data
+      };
+    } catch (error) {
+      console.error('푸시 데이터 파싱 오류:', error);
+    }
+  }
+  
+  // 사운드 알림 재생
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.volume = 0.5; // 볼륨을 50%로 설정
+      audio.play().catch(error => {
+        console.log('사운드 재생 실패 (정상적인 경우):', error);
+      });
+    } catch (error) {
+      console.log('사운드 파일 로드 실패:', error);
+    }
+  };
+  
+  // 알림 표시
+  event.waitUntil(
+    Promise.all([
+      // 사운드 재생
+      playNotificationSound(),
+      // 알림 표시
+      self.registration.showNotification(notificationData.title, {
+        body: notificationData.body,
+        icon: notificationData.icon,
+        badge: notificationData.badge,
+        tag: notificationData.tag,
+        data: notificationData.data,
+        requireInteraction: true, // 사용자가 직접 닫을 때까지 유지
+        silent: false, // 기본 브라우저 알림음도 재생
+        actions: [
+          {
+            action: 'view',
+            title: '확인',
+            icon: '/logo192.png'
+          },
+          {
+            action: 'dismiss',
+            title: '닫기'
+          }
+        ]
+      })
+    ])
+  );
+});
+
+// 알림 클릭 처리
+self.addEventListener('notificationclick', event => {
+  console.log('알림 클릭:', event);
+  
+  event.notification.close();
+  
+  if (event.action === 'dismiss') {
+    return;
+  }
+  
+  // 앱 열기 또는 포커스
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // 이미 열린 창이 있으면 포커스
+      for (let client of clients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      
+      // 열린 창이 없으면 새 창 열기
+      if (self.clients.openWindow) {
+        return self.clients.openWindow('/');
+      }
+    })
+  );
+});
+
+// 알림 닫기 처리
+self.addEventListener('notificationclose', event => {
+  console.log('알림 닫힘:', event);
+  
+  // 알림이 닫힐 때 클라이언트에게 알림
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'NOTIFICATION_CLOSED',
+        notificationId: event.notification.tag
+      });
+    });
+  });
+});
+
 // 메시지 처리 (앱에서 캐시 정리 요청 시)
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
@@ -143,5 +258,48 @@ self.addEventListener('message', event => {
         });
       });
     });
+  }
+  
+  // 푸시 알림 구독 요청
+  if (event.data && event.data.type === 'SUBSCRIBE_PUSH') {
+    event.waitUntil(
+      self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: event.data.applicationServerKey
+      }).then(subscription => {
+        // 구독 정보를 클라이언트에게 전달
+        event.ports[0].postMessage({
+          type: 'PUSH_SUBSCRIPTION_SUCCESS',
+          subscription: subscription
+        });
+      }).catch(error => {
+        console.error('푸시 구독 실패:', error);
+        event.ports[0].postMessage({
+          type: 'PUSH_SUBSCRIPTION_ERROR',
+          error: error.message
+        });
+      })
+    );
+  }
+  
+  // 푸시 알림 구독 해제 요청
+  if (event.data && event.data.type === 'UNSUBSCRIBE_PUSH') {
+    event.waitUntil(
+      self.registration.pushManager.getSubscription().then(subscription => {
+        if (subscription) {
+          return subscription.unsubscribe();
+        }
+      }).then(() => {
+        event.ports[0].postMessage({
+          type: 'PUSH_UNSUBSCRIPTION_SUCCESS'
+        });
+      }).catch(error => {
+        console.error('푸시 구독 해제 실패:', error);
+        event.ports[0].postMessage({
+          type: 'PUSH_UNSUBSCRIPTION_ERROR',
+          error: error.message
+        });
+      })
+    );
   }
 }); 
