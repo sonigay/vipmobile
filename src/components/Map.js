@@ -41,21 +41,21 @@ function ForceZoomUpdater({ forceZoomToStore }) {
       const { lat, lng } = forceZoomToStore;
       console.log('ForceZoomUpdater 실행:', lat, lng, '지도 인스턴스:', map);
       
-      try {
+        try {
         // 지도가 완전히 로드된 후에 확대 실행
         const timer = setTimeout(() => {
           if (map && map._loaded) {
-            map.setView([lat, lng], 14, {
-              animate: true,
-              duration: 1
-            });
+          map.setView([lat, lng], 14, {
+            animate: true,
+            duration: 1
+          });
             console.log('ForceZoomUpdater 확대 완료');
           }
         }, 100);
-        
+          
         return () => clearTimeout(timer);
-      } catch (error) {
-        console.error('ForceZoomUpdater 오류:', error);
+        } catch (error) {
+          console.error('ForceZoomUpdater 오류:', error);
       }
     }
   }, [forceZoomToStore, map]);
@@ -75,13 +75,13 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
     }
     
     if (map && map._loaded) {
-      if (bounds) {
-        map.fitBounds(bounds);
-        if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-          map.setZoom(isAgentMode ? 12 : 15);
-        }
-      } else if (center) {
-        map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
+    if (bounds) {
+      map.fitBounds(bounds);
+      if (map.getZoom() > (isAgentMode ? 12 : 15)) {
+        map.setZoom(isAgentMode ? 12 : 15);
+      }
+    } else if (center) {
+      map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
       }
     }
   }, [map, center, bounds, zoom, isAgentMode, forceZoomToStore]);
@@ -441,11 +441,11 @@ function Map({
       try {
         const mapInstance = mapRef.current;
         if (mapInstance._loaded && mapInstance._mapPane) {
-          mapInstance.setView([lat, lng], 14, {
-            animate: true,
-            duration: 1
-          });
-          console.log('강제 확대 직접 조작 완료');
+        mapInstance.setView([lat, lng], 14, {
+          animate: true,
+          duration: 1
+        });
+        console.log('강제 확대 직접 조작 완료');
         }
       } catch (error) {
         console.error('강제 확대 직접 조작 오류:', error);

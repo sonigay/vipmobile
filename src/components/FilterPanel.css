@@ -137,7 +137,7 @@
 .MuiSlider-rail {
   height: 4px !important;
   opacity: 0.3;
-}
+} 
 
 /* 담당개통확인 화면 스타일 */
 .activation-screen {
@@ -678,4 +678,171 @@
 
 .data-info p {
   margin: 0;
+}
+
+/* 모바일 반응형 스타일 */
+@media (max-width: 768px) {
+  .filter-panel {
+    padding: 12px !important;
+    margin-bottom: 8px !important;
+    border-radius: 8px !important;
+  }
+  
+  .filter-header {
+    font-size: 1rem !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+  }
+  
+  .filter-content {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  .filter-left {
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  
+  .search-group {
+    flex-direction: column !important;
+    gap: 8px !important;
+    min-width: auto !important;
+    width: 100% !important;
+  }
+  
+  .model-search,
+  .color-select {
+    width: 100% !important;
+  }
+  
+  .radius-group {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding-left: 0 !important;
+    border-left: none !important;
+    border-top: 1px solid #eef2f6 !important;
+    padding-top: 8px !important;
+  }
+  
+  .radius-label {
+    justify-content: center !important;
+    white-space: normal !important;
+  }
+  
+  .radius-slider {
+    min-width: auto !important;
+    padding: 0 8px !important;
+  }
+  
+  .selected-filters {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    min-width: auto !important;
+    width: 100% !important;
+  }
+  
+  .selected-filters-title {
+    justify-content: center !important;
+    white-space: normal !important;
+  }
+  
+  .selected-filter-items {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: center !important;
+  }
+  
+  .selected-filter-item {
+    font-size: 0.8rem !important;
+  }
+  
+  /* MUI 컴포넌트 모바일 최적화 */
+  .MuiAutocomplete-root .MuiOutlinedInput-root {
+    padding: 8px 12px !important;
+  }
+  
+  .MuiAutocomplete-root .MuiOutlinedInput-root .MuiAutocomplete-input {
+    padding: 8px !important;
+    font-size: 16px !important; /* iOS에서 줌 방지 */
+  }
+  
+  .MuiSelect-select {
+    padding: 12px 16px !important;
+    font-size: 16px !important; /* iOS에서 줌 방지 */
+  }
+  
+  .MuiSlider-root {
+    margin: 8px 0 !important;
+  }
+  
+  .MuiSlider-thumb {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  .MuiSlider-track {
+    height: 6px !important;
+  }
+  
+  .MuiSlider-rail {
+    height: 6px !important;
+  }
+}
+
+/* 더 작은 모바일 화면 (480px 이하) */
+@media (max-width: 480px) {
+  .filter-panel {
+    padding: 8px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .filter-header {
+    font-size: 0.9rem !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .filter-content {
+    gap: 8px !important;
+  }
+  
+  .filter-left {
+    gap: 6px !important;
+  }
+  
+  .search-group {
+    gap: 6px !important;
+  }
+  
+  .radius-group {
+    gap: 6px !important;
+    padding-top: 6px !important;
+  }
+  
+  .selected-filters {
+    gap: 6px !important;
+  }
+  
+  .selected-filter-items {
+    gap: 6px !important;
+  }
+  
+  .selected-filter-item {
+    font-size: 0.7rem !important;
+  }
+  
+  .MuiAutocomplete-root .MuiOutlinedInput-root {
+    padding: 6px 10px !important;
+  }
+  
+  .MuiAutocomplete-root .MuiOutlinedInput-root .MuiAutocomplete-input {
+    padding: 6px !important;
+  }
+  
+  .MuiSelect-select {
+    padding: 10px 14px !important;
+  }
 } 

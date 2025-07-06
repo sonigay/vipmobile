@@ -234,22 +234,22 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     let total = 0;
     Object.values(store.inventory).forEach(category => {
       if (typeof category === 'object' && category !== null) {
-        Object.values(category).forEach(model => {
+      Object.values(category).forEach(model => {
           if (typeof model === 'object' && model !== null) {
-            Object.values(model).forEach(status => {
+        Object.values(model).forEach(status => {
               if (typeof status === 'object' && status !== null) {
-                Object.values(status).forEach(qty => {
+          Object.values(status).forEach(qty => {
                   // qty가 객체인 경우 quantity 속성을 확인
                   if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
                     total += qty.quantity || 0;
                   } else if (typeof qty === 'number') {
-                    total += qty || 0;
+            total += qty || 0;
                   }
-                });
+          });
               }
-            });
-          }
         });
+          }
+      });
       }
     });
     
@@ -674,7 +674,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
         {/* 알림 시스템 */}
         <NotificationButton />
         <AnnouncementBanner />
-        
+
         {/* 메인 콘텐츠 */}
         <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
           {/* 검색 및 필터 */}

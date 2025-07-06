@@ -50,7 +50,7 @@ const clientCacheUtils = {
           console.warn('localStorage 저장 재시도 실패:', retryError);
         }
       } else {
-        console.warn('localStorage 저장 실패:', error);
+      console.warn('localStorage 저장 실패:', error);
       }
     }
   },

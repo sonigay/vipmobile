@@ -150,4 +150,194 @@
 
 .stores-grid::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* 모바일 반응형 스타일 */
+@media (max-width: 768px) {
+  .stores-list {
+    border-radius: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .stores-list h3 {
+    padding: 12px !important;
+    font-size: 16px !important;
+  }
+  
+  .stores-list table {
+    font-size: 14px !important;
+  }
+  
+  .stores-list th, 
+  .stores-list td {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+  }
+  
+  .stores-list th {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+  }
+  
+  /* 모바일에서 테이블 스크롤 최적화 */
+  .stores-list {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .stores-list table {
+    min-width: 600px !important; /* 최소 너비 보장 */
+  }
+  
+  /* 모바일에서 스토어 아이템 최적화 */
+  .store-item {
+    padding: 8px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .store-name {
+    font-size: 14px !important;
+    margin-bottom: 2px !important;
+  }
+  
+  .store-address {
+    font-size: 12px !important;
+    margin-bottom: 2px !important;
+  }
+  
+  .store-inventory {
+    font-size: 12px !important;
+  }
+  
+  .model-info {
+    font-size: 11px !important;
+  }
+  
+  /* 모바일에서 그리드 최적화 */
+  .stores-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    padding: 8px !important;
+  }
+  
+  .store-card {
+    padding: 12px !important;
+    border-radius: 8px !important;
+  }
+  
+  .store-card-header {
+    padding-bottom: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .store-card-title {
+    font-size: 16px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .store-card-subtitle {
+    font-size: 12px !important;
+  }
+  
+  .store-card-content {
+    gap: 6px !important;
+  }
+  
+  .inventory-item {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  .inventory-label {
+    font-size: 11px !important;
+  }
+  
+  .inventory-count {
+    font-size: 13px !important;
+  }
+  
+  /* 모바일에서 스크롤바 최적화 */
+  .stores-grid::-webkit-scrollbar {
+    width: 6px !important;
+  }
+  
+  .stores-grid::-webkit-scrollbar-thumb {
+    border-radius: 3px !important;
+  }
+}
+
+/* 더 작은 모바일 화면 (480px 이하) */
+@media (max-width: 480px) {
+  .stores-list h3 {
+    padding: 10px !important;
+    font-size: 15px !important;
+  }
+  
+  .stores-list th, 
+  .stores-list td {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  .stores-list th {
+    font-size: 11px !important;
+  }
+  
+  .stores-list table {
+    min-width: 500px !important;
+  }
+  
+  .store-item {
+    padding: 6px !important;
+  }
+  
+  .store-name {
+    font-size: 13px !important;
+  }
+  
+  .store-address {
+    font-size: 11px !important;
+  }
+  
+  .store-inventory {
+    font-size: 11px !important;
+  }
+  
+  .model-info {
+    font-size: 10px !important;
+  }
+  
+  .stores-grid {
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+  
+  .store-card {
+    padding: 10px !important;
+  }
+  
+  .store-card-title {
+    font-size: 15px !important;
+  }
+  
+  .store-card-subtitle {
+    font-size: 11px !important;
+  }
+  
+  .store-card-content {
+    gap: 4px !important;
+  }
+  
+  .inventory-item {
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+  }
+  
+  .inventory-label {
+    font-size: 10px !important;
+  }
+  
+  .inventory-count {
+    font-size: 12px !important;
+  }
 } 

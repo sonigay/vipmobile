@@ -1468,7 +1468,15 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Container maxWidth="xl" sx={{ height: '100vh', py: 2 }}>
+      <Container maxWidth="xl" sx={{ 
+        height: '100vh', 
+        py: 2,
+        '@media (max-width: 768px)': {
+          maxWidth: '100%',
+          px: 1,
+          py: 1
+        }
+      }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
           <AppBar position="static">
             <Toolbar>
@@ -1476,9 +1484,9 @@ function App() {
                 {isAgentMode ? (
                   // 관리자 모드일 때 대리점 정보 표시
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
-                      {agentTarget} ({agentQualification})
-                    </span>
+                  <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
+                    {agentTarget} ({agentQualification})
+                  </span>
                     {currentView === 'activation' && getAgentTotalActivation() && (
                       <Box sx={{ 
                         display: 'flex', 
@@ -1501,121 +1509,14 @@ function App() {
                         </span>
                       </Box>
                     )}
-                    {currentView === 'assigned' && getAgentTotalInventory() && (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 1, 
-                        p: 0.5, 
-                        backgroundColor: 'rgba(255,255,255,0.8)', 
-                        borderRadius: 1,
-                        fontSize: '0.6em',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}>
-                        <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                          휴대폰: {getAgentTotalInventory().phones}개
-                        </span>
-                        <span style={{ color: '#f57c00', fontWeight: 'bold' }}>
-                          웨어러블: {getAgentTotalInventory().wearables}개
-                        </span>
-                        <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}>
-                          태블릿: {getAgentTotalInventory().tablets}개
-                        </span>
-                      </Box>
-                    )}
                   </Box>
-                ) : loggedInStore && (
-                  // 일반 매장 모드일 때 기존 정보 표시
-                  <>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>{loggedInStore.name}</span>
-                    {selectedModel ? (
-                      <span style={{ marginLeft: '16px', fontSize: '0.6em' }}>
-                        {selectedModel} 
-                        {selectedColor ? ` ${selectedColor}` : ''} 
-                        재고: {(() => {
-                          if (!loggedInStore.inventory) return 0;
-                          
-                          // 새로운 데이터 구조에 맞게 재고 계산
-                          let totalInventory = 0;
-                          
-                          if (selectedModel && selectedColor) {
-                            // 특정 모델과 색상의 재고 확인
-                            Object.values(loggedInStore.inventory).forEach(category => {
-                              if (category[selectedModel]) {
-                                Object.values(category[selectedModel]).forEach(status => {
-                                  if (status[selectedColor]) {
-                                    const qty = status[selectedColor];
-                                    // qty가 객체인 경우 quantity 필드 확인
-                                    if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
-                                      totalInventory += qty.quantity || 0;
-                                    } else if (typeof qty === 'number') {
-                                      totalInventory += qty || 0;
-                                    }
-                                  }
-                                });
-                              }
-                            });
-                          } else if (selectedModel) {
-                            // 특정 모델의 전체 재고 확인
-                            Object.values(loggedInStore.inventory).forEach(category => {
-                              if (category[selectedModel]) {
-                                Object.values(category[selectedModel]).forEach(status => {
-                                  Object.values(status).forEach(qty => {
-                                    // qty가 객체인 경우 quantity 필드 확인
-                                    if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
-                                      totalInventory += qty.quantity || 0;
-                                    } else if (typeof qty === 'number') {
-                                      totalInventory += qty || 0;
-                                    }
-                                  });
-                                });
-                              }
-                            });
-                          }
-                          
-                          return totalInventory;
-                        })()}
-                      </span>
-                    ) : (
-                      <span style={{ marginLeft: '16px', fontSize: '0.6em' }}>
-                        총 재고: {(() => {
-                          if (!loggedInStore.inventory) return 0;
-                          
-                          // 새로운 데이터 구조에 맞게 전체 재고 계산
-                          let totalInventory = 0;
-                          Object.values(loggedInStore.inventory).forEach(category => {
-                            if (typeof category === 'object' && category !== null) {
-                              Object.values(category).forEach(model => {
-                                if (typeof model === 'object' && model !== null) {
-                                  Object.values(model).forEach(status => {
-                                    if (typeof status === 'object' && status !== null) {
-                                      Object.values(status).forEach(qty => {
-                                        // qty가 객체인 경우 quantity 필드 확인
-                                        if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
-                                          totalInventory += qty.quantity || 0;
-                                        } else if (typeof qty === 'number') {
-                                          totalInventory += qty || 0;
-                                        }
-                                      });
-                                    }
-                                  });
-                                }
-                              });
-                            }
-                          });
-                          
-                          return totalInventory;
-                        })()}
-                      </span>
-                    )}
-                  </>
+                ) : (
+                  'VIP+ 가용재고 조회 서비스'
                 )}
-                {!loggedInStore && '가까운 가용재고 조회'}
               </Typography>
               
-              {/* 캐시 상태 표시 */}
               {cacheStatus && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
+                <Box className="cache-info" sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
                   <Chip 
                     label={`캐시: ${cacheStatus.memory.valid}/${cacheStatus.memory.total}`}
                     size="small"
@@ -1638,7 +1539,7 @@ function App() {
               
               {/* 관리자 모드 재고 확인 메뉴 */}
               {isLoggedIn && isAgentMode && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
+                <Box className="admin-mode-buttons" sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
                   <Button 
                     color="inherit" 
                     onClick={() => handleViewChange('all')}
@@ -1681,26 +1582,9 @@ function App() {
                 </Box>
               )}
               
-              {isLoggedIn && (
-                <>
-                  <Button 
-                    color="inherit" 
-                    onClick={handleCheckUpdate}
-                    sx={{ 
-                      fontSize: '0.8em',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      borderRadius: 1,
-                      mr: 1
-                    }}
-                  >
-                    업데이트 확인
-                  </Button>
-                  {/* 실시간 대시보드 버튼 제거 (재고 모드로 이동) */}
-                  <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
-                    로그아웃
-                  </Button>
-                </>
-              )}
+              <Button color="inherit" onClick={handleLogout}>
+                로그아웃
+              </Button>
             </Toolbar>
           </AppBar>
           {isLoading ? (
@@ -1985,31 +1869,31 @@ function App() {
                     </>
                   ) : (
                     // 기존 재고확인 모드
-                    <>
-                      <StoreInfoTable 
-                        selectedStore={selectedStore}
-                        requestedStore={requestedStore}
-                        agentTarget={agentTarget}
-                        agentContactId={agentContactId}
-                        onCallButtonClick={handleCallButtonClick}
-                        onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
-                        selectedModel={selectedModel}
-                        selectedColor={selectedColor}
-                        currentView={currentView}
+                <>
+                  <StoreInfoTable 
+                    selectedStore={selectedStore}
+                    requestedStore={requestedStore}
+                    agentTarget={agentTarget}
+                    agentContactId={agentContactId}
+                    onCallButtonClick={handleCallButtonClick}
+                    onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    currentView={currentView}
                         agentTotalInventory={getAgentTotalInventory()}
-                      />
-                      <AgentFilterPanel
-                        models={data?.models}
-                        colorsByModel={data?.colorsByModel}
-                        selectedModel={selectedModel}
-                        selectedColor={selectedColor}
-                        onModelSelect={handleModelSelect}
-                        onColorSelect={handleColorSelect}
-                        searchQuery={searchQuery}
-                        searchResults={searchResults}
-                        onStoreSearch={handleStoreSearch}
-                        onSearchResultSelect={handleSearchResultSelect}
-                      />
+                  />
+                  <AgentFilterPanel
+                    models={data?.models}
+                    colorsByModel={data?.colorsByModel}
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    onModelSelect={handleModelSelect}
+                    onColorSelect={handleColorSelect}
+                    searchQuery={searchQuery}
+                    searchResults={searchResults}
+                    onStoreSearch={handleStoreSearch}
+                    onSearchResultSelect={handleSearchResultSelect}
+                  />
                     </>
                   )}
                 </>
@@ -2028,27 +1912,27 @@ function App() {
                 />
               )}
               {currentView !== 'activation' && (
-                <Box sx={{ flex: 1 }}>
-                  <Map
-                    userLocation={userLocation}
-                    filteredStores={filteredStores}
-                    selectedStore={selectedStore}
-                    requestedStore={requestedStore}
-                    onStoreSelect={handleStoreSelect}
-                    selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
-                    selectedModel={selectedModel}
-                    selectedColor={selectedColor}
-                    loggedInStoreId={loggedInStore?.id}
-                    isAgentMode={isAgentMode}
-                    currentView={currentView}
-                    forceZoomToStore={forceZoomToStore}
+              <Box sx={{ flex: 1 }}>
+                <Map
+                  userLocation={userLocation}
+                  filteredStores={filteredStores}
+                  selectedStore={selectedStore}
+                  requestedStore={requestedStore}
+                  onStoreSelect={handleStoreSelect}
+                  selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
+                  selectedModel={selectedModel}
+                  selectedColor={selectedColor}
+                  loggedInStoreId={loggedInStore?.id}
+                  isAgentMode={isAgentMode}
+                  currentView={currentView}
+                  forceZoomToStore={forceZoomToStore}
                     activationData={activationData}
                     showActivationMarkers={currentView === 'activation'}
                     activationModelSearch={activationModelSearch}
                     activationDateSearch={activationDateSearch}
                     agentTarget={agentTarget}
-                  />
-                </Box>
+                />
+              </Box>
               )}
             </>
           )}
