@@ -20,7 +20,7 @@ import {
   sendTestPushNotification
 } from '../utils/pushNotificationUtils';
 
-function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget }) {
+function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -62,96 +62,146 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
     return totalInventory;
   };
 
-  // 관리자모드용 카테고리별 재고 계산 함수
-  const getAgentInventoryByCategory = (store) => {
-    if (!store || !store.inventory) {
+  // 담당자의 거래처들 찾기 함수
+  const getAgentStores = () => {
+    if (!data || !data.stores || !agentTarget) {
+      console.log('Header - getAgentStores: 데이터 또는 담당자 정보 없음', { data: !!data, stores: data?.stores?.length, agentTarget });
+      return [];
+    }
+    
+    // 담당자명 앞 3글자로 매칭
+    const agentPrefix = agentTarget.toString().substring(0, 3);
+    
+    const agentStores = data.stores.filter(store => {
+      if (!store.manager) return false;
+      const managerPrefix = store.manager.toString().substring(0, 3);
+      return managerPrefix === agentPrefix;
+    });
+    
+    console.log('Header - getAgentStores: 담당자 거래처 찾기 결과', {
+      agentTarget,
+      agentPrefix,
+      totalStores: data.stores.length,
+      agentStores: agentStores.map(store => ({ name: store.name, manager: store.manager })),
+      agentStoresCount: agentStores.length
+    });
+    
+    return agentStores;
+  };
+
+  // 담당자의 거래처들의 카테고리별 재고 계산 함수
+  const getAgentInventoryByCategory = () => {
+    if (!agentTarget) {
       return { phones: 0, wearables: 0, tablets: 0 };
     }
     
+    const agentStores = getAgentStores();
     const categories = {
       phones: 0,      // 휴대폰
       wearables: 0,   // 웨어러블
       tablets: 0      // 테블릿 (smartDevices)
     };
     
-    // phones 카테고리 (휴대폰)
-    if (store.inventory.phones) {
-      Object.values(store.inventory.phones).forEach(model => {
-        if (typeof model === 'object' && model !== null) {
-          Object.values(model).forEach(status => {
-            if (typeof status === 'object' && status !== null) {
-              Object.values(status).forEach(item => {
-                if (typeof item === 'object' && item && item.quantity) {
-                  categories.phones += item.quantity || 0;
-                } else if (typeof item === 'number') {
-                  categories.phones += item || 0;
-                }
-              });
-            }
-          });
-        }
-      });
-    }
+    agentStores.forEach(store => {
+      if (!store.inventory) return;
+      
+      // phones 카테고리 (휴대폰)
+      if (store.inventory.phones) {
+        Object.values(store.inventory.phones).forEach(model => {
+          if (typeof model === 'object' && model !== null) {
+            Object.values(model).forEach(status => {
+              if (typeof status === 'object' && status !== null) {
+                Object.values(status).forEach(item => {
+                  if (typeof item === 'object' && item && item.quantity) {
+                    categories.phones += item.quantity || 0;
+                  } else if (typeof item === 'number') {
+                    categories.phones += item || 0;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+      
+      // wearables 카테고리 (웨어러블)
+      if (store.inventory.wearables) {
+        Object.values(store.inventory.wearables).forEach(model => {
+          if (typeof model === 'object' && model !== null) {
+            Object.values(model).forEach(status => {
+              if (typeof status === 'object' && status !== null) {
+                Object.values(status).forEach(item => {
+                  if (typeof item === 'object' && item && item.quantity) {
+                    categories.wearables += item.quantity || 0;
+                  } else if (typeof item === 'number') {
+                    categories.wearables += item || 0;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+      
+      // smartDevices 카테고리 (테블릿)
+      if (store.inventory.smartDevices) {
+        Object.values(store.inventory.smartDevices).forEach(model => {
+          if (typeof model === 'object' && model !== null) {
+            Object.values(model).forEach(status => {
+              if (typeof status === 'object' && status !== null) {
+                Object.values(status).forEach(item => {
+                  if (typeof item === 'object' && item && item.quantity) {
+                    categories.tablets += item.quantity || 0;
+                  } else if (typeof item === 'number') {
+                    categories.tablets += item || 0;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
     
-    // wearables 카테고리 (웨어러블)
-    if (store.inventory.wearables) {
-      Object.values(store.inventory.wearables).forEach(model => {
-        if (typeof model === 'object' && model !== null) {
-          Object.values(model).forEach(status => {
-            if (typeof status === 'object' && status !== null) {
-              Object.values(status).forEach(item => {
-                if (typeof item === 'object' && item && item.quantity) {
-                  categories.wearables += item.quantity || 0;
-                } else if (typeof item === 'number') {
-                  categories.wearables += item || 0;
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-    
-    // smartDevices 카테고리 (테블릿)
-    if (store.inventory.smartDevices) {
-      Object.values(store.inventory.smartDevices).forEach(model => {
-        if (typeof model === 'object' && model !== null) {
-          Object.values(model).forEach(status => {
-            if (typeof status === 'object' && status !== null) {
-              Object.values(status).forEach(item => {
-                if (typeof item === 'object' && item && item.quantity) {
-                  categories.tablets += item.quantity || 0;
-                } else if (typeof item === 'number') {
-                  categories.tablets += item || 0;
-                }
-              });
-            }
-          });
-        }
-      });
-    }
+    console.log('Header - getAgentInventoryByCategory: 담당자 재고 계산 결과', {
+      agentTarget,
+      agentStoresCount: agentStores.length,
+      categories
+    });
     
     return categories;
   };
 
-  // 관리자모드용 개통 데이터 계산 함수
+  // 담당자의 거래처들의 당월 개통 데이터 계산 함수
   const getAgentActivationTotal = () => {
     if (!activationData || !agentTarget) {
+      console.log('Header - getAgentActivationTotal: 개통 데이터 또는 담당자 정보 없음', { activationData: !!activationData, agentTarget });
       return 0;
     }
     
+    const agentStores = getAgentStores();
+    const agentStoreNames = agentStores.map(store => store.name);
+    
     let totalActivation = 0;
+    const matchedStores = [];
     
     Object.values(activationData).forEach(storeData => {
-      // 담당자 필터링
-      if (storeData.agents && storeData.agents.some(agent => {
-        if (!agent || !agentTarget) return false;
-        const agentPrefix = agent.toString().substring(0, 3);
-        const targetPrefix = agentTarget.toString().substring(0, 3);
-        return agentPrefix === targetPrefix;
-      })) {
+      // 담당자의 거래처인지 확인
+      if (agentStoreNames.includes(storeData.storeName)) {
         totalActivation += storeData.currentMonth || 0;
+        matchedStores.push({
+          storeName: storeData.storeName,
+          currentMonth: storeData.currentMonth || 0
+        });
       }
+    });
+    
+    console.log('Header - getAgentActivationTotal: 담당자 개통 데이터 계산 결과', {
+      agentTarget,
+      agentStoresCount: agentStores.length,
+      agentStoreNames,
+      totalActivation,
+      matchedStores
     });
     
     return totalActivation;
@@ -354,7 +404,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
                     }}
                   />
                   {(() => {
-                    const categories = getAgentInventoryByCategory(loggedInStore);
+                    const categories = getAgentInventoryByCategory();
                     console.log('Header - 재고 데이터 디버깅:', {
                       loggedInStore: loggedInStore,
                       inventory: loggedInStore?.inventory,

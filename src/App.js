@@ -1643,6 +1643,7 @@ function App() {
             onViewChange={setCurrentView}
             activationData={activationData}
             agentTarget={agentTarget}
+            data={data}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
