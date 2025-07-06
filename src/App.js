@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress, Chip } from '@mui/material';
+import { Container, Box, AppBar, Toolbar, Typography, Button, CircularProgress, Chip, IconButton } from '@mui/material';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
@@ -28,6 +28,21 @@ import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpda
 // 모바일 최적화 관련 import 제거 (재고 모드로 이동)
 // 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
 import './mobile.css';
+import PersonIcon from '@mui/icons-material/Person';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow, 
+  Paper 
+} from '@mui/material';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -90,6 +105,7 @@ function App() {
   const [agentContactId, setAgentContactId] = useState('');
   // 재고모드 관련 상태 추가
   const [isInventoryMode, setIsInventoryMode] = useState(false);
+  const [inventoryUserName, setInventoryUserName] = useState(''); // 재고모드 접속자 이름 추가
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -120,9 +136,30 @@ function App() {
   const [activationDateSearch, setActivationDateSearch] = useState('');
   // 알림 시스템 초기화
   const [notificationInitialized, setNotificationInitialized] = useState(false);
+  
+  // 배정관리 관련 상태 추가
+  const [assignmentHistory, setAssignmentHistory] = useState([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
 
-  // 재고모드 ID 목록
-  const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
+  // 토스트 알림 상태
+  const [toastNotifications, setToastNotifications] = useState([]);
+
+  // 재고모드 접속 아이디 목록
+  const INVENTORY_MODE_IDS = [
+    "JEGO306891",  // 경수
+    "JEGO315835",  // 경인
+    "JEGO314942",  // 호남
+    "JEGO316558",  // 동서울
+    "JEGO316254",  // 호남2
+    "VIP3473",     // 김수빈
+    "VIP4464",     // 홍기현
+    "VIP8119",     // 홍남옥
+    "VIP8062",     // 이병각
+    "VIP6741",     // 이형주
+    "VIP6965"      // 정광영
+  ];
   
   // 알림 시스템 및 모바일 최적화 초기화 제거 (재고 모드로 이동)
 
@@ -707,6 +744,7 @@ function App() {
         } else if (parsedState.isInventory) {
           // 재고모드 상태 복원
           setIsInventoryMode(true);
+          setInventoryUserName(parsedState.inventoryUserName || '재고관리자');
           
           // 재고모드 위치 설정 (전체 지역 보기)
           setUserLocation({
@@ -1078,6 +1116,25 @@ function App() {
       setIsInventoryMode(true);
       setIsAgentMode(false);
       
+      // 재고모드 접속자 이름 설정
+      const inventoryUserNames = {
+        'JEGO306891': '경수',
+        'JEGO315835': '경인',
+        'JEGO314942': '호남',
+        'JEGO316558': '동서울',
+        'JEGO316254': '호남2',
+        'VIP3473': '김수빈',
+        'VIP4464': '홍기현',
+        'VIP8119': '홍남옥',
+        'VIP8062': '이병각',
+        'VIP6741': '이형주',
+        'VIP6965': '정광영'
+      };
+      
+      const userName = inventoryUserNames[store.id] || '재고관리자';
+      setInventoryUserName(userName);
+      console.log(`재고모드 접속자: ${userName}`);
+      
       // 재고모드에서는 서울시청을 중심으로 전체 지역 보기
       setUserLocation({
         lat: 37.5665,
@@ -1089,7 +1146,8 @@ function App() {
       localStorage.setItem('loginState', JSON.stringify({
         isInventory: true,
         isAgent: false,
-        store: store
+        store: store,
+        inventoryUserName: userName
       }));
     }
     // 관리자 모드인지 확인
@@ -1159,6 +1217,7 @@ function App() {
     setAgentContactId('');
     // 재고모드 상태 초기화
     setIsInventoryMode(false);
+    setInventoryUserName(''); // 재고모드 접속자 이름 초기화
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -1437,6 +1496,106 @@ function App() {
     return totalInventory;
   }, [selectedModel, selectedColor]);
 
+  // 배정관리 관련 함수들
+  const loadAssignmentHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/assignment/history`);
+      if (response.ok) {
+        const data = await response.json();
+        setAssignmentHistory(data.assignments || []);
+      }
+    } catch (error) {
+      console.error('배정 히스토리 로딩 실패:', error);
+    }
+  }, []);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications?user_id=${loggedInStore?.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        const unreadCount = data.notifications.filter(n => !n.is_read).length;
+        setUnreadNotifications(unreadCount);
+      }
+    } catch (error) {
+      console.error('알림 로딩 실패:', error);
+    }
+  }, [loggedInStore?.id]);
+
+  const markNotificationAsRead = useCallback(async (notificationId) => {
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
+        method: 'PUT'
+      });
+      loadNotifications();
+    } catch (error) {
+      console.error('알림 읽음 처리 실패:', error);
+    }
+  }, [loadNotifications]);
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play();
+    } catch (error) {
+      console.error('알림음 재생 실패:', error);
+    }
+  }, []);
+
+  const showNotificationToast = useCallback((notification) => {
+    // 토스트 알림 표시 로직
+    console.log('새로운 배정 알림:', notification);
+    playNotificationSound();
+    setUnreadNotifications(prev => prev + 1);
+    
+    // 토스트 알림 추가
+    const toastId = Date.now();
+    const newToast = {
+      id: toastId,
+      title: notification.title || '새로운 배정 완료',
+      message: notification.message || '새로운 배정이 완료되었습니다.',
+      timestamp: new Date()
+    };
+    
+    setToastNotifications(prev => [...prev, newToast]);
+    
+    // 5초 후 자동 제거
+    setTimeout(() => {
+      setToastNotifications(prev => prev.filter(toast => toast.id !== toastId));
+    }, 5000);
+  }, [playNotificationSound]);
+
+  // 실시간 알림 수신 설정
+  useEffect(() => {
+    if (isAgentMode && loggedInStore) {
+      const eventSource = new EventSource(`${process.env.REACT_APP_API_URL}/api/notifications/stream?user_id=${loggedInStore.id}`);
+      
+      eventSource.onmessage = (event) => {
+        const notification = JSON.parse(event.data);
+        if (notification.type === 'assignment_completed') {
+          showNotificationToast(notification);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('실시간 알림 연결 오류:', error);
+        eventSource.close();
+      };
+
+      return () => {
+        eventSource.close();
+      };
+    }
+  }, [isAgentMode, loggedInStore, showNotificationToast]);
+
+  // 관리자모드 접속 시 배정 히스토리와 알림 로드
+  useEffect(() => {
+    if (isAgentMode && loggedInStore) {
+      loadAssignmentHistory();
+      loadNotifications();
+    }
+  }, [isAgentMode, loggedInStore, loadAssignmentHistory, loadNotifications]);
+
   if (!isLoggedIn) {
     return (
       <ThemeProvider theme={theme}>
@@ -1510,6 +1669,26 @@ function App() {
                       </Box>
                     )}
                   </Box>
+                ) : isInventoryMode ? (
+                  // 재고모드일 때 접속자 이름 표시
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
+                      재고 관리 시스템
+                    </span>
+                    {inventoryUserName && (
+                      <Chip
+                        icon={<PersonIcon />}
+                        label={`접속자: ${inventoryUserName}`}
+                        size="small"
+                        sx={{ 
+                          backgroundColor: 'rgba(255,255,255,0.2)', 
+                          color: 'white',
+                          fontSize: '0.6em',
+                          '& .MuiChip-icon': { color: 'white', fontSize: '0.8em' }
+                        }}
+                      />
+                    )}
+                  </Box>
                 ) : (
                   '(주)브이아이피플러스'
                 )}
@@ -1579,12 +1758,53 @@ function App() {
                   >
                     담당개통확인
                   </Button>
+                  <Button 
+                    color="inherit" 
+                    onClick={() => handleViewChange('assignment_management')}
+                    sx={{ 
+                      fontSize: '0.8em',
+                      backgroundColor: currentView === 'assignment_management' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)'
+                      }
+                    }}
+                  >
+                    배정관리
+                  </Button>
                 </Box>
               )}
               
               <Button color="inherit" onClick={handleLogout}>
                 로그아웃
               </Button>
+              
+              {/* 관리자모드 알림 아이콘 */}
+              {isAgentMode && (
+                <Box sx={{ position: 'relative', ml: 1 }}>
+                  <IconButton 
+                    color="inherit" 
+                    onClick={() => setShowNotificationModal(true)}
+                    sx={{ position: 'relative' }}
+                  >
+                    <NotificationsIcon />
+                    {unreadNotifications > 0 && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          width: 12,
+                          height: 12,
+                          backgroundColor: '#ff4444',
+                          borderRadius: '50%',
+                          border: '2px solid white',
+                          animation: 'pulse 2s infinite'
+                        }}
+                      />
+                    )}
+                  </IconButton>
+                </Box>
+              )}
             </Toolbar>
           </AppBar>
           {isLoading ? (
@@ -1897,6 +2117,50 @@ function App() {
                     </>
                   )}
                 </>
+              ) : currentView === 'assignment_management' ? (
+                // 배정관리 화면
+                <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+                  <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+                    배정 관리
+                  </Typography>
+                  
+                  {/* 배정 히스토리 테이블 */}
+                  <Paper sx={{ p: 2, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      배정 히스토리
+                    </Typography>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>배정자</TableCell>
+                            <TableCell>모델</TableCell>
+                            <TableCell>색상</TableCell>
+                            <TableCell>수량</TableCell>
+                            <TableCell>배정 대상</TableCell>
+                            <TableCell>배정 시간</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {assignmentHistory.map((assignment, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{assignment.assigner}</TableCell>
+                              <TableCell>{assignment.model}</TableCell>
+                              <TableCell>{assignment.color}</TableCell>
+                              <TableCell>{assignment.quantity}대</TableCell>
+                              <TableCell>
+                                {assignment.target_office} / {assignment.target_department} / {assignment.target_agent}
+                              </TableCell>
+                              <TableCell>
+                                {new Date(assignment.assigned_at).toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Paper>
+                </Box>
               ) : (
                 // 일반 매장 모드일 때 FilterPanel만 표시
                 <FilterPanel
@@ -1953,6 +2217,64 @@ function App() {
         onClose={handleUpdateProgressPopupClose}
         isLatestVersion={false}
       />
+
+      {/* 알림 모달 */}
+      <Dialog
+        open={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <NotificationsIcon color="primary" />
+            <Typography variant="h6">알림</Typography>
+            {unreadNotifications > 0 && (
+              <Chip 
+                label={unreadNotifications} 
+                color="error" 
+                size="small"
+                sx={{ ml: 'auto' }}
+              />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ minHeight: '300px' }}>
+            <Typography variant="body1" gutterBottom>
+              새로운 배정이 완료되었습니다.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              경수님이 iPhone 15 Pro (블랙) 50대를 경인사무소 영업1팀에 배정했습니다.
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              2024-01-15 10:30
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNotificationModal(false)}>
+            닫기
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 토스트 알림들 */}
+      {toastNotifications.map((toast, index) => (
+        <Box
+          key={toast.id}
+          className="notification-toast"
+          sx={{
+            top: `${20 + index * 80}px`
+          }}
+        >
+          <div className="notification-title">{toast.title}</div>
+          <div className="notification-message">{toast.message}</div>
+          <div className="notification-time">
+            {toast.timestamp.toLocaleTimeString()}
+          </div>
+        </Box>
+      ))}
 
       {/* 알림 시스템 */}
                     {/* 알림 시스템 제거 (재고 모드로 이동) */}

@@ -248,7 +248,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
   const assignments = {};
   let remainingQuantity = totalQuantity;
   
-  // 점수 비율에 따른 배정량 계산 (100% 배정 보장)
+  // 1차 배정: 점수 비율에 따른 기본 배정
   agentScores.forEach(({ agent, score }, index) => {
     const ratio = totalScore > 0 ? score / totalScore : 1 / eligibleAgents.length;
     
@@ -277,31 +277,96 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
       quantity: assignedQuantity,
       colors: modelData.colors.map(color => color.name), // 색상명 배열
       score: score,
-      ratio: ratio
+      ratio: ratio,
+      originalScore: score // 원본 점수 보존
     };
     
     remainingQuantity -= assignedQuantity;
   });
   
-  console.log(`모델 ${modelName} 배정 완료:`, {
+  // 2차 배정: 자투리 재고 재배정 (100% 배정 보장)
+  if (remainingQuantity > 0) {
+    console.log(`🔄 모델 ${modelName}에서 ${remainingQuantity}개 자투리 재고 재배정 시작`);
+    
+    // 판매량과 거래처수 기준으로 재배정 우선순위 결정
+    const redistributionCandidates = agentScores
+      .map(({ agent, score }) => {
+        // 개통실적 데이터에서 판매량과 거래처수 추출
+        const agentData = storeData?.activationData?.filter(item => 
+          item.contactId === agent.contactId
+        ) || [];
+        
+        const totalSales = agentData.reduce((sum, item) => {
+          const modelData = item.models?.[modelName];
+          return sum + (modelData?.당월실적 || 0) + (modelData?.전월실적 || 0);
+        }, 0);
+        
+        const storeCount = agentData.length; // 거래처수
+        
+        return {
+          agentId: agent.contactId,
+          agent,
+          score,
+          totalSales,
+          storeCount,
+          currentQuantity: assignments[agent.contactId]?.quantity || 0
+        };
+      })
+      .sort((a, b) => {
+        // 1순위: 판매량 높은 순
+        if (b.totalSales !== a.totalSales) {
+          return b.totalSales - a.totalSales;
+        }
+        // 2순위: 거래처수 많은 순
+        if (b.storeCount !== a.storeCount) {
+          return b.storeCount - a.storeCount;
+        }
+        // 3순위: 원래 점수 높은 순
+        return b.score - a.score;
+      });
+    
+    // 자투리 재고를 우선순위에 따라 재배정
+    let redistributionIndex = 0;
+    while (remainingQuantity > 0 && redistributionIndex < redistributionCandidates.length) {
+      const candidate = redistributionCandidates[redistributionIndex];
+      
+      // 해당 영업사원에게 1개씩 추가 배정
+      if (assignments[candidate.agentId]) {
+        assignments[candidate.agentId].quantity += 1;
+        assignments[candidate.agentId].redistributed = (assignments[candidate.agentId].redistributed || 0) + 1;
+        remainingQuantity -= 1;
+        
+        console.log(`✅ ${candidate.agent.target}에게 자투리 재고 1개 추가 배정 (판매량: ${candidate.totalSales}, 거래처: ${candidate.storeCount}개)`);
+      }
+      
+      redistributionIndex++;
+      
+      // 한 바퀴 돌았는데도 남은 수량이 있으면 다시 처음부터
+      if (redistributionIndex >= redistributionCandidates.length && remainingQuantity > 0) {
+        redistributionIndex = 0;
+      }
+    }
+    
+    // 여전히 남은 수량이 있다면 마지막 영업사원에게 모두 배정
+    if (remainingQuantity > 0) {
+      const lastAgentId = agentScores[agentScores.length - 1].agent.contactId;
+      if (assignments[lastAgentId]) {
+        assignments[lastAgentId].quantity += remainingQuantity;
+        assignments[lastAgentId].redistributed = (assignments[lastAgentId].redistributed || 0) + remainingQuantity;
+        console.log(`⚠️ ${assignments[lastAgentId].agentName}에게 남은 ${remainingQuantity}개 모두 배정`);
+        remainingQuantity = 0;
+      }
+    }
+  }
+  
+  console.log(`✅ 모델 ${modelName} 배정 완료:`, {
     totalQuantity,
     assignedQuantity: totalQuantity - remainingQuantity,
     remainingQuantity,
     agentCount: eligibleAgents.length,
-    colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`)
+    colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`),
+    redistributionCount: Object.values(assignments).reduce((sum, assignment) => sum + (assignment.redistributed || 0), 0)
   });
-  
-  // 100% 배정 확인
-  if (remainingQuantity > 0) {
-    console.warn(`⚠️ 모델 ${modelName}에서 ${remainingQuantity}개가 남았습니다. 마지막 영업사원에게 추가 배정합니다.`);
-    
-    // 마지막 영업사원에게 남은 수량 추가 배정
-    const lastAgentId = agentScores[agentScores.length - 1].agent.contactId;
-    if (assignments[lastAgentId]) {
-      assignments[lastAgentId].quantity += remainingQuantity;
-      console.log(`✅ ${lastAgentId}에게 추가 ${remainingQuantity}개 배정 완료`);
-    }
-  }
   
   return assignments;
 };

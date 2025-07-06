@@ -1532,7 +1532,19 @@ app.post('/api/login', async (req, res) => {
     console.log('Step 1: Starting login process...');
     
     // 재고모드 전용 ID 목록
-    const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
+    const INVENTORY_MODE_IDS = [
+      "JEGO306891",  // 경수
+      "JEGO315835",  // 경인
+      "JEGO314942",  // 호남
+      "JEGO316558",  // 동서울
+      "JEGO316254",  // 호남2
+      "VIP3473",     // 김수빈
+      "VIP4464",     // 홍기현
+      "VIP8119",     // 홍남옥
+      "VIP8062",     // 이병각
+      "VIP6741",     // 이형주
+      "VIP6965"      // 정광영
+    ];
     
     // 재고모드 ID인지 먼저 확인
     if (INVENTORY_MODE_IDS.includes(storeId)) {
@@ -2032,4 +2044,275 @@ process.on('SIGINT', async () => {
       process.exit(0);
     }, 1000);
   });
+});
+
+// 배정관리 관련 API
+app.get('/api/assignment/history', async (req, res) => {
+  try {
+    // 배정 히스토리 데이터 (임시로 하드코딩된 데이터 반환)
+    const assignments = [
+      {
+        id: 1,
+        assigner: '경수',
+        model: 'iPhone 15 Pro',
+        color: '블랙',
+        quantity: 50,
+        target_office: '경인사무소',
+        target_department: '영업1팀',
+        target_agent: '김영업',
+        assigned_at: new Date('2024-01-15T10:30:00'),
+        status: 'completed'
+      },
+      {
+        id: 2,
+        assigner: '홍기현',
+        model: 'Galaxy S24',
+        color: '화이트',
+        quantity: 30,
+        target_office: '호남사무소',
+        target_department: '영업2팀',
+        target_agent: '이영업',
+        assigned_at: new Date('2024-01-15T09:15:00'),
+        status: 'completed'
+      }
+    ];
+    
+    res.json({ success: true, assignments });
+  } catch (error) {
+    console.error('배정 히스토리 조회 오류:', error);
+    res.status(500).json({ success: false, error: '배정 히스토리 조회 실패' });
+  }
+});
+
+app.post('/api/assignment/complete', async (req, res) => {
+  try {
+    const { 
+      assigner, 
+      model, 
+      color, 
+      quantity, 
+      target_office, 
+      target_department, 
+      target_agent,
+      target_offices,
+      target_departments,
+      target_agents
+    } = req.body;
+    
+    // 배정 정보 저장 (실제로는 데이터베이스에 저장)
+    const assignment = {
+      id: Date.now(),
+      assigner,
+      model,
+      color,
+      quantity,
+      target_office,
+      target_department,
+      target_agent,
+      assigned_at: new Date(),
+      status: 'completed'
+    };
+    
+    console.log('새로운 배정 완료:', assignment);
+    console.log('배정 대상자:', { target_offices, target_departments, target_agents });
+    
+    // 배정 대상자에게만 알림 전송
+    const notification = {
+      type: 'assignment_completed',
+      title: '새로운 배정 완료',
+      message: `${assigner}님이 ${model} (${color}) ${quantity}대를 배정했습니다.`,
+      data: assignment,
+      timestamp: new Date()
+    };
+    
+    // 대상자 필터링하여 알림 전송
+    sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
+    
+    res.json({ success: true, assignment });
+  } catch (error) {
+    console.error('배정 완료 처리 오류:', error);
+    res.status(500).json({ success: false, error: '배정 완료 처리 실패' });
+  }
+});
+
+// 알림 관련 API
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    
+    // 사용자별 알림 조회 (임시 데이터)
+    const notifications = [
+      {
+        id: 1,
+        user_id,
+        type: 'assignment_completed',
+        title: '새로운 배정 완료',
+        message: '경수님이 iPhone 15 Pro (블랙) 50대를 경인사무소 영업1팀에 배정했습니다.',
+        data: {
+          assigner: '경수',
+          model: 'iPhone 15 Pro',
+          color: '블랙',
+          quantity: 50,
+          target_office: '경인사무소',
+          target_department: '영업1팀',
+          target_agent: '김영업'
+        },
+        is_read: false,
+        created_at: new Date('2024-01-15T10:30:00')
+      }
+    ];
+    
+    res.json({ success: true, notifications });
+  } catch (error) {
+    console.error('알림 조회 오류:', error);
+    res.status(500).json({ success: false, error: '알림 조회 실패' });
+  }
+});
+
+app.put('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 알림 읽음 처리 (실제로는 데이터베이스 업데이트)
+    console.log(`알림 ${id} 읽음 처리`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('알림 읽음 처리 오류:', error);
+    res.status(500).json({ success: false, error: '알림 읽음 처리 실패' });
+  }
+});
+
+// 실시간 알림 스트림 (Server-Sent Events)
+const connectedClients = new Map();
+
+app.get('/api/notifications/stream', (req, res) => {
+  const { user_id } = req.query;
+  
+  // SSE 헤더 설정
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+  
+  // 클라이언트 연결 저장
+  const clientId = Date.now();
+  connectedClients.set(clientId, { res, user_id });
+  
+  console.log(`클라이언트 ${clientId} (${user_id}) 연결됨`);
+  
+  // 연결 해제 시 클라이언트 제거
+  req.on('close', () => {
+    connectedClients.delete(clientId);
+    console.log(`클라이언트 ${clientId} 연결 해제됨`);
+  });
+  
+  // 초기 연결 메시지
+  res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
+});
+
+// 모든 관리자모드 접속자에게 알림 전송하는 함수
+function sendNotificationToAllAgents(notification) {
+  console.log('모든 관리자모드 접속자에게 알림 전송:', notification);
+  
+  connectedClients.forEach((client, clientId) => {
+    try {
+      client.res.write(`data: ${JSON.stringify(notification)}\n\n`);
+      console.log(`알림 전송 완료: 클라이언트 ${clientId}`);
+    } catch (error) {
+      console.error(`클라이언트 ${clientId}에게 알림 전송 실패:`, error);
+      connectedClients.delete(clientId);
+    }
+  });
+}
+
+// 배정 대상자에게만 알림 전송하는 함수
+function sendNotificationToTargetAgents(notification, targetOffices, targetDepartments, targetAgents) {
+  console.log('배정 대상자에게만 알림 전송:', {
+    notification,
+    targetOffices,
+    targetDepartments,
+    targetAgents
+  });
+  
+  // 실제 담당자 데이터를 가져오는 로직
+  let agents = [];
+  try {
+    // Google Sheets에서 담당자 데이터 가져오기
+    const agentSheetName = '담당자';
+    const agentData = await getSheetValues(agentSheetName);
+    
+    if (agentData && agentData.length > 1) {
+      // 헤더 제외하고 데이터 파싱
+      agents = agentData.slice(1).map(row => ({
+        target: row[0], // 담당자명
+        contactId: row[1], // 연락처 ID
+        office: row[2], // 사무실
+        department: row[3] // 부서
+      })).filter(agent => agent.target && agent.contactId);
+      
+      console.log(`담당자 데이터 로드 완료: ${agents.length}명`);
+    } else {
+      console.warn('담당자 데이터가 없거나 유효하지 않음');
+    }
+  } catch (error) {
+    console.error('담당자 데이터 로드 실패:', error);
+    // 실패 시 기본 데이터 사용
+    agents = [
+      { target: '김영업', contactId: 'kim001', office: '서울지사', department: '영업1팀' },
+      { target: '이매니저', contactId: 'lee002', office: '부산지사', department: '영업2팀' },
+      { target: '박대리', contactId: 'park003', office: '대구지사', department: '영업3팀' },
+      { target: '최영업', contactId: 'choi004', office: '인천지사', department: '영업1팀' },
+      { target: '정매니저', contactId: 'jung005', office: '인천지사', department: '영업2팀' }
+    ];
+  }
+  
+  connectedClients.forEach((client, clientId) => {
+    try {
+      // 클라이언트가 배정 대상자인지 확인
+      if (isTargetAgent(client.user_id, targetOffices, targetDepartments, targetAgents, agents)) {
+        client.res.write(`data: ${JSON.stringify(notification)}\n\n`);
+        console.log(`알림 전송 완료: 클라이언트 ${clientId} (${client.user_id})`);
+      } else {
+        console.log(`클라이언트 ${clientId} (${client.user_id})는 배정 대상자가 아님`);
+      }
+    } catch (error) {
+      console.error(`클라이언트 ${clientId}에게 알림 전송 실패:`, error);
+      connectedClients.delete(clientId);
+    }
+  });
+}
+
+// 대상자 확인 함수
+function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, agents) {
+  // 사용자 정보에서 소속 확인
+  const userAgent = agents.find(agent => agent.contactId === userId);
+  if (!userAgent) {
+    console.log(`사용자 ${userId}의 정보를 찾을 수 없음`);
+    return false;
+  }
+  
+  console.log(`사용자 ${userId} 정보:`, userAgent);
+  console.log(`배정 대상자:`, { targetOffices, targetDepartments, targetAgents });
+  
+  // 전체 배정인 경우 모든 관리자모드 접속자에게 전송
+  if (targetOffices.includes('전체') || targetDepartments.includes('전체') || targetAgents.includes('전체')) {
+    console.log(`전체 배정이므로 ${userId}에게 알림 전송`);
+    return true;
+  }
+  
+  // 특정 대상자 배정인 경우 해당 대상자만 확인
+  const isTarget = targetOffices.includes(userAgent.office) || 
+                   targetDepartments.includes(userAgent.department) || 
+                   targetAgents.includes(userAgent.target);
+  
+  console.log(`${userId} 대상자 여부:`, isTarget);
+  return isTarget;
+}
+
+app.listen(port, () => {
+  console.log(`서버가 포트 ${port}에서 실행 중입니다.`);
 }); 

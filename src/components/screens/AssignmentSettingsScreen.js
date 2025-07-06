@@ -32,7 +32,11 @@ import {
   LinearProgress,
   CircularProgress,
   Tabs,
-  Tab
+  Tab,
+  Divider,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -45,12 +49,18 @@ import {
   CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
   Preview as PreviewIcon,
   BarChart as BarChartIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Info as InfoIcon,
+  Check as CheckIcon,
+  Print as PrintIcon,
+  ExpandMore as ExpandMoreIcon,
+  Help as HelpIcon
 } from '@mui/icons-material';
 import { calculateFullAssignment, clearAssignmentCache, getSelectedTargets } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
 import { extractAvailableModels, getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
 import { addAssignmentCompletedNotification, addSettingsChangedNotification } from '../../utils/notificationUtils';
+import { saveAssignmentHistory, createHistoryItem } from '../../utils/assignmentHistory';
 
 // API 기본 URL 설정
 const API_BASE_URL = process.env.REACT_APP_API_URL;
@@ -561,34 +571,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     });
   };
 
-  // 배정 대상 변경
-  const handleTargetChange = (type, target, checked) => {
-    setAssignmentSettings(prev => ({
-      ...prev,
-      targets: {
-        ...prev.targets,
-        [type]: {
-          ...prev.targets[type],
-          [target]: checked
-        }
-      }
-    }));
-  };
-
-  // 전체 선택/해제
-  const handleSelectAll = (type, checked) => {
-    setAssignmentSettings(prev => {
-      const newTargets = { ...prev.targets };
-      Object.keys(newTargets[type]).forEach(key => {
-        newTargets[type][key] = checked;
-      });
-      return {
-        ...prev,
-        targets: newTargets
-      };
-    });
-  };
-
   // 초기화 (모든 체크박스 해제)
   const handleReset = (type) => {
     setAssignmentSettings(prev => {
@@ -601,6 +583,500 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         targets: newTargets
       };
     });
+  };
+
+  // 담당자 데이터 분석하여 계층 구조 생성
+  const getHierarchicalStructure = useMemo(() => {
+    const structure = {
+      offices: {},
+      departments: {},
+      agents: {}
+    };
+
+    // 유효한 담당자만 필터링
+    const validAgents = agents.filter(agent => 
+      agent.office && agent.office.trim() !== '' && 
+      agent.department && agent.department.trim() !== ''
+    );
+
+    validAgents.forEach(agent => {
+      const office = agent.office.trim();
+      const department = agent.department.trim();
+      const agentId = agent.contactId;
+
+      // 사무실별 구조
+      if (!structure.offices[office]) {
+        structure.offices[office] = {
+          departments: new Set(),
+          agents: new Set()
+        };
+      }
+      structure.offices[office].departments.add(department);
+      structure.offices[office].agents.add(agentId);
+
+      // 소속별 구조
+      if (!structure.departments[department]) {
+        structure.departments[department] = {
+          office: office,
+          agents: new Set()
+        };
+      }
+      structure.departments[department].agents.add(agentId);
+
+      // 영업사원별 구조
+      structure.agents[agentId] = {
+        name: agent.target,
+        office: office,
+        department: department
+      };
+    });
+
+    return structure;
+  }, [agents]);
+
+  // 계층적 배정 대상 변경
+  const handleHierarchicalTargetChange = (type, target, checked) => {
+    setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      
+      if (type === 'offices') {
+        // 사무실 선택/해제 시 해당 소속과 영업사원도 함께 처리
+        newTargets.offices[target] = checked;
+        
+        if (getHierarchicalStructure.offices[target]) {
+          const officeData = getHierarchicalStructure.offices[target];
+          
+          // 해당 사무실의 소속들 처리
+          officeData.departments.forEach(dept => {
+            if (newTargets.departments[dept] !== undefined) {
+              newTargets.departments[dept] = checked;
+            }
+          });
+          
+          // 해당 사무실의 영업사원들 처리
+          officeData.agents.forEach(agentId => {
+            if (newTargets.agents[agentId] !== undefined) {
+              newTargets.agents[agentId] = checked;
+            }
+          });
+        }
+      } else if (type === 'departments') {
+        // 소속 선택/해제 시 해당 영업사원도 함께 처리
+        newTargets.departments[target] = checked;
+        
+        if (getHierarchicalStructure.departments[target]) {
+          const deptData = getHierarchicalStructure.departments[target];
+          
+          // 해당 소속의 영업사원들 처리
+          deptData.agents.forEach(agentId => {
+            if (newTargets.agents[agentId] !== undefined) {
+              newTargets.agents[agentId] = checked;
+            }
+          });
+        }
+      } else if (type === 'agents') {
+        // 영업사원 개별 선택/해제
+        newTargets.agents[target] = checked;
+      }
+
+      return {
+        ...prev,
+        targets: newTargets
+      };
+    });
+  };
+
+  // 계층적 전체 선택/해제
+  const handleHierarchicalSelectAll = (type, checked) => {
+    setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      
+      if (type === 'offices') {
+        // 사무실 전체 선택/해제
+        Object.keys(newTargets.offices).forEach(office => {
+          newTargets.offices[office] = checked;
+          
+          if (getHierarchicalStructure.offices[office]) {
+            const officeData = getHierarchicalStructure.offices[office];
+            
+            // 해당 사무실의 소속들 처리
+            officeData.departments.forEach(dept => {
+              if (newTargets.departments[dept] !== undefined) {
+                newTargets.departments[dept] = checked;
+              }
+            });
+            
+            // 해당 사무실의 영업사원들 처리
+            officeData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = checked;
+              }
+            });
+          }
+        });
+      } else if (type === 'departments') {
+        // 소속 전체 선택/해제
+        Object.keys(newTargets.departments).forEach(dept => {
+          newTargets.departments[dept] = checked;
+          
+          if (getHierarchicalStructure.departments[dept]) {
+            const deptData = getHierarchicalStructure.departments[dept];
+            
+            // 해당 소속의 영업사원들 처리
+            deptData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = checked;
+              }
+            });
+          }
+        });
+      } else if (type === 'agents') {
+        // 영업사원 전체 선택/해제
+        Object.keys(newTargets.agents).forEach(agentId => {
+          newTargets.agents[agentId] = checked;
+        });
+      }
+
+      return {
+        ...prev,
+        targets: newTargets
+      };
+    });
+  };
+
+  // 계층적 초기화
+  const handleHierarchicalReset = (type) => {
+    setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      
+      if (type === 'offices') {
+        // 사무실 전체 해제 시 모든 하위 항목도 해제
+        Object.keys(newTargets.offices).forEach(office => {
+          newTargets.offices[office] = false;
+          
+          if (getHierarchicalStructure.offices[office]) {
+            const officeData = getHierarchicalStructure.offices[office];
+            
+            officeData.departments.forEach(dept => {
+              if (newTargets.departments[dept] !== undefined) {
+                newTargets.departments[dept] = false;
+              }
+            });
+            
+            officeData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = false;
+              }
+            });
+          }
+        });
+      } else if (type === 'departments') {
+        // 소속 전체 해제 시 해당 영업사원들도 해제
+        Object.keys(newTargets.departments).forEach(dept => {
+          newTargets.departments[dept] = false;
+          
+          if (getHierarchicalStructure.departments[dept]) {
+            const deptData = getHierarchicalStructure.departments[dept];
+            
+            deptData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = false;
+              }
+            });
+          }
+        });
+      } else if (type === 'agents') {
+        // 영업사원 전체 해제
+        Object.keys(newTargets.agents).forEach(agentId => {
+          newTargets.agents[agentId] = false;
+        });
+      }
+
+      return {
+        ...prev,
+        targets: newTargets
+      };
+    });
+  };
+
+  // 배정 확정
+  const handleConfirmAssignment = async () => {
+    if (!previewData) {
+      alert('배정 미리보기를 먼저 실행해주세요.');
+      return;
+    }
+
+    try {
+      // 실제 배정 데이터에서 대상자 정보 추출
+      const targetOffices = Object.keys(previewData.offices || {});
+      const targetDepartments = [...new Set(Object.values(previewData.agents || {}).map(agent => agent.department).filter(Boolean))];
+      const targetAgents = Object.values(previewData.agents || {}).map(agent => agent.agentName).filter(Boolean);
+      
+      // 배정된 총 수량 계산
+      const totalAssignedQuantity = Object.values(previewData.agents || {}).reduce((sum, agent) => {
+        return sum + Object.values(agent).reduce((agentSum, model) => {
+          return agentSum + (typeof model === 'object' && model.quantity ? model.quantity : 0);
+        }, 0);
+      }, 0);
+      
+      // 배정된 모델들 추출
+      const assignedModels = Object.keys(previewData.models || {});
+      
+      // 배정 정보를 서버로 전송
+      const assignmentData = {
+        assigner: '재고관리자', // 실제로는 로그인한 사용자 정보 사용
+        model: assignedModels.join(', '), // 실제 배정된 모든 모델
+        color: '전체', // 또는 실제 배정된 색상들
+        quantity: totalAssignedQuantity,
+        target_office: targetOffices.join(', '),
+        target_department: targetDepartments.join(', '),
+        target_agent: targetAgents.join(', '),
+        // 배정 대상자 목록 추가
+        target_offices: targetOffices,
+        target_departments: targetDepartments,
+        target_agents: targetAgents
+      };
+
+      // 서버에 배정 완료 요청 전송
+      const response = await fetch(`${API_BASE_URL}/api/assignment/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(assignmentData)
+      });
+
+      if (response.ok) {
+        console.log('배정 완료 및 알림 전송 성공');
+        console.log('배정 대상자:', {
+          offices: targetOffices,
+          departments: targetDepartments,
+          agents: targetAgents
+        });
+      } else {
+        console.error('배정 완료 요청 실패:', response.status);
+      }
+    } catch (error) {
+      console.error('배정 완료 처리 중 오류:', error);
+    }
+
+    // 배정 히스토리 아이템 생성
+    const historyItem = createHistoryItem(
+      previewData, // 배정 결과 데이터
+      assignmentSettings, // 배정 설정
+      agents, // 담당자 목록
+      {
+        totalAgents: Object.keys(previewData.agents).length,
+        totalModels: Object.keys(previewData.models).length,
+        totalAssigned: Object.values(previewData.agents).reduce((sum, agent) => {
+          return sum + Object.values(agent).reduce((agentSum, model) => agentSum + (model.quantity || 0), 0);
+        }, 0),
+        totalQuantity: Object.values(previewData.models).reduce((sum, model) => {
+          return sum + model.colors.reduce((colorSum, color) => colorSum + (color.quantity || 0), 0);
+        }, 0),
+        screenType: 'assignment_settings'
+      }
+    );
+
+    // 히스토리 저장
+    const result = saveAssignmentHistory(historyItem);
+    
+    if (result) {
+      alert('배정이 확정되어 히스토리에 저장되었습니다.\n관리자모드 접속자들에게 알림이 전송되었습니다.');
+      
+      // 배정 완료 알림 추가
+      const totalAgents = Object.keys(previewData.agents).length;
+      const totalQuantity = Object.values(previewData.agents).reduce((sum, agent) => {
+        return sum + Object.values(agent).reduce((agentSum, model) => agentSum + (model.quantity || 0), 0);
+      }, 0);
+      const models = Object.keys(previewData.models);
+      
+      addAssignmentCompletedNotification({
+        totalAgents,
+        totalQuantity,
+        models,
+        preview: previewData,
+        confirmed: true
+      });
+      
+      // 설정 저장
+      saveSettings();
+      
+    } else {
+      alert('배정 확정에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  // 인쇄 기능
+  const handlePrint = (type) => {
+    const printWindow = window.open('', '_blank');
+    
+    let printContent = '';
+    const currentDate = new Date().toLocaleDateString('ko-KR');
+    const currentTime = new Date().toLocaleTimeString('ko-KR');
+    
+    // 공통 헤더
+    const header = `
+      <html>
+        <head>
+          <title>배정 현황 - ${type}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .summary { margin: 20px 0; padding: 10px; background-color: #f9f9f9; }
+            .footer { margin-top: 20px; text-align: center; font-size: 12px; color: #666; }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>재고 배정 현황</h1>
+            <p>출력일시: ${currentDate} ${currentTime}</p>
+            <p>배정 비율: 회전율 ${assignmentSettings.ratios.turnoverRate}% | 거래처수 ${assignmentSettings.ratios.storeCount}% | 잔여재고 ${assignmentSettings.ratios.remainingInventory}% | 판매량 ${assignmentSettings.ratios.salesVolume}%</p>
+          </div>
+    `;
+    
+    const footer = `
+          <div class="footer">
+            <p>※ 이 문서는 시스템에서 자동 생성되었습니다.</p>
+            <p>※ 배정 비율은 각 영업사원의 성과 지표를 종합적으로 고려하여 계산됩니다.</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    if (type === 'summary') {
+      // 모델별 배정 현황 인쇄
+      printContent = header + `
+        <div class="summary">
+          <h2>모델별 배정 현황</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>모델명</th>
+                <th>전체 수량</th>
+                <th>배정 수량</th>
+                <th>배정률</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.values(previewData.models).map(model => `
+                <tr>
+                  <td>${model.name}</td>
+                  <td>${model.totalQuantity}개</td>
+                  <td>${model.assignedQuantity}개</td>
+                  <td>${model.totalQuantity > 0 ? Math.round((model.assignedQuantity / model.totalQuantity) * 100) : 0}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` + footer;
+    } else if (type === 'office') {
+      // 사무실별 배정 현황 인쇄
+      printContent = header + `
+        <div class="summary">
+          <h2>사무실별 배정 현황</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>사무실</th>
+                <th>영업사원 수</th>
+                <th>총 배정량</th>
+                <th>평균 배정량</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(previewData.offices).map(([officeName, officeData]) => `
+                <tr>
+                  <td>${officeName}</td>
+                  <td>${officeData.agentCount}명</td>
+                  <td><strong>${officeData.totalQuantity}개</strong></td>
+                  <td>${officeData.agentCount > 0 ? Math.round(officeData.totalQuantity / officeData.agentCount) : 0}개</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` + footer;
+    } else if (type === 'agent') {
+      // 영업사원별 배정 현황 인쇄
+      printContent = header + `
+        <div class="summary">
+          <h2>영업사원별 배정 현황 (전체 ${Object.keys(previewData.agents).length}명)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>영업사원</th>
+                <th>사무실</th>
+                <th>소속</th>
+                <th>총 배정량</th>
+                <th>평균 점수</th>
+                ${Object.keys(previewData.models).map(modelName => `
+                  <th>${modelName}</th>
+                `).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(previewData.agents).map(([agentId, agentData]) => `
+                <tr>
+                  <td>${agentData.agentName}</td>
+                  <td>${agentData.office}</td>
+                  <td>${agentData.department}</td>
+                  <td><strong>${Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0)}개</strong></td>
+                  <td>${Math.round(agentData.averageScore || 0)}점</td>
+                  ${Object.keys(previewData.models).map(modelName => `
+                    <td>${agentData[modelName]?.quantity || '-'}</td>
+                  `).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` + footer;
+    } else if (type === 'department') {
+      // 소속별 배정 현황 인쇄
+      printContent = header + `
+        <div class="summary">
+          <h2>소속별 배정 현황</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>소속</th>
+                <th>영업사원 수</th>
+                <th>총 배정량</th>
+                <th>평균 배정량</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(previewData.departments).map(([departmentName, departmentData]) => `
+                <tr>
+                  <td>${departmentName}</td>
+                  <td>${departmentData.agentCount}명</td>
+                  <td><strong>${departmentData.totalQuantity}개</strong></td>
+                  <td>${departmentData.agentCount > 0 ? Math.round(departmentData.totalQuantity / departmentData.agentCount) : 0}개</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` + footer;
+    }
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // 인쇄 다이얼로그 표시
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
   };
 
   return (
@@ -876,9 +1352,25 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  배정 대상 선택
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    배정 대상 선택
+                  </Typography>
+                  <Chip 
+                    label="계층적 선택" 
+                    color="info" 
+                    variant="outlined" 
+                    size="small"
+                    icon={<InfoIcon />}
+                  />
+                </Box>
+                
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  <Typography variant="body2">
+                    <strong>계층적 선택:</strong> 사무실 선택 시 해당 소속과 영업사원이 자동 선택됩니다. 
+                    소속 선택 시 해당 영업사원이 자동 선택됩니다.
+                  </Typography>
+                </Alert>
                 
                 <Grid container spacing={3}>
                   {/* 사무실별 배정 대상 */}
@@ -892,33 +1384,44 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           <Button
                             size="small"
                             variant="outlined"
-                            onClick={() => handleReset('offices')}
+                            onClick={() => handleHierarchicalReset('offices')}
                           >
                             초기화
                           </Button>
                           <Button
                             size="small"
-                            onClick={() => handleSelectAll('offices', true)}
+                            onClick={() => handleHierarchicalSelectAll('offices', true)}
                           >
                             전체선택
                           </Button>
                         </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {Object.entries(assignmentSettings.targets.offices).map(([office, checked]) => (
-                          <Box key={office} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Checkbox
-                              checked={checked}
-                              onChange={(e) => handleTargetChange('offices', office, e.target.checked)}
-                              icon={<CheckBoxOutlineBlankIcon />}
-                              checkedIcon={<CheckBoxIcon />}
-                              size="small"
-                            />
-                            <Typography variant="body2">
-                              {office}
-                            </Typography>
-                          </Box>
-                        ))}
+                        {Object.entries(assignmentSettings.targets.offices).map(([office, checked]) => {
+                          const officeData = getHierarchicalStructure.offices[office];
+                          const deptCount = officeData ? officeData.departments.size : 0;
+                          const agentCount = officeData ? officeData.agents.size : 0;
+                          
+                          return (
+                            <Box key={office} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <Checkbox
+                                checked={checked}
+                                onChange={(e) => handleHierarchicalTargetChange('offices', office, e.target.checked)}
+                                icon={<CheckBoxOutlineBlankIcon />}
+                                checkedIcon={<CheckBoxIcon />}
+                                size="small"
+                              />
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2">
+                                  {office}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  소속 {deptCount}개, 영업사원 {agentCount}명
+                                </Typography>
+                              </Box>
+                            </Box>
+                          );
+                        })}
                       </Box>
                     </Paper>
                   </Grid>
@@ -934,33 +1437,44 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           <Button
                             size="small"
                             variant="outlined"
-                            onClick={() => handleReset('departments')}
+                            onClick={() => handleHierarchicalReset('departments')}
                           >
                             초기화
                           </Button>
                           <Button
                             size="small"
-                            onClick={() => handleSelectAll('departments', true)}
+                            onClick={() => handleHierarchicalSelectAll('departments', true)}
                           >
                             전체선택
                           </Button>
                         </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {Object.entries(assignmentSettings.targets.departments).map(([department, checked]) => (
-                          <Box key={department} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Checkbox
-                              checked={checked}
-                              onChange={(e) => handleTargetChange('departments', department, e.target.checked)}
-                              icon={<CheckBoxOutlineBlankIcon />}
-                              checkedIcon={<CheckBoxIcon />}
-                              size="small"
-                            />
-                            <Typography variant="body2">
-                              {department}
-                            </Typography>
-                          </Box>
-                        ))}
+                        {Object.entries(assignmentSettings.targets.departments).map(([department, checked]) => {
+                          const deptData = getHierarchicalStructure.departments[department];
+                          const agentCount = deptData ? deptData.agents.size : 0;
+                          const office = deptData ? deptData.office : '';
+                          
+                          return (
+                            <Box key={department} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <Checkbox
+                                checked={checked}
+                                onChange={(e) => handleHierarchicalTargetChange('departments', department, e.target.checked)}
+                                icon={<CheckBoxOutlineBlankIcon />}
+                                checkedIcon={<CheckBoxIcon />}
+                                size="small"
+                              />
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2">
+                                  {department}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {office} • 영업사원 {agentCount}명
+                                </Typography>
+                              </Box>
+                            </Box>
+                          );
+                        })}
                       </Box>
                     </Paper>
                   </Grid>
@@ -976,13 +1490,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           <Button
                             size="small"
                             variant="outlined"
-                            onClick={() => handleReset('agents')}
+                            onClick={() => handleHierarchicalReset('agents')}
                           >
                             초기화
                           </Button>
                           <Button
                             size="small"
-                            onClick={() => handleSelectAll('agents', true)}
+                            onClick={() => handleHierarchicalSelectAll('agents', true)}
                           >
                             전체선택
                           </Button>
@@ -991,18 +1505,27 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                         {Object.entries(assignmentSettings.targets.agents).map(([agentId, checked]) => {
                           const agent = agents.find(a => a.contactId === agentId);
+                          const agentData = getHierarchicalStructure.agents[agentId];
+                          
                           return (
                             <Box key={agentId} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                               <Checkbox
                                 checked={checked}
-                                onChange={(e) => handleTargetChange('agents', agentId, e.target.checked)}
+                                onChange={(e) => handleHierarchicalTargetChange('agents', agentId, e.target.checked)}
                                 icon={<CheckBoxOutlineBlankIcon />}
                                 checkedIcon={<CheckBoxIcon />}
                                 size="small"
                               />
-                              <Typography variant="body2">
-                                {agent ? agent.target : agentId}
-                              </Typography>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2">
+                                  {agent ? agent.target : agentId}
+                                </Typography>
+                                {agentData && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {agentData.office} • {agentData.department}
+                                  </Typography>
+                                )}
+                              </Box>
                             </Box>
                           );
                         })}
@@ -1090,12 +1613,122 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </Card>
             ) : (
               <Box>
+                {/* 배정 비율 설명 */}
+                <Accordion sx={{ mb: 3 }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <HelpIcon color="primary" />
+                      <Typography variant="h6">
+                        배정 비율 계산 방식 안내
+                      </Typography>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          현재 설정된 배정 비율
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Chip 
+                            label={`회전율: ${assignmentSettings.ratios.turnoverRate}%`} 
+                            color="primary" 
+                            variant="outlined"
+                          />
+                          <Chip 
+                            label={`거래처수: ${assignmentSettings.ratios.storeCount}%`} 
+                            color="secondary" 
+                            variant="outlined"
+                          />
+                          <Chip 
+                            label={`잔여재고: ${assignmentSettings.ratios.remainingInventory}%`} 
+                            color="warning" 
+                            variant="outlined"
+                          />
+                          <Chip 
+                            label={`판매량: ${assignmentSettings.ratios.salesVolume}%`} 
+                            color="info" 
+                            variant="outlined"
+                          />
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          점수 계산 방식
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Typography variant="body2">
+                            • <strong>회전율:</strong> 높을수록 높은 점수 (재고 회전이 빠른 영업사원 우선)
+                          </Typography>
+                          <Typography variant="body2">
+                            • <strong>거래처수:</strong> 많을수록 높은 점수 (거래처가 많은 영업사원 우선)
+                          </Typography>
+                          <Typography variant="body2">
+                            • <strong>잔여재고:</strong> 적을수록 높은 점수 (재고가 적은 영업사원 우선)
+                          </Typography>
+                          <Typography variant="body2">
+                            • <strong>판매량:</strong> 높을수록 높은 점수 (판매 실적이 좋은 영업사원 우선)
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                    <Divider sx={{ my: 2 }} />
+                    <Alert severity="info">
+                      <Typography variant="body2">
+                        <strong>배정 원칙:</strong> 각 영업사원의 종합 점수에 따라 재고를 배정하며, 
+                        자투리 재고는 판매량과 거래처수가 많은 영업사원에게 우선적으로 재배정됩니다.
+                      </Typography>
+                    </Alert>
+                  </AccordionDetails>
+                </Accordion>
+
+                {/* 배정 확정 버튼 */}
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          배정 확정
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          현재 배정 결과를 확정하여 히스토리에 저장합니다.
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="large"
+                        onClick={handleConfirmAssignment}
+                        startIcon={<CheckIcon />}
+                        sx={{ 
+                          px: 4, 
+                          py: 1.5,
+                          fontSize: '1.1rem',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        배정 확정
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+
                 {/* 모델별 배정 현황 */}
                 <Card sx={{ mb: 3 }}>
                   <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      모델별 배정 현황
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6">
+                        모델별 배정 현황
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        startIcon={<PrintIcon />}
+                        onClick={() => handlePrint('summary')}
+                        size="small"
+                      >
+                        인쇄
+                      </Button>
+                    </Box>
                     <TableContainer component={Paper} variant="outlined">
                       <Table size="small">
                         <TableHead>
@@ -1148,9 +1781,19 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     {/* 사무실별 배정 현황 */}
                     {previewSubTab === 0 && (
                       <Box>
-                        <Typography variant="subtitle1" gutterBottom>
-                          사무실별 배정 현황
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle1">
+                            사무실별 배정 현황
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            startIcon={<PrintIcon />}
+                            onClick={() => handlePrint('office')}
+                            size="small"
+                          >
+                            인쇄
+                          </Button>
+                        </Box>
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
                             <TableHead>
@@ -1185,9 +1828,19 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     {/* 영업사원별 배정 현황 */}
                     {previewSubTab === 1 && (
                       <Box>
-                        <Typography variant="subtitle1" gutterBottom>
-                          영업사원별 모델/색상 배정 현황 (전체 {Object.keys(previewData.agents).length}명)
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle1">
+                            영업사원별 모델/색상 배정 현황 (전체 {Object.keys(previewData.agents).length}명)
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            startIcon={<PrintIcon />}
+                            onClick={() => handlePrint('agent')}
+                            size="small"
+                          >
+                            인쇄
+                          </Button>
+                        </Box>
                         
                         {/* 모델별 색상별 배정량 테이블 */}
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
@@ -1303,9 +1956,19 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     {/* 소속별 배정 현황 */}
                     {previewSubTab === 2 && (
                       <Box>
-                        <Typography variant="subtitle1" gutterBottom>
-                          소속별 배정 현황
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle1">
+                            소속별 배정 현황
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            startIcon={<PrintIcon />}
+                            onClick={() => handlePrint('department')}
+                            size="small"
+                          >
+                            인쇄
+                          </Button>
+                        </Box>
                         <TableContainer component={Paper} variant="outlined">
                           <Table size="small">
                             <TableHead>

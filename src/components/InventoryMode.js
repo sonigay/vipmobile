@@ -101,7 +101,7 @@ const LoadingSkeleton = () => (
   </Box>
 );
 
-function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
+function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUserName }) {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -600,9 +600,30 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
             vertical: 'top',
             horizontal: 'left',
           }}
-          disablePortal={false}
-          keepMounted={false}
-          autoFocus={false}
+          PaperProps={{
+            sx: {
+              minWidth: '220px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(10px)',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              '& .MuiMenuItem-root': {
+                borderRadius: '8px',
+                margin: '4px 8px',
+                padding: '12px 16px',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                  transform: 'translateX(4px)',
+                  boxShadow: '0 2px 8px rgba(25, 118, 210, 0.15)'
+                },
+                '&:active': {
+                  transform: 'translateX(2px) scale(0.98)'
+                }
+              }
+            }
+          }}
         >
           {selectedMenu === 'master' && (
             <>
