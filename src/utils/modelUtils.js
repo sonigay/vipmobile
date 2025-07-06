@@ -123,7 +123,7 @@ export const getModelInventorySummary = (data, model, color = null) => {
   const stores = [];
 
   if (!data || !Array.isArray(data)) {
-    return { totalQuantity: 0, storeCount: 0, stores: [] };
+    return { totalQuantity: 0, storeCount: 0, stores: [], avgQuantity: 0, maxQuantity: 0 };
   }
 
   data.forEach(store => {
@@ -169,5 +169,9 @@ export const getModelInventorySummary = (data, model, color = null) => {
     }
   });
 
-  return { totalQuantity, storeCount, stores };
+  // 평균 수량과 최대 수량 계산
+  const avgQuantity = storeCount > 0 ? Math.round(totalQuantity / storeCount) : 0;
+  const maxQuantity = stores.length > 0 ? Math.max(...stores.map(s => s.quantity)) : 0;
+
+  return { totalQuantity, storeCount, stores, avgQuantity, maxQuantity };
 }; 

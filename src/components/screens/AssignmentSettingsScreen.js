@@ -130,15 +130,23 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     }
   }, []);
 
-  // 담당자 데이터가 로드되면 배정 대상 초기화
+  // 담당자 데이터가 로드되면 배정 대상 초기화 (사무실과 소속이 있는 담당자만)
   useEffect(() => {
     if (agents.length > 0) {
       setAssignmentSettings(prev => {
         const newSettings = { ...prev };
         
+        // 사무실과 소속이 모두 있는 담당자만 필터링
+        const validAgents = agents.filter(agent => 
+          agent.office && agent.office.trim() !== '' && 
+          agent.department && agent.department.trim() !== ''
+        );
+        
+        console.log(`전체 담당자: ${agents.length}명, 유효한 담당자: ${validAgents.length}명`);
+        
         // 사무실별 배정 대상 초기화
         const offices = new Set();
-        agents.forEach(agent => {
+        validAgents.forEach(agent => {
           if (agent.office) offices.add(agent.office);
         });
         
@@ -150,7 +158,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
         // 소속별 배정 대상 초기화
         const departments = new Set();
-        agents.forEach(agent => {
+        validAgents.forEach(agent => {
           if (agent.department) departments.add(agent.department);
         });
         
@@ -160,8 +168,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           }
         });
 
-        // 영업사원별 배정 대상 초기화
-        agents.forEach(agent => {
+        // 영업사원별 배정 대상 초기화 (유효한 담당자만)
+        validAgents.forEach(agent => {
           if (!newSettings.targets.agents.hasOwnProperty(agent.contactId)) {
             newSettings.targets.agents[agent.contactId] = true; // 기본값: 선택됨
           }
@@ -434,9 +442,25 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  담당자 관리
-                </Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">
+                    담당자 관리
+                  </Typography>
+                  <Box display="flex" gap={1}>
+                    <Chip 
+                      label={`전체: ${agents.length}명`} 
+                      color="default" 
+                      variant="outlined" 
+                      size="small"
+                    />
+                    <Chip 
+                      label={`유효: ${agents.filter(agent => agent.office && agent.office.trim() !== '' && agent.department && agent.department.trim() !== '').length}명`} 
+                      color="primary" 
+                      variant="outlined" 
+                      size="small"
+                    />
+                  </Box>
+                </Box>
                 <TableContainer sx={{ maxHeight: 400 }}>
                   <Table size="small">
                     <TableHead>
@@ -448,55 +472,57 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {agents.map((agent) => (
-                        <TableRow key={agent.contactId}>
-                          <TableCell>{agent.target}</TableCell>
-                          <TableCell>
-                            {editingAgent?.contactId === agent.contactId ? (
-                              <TextField
-                                size="small"
-                                value={editingAgent.office}
-                                onChange={(e) => setEditingAgent(prev => ({
-                                  ...prev,
-                                  office: e.target.value
-                                }))}
-                              />
-                            ) : (
-                              agent.office || '미지정'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingAgent?.contactId === agent.contactId ? (
-                              <TextField
-                                size="small"
-                                value={editingAgent.department}
-                                onChange={(e) => setEditingAgent(prev => ({
-                                  ...prev,
-                                  department: e.target.value
-                                }))}
-                              />
-                            ) : (
-                              agent.department || '미지정'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingAgent?.contactId === agent.contactId ? (
-                              <>
-                                <IconButton size="small" onClick={handleAgentSave}>
-                                  <SaveIcon />
+                      {agents
+                        .filter(agent => agent.office && agent.office.trim() !== '' && agent.department && agent.department.trim() !== '')
+                        .map((agent) => (
+                          <TableRow key={agent.contactId}>
+                            <TableCell>{agent.target}</TableCell>
+                            <TableCell>
+                              {editingAgent?.contactId === agent.contactId ? (
+                                <TextField
+                                  size="small"
+                                  value={editingAgent.office}
+                                  onChange={(e) => setEditingAgent(prev => ({
+                                    ...prev,
+                                    office: e.target.value
+                                  }))}
+                                />
+                              ) : (
+                                agent.office || '미지정'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingAgent?.contactId === agent.contactId ? (
+                                <TextField
+                                  size="small"
+                                  value={editingAgent.department}
+                                  onChange={(e) => setEditingAgent(prev => ({
+                                    ...prev,
+                                    department: e.target.value
+                                  }))}
+                                />
+                              ) : (
+                                agent.department || '미지정'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingAgent?.contactId === agent.contactId ? (
+                                <>
+                                  <IconButton size="small" onClick={handleAgentSave}>
+                                    <SaveIcon />
+                                  </IconButton>
+                                  <IconButton size="small" onClick={handleAgentCancel}>
+                                    <CancelIcon />
+                                  </IconButton>
+                                </>
+                              ) : (
+                                <IconButton size="small" onClick={() => handleAgentEdit(agent)}>
+                                  <EditIcon />
                                 </IconButton>
-                                <IconButton size="small" onClick={handleAgentCancel}>
-                                  <CancelIcon />
-                                </IconButton>
-                              </>
-                            ) : (
-                              <IconButton size="small" onClick={() => handleAgentEdit(agent)}>
-                                <EditIcon />
-                              </IconButton>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -907,14 +933,28 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       </Box>
 
       {/* 모델 추가 다이얼로그 */}
-      <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>모델 추가</DialogTitle>
+      <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="lg" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">모델 추가</Typography>
+            <Button
+              size="small"
+              onClick={() => {
+                setSelectedModel('');
+                setSelectedColor('');
+                setNewModel({ name: '', color: '', quantity: 0 });
+              }}
+            >
+              초기화
+            </Button>
+          </Box>
+        </DialogTitle>
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            {/* 기존 보유 모델 선택 */}
-            <Grid item xs={12}>
+            {/* 모델 검색 및 선택 */}
+            <Grid item xs={12} md={6}>
               <Typography variant="subtitle1" gutterBottom>
-                기존 보유 모델 선택
+                📱 모델 선택
               </Typography>
               <FormControl fullWidth>
                 <InputLabel>모델명</InputLabel>
@@ -930,18 +970,40 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   <MenuItem value="">
                     <em>모델을 선택하세요</em>
                   </MenuItem>
-                  {availableModels.models.map((model) => (
-                    <MenuItem key={model} value={model}>
-                      {model}
-                    </MenuItem>
-                  ))}
+                  {availableModels.models
+                    .sort()
+                    .map((model) => (
+                      <MenuItem key={model} value={model}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                          <span>{model}</span>
+                          <Chip 
+                            size="small" 
+                            label={getColorsForModel(availableModels.modelColors, model).length} 
+                            color="primary" 
+                            variant="outlined"
+                          />
+                        </Box>
+                      </MenuItem>
+                    ))}
                 </Select>
               </FormControl>
+              
+              {/* 모델별 색상 개수 요약 */}
+              {!selectedModel && (
+                <Box mt={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    총 {availableModels.models.length}개 모델, {availableModels.colors.length}개 색상
+                  </Typography>
+                </Box>
+              )}
             </Grid>
 
-            {/* 선택된 모델의 색상 선택 */}
-            {selectedModel && (
-              <Grid item xs={12}>
+            {/* 색상 선택 */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" gutterBottom>
+                🎨 색상 선택
+              </Typography>
+              {selectedModel ? (
                 <FormControl fullWidth>
                   <InputLabel>색상</InputLabel>
                   <Select
@@ -955,41 +1017,100 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     <MenuItem value="">
                       <em>색상을 선택하세요</em>
                     </MenuItem>
-                    {getColorsForModel(availableModels.modelColors, selectedModel).map((color) => (
-                      <MenuItem key={color} value={color}>
-                        {color}
-                      </MenuItem>
-                    ))}
+                    {getColorsForModel(availableModels.modelColors, selectedModel)
+                      .sort()
+                      .map((color) => (
+                        <MenuItem key={color} value={color}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                            <span>{color}</span>
+                            <Chip 
+                              size="small" 
+                              label="재고확인" 
+                              color="secondary" 
+                              variant="outlined"
+                            />
+                          </Box>
+                        </MenuItem>
+                      ))}
                   </Select>
                 </FormControl>
-              </Grid>
-            )}
+              ) : (
+                <Box 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  height="56px"
+                  border="1px dashed #ccc"
+                  borderRadius="4px"
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    모델을 먼저 선택해주세요
+                  </Typography>
+                </Box>
+              )}
+            </Grid>
 
-            {/* 선택된 모델/색상의 재고 현황 */}
+            {/* 선택된 모델/색상의 상세 재고 현황 */}
             {selectedModel && selectedColor && (
               <Grid item xs={12}>
-                <Card variant="outlined">
+                <Card variant="outlined" sx={{ backgroundColor: '#f8f9fa' }}>
                   <CardContent>
-                    <Typography variant="subtitle2" gutterBottom>
-                      {selectedModel} - {selectedColor} 재고 현황
+                    <Typography variant="subtitle2" gutterBottom color="primary">
+                      📊 {selectedModel} - {selectedColor} 재고 현황
                     </Typography>
                     {(() => {
                       const summary = getModelInventorySummary(data, selectedModel, selectedColor);
                       return (
-                        <Box>
-                          <Typography variant="body2">
-                            총 수량: {summary.totalQuantity}개
-                          </Typography>
-                          <Typography variant="body2">
-                            보유 매장: {summary.storeCount}개
-                          </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Box textAlign="center">
+                              <Typography variant="h6" color="primary">
+                                {summary.totalQuantity}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                총 수량
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Box textAlign="center">
+                              <Typography variant="h6" color="secondary">
+                                {summary.storeCount}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                보유 매장
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Box textAlign="center">
+                              <Typography variant="h6" color="success.main">
+                                {summary.avgQuantity}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                매장당 평균
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={12} sm={6} md={3}>
+                            <Box textAlign="center">
+                              <Typography variant="h6" color="warning.main">
+                                {summary.maxQuantity}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                최대 보유량
+                              </Typography>
+                            </Box>
+                          </Grid>
                           {summary.stores.length > 0 && (
-                            <Typography variant="body2" color="text.secondary">
-                              주요 보유 매장: {summary.stores.slice(0, 3).map(s => s.name).join(', ')}
-                              {summary.stores.length > 3 && ` 외 ${summary.stores.length - 3}개`}
-                            </Typography>
+                            <Grid item xs={12}>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>주요 보유 매장:</strong> {summary.stores.slice(0, 5).map(s => s.name).join(', ')}
+                                {summary.stores.length > 5 && ` 외 ${summary.stores.length - 5}개`}
+                              </Typography>
+                            </Grid>
                           )}
-                        </Box>
+                        </Grid>
                       );
                     })()}
                   </CardContent>
@@ -997,38 +1118,51 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </Grid>
             )}
 
-            {/* 수동 입력 (기존 방식) */}
+            {/* 수동 입력 섹션 */}
             <Grid item xs={12}>
-              <Typography variant="subtitle1" gutterBottom>
-                또는 수동 입력
-              </Typography>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="모델명 (수동)"
-                value={newModel.name}
-                onChange={(e) => setNewModel(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="직접 모델명을 입력하세요"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="색상 (수동)"
-                value={newModel.color}
-                onChange={(e) => setNewModel(prev => ({ ...prev, color: e.target.value }))}
-                placeholder="직접 색상을 입력하세요"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                type="number"
-                label="입고 수량"
-                value={newModel.quantity}
-                onChange={(e) => setNewModel(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
-              />
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>
+                    ✏️ 수동 입력 (선택사항)
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    위에서 모델과 색상을 선택했거나, 직접 입력할 수 있습니다.
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="모델명"
+                        value={newModel.name}
+                        onChange={(e) => setNewModel(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="모델명을 입력하세요"
+                        helperText={selectedModel ? `선택됨: ${selectedModel}` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="색상"
+                        value={newModel.color}
+                        onChange={(e) => setNewModel(prev => ({ ...prev, color: e.target.value }))}
+                        placeholder="색상을 입력하세요"
+                        helperText={selectedColor ? `선택됨: ${selectedColor}` : ''}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="입고 수량"
+                        value={newModel.quantity}
+                        onChange={(e) => setNewModel(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                        placeholder="수량을 입력하세요"
+                        inputProps={{ min: 1 }}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
             </Grid>
           </Grid>
         </DialogContent>
@@ -1045,8 +1179,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             onClick={handleAddModel} 
             variant="contained"
             disabled={!newModel.name || !newModel.color || newModel.quantity <= 0}
+            startIcon={<AddIcon />}
           >
-            추가
+            모델 추가
           </Button>
         </DialogActions>
       </Dialog>
