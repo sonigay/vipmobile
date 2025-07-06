@@ -2126,7 +2126,7 @@ app.post('/api/assignment/complete', async (req, res) => {
     };
     
     // 대상자 필터링하여 알림 전송
-    sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
+    await sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
     
     res.json({ success: true, assignment });
   } catch (error) {
@@ -2230,7 +2230,7 @@ function sendNotificationToAllAgents(notification) {
 }
 
 // 배정 대상자에게만 알림 전송하는 함수
-function sendNotificationToTargetAgents(notification, targetOffices, targetDepartments, targetAgents) {
+async function sendNotificationToTargetAgents(notification, targetOffices, targetDepartments, targetAgents) {
   console.log('배정 대상자에게만 알림 전송:', {
     notification,
     targetOffices,
