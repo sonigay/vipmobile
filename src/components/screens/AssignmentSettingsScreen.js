@@ -50,6 +50,14 @@ import AssignmentVisualization from '../AssignmentVisualization';
 import { extractAvailableModels, getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
 import { addAssignmentCompletedNotification, addSettingsChangedNotification } from '../../utils/notificationUtils';
 
+// API 기본 URL 설정
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+// 환경변수 검증
+if (!API_BASE_URL) {
+  console.error('REACT_APP_API_URL 환경변수가 설정되지 않았습니다.');
+}
+
 function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
   const [assignmentSettings, setAssignmentSettings] = useState({
@@ -90,7 +98,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         let agentDataLoaded = false;
         
         try {
-          const agentResponse = await fetch('http://localhost:4000/api/agents');
+          const agentResponse = await fetch(`${API_BASE_URL}/api/agents`);
           console.log('담당자 API 응답 상태:', agentResponse.status);
           console.log('담당자 API 응답 헤더:', agentResponse.headers.get('content-type'));
           
@@ -147,7 +155,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           console.log('Props로 받은 데이터가 없거나 배열이 아님, API에서 가져오기 시도');
           // 데이터가 없으면 API에서 직접 가져오기
           try {
-            const storeResponse = await fetch('http://localhost:4000/api/data');
+            const storeResponse = await fetch(`${API_BASE_URL}/api/data`);
             console.log('매장 API 응답 상태:', storeResponse.status);
             console.log('매장 API 응답 헤더:', storeResponse.headers.get('content-type'));
             
@@ -310,7 +318,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgressMessage('매장 데이터를 로드하는 중...');
       
       // 매장 데이터 가져오기 (재고 정보용)
-      const storeResponse = await fetch('http://localhost:4000/api/data');
+      const storeResponse = await fetch(`${API_BASE_URL}/api/data`);
       const storeData = await storeResponse.json();
       
       setProgress(30);

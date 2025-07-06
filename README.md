@@ -25,6 +25,29 @@
 - **Google Sheets API** - 데이터 저장소
 - **OpenStreetMap Nominatim** - 주소-좌표 변환
 
+## 환경 설정
+
+### API 서버 URL 설정
+
+프로젝트 루트에 `.env` 파일을 생성하고 다음 내용을 추가하세요:
+
+```env
+# API 서버 URL 설정
+REACT_APP_API_URL=your-api-server-url
+
+# 기타 환경변수들
+REACT_APP_ENV=production
+```
+
+### 개발 환경 설정
+
+로컬 개발 시에는 다음과 같이 설정하세요:
+
+```env
+REACT_APP_API_URL=http://localhost:4000
+REACT_APP_ENV=development
+```
+
 ## 설치 및 실행
 
 ### 1. 저장소 클론

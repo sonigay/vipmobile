@@ -141,7 +141,7 @@ function Login({ onLogin }) {
     setError('');
 
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'https://port-0-jegomap-m9sqvpptbf26e8e5.sel4.cloudtype.app';
+      const API_URL = process.env.REACT_APP_API_URL;
       
       // 새로운 로그인 API를 사용하여 로그인
       const response = await fetch(`${API_URL}/api/login`, {

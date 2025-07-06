@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 // 날짜 문자열을 Date 객체로 변환
 function parseDate(dateStr) {

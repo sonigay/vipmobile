@@ -95,7 +95,7 @@ class RealtimeDashboardManager {
   // 재고 데이터 업데이트
   async updateInventoryData() {
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_URL = process.env.REACT_APP_API_URL;
       const response = await fetch(`${API_URL}/api/inventory-summary`, {
         method: 'GET',
         headers: {
@@ -134,7 +134,7 @@ class RealtimeDashboardManager {
   // 배정 데이터 업데이트
   async updateAssignmentData() {
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_URL = process.env.REACT_APP_API_URL;
       const response = await fetch(`${API_URL}/api/assignment-summary`, {
         method: 'GET',
         headers: {
@@ -173,7 +173,7 @@ class RealtimeDashboardManager {
   // 개통 데이터 업데이트
   async updateActivationData() {
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_URL = process.env.REACT_APP_API_URL;
       const response = await fetch(`${API_URL}/api/activation-summary`, {
         method: 'GET',
         headers: {
@@ -309,7 +309,7 @@ class RealtimeDashboardManager {
   // WebSocket 연결
   connectWebSocket() {
     try {
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_URL = process.env.REACT_APP_API_URL;
       const wsUrl = API_URL.replace('http', 'ws') + '/ws/dashboard';
       
       this.websocket = new WebSocket(wsUrl);

@@ -89,7 +89,7 @@ const loadActivationDataBatch = async () => {
   }
   
   try {
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+    const API_URL = process.env.REACT_APP_API_URL;
     const [currentMonthResponse, previousMonthResponse] = await Promise.all([
       fetch(`${API_URL}/api/activation-data/current-month`),
       fetch(`${API_URL}/api/activation-data/previous-month`)

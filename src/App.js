@@ -32,7 +32,7 @@ import './mobile.css';
 // Logger 유틸리티
 const logActivity = async (activityData) => {
   try {
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+    const API_URL = process.env.REACT_APP_API_URL;
     const loggingEnabled = process.env.REACT_APP_LOGGING_ENABLED === 'true';
     
     if (!loggingEnabled) {

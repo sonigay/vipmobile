@@ -15,16 +15,11 @@ export const extractAvailableModels = (data) => {
 
   data.forEach((store, index) => {
     if (store.inventory) {
-      console.log(`매장 ${index + 1} (${store.name || store.id}): inventory 존재`);
-      
       // 각 카테고리별로 모델과 색상 추출
       Object.entries(store.inventory).forEach(([category, categoryData]) => {
         if (categoryData && typeof categoryData === 'object') {
-          console.log(`  카테고리 ${category}:`, Object.keys(categoryData));
-          
           Object.entries(categoryData).forEach(([model, modelData]) => {
             models.add(model);
-            console.log(`    모델 추가: ${model}`);
             
             if (modelData && typeof modelData === 'object') {
               Object.entries(modelData).forEach(([status, statusData]) => {
@@ -37,7 +32,6 @@ export const extractAvailableModels = (data) => {
                       modelColors.set(model, new Set());
                     }
                     modelColors.get(model).add(color);
-                    console.log(`      색상 추가: ${model} - ${color}`);
                   });
                 }
               });

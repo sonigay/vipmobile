@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || 'https://port-0-jegomap-m9sqvpptbf26e8e5.sel4.cloudtype.app';
+const API_URL = process.env.REACT_APP_API_URL;
 
 // 프론트엔드 캐싱 시스템
 const clientCache = new Map();
