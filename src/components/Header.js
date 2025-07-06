@@ -20,7 +20,7 @@ import {
   sendTestPushNotification
 } from '../utils/pushNotificationUtils';
 
-function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange }) {
+function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -132,6 +132,29 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
     }
     
     return categories;
+  };
+
+  // 관리자모드용 개통 데이터 계산 함수
+  const getAgentActivationTotal = () => {
+    if (!activationData || !agentTarget) {
+      return 0;
+    }
+    
+    let totalActivation = 0;
+    
+    Object.values(activationData).forEach(storeData => {
+      // 담당자 필터링
+      if (storeData.agents && storeData.agents.some(agent => {
+        if (!agent || !agentTarget) return false;
+        const agentPrefix = agent.toString().substring(0, 3);
+        const targetPrefix = agentTarget.toString().substring(0, 3);
+        return agentPrefix === targetPrefix;
+      })) {
+        totalActivation += storeData.currentMonth || 0;
+      }
+    });
+    
+    return totalActivation;
   };
 
   // 푸시 알림 상태 초기화
@@ -332,6 +355,11 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
                   />
                   {(() => {
                     const categories = getAgentInventoryByCategory(loggedInStore);
+                    console.log('Header - 재고 데이터 디버깅:', {
+                      loggedInStore: loggedInStore,
+                      inventory: loggedInStore?.inventory,
+                      categories: categories
+                    });
                     return (
                       <>
                         <Chip
@@ -378,7 +406,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
                     }}
                   />
                   <Chip
-                    label="총개통수량 확인 중..."
+                    label={`총개통:${getAgentActivationTotal()}개`}
                     size="small"
                     sx={{ 
                       backgroundColor: 'rgba(33, 150, 243, 0.3)', 

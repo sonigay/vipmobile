@@ -1641,6 +1641,8 @@ function App() {
             isAgentMode={isAgentMode}
             currentView={currentView}
             onViewChange={setCurrentView}
+            activationData={activationData}
+            agentTarget={agentTarget}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
