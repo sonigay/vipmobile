@@ -134,17 +134,13 @@ function App() {
   const [activationModelSearch, setActivationModelSearch] = useState('');
   // 개통실적 날짜 검색 상태
   const [activationDateSearch, setActivationDateSearch] = useState('');
-  // 알림 시스템 초기화
+    // 알림 시스템 초기화
   const [notificationInitialized, setNotificationInitialized] = useState(false);
   
-  // 배정관리 관련 상태 추가
-  const [assignmentHistory, setAssignmentHistory] = useState([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState(null);
-
   // 토스트 알림 상태
   const [toastNotifications, setToastNotifications] = useState([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   // 재고모드 접속 아이디 목록
   const INVENTORY_MODE_IDS = [
@@ -1496,19 +1492,6 @@ function App() {
     return totalInventory;
   }, [selectedModel, selectedColor]);
 
-  // 배정관리 관련 함수들
-  const loadAssignmentHistory = useCallback(async () => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/assignment/history`);
-      if (response.ok) {
-        const data = await response.json();
-        setAssignmentHistory(data.assignments || []);
-      }
-    } catch (error) {
-      console.error('배정 히스토리 로딩 실패:', error);
-    }
-  }, []);
-
   const loadNotifications = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications?user_id=${loggedInStore?.id}`);
@@ -1521,17 +1504,6 @@ function App() {
       console.error('알림 로딩 실패:', error);
     }
   }, [loggedInStore?.id]);
-
-  const markNotificationAsRead = useCallback(async (notificationId) => {
-    try {
-      await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
-        method: 'PUT'
-      });
-      loadNotifications();
-    } catch (error) {
-      console.error('알림 읽음 처리 실패:', error);
-    }
-  }, [loadNotifications]);
 
   const playNotificationSound = useCallback(() => {
     try {
@@ -1758,19 +1730,6 @@ function App() {
                   >
                     담당개통확인
                   </Button>
-                  <Button 
-                    color="inherit" 
-                    onClick={() => handleViewChange('assignment_management')}
-                    sx={{ 
-                      fontSize: '0.8em',
-                      backgroundColor: currentView === 'assignment_management' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,0.2)'
-                      }
-                    }}
-                  >
-                    배정관리
-                  </Button>
                 </Box>
               )}
               
@@ -1783,7 +1742,11 @@ function App() {
                 <Box sx={{ position: 'relative', ml: 1 }}>
                   <IconButton 
                     color="inherit" 
-                    onClick={() => setShowNotificationModal(true)}
+                    onClick={() => {
+                      setShowNotificationModal(true);
+                      // 알림 아이콘 클릭 시 읽음 처리
+                      setUnreadNotifications(0);
+                    }}
                     sx={{ position: 'relative' }}
                   >
                     <NotificationsIcon />
@@ -2117,50 +2080,6 @@ function App() {
                     </>
                   )}
                 </>
-              ) : currentView === 'assignment_management' ? (
-                // 배정관리 화면
-                <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-                  <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-                    배정 관리
-                  </Typography>
-                  
-                  {/* 배정 히스토리 테이블 */}
-                  <Paper sx={{ p: 2, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      배정 히스토리
-                    </Typography>
-                    <TableContainer>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>배정자</TableCell>
-                            <TableCell>모델</TableCell>
-                            <TableCell>색상</TableCell>
-                            <TableCell>수량</TableCell>
-                            <TableCell>배정 대상</TableCell>
-                            <TableCell>배정 시간</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {assignmentHistory.map((assignment, index) => (
-                            <TableRow key={index}>
-                              <TableCell>{assignment.assigner}</TableCell>
-                              <TableCell>{assignment.model}</TableCell>
-                              <TableCell>{assignment.color}</TableCell>
-                              <TableCell>{assignment.quantity}대</TableCell>
-                              <TableCell>
-                                {assignment.target_office} / {assignment.target_department} / {assignment.target_agent}
-                              </TableCell>
-                              <TableCell>
-                                {new Date(assignment.assigned_at).toLocaleString()}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Paper>
-                </Box>
               ) : (
                 // 일반 매장 모드일 때 FilterPanel만 표시
                 <FilterPanel
@@ -2221,7 +2140,23 @@ function App() {
       {/* 알림 모달 */}
       <Dialog
         open={showNotificationModal}
-        onClose={() => setShowNotificationModal(false)}
+        onClose={() => {
+          setShowNotificationModal(false);
+          // 알림 모달을 닫을 때 읽음 처리
+          setUnreadNotifications(0);
+          // 모든 알림을 읽음 처리로 표시
+          if (loggedInStore?.id) {
+            fetch(`${process.env.REACT_APP_API_URL}/api/notifications/mark-all-read`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ user_id: loggedInStore.id })
+            }).catch(error => {
+              console.error('알림 읽음 처리 실패:', error);
+            });
+          }
+        }}
         maxWidth="md"
         fullWidth
       >

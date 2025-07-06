@@ -2183,6 +2183,21 @@ app.put('/api/notifications/:id/read', async (req, res) => {
   }
 });
 
+// 모든 알림을 읽음 처리하는 API
+app.put('/api/notifications/mark-all-read', async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    
+    // 모든 알림을 읽음 처리 (실제로는 데이터베이스 업데이트)
+    console.log(`사용자 ${user_id}의 모든 알림을 읽음 처리`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('모든 알림 읽음 처리 오류:', error);
+    res.status(500).json({ success: false, error: '모든 알림 읽음 처리 실패' });
+  }
+});
+
 // 실시간 알림 스트림 (Server-Sent Events)
 const connectedClients = new Map();
 
