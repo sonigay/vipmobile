@@ -884,21 +884,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     if (result) {
       alert('배정이 확정되어 히스토리에 저장되었습니다.\n관리자모드 접속자들에게 알림이 전송되었습니다.');
       
-      // 배정 완료 알림 추가
-      const totalAgents = Object.keys(previewData.agents).length;
-      const totalQuantity = Object.values(previewData.agents).reduce((sum, agent) => {
-        return sum + Object.values(agent).reduce((agentSum, model) => agentSum + (model.quantity || 0), 0);
-      }, 0);
-      const models = Object.keys(previewData.models);
-      
-      addAssignmentCompletedNotification({
-        totalAgents,
-        totalQuantity,
-        models,
-        preview: previewData,
-        confirmed: true
-      });
-      
       // 설정 저장
       saveSettings();
       

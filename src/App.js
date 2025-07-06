@@ -1560,13 +1560,12 @@ function App() {
     }
   }, [isAgentMode, loggedInStore, showNotificationToast]);
 
-  // 관리자모드 접속 시 배정 히스토리와 알림 로드
+  // 관리자모드 접속 시 알림 로드
   useEffect(() => {
     if (isAgentMode && loggedInStore) {
-      loadAssignmentHistory();
       loadNotifications();
     }
-  }, [isAgentMode, loggedInStore, loadAssignmentHistory, loadNotifications]);
+  }, [isAgentMode, loggedInStore, loadNotifications]);
 
   if (!isLoggedIn) {
     return (
@@ -1613,11 +1612,27 @@ function App() {
             <Toolbar>
               <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
                 {isAgentMode ? (
-                  // 관리자 모드일 때 대리점 정보 표시
+                  // 관리자 모드일 때 접속자 이름과 직급 표시
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
-                    {agentTarget} ({agentQualification})
-                  </span>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
+                      {agentTarget} ({agentQualification})
+                    </span>
+                    {currentView === 'assigned' && (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1, 
+                        p: 0.5, 
+                        backgroundColor: 'rgba(255,255,255,0.8)', 
+                        borderRadius: 1,
+                        fontSize: '0.6em',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                      }}>
+                        <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
+                          총보유재고: {getAgentTotalInventory()}개
+                        </span>
+                      </Box>
+                    )}
                     {currentView === 'activation' && getAgentTotalActivation() && (
                       <Box sx={{ 
                         display: 'flex', 
@@ -1662,7 +1677,23 @@ function App() {
                     )}
                   </Box>
                 ) : (
-                  '(주)브이아이피플러스'
+                  // 일반 매장 모드일 때 업체명과 보유재고 표시
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
+                      {loggedInStore?.name || '(주)브이아이피플러스'}
+                    </span>
+                    {loggedInStore && (
+                      <Chip
+                        label={`보유재고: ${getStoreInventory(loggedInStore)}개`}
+                        size="small"
+                        sx={{ 
+                          backgroundColor: 'rgba(255,255,255,0.2)', 
+                          color: 'white',
+                          fontSize: '0.6em'
+                        }}
+                      />
+                    )}
+                  </Box>
                 )}
               </Typography>
               

@@ -2086,18 +2086,21 @@ app.get('/api/assignment/history', async (req, res) => {
 
 app.post('/api/assignment/complete', async (req, res) => {
   try {
-    const { 
-      assigner, 
-      model, 
-      color, 
-      quantity, 
-      target_office, 
-      target_department, 
+    const {
+      assigner,
+      model,
+      color,
+      quantity,
+      target_office,
+      target_department,
       target_agent,
       target_offices,
       target_departments,
       target_agents
     } = req.body;
+    
+    // 실제 배정된 수량 계산 (quantity가 0이 아닌 경우에만)
+    const actualQuantity = parseInt(quantity) || 0;
     
     // 배정 정보 저장 (실제로는 데이터베이스에 저장)
     const assignment = {
@@ -2105,7 +2108,7 @@ app.post('/api/assignment/complete', async (req, res) => {
       assigner,
       model,
       color,
-      quantity,
+      quantity: actualQuantity,
       target_office,
       target_department,
       target_agent,
@@ -2116,17 +2119,21 @@ app.post('/api/assignment/complete', async (req, res) => {
     console.log('새로운 배정 완료:', assignment);
     console.log('배정 대상자:', { target_offices, target_departments, target_agents });
     
-    // 배정 대상자에게만 알림 전송
-    const notification = {
-      type: 'assignment_completed',
-      title: '새로운 배정 완료',
-      message: `${assigner}님이 ${model} (${color}) ${quantity}대를 배정했습니다.`,
-      data: assignment,
-      timestamp: new Date()
-    };
-    
-    // 대상자 필터링하여 알림 전송
-    await sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
+    // 배정 대상자에게만 알림 전송 (실제 배정된 수량이 있는 경우에만)
+    if (actualQuantity > 0) {
+      const notification = {
+        type: 'assignment_completed',
+        title: '새로운 배정 완료',
+        message: `${assigner}님이 ${model} (${color}) ${actualQuantity}대를 배정했습니다.`,
+        data: assignment,
+        timestamp: new Date()
+      };
+      
+      // 대상자 필터링하여 알림 전송
+      await sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
+    } else {
+      console.log('배정된 수량이 0이므로 알림을 전송하지 않습니다.');
+    }
     
     res.json({ success: true, assignment });
   } catch (error) {
@@ -2253,8 +2260,9 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     targetAgents
   });
   
-  // 실제 담당자 데이터를 가져오는 로직
+  // 실제 담당자 데이터를 가져오는 로직 (Google Sheets에서)
   let agents = [];
+  
   try {
     // Google Sheets에서 담당자 데이터 가져오기
     const agentSheetName = '담당자';
@@ -2275,15 +2283,9 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     }
   } catch (error) {
     console.error('담당자 데이터 로드 실패:', error);
-    // 실패 시 기본 데이터 사용
-    agents = [
-      { target: '김영업', contactId: 'kim001', office: '서울지사', department: '영업1팀' },
-      { target: '이매니저', contactId: 'lee002', office: '부산지사', department: '영업2팀' },
-      { target: '박대리', contactId: 'park003', office: '대구지사', department: '영업3팀' },
-      { target: '최영업', contactId: 'choi004', office: '인천지사', department: '영업1팀' },
-      { target: '정매니저', contactId: 'jung005', office: '인천지사', department: '영업2팀' }
-    ];
   }
+  
+  console.log('사용 가능한 담당자 목록:', agents.map(a => `${a.target}(${a.contactId}) - ${a.office} ${a.department}`));
   
   connectedClients.forEach((client, clientId) => {
     try {
