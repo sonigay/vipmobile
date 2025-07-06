@@ -1,5 +1,7 @@
 // 푸시 알림 관리 유틸리티
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 // VAPID 공개키를 URL-safe base64에서 Uint8Array로 변환
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -25,9 +27,13 @@ export async function subscribeToPushNotifications(userId) {
       throw new Error('사용자 ID가 제공되지 않았습니다.');
     }
     
+    if (!API_URL) {
+      throw new Error('API URL이 설정되지 않았습니다.');
+    }
+    
     // 1. VAPID 공개키 가져오기
     console.log('VAPID 공개키 요청 중...');
-    const response = await fetch('/api/push/vapid-public-key');
+    const response = await fetch(`${API_URL}/api/push/vapid-public-key`);
     
     if (!response.ok) {
       throw new Error(`VAPID 공개키 요청 실패: ${response.status} ${response.statusText}`);
@@ -79,7 +85,7 @@ export async function subscribeToPushNotifications(userId) {
     
     // 5. 서버에 구독 정보 전송
     console.log('서버에 구독 정보 전송 중...');
-    const subscribeResponse = await fetch('/api/push/subscribe', {
+    const subscribeResponse = await fetch(`${API_URL}/api/push/subscribe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -130,7 +136,7 @@ export async function unsubscribeFromPushNotifications(userId) {
     }
     
     // 서버에서 구독 정보 삭제
-    await fetch('/api/push/unsubscribe', {
+    await fetch(`${API_URL}/api/push/unsubscribe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -187,7 +193,11 @@ export async function getPushSubscriptionStatus() {
 // 테스트 푸시 알림 전송
 export async function sendTestPushNotification(userId) {
   try {
-    const response = await fetch('/api/push/send', {
+    if (!API_URL) {
+      throw new Error('API URL이 설정되지 않았습니다.');
+    }
+    
+    const response = await fetch(`${API_URL}/api/push/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
