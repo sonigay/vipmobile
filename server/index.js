@@ -2147,27 +2147,8 @@ app.get('/api/notifications', async (req, res) => {
   try {
     const { user_id } = req.query;
     
-    // 사용자별 알림 조회 (임시 데이터)
-    const notifications = [
-      {
-        id: 1,
-        user_id,
-        type: 'assignment_completed',
-        title: '새로운 배정 완료',
-        message: '경수님이 iPhone 15 Pro (블랙) 50대를 경인사무소 영업1팀에 배정했습니다.',
-        data: {
-          assigner: '경수',
-          model: 'iPhone 15 Pro',
-          color: '블랙',
-          quantity: 50,
-          target_office: '경인사무소',
-          target_department: '영업1팀',
-          target_agent: '김영업'
-        },
-        is_read: false,
-        created_at: new Date('2024-01-15T10:30:00')
-      }
-    ];
+    // 실제 알림 데이터는 데이터베이스에서 조회 (현재는 빈 배열)
+    const notifications = [];
     
     res.json({ success: true, notifications });
   } catch (error) {

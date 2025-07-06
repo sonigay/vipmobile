@@ -162,13 +162,45 @@ class NotificationManager {
 
   // 설정 변경 알림
   addSettingsChangedNotification(settingsData) {
-    return this.addNotification(
-      NOTIFICATION_TYPES.SETTINGS_CHANGED,
-      '배정 설정 변경',
-      '배정 비율 또는 모델 설정이 변경되었습니다.',
-      NOTIFICATION_PRIORITY.MEDIUM,
-      settingsData
-    );
+    // 배정 비율 변경 여부 확인
+    const hasRatioChanged = settingsData && settingsData.ratios && settingsData.previousRatios;
+    let message = '';
+    
+    if (hasRatioChanged) {
+      const changes = [];
+      const { ratios, previousRatios, changedBy } = settingsData;
+      
+      if (ratios.turnoverRate !== previousRatios.turnoverRate) {
+        changes.push(`회전율: ${previousRatios.turnoverRate}% → ${ratios.turnoverRate}%`);
+      }
+      if (ratios.storeCount !== previousRatios.storeCount) {
+        changes.push(`거래처수: ${previousRatios.storeCount}% → ${ratios.storeCount}%`);
+      }
+      if (ratios.remainingInventory !== previousRatios.remainingInventory) {
+        changes.push(`잔여재고: ${previousRatios.remainingInventory}% → ${ratios.remainingInventory}%`);
+      }
+      if (ratios.salesVolume !== previousRatios.salesVolume) {
+        changes.push(`판매량: ${previousRatios.salesVolume}% → ${ratios.salesVolume}%`);
+      }
+      
+      if (changes.length > 0) {
+        const userName = changedBy || '시스템';
+        message = `${userName}님이 배정 비율을 다음과 같이 변경했습니다:\n${changes.join('\n')}`;
+      }
+    }
+    
+    // 배정 비율이 변경된 경우에만 알림 전송
+    if (message) {
+      return this.addNotification(
+        NOTIFICATION_TYPES.SETTINGS_CHANGED,
+        '배정 비율 변경 알림',
+        message,
+        NOTIFICATION_PRIORITY.MEDIUM,
+        settingsData
+      );
+    }
+    
+    return null; // 변경사항이 없으면 알림 전송하지 않음
   }
 
   // 시스템 공지사항 추가

@@ -43,6 +43,8 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import RealtimeDashboard from './components/RealtimeDashboard';
+import { addNotification, addAssignmentCompletedNotification, addSettingsChangedNotification } from './utils/notificationUtils';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -141,6 +143,7 @@ function App() {
   const [toastNotifications, setToastNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showRealtimeDashboard, setShowRealtimeDashboard] = useState(false);
 
   // 재고모드 접속 아이디 목록
   const INVENTORY_MODE_IDS = [
@@ -1767,6 +1770,19 @@ function App() {
                   >
                     담당개통확인
                   </Button>
+                  <Button 
+                    color="inherit" 
+                    onClick={() => setShowRealtimeDashboard(true)}
+                    sx={{ 
+                      fontSize: '0.8em',
+                      backgroundColor: showRealtimeDashboard ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.2)'
+                      }
+                    }}
+                  >
+                    실시간대시보드
+                  </Button>
                 </Box>
               )}
               
@@ -2247,6 +2263,14 @@ function App() {
           </div>
         </Box>
       ))}
+
+      {/* 실시간 대시보드 */}
+      {showRealtimeDashboard && (
+        <RealtimeDashboard
+          onClose={() => setShowRealtimeDashboard(false)}
+          data={data}
+        />
+      )}
 
       {/* 알림 시스템 */}
                     {/* 알림 시스템 제거 (재고 모드로 이동) */}

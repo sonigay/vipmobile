@@ -36,7 +36,12 @@ import {
   Divider,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -54,7 +59,10 @@ import {
   Check as CheckIcon,
   Print as PrintIcon,
   ExpandMore as ExpandMoreIcon,
-  Help as HelpIcon
+  Help as HelpIcon,
+  Share as ShareIcon,
+  Download as DownloadIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 import { calculateFullAssignment, clearAssignmentCache, getSelectedTargets } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
@@ -99,6 +107,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [previewSubTab, setPreviewSubTab] = useState(0);
+  const [showSharedSettingsDialog, setShowSharedSettingsDialog] = useState(false);
 
   // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
@@ -245,13 +254,176 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     loadData();
   }, [data]);
 
-  // 로컬 스토리지에서 설정 로드
+  // 컴포넌트 마운트 시 저장된 설정 로드
   useEffect(() => {
-    const savedSettings = localStorage.getItem('assignmentSettings');
-    if (savedSettings) {
-      setAssignmentSettings(JSON.parse(savedSettings));
-    }
+    loadSettings();
   }, []);
+
+  // 설정이 변경될 때마다 자동 저장
+  useEffect(() => {
+    // 초기 로드 시에는 저장하지 않음
+    if (assignmentSettings.ratios.turnoverRate !== 25) {
+      saveSettings();
+    }
+  }, [assignmentSettings, agents, selectedModel, selectedColor, newModel, activeTab]);
+
+  // 설정 저장 (사용자별로 로컬 스토리지에 모든 설정 저장)
+  const saveSettings = () => {
+    // 현재 로그인한 사용자 ID 가져오기
+    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    
+    // 모든 설정을 사용자별로 로컬 스토리지에 저장
+    const settingsToSave = {
+      assignmentSettings,
+      agents,
+      selectedModel,
+      selectedColor,
+      newModel,
+      activeTab
+    };
+    
+    localStorage.setItem(`assignmentSettingsData_${currentUserId}`, JSON.stringify(settingsToSave));
+    
+    // 이전 설정과 비교하여 변경사항 확인
+    const previousSettings = localStorage.getItem(`previousAssignmentSettings_${currentUserId}`);
+    if (previousSettings) {
+      try {
+        const previous = JSON.parse(previousSettings);
+        const currentRatios = assignmentSettings.ratios;
+        const previousRatios = previous.assignmentSettings?.ratios;
+        
+        // 비율 변경사항이 있는지 확인
+        if (previousRatios && (
+          currentRatios.turnoverRate !== previousRatios.turnoverRate ||
+          currentRatios.storeCount !== previousRatios.storeCount ||
+          currentRatios.remainingInventory !== previousRatios.remainingInventory ||
+          currentRatios.salesVolume !== previousRatios.salesVolume
+        )) {
+          // 비율 변경 알림 추가
+          addSettingsChangedNotification({
+            ratios: currentRatios,
+            previousRatios: previousRatios,
+            changedBy: currentUserId,
+            modelCount: Object.keys(assignmentSettings.models).length,
+            targetCount: {
+              offices: Object.keys(assignmentSettings.targets.offices).filter(key => assignmentSettings.targets.offices[key]).length,
+              departments: Object.keys(assignmentSettings.targets.departments).filter(key => assignmentSettings.targets.departments[key]).length,
+              agents: Object.keys(assignmentSettings.targets.agents).filter(key => assignmentSettings.targets.agents[key]).length
+            }
+          });
+        }
+      } catch (error) {
+        console.error('이전 설정 비교 중 오류:', error);
+      }
+    }
+    
+    // 현재 설정을 이전 설정으로 저장
+    localStorage.setItem(`previousAssignmentSettings_${currentUserId}`, JSON.stringify(settingsToSave));
+    
+    console.log(`${currentUserId} 사용자의 설정이 로컬 스토리지에 저장되었습니다.`);
+  };
+
+  // 설정 로드 (사용자별로 로컬 스토리지에서 모든 설정 복원)
+  const loadSettings = () => {
+    try {
+      // 현재 로그인한 사용자 ID 가져오기
+      const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+      
+      const savedData = localStorage.getItem(`assignmentSettingsData_${currentUserId}`);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        
+        if (parsedData.assignmentSettings) {
+          setAssignmentSettings(parsedData.assignmentSettings);
+        }
+        if (parsedData.agents) {
+          setAgents(parsedData.agents);
+        }
+        if (parsedData.selectedModel) {
+          setSelectedModel(parsedData.selectedModel);
+        }
+        if (parsedData.selectedColor) {
+          setSelectedColor(parsedData.selectedColor);
+        }
+        if (parsedData.newModel) {
+          setNewModel(parsedData.newModel);
+        }
+        if (parsedData.activeTab !== undefined) {
+          setActiveTab(parsedData.activeTab);
+        }
+        
+        console.log(`${currentUserId} 사용자의 저장된 설정을 로컬 스토리지에서 복원했습니다.`);
+      } else {
+        // 사용자별 설정이 없으면 기본값 설정
+        console.log(`${currentUserId} 사용자의 설정이 없어 기본값을 설정합니다.`);
+        setDefaultSettings();
+      }
+    } catch (error) {
+      console.error('설정 로드 중 오류:', error);
+      setDefaultSettings();
+    }
+  };
+
+  // 기본 설정 설정
+  const setDefaultSettings = () => {
+    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    
+    const defaultSettings = {
+      assignmentSettings: {
+        ratios: {
+          turnoverRate: 30,
+          storeCount: 25,
+          remainingInventory: 25,
+          salesVolume: 20
+        },
+        models: {},
+        targets: {
+          offices: {},
+          departments: {},
+          agents: {}
+        }
+      },
+      agents: [],
+      selectedModel: '',
+      selectedColor: '',
+      newModel: {
+        name: '',
+        color: '',
+        quantity: 1
+      },
+      activeTab: 0
+    };
+    
+    // 기본 설정을 사용자별로 저장
+    localStorage.setItem(`assignmentSettingsData_${currentUserId}`, JSON.stringify(defaultSettings));
+    localStorage.setItem(`previousAssignmentSettings_${currentUserId}`, JSON.stringify(defaultSettings));
+    
+    // 상태 업데이트
+    setAssignmentSettings(defaultSettings.assignmentSettings);
+    setSelectedModel(defaultSettings.selectedModel);
+    setSelectedColor(defaultSettings.selectedColor);
+    setNewModel(defaultSettings.newModel);
+    setActiveTab(defaultSettings.activeTab);
+  };
+
+  // 모든 설정 초기화 (사용자별)
+  const handleResetAllSettings = () => {
+    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    
+    if (window.confirm('모든 배정 설정을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+      // 사용자별 로컬 스토리지에서 설정 삭제
+      localStorage.removeItem(`assignmentSettingsData_${currentUserId}`);
+      localStorage.removeItem(`previousAssignmentSettings_${currentUserId}`);
+      
+      // 기본 설정으로 초기화
+      setDefaultSettings();
+      
+      // 담당자 데이터는 서버에서 다시 로드
+      loadData();
+      
+      alert('모든 배정 설정이 초기화되었습니다.');
+    }
+  };
 
   // 담당자 데이터가 로드되면 배정 대상 초기화 (사무실과 소속이 있는 담당자만)
   useEffect(() => {
@@ -302,22 +474,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       });
     }
   }, [agents]);
-
-  // 설정 저장
-  const saveSettings = () => {
-    localStorage.setItem('assignmentSettings', JSON.stringify(assignmentSettings));
-    
-    // 설정 변경 알림 추가
-    addSettingsChangedNotification({
-      ratios: assignmentSettings.ratios,
-      modelCount: Object.keys(assignmentSettings.models).length,
-      targetCount: {
-        offices: Object.keys(assignmentSettings.targets.offices).filter(key => assignmentSettings.targets.offices[key]).length,
-        departments: Object.keys(assignmentSettings.targets.departments).filter(key => assignmentSettings.targets.departments[key]).length,
-        agents: Object.keys(assignmentSettings.targets.agents).filter(key => assignmentSettings.targets.agents[key]).length
-      }
-    });
-  };
 
   // 배정 미리보기
   const handlePreviewAssignment = async () => {
@@ -380,17 +536,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       setPreviewData(preview);
       
-      // 배정 완료 알림 추가
-      const totalAgents = Object.keys(preview.agents).length;
-      const totalQuantity = Object.values(preview.agents).reduce((sum, agent) => sum + (agent.quantity || 0), 0);
-      const models = Object.keys(assignmentSettings.models);
-      
-      addAssignmentCompletedNotification({
-        totalAgents,
-        totalQuantity,
-        models,
-        preview
-      });
+      // 미리보기에서는 알림을 전송하지 않음 (실제 배정 확정 시에만 전송)
       
       setProgress(100);
       setProgressMessage('배정 계산이 완료되었습니다!');
@@ -1064,6 +1210,60 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     }, 500);
   };
 
+  // 사용자별 설정 공유 기능
+  const handleShareSettings = () => {
+    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    const currentSettings = assignmentSettings;
+    
+    // 공유할 설정 정보 생성
+    const shareData = {
+      sharedBy: currentUserId,
+      timestamp: new Date().toISOString(),
+      ratios: currentSettings.ratios,
+      modelCount: Object.keys(currentSettings.models).length,
+      targetCount: {
+        offices: Object.keys(currentSettings.targets.offices).filter(key => currentSettings.targets.offices[key]).length,
+        departments: Object.keys(currentSettings.targets.departments).filter(key => currentSettings.targets.departments[key]).length,
+        agents: Object.keys(currentSettings.targets.agents).filter(key => currentSettings.targets.agents[key]).length
+      }
+    };
+    
+    // 공유 설정을 로컬 스토리지에 저장 (다른 사용자들이 볼 수 있도록)
+    const sharedSettings = JSON.parse(localStorage.getItem('sharedAssignmentSettings') || '[]');
+    sharedSettings.unshift(shareData);
+    
+    // 최대 10개까지만 유지
+    if (sharedSettings.length > 10) {
+      sharedSettings.splice(10);
+    }
+    
+    localStorage.setItem('sharedAssignmentSettings', JSON.stringify(sharedSettings));
+    
+    // 공유 알림 추가
+    addSettingsChangedNotification({
+      ratios: currentSettings.ratios,
+      sharedBy: currentUserId,
+      isShared: true,
+      modelCount: shareData.modelCount,
+      targetCount: shareData.targetCount
+    });
+    
+    alert('배정 비율 설정이 공유되었습니다. 다른 사용자들이 알림센터에서 확인할 수 있습니다.');
+  };
+
+  // 공유된 설정 불러오기
+  const handleLoadSharedSettings = () => {
+    const sharedSettings = JSON.parse(localStorage.getItem('sharedAssignmentSettings') || '[]');
+    
+    if (sharedSettings.length === 0) {
+      alert('공유된 설정이 없습니다.');
+      return;
+    }
+    
+    // 공유 설정 목록 다이얼로그 열기
+    setShowSharedSettingsDialog(true);
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 */}
@@ -1076,6 +1276,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             배정셋팅
           </Typography>
+          <Button 
+            color="inherit" 
+            onClick={handleResetAllSettings}
+            sx={{ mr: 2 }}
+            title="모든 배정 설정 초기화"
+          >
+            설정 초기화
+          </Button>
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
@@ -1101,7 +1309,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             sx={{ mx: 1 }}
             title="키보드 단축키: 2"
           >
-            미리보기
+            배정확정으로가기
           </Button>
           <Button
             variant={activeTab === 2 ? 'contained' : 'text'}
@@ -1116,7 +1324,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           {/* 키보드 단축키 안내 */}
           <Box sx={{ ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              단축키: Ctrl+S(저장) | Ctrl+P(미리보기) | Ctrl+R(캐시정리) | 1,2,3(탭전환)
+              단축키: Ctrl+S(저장) | Ctrl+P(배정준비) | Ctrl+R(캐시정리) | 1,2,3(탭전환)
             </Typography>
           </Box>
         </Box>
@@ -1277,6 +1485,28 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     sx={{ mb: 3 }}
                   />
                   
+                  {/* 설정 공유 버튼들 */}
+                  <Box sx={{ mt: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleShareSettings}
+                      startIcon={<ShareIcon />}
+                      sx={{ borderRadius: 1 }}
+                    >
+                      설정 공유
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleLoadSharedSettings}
+                      startIcon={<DownloadIcon />}
+                      sx={{ borderRadius: 1 }}
+                    >
+                      공유 설정 불러오기
+                    </Button>
+                  </Box>
+                  
                   {/* 진행률 표시 */}
                   {isLoadingPreview && (
                     <Box sx={{ mt: 2 }}>
@@ -1312,7 +1542,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       disabled={isLoadingPreview}
                       sx={{ flex: 1 }}
                     >
-                      {isLoadingPreview ? '계산중...' : '배정 미리보기'}
+                      {isLoadingPreview ? '계산중...' : '배정 준비하기'}
                     </Button>
                   </Box>
 
@@ -1592,7 +1822,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     startIcon={<PreviewIcon />}
                     disabled={isLoadingPreview}
                   >
-                    {isLoadingPreview ? '계산중...' : '배정 미리보기 실행'}
+                    {isLoadingPreview ? '계산중...' : '배정 준비하기'}
                   </Button>
                 </CardContent>
               </Card>
@@ -2289,6 +2519,97 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             startIcon={<AddIcon />}
           >
             모델 추가
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 공유 설정 목록 다이얼로그 */}
+      <Dialog
+        open={showSharedSettingsDialog}
+        onClose={() => setShowSharedSettingsDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ShareIcon color="primary" />
+            <Typography variant="h6">공유된 배정 설정 목록</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            {(() => {
+              const sharedSettings = JSON.parse(localStorage.getItem('sharedAssignmentSettings') || '[]');
+              
+              if (sharedSettings.length === 0) {
+                return (
+                  <Alert severity="info">
+                    공유된 배정 설정이 없습니다.
+                  </Alert>
+                );
+              }
+              
+              return (
+                <List>
+                  {sharedSettings.map((setting, index) => (
+                    <ListItem key={index} divider>
+                      <ListItemIcon>
+                        <PersonIcon color="primary" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                              {setting.sharedBy}님이 공유한 설정
+                            </Typography>
+                            <Chip 
+                              label={new Date(setting.timestamp).toLocaleString('ko-KR')} 
+                              size="small" 
+                              variant="outlined"
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box>
+                            <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                              <Chip label={`회전율: ${setting.ratios.turnoverRate}%`} size="small" color="primary" />
+                              <Chip label={`거래처수: ${setting.ratios.storeCount}%`} size="small" color="secondary" />
+                              <Chip label={`잔여재고: ${setting.ratios.remainingInventory}%`} size="small" color="warning" />
+                              <Chip label={`판매량: ${setting.ratios.salesVolume}%`} size="small" color="info" />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              모델: {setting.modelCount}개 | 사무실: {setting.targetCount.offices}개 | 
+                              소속: {setting.targetCount.departments}개 | 영업사원: {setting.targetCount.agents}명
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                      <ListItemSecondaryAction>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            setAssignmentSettings(prev => ({
+                              ...prev,
+                              ratios: setting.ratios
+                            }));
+                            setShowSharedSettingsDialog(false);
+                            alert('공유된 배정 비율이 적용되었습니다.');
+                          }}
+                        >
+                          적용
+                        </Button>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              );
+            })()}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSharedSettingsDialog(false)}>
+            닫기
           </Button>
         </DialogActions>
       </Dialog>

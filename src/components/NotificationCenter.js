@@ -236,12 +236,16 @@ function NotificationCenter({ open, onClose }) {
         open={open}
         onClose={onClose}
         PaperProps={{
-          sx: { width: 400 }
+          sx: { 
+            width: 450,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)'
+          }
         }}
       >
-        <AppBar position="static">
-          <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+        <AppBar position="static" elevation={0}>
+          <Toolbar sx={{ backgroundColor: '#1976d2' }}>
+            <NotificationsIcon sx={{ mr: 1 }} />
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
               알림 센터
             </Typography>
             <IconButton color="inherit" onClick={onClose}>
@@ -250,53 +254,79 @@ function NotificationCenter({ open, onClose }) {
           </Toolbar>
         </AppBar>
 
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ p: 3, height: 'calc(100vh - 64px)', overflow: 'auto' }}>
           {/* 통계 정보 */}
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
               알림 통계
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Chip label={`전체: ${stats.total}`} variant="outlined" />
-              <Chip label={`읽지 않음: ${stats.unread}`} color="primary" />
-              <Chip label={`아카이브: ${stats.archived}`} variant="outlined" />
+              <Chip 
+                label={`전체: ${stats.total}`} 
+                variant="outlined" 
+                sx={{ borderRadius: 1 }}
+              />
+              <Chip 
+                label={`읽지 않음: ${stats.unread}`} 
+                color="primary"
+                sx={{ borderRadius: 1 }}
+              />
+              <Chip 
+                label={`아카이브: ${stats.archived}`} 
+                variant="outlined"
+                sx={{ borderRadius: 1 }}
+              />
             </Box>
           </Paper>
 
           {/* 탭 */}
-          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
-            <Tab label="알림" />
-            <Tab label="공지사항" />
-            <Tab label="설정" />
-          </Tabs>
+          <Paper sx={{ mb: 3, borderRadius: 2 }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(e, newValue) => setActiveTab(newValue)} 
+              sx={{ 
+                '& .MuiTab-root': {
+                  fontWeight: 'bold',
+                  textTransform: 'none',
+                  fontSize: '0.9rem'
+                }
+              }}
+            >
+              <Tab label="알림" />
+              <Tab label="공지사항" />
+              <Tab label="설정" />
+            </Tabs>
+          </Paper>
 
           {/* 알림 탭 */}
           {activeTab === 0 && (
             <Box>
               {/* 필터 */}
-              <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
+              <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
                   필터
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
                     <InputLabel>읽음 상태</InputLabel>
                     <Select
                       value={filters.read === undefined ? '' : filters.read}
                       onChange={(e) => setFilters({ ...filters, read: e.target.value === '' ? undefined : e.target.value })}
                       label="읽음 상태"
+                      sx={{ borderRadius: 1 }}
                     >
                       <MenuItem value="">전체</MenuItem>
                       <MenuItem value={false}>읽지 않음</MenuItem>
                       <MenuItem value={true}>읽음</MenuItem>
                     </Select>
                   </FormControl>
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
                     <InputLabel>타입</InputLabel>
                     <Select
                       value={filters.type}
                       onChange={(e) => setFilters({ ...filters, type: e.target.value })}
                       label="타입"
+                      sx={{ borderRadius: 1 }}
                     >
                       <MenuItem value="">전체</MenuItem>
                       <MenuItem value={NOTIFICATION_TYPES.ASSIGNMENT_COMPLETED}>배정 완료</MenuItem>
@@ -309,11 +339,13 @@ function NotificationCenter({ open, onClose }) {
               </Paper>
 
               {/* 액션 버튼 */}
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                 <Button
                   size="small"
                   onClick={handleMarkAllAsRead}
                   disabled={stats.unread === 0}
+                  variant="outlined"
+                  sx={{ borderRadius: 1 }}
                 >
                   모두 읽음
                 </Button>
@@ -322,6 +354,8 @@ function NotificationCenter({ open, onClose }) {
                   onClick={handleClearAllNotifications}
                   disabled={notifications.length === 0}
                   color="error"
+                  variant="outlined"
+                  sx={{ borderRadius: 1 }}
                 >
                   모두 삭제
                 </Button>
@@ -338,59 +372,104 @@ function NotificationCenter({ open, onClose }) {
                   </ListItem>
                 ) : (
                   notifications.map((notification) => (
-                    <ListItem key={notification.id} divider>
-                      <ListItemIcon>
+                    <ListItem 
+                      key={notification.id} 
+                      divider
+                      sx={{
+                        alignItems: 'flex-start',
+                        py: 2,
+                        '&:hover': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                        }
+                      }}
+                    >
+                      <ListItemIcon sx={{ mt: 0.5, minWidth: 40 }}>
                         {getNotificationIcon(notification.type, notification.priority)}
                       </ListItemIcon>
                       <ListItemText
                         primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle2">
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Typography 
+                              variant="subtitle2" 
+                              sx={{ 
+                                fontWeight: notification.read ? 'normal' : 'bold',
+                                color: notification.read ? 'text.primary' : 'primary.main'
+                              }}
+                            >
                               {notification.title}
                             </Typography>
                             <Chip
                               label={notification.priority}
                               size="small"
                               color={getPriorityColor(notification.priority)}
+                              sx={{ height: 20, fontSize: '0.7rem' }}
                             />
                             {!notification.read && (
-                              <Chip label="새" size="small" color="primary" />
+                              <Chip 
+                                label="새" 
+                                size="small" 
+                                color="primary"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
                             )}
                           </Box>
                         }
                         secondary={
                           <Box>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography 
+                              variant="body2" 
+                              color="text.secondary"
+                              sx={{ 
+                                mb: 1,
+                                lineHeight: 1.4,
+                                wordBreak: 'break-word'
+                              }}
+                            >
                               {notification.message}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary"
+                              sx={{ fontSize: '0.75rem' }}
+                            >
                               {formatDate(notification.timestamp)}
                             </Typography>
                           </Box>
                         }
                       />
-                      <ListItemSecondaryAction>
+                      <ListItemSecondaryAction sx={{ top: '50%', transform: 'translateY(-50%)' }}>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           {!notification.read && (
                             <IconButton
                               size="small"
                               onClick={() => handleMarkAsRead(notification.id)}
+                              sx={{ 
+                                color: 'success.main',
+                                '&:hover': { backgroundColor: 'success.light', color: 'white' }
+                              }}
                             >
-                              <CheckCircleIcon />
+                              <CheckCircleIcon fontSize="small" />
                             </IconButton>
                           )}
                           <IconButton
                             size="small"
                             onClick={() => handleArchive(notification.id)}
+                            sx={{ 
+                              color: 'info.main',
+                              '&:hover': { backgroundColor: 'info.light', color: 'white' }
+                            }}
                           >
-                            <ArchiveIcon />
+                            <ArchiveIcon fontSize="small" />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteNotification(notification.id)}
-                            color="error"
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': { backgroundColor: 'error.light', color: 'white' }
+                            }}
                           >
-                            <DeleteIcon />
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </ListItemSecondaryAction>
@@ -427,49 +506,82 @@ function NotificationCenter({ open, onClose }) {
                   </ListItem>
                 ) : (
                   announcements.map((announcement) => (
-                    <ListItem key={announcement.id} divider>
-                      <ListItemIcon>
+                    <ListItem 
+                      key={announcement.id} 
+                      divider
+                      sx={{
+                        alignItems: 'flex-start',
+                        py: 2,
+                        '&:hover': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                        }
+                      }}
+                    >
+                      <ListItemIcon sx={{ mt: 0.5, minWidth: 40 }}>
                         <AnnouncementIcon color="primary" />
                       </ListItemIcon>
                       <ListItemText
                         primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle2">
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Typography 
+                              variant="subtitle2"
+                              sx={{ fontWeight: 'bold', color: 'primary.main' }}
+                            >
                               {announcement.title}
                             </Typography>
                             <Chip
                               label={announcement.priority}
                               size="small"
                               color={getPriorityColor(announcement.priority)}
+                              sx={{ height: 20, fontSize: '0.7rem' }}
                             />
                           </Box>
                         }
                         secondary={
                           <Box>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography 
+                              variant="body2" 
+                              color="text.secondary"
+                              sx={{ 
+                                mb: 1,
+                                lineHeight: 1.4,
+                                wordBreak: 'break-word'
+                              }}
+                            >
                               {announcement.content}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary"
+                              sx={{ fontSize: '0.75rem' }}
+                            >
                               {formatDate(announcement.timestamp)}
                               {announcement.expiresAt && ` • 만료: ${formatDate(announcement.expiresAt)}`}
                             </Typography>
                           </Box>
                         }
                       />
-                      <ListItemSecondaryAction>
+                      <ListItemSecondaryAction sx={{ top: '50%', transform: 'translateY(-50%)' }}>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton
                             size="small"
                             onClick={() => handleDeactivateAnnouncement(announcement.id)}
+                            sx={{ 
+                              color: 'warning.main',
+                              '&:hover': { backgroundColor: 'warning.light', color: 'white' }
+                            }}
                           >
-                            <CloseIcon />
+                            <CloseIcon fontSize="small" />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteAnnouncement(announcement.id)}
-                            color="error"
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': { backgroundColor: 'error.light', color: 'white' }
+                            }}
                           >
-                            <DeleteIcon />
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </ListItemSecondaryAction>
