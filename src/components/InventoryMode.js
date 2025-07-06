@@ -61,6 +61,16 @@ import {
 import { fetchData } from '../api';
 import UpdateProgressPopup from './UpdateProgressPopup';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+import NotificationButton from './NotificationButton';
+import AnnouncementBanner from './AnnouncementBanner';
+import { notificationManager } from '../utils/notificationUtils';
+import { 
+  mobileOptimizationManager, 
+  applyMobileOptimizations, 
+  optimizeMobileNavigation, 
+  optimizePerformance,
+  isMobile 
+} from '../utils/mobileUtils';
 
 // 지연 로딩 컴포넌트들
 const InventoryAuditScreen = lazy(() => import('./screens/InventoryAuditScreen'));
@@ -113,6 +123,8 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
   const [tabValue, setTabValue] = useState(0);
   // 업데이트 진행 팝업 상태
   const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+  // 알림 시스템 및 모바일 최적화 초기화 상태
+  const [notificationInitialized, setNotificationInitialized] = useState(false);
 
   // 데이터 로딩 (메모이제이션 적용)
   const loadData = useCallback(async () => {
@@ -166,6 +178,26 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
       });
     }
   }, []);
+
+  // 알림 시스템 및 모바일 최적화 초기화
+  useEffect(() => {
+    if (!notificationInitialized) {
+      // 알림 권한 요청
+      notificationManager.requestNotificationPermission();
+      
+      // 오래된 알림 및 공지사항 정리
+      notificationManager.cleanupOldNotifications();
+      notificationManager.cleanupExpiredAnnouncements();
+      
+      // 모바일 최적화 적용
+      applyMobileOptimizations();
+      optimizeMobileNavigation();
+      optimizePerformance();
+      
+      // 초기화 완료
+      setNotificationInitialized(true);
+    }
+  }, [notificationInitialized]);
 
   useEffect(() => {
     loadData();
@@ -619,6 +651,10 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
           )}
         </Menu>
 
+        {/* 알림 시스템 */}
+        <NotificationButton />
+        <AnnouncementBanner />
+        
         {/* 메인 콘텐츠 */}
         <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
           {/* 검색 및 필터 */}
@@ -1066,6 +1102,10 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
           </Toolbar>
         </AppBar>
         
+        {/* 알림 시스템 */}
+        <NotificationButton />
+        <AnnouncementBanner />
+        
         <LoadingSkeleton />
       </Box>
     );
@@ -1186,6 +1226,10 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
           </Button>
         </Toolbar>
       </AppBar>
+      
+      {/* 알림 시스템 */}
+      <NotificationButton />
+      <AnnouncementBanner />
       
       <Box sx={{ flex: 1, p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <Typography variant="h4" color="text.secondary">

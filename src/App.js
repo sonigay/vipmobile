@@ -7,10 +7,7 @@ import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
-import AssignmentSettingsScreen from './components/screens/AssignmentSettingsScreen';
-import DepartmentAssignmentScreen from './components/screens/DepartmentAssignmentScreen';
-import OfficeAssignmentScreen from './components/screens/OfficeAssignmentScreen';
-import SalesAgentAssignmentScreen from './components/screens/SalesAgentAssignmentScreen';
+// 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
 import { calculateDistance } from './utils/distanceUtils';
 import { 
@@ -27,16 +24,8 @@ import UpdatePopup from './components/UpdatePopup';
 import UpdateProgressPopup from './components/UpdateProgressPopup';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
-import NotificationButton from './components/NotificationButton';
-import AnnouncementBanner from './components/AnnouncementBanner';
-import { notificationManager } from './utils/notificationUtils';
-import { 
-  mobileOptimizationManager, 
-  applyMobileOptimizations, 
-  optimizeMobileNavigation, 
-  optimizePerformance,
-  isMobile 
-} from './utils/mobileUtils';
+// 알림 시스템 관련 import 제거 (재고 모드로 이동)
+// 모바일 최적화 관련 import 제거 (재고 모드로 이동)
 // 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
 import './mobile.css';
 
@@ -102,8 +91,7 @@ function App() {
   // 재고모드 관련 상태 추가
   const [isInventoryMode, setIsInventoryMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
-  const [isAssignmentMode, setIsAssignmentMode] = useState(false);
-  const [assignmentScreen, setAssignmentScreen] = useState(null); // 'settings' | 'department' | 'office' | 'sales'
+  // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
   // 재고요청점 검색 관련 상태 추가
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,38 +124,9 @@ function App() {
   // 재고모드 ID 목록
   const INVENTORY_MODE_IDS = ["JEGO306891", "JEGO315835", "JEGO314942", "JEGO316558", "JEGO316254"];
   
-  // 알림 시스템 및 모바일 최적화 초기화
-  useEffect(() => {
-    if (!notificationInitialized) {
-      // 알림 권한 요청
-      notificationManager.requestNotificationPermission();
-      
-      // 오래된 알림 및 공지사항 정리
-      notificationManager.cleanupOldNotifications();
-      notificationManager.cleanupExpiredAnnouncements();
-      
-      // 모바일 최적화 적용
-      applyMobileOptimizations();
-      optimizeMobileNavigation();
-      optimizePerformance();
-      
-      // 초기화 완료
-      setNotificationInitialized(true);
-    }
-  }, [notificationInitialized]);
+  // 알림 시스템 및 모바일 최적화 초기화 제거 (재고 모드로 이동)
 
-  // 재고배정 모드 핸들러
-  const handleAssignmentMode = (screen) => {
-    setIsAssignmentMode(true);
-    setAssignmentScreen(screen);
-    setCurrentView('assignment');
-  };
-  
-  const handleAssignmentBack = () => {
-    setIsAssignmentMode(false);
-    setAssignmentScreen(null);
-    setCurrentView('all');
-  };
+  // 배정 모드 핸들러 제거 (재고 모드로 이동)
 
   // 실시간 대시보드 모드 핸들러 제거 (재고 모드로 이동)
 
@@ -1501,22 +1460,7 @@ function App() {
     );
   }
 
-  // 재고배정 모드일 때는 별도 화면 렌더링
-  if (isAssignmentMode && assignmentScreen) {
-    const assignmentScreens = {
-      settings: <AssignmentSettingsScreen data={data?.stores} onBack={handleAssignmentBack} onLogout={handleLogout} />,
-      department: <DepartmentAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
-      office: <OfficeAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />,
-      sales: <SalesAgentAssignmentScreen onBack={handleAssignmentBack} onLogout={handleLogout} />
-    };
-
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {assignmentScreens[assignmentScreen]}
-      </ThemeProvider>
-    );
-  }
+  // 배정 모드 제거 (재고 모드로 이동)
 
   // 실시간 대시보드 모드 제거 (재고 모드로 이동)
 
@@ -2128,8 +2072,7 @@ function App() {
       />
 
       {/* 알림 시스템 */}
-      {isLoggedIn && <NotificationButton />}
-      <AnnouncementBanner />
+                    {/* 알림 시스템 제거 (재고 모드로 이동) */}
     </ThemeProvider>
   );
 }
