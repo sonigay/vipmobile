@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Switch, FormControlLabel, Alert } from '@mui/material';
-import { Update as UpdateIcon, Person as PersonIcon, Notifications as NotificationsIcon, NotificationsOff as NotificationsOffIcon, Logout as LogoutIcon } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Switch, FormControlLabel, Alert, Menu, MenuItem } from '@mui/material';
+import { 
+  Update as UpdateIcon, 
+  Person as PersonIcon, 
+  Notifications as NotificationsIcon, 
+  NotificationsOff as NotificationsOffIcon, 
+  Logout as LogoutIcon,
+  Inventory as InventoryIcon,
+  Assignment as AssignmentIcon,
+  Business as BusinessIcon,
+  MoreVert as MoreVertIcon
+} from '@mui/icons-material';
 import { 
   subscribeToPushNotifications, 
   unsubscribeFromPushNotifications, 
@@ -10,13 +20,14 @@ import {
   sendTestPushNotification
 } from '../utils/pushNotificationUtils';
 
-function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore }) {
+function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
   // 푸시 알림 상태 초기화
   useEffect(() => {
@@ -125,6 +136,22 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
     }
   };
 
+  // 메뉴 핸들러
+  const handleMenuOpen = (event) => {
+    setMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
+
+  const handleViewChange = (view) => {
+    if (onViewChange) {
+      onViewChange(view);
+    }
+    handleMenuClose();
+  };
+
   return (
     <AppBar position="static">
       <Toolbar>
@@ -185,6 +212,20 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
             >
               업데이트 확인
             </Button>
+          )}
+          
+          {/* 관리자모드 메뉴 */}
+          {isAgentMode && (
+            <IconButton
+              color="inherit"
+              onClick={handleMenuOpen}
+              sx={{ 
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 1
+              }}
+            >
+              <MoreVertIcon />
+            </IconButton>
           )}
           
           {/* 로그아웃 버튼 */}
@@ -270,6 +311,34 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 관리자모드 메뉴 */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={() => handleViewChange('all')}>
+          <InventoryIcon sx={{ mr: 1 }} />
+          전체재고확인
+        </MenuItem>
+        <MenuItem onClick={() => handleViewChange('assigned')}>
+          <AssignmentIcon sx={{ mr: 1 }} />
+          담당재고확인
+        </MenuItem>
+        <MenuItem onClick={() => handleViewChange('activation')}>
+          <BusinessIcon sx={{ mr: 1 }} />
+          담당개통확인
+        </MenuItem>
+      </Menu>
     </AppBar>
   );
 }

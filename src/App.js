@@ -1638,6 +1638,9 @@ function App() {
             currentUserId={loggedInStore?.id}
             onLogout={handleLogout}
             loggedInStore={loggedInStore}
+            isAgentMode={isAgentMode}
+            currentView={currentView}
+            onViewChange={setCurrentView}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
