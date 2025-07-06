@@ -2307,6 +2307,14 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
           department: row[4] // 부서
         };
         
+        // contactId가 전화번호 형식인지 확인하고, 아니면 role과 교체
+        if (agent.contactId && !agent.contactId.match(/^\d{10,11}$/)) {
+          // contactId가 전화번호가 아니면 role과 교체
+          const temp = agent.contactId;
+          agent.contactId = agent.role;
+          agent.role = temp;
+        }
+        
         console.log(`담당자 데이터 파싱 ${index + 1}:`, agent);
         return agent;
       }).filter(agent => agent.target && agent.contactId);
@@ -2434,8 +2442,12 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
     agentsCount: agents?.length || 0
   });
   
-  // 사용자 정보에서 소속 확인
-  const userAgent = agents.find(agent => agent.contactId === userId);
+  // 사용자 정보에서 소속 확인 (contactId 또는 role로 매칭)
+  let userAgent = agents.find(agent => agent.contactId === userId);
+  if (!userAgent) {
+    // contactId로 찾지 못하면 role로 찾기
+    userAgent = agents.find(agent => agent.role === userId);
+  }
   if (!userAgent) {
     console.log(`사용자 ${userId}의 정보를 찾을 수 없음`);
     return false;
