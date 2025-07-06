@@ -2152,6 +2152,13 @@ app.post('/api/assignment/complete', async (req, res) => {
         timestamp: new Date()
       };
       
+      console.log('알림 전송 시작:', {
+        notification,
+        targetOffices: target_offices,
+        targetDepartments: target_departments,
+        targetAgents: target_agents
+      });
+      
       // 대상자 필터링하여 알림 전송
       await sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
     } else {
@@ -2257,7 +2264,7 @@ function sendNotificationToAllAgents(notification) {
 
 // 배정 대상자에게만 알림 전송하는 함수
 async function sendNotificationToTargetAgents(notification, targetOffices, targetDepartments, targetAgents) {
-  console.log('배정 대상자에게만 알림 전송:', {
+  console.log('배정 대상자에게만 알림 전송 시작:', {
     notification,
     targetOffices,
     targetDepartments,
@@ -2272,14 +2279,26 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     const agentSheetName = '담당자';
     const agentData = await getSheetValues(agentSheetName);
     
+    console.log('담당자 시트 데이터 로드 결과:', {
+      hasData: !!agentData,
+      dataLength: agentData?.length || 0,
+      firstRow: agentData?.[0],
+      secondRow: agentData?.[1]
+    });
+    
     if (agentData && agentData.length > 1) {
       // 헤더 제외하고 데이터 파싱
-      agents = agentData.slice(1).map(row => ({
-        target: row[0], // 담당자명
-        contactId: row[1], // 연락처 ID
-        office: row[2], // 사무실
-        department: row[3] // 부서
-      })).filter(agent => agent.target && agent.contactId);
+      agents = agentData.slice(1).map((row, index) => {
+        const agent = {
+          target: row[0], // 담당자명
+          contactId: row[1], // 연락처 ID
+          office: row[2], // 사무실
+          department: row[3] // 부서
+        };
+        
+        console.log(`담당자 데이터 파싱 ${index + 1}:`, agent);
+        return agent;
+      }).filter(agent => agent.target && agent.contactId);
       
       console.log(`담당자 데이터 로드 완료: ${agents.length}명`);
     } else {
@@ -2291,13 +2310,26 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
   
   console.log('사용 가능한 담당자 목록:', agents.map(a => `${a.target}(${a.contactId}) - ${a.office} ${a.department}`));
   
+  // 배정 대상자 필터링
+  const targetAgentsList = agents.filter(agent => 
+    isTargetAgent(agent.contactId, targetOffices, targetDepartments, targetAgents, agents)
+  );
+  
+  console.log('배정 대상자 필터링 결과:', {
+    totalAgents: agents.length,
+    targetAgentsCount: targetAgentsList.length,
+    targetAgents: targetAgentsList.map(a => `${a.target}(${a.contactId})`)
+  });
+  
   // SSE 실시간 알림 전송
+  let sseSentCount = 0;
   connectedClients.forEach((client, clientId) => {
     try {
       // 클라이언트가 배정 대상자인지 확인
       if (isTargetAgent(client.user_id, targetOffices, targetDepartments, targetAgents, agents)) {
         client.res.write(`data: ${JSON.stringify(notification)}\n\n`);
         console.log(`SSE 알림 전송 완료: 클라이언트 ${clientId} (${client.user_id})`);
+        sseSentCount++;
         
         // 푸시 알림도 함께 전송
         sendPushNotificationToUser(client.user_id, notification);
@@ -2311,20 +2343,32 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
   });
   
   // 오프라인 사용자를 위한 푸시 알림 전송
-  agents.forEach(agent => {
-    if (isTargetAgent(agent.contactId, targetOffices, targetDepartments, targetAgents, agents)) {
-      // 현재 온라인 상태가 아닌 사용자에게만 푸시 알림 전송
-      const isOnline = Array.from(connectedClients.values()).some(client => client.user_id === agent.contactId);
-      if (!isOnline) {
-        sendPushNotificationToUser(agent.contactId, notification);
-      }
+  let pushSentCount = 0;
+  targetAgentsList.forEach(agent => {
+    // 현재 온라인 상태가 아닌 사용자에게만 푸시 알림 전송
+    const isOnline = Array.from(connectedClients.values()).some(client => client.user_id === agent.contactId);
+    if (!isOnline) {
+      sendPushNotificationToUser(agent.contactId, notification);
+      pushSentCount++;
     }
+  });
+  
+  console.log('알림 전송 완료 요약:', {
+    sseSentCount,
+    pushSentCount,
+    totalSent: sseSentCount + pushSentCount
   });
 }
 
 // 푸시 알림 전송 함수
 async function sendPushNotificationToUser(userId, notification) {
   try {
+    console.log(`푸시 알림 전송 시도: ${userId}`, {
+      hasSubscription: pushSubscriptions.has(userId),
+      notificationTitle: notification.title,
+      notificationMessage: notification.message
+    });
+    
     const subscription = pushSubscriptions.get(userId);
     if (!subscription) {
       console.log(`사용자 ${userId}의 푸시 구독이 없습니다.`);
@@ -2344,6 +2388,8 @@ async function sendPushNotificationToUser(userId, notification) {
       }
     });
     
+    console.log(`푸시 알림 페이로드:`, payload);
+    
     await webpush.sendNotification(subscription, payload);
     console.log(`푸시 알림 전송 완료: ${userId}`);
   } catch (error) {
@@ -2359,6 +2405,14 @@ async function sendPushNotificationToUser(userId, notification) {
 
 // 대상자 확인 함수
 function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, agents) {
+  console.log('대상자 확인 함수 호출:', {
+    userId,
+    targetOffices,
+    targetDepartments,
+    targetAgents,
+    agentsCount: agents?.length || 0
+  });
+  
   // 사용자 정보에서 소속 확인
   const userAgent = agents.find(agent => agent.contactId === userId);
   if (!userAgent) {
@@ -2369,18 +2423,30 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   console.log(`사용자 ${userId} 정보:`, userAgent);
   console.log(`배정 대상자:`, { targetOffices, targetDepartments, targetAgents });
   
+  // 빈 배열이거나 undefined인 경우 처리
+  const offices = Array.isArray(targetOffices) ? targetOffices : [];
+  const departments = Array.isArray(targetDepartments) ? targetDepartments : [];
+  const agents = Array.isArray(targetAgents) ? targetAgents : [];
+  
   // 전체 배정인 경우 모든 관리자모드 접속자에게 전송
-  if (targetOffices.includes('전체') || targetDepartments.includes('전체') || targetAgents.includes('전체')) {
+  if (offices.includes('전체') || departments.includes('전체') || agents.includes('전체')) {
     console.log(`전체 배정이므로 ${userId}에게 알림 전송`);
     return true;
   }
   
   // 특정 대상자 배정인 경우 해당 대상자만 확인
-  const isTarget = targetOffices.includes(userAgent.office) || 
-                   targetDepartments.includes(userAgent.department) || 
-                   targetAgents.includes(userAgent.target);
+  const isTarget = offices.includes(userAgent.office) || 
+                   departments.includes(userAgent.department) || 
+                   agents.includes(userAgent.target) ||
+                   agents.includes(userAgent.contactId);
   
-  console.log(`${userId} 대상자 여부:`, isTarget);
+  console.log(`${userId} 대상자 여부:`, isTarget, {
+    officeMatch: offices.includes(userAgent.office),
+    departmentMatch: departments.includes(userAgent.department),
+    targetMatch: agents.includes(userAgent.target),
+    contactIdMatch: agents.includes(userAgent.contactId)
+  });
+  
   return isTarget;
 }
 
@@ -2397,6 +2463,12 @@ app.post('/api/push/subscribe', async (req, res) => {
   try {
     const { subscription, userId } = req.body;
     
+    console.log('푸시 구독 등록 요청:', {
+      hasSubscription: !!subscription,
+      userId,
+      subscriptionKeys: subscription ? Object.keys(subscription) : []
+    });
+    
     if (!subscription || !userId) {
       return res.status(400).json({ 
         success: false, 
@@ -2406,7 +2478,13 @@ app.post('/api/push/subscribe', async (req, res) => {
     
     // 구독 정보 저장
     pushSubscriptions.set(userId, subscription);
-    console.log(`푸시 구독 등록: ${userId}`);
+    console.log(`푸시 구독 등록 완료: ${userId}`, {
+      totalSubscriptions: pushSubscriptions.size,
+      subscription: {
+        endpoint: subscription.endpoint,
+        keys: subscription.keys ? Object.keys(subscription.keys) : []
+      }
+    });
     
     res.json({ success: true });
   } catch (error) {
