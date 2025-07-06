@@ -963,37 +963,40 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       let targetAgents = [];
       
       if (previewData.agents) {
-        Object.entries(previewData.agents).forEach(([contactId, agent]) => {
-          console.log(`담당자 정보 확인 - contactId: ${contactId}, agent:`, agent);
+        Object.entries(previewData.agents).forEach(([contactId, agentData]) => {
+          console.log(`담당자 정보 확인 - contactId: ${contactId}, agentData:`, agentData);
           
-          // agent가 객체인 경우
-          if (typeof agent === 'object' && agent !== null) {
-            // agent 객체의 모든 키 확인
-            console.log(`agent 객체의 키들:`, Object.keys(agent));
-            
-            // department와 agentName을 찾기 위해 다양한 가능한 키 확인
-            const department = agent.department || agent.departmentName || agent.소속 || agent.부서;
-            const agentName = agent.agentName || agent.name || agent.target || agent.담당자;
-            
-            console.log(`추출된 정보 - department: ${department}, agentName: ${agentName}`);
-            
-            if (department) {
-              targetDepartments.push(department);
-              console.log(`부서 추가: ${department}`);
-            }
-            if (agentName) {
-              targetAgents.push(agentName);
-              console.log(`담당자 추가: ${agentName}`);
-            }
+          // agentData가 객체인 경우 (모델별 데이터가 들어있음)
+          if (typeof agentData === 'object' && agentData !== null) {
+            // 각 모델별 데이터에서 담당자 정보 추출
+            Object.entries(agentData).forEach(([modelName, modelData]) => {
+              console.log(`모델 ${modelName} 데이터:`, modelData);
+              
+              if (typeof modelData === 'object' && modelData !== null) {
+                const department = modelData.department || modelData.departmentName || modelData.소속 || modelData.부서;
+                const agentName = modelData.agentName || modelData.name || modelData.target || modelData.담당자;
+                
+                console.log(`모델 ${modelName}에서 추출된 정보 - department: ${department}, agentName: ${agentName}`);
+                
+                if (department && !targetDepartments.includes(department)) {
+                  targetDepartments.push(department);
+                  console.log(`부서 추가: ${department}`);
+                }
+                if (agentName && !targetAgents.includes(agentName)) {
+                  targetAgents.push(agentName);
+                  console.log(`담당자 추가: ${agentName}`);
+                }
+              }
+            });
           }
         });
       }
       
-      // 만약 여전히 비어있다면, agents 배열에서 직접 추출 시도
+      // 만약 여전히 비어있다면, 다른 구조 시도
       if (targetDepartments.length === 0 && targetAgents.length === 0) {
-        console.log('agents 객체에서 추출 실패, agents 배열에서 직접 추출 시도');
+        console.log('중첩 구조에서 추출 실패, 다른 구조 시도');
         
-        // agents 배열이 있는지 확인 (다른 구조일 가능성)
+        // agents 배열이 있는지 확인
         if (Array.isArray(previewData.agents)) {
           previewData.agents.forEach(agent => {
             if (agent.department) {
