@@ -1451,9 +1451,9 @@ function App() {
     if (selectedModel && selectedColor) {
       // 특정 모델과 색상의 재고 확인
       Object.values(store.inventory).forEach(category => {
-        if (category[selectedModel]) {
+        if (category && category[selectedModel]) {
           Object.values(category[selectedModel]).forEach(status => {
-            if (status[selectedColor]) {
+            if (status && status[selectedColor]) {
               totalInventory += status[selectedColor] || 0;
             }
           });
@@ -1462,11 +1462,13 @@ function App() {
     } else if (selectedModel) {
       // 특정 모델의 전체 재고 확인
       Object.values(store.inventory).forEach(category => {
-        if (category[selectedModel]) {
+        if (category && category[selectedModel]) {
           Object.values(category[selectedModel]).forEach(status => {
-            Object.values(status).forEach(qty => {
-              totalInventory += qty || 0;
-            });
+            if (status && typeof status === 'object') {
+              Object.values(status).forEach(qty => {
+                totalInventory += qty || 0;
+              });
+            }
           });
         }
       });
@@ -1479,7 +1481,11 @@ function App() {
               Object.values(model).forEach(status => {
                 if (typeof status === 'object' && status !== null) {
                   Object.values(status).forEach(qty => {
-                    totalInventory += qty || 0;
+                    if (typeof qty === 'number') {
+                      totalInventory += qty || 0;
+                    } else if (typeof qty === 'object' && qty && typeof qty.quantity === 'number') {
+                      totalInventory += qty.quantity || 0;
+                    }
                   });
                 }
               });
@@ -1617,7 +1623,7 @@ function App() {
                     <span style={{ fontWeight: 'bold', fontSize: '0.7em' }}>
                       {agentTarget} ({agentQualification})
                     </span>
-                    {currentView === 'assigned' && (
+                    {currentView === 'assigned' && getAgentTotalInventory() && (
                       <Box sx={{ 
                         display: 'flex', 
                         alignItems: 'center', 
@@ -1629,7 +1635,7 @@ function App() {
                         boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
                       }}>
                         <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                          총보유재고: {getAgentTotalInventory()}개
+                          총보유재고: {getAgentTotalInventory().phones + getAgentTotalInventory().wearables + getAgentTotalInventory().tablets}개
                         </span>
                       </Box>
                     )}
