@@ -1593,6 +1593,14 @@ function App() {
 
       eventSource.onerror = (error) => {
         console.error('실시간 알림 연결 오류:', error);
+        console.log('SSE 연결 상태:', eventSource.readyState);
+        // 연결이 끊어진 경우 5초 후 재연결 시도
+        setTimeout(() => {
+          if (eventSource.readyState === EventSource.CLOSED) {
+            console.log('SSE 재연결 시도...');
+            // 재연결 로직은 useEffect의 의존성 배열에 의해 자동으로 처리됨
+          }
+        }, 5000);
         eventSource.close();
       };
 

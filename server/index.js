@@ -252,8 +252,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS 설정
-app.use(cors());
+// CORS 설정 (더 구체적으로)
+app.use(cors({
+  origin: true, // 모든 origin 허용 (개발 환경)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control']
+}));
 app.use(express.json());
 
 // Google Sheets API configuration
@@ -2225,13 +2230,15 @@ const connectedClients = new Map();
 app.get('/api/notifications/stream', (req, res) => {
   const { user_id } = req.query;
   
-  // SSE 헤더 설정
+  // SSE 헤더 설정 (CORS 개선)
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
+    'Access-Control-Allow-Headers': 'Cache-Control, Content-Type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
   });
   
   // 클라이언트 연결 저장

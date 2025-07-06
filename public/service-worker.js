@@ -59,7 +59,11 @@ self.addEventListener('fetch', event => {
           if (response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseClone);
+              cache.put(event.request, responseClone).catch(error => {
+                console.log('캐시 저장 실패 (무시):', error);
+              });
+            }).catch(error => {
+              console.log('캐시 열기 실패 (무시):', error);
             });
           }
           return response;
@@ -77,7 +81,11 @@ self.addEventListener('fetch', event => {
           if (response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseClone);
+              cache.put(event.request, responseClone).catch(error => {
+                console.log('캐시 저장 실패 (무시):', error);
+              });
+            }).catch(error => {
+              console.log('캐시 열기 실패 (무시):', error);
             });
           }
           return response;
