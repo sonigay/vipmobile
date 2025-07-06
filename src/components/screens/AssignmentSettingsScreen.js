@@ -1355,7 +1355,15 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
       {/* 탭 네비게이션 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'background.paper' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          py: 1,
+          // 모바일에서 탭 버튼 크기 조정
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}>
           <Button
             variant={activeTab === 0 ? 'contained' : 'text'}
             onClick={() => setActiveTab(0)}
@@ -1385,8 +1393,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           </Button>
           
           {/* 키보드 단축키 안내 */}
-          <Box sx={{ ml: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="caption" color="text.secondary">
+          <Box sx={{ 
+            ml: { sm: 3 }, 
+            mt: { xs: 1, sm: 0 },
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1 
+          }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
               단축키: Ctrl+S(저장) | Ctrl+P(배정준비) | Ctrl+R(캐시정리) | 1,2,3(탭전환)
             </Typography>
           </Box>
@@ -1394,7 +1408,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       </Box>
 
       {/* 콘텐츠 */}
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+      <Box sx={{ 
+        flex: 1, 
+        p: 3, 
+        overflow: 'auto',
+        // 모바일에서 하단 메뉴와 겹치지 않도록 여백 추가
+        pb: { xs: 8, sm: 3 }
+      }}>
         {activeTab === 0 && (
           <Grid container spacing={3}>
           
@@ -1819,7 +1839,15 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <Grid item xs={12}>
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  mb: 2,
+                  // 모바일에서 버튼 크기 조정
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: { xs: 1, sm: 0 }
+                }}>
                   <Typography variant="h6">
                     모델 관리
                   </Typography>
@@ -1827,6 +1855,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={() => setShowModelDialog(true)}
+                    size="small"
+                    sx={{ 
+                      minWidth: { xs: '100%', sm: 'auto' },
+                      fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                    }}
                   >
                     모델 추가
                   </Button>
