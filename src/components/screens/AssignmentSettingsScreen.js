@@ -975,6 +975,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             const department = agent.department || agent.departmentName || agent.소속 || agent.부서;
             const agentName = agent.agentName || agent.name || agent.target || agent.담당자;
             
+            console.log(`추출된 정보 - department: ${department}, agentName: ${agentName}`);
+            
             if (department) {
               targetDepartments.push(department);
               console.log(`부서 추가: ${department}`);
@@ -985,6 +987,25 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             }
           }
         });
+      }
+      
+      // 만약 여전히 비어있다면, agents 배열에서 직접 추출 시도
+      if (targetDepartments.length === 0 && targetAgents.length === 0) {
+        console.log('agents 객체에서 추출 실패, agents 배열에서 직접 추출 시도');
+        
+        // agents 배열이 있는지 확인 (다른 구조일 가능성)
+        if (Array.isArray(previewData.agents)) {
+          previewData.agents.forEach(agent => {
+            if (agent.department) {
+              targetDepartments.push(agent.department);
+              console.log(`배열에서 부서 추가: ${agent.department}`);
+            }
+            if (agent.agentName || agent.name || agent.target) {
+              targetAgents.push(agent.agentName || agent.name || agent.target);
+              console.log(`배열에서 담당자 추가: ${agent.agentName || agent.name || agent.target}`);
+            }
+          });
+        }
       }
       
       // 중복 제거
