@@ -265,7 +265,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         
         offices.forEach(office => {
           if (!newSettings.targets.offices.hasOwnProperty(office)) {
-            newSettings.targets.offices[office] = true; // 기본값: 선택됨
+            newSettings.targets.offices[office] = false; // 기본값: 선택되지 않음
           }
         });
 
@@ -277,14 +277,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         
         departments.forEach(department => {
           if (!newSettings.targets.departments.hasOwnProperty(department)) {
-            newSettings.targets.departments[department] = true; // 기본값: 선택됨
+            newSettings.targets.departments[department] = false; // 기본값: 선택되지 않음
           }
         });
 
         // 영업사원별 배정 대상 초기화 (유효한 담당자만)
         validAgents.forEach(agent => {
           if (!newSettings.targets.agents.hasOwnProperty(agent.contactId)) {
-            newSettings.targets.agents[agent.contactId] = true; // 기본값: 선택됨
+            newSettings.targets.agents[agent.contactId] = false; // 기본값: 선택되지 않음
           }
         });
 
@@ -589,6 +589,20 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     });
   };
 
+  // 초기화 (모든 체크박스 해제)
+  const handleReset = (type) => {
+    setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      Object.keys(newTargets[type]).forEach(key => {
+        newTargets[type][key] = false;
+      });
+      return {
+        ...prev,
+        targets: newTargets
+      };
+    });
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 */}
@@ -874,12 +888,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         <Typography variant="subtitle1" fontWeight="bold">
                           사무실별 배정
                         </Typography>
-                        <Button
-                          size="small"
-                          onClick={() => handleSelectAll('offices', true)}
-                        >
-                          전체선택
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleReset('offices')}
+                          >
+                            초기화
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => handleSelectAll('offices', true)}
+                          >
+                            전체선택
+                          </Button>
+                        </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                         {Object.entries(assignmentSettings.targets.offices).map(([office, checked]) => (
@@ -907,12 +930,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         <Typography variant="subtitle1" fontWeight="bold">
                           소속별 배정
                         </Typography>
-                        <Button
-                          size="small"
-                          onClick={() => handleSelectAll('departments', true)}
-                        >
-                          전체선택
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleReset('departments')}
+                          >
+                            초기화
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => handleSelectAll('departments', true)}
+                          >
+                            전체선택
+                          </Button>
+                        </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                         {Object.entries(assignmentSettings.targets.departments).map(([department, checked]) => (
@@ -940,12 +972,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         <Typography variant="subtitle1" fontWeight="bold">
                           영업사원별 배정
                         </Typography>
-                        <Button
-                          size="small"
-                          onClick={() => handleSelectAll('agents', true)}
-                        >
-                          전체선택
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleReset('agents')}
+                          >
+                            초기화
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => handleSelectAll('agents', true)}
+                          >
+                            전체선택
+                          </Button>
+                        </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                         {Object.entries(assignmentSettings.targets.agents).map(([agentId, checked]) => {
