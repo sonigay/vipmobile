@@ -2311,8 +2311,4 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   
   console.log(`${userId} 대상자 여부:`, isTarget);
   return isTarget;
-}
-
-app.listen(port, () => {
-  console.log(`서버가 포트 ${port}에서 실행 중입니다.`);
-}); 
+} 
