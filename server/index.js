@@ -983,8 +983,8 @@ app.get('/api/agents', async (req, res) => {
       throw new Error('Failed to fetch data from agent sheet');
     }
 
-    // 헤더 제거
-    const agentRows = agentValues.slice(1);
+    // 헤더 제거 (3행까지가 헤더이므로 4행부터 시작)
+    const agentRows = agentValues.slice(3);
     
     // 대리점 데이터 구성
     const agents = agentRows.map(row => {

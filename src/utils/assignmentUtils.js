@@ -56,6 +56,10 @@ export const getSelectedTargets = (agents, settings) => {
   const selectedDepartments = Object.keys(targets.departments).filter(key => targets.departments[key]);
   const selectedAgentIds = Object.keys(targets.agents).filter(key => targets.agents[key]);
   
+  console.log('선택된 사무실:', selectedOffices);
+  console.log('선택된 소속:', selectedDepartments);
+  console.log('선택된 영업사원 ID:', selectedAgentIds);
+  
   // 조건에 맞는 영업사원 필터링
   const eligibleAgents = agents.filter(agent => {
     // 영업사원별 선택이 되어 있는지 확인
@@ -65,8 +69,17 @@ export const getSelectedTargets = (agents, settings) => {
     const isOfficeSelected = selectedOffices.includes(agent.office);
     const isDepartmentSelected = selectedDepartments.includes(agent.department);
     
-    return isAgentSelected && (isOfficeSelected || isDepartmentSelected);
+    // 영업사원이 선택되어 있으면 포함 (사무실/소속 선택 여부와 무관)
+    if (isAgentSelected) {
+      return true;
+    }
+    
+    // 영업사원이 선택되지 않았지만, 사무실과 소속이 모두 선택된 경우 포함
+    return isOfficeSelected && isDepartmentSelected;
   });
+  
+  console.log('배정 대상 영업사원:', eligibleAgents.length, '명');
+  console.log('배정 대상 상세:', eligibleAgents.map(a => ({ name: a.target, office: a.office, department: a.department })));
   
   return {
     selectedOffices,

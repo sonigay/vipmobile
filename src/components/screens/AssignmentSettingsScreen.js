@@ -45,7 +45,7 @@ import {
   BarChart as BarChartIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { calculateFullAssignment, clearAssignmentCache } from '../../utils/assignmentUtils';
+import { calculateFullAssignment, clearAssignmentCache, getSelectedTargets } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
 import { extractAvailableModels, getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
 import { addAssignmentCompletedNotification, addSettingsChangedNotification } from '../../utils/notificationUtils';
@@ -308,6 +308,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 배정 미리보기
   const handlePreviewAssignment = async () => {
+    console.log('배정 미리보기 시작');
+    console.log('API_BASE_URL:', API_BASE_URL);
+    console.log('agents:', agents.length);
+    console.log('assignmentSettings:', assignmentSettings);
+    
     setIsLoadingPreview(true);
     setProgress(0);
     setProgressMessage('배정 계산을 시작합니다...');
@@ -317,15 +322,45 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgress(10);
       setProgressMessage('매장 데이터를 로드하는 중...');
       
+      if (!API_BASE_URL) {
+        throw new Error('API_BASE_URL이 설정되지 않았습니다.');
+      }
+      
+      // 배정 대상 확인
+      const { eligibleAgents } = getSelectedTargets(agents, assignmentSettings);
+      console.log('선택된 배정 대상:', eligibleAgents.length, '명');
+      console.log('선택된 대상 상세:', eligibleAgents);
+      
+      if (eligibleAgents.length === 0) {
+        throw new Error('배정할 대상이 선택되지 않았습니다. 배정 설정에서 사무실, 소속, 또는 영업사원을 선택해주세요.');
+      }
+      
+      // 모델 확인
+      const modelCount = Object.keys(assignmentSettings.models).length;
+      console.log('설정된 모델 수:', modelCount);
+      
+      if (modelCount === 0) {
+        throw new Error('배정할 모델이 설정되지 않았습니다. 모델을 추가해주세요.');
+      }
+      
       // 매장 데이터 가져오기 (재고 정보용)
+      console.log('매장 데이터 요청 중:', `${API_BASE_URL}/api/data`);
       const storeResponse = await fetch(`${API_BASE_URL}/api/data`);
+      
+      if (!storeResponse.ok) {
+        throw new Error(`매장 데이터 요청 실패: ${storeResponse.status} ${storeResponse.statusText}`);
+      }
+      
       const storeData = await storeResponse.json();
+      console.log('매장 데이터 로드 완료:', storeData.stores?.length || 0, '개 매장');
       
       setProgress(30);
       setProgressMessage('개통실적 데이터를 로드하는 중...');
       
       // 새로운 배정 로직으로 계산
+      console.log('배정 계산 시작');
       const preview = await calculateFullAssignment(agents, assignmentSettings, storeData);
+      console.log('배정 계산 완료:', preview);
       
       setProgress(90);
       setProgressMessage('결과를 정리하는 중...');
@@ -355,7 +390,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       
     } catch (error) {
       console.error('배정 미리보기 실패:', error);
-      setProgressMessage('배정 계산 중 오류가 발생했습니다.');
+      console.error('에러 상세:', error.message);
+      setProgressMessage(`배정 계산 중 오류가 발생했습니다: ${error.message}`);
     } finally {
       setIsLoadingPreview(false);
     }
