@@ -155,7 +155,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           console.log('Props로 받은 데이터가 없거나 배열이 아님, API에서 가져오기 시도');
           // 데이터가 없으면 API에서 직접 가져오기
           try {
-            const storeResponse = await fetch(`${API_BASE_URL}/api/data`);
+            const storeResponse = await fetch(`${API_BASE_URL}/api/stores`);
             console.log('매장 API 응답 상태:', storeResponse.status);
             console.log('매장 API 응답 헤더:', storeResponse.headers.get('content-type'));
             
@@ -344,8 +344,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       }
       
       // 매장 데이터 가져오기 (재고 정보용)
-      console.log('매장 데이터 요청 중:', `${API_BASE_URL}/api/data`);
-      const storeResponse = await fetch(`${API_BASE_URL}/api/data`);
+      console.log('매장 데이터 요청 중:', `${API_BASE_URL}/api/stores`);
+      const storeResponse = await fetch(`${API_BASE_URL}/api/stores`);
       
       if (!storeResponse.ok) {
         throw new Error(`매장 데이터 요청 실패: ${storeResponse.status} ${storeResponse.statusText}`);
