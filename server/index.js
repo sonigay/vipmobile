@@ -2426,10 +2426,10 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   // 빈 배열이거나 undefined인 경우 처리
   const offices = Array.isArray(targetOffices) ? targetOffices : [];
   const departments = Array.isArray(targetDepartments) ? targetDepartments : [];
-  const agents = Array.isArray(targetAgents) ? targetAgents : [];
+  const targetAgentsList = Array.isArray(targetAgents) ? targetAgents : [];
   
   // 전체 배정인 경우 모든 관리자모드 접속자에게 전송
-  if (offices.includes('전체') || departments.includes('전체') || agents.includes('전체')) {
+  if (offices.includes('전체') || departments.includes('전체') || targetAgentsList.includes('전체')) {
     console.log(`전체 배정이므로 ${userId}에게 알림 전송`);
     return true;
   }
@@ -2437,14 +2437,14 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   // 특정 대상자 배정인 경우 해당 대상자만 확인
   const isTarget = offices.includes(userAgent.office) || 
                    departments.includes(userAgent.department) || 
-                   agents.includes(userAgent.target) ||
-                   agents.includes(userAgent.contactId);
+                   targetAgentsList.includes(userAgent.target) ||
+                   targetAgentsList.includes(userAgent.contactId);
   
   console.log(`${userId} 대상자 여부:`, isTarget, {
     officeMatch: offices.includes(userAgent.office),
     departmentMatch: departments.includes(userAgent.department),
-    targetMatch: agents.includes(userAgent.target),
-    contactIdMatch: agents.includes(userAgent.contactId)
+    targetMatch: targetAgentsList.includes(userAgent.target),
+    contactIdMatch: targetAgentsList.includes(userAgent.contactId)
   });
   
   return isTarget;
