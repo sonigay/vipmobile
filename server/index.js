@@ -2550,34 +2550,5 @@ app.post('/api/push/send-all', async (req, res) => {
   }
 });
 
-// 서버 시작
-const server = app.listen(port, () => {
-  console.log(`서버가 포트 ${port}에서 실행 중입니다.`);
-  console.log(`VAPID Public Key: ${vapidKeys.publicKey}`);
-}).on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.log(`서버 시작 실패: ${error.message}`);
-    console.log(`포트 ${port}가 이미 사용 중입니다. 다른 포트를 시도하거나 기존 프로세스를 종료해주세요.`);
-    process.exit(1);
-  } else {
-    console.error('서버 시작 중 오류 발생:', error);
-    process.exit(1);
-  }
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM 신호를 받았습니다. 서버를 종료합니다...');
-  server.close(() => {
-    console.log('서버가 정상적으로 종료되었습니다.');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT 신호를 받았습니다. 서버를 종료합니다...');
-  server.close(() => {
-    console.log('서버가 정상적으로 종료되었습니다.');
-    process.exit(0);
-  });
-}); 
+// 서버 시작 코드는 1866번째 줄에 이미 존재합니다.
+// 중복된 서버 시작 코드 제거 
