@@ -67,6 +67,8 @@ const UpdatePopup = ({ open, onClose, updates, onMarkAsRead }) => {
       onClose={handleClose}
       maxWidth="md"
       fullWidth
+      disableEnforceFocus
+      disableAutoFocus
       PaperProps={{
         sx: {
           borderRadius: 2,

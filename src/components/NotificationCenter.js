@@ -235,6 +235,8 @@ function NotificationCenter({ open, onClose }) {
         anchor="right"
         open={open}
         onClose={onClose}
+        disableEnforceFocus
+        disableAutoFocus
         PaperProps={{
           sx: { 
             width: 450,

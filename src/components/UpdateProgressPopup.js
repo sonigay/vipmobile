@@ -81,6 +81,8 @@ const UpdateProgressPopup = ({ open, onClose, onUpdate, isLatestVersion = false 
       maxWidth="sm"
       fullWidth
       disableEscapeKeyDown={isUpdating}
+      disableEnforceFocus
+      disableAutoFocus
       PaperProps={{
         sx: {
           borderRadius: 2,
