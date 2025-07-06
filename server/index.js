@@ -2276,7 +2276,7 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
   
   try {
     // Google Sheets에서 담당자 데이터 가져오기
-    const agentSheetName = '담당자';
+    const agentSheetName = '대리점아이디관리';
     const agentData = await getSheetValues(agentSheetName);
     
     console.log('담당자 시트 데이터 로드 결과:', {
@@ -2287,11 +2287,11 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     });
     
     if (agentData && agentData.length > 1) {
-      // 헤더 제외하고 데이터 파싱
+      // 헤더 제외하고 데이터 파싱 (대리점아이디관리 시트 구조)
       agents = agentData.slice(1).map((row, index) => {
         const agent = {
           target: row[0], // 담당자명
-          contactId: row[1], // 연락처 ID
+          contactId: row[1], // 연락처 ID (아이디)
           office: row[2], // 사무실
           department: row[3] // 부서
         };
@@ -2309,6 +2309,12 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
   }
   
   console.log('사용 가능한 담당자 목록:', agents.map(a => `${a.target}(${a.contactId}) - ${a.office} ${a.department}`));
+  console.log('현재 연결된 클라이언트:', Array.from(connectedClients.entries()).map(([id, client]) => `${id}:${client.user_id}`));
+  console.log('배정 대상자 정보:', {
+    targetOffices: targetOffices || [],
+    targetDepartments: targetDepartments || [],
+    targetAgents: targetAgents || []
+  });
   
   // 배정 대상자 필터링
   const targetAgentsList = agents.filter(agent => 
