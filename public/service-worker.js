@@ -151,16 +151,21 @@ self.addEventListener('push', event => {
   
   console.log('최종 알림 데이터:', notificationData);
   
-  // 사운드 알림 재생
+  // 사운드 알림 재생 (Service Worker에서는 Audio 객체 사용 불가)
   const playNotificationSound = () => {
     try {
-      const audio = new Audio('/sounds/notification.mp3');
-      audio.volume = 0.5; // 볼륨을 50%로 설정
-      audio.play().catch(error => {
-        console.log('사운드 재생 실패 (정상적인 경우):', error);
+      // Service Worker에서는 Audio 객체를 직접 사용할 수 없으므로
+      // 클라이언트에게 사운드 재생을 요청
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'PLAY_NOTIFICATION_SOUND',
+            soundUrl: '/sounds/notification.mp3'
+          });
+        });
       });
     } catch (error) {
-      console.log('사운드 파일 로드 실패:', error);
+      console.log('사운드 재생 요청 실패:', error);
     }
   };
   

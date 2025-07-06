@@ -774,10 +774,23 @@ function App() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {
+        console.log('Service Worker 메시지 수신:', event.data);
+        
         if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
           console.log('Service Worker에서 자동 로그아웃 요청 받음');
           performAutoLogout();
           setShowUpdateProgressPopup(true);
+        } else if (event.data && event.data.type === 'PLAY_NOTIFICATION_SOUND') {
+          console.log('알림 사운드 재생 요청 받음:', event.data.soundUrl);
+          try {
+            const audio = new Audio(event.data.soundUrl);
+            audio.volume = 0.5;
+            audio.play().catch(error => {
+              console.log('알림 사운드 재생 실패:', error);
+            });
+          } catch (error) {
+            console.error('알림 사운드 로드 실패:', error);
+          }
         }
       });
     }
