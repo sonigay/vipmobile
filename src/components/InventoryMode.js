@@ -70,6 +70,7 @@ const InventoryAssignmentScreen = lazy(() => import('./screens/InventoryAssignme
 const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
 const DepartmentAssignmentScreen = lazy(() => import('./screens/DepartmentAssignmentScreen'));
 const AssignmentHistoryScreen = lazy(() => import('./screens/AssignmentHistoryScreen'));
+const RealtimeDashboardScreen = lazy(() => import('./screens/RealtimeDashboardScreen'));
 
 // 로딩 스켈레톤 컴포넌트
 const LoadingSkeleton = () => (
@@ -598,6 +599,12 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
                   <HistoryIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>배정 히스토리</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => setCurrentScreen('realtime_dashboard')}>
+                <ListItemIcon>
+                  <WatchIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>실시간 대시보드</ListItemText>
               </MenuItem>
             </>
           )}
@@ -1145,6 +1152,17 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode }) {
     return (
       <Suspense fallback={<LoadingSkeleton />}>
         <AssignmentHistoryScreen
+          onBack={handleBackToMain}
+          onLogout={onLogout}
+        />
+      </Suspense>
+    );
+  }
+
+  if (currentScreen === 'realtime_dashboard') {
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <RealtimeDashboardScreen
           onBack={handleBackToMain}
           onLogout={onLogout}
         />

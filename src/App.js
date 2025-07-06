@@ -37,8 +37,7 @@ import {
   optimizePerformance,
   isMobile 
 } from './utils/mobileUtils';
-import { realtimeDashboardManager } from './utils/realtimeDashboardUtils';
-import RealtimeDashboardScreen from './components/screens/RealtimeDashboardScreen';
+// 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
 import './mobile.css';
 
 // Logger 유틸리티
@@ -105,8 +104,7 @@ function App() {
   // 재고배정 모드 관련 상태 추가
   const [isAssignmentMode, setIsAssignmentMode] = useState(false);
   const [assignmentScreen, setAssignmentScreen] = useState(null); // 'settings' | 'department' | 'office' | 'sales'
-  // 실시간 대시보드 모드 관련 상태 추가
-  const [isRealtimeDashboardMode, setIsRealtimeDashboardMode] = useState(false);
+  // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
   // 재고요청점 검색 관련 상태 추가
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -171,16 +169,7 @@ function App() {
     setCurrentView('all');
   };
 
-  // 실시간 대시보드 모드 핸들러
-  const handleRealtimeDashboardMode = () => {
-    setIsRealtimeDashboardMode(true);
-    setCurrentView('dashboard');
-  };
-  
-  const handleRealtimeDashboardBack = () => {
-    setIsRealtimeDashboardMode(false);
-    setCurrentView('all');
-  };
+  // 실시간 대시보드 모드 핸들러 제거 (재고 모드로 이동)
 
   // 캐시 상태 업데이트 함수
   const updateCacheStatus = useCallback(() => {
@@ -1529,18 +1518,7 @@ function App() {
     );
   }
 
-  // 실시간 대시보드 모드일 때는 별도 화면 렌더링
-  if (isRealtimeDashboardMode) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <RealtimeDashboardScreen 
-          onBack={handleRealtimeDashboardBack} 
-          onLogout={handleLogout} 
-        />
-      </ThemeProvider>
-    );
-  }
+  // 실시간 대시보드 모드 제거 (재고 모드로 이동)
 
 
 
@@ -1623,7 +1601,13 @@ function App() {
                               if (category[selectedModel]) {
                                 Object.values(category[selectedModel]).forEach(status => {
                                   if (status[selectedColor]) {
-                                    totalInventory += status[selectedColor] || 0;
+                                    const qty = status[selectedColor];
+                                    // qty가 객체인 경우 quantity 필드 확인
+                                    if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
+                                      totalInventory += qty.quantity || 0;
+                                    } else if (typeof qty === 'number') {
+                                      totalInventory += qty || 0;
+                                    }
                                   }
                                 });
                               }
@@ -1634,7 +1618,12 @@ function App() {
                               if (category[selectedModel]) {
                                 Object.values(category[selectedModel]).forEach(status => {
                                   Object.values(status).forEach(qty => {
-                                    totalInventory += qty || 0;
+                                    // qty가 객체인 경우 quantity 필드 확인
+                                    if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
+                                      totalInventory += qty.quantity || 0;
+                                    } else if (typeof qty === 'number') {
+                                      totalInventory += qty || 0;
+                                    }
                                   });
                                 });
                               }
@@ -1658,7 +1647,12 @@ function App() {
                                   Object.values(model).forEach(status => {
                                     if (typeof status === 'object' && status !== null) {
                                       Object.values(status).forEach(qty => {
-                                        totalInventory += qty || 0;
+                                        // qty가 객체인 경우 quantity 필드 확인
+                                        if (typeof qty === 'object' && qty !== null && qty.quantity !== undefined) {
+                                          totalInventory += qty.quantity || 0;
+                                        } else if (typeof qty === 'number') {
+                                          totalInventory += qty || 0;
+                                        }
                                       });
                                     }
                                   });
@@ -1758,13 +1752,7 @@ function App() {
                   >
                     업데이트 확인
                   </Button>
-                  <Button 
-                    color="inherit" 
-                    onClick={handleRealtimeDashboardMode} 
-                    sx={{ fontSize: '0.8em', mr: 1 }}
-                  >
-                    실시간 대시보드
-                  </Button>
+                  {/* 실시간 대시보드 버튼 제거 (재고 모드로 이동) */}
                   <Button color="inherit" onClick={handleLogout} sx={{ fontSize: '0.8em' }}>
                     로그아웃
                   </Button>
