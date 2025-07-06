@@ -1454,7 +1454,6 @@ function App() {
         <InventoryMode 
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
-          onAssignmentMode={handleAssignmentMode}
         />
       </ThemeProvider>
     );
