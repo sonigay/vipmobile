@@ -97,7 +97,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   
   const [editingAgent, setEditingAgent] = useState(null);
   const [showModelDialog, setShowModelDialog] = useState(false);
-  const [newModel, setNewModel] = useState({ name: '', color: '', quantity: 0 });
+  const [newModel, setNewModel] = useState({ name: '', color: '', quantity: 0, bulkQuantities: {} });
   const [availableModels, setAvailableModels] = useState({ models: [], colors: [], modelColors: new Map() });
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
@@ -641,23 +641,79 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     }));
   };
 
-  // 모델 추가
+  // 모델 추가 (일괄 입력)
   const handleAddModel = () => {
-    // 선택된 모델과 색상이 있으면 그것을 사용, 없으면 수동 입력된 값을 사용
     const modelName = selectedModel || newModel.name;
-    const modelColor = selectedColor || newModel.color;
     
-    if (modelName && modelColor && newModel.quantity > 0) {
+    if (modelName && newModel.bulkQuantities && Object.keys(newModel.bulkQuantities).length > 0) {
+      // 일괄 입력된 수량이 있는 경우
+      const validColors = Object.entries(newModel.bulkQuantities)
+        .filter(([color, quantity]) => quantity > 0)
+        .map(([color, quantity]) => ({ name: color, quantity }));
+      
+      if (validColors.length > 0) {
+        setAssignmentSettings(prev => {
+          const existingModel = prev.models[modelName];
+          
+          if (existingModel) {
+            // 기존 모델이 있으면 색상과 수량을 병합
+            const existingColors = [...existingModel.colors];
+            
+            validColors.forEach(newColor => {
+              const existingColorIndex = existingColors.findIndex(color => color.name === newColor.name);
+              
+              if (existingColorIndex >= 0) {
+                // 기존 색상이 있으면 수량 업데이트
+                existingColors[existingColorIndex] = {
+                  ...existingColors[existingColorIndex],
+                  quantity: newColor.quantity
+                };
+              } else {
+                // 새로운 색상 추가
+                existingColors.push(newColor);
+              }
+            });
+            
+            return {
+              ...prev,
+              models: {
+                ...prev.models,
+                [modelName]: {
+                  ...existingModel,
+                  colors: existingColors
+                }
+              }
+            };
+          } else {
+            // 새로운 모델 생성
+            return {
+              ...prev,
+              models: {
+                ...prev.models,
+                [modelName]: {
+                  colors: validColors
+                }
+              }
+            };
+          }
+        });
+        
+        setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
+        setSelectedModel('');
+        setSelectedColor('');
+        setShowModelDialog(false);
+      }
+    } else if (modelName && selectedColor && newModel.quantity > 0) {
+      // 기존 방식 (단일 색상 입력)
+      const modelColor = selectedColor;
+      
       setAssignmentSettings(prev => {
         const existingModel = prev.models[modelName];
         
-        // 기존 모델이 있으면 색상과 수량을 추가, 없으면 새로 생성
         if (existingModel) {
-          // 기존 색상이 있는지 확인
           const existingColorIndex = existingModel.colors.findIndex(color => color.name === modelColor);
           
           if (existingColorIndex >= 0) {
-            // 기존 색상이 있으면 수량만 업데이트
             const updatedColors = [...existingModel.colors];
             updatedColors[existingColorIndex] = {
               ...updatedColors[existingColorIndex],
@@ -675,7 +731,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               }
             };
           } else {
-            // 새로운 색상 추가
             return {
               ...prev,
               models: {
@@ -691,7 +746,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             };
           }
         } else {
-          // 새로운 모델 생성
           return {
             ...prev,
             models: {
@@ -704,11 +758,39 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         }
       });
       
-      setNewModel({ name: '', color: '', quantity: 0 });
+      setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
       setSelectedModel('');
       setSelectedColor('');
       setShowModelDialog(false);
     }
+  };
+
+  // 일괄 수량 적용
+  const handleBulkQuantityApply = (quantity) => {
+    if (selectedModel && quantity > 0) {
+      const colors = getColorsForModel(availableModels.modelColors, selectedModel);
+      const bulkQuantities = {};
+      
+      colors.forEach(color => {
+        bulkQuantities[color] = quantity;
+      });
+      
+      setNewModel(prev => ({
+        ...prev,
+        bulkQuantities
+      }));
+    }
+  };
+
+  // 색상별 수량 변경
+  const handleColorQuantityChange = (color, quantity) => {
+    setNewModel(prev => ({
+      ...prev,
+      bulkQuantities: {
+        ...prev.bulkQuantities,
+        [color]: parseInt(quantity) || 0
+      }
+    }));
   };
 
   // 모델 삭제
@@ -2125,7 +2207,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">
-                            사무실별 배정 현황
+                            사무실별 모델/색상 배정 현황
                           </Typography>
                           <Button
                             variant="outlined"
@@ -2136,34 +2218,126 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             인쇄
                           </Button>
                         </Box>
-                        <TableContainer component={Paper} variant="outlined">
-                          <Table size="small">
+                        
+                        {/* 모델별 색상별 배정량 테이블 */}
+                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
+                          <Table size="small" stickyHeader>
                             <TableHead>
                               <TableRow>
-                                <TableCell>사무실</TableCell>
-                                <TableCell align="center">영업사원 수</TableCell>
-                                <TableCell align="center">총 배정량</TableCell>
-                                <TableCell align="center">평균 배정량</TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  사무실
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  영업사원 수
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  총 배정량
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  평균 배정량
+                                </TableCell>
+                                {/* 모델별 색상별 헤더 */}
+                                {Object.entries(previewData.models).map(([modelName, modelData]) => (
+                                  <TableCell key={modelName} align="center" colSpan={modelData.colors.length}>
+                                    {modelName}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              <TableRow>
+                                <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                {/* 색상별 헤더 */}
+                                {Object.entries(previewData.models).map(([modelName, modelData]) => 
+                                  modelData.colors.map((color, colorIndex) => (
+                                    <TableCell key={`${modelName}-${color.name}`} align="center" sx={{ 
+                                      backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                      fontWeight: 'bold',
+                                      fontSize: '0.75rem'
+                                    }}>
+                                      {color.name}
+                                    </TableCell>
+                                  ))
+                                )}
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {Object.entries(previewData.offices).map(([officeName, officeData]) => (
-                                <TableRow key={officeName}>
-                                  <TableCell>{officeName}</TableCell>
-                                  <TableCell align="center">{officeData.agentCount}명</TableCell>
-                                  <TableCell align="center">
-                                    <strong>{officeData.totalQuantity}개</strong>
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    {officeData.agentCount > 0 
-                                      ? Math.round(officeData.totalQuantity / officeData.agentCount)
-                                      : 0}개
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {Object.entries(previewData.offices).map(([officeName, officeData]) => {
+                                // 사무실별 모델/색상별 배정량 계산
+                                const officeModelAssignments = {};
+                                
+                                Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+                                  officeModelAssignments[modelName] = {
+                                    quantity: 0,
+                                    colors: modelData.colors.map(color => ({ name: color.name, quantity: 0 }))
+                                  };
+                                  
+                                  // 해당 사무실의 영업사원들의 배정량 합산
+                                  officeData.agents.forEach(agent => {
+                                    const agentAssignments = previewData.agents[agent.contactId];
+                                    if (agentAssignments && agentAssignments[modelName]) {
+                                      const modelAssignment = agentAssignments[modelName];
+                                      officeModelAssignments[modelName].quantity += modelAssignment.quantity || 0;
+                                      
+                                      // 색상별 배정량은 균등 분배로 계산 (실제로는 더 복잡할 수 있음)
+                                      const colorCount = modelData.colors.length;
+                                      const quantityPerColor = Math.round((modelAssignment.quantity || 0) / colorCount);
+                                      modelData.colors.forEach((color, colorIndex) => {
+                                        officeModelAssignments[modelName].colors[colorIndex].quantity += quantityPerColor;
+                                      });
+                                    }
+                                  });
+                                });
+                                
+                                return (
+                                  <TableRow key={officeName}>
+                                    <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                      {officeName}
+                                    </TableCell>
+                                    <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                      {officeData.agentCount}명
+                                    </TableCell>
+                                    <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                      <strong>{officeData.totalQuantity}개</strong>
+                                    </TableCell>
+                                    <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                      {officeData.agentCount > 0 
+                                        ? Math.round(officeData.totalQuantity / officeData.agentCount)
+                                        : 0}개
+                                    </TableCell>
+                                    {/* 모델별 색상별 배정량 */}
+                                    {Object.entries(previewData.models).map(([modelName, modelData]) => 
+                                      modelData.colors.map((color, colorIndex) => {
+                                        const modelAssignment = officeModelAssignments[modelName];
+                                        const assignedQuantity = modelAssignment ? modelAssignment.colors[colorIndex].quantity : 0;
+                                        
+                                        return (
+                                          <TableCell key={`${officeName}-${modelName}-${color.name}`} align="center" sx={{ 
+                                            backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                            fontWeight: assignedQuantity > 0 ? 'bold' : 'normal',
+                                            color: assignedQuantity > 0 ? 'primary.main' : 'text.secondary'
+                                          }}>
+                                            {assignedQuantity > 0 ? `${assignedQuantity}개` : '-'}
+                                          </TableCell>
+                                        );
+                                      })
+                                    )}
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </TableContainer>
+                        
+                        {/* 테이블 설명 */}
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            • 각 셀은 해당 사무실이 배정받은 모델/색상별 수량을 표시합니다.<br/>
+                            • '-' 표시는 해당 모델/색상에 배정되지 않았음을 의미합니다.<br/>
+                            • 색상별 배정량은 영업사원별 배정량을 균등 분배하여 계산됩니다.
+                          </Typography>
+                        </Box>
                       </Box>
                     )}
 
@@ -2300,7 +2474,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">
-                            소속별 배정 현황
+                            소속별 모델/색상 배정 현황
                           </Typography>
                           <Button
                             variant="outlined"
@@ -2311,34 +2485,126 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             인쇄
                           </Button>
                         </Box>
-                        <TableContainer component={Paper} variant="outlined">
-                          <Table size="small">
+                        
+                        {/* 모델별 색상별 배정량 테이블 */}
+                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
+                          <Table size="small" stickyHeader>
                             <TableHead>
                               <TableRow>
-                                <TableCell>소속</TableCell>
-                                <TableCell align="center">영업사원 수</TableCell>
-                                <TableCell align="center">총 배정량</TableCell>
-                                <TableCell align="center">평균 배정량</TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  소속
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  영업사원 수
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  총 배정량
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  평균 배정량
+                                </TableCell>
+                                {/* 모델별 색상별 헤더 */}
+                                {Object.entries(previewData.models).map(([modelName, modelData]) => (
+                                  <TableCell key={modelName} align="center" colSpan={modelData.colors.length}>
+                                    {modelName}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              <TableRow>
+                                <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                {/* 색상별 헤더 */}
+                                {Object.entries(previewData.models).map(([modelName, modelData]) => 
+                                  modelData.colors.map((color, colorIndex) => (
+                                    <TableCell key={`${modelName}-${color.name}`} align="center" sx={{ 
+                                      backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                      fontWeight: 'bold',
+                                      fontSize: '0.75rem'
+                                    }}>
+                                      {color.name}
+                                    </TableCell>
+                                  ))
+                                )}
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {Object.entries(previewData.departments).map(([departmentName, departmentData]) => (
-                                <TableRow key={departmentName}>
-                                  <TableCell>{departmentName}</TableCell>
-                                  <TableCell align="center">{departmentData.agentCount}명</TableCell>
-                                  <TableCell align="center">
-                                    <strong>{departmentData.totalQuantity}개</strong>
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    {departmentData.agentCount > 0 
-                                      ? Math.round(departmentData.totalQuantity / departmentData.agentCount)
-                                      : 0}개
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {Object.entries(previewData.departments).map(([departmentName, departmentData]) => {
+                                // 소속별 모델/색상별 배정량 계산
+                                const departmentModelAssignments = {};
+                                
+                                Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+                                  departmentModelAssignments[modelName] = {
+                                    quantity: 0,
+                                    colors: modelData.colors.map(color => ({ name: color.name, quantity: 0 }))
+                                  };
+                                  
+                                  // 해당 소속의 영업사원들의 배정량 합산
+                                  departmentData.agents.forEach(agent => {
+                                    const agentAssignments = previewData.agents[agent.contactId];
+                                    if (agentAssignments && agentAssignments[modelName]) {
+                                      const modelAssignment = agentAssignments[modelName];
+                                      departmentModelAssignments[modelName].quantity += modelAssignment.quantity || 0;
+                                      
+                                      // 색상별 배정량은 균등 분배로 계산 (실제로는 더 복잡할 수 있음)
+                                      const colorCount = modelData.colors.length;
+                                      const quantityPerColor = Math.round((modelAssignment.quantity || 0) / colorCount);
+                                      modelData.colors.forEach((color, colorIndex) => {
+                                        departmentModelAssignments[modelName].colors[colorIndex].quantity += quantityPerColor;
+                                      });
+                                    }
+                                  });
+                                });
+                                
+                                return (
+                                  <TableRow key={departmentName}>
+                                    <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                      {departmentName}
+                                    </TableCell>
+                                    <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                      {departmentData.agentCount}명
+                                    </TableCell>
+                                    <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                      <strong>{departmentData.totalQuantity}개</strong>
+                                    </TableCell>
+                                    <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                      {departmentData.agentCount > 0 
+                                        ? Math.round(departmentData.totalQuantity / departmentData.agentCount)
+                                        : 0}개
+                                    </TableCell>
+                                    {/* 모델별 색상별 배정량 */}
+                                    {Object.entries(previewData.models).map(([modelName, modelData]) => 
+                                      modelData.colors.map((color, colorIndex) => {
+                                        const modelAssignment = departmentModelAssignments[modelName];
+                                        const assignedQuantity = modelAssignment ? modelAssignment.colors[colorIndex].quantity : 0;
+                                        
+                                        return (
+                                          <TableCell key={`${departmentName}-${modelName}-${color.name}`} align="center" sx={{ 
+                                            backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                            fontWeight: assignedQuantity > 0 ? 'bold' : 'normal',
+                                            color: assignedQuantity > 0 ? 'primary.main' : 'text.secondary'
+                                          }}>
+                                            {assignedQuantity > 0 ? `${assignedQuantity}개` : '-'}
+                                          </TableCell>
+                                        );
+                                      })
+                                    )}
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </TableContainer>
+                        
+                        {/* 테이블 설명 */}
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            • 각 셀은 해당 소속이 배정받은 모델/색상별 수량을 표시합니다.<br/>
+                            • '-' 표시는 해당 모델/색상에 배정되지 않았음을 의미합니다.<br/>
+                            • 색상별 배정량은 영업사원별 배정량을 균등 분배하여 계산됩니다.
+                          </Typography>
+                        </Box>
                       </Box>
                     )}
                   </CardContent>
@@ -2559,24 +2825,105 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </Grid>
             )}
 
-            {/* 선택된 모델/색상의 입고수량 입력 */}
-            {selectedModel && selectedColor && (
+            {/* 선택된 모델의 일괄 입고수량 입력 */}
+            {selectedModel && (
               <Grid item xs={12}>
                 <Card variant="outlined" sx={{ backgroundColor: '#e3f2fd' }}>
                   <CardContent>
                     <Typography variant="subtitle2" gutterBottom color="primary">
-                      📦 {selectedModel} - {selectedColor} 입고수량 설정
+                      📦 {selectedModel} 일괄 입고수량 설정
                     </Typography>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="입고 수량"
-                      value={newModel.quantity}
-                      onChange={(e) => setNewModel(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
-                      placeholder="입고할 수량을 입력하세요"
-                      inputProps={{ min: 1 }}
-                      helperText="선택된 모델과 색상에 대한 입고 수량을 입력하세요"
-                    />
+                    
+                    {/* 일괄 수량 적용 */}
+                    <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField
+                        type="number"
+                        label="모든 색상에 적용할 수량"
+                        size="small"
+                        sx={{ width: 200 }}
+                        inputProps={{ min: 1 }}
+                        placeholder="수량 입력"
+                      />
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          const input = document.querySelector('input[placeholder="수량 입력"]');
+                          if (input && input.value) {
+                            handleBulkQuantityApply(parseInt(input.value));
+                          }
+                        }}
+                      >
+                        일괄 적용
+                      </Button>
+                    </Box>
+                    
+                    {/* 색상별 수량 입력 테이블 */}
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>색상</TableCell>
+                            <TableCell align="center">입고 수량</TableCell>
+                            <TableCell align="center">재고 현황</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {getColorsForModel(availableModels.modelColors, selectedModel).map((color) => {
+                            const summary = getModelInventorySummary(data, selectedModel, color);
+                            return (
+                              <TableRow key={color}>
+                                <TableCell>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box
+                                      sx={{
+                                        width: 16,
+                                        height: 16,
+                                        borderRadius: '50%',
+                                        backgroundColor: color.toLowerCase().includes('블랙') ? '#000' :
+                                                       color.toLowerCase().includes('화이트') ? '#fff' :
+                                                       color.toLowerCase().includes('실버') ? '#c0c0c0' :
+                                                       color.toLowerCase().includes('블루') ? '#0066cc' :
+                                                       color.toLowerCase().includes('골드') ? '#ffd700' :
+                                                       color.toLowerCase().includes('핑크') ? '#ff69b4' :
+                                                       color.toLowerCase().includes('그린') ? '#228b22' :
+                                                       color.toLowerCase().includes('레드') ? '#dc143c' :
+                                                       '#ddd',
+                                        border: '1px solid #ccc'
+                                      }}
+                                    />
+                                    {color}
+                                  </Box>
+                                </TableCell>
+                                <TableCell align="center">
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    value={newModel.bulkQuantities[color] || 0}
+                                    onChange={(e) => handleColorQuantityChange(color, e.target.value)}
+                                    inputProps={{ min: 0 }}
+                                    sx={{ width: 80 }}
+                                  />
+                                </TableCell>
+                                <TableCell align="center">
+                                  <Typography variant="body2" color="text.secondary">
+                                    {summary.totalQuantity}개
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        • 일괄 적용 버튼을 사용하여 모든 색상에 동일한 수량을 설정할 수 있습니다.<br/>
+                        • 개별 색상의 수량을 조정하려면 각 행의 입력 필드를 사용하세요.<br/>
+                        • 재고 현황은 현재 매장 데이터를 기반으로 계산됩니다.
+                      </Typography>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -2635,14 +2982,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             setShowModelDialog(false);
             setSelectedModel('');
             setSelectedColor('');
-            setNewModel({ name: '', color: '', quantity: 0 });
+            setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
           }}>
             취소
           </Button>
           <Button 
             onClick={handleAddModel} 
             variant="contained"
-            disabled={!((selectedModel && selectedColor && newModel.quantity > 0) || (newModel.name && newModel.color && newModel.quantity > 0))}
+            disabled={!(
+              (selectedModel && newModel.bulkQuantities && Object.values(newModel.bulkQuantities).some(qty => qty > 0)) ||
+              (selectedModel && selectedColor && newModel.quantity > 0) ||
+              (newModel.name && newModel.color && newModel.quantity > 0)
+            )}
             startIcon={<AddIcon />}
           >
             모델 추가
