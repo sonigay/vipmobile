@@ -1114,9 +1114,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 배정된 모델들 추출
       const assignedModels = Object.keys(previewData.models || {});
       
+      // 현재 로그인한 사용자 정보 가져오기
+      const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+      const currentUser = loginState.inventoryUserName || '재고관리자';
+
       // 배정 정보를 서버로 전송
       const assignmentData = {
-        assigner: '재고관리자', // 실제로는 로그인한 사용자 정보 사용
+        assigner: currentUser, // 현재 로그인한 사용자
         model: assignedModels.join(', '), // 실제 배정된 모든 모델
         color: '전체', // 또는 실제 배정된 색상들
         quantity: totalAssignedQuantity,
@@ -1158,6 +1162,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       assignmentSettings, // 배정 설정
       agents, // 담당자 목록
       {
+        assigner: currentUser, // 배정자 정보 추가
         totalAgents: Object.keys(previewData.agents).length,
         totalModels: Object.keys(previewData.models).length,
         totalAssigned: Object.values(previewData.agents).reduce((sum, agent) => {
