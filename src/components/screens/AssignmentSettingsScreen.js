@@ -1034,6 +1034,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       return;
     }
 
+    // 현재 로그인한 사용자 정보 가져오기 (함수 시작 부분으로 이동)
+    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+    const currentUser = loginState.inventoryUserName || '재고관리자';
+
     try {
       // 실제 배정 데이터에서 대상자 정보 추출
       console.log('previewData 구조 확인:', previewData);
@@ -1113,10 +1117,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       // 배정된 모델들 추출
       const assignedModels = Object.keys(previewData.models || {});
-      
-      // 현재 로그인한 사용자 정보 가져오기
-      const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
-      const currentUser = loginState.inventoryUserName || '재고관리자';
 
       // 배정 정보를 서버로 전송
       const assignmentData = {
