@@ -2335,16 +2335,26 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       const modelAssignment = agentAssignments[modelName];
                                       officeModelAssignments[modelName].quantity += modelAssignment.quantity || 0;
                                       
-                                      // 색상별 배정량을 정확하게 계산 (소수점 버림으로 일치시킴)
-                                      const colorCount = modelData.colors.length;
-                                      const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
-                                      const remainder = (modelAssignment.quantity || 0) % colorCount;
-                                      
-                                      modelData.colors.forEach((color, colorIndex) => {
-                                        // 기본 수량 + 나머지 분배
-                                        const colorQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
-                                        officeModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
-                                      });
+                                      // 색상별 배정량을 정확하게 계산 (실제 배정된 색상별 수량 사용)
+                                      if (modelAssignment.colorQuantities) {
+                                        // 새로운 방식: 실제 색상별 배정량 사용
+                                        modelData.colors.forEach((color, colorIndex) => {
+                                          const colorQuantity = modelAssignment.colorQuantities[color.name] || 0;
+                                          officeModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
+                                        });
+                                      } else {
+                                        // 기존 방식: 균등 분배 (하위 호환성)
+                                        const colorCount = modelData.colors.length;
+                                        const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
+                                        const remainder = (modelAssignment.quantity || 0) % colorCount;
+                                        
+                                        if (modelAssignment.quantity > 0) {
+                                          modelData.colors.forEach((color, colorIndex) => {
+                                            const colorQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
+                                            officeModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
+                                          });
+                                        }
+                                      }
                                     }
                                   });
                                 });
@@ -2606,16 +2616,26 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       const modelAssignment = agentAssignments[modelName];
                                       departmentModelAssignments[modelName].quantity += modelAssignment.quantity || 0;
                                       
-                                      // 색상별 배정량을 정확하게 계산 (소수점 버림으로 일치시킴)
-                                      const colorCount = modelData.colors.length;
-                                      const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
-                                      const remainder = (modelAssignment.quantity || 0) % colorCount;
-                                      
-                                      modelData.colors.forEach((color, colorIndex) => {
-                                        // 기본 수량 + 나머지 분배
-                                        const colorQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
-                                        departmentModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
-                                      });
+                                      // 색상별 배정량을 정확하게 계산 (실제 배정된 색상별 수량 사용)
+                                      if (modelAssignment.colorQuantities) {
+                                        // 새로운 방식: 실제 색상별 배정량 사용
+                                        modelData.colors.forEach((color, colorIndex) => {
+                                          const colorQuantity = modelAssignment.colorQuantities[color.name] || 0;
+                                          departmentModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
+                                        });
+                                      } else {
+                                        // 기존 방식: 균등 분배 (하위 호환성)
+                                        const colorCount = modelData.colors.length;
+                                        const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
+                                        const remainder = (modelAssignment.quantity || 0) % colorCount;
+                                        
+                                        if (modelAssignment.quantity > 0) {
+                                          modelData.colors.forEach((color, colorIndex) => {
+                                            const colorQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
+                                            departmentModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
+                                          });
+                                        }
+                                      }
                                     }
                                   });
                                 });

@@ -308,49 +308,80 @@ const adjustAssignments = (baseAssignments, totalQuantity) => {
   return baseAssignments;
 };
 
-// 모델별 배정 수량 계산 (정확한 100% 배정 보장 버전)
+// 색상별 배정 수량 계산 (정확한 100% 배정 보장 버전)
 export const calculateModelAssignment = async (modelName, modelData, eligibleAgents, settings, storeData) => {
   if (eligibleAgents.length === 0) {
     return {};
   }
   
-  // 색상별 수량의 총합 계산
-  const totalQuantity = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
-  
   // 1단계: 정확한 가중치 계산
   const weightedAgents = await calculateAccurateWeights(eligibleAgents, modelName, settings, storeData);
   
-  // 2단계: 기본 배정량 계산 (버림)
-  const baseAssignments = calculateBaseAssignments(weightedAgents, totalQuantity);
+  // 2단계: 색상별로 개별 배정 계산
+  const colorAssignments = {};
   
-  // 3단계: 차이 보정
-  const adjustedAssignments = adjustAssignments(baseAssignments, totalQuantity);
+  for (const color of modelData.colors) {
+    const colorQuantity = color.quantity || 0;
+    if (colorQuantity > 0) {
+      // 해당 색상의 배정량 계산
+      const colorBaseAssignments = calculateBaseAssignments(weightedAgents, colorQuantity);
+      const colorAdjustedAssignments = adjustAssignments(colorBaseAssignments, colorQuantity);
+      
+      colorAssignments[color.name] = colorAdjustedAssignments;
+    }
+  }
   
-  // 4단계: 최종 배정량 계산
+  // 3단계: 영업사원별로 색상별 배정량 통합
   const assignments = {};
-  adjustedAssignments.forEach(item => {
-    assignments[item.agent.contactId] = {
-      agentName: item.agent.target,
-      office: item.agent.office,
-      department: item.agent.department,
-      quantity: item.baseQuantity,
-      finalWeight: item.finalWeight,
-      rawScore: item.rawScore,
-      adjusted: item.adjusted || 0,
-      colors: modelData.colors.map(color => color.name),
-      details: item.details
-    };
+  
+  eligibleAgents.forEach(agent => {
+    const agentColorQuantities = {};
+    let totalAgentQuantity = 0;
+    
+    // 각 색상별 배정량 합산
+    Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
+      const agentColorAssignment = colorAssignmentList.find(item => item.agent.contactId === agent.contactId);
+      const colorQuantity = agentColorAssignment ? agentColorAssignment.baseQuantity : 0;
+      
+      agentColorQuantities[colorName] = colorQuantity;
+      totalAgentQuantity += colorQuantity;
+    });
+    
+    if (totalAgentQuantity > 0) {
+      assignments[agent.contactId] = {
+        agentName: agent.target,
+        office: agent.office,
+        department: agent.department,
+        quantity: totalAgentQuantity,
+        colorQuantities: agentColorQuantities, // 색상별 배정량 추가
+        finalWeight: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.finalWeight || 0,
+        rawScore: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.rawScore || 0,
+        colors: modelData.colors.map(color => color.name),
+        details: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.details || {}
+      };
+    }
   });
   
-  // 검증: 총합이 정확히 일치하는지 확인
+  // 4단계: 검증 - 각 색상별 총 배정량 확인
+  Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
+    const totalColorAssigned = colorAssignmentList.reduce((sum, item) => sum + item.baseQuantity, 0);
+    const expectedColorQuantity = modelData.colors.find(color => color.name === colorName)?.quantity || 0;
+    
+    console.log(`✅ 색상 ${colorName} 배정 검증:`, {
+      expected: expectedColorQuantity,
+      assigned: totalColorAssigned,
+      difference: expectedColorQuantity - totalColorAssigned
+    });
+  });
+  
+  // 전체 검증
   const totalAssigned = Object.values(assignments).reduce((sum, assignment) => sum + assignment.quantity, 0);
-  const adjustmentCount = Object.values(assignments).reduce((sum, assignment) => sum + (assignment.adjusted || 0), 0);
+  const totalExpected = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
   
   console.log(`✅ 모델 ${modelName} 정확한 배정 완료:`, {
-    totalQuantity,
+    totalExpected,
     totalAssigned,
-    difference: totalQuantity - totalAssigned, // 항상 0이어야 함
-    adjustmentCount,
+    difference: totalExpected - totalAssigned,
     agentCount: eligibleAgents.length,
     colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`)
   });
