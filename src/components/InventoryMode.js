@@ -76,7 +76,7 @@ import {
 const InventoryAuditScreen = lazy(() => import('./screens/InventoryAuditScreen'));
 const MasterInventoryScreen = lazy(() => import('./screens/MasterInventoryScreen'));
 const DuplicateCasesScreen = lazy(() => import('./screens/DuplicateCasesScreen'));
-const InventoryAssignmentScreen = lazy(() => import('./screens/InventoryAssignmentScreen'));
+
 const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
 const DepartmentAssignmentScreen = lazy(() => import('./screens/DepartmentAssignmentScreen'));
 const AssignmentHistoryScreen = lazy(() => import('./screens/AssignmentHistoryScreen'));
