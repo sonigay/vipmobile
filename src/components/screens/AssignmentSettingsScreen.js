@@ -2507,7 +2507,20 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       {Object.entries(previewData.models).map(([modelName, modelData]) => 
                                         modelData.colors.map((color, colorIndex) => {
                                           const modelAssignment = agentData[modelName];
-                                          const assignedQuantity = modelAssignment ? modelAssignment.quantity : 0;
+                                          let assignedQuantity = 0;
+                                          
+                                          if (modelAssignment) {
+                                            if (modelAssignment.colorQuantities) {
+                                              // 새로운 방식: 실제 색상별 배정량 사용
+                                              assignedQuantity = modelAssignment.colorQuantities[color.name] || 0;
+                                            } else {
+                                              // 기존 방식: 균등 분배 (하위 호환성)
+                                              const colorCount = modelData.colors.length;
+                                              const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
+                                              const remainder = (modelAssignment.quantity || 0) % colorCount;
+                                              assignedQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
+                                            }
+                                          }
                                           
                                           return (
                                             <TableCell key={`${agentId}-${modelName}-${color.name}`} align="center" sx={{ 
