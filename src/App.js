@@ -1684,7 +1684,12 @@ function App() {
                   {currentView === 'activation' ? (
                     // 담당개통확인 모드 - 지도를 위로, 테이블을 아래로
                     <>
-                      <Box sx={{ flex: 1, mb: 2 }}>
+                      <Box sx={{ 
+                        height: { xs: '40vh', sm: '50vh', md: '60vh' }, 
+                        mb: 2,
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }} className="activation-map-container">
                         <Map
                           userLocation={userLocation}
                           filteredStores={isAgentMode && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
@@ -1710,8 +1715,10 @@ function App() {
                         backgroundColor: 'white', 
                         borderRadius: 1, 
                         p: 2,
-                        boxShadow: 1
-                      }}>
+                        boxShadow: 1,
+                        height: { xs: '60vh', sm: '50vh', md: '40vh' },
+                        overflow: 'auto'
+                      }} className="activation-table-container">
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                             담당개통확인

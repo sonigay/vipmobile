@@ -279,6 +279,26 @@
     border-radius: 4px !important;
   }
   
+  /* 모바일에서 담당개통확인 화면 최적화 */
+  .activation-screen {
+    height: 100vh !important;
+    overflow-y: auto !important;
+  }
+  
+  /* 모바일에서 담당개통확인 지도 영역 */
+  .activation-map-container {
+    height: 40vh !important;
+    min-height: 300px !important;
+    max-height: 400px !important;
+  }
+  
+  /* 모바일에서 담당개통확인 테이블 영역 */
+  .activation-table-container {
+    height: 60vh !important;
+    overflow-y: auto !important;
+    padding: 8px !important;
+  }
+  
   /* 모바일에서 테이블 최적화 */
   .stores-list {
     border-radius: 4px !important;
