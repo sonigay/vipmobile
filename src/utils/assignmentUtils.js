@@ -251,7 +251,64 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
   }
 };
 
-// 모델별 배정 수량 계산 (100% 배정 보장 버전)
+// 정확한 가중치 계산 (엑셀 공식 기반)
+const calculateAccurateWeights = async (agents, modelName, settings, storeData) => {
+  const weightPromises = agents.map(async (agent) => {
+    const { rawScore, details } = await calculateRawScore(agent, modelName, settings, storeData);
+    
+    // 정규화된 가중치 계산 (엑셀 공식 기반)
+    const normalizedTurnoverRate = details.turnoverRate / 100; // 0-1 범위
+    const normalizedInventoryScore = details.inventoryScore / 100; // 0-1 범위
+    const normalizedStoreCount = Math.min(details.storeCount / 10, 1); // 0-1 범위 (최대 10개 기준)
+    const normalizedSalesVolume = Math.min(details.salesVolume / 100, 1); // 0-1 범위 (최대 100개 기준)
+    
+    // 최종 가중치 (비율 적용)
+    const finalWeight = (
+      (settings.ratios.turnoverRate / 100) * normalizedTurnoverRate +
+      (settings.ratios.remainingInventory / 100) * normalizedInventoryScore +
+      (settings.ratios.storeCount / 100) * normalizedStoreCount +
+      (settings.ratios.salesVolume / 100) * normalizedSalesVolume
+    );
+    
+    return { agent, finalWeight, rawScore, details };
+  });
+  
+  return await Promise.all(weightPromises);
+};
+
+// 기본 배정량 계산 (버림 처리)
+const calculateBaseAssignments = (weightedAgents, totalQuantity) => {
+  const totalWeight = weightedAgents.reduce((sum, item) => sum + item.finalWeight, 0);
+  
+  return weightedAgents.map(item => {
+    const baseQuantity = totalWeight > 0 ? Math.floor((item.finalWeight / totalWeight) * totalQuantity) : 0;
+    return { ...item, baseQuantity };
+  });
+};
+
+// 차이 계산 및 보정 (엑셀 공식 기반)
+const adjustAssignments = (baseAssignments, totalQuantity) => {
+  const totalAssigned = baseAssignments.reduce((sum, item) => sum + item.baseQuantity, 0);
+  const difference = totalQuantity - totalAssigned;
+  
+  if (difference > 0) {
+    // 가중치가 높은 순으로 정렬
+    const sortedAssignments = [...baseAssignments].sort((a, b) => b.finalWeight - a.finalWeight);
+    
+    // 차이만큼 상위 영업사원에게 1씩 추가 배정
+    for (let i = 0; i < difference; i++) {
+      const targetIndex = i % sortedAssignments.length;
+      sortedAssignments[targetIndex].baseQuantity += 1;
+      sortedAssignments[targetIndex].adjusted = (sortedAssignments[targetIndex].adjusted || 0) + 1;
+    }
+    
+    return sortedAssignments;
+  }
+  
+  return baseAssignments;
+};
+
+// 모델별 배정 수량 계산 (정확한 100% 배정 보장 버전)
 export const calculateModelAssignment = async (modelName, modelData, eligibleAgents, settings, storeData) => {
   if (eligibleAgents.length === 0) {
     return {};
@@ -260,126 +317,42 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
   // 색상별 수량의 총합 계산
   const totalQuantity = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
   
-  // 1단계: 모든 영업사원의 원시 점수 계산
-  const rawScorePromises = eligibleAgents.map(async (agent) => {
-    const { rawScore, details } = await calculateRawScore(agent, modelName, settings, storeData);
-    return { agent, rawScore, details };
-  });
+  // 1단계: 정확한 가중치 계산
+  const weightedAgents = await calculateAccurateWeights(eligibleAgents, modelName, settings, storeData);
   
-  const agentRawScores = await Promise.all(rawScorePromises);
+  // 2단계: 기본 배정량 계산 (버림)
+  const baseAssignments = calculateBaseAssignments(weightedAgents, totalQuantity);
   
-  // 2단계: 점수 정규화 (0-100 범위)
-  const normalizedScores = normalizeScores(agentRawScores);
+  // 3단계: 차이 보정
+  const adjustedAssignments = adjustAssignments(baseAssignments, totalQuantity);
   
-  // 3단계: 정규화된 점수로 정렬
-  normalizedScores.sort((a, b) => b.normalizedScore - a.normalizedScore);
-  
-  // 4단계: 정규화된 점수 합계 계산
-  const totalNormalizedScore = normalizedScores.reduce((sum, item) => sum + item.normalizedScore, 0);
-  
+  // 4단계: 최종 배정량 계산
   const assignments = {};
-  let remainingQuantity = totalQuantity;
-  
-  // 5단계: 1차 배정 - 정규화된 점수 비율에 따른 기본 배정 (소수점 버림)
-  normalizedScores.forEach(({ agent, normalizedScore, rawScore, details }, index) => {
-    const ratio = totalNormalizedScore > 0 ? normalizedScore / totalNormalizedScore : 1 / eligibleAgents.length;
-    
-    // 기본 배정량 (소수점 버림으로 정확한 수량 계산)
-    let assignedQuantity = Math.floor(totalQuantity * ratio);
-    
-    // 최소 1개 보장 (수량이 있는 경우)
-    if (remainingQuantity > 0 && assignedQuantity === 0) {
-      assignedQuantity = 1;
-    }
-    
-    // 남은 수량 초과 방지
-    assignedQuantity = Math.min(assignedQuantity, remainingQuantity);
-    
-    assignments[agent.contactId] = {
-      agentName: agent.target,
-      office: agent.office,
-      department: agent.department,
-      quantity: assignedQuantity,
-      colors: modelData.colors.map(color => color.name), // 색상명 배열
-      normalizedScore: normalizedScore,
-      rawScore: rawScore,
-      ratio: ratio,
-      details: details
+  adjustedAssignments.forEach(item => {
+    assignments[item.agent.contactId] = {
+      agentName: item.agent.target,
+      office: item.agent.office,
+      department: item.agent.department,
+      quantity: item.baseQuantity,
+      finalWeight: item.finalWeight,
+      rawScore: item.rawScore,
+      adjusted: item.adjusted || 0,
+      colors: modelData.colors.map(color => color.name),
+      details: item.details
     };
-    
-    remainingQuantity -= assignedQuantity;
   });
   
-  // 6단계: 잔여 재고 재배정 (100% 배정 보장)
-  if (remainingQuantity > 0) {
-    console.log(`🔄 모델 ${modelName}에서 ${remainingQuantity}개 잔여 재고 재배정 시작`);
-    
-    // 잔여재고 우선순위 기반 재배정 후보 선별
-    const redistributionCandidates = normalizedScores
-      .map(({ agent, normalizedScore, details }) => {
-        // 잔여재고 확인 (details에서 가져옴)
-        const hasInventory = details.remainingInventory > 0;
-        
-        return {
-          agentId: agent.contactId,
-          agent,
-          normalizedScore,
-          hasInventory,
-          currentQuantity: assignments[agent.contactId]?.quantity || 0,
-          priority: hasInventory ? 0 : 1 // 잔여재고 없는 곳 우선
-        };
-      })
-      .sort((a, b) => {
-        // 1순위: 잔여재고 없는 곳 우선
-        if (a.priority !== b.priority) {
-          return b.priority - a.priority;
-        }
-        // 2순위: 정규화된 점수 높은 순
-        return b.normalizedScore - a.normalizedScore;
-      });
-    
-    // 잔여재고 없는 곳에 우선 배정
-    let redistributionIndex = 0;
-    while (remainingQuantity > 0 && redistributionIndex < redistributionCandidates.length) {
-      const candidate = redistributionCandidates[redistributionIndex];
-      
-      if (assignments[candidate.agentId]) {
-        assignments[candidate.agentId].quantity += 1;
-        assignments[candidate.agentId].redistributed = (assignments[candidate.agentId].redistributed || 0) + 1;
-        remainingQuantity -= 1;
-        
-        console.log(`✅ ${candidate.agent.target}에게 잔여 재고 1개 추가 배정 (잔여재고: ${candidate.hasInventory ? '있음' : '없음'}, 점수: ${Math.round(candidate.normalizedScore)})`);
-      }
-      
-      redistributionIndex++;
-    }
-    
-    // 여전히 남은 수량이 있으면 모든 영업사원에게 순차 배정
-    if (remainingQuantity > 0) {
-      redistributionIndex = 0;
-      while (remainingQuantity > 0) {
-        const candidate = redistributionCandidates[redistributionIndex % redistributionCandidates.length];
-        
-        if (assignments[candidate.agentId]) {
-          assignments[candidate.agentId].quantity += 1;
-          assignments[candidate.agentId].redistributed = (assignments[candidate.agentId].redistributed || 0) + 1;
-          remainingQuantity -= 1;
-          
-          console.log(`✅ ${candidate.agent.target}에게 추가 잔여 재고 1개 배정`);
-        }
-        
-        redistributionIndex++;
-      }
-    }
-  }
+  // 검증: 총합이 정확히 일치하는지 확인
+  const totalAssigned = Object.values(assignments).reduce((sum, assignment) => sum + assignment.quantity, 0);
+  const adjustmentCount = Object.values(assignments).reduce((sum, assignment) => sum + (assignment.adjusted || 0), 0);
   
-  console.log(`✅ 모델 ${modelName} 배정 완료:`, {
+  console.log(`✅ 모델 ${modelName} 정확한 배정 완료:`, {
     totalQuantity,
-    assignedQuantity: totalQuantity - remainingQuantity,
-    remainingQuantity,
+    totalAssigned,
+    difference: totalQuantity - totalAssigned, // 항상 0이어야 함
+    adjustmentCount,
     agentCount: eligibleAgents.length,
-    colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`),
-    redistributionCount: Object.values(assignments).reduce((sum, assignment) => sum + (assignment.redistributed || 0), 0)
+    colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`)
   });
   
   return assignments;

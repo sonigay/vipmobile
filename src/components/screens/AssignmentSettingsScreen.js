@@ -285,38 +285,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     
     localStorage.setItem(`assignmentSettingsData_${currentUserId}`, JSON.stringify(settingsToSave));
     
-    // 이전 설정과 비교하여 변경사항 확인
-    const previousSettings = localStorage.getItem(`previousAssignmentSettings_${currentUserId}`);
-    if (previousSettings) {
-      try {
-        const previous = JSON.parse(previousSettings);
-        const currentRatios = assignmentSettings.ratios;
-        const previousRatios = previous.assignmentSettings?.ratios;
-        
-        // 비율 변경사항이 있는지 확인
-        if (previousRatios && (
-          currentRatios.turnoverRate !== previousRatios.turnoverRate ||
-          currentRatios.storeCount !== previousRatios.storeCount ||
-          currentRatios.remainingInventory !== previousRatios.remainingInventory ||
-          currentRatios.salesVolume !== previousRatios.salesVolume
-        )) {
-          // 비율 변경 알림 추가
-          addSettingsChangedNotification({
-            ratios: currentRatios,
-            previousRatios: previousRatios,
-            changedBy: currentUserId,
-            modelCount: Object.keys(assignmentSettings.models).length,
-            targetCount: {
-              offices: Object.keys(assignmentSettings.targets.offices).filter(key => assignmentSettings.targets.offices[key]).length,
-              departments: Object.keys(assignmentSettings.targets.departments).filter(key => assignmentSettings.targets.departments[key]).length,
-              agents: Object.keys(assignmentSettings.targets.agents).filter(key => assignmentSettings.targets.agents[key]).length
-            }
-          });
-        }
-      } catch (error) {
-        console.error('이전 설정 비교 중 오류:', error);
-      }
-    }
+
     
     // 현재 설정을 이전 설정으로 저장
     localStorage.setItem(`previousAssignmentSettings_${currentUserId}`, JSON.stringify(settingsToSave));
