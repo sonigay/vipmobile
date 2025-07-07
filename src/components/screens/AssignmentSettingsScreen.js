@@ -645,9 +645,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const handleAddModel = () => {
     const modelName = selectedModel || newModel.name;
     
-    if (modelName && newModel.bulkQuantities && Object.keys(newModel.bulkQuantities).length > 0) {
+    if (modelName && newModel.bulkQuantities && Object.keys(newModel.bulkQuantities || {}).length > 0) {
       // 일괄 입력된 수량이 있는 경우
-      const validColors = Object.entries(newModel.bulkQuantities)
+      const validColors = Object.entries(newModel.bulkQuantities || {})
         .filter(([color, quantity]) => quantity > 0)
         .map(([color, quantity]) => ({ name: color, quantity }));
       
@@ -777,7 +777,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       setNewModel(prev => ({
         ...prev,
-        bulkQuantities
+        bulkQuantities: bulkQuantities
       }));
     }
   };
@@ -787,7 +787,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     setNewModel(prev => ({
       ...prev,
       bulkQuantities: {
-        ...prev.bulkQuantities,
+        ...(prev.bulkQuantities || {}),
         [color]: parseInt(quantity) || 0
       }
     }));
@@ -2899,7 +2899,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   <TextField
                                     type="number"
                                     size="small"
-                                    value={newModel.bulkQuantities[color] || 0}
+                                    value={(newModel.bulkQuantities && newModel.bulkQuantities[color]) || 0}
                                     onChange={(e) => handleColorQuantityChange(color, e.target.value)}
                                     inputProps={{ min: 0 }}
                                     sx={{ width: 80 }}
@@ -2990,7 +2990,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             onClick={handleAddModel} 
             variant="contained"
             disabled={!(
-              (selectedModel && newModel.bulkQuantities && Object.values(newModel.bulkQuantities).some(qty => qty > 0)) ||
+              (selectedModel && newModel.bulkQuantities && Object.values(newModel.bulkQuantities || {}).some(qty => qty > 0)) ||
               (selectedModel && selectedColor && newModel.quantity > 0) ||
               (newModel.name && newModel.color && newModel.quantity > 0)
             )}
