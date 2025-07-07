@@ -526,7 +526,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
     return (
       <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* 헤더 */}
-        <AppBar position="static">
+        <AppBar position="static" sx={{ backgroundColor: '#2E7D32' }}>
           <Toolbar>
             <InventoryIcon sx={{ mr: 2 }} />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -537,54 +537,20 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button 
                 color="inherit" 
-                onClick={(e) => handleMenuClick(e, 'inventory')}
-                onMouseEnter={() => handleMenuHover('inventory', 'inventory')}
-                endIcon={<ExpandMoreIcon />}
-              >
-                재고실사
-              </Button>
-              
-              <Button 
-                color="inherit" 
-                onClick={(e) => handleMenuClick(e, 'master')}
-                onMouseEnter={() => {
-                  handleMenuHover('master', 'phone');
-                  handleMenuHover('master', 'sim');
-                }}
-                endIcon={<ExpandMoreIcon />}
-              >
-                마스터재고매칭
-              </Button>
-              
-              <Button 
-                color="inherit" 
-                onClick={(e) => handleMenuClick(e, 'duplicate')}
-                onMouseEnter={() => {
-                  handleMenuHover('duplicate', 'phone');
-                  handleMenuHover('duplicate', 'sim');
-                }}
-                endIcon={<ExpandMoreIcon />}
-              >
-                폰클중복건
-              </Button>
-              
-              <Button 
-                color="inherit" 
                 onClick={(e) => handleMenuClick(e, 'assignment')}
                 onMouseEnter={() => {
                   handleMenuHover('assignment', 'office');
                   handleMenuHover('assignment', 'sales');
                 }}
                 endIcon={<ExpandMoreIcon />}
+                sx={{
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)'
+                  }
+                }}
               >
                 재고배정
-              </Button>
-              
-              <Button 
-                color="inherit" 
-                onClick={() => setCurrentScreen('realtime_dashboard')}
-              >
-                실시간대시보드
               </Button>
             </Box>
             
@@ -621,9 +587,9 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
                 padding: '12px 16px',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
-                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                  backgroundColor: 'rgba(46, 125, 50, 0.08)',
                   transform: 'translateX(4px)',
-                  boxShadow: '0 2px 8px rgba(25, 118, 210, 0.15)'
+                  boxShadow: '0 2px 8px rgba(46, 125, 50, 0.15)'
                 },
                 '&:active': {
                   transform: 'translateX(2px) scale(0.98)'
@@ -632,40 +598,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
             }
           }}
         >
-          {selectedMenu === 'master' && (
-            <>
-              <MenuItem onClick={() => handleSubMenuClick('phone')}>
-                <ListItemIcon>
-                  <PhoneAndroidIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>단말기</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSubMenuClick('sim')}>
-                <ListItemIcon>
-                  <SimCardIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>유심</ListItemText>
-              </MenuItem>
-            </>
-          )}
-          
-          {selectedMenu === 'duplicate' && (
-            <>
-              <MenuItem onClick={() => handleSubMenuClick('phone')}>
-                <ListItemIcon>
-                  <PhoneAndroidIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>단말기</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSubMenuClick('sim')}>
-                <ListItemIcon>
-                  <SimCardIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>유심</ListItemText>
-              </MenuItem>
-            </>
-          )}
-          
           {selectedMenu === 'assignment' && (
             <>
               <MenuItem onClick={() => handleSubMenuClick('settings')}>
@@ -681,15 +613,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
                 <ListItemText>배정 히스토리</ListItemText>
               </MenuItem>
             </>
-          )}
-          
-          {selectedMenu === 'inventory' && (
-            <MenuItem onClick={() => handleSubMenuClick('inventory')}>
-              <ListItemIcon>
-                <AssignmentIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>재고실사</ListItemText>
-            </MenuItem>
           )}
         </Menu>
 
