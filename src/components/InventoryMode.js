@@ -1140,19 +1140,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
     );
   }
 
-  if (currentScreen.startsWith('assignment_')) {
-    return (
-      <Suspense fallback={<LoadingSkeleton />}>
-        <InventoryAssignmentScreen 
-          data={data}
-          onBack={handleBackToMain}
-          onLogout={onLogout}
-          screenType={currentScreen}
-        />
-      </Suspense>
-    );
-  }
-
   if (currentScreen === 'assignment_history') {
     return (
       <Suspense fallback={<LoadingSkeleton />}>
@@ -1163,6 +1150,8 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
       </Suspense>
     );
   }
+
+
 
   if (currentScreen === 'realtime_dashboard') {
     return (
