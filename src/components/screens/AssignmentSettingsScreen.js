@@ -630,15 +630,43 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     setEditingAgent(null);
   };
 
-  // 비율 변경
+  // 비율 변경 (합계 100% 제한)
   const handleRatioChange = (type, value) => {
-    setAssignmentSettings(prev => ({
-      ...prev,
-      ratios: {
-        ...prev.ratios,
-        [type]: value
-      }
-    }));
+    setAssignmentSettings(prev => {
+      // 현재 다른 항목들의 합계 계산
+      const otherSum = Object.entries(prev.ratios)
+        .filter(([key, _]) => key !== type)
+        .reduce((sum, [_, ratioValue]) => sum + ratioValue, 0);
+      
+      // 최대 허용값 계산
+      const maxAllowed = 100 - otherSum;
+      
+      // 합계가 100%를 초과하지 않는 경우에만 변경 허용
+      const newValue = Math.min(value, maxAllowed);
+      
+      return {
+        ...prev,
+        ratios: {
+          ...prev.ratios,
+          [type]: newValue
+        }
+      };
+    });
+  };
+
+  // 각 슬라이더의 최대값 계산
+  const getSliderMaxValue = (type) => {
+    const otherSum = Object.entries(assignmentSettings.ratios)
+      .filter(([key, _]) => key !== type)
+      .reduce((sum, [_, ratioValue]) => sum + ratioValue, 0);
+    
+    return 100 - otherSum;
+  };
+
+  // 각 슬라이더의 비활성화 상태 계산
+  const getSliderDisabled = (type) => {
+    const maxValue = getSliderMaxValue(type);
+    return maxValue <= 0;
   };
 
   // 모델 추가 (일괄 입력)
@@ -1641,44 +1669,102 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   배정 비율 설정
                 </Typography>
                 <Box sx={{ p: 2 }}>
-                  <Typography gutterBottom>회전율: {assignmentSettings.ratios.turnoverRate}%</Typography>
+                  {/* 현재 합계 표시 */}
+                  <Box sx={{ mb: 2, p: 1, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                      현재 합계: <strong>{Object.values(assignmentSettings.ratios).reduce((sum, ratio) => sum + ratio, 0)}%</strong>
+                      {Object.values(assignmentSettings.ratios).reduce((sum, ratio) => sum + ratio, 0) === 100 && (
+                        <span style={{ color: 'green', marginLeft: 8 }}>✓ 완료</span>
+                      )}
+                    </Typography>
+                  </Box>
+
+                  <Typography gutterBottom>
+                    회전율: {assignmentSettings.ratios.turnoverRate}%
+                    {getSliderDisabled('turnoverRate') && <span style={{ color: 'red', marginLeft: 8 }}>(최대)</span>}
+                  </Typography>
                   <Slider
                     value={assignmentSettings.ratios.turnoverRate}
                     onChange={(e, value) => handleRatioChange('turnoverRate', value)}
                     min={0}
-                    max={100}
+                    max={getSliderMaxValue('turnoverRate')}
+                    disabled={getSliderDisabled('turnoverRate')}
                     valueLabelDisplay="auto"
-                    sx={{ mb: 3 }}
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiSlider-track': { 
+                        backgroundColor: getSliderDisabled('turnoverRate') ? 'grey' : 'primary.main' 
+                      },
+                      '& .MuiSlider-thumb': { 
+                        backgroundColor: getSliderDisabled('turnoverRate') ? 'grey' : 'primary.main' 
+                      }
+                    }}
                   />
                   
-                  <Typography gutterBottom>거래처수: {assignmentSettings.ratios.storeCount}%</Typography>
+                  <Typography gutterBottom>
+                    거래처수: {assignmentSettings.ratios.storeCount}%
+                    {getSliderDisabled('storeCount') && <span style={{ color: 'red', marginLeft: 8 }}>(최대)</span>}
+                  </Typography>
                   <Slider
                     value={assignmentSettings.ratios.storeCount}
                     onChange={(e, value) => handleRatioChange('storeCount', value)}
                     min={0}
-                    max={100}
+                    max={getSliderMaxValue('storeCount')}
+                    disabled={getSliderDisabled('storeCount')}
                     valueLabelDisplay="auto"
-                    sx={{ mb: 3 }}
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiSlider-track': { 
+                        backgroundColor: getSliderDisabled('storeCount') ? 'grey' : 'secondary.main' 
+                      },
+                      '& .MuiSlider-thumb': { 
+                        backgroundColor: getSliderDisabled('storeCount') ? 'grey' : 'secondary.main' 
+                      }
+                    }}
                   />
                   
-                  <Typography gutterBottom>잔여재고: {assignmentSettings.ratios.remainingInventory}%</Typography>
+                  <Typography gutterBottom>
+                    잔여재고: {assignmentSettings.ratios.remainingInventory}%
+                    {getSliderDisabled('remainingInventory') && <span style={{ color: 'red', marginLeft: 8 }}>(최대)</span>}
+                  </Typography>
                   <Slider
                     value={assignmentSettings.ratios.remainingInventory}
                     onChange={(e, value) => handleRatioChange('remainingInventory', value)}
                     min={0}
-                    max={100}
+                    max={getSliderMaxValue('remainingInventory')}
+                    disabled={getSliderDisabled('remainingInventory')}
                     valueLabelDisplay="auto"
-                    sx={{ mb: 3 }}
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiSlider-track': { 
+                        backgroundColor: getSliderDisabled('remainingInventory') ? 'grey' : 'warning.main' 
+                      },
+                      '& .MuiSlider-thumb': { 
+                        backgroundColor: getSliderDisabled('remainingInventory') ? 'grey' : 'warning.main' 
+                      }
+                    }}
                   />
                   
-                  <Typography gutterBottom>판매량: {assignmentSettings.ratios.salesVolume}%</Typography>
+                  <Typography gutterBottom>
+                    판매량: {assignmentSettings.ratios.salesVolume}%
+                    {getSliderDisabled('salesVolume') && <span style={{ color: 'red', marginLeft: 8 }}>(최대)</span>}
+                  </Typography>
                   <Slider
                     value={assignmentSettings.ratios.salesVolume}
                     onChange={(e, value) => handleRatioChange('salesVolume', value)}
                     min={0}
-                    max={100}
+                    max={getSliderMaxValue('salesVolume')}
+                    disabled={getSliderDisabled('salesVolume')}
                     valueLabelDisplay="auto"
-                    sx={{ mb: 3 }}
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiSlider-track': { 
+                        backgroundColor: getSliderDisabled('salesVolume') ? 'grey' : 'info.main' 
+                      },
+                      '& .MuiSlider-thumb': { 
+                        backgroundColor: getSliderDisabled('salesVolume') ? 'grey' : 'info.main' 
+                      }
+                    }}
                   />
                   
                   {/* 설정 공유 버튼들 */}
@@ -2280,11 +2366,15 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       const modelAssignment = agentAssignments[modelName];
                                       officeModelAssignments[modelName].quantity += modelAssignment.quantity || 0;
                                       
-                                      // 색상별 배정량은 균등 분배로 계산 (실제로는 더 복잡할 수 있음)
+                                      // 색상별 배정량을 정확하게 계산 (소수점 버림으로 일치시킴)
                                       const colorCount = modelData.colors.length;
-                                      const quantityPerColor = Math.round((modelAssignment.quantity || 0) / colorCount);
+                                      const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
+                                      const remainder = (modelAssignment.quantity || 0) % colorCount;
+                                      
                                       modelData.colors.forEach((color, colorIndex) => {
-                                        officeModelAssignments[modelName].colors[colorIndex].quantity += quantityPerColor;
+                                        // 기본 수량 + 나머지 분배
+                                        const colorQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
+                                        officeModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
                                       });
                                     }
                                   });
@@ -2547,11 +2637,15 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       const modelAssignment = agentAssignments[modelName];
                                       departmentModelAssignments[modelName].quantity += modelAssignment.quantity || 0;
                                       
-                                      // 색상별 배정량은 균등 분배로 계산 (실제로는 더 복잡할 수 있음)
+                                      // 색상별 배정량을 정확하게 계산 (소수점 버림으로 일치시킴)
                                       const colorCount = modelData.colors.length;
-                                      const quantityPerColor = Math.round((modelAssignment.quantity || 0) / colorCount);
+                                      const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
+                                      const remainder = (modelAssignment.quantity || 0) % colorCount;
+                                      
                                       modelData.colors.forEach((color, colorIndex) => {
-                                        departmentModelAssignments[modelName].colors[colorIndex].quantity += quantityPerColor;
+                                        // 기본 수량 + 나머지 분배
+                                        const colorQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
+                                        departmentModelAssignments[modelName].colors[colorIndex].quantity += colorQuantity;
                                       });
                                     }
                                   });

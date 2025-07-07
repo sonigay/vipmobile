@@ -144,18 +144,11 @@ const loadActivationDataBatch = async () => {
   }
 };
 
-// 배정 점수 계산 (최적화된 버전)
-export const calculateAssignmentScore = async (agent, model, settings, storeData) => {
+// 원시 점수 계산 (정규화 전)
+const calculateRawScore = async (agent, model, settings, storeData) => {
   const { ratios } = settings;
   
   try {
-    // 캐시 키 생성
-    const cacheKey = generateCacheKey([agent], settings, model);
-    const cachedScore = getFromCache(cacheKey);
-    if (cachedScore !== null) {
-      return cachedScore;
-    }
-    
     // 배치로드된 개통실적 데이터 사용
     const activationData = await loadActivationDataBatch();
     
@@ -187,12 +180,12 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
     // 재고가 0이면 최고점(100), 재고가 많을수록 점수 감소
     const inventoryScore = remainingInventory === 0 ? 100 : Math.max(0, 100 - (remainingInventory * 10));
     
-    // 기본 점수 계산 (개통실적 데이터가 없는 경우에도 기본값 제공)
-    let score = 0;
+    // 원시 점수 계산 (개통실적 데이터가 없는 경우에도 기본값 제공)
+    let rawScore = 0;
     
     if (totalSales > 0 || remainingInventory > 0 || storeCount > 0) {
       // 실제 데이터가 있는 경우
-      score = (
+      rawScore = (
         turnoverRate * (ratios.turnoverRate / 100) +
         storeCount * (ratios.storeCount / 100) +
         inventoryScore * (ratios.remainingInventory / 100) + // 잔여재고 점수 사용
@@ -200,29 +193,65 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
       );
     } else {
       // 데이터가 없는 경우 기본 점수 (균등 배정을 위한 최소 점수)
-      score = 50;
+      rawScore = 50;
     }
     
+    return {
+      rawScore,
+      details: {
+        turnoverRate: Math.round(turnoverRate * 100) / 100,
+        storeCount,
+        remainingInventory,
+        inventoryScore: Math.round(inventoryScore * 100) / 100,
+        salesVolume
+      }
+    };
+  } catch (error) {
+    console.error('원시 점수 계산 중 오류:', error);
+    return { rawScore: 50, details: {} };
+  }
+};
+
+// 점수 정규화 (0-100 범위)
+const normalizeScores = (agentScores) => {
+  const maxScore = Math.max(...agentScores.map(item => item.rawScore));
+  const minScore = Math.min(...agentScores.map(item => item.rawScore));
+  const range = maxScore - minScore;
+  
+  return agentScores.map(item => ({
+    ...item,
+    normalizedScore: range > 0 ? ((item.rawScore - minScore) / range) * 100 : 50
+  }));
+};
+
+// 배정 점수 계산 (정규화된 버전)
+export const calculateAssignmentScore = async (agent, model, settings, storeData) => {
+  try {
+    // 캐시 키 생성
+    const cacheKey = generateCacheKey([agent], settings, model);
+    const cachedScore = getFromCache(cacheKey);
+    if (cachedScore !== null) {
+      return cachedScore;
+    }
+    
+    const { rawScore, details } = await calculateRawScore(agent, model, settings, storeData);
+    
     console.log(`배정 점수 계산 - ${agent.target} (${model}):`, {
-      turnoverRate: Math.round(turnoverRate * 100) / 100,
-      storeCount,
-      remainingInventory,
-      inventoryScore: Math.round(inventoryScore * 100) / 100,
-      salesVolume,
-      score: Math.round(score * 100) / 100
+      ...details,
+      rawScore: Math.round(rawScore * 100) / 100
     });
     
     // 결과 캐싱
-    setCache(cacheKey, score);
+    setCache(cacheKey, rawScore);
     
-    return score;
+    return rawScore;
   } catch (error) {
     console.error('배정 점수 계산 중 오류:', error);
     return 50; // 기본값
   }
 };
 
-// 모델별 배정 수량 계산 (최적화된 버전)
+// 모델별 배정 수량 계산 (100% 배정 보장 버전)
 export const calculateModelAssignment = async (modelName, modelData, eligibleAgents, settings, storeData) => {
   if (eligibleAgents.length === 0) {
     return {};
@@ -231,44 +260,40 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
   // 색상별 수량의 총합 계산
   const totalQuantity = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
   
-  // 병렬로 모든 영업사원의 배정 점수 계산
-  const scorePromises = eligibleAgents.map(async (agent) => {
-    const score = await calculateAssignmentScore(agent, modelName, settings, storeData);
-    return { agent, score };
+  // 1단계: 모든 영업사원의 원시 점수 계산
+  const rawScorePromises = eligibleAgents.map(async (agent) => {
+    const { rawScore, details } = await calculateRawScore(agent, modelName, settings, storeData);
+    return { agent, rawScore, details };
   });
   
-  const agentScores = await Promise.all(scorePromises);
+  const agentRawScores = await Promise.all(rawScorePromises);
   
-  // 점수별로 정렬
-  agentScores.sort((a, b) => b.score - a.score);
+  // 2단계: 점수 정규화 (0-100 범위)
+  const normalizedScores = normalizeScores(agentRawScores);
   
-  // 총 점수 계산
-  const totalScore = agentScores.reduce((sum, item) => sum + item.score, 0);
+  // 3단계: 정규화된 점수로 정렬
+  normalizedScores.sort((a, b) => b.normalizedScore - a.normalizedScore);
+  
+  // 4단계: 정규화된 점수 합계 계산
+  const totalNormalizedScore = normalizedScores.reduce((sum, item) => sum + item.normalizedScore, 0);
   
   const assignments = {};
   let remainingQuantity = totalQuantity;
   
-  // 1차 배정: 점수 비율에 따른 기본 배정
-  agentScores.forEach(({ agent, score }, index) => {
-    const ratio = totalScore > 0 ? score / totalScore : 1 / eligibleAgents.length;
+  // 5단계: 1차 배정 - 정규화된 점수 비율에 따른 기본 배정 (소수점 버림)
+  normalizedScores.forEach(({ agent, normalizedScore, rawScore, details }, index) => {
+    const ratio = totalNormalizedScore > 0 ? normalizedScore / totalNormalizedScore : 1 / eligibleAgents.length;
     
-    let assignedQuantity;
+    // 기본 배정량 (소수점 버림으로 정확한 수량 계산)
+    let assignedQuantity = Math.floor(totalQuantity * ratio);
     
-    if (index === agentScores.length - 1) {
-      // 마지막 영업사원에게 남은 수량 모두 배정
-      assignedQuantity = remainingQuantity;
-    } else {
-      // 비율에 따른 배정량 계산
-      assignedQuantity = Math.round(totalQuantity * ratio);
-      
-      // 남은 수량을 초과하지 않도록 조정
-      assignedQuantity = Math.min(assignedQuantity, remainingQuantity);
-      
-      // 최소 1개는 배정 (수량이 있는 경우)
-      if (remainingQuantity > 0 && assignedQuantity === 0) {
-        assignedQuantity = 1;
-      }
+    // 최소 1개 보장 (수량이 있는 경우)
+    if (remainingQuantity > 0 && assignedQuantity === 0) {
+      assignedQuantity = 1;
     }
+    
+    // 남은 수량 초과 방지
+    assignedQuantity = Math.min(assignedQuantity, remainingQuantity);
     
     assignments[agent.contactId] = {
       agentName: agent.target,
@@ -276,85 +301,74 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
       department: agent.department,
       quantity: assignedQuantity,
       colors: modelData.colors.map(color => color.name), // 색상명 배열
-      score: score,
+      normalizedScore: normalizedScore,
+      rawScore: rawScore,
       ratio: ratio,
-      originalScore: score // 원본 점수 보존
+      details: details
     };
     
     remainingQuantity -= assignedQuantity;
   });
   
-  // 2차 배정: 자투리 재고 재배정 (100% 배정 보장)
+  // 6단계: 잔여 재고 재배정 (100% 배정 보장)
   if (remainingQuantity > 0) {
-    console.log(`🔄 모델 ${modelName}에서 ${remainingQuantity}개 자투리 재고 재배정 시작`);
+    console.log(`🔄 모델 ${modelName}에서 ${remainingQuantity}개 잔여 재고 재배정 시작`);
     
-    // 판매량과 거래처수 기준으로 재배정 우선순위 결정
-    const redistributionCandidates = agentScores
-      .map(({ agent, score }) => {
-        // 개통실적 데이터에서 판매량과 거래처수 추출
-        const agentData = storeData?.activationData?.filter(item => 
-          item.contactId === agent.contactId
-        ) || [];
-        
-        const totalSales = agentData.reduce((sum, item) => {
-          const modelData = item.models?.[modelName];
-          return sum + (modelData?.당월실적 || 0) + (modelData?.전월실적 || 0);
-        }, 0);
-        
-        const storeCount = agentData.length; // 거래처수
+    // 잔여재고 우선순위 기반 재배정 후보 선별
+    const redistributionCandidates = normalizedScores
+      .map(({ agent, normalizedScore, details }) => {
+        // 잔여재고 확인 (details에서 가져옴)
+        const hasInventory = details.remainingInventory > 0;
         
         return {
           agentId: agent.contactId,
           agent,
-          score,
-          totalSales,
-          storeCount,
-          currentQuantity: assignments[agent.contactId]?.quantity || 0
+          normalizedScore,
+          hasInventory,
+          currentQuantity: assignments[agent.contactId]?.quantity || 0,
+          priority: hasInventory ? 0 : 1 // 잔여재고 없는 곳 우선
         };
       })
       .sort((a, b) => {
-        // 1순위: 판매량 높은 순
-        if (b.totalSales !== a.totalSales) {
-          return b.totalSales - a.totalSales;
+        // 1순위: 잔여재고 없는 곳 우선
+        if (a.priority !== b.priority) {
+          return b.priority - a.priority;
         }
-        // 2순위: 거래처수 많은 순
-        if (b.storeCount !== a.storeCount) {
-          return b.storeCount - a.storeCount;
-        }
-        // 3순위: 원래 점수 높은 순
-        return b.score - a.score;
+        // 2순위: 정규화된 점수 높은 순
+        return b.normalizedScore - a.normalizedScore;
       });
     
-    // 자투리 재고를 우선순위에 따라 재배정
+    // 잔여재고 없는 곳에 우선 배정
     let redistributionIndex = 0;
     while (remainingQuantity > 0 && redistributionIndex < redistributionCandidates.length) {
       const candidate = redistributionCandidates[redistributionIndex];
       
-      // 해당 영업사원에게 1개씩 추가 배정
       if (assignments[candidate.agentId]) {
         assignments[candidate.agentId].quantity += 1;
         assignments[candidate.agentId].redistributed = (assignments[candidate.agentId].redistributed || 0) + 1;
         remainingQuantity -= 1;
         
-        console.log(`✅ ${candidate.agent.target}에게 자투리 재고 1개 추가 배정 (판매량: ${candidate.totalSales}, 거래처: ${candidate.storeCount}개)`);
+        console.log(`✅ ${candidate.agent.target}에게 잔여 재고 1개 추가 배정 (잔여재고: ${candidate.hasInventory ? '있음' : '없음'}, 점수: ${Math.round(candidate.normalizedScore)})`);
       }
       
       redistributionIndex++;
-      
-      // 한 바퀴 돌았는데도 남은 수량이 있으면 다시 처음부터
-      if (redistributionIndex >= redistributionCandidates.length && remainingQuantity > 0) {
-        redistributionIndex = 0;
-      }
     }
     
-    // 여전히 남은 수량이 있다면 마지막 영업사원에게 모두 배정
+    // 여전히 남은 수량이 있으면 모든 영업사원에게 순차 배정
     if (remainingQuantity > 0) {
-      const lastAgentId = agentScores[agentScores.length - 1].agent.contactId;
-      if (assignments[lastAgentId]) {
-        assignments[lastAgentId].quantity += remainingQuantity;
-        assignments[lastAgentId].redistributed = (assignments[lastAgentId].redistributed || 0) + remainingQuantity;
-        console.log(`⚠️ ${assignments[lastAgentId].agentName}에게 남은 ${remainingQuantity}개 모두 배정`);
-        remainingQuantity = 0;
+      redistributionIndex = 0;
+      while (remainingQuantity > 0) {
+        const candidate = redistributionCandidates[redistributionIndex % redistributionCandidates.length];
+        
+        if (assignments[candidate.agentId]) {
+          assignments[candidate.agentId].quantity += 1;
+          assignments[candidate.agentId].redistributed = (assignments[candidate.agentId].redistributed || 0) + 1;
+          remainingQuantity -= 1;
+          
+          console.log(`✅ ${candidate.agent.target}에게 추가 잔여 재고 1개 배정`);
+        }
+        
+        redistributionIndex++;
       }
     }
   }
