@@ -270,7 +270,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 설정 저장 (사용자별로 로컬 스토리지에 모든 설정 저장)
   const saveSettings = () => {
     // 현재 로그인한 사용자 ID 가져오기
-    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+    const currentUserId = loginState.inventoryUserName || 'unknown';
     
     // 모든 설정을 사용자별로 로컬 스토리지에 저장
     const settingsToSave = {
@@ -327,7 +328,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const loadSettings = () => {
     try {
       // 현재 로그인한 사용자 ID 가져오기
-      const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+      const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+      const currentUserId = loginState.inventoryUserName || 'unknown';
       
       const savedData = localStorage.getItem(`assignmentSettingsData_${currentUserId}`);
       if (savedData) {
@@ -366,7 +368,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 기본 설정 설정
   const setDefaultSettings = () => {
-    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+    const currentUserId = loginState.inventoryUserName || 'unknown';
     
     const defaultSettings = {
       assignmentSettings: {
@@ -408,7 +411,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 모든 설정 초기화 (사용자별)
   const handleResetAllSettings = () => {
-    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+    const currentUserId = loginState.inventoryUserName || 'unknown';
     
     if (window.confirm('모든 배정 설정을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
       // 사용자별 로컬 스토리지에서 설정 삭제
@@ -1275,7 +1279,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 사용자별 설정 공유 기능
   const handleShareSettings = () => {
-    const currentUserId = localStorage.getItem('inventoryUserName') || 'unknown';
+    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+    const currentUserId = loginState.inventoryUserName || 'unknown';
     const currentSettings = assignmentSettings;
     
     // 공유할 설정 정보 생성
@@ -1325,6 +1330,32 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     
     // 공유 설정 목록 다이얼로그 열기
     setShowSharedSettingsDialog(true);
+  };
+
+  // 공유 설정 삭제
+  const handleDeleteSharedSetting = (index) => {
+    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+    const currentUserId = loginState.inventoryUserName || 'unknown';
+    
+    const sharedSettings = JSON.parse(localStorage.getItem('sharedAssignmentSettings') || '[]');
+    const settingToDelete = sharedSettings[index];
+    
+    // 본인이 공유한 설정인지 확인
+    if (settingToDelete.sharedBy !== currentUserId) {
+      alert('본인이 공유한 설정만 삭제할 수 있습니다.');
+      return;
+    }
+    
+    if (window.confirm('이 공유 설정을 삭제하시겠습니까?')) {
+      // 해당 설정 삭제
+      sharedSettings.splice(index, 1);
+      localStorage.setItem('sharedAssignmentSettings', JSON.stringify(sharedSettings));
+      
+      alert('공유 설정이 삭제되었습니다.');
+      // 다이얼로그를 닫았다가 다시 열어서 목록 갱신
+      setShowSharedSettingsDialog(false);
+      setTimeout(() => setShowSharedSettingsDialog(true), 100);
+    }
   };
 
   return (
@@ -2647,57 +2678,76 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               
               return (
                 <List>
-                  {sharedSettings.map((setting, index) => (
-                    <ListItem key={index} divider>
-                      <ListItemIcon>
-                        <PersonIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                              {setting.sharedBy}님이 공유한 설정
-                            </Typography>
-                            <Chip 
-                              label={new Date(setting.timestamp).toLocaleString('ko-KR')} 
-                              size="small" 
-                              variant="outlined"
-                            />
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
-                              <Chip label={`회전율: ${setting.ratios.turnoverRate}%`} size="small" color="primary" />
-                              <Chip label={`거래처수: ${setting.ratios.storeCount}%`} size="small" color="secondary" />
-                              <Chip label={`잔여재고: ${setting.ratios.remainingInventory}%`} size="small" color="warning" />
-                              <Chip label={`판매량: ${setting.ratios.salesVolume}%`} size="small" color="info" />
+                  {sharedSettings.map((setting, index) => {
+                    const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+                    const currentUserId = loginState.inventoryUserName || 'unknown';
+                    const isMySharedSetting = setting.sharedBy === currentUserId;
+                    
+                    return (
+                      <ListItem key={index} divider>
+                        <ListItemIcon>
+                          <PersonIcon color="primary" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                {setting.sharedBy}님이 공유한 설정
+                              </Typography>
+                              <Chip 
+                                label={new Date(setting.timestamp).toLocaleString('ko-KR')} 
+                                size="small" 
+                                variant="outlined"
+                              />
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
-                              모델: {setting.modelCount}개 | 사무실: {setting.targetCount.offices}개 | 
-                              소속: {setting.targetCount.departments}개 | 영업사원: {setting.targetCount.agents}명
-                            </Typography>
+                          }
+                          secondary={
+                            <Box>
+                              <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                                <Chip label={`회전율: ${setting.ratios.turnoverRate}%`} size="small" color="primary" />
+                                <Chip label={`거래처수: ${setting.ratios.storeCount}%`} size="small" color="secondary" />
+                                <Chip label={`잔여재고: ${setting.ratios.remainingInventory}%`} size="small" color="warning" />
+                                <Chip label={`판매량: ${setting.ratios.salesVolume}%`} size="small" color="info" />
+                              </Box>
+                              <Typography variant="caption" color="text.secondary">
+                                모델: {setting.modelCount}개 | 사무실: {setting.targetCount.offices}개 | 
+                                소속: {setting.targetCount.departments}개 | 영업사원: {setting.targetCount.agents}명
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                        <ListItemSecondaryAction>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                setAssignmentSettings(prev => ({
+                                  ...prev,
+                                  ratios: setting.ratios
+                                }));
+                                setShowSharedSettingsDialog(false);
+                                alert('공유된 배정 비율이 적용되었습니다.');
+                              }}
+                            >
+                              적용
+                            </Button>
+                            {isMySharedSetting && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => handleDeleteSharedSetting(index)}
+                                startIcon={<DeleteIcon />}
+                              >
+                                삭제
+                              </Button>
+                            )}
                           </Box>
-                        }
-                      />
-                      <ListItemSecondaryAction>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => {
-                            setAssignmentSettings(prev => ({
-                              ...prev,
-                              ratios: setting.ratios
-                            }));
-                            setShowSharedSettingsDialog(false);
-                            alert('공유된 배정 비율이 적용되었습니다.');
-                          }}
-                        >
-                          적용
-                        </Button>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    );
+                  })}
                 </List>
               );
             })()}
