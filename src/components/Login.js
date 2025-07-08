@@ -373,19 +373,19 @@ function Login({ onLogin }) {
               gap: 1,
               flexWrap: 'nowrap'
             }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
                 LG유플러스(주)
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
                 (주)엠제이통신
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
                 (주)스마트폰면세점
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
                 (주)본앤코리아
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
                 폰다컴퍼니
               </Typography>
             </Box>
