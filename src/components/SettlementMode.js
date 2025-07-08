@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 
 function SettlementMode({ onLogout, loggedInStore, settlementUserName }) {
   const [excelData, setExcelData] = useState(null);
+  const [originalFileName, setOriginalFileName] = useState(''); // 원본 파일명 저장
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,6 +38,9 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName }) {
 
     setIsLoading(true);
     setError('');
+
+    // 원본 파일명 저장
+    setOriginalFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -75,9 +79,17 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName }) {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '정산데이터');
       
-      // 파일명에 현재 날짜 추가
-      const today = new Date().toISOString().split('T')[0];
-      const fileName = `정산데이터_${today}.xlsx`;
+      // 원본 파일명이 있으면 사용, 없으면 기본 파일명 사용
+      let fileName;
+      if (originalFileName) {
+        // 원본 파일명에서 확장자 제거 후 다시 추가
+        const nameWithoutExt = originalFileName.replace(/\.(xlsx|xls)$/i, '');
+        fileName = `${nameWithoutExt}_수정본.xlsx`;
+      } else {
+        // 기본 파일명에 현재 날짜 추가
+        const today = new Date().toISOString().split('T')[0];
+        fileName = `정산데이터_${today}.xlsx`;
+      }
       
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
@@ -169,39 +181,51 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName }) {
 
         {/* 업로드된 데이터 표시 */}
         {excelData && (
-          <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-            <TableContainer sx={{ maxHeight: 600 }}>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {excelData[0] && excelData[0].map((header, index) => (
-                      <TableCell 
-                        key={index}
-                        sx={{ 
-                          backgroundColor: '#f5f5f5',
-                          fontWeight: 600,
-                          fontSize: '0.875rem'
-                        }}
-                      >
-                        {header || `열 ${index + 1}`}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {excelData.slice(1).map((row, rowIndex) => (
-                    <TableRow key={rowIndex} hover>
-                      {row.map((cell, cellIndex) => (
-                        <TableCell key={cellIndex} sx={{ fontSize: '0.875rem' }}>
-                          {cell || ''}
+          <>
+            {/* 파일 정보 표시 */}
+            <Box sx={{ mb: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                📁 업로드된 파일: <strong>{originalFileName}</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                📊 데이터 행 수: <strong>{excelData.length - 1}개</strong> (헤더 제외)
+              </Typography>
+            </Box>
+            
+            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+              <TableContainer sx={{ maxHeight: 600 }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      {excelData[0] && excelData[0].map((header, index) => (
+                        <TableCell 
+                          key={index}
+                          sx={{ 
+                            backgroundColor: '#f5f5f5',
+                            fontWeight: 600,
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          {header || `열 ${index + 1}`}
                         </TableCell>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+                  </TableHead>
+                  <TableBody>
+                    {excelData.slice(1).map((row, rowIndex) => (
+                      <TableRow key={rowIndex} hover>
+                        {row.map((cell, cellIndex) => (
+                          <TableCell key={cellIndex} sx={{ fontSize: '0.875rem' }}>
+                            {cell || ''}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </>
         )}
 
         {/* 데이터가 없을 때 안내 메시지 */}
