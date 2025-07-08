@@ -274,91 +274,130 @@ function Login({ onLogin }) {
           
           <Divider sx={{ my: 3 }} />
           
-          {/* 협력업체 푸터 섹션 */}
+          {/* PARTNERS 섹션 */}
           <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.875rem' }}>
-              협력업체
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                mb: 2, 
+                fontSize: '0.9rem', 
+                fontWeight: 600, 
+                color: '#374151',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase'
+              }}
+            >
+              PARTNERS
             </Typography>
             <Box sx={{ 
               display: 'flex', 
               justifyContent: 'center', 
-              gap: 1,
-              mb: 2,
+              gap: 1.5,
               flexWrap: 'nowrap'
             }}>
               <Box sx={{ 
                 width: '70px',
                 height: '60px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#fafafa'
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
               }}>
                 <img 
                   src="/1.png" 
-                  alt="LG유플러스(주)"
+                  alt="LG유플러스"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
               <Box sx={{ 
                 width: '70px',
                 height: '60px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#fafafa'
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
               }}>
                 <img 
                   src="/2.png" 
-                  alt="(주)엠제이통신"
+                  alt="엠제이통신"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
               <Box sx={{ 
                 width: '70px',
                 height: '60px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#fafafa'
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
               }}>
                 <img 
                   src="/3.png" 
-                  alt="(주)스마트폰면세점"
+                  alt="스마트폰면세점"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
               <Box sx={{ 
                 width: '70px',
                 height: '60px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#fafafa'
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
               }}>
                 <img 
                   src="/4.png" 
-                  alt="(주)본앤코리아"
+                  alt="본앤코리아"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
               <Box sx={{ 
                 width: '70px',
                 height: '60px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#fafafa'
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
               }}>
                 <img 
                   src="/5.png" 
@@ -366,28 +405,6 @@ function Login({ onLogin }) {
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
-            </Box>
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              gap: 1,
-              flexWrap: 'nowrap'
-            }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
-                LG유플러스(주)
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
-                (주)엠제이통신
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
-                (주)스마트폰면세점
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
-                (주)본앤코리아
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.55rem', width: '70px', textAlign: 'center' }}>
-                폰다컴퍼니
-              </Typography>
             </Box>
           </Box>
           
