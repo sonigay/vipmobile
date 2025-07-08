@@ -7,6 +7,7 @@ import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
+import SettlementMode from './components/SettlementMode';
 import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
@@ -109,6 +110,9 @@ function App() {
   // 재고모드 관련 상태 추가
   const [isInventoryMode, setIsInventoryMode] = useState(false);
   const [inventoryUserName, setInventoryUserName] = useState(''); // 재고모드 접속자 이름 추가
+  // 정산모드 관련 상태 추가
+  const [isSettlementMode, setIsSettlementMode] = useState(false);
+  const [settlementUserName, setSettlementUserName] = useState(''); // 정산모드 접속자 이름 추가
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -160,6 +164,12 @@ function App() {
     "VIP8062",     // 이병각
     "VIP6741",     // 이형주
     "VIP6965"      // 정광영
+  ];
+
+  // 정산모드 접속 아이디 목록
+  const SETTLEMENT_MODE_IDS = [
+    "JUNGSAN1620",  // 함용주
+    "JUNGSAN8119"   // 홍남옥
   ];
   
   // 알림 시스템 및 모바일 최적화 초기화 제거 (재고 모드로 이동)
@@ -1124,11 +1134,38 @@ function App() {
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
+    // 정산모드인지 확인
+    if (SETTLEMENT_MODE_IDS.includes(store.id)) {
+      console.log('로그인: 정산모드');
+      setIsSettlementMode(true);
+      setIsInventoryMode(false);
+      setIsAgentMode(false);
+      
+      // 정산모드 접속자 이름 설정
+      const settlementUserNames = {
+        'JUNGSAN1620': '함용주',
+        'JUNGSAN8119': '홍남옥'
+      };
+      
+      const userName = settlementUserNames[store.id] || '정산관리자';
+      setSettlementUserName(userName);
+      console.log(`정산모드 접속자: ${userName}`);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isSettlement: true,
+        isInventory: false,
+        isAgent: false,
+        store: store,
+        settlementUserName: userName
+      }));
+    }
     // 재고모드인지 확인 (백엔드 응답의 isInventory 플래그 우선 확인)
-    if (store.isInventory || INVENTORY_MODE_IDS.includes(store.id)) {
+    else if (store.isInventory || INVENTORY_MODE_IDS.includes(store.id)) {
       console.log('로그인: 재고모드');
       setIsInventoryMode(true);
       setIsAgentMode(false);
+      setIsSettlementMode(false);
       
       // 재고모드 접속자 이름 설정
       const inventoryUserNames = {
@@ -1160,6 +1197,7 @@ function App() {
       localStorage.setItem('loginState', JSON.stringify({
         isInventory: true,
         isAgent: false,
+        isSettlement: false,
         store: store,
         inventoryUserName: userName
       }));
@@ -1169,6 +1207,7 @@ function App() {
       console.log('로그인: 관리자 모드');
       setIsAgentMode(true);
       setIsInventoryMode(false);
+      setIsSettlementMode(false);
       setAgentTarget(store.target);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
@@ -1185,6 +1224,7 @@ function App() {
       localStorage.setItem('loginState', JSON.stringify({
         isAgent: true,
         isInventory: false,
+        isSettlement: false,
         store: store,
         agentTarget: store.target,
         agentQualification: store.qualification,
@@ -1198,6 +1238,7 @@ function App() {
       console.log('로그인: 일반 매장 모드');
       setIsAgentMode(false);
       setIsInventoryMode(false);
+      setIsSettlementMode(false);
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -1210,6 +1251,7 @@ function App() {
       localStorage.setItem('loginState', JSON.stringify({
         isAgent: false,
         isInventory: false,
+        isSettlement: false,
         store: store
       }));
     }
@@ -1232,6 +1274,9 @@ function App() {
     // 재고모드 상태 초기화
     setIsInventoryMode(false);
     setInventoryUserName(''); // 재고모드 접속자 이름 초기화
+    // 정산모드 상태 초기화
+    setIsSettlementMode(false);
+    setSettlementUserName(''); // 정산모드 접속자 이름 초기화
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -1622,6 +1667,20 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Login onLogin={handleLogin} />
+      </ThemeProvider>
+    );
+  }
+
+  // 정산모드일 때는 별도 화면 렌더링
+  if (isSettlementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <SettlementMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          settlementUserName={settlementUserName}
+        />
       </ThemeProvider>
     );
   }
