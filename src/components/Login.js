@@ -278,75 +278,95 @@ function Login({ onLogin }) {
             </Typography>
             <Box sx={{ 
               display: 'flex', 
-              flexWrap: 'wrap', 
               justifyContent: 'center', 
-              gap: 2,
-              mb: 2 
+              gap: 1,
+              mb: 2,
+              flexWrap: 'nowrap'
             }}>
               <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+                width: '80px',
+                height: '60px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                display: 'flex',
                 alignItems: 'center',
-                minWidth: '120px'
+                justifyContent: 'center',
+                backgroundColor: '#fafafa'
               }}>
                 <img 
                   src="/1.png" 
-                  alt="엘지유플러스"
-                  style={{ height: '40px', marginBottom: '4px' }}
+                  alt="LG유플러스(주)"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                  엘지유플러스
-                </Typography>
               </Box>
               <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+                width: '80px',
+                height: '60px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                display: 'flex',
                 alignItems: 'center',
-                minWidth: '120px'
+                justifyContent: 'center',
+                backgroundColor: '#fafafa'
               }}>
                 <img 
                   src="/2.png" 
                   alt="(주)엠제이통신"
-                  style={{ height: '40px', marginBottom: '4px' }}
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                  (주)엠제이통신
-                </Typography>
               </Box>
               <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+                width: '80px',
+                height: '60px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                display: 'flex',
                 alignItems: 'center',
-                minWidth: '120px'
+                justifyContent: 'center',
+                backgroundColor: '#fafafa'
               }}>
                 <img 
                   src="/3.png" 
                   alt="(주)스마트폰면세점"
-                  style={{ height: '40px', marginBottom: '4px' }}
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                  (주)스마트폰면세점
-                </Typography>
               </Box>
               <Box sx={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+                width: '80px',
+                height: '60px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                display: 'flex',
                 alignItems: 'center',
-                minWidth: '120px'
+                justifyContent: 'center',
+                backgroundColor: '#fafafa'
               }}>
                 <img 
                   src="/4.png" 
                   alt="(주)본앤코리아"
-                  style={{ height: '40px', marginBottom: '4px' }}
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                  (주)본앤코리아
-                </Typography>
               </Box>
             </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-              Powered by 협력업체
-            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: 1,
+              flexWrap: 'nowrap'
+            }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', width: '80px', textAlign: 'center' }}>
+                LG유플러스(주)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', width: '80px', textAlign: 'center' }}>
+                (주)엠제이통신
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', width: '80px', textAlign: 'center' }}>
+                (주)스마트폰면세점
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', width: '80px', textAlign: 'center' }}>
+                (주)본앤코리아
+              </Typography>
+            </Box>
           </Box>
           
           <Divider sx={{ my: 2 }} />
