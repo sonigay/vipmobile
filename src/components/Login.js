@@ -284,7 +284,7 @@ function Login({ onLogin }) {
               flexWrap: 'nowrap'
             }}>
               <Box sx={{ 
-                width: '90px',
+                width: '70px',
                 height: '60px',
                 border: '1px solid #e0e0e0',
                 borderRadius: '4px',
@@ -300,7 +300,7 @@ function Login({ onLogin }) {
                 />
               </Box>
               <Box sx={{ 
-                width: '90px',
+                width: '70px',
                 height: '60px',
                 border: '1px solid #e0e0e0',
                 borderRadius: '4px',
@@ -316,7 +316,7 @@ function Login({ onLogin }) {
                 />
               </Box>
               <Box sx={{ 
-                width: '90px',
+                width: '70px',
                 height: '60px',
                 border: '1px solid #e0e0e0',
                 borderRadius: '4px',
@@ -332,7 +332,7 @@ function Login({ onLogin }) {
                 />
               </Box>
               <Box sx={{ 
-                width: '90px',
+                width: '70px',
                 height: '60px',
                 border: '1px solid #e0e0e0',
                 borderRadius: '4px',
@@ -347,6 +347,22 @@ function Login({ onLogin }) {
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
+              <Box sx={{ 
+                width: '70px',
+                height: '60px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#fafafa'
+              }}>
+                <img 
+                  src="/5.png" 
+                  alt="폰다컴퍼니"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              </Box>
             </Box>
             <Box sx={{ 
               display: 'flex', 
@@ -354,17 +370,20 @@ function Login({ onLogin }) {
               gap: 1,
               flexWrap: 'nowrap'
             }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', width: '90px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
                 LG유플러스(주)
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', width: '90px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
                 (주)엠제이통신
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', width: '90px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
                 (주)스마트폰면세점
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', width: '90px', textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
                 (주)본앤코리아
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', width: '70px', textAlign: 'center' }}>
+                폰다컴퍼니
               </Typography>
             </Box>
           </Box>
