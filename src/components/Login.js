@@ -219,6 +219,9 @@ function Login({ onLogin }) {
               alt="(주)브이아이피플러스"
               style={{ maxWidth: '150px', margin: '0 auto' }}
             />
+            <Typography variant="h6" color="text.secondary" sx={{ mt: 1, fontSize: '1.1rem', fontWeight: 500 }}>
+              (주)브이아이피플러스
+            </Typography>
           </Box>
 
           {showConsentForm && (
