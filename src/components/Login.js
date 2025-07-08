@@ -271,6 +271,86 @@ function Login({ onLogin }) {
           
           <Divider sx={{ my: 3 }} />
           
+          {/* 협력업체 푸터 섹션 */}
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.875rem' }}>
+              협력업체
+            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              justifyContent: 'center', 
+              gap: 2,
+              mb: 2 
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                minWidth: '120px'
+              }}>
+                <img 
+                  src="/1.png" 
+                  alt="엘지유플러스"
+                  style={{ height: '40px', marginBottom: '4px' }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                  엘지유플러스
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                minWidth: '120px'
+              }}>
+                <img 
+                  src="/2.png" 
+                  alt="(주)엠제이통신"
+                  style={{ height: '40px', marginBottom: '4px' }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                  (주)엠제이통신
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                minWidth: '120px'
+              }}>
+                <img 
+                  src="/3.png" 
+                  alt="(주)스마트폰면세점"
+                  style={{ height: '40px', marginBottom: '4px' }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                  (주)스마트폰면세점
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                minWidth: '120px'
+              }}>
+                <img 
+                  src="/4.png" 
+                  alt="(주)본앤코리아"
+                  style={{ height: '40px', marginBottom: '4px' }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                  (주)본앤코리아
+                </Typography>
+              </Box>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+              Powered by 협력업체
+            </Typography>
+          </Box>
+          
+          <Divider sx={{ my: 2 }} />
+          
           <Box className="login-info" sx={{ textAlign: 'center', mt: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
               엘지유플러스 공식 대리점 (주)브이아이피플러스를 이용해 주셔서 진심으로 감사드립니다.
