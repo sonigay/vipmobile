@@ -136,6 +136,22 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
           uniqueStores: Array.from(uniqueStores),
           storeCount: storeCount
         });
+        
+        // 김수빈인 경우 더 자세한 정보 출력
+        if (agent.target === '김수빈') {
+          console.log('🚨 김수빈 상세 거래처 정보:', {
+            agentName: agent.target,
+            totalRecords: agentCurrentData.length,
+            allStores: agentCurrentData.map(record => record['출고처']).filter(Boolean),
+            uniqueStores: Array.from(uniqueStores),
+            storeCount: storeCount,
+            sampleRecords: agentCurrentData.slice(0, 3).map(record => ({
+              출고처: record['출고처'],
+              모델명: record['모델명'],
+              개통: record['개통']
+            }))
+          });
+        }
       } catch (error) {
         console.error(`거래처수 계산 중 오류 (${agent.target}):`, error);
         storeCount = 0;
