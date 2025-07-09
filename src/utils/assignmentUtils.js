@@ -100,8 +100,30 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
     if (storeData && Array.isArray(storeData)) {
       storeCount = storeData.filter(store => 
         store.manager === agent.target || 
-        store.담당자 === agent.target
+        store.담당자 === agent.target ||
+        store.name === agent.target // 담당자가 본인 이름의 업체명을 가진 경우
       ).length;
+      
+      // 김수빈의 경우 더 상세한 로그
+      if (agent.target === '김수빈') {
+        const matchingStores = storeData.filter(store => 
+          store.manager === agent.target || 
+          store.담당자 === agent.target ||
+          store.name === agent.target
+        );
+        console.log('🚨 김수빈 매장 매칭 결과:', {
+          totalStores: storeData.length,
+          matchingStores: matchingStores.map(store => ({
+            name: store.name,
+            manager: store.manager,
+            담당자: store.담당자,
+            matchType: store.manager === agent.target ? 'manager' : 
+                      store.담당자 === agent.target ? '담당자' : 
+                      store.name === agent.target ? 'name' : 'none'
+          })),
+          storeCount
+        });
+      }
     }
     
     // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
