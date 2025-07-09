@@ -1216,12 +1216,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     // 디버깅: 실제 받은 데이터 구조 확인
     console.log(`🎯 ScoreDisplay - ${modelName}-${colorName}:`, scores);
     
-    // 상세값 매핑
+    // 상세값 매핑 (실제 배정 로직에 맞게 조정)
     const logicDetailLabel = {
       turnoverRate: v => `회전율: ${v !== undefined ? v + '%' : '-'}`,
       storeCount: v => `거래처수: ${v !== undefined ? v : '-'}`,
       remainingInventory: v => `잔여재고: ${v !== undefined ? v : '-'}`,
-      inventoryScore: v => `재고점수: ${v !== undefined ? v : '-'}`,
       salesVolume: v => `판매량: ${v !== undefined ? v : '-'}`,
     };
     

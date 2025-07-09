@@ -103,10 +103,16 @@ const loadActivationDataBatch = async () => {
   
   try {
     const API_URL = process.env.REACT_APP_API_URL;
+    
+    // 백엔드에서 제공하는 구글 시트 기반 개통실적 데이터 API 사용
     const [currentMonthResponse, previousMonthResponse] = await Promise.all([
       fetch(`${API_URL}/api/activation-data/current-month`),
       fetch(`${API_URL}/api/activation-data/previous-month`)
     ]);
+    
+    if (!currentMonthResponse.ok || !previousMonthResponse.ok) {
+      throw new Error('개통실적 데이터 API 호출 실패');
+    }
     
     const currentMonthData = await currentMonthResponse.json();
     const previousMonthData = await previousMonthResponse.json();
@@ -117,29 +123,41 @@ const loadActivationDataBatch = async () => {
       previous: new Map()
     };
     
-    // 담당자별로 데이터 그룹화
+    // 담당자별로 데이터 그룹화 (구글 시트 필드명 사용)
     currentMonthData.forEach(record => {
       const key = record['담당자'];
-      if (!indexedData.current.has(key)) {
-        indexedData.current.set(key, []);
+      if (key) {
+        if (!indexedData.current.has(key)) {
+          indexedData.current.set(key, []);
+        }
+        indexedData.current.get(key).push(record);
       }
-      indexedData.current.get(key).push(record);
     });
     
     previousMonthData.forEach(record => {
       const key = record['담당자'];
-      if (!indexedData.previous.has(key)) {
-        indexedData.previous.set(key, []);
+      if (key) {
+        if (!indexedData.previous.has(key)) {
+          indexedData.previous.set(key, []);
+        }
+        indexedData.previous.get(key).push(record);
       }
-      indexedData.previous.get(key).push(record);
     });
     
     activationDataCache = indexedData;
     activationDataTimestamp = now;
     
+    console.log('✅ 구글 시트 기반 개통실적 데이터 로드 완료:', {
+      currentMonth: currentMonthData.length,
+      previousMonth: previousMonthData.length,
+      currentAgents: indexedData.current.size,
+      previousAgents: indexedData.previous.size
+    });
+    
     return indexedData;
+    
   } catch (error) {
-    console.error('개통실적 데이터 배치 로드 실패:', error);
+    console.error('개통실적 데이터 로드 실패:', error);
     return { current: new Map(), previous: new Map() };
   }
 };
@@ -156,19 +174,19 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     const agentCurrentData = activationData.current.get(agent.target) || [];
     const agentPreviousData = activationData.previous.get(agent.target) || [];
     
-    // 모델+색상별 데이터 필터링 (색상 정보가 있는 경우)
+    // 구글 시트 필드명 사용 (백엔드에서 이미 매핑됨)
     const modelColorCurrentData = agentCurrentData.filter(record => 
-      record['모델'] === model && 
+      record['모델명'] === model && 
       (record['색상'] === color || !record['색상']) // 색상 정보가 없으면 모델만으로 필터링
     );
     const modelColorPreviousData = agentPreviousData.filter(record => 
-      record['모델'] === model && 
+      record['모델명'] === model && 
       (record['색상'] === color || !record['색상'])
     );
     
     // 모델별 데이터 필터링 (색상별 데이터가 없을 경우 모델별로 계산)
-    const modelCurrentData = agentCurrentData.filter(record => record['모델'] === model);
-    const modelPreviousData = agentPreviousData.filter(record => record['모델'] === model);
+    const modelCurrentData = agentCurrentData.filter(record => record['모델명'] === model);
+    const modelPreviousData = agentPreviousData.filter(record => record['모델명'] === model);
     
     // 색상별 수량 계산 (색상별 데이터가 있으면 사용, 없으면 모델별 데이터 사용)
     const currentMonthSales = modelColorCurrentData.length > 0 
@@ -199,7 +217,35 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       ? (totalSales / (remainingInventory + totalSales)) * 100 
       : 0;
     
-    const storeCount = agentCurrentData.length; // 거래처수 = 담당자별로 보유중인 매장수
+    // 거래처수 계산: 담당자가 관리하는 매장 수
+    let storeCount = 0;
+    
+    // storeData에서 해당 담당자가 관리하는 매장 수 계산
+    if (storeData && Array.isArray(storeData)) {
+      storeCount = storeData.filter(store => 
+        store.manager === agent.target || 
+        store.담당자 === agent.target
+      ).length;
+    }
+    
+    // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
+    if (storeCount === 0) {
+      // 개통실적 데이터에서 고유한 출고처 수 추정 (구글 시트 필드명: '출고처')
+      const uniqueStores = new Set();
+      agentCurrentData.forEach(record => {
+        const storeName = record['출고처'];
+        if (storeName) {
+          uniqueStores.add(storeName);
+        }
+      });
+      storeCount = uniqueStores.size;
+      
+      console.log(`🏪 ${agent.target} 거래처수 계산:`, {
+        fromStoreData: storeData ? 'storeData에서 계산' : 'storeData 없음',
+        fromActivationData: uniqueStores.size,
+        finalStoreCount: storeCount
+      });
+    }
     const salesVolume = totalSales; // 판매량 = 당월실적+전월실적
     
     // 잔여재고 점수 계산 (재고가 적을수록 높은 점수)
@@ -222,22 +268,32 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         (ratios.salesVolume / 100) * normalizedSalesVolume
       ) * 100;
     } else {
+      // 데이터가 없는 경우 기본 점수 (모든 영업사원이 동일하게 받음)
       rawScore = 50;
+      console.log(`⚠️ ${agent.target} (${model}-${color || '전체'}): 데이터 없음, 기본 점수 사용`);
     }
     
-    // 각 로직별 정규화된 점수 계산 (0-100 범위)
+    // 각 로직별 정규화된 점수 계산 (0-100 범위) - 더 현실적인 기준으로 조정
     const normalizedTurnoverRate = turnoverRate; // 이미 퍼센트 단위
-    const normalizedStoreCount = Math.min(storeCount / 10, 1) * 100; // 거래처수 정규화 (10개 기준)
+    const normalizedStoreCount = Math.min(storeCount / 5, 1) * 100; // 거래처수 정규화 (5개 기준으로 조정)
     const normalizedInventoryScore = inventoryScore; // 이미 0-100 범위
-    const normalizedSalesVolume = Math.min(salesVolume / 100, 1) * 100; // 판매량 정규화 (100개 기준)
+    const normalizedSalesVolume = Math.min(salesVolume / 50, 1) * 100; // 판매량 정규화 (50개 기준으로 조정)
     
     console.log(`🔍 상세 점수 계산 - ${agent.target} (${model}-${color || '전체'}):`, {
-      turnoverRate: { original: turnoverRate, normalized: normalizedTurnoverRate },
-      storeCount: { original: storeCount, normalized: normalizedStoreCount },
-      remainingInventory: { original: remainingInventory },
-      inventoryScore: { original: inventoryScore, normalized: normalizedInventoryScore },
-      salesVolume: { original: salesVolume, normalized: normalizedSalesVolume },
-      rawScore: Math.round(rawScore * 100) / 100
+      dataSource: {
+        currentMonthRecords: agentCurrentData.length,
+        previousMonthRecords: agentPreviousData.length,
+        modelColorCurrentRecords: modelColorCurrentData.length,
+        modelColorPreviousRecords: modelColorPreviousData.length
+      },
+      calculatedValues: {
+        turnoverRate: { original: turnoverRate, normalized: normalizedTurnoverRate },
+        storeCount: { original: storeCount, normalized: normalizedStoreCount },
+        remainingInventory: { original: remainingInventory },
+        inventoryScore: { original: inventoryScore, normalized: normalizedInventoryScore },
+        salesVolume: { original: salesVolume, normalized: normalizedSalesVolume }
+      },
+      finalScore: Math.round(rawScore * 100) / 100
     });
     
     return {
@@ -246,7 +302,6 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         turnoverRate: { value: Math.round(normalizedTurnoverRate * 100) / 100, detail: Math.round(turnoverRate * 100) / 100 },
         storeCount: { value: Math.round(normalizedStoreCount * 100) / 100, detail: storeCount },
         remainingInventory: { value: Math.round(normalizedInventoryScore * 100) / 100, detail: remainingInventory },
-        inventoryScore: { value: Math.round(normalizedInventoryScore * 100) / 100, detail: Math.round(inventoryScore * 100) / 100 },
         salesVolume: { value: Math.round(normalizedSalesVolume * 100) / 100, detail: salesVolume }
       }
     };
@@ -303,30 +358,68 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
   }
 };
 
-// 색상별 정확한 가중치 계산
+// 색상별 정확한 가중치 계산 (상대적 비교 적용)
 const calculateColorAccurateWeights = async (agents, modelName, colorName, settings, storeData, modelData = null) => {
-  const weightPromises = agents.map(async (agent) => {
+  // 1단계: 모든 영업사원의 원시 점수 계산
+  const agentScores = await Promise.all(agents.map(async (agent) => {
     const { rawScore, details } = await calculateColorRawScore(agent, modelName, colorName, settings, storeData, modelData);
+    return { agent, rawScore, details };
+  }));
+  
+  // 2단계: 상대적 정규화를 위한 최대/최소값 계산
+  const maxSalesVolume = Math.max(...agentScores.map(item => item.details.salesVolume.detail));
+  const maxStoreCount = Math.max(...agentScores.map(item => item.details.storeCount.detail));
+  const maxInventory = Math.max(...agentScores.map(item => item.details.remainingInventory.detail));
+  
+  console.log(`📊 ${modelName}-${colorName} 상대적 비교 기준:`, {
+    maxSalesVolume,
+    maxStoreCount,
+    maxInventory,
+    agentCount: agents.length
+  });
+  
+  // 3단계: 상대적 정규화 적용
+  const normalizedScores = agentScores.map(({ agent, rawScore, details }) => {
+    // 상대적 정규화 (최대값 대비 비율)
+    const relativeSalesVolume = maxSalesVolume > 0 ? (details.salesVolume.detail / maxSalesVolume) * 100 : 0;
+    const relativeStoreCount = maxStoreCount > 0 ? (details.storeCount.detail / maxStoreCount) * 100 : 0;
+    const relativeInventoryScore = maxInventory > 0 ? Math.max(0, 100 - (details.remainingInventory.detail / maxInventory) * 100) : 100;
     
-    // 최종 가중치 (rawScore와 동일한 방식으로 계산)
-    const finalWeight = rawScore / 100; // 0-1 범위로 변환
+    // 새로운 상대적 점수 계산
+    const relativeRawScore = (
+      (settings.ratios.turnoverRate / 100) * details.turnoverRate.value +
+      (settings.ratios.remainingInventory / 100) * relativeInventoryScore +
+      (settings.ratios.storeCount / 100) * relativeStoreCount +
+      (settings.ratios.salesVolume / 100) * relativeSalesVolume
+    );
     
-    console.log(`🔍 색상별 점수 계산 - ${agent.target} (${modelName}-${colorName}):`, {
-      rawScore: Math.round(rawScore * 100) / 100,
+    const finalWeight = relativeRawScore / 100; // 0-1 범위로 변환
+    
+    console.log(`🔍 상대적 점수 계산 - ${agent.target} (${modelName}-${colorName}):`, {
+      originalRawScore: Math.round(rawScore * 100) / 100,
+      relativeRawScore: Math.round(relativeRawScore * 100) / 100,
       finalWeight: Math.round(finalWeight * 1000) / 1000,
-      details: {
-        turnoverRate: details.turnoverRate,
-        storeCount: details.storeCount,
-        remainingInventory: details.remainingInventory,
-        inventoryScore: details.inventoryScore,
-        salesVolume: details.salesVolume
+      relativeScores: {
+        salesVolume: Math.round(relativeSalesVolume * 100) / 100,
+        storeCount: Math.round(relativeStoreCount * 100) / 100,
+        inventoryScore: Math.round(relativeInventoryScore * 100) / 100
       }
     });
     
-    return { agent, finalWeight, rawScore, details };
+    return { 
+      agent, 
+      finalWeight, 
+      rawScore: relativeRawScore, 
+      details: {
+        ...details,
+        salesVolume: { value: relativeSalesVolume, detail: details.salesVolume.detail },
+        storeCount: { value: relativeStoreCount, detail: details.storeCount.detail },
+        remainingInventory: { value: relativeInventoryScore, detail: details.remainingInventory.detail }
+      }
+    };
   });
   
-  return await Promise.all(weightPromises);
+  return normalizedScores;
 };
 
 // 모델별 정확한 가중치 계산 (기존 호환성을 위해 유지)
