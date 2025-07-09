@@ -108,6 +108,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [progressMessage, setProgressMessage] = useState('');
   const [previewSubTab, setPreviewSubTab] = useState(0);
   const [showSharedSettingsDialog, setShowSharedSettingsDialog] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
@@ -660,10 +661,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               const existingColorIndex = existingColors.findIndex(color => color.name === newColor.name);
               
               if (existingColorIndex >= 0) {
-                // 기존 색상이 있으면 수량에 더하기
+                // 기존 색상이 있으면 수량 처리 (편집 모드: 교체, 추가 모드: 더하기)
+                const currentQuantity = existingColors[existingColorIndex].quantity;
+                const newQuantity = isEditMode ? newColor.quantity : currentQuantity + newColor.quantity;
+                
                 existingColors[existingColorIndex] = {
                   ...existingColors[existingColorIndex],
-                  quantity: existingColors[existingColorIndex].quantity + newColor.quantity
+                  quantity: newQuantity
                 };
               } else {
                 // 새로운 색상 추가
@@ -698,6 +702,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
         setSelectedModel('');
         setSelectedColor('');
+        setIsEditMode(false);
         setShowModelDialog(false);
       }
     } else if (modelName && selectedColor && newModel.quantity > 0) {
@@ -712,9 +717,12 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           
           if (existingColorIndex >= 0) {
             const updatedColors = [...existingModel.colors];
+            const currentQuantity = updatedColors[existingColorIndex].quantity;
+            const newQuantity = isEditMode ? newModel.quantity : currentQuantity + newModel.quantity;
+            
             updatedColors[existingColorIndex] = {
               ...updatedColors[existingColorIndex],
-              quantity: updatedColors[existingColorIndex].quantity + newModel.quantity
+              quantity: newQuantity
             };
             
             return {
@@ -758,6 +766,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
       setSelectedModel('');
       setSelectedColor('');
+      setIsEditMode(false);
       setShowModelDialog(false);
     }
   };
@@ -2067,7 +2076,12 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={() => setShowModelDialog(true)}
+                    onClick={() => {
+                      setIsEditMode(false);
+                      setSelectedModel('');
+                      setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
+                      setShowModelDialog(true);
+                    }}
                     size="small"
                     sx={{ 
                       minWidth: { xs: '100%', sm: 'auto' },
@@ -2092,6 +2106,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         }}
                         onClick={() => {
                           setSelectedModel(modelName);
+                          setIsEditMode(true);
                           setNewModel(prev => ({
                             ...prev,
                             name: modelName,
@@ -2857,13 +2872,16 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="lg" fullWidth>
         <DialogTitle>
           <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">모델 추가</Typography>
+            <Typography variant="h6">
+              {isEditMode ? `모델 편집: ${selectedModel}` : '모델 추가'}
+            </Typography>
             <Button
               size="small"
               onClick={() => {
                 setSelectedModel('');
                 setSelectedColor('');
-                setNewModel({ name: '', color: '', quantity: 0 });
+                setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
+                setIsEditMode(false);
               }}
             >
               초기화
