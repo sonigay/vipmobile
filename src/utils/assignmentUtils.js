@@ -110,11 +110,22 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
         const activationData = await loadActivationDataBatch();
         const agentCurrentData = (activationData.current.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
         
-        // 개통실적 데이터에서 고유한 출고처 수 추정 (빈 값이나 의미없는 값 제외)
+        // 개통실적 데이터에서 고유한 출고처 수 추정 (빈 값, 의미없는 값, 0 등 제외)
         const uniqueStores = new Set();
         agentCurrentData.forEach(record => {
           const storeName = record['출고처'];
-          if (storeName && storeName.trim() !== '' && storeName !== '-' && storeName !== '미지정' && storeName !== '기타') {
+          if (
+            storeName &&
+            typeof storeName === 'string' &&
+            storeName.trim() !== '' &&
+            storeName !== '-' &&
+            storeName !== '미지정' &&
+            storeName !== '미정' &&
+            storeName !== '기타' &&
+            storeName !== '없음' &&
+            storeName !== '0' &&
+            storeName.trim() !== '0'
+          ) {
             uniqueStores.add(storeName.trim());
           }
         });
@@ -634,10 +645,10 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     return {
       rawScore,
       details: {
-        turnoverRate: { value: Math.round(normalizedTurnoverRate * 100) / 100, detail: Math.round(turnoverRate * 100) / 100 },
-        storeCount: { value: Math.round(normalizedStoreCount * 100) / 100, detail: storeCount },
-        remainingInventory: { value: Math.round(normalizedInventoryScore * 100) / 100, detail: remainingInventory },
-        salesVolume: { value: Math.round(normalizedSalesVolume * 100) / 100, detail: salesVolume }
+        turnoverRate: { value: Math.round(normalizedTurnoverRate), detail: Math.round(turnoverRate) },
+        storeCount: { value: Math.round(normalizedStoreCount), detail: storeCount },
+        remainingInventory: { value: Math.round(normalizedInventoryScore), detail: Math.round(remainingInventory) },
+        salesVolume: { value: Math.round(normalizedSalesVolume), detail: Math.round(salesVolume) }
       }
     };
   } catch (error) {

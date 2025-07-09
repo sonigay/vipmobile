@@ -3101,7 +3101,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                                 <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
                                                   {assignedQuantity > 0 ? `${assignedQuantity}개` : '-'}
                                                 </div>
-                                                {assignedQuantity > 0 && colorScores && (
+                                                {assignedQuantity > 0 && colorScores && isExpanded && (
                                                   <ScoreDisplay scores={colorScores} modelName={modelName} colorName={color.name} />
                                                 )}
                                               </TableCell>
