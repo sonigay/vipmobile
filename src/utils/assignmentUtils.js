@@ -744,25 +744,38 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
   const maxSalesVolume = Math.max(...agentScores.map(item => item.details.salesVolume.detail));
   const maxStoreCount = Math.max(...agentScores.map(item => item.details.storeCount.detail));
   // 잔여재고 점수는 (판매량 - 보유재고) * -1 공식으로 계산된 값으로 비교
-  const maxInventoryScore = Math.max(...agentScores.map(item => item.details.remainingInventory.value));
-  const minInventoryScore = Math.min(...agentScores.map(item => item.details.remainingInventory.value));
+  // 원본 inventoryScore 값을 사용하여 상대적 정규화 계산
+  const inventoryScores = agentScores.map(item => {
+    const salesVolume = item.details.salesVolume.detail;
+    const remainingInventory = item.details.remainingInventory.detail;
+    return (salesVolume - remainingInventory) * -1;
+  });
+  const maxInventoryScore = Math.max(...inventoryScores);
+  const minInventoryScore = Math.min(...inventoryScores);
   
       console.log(`📊 ${modelName}-${colorName} 상대적 비교 기준:`, {
       maxSalesVolume,
       maxStoreCount,
       maxInventoryScore,
       minInventoryScore,
-      agentCount: agents.length
+      agentCount: agents.length,
+      inventoryScores: inventoryScores.map((score, i) => ({
+        agent: agentScores[i].agent.target,
+        salesVolume: agentScores[i].details.salesVolume.detail,
+        remainingInventory: agentScores[i].details.remainingInventory.detail,
+        inventoryScore: score
+      }))
     });
   
   // 3단계: 상대적 정규화 적용
-  const normalizedScores = agentScores.map(({ agent, rawScore, details }) => {
+  const normalizedScores = agentScores.map(({ agent, rawScore, details }, index) => {
     // 상대적 정규화 (최대값 대비 비율)
     const relativeSalesVolume = maxSalesVolume > 0 ? (details.salesVolume.detail / maxSalesVolume) * 100 : 0;
     const relativeStoreCount = maxStoreCount > 0 ? (details.storeCount.detail / maxStoreCount) * 100 : 0;
     // 잔여재고 점수는 0-100 범위로 정규화 (최대값과 최소값 기준)
+    const currentInventoryScore = inventoryScores[index];
     const relativeInventoryScore = maxInventoryScore !== minInventoryScore 
-      ? ((details.remainingInventory.value - minInventoryScore) / (maxInventoryScore - minInventoryScore)) * 100 
+      ? ((currentInventoryScore - minInventoryScore) / (maxInventoryScore - minInventoryScore)) * 100 
       : 50;
     
     // 새로운 상대적 점수 계산
