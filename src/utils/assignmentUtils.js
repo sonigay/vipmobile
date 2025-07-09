@@ -208,13 +208,13 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       sampleModelRecord: modelCurrentData[0]
     });
     
-    // 개통 숫자 계산: 해당 모델명+색상의 개통 기록 수를 카운팅
-    const currentMonthSales = modelColorCurrentData.length > 0 
-      ? modelColorCurrentData.length  // 색상별 데이터가 있으면 레코드 수 카운팅
-      : modelCurrentData.length;      // 색상별 데이터가 없으면 모델별 레코드 수 카운팅
+    // 개통 숫자 계산: 해당 모델명+색상의 개통 기록의 '개통' 필드 합산
+    const currentMonthSales = modelColorCurrentData.length > 0
+      ? modelColorCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0)
+      : modelCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
     const previousMonthSales = modelColorPreviousData.length > 0
-      ? modelColorPreviousData.length // 색상별 데이터가 있으면 레코드 수 카운팅
-      : modelPreviousData.length;     // 색상별 데이터가 없으면 모델별 레코드 수 카운팅
+      ? modelColorPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0)
+      : modelPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
     const totalSales = currentMonthSales + previousMonthSales;
     
     // 디버깅: 개통 숫자 계산 결과 확인
@@ -224,7 +224,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       totalSales,
       currentMonthRecords: modelColorCurrentData.length > 0 ? modelColorCurrentData.length : modelCurrentData.length,
       previousMonthRecords: modelColorPreviousData.length > 0 ? modelColorPreviousData.length : modelPreviousData.length,
-      calculationMethod: modelColorCurrentData.length > 0 ? '색상별 카운팅' : '모델별 카운팅'
+      calculationMethod: modelColorCurrentData.length > 0 ? '색상별 개통합' : '모델별 개통합'
     });
     
     // 재고 숫자 계산: 해당 모델명+색상의 재고 수량을 합산
@@ -254,13 +254,24 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       storeDataLength: storeData?.length || 0,
       modelDataAvailable: !!modelData,
       colorCount: modelData?.colors?.length,
-      calculationMethod: color ? '색상별 합산' : '모델별 균등분배'
+      calculationMethod: color ? '색상별 합산' : '모델별 균등분배',
+      sampleStoreInventory: storeData?.[0]?.inventory?.[model] || 'no inventory',
+      allStoresWithModel: storeData?.filter(store => store.inventory?.[model]).length || 0
     });
     
     // 회전율 계산: ((전월개통 숫자+당월개통 숫자) / (재고 숫자 + (전월개통 숫자+당월개통 숫자))) * 100
     const turnoverRate = remainingInventory + totalSales > 0 
       ? (totalSales / (remainingInventory + totalSales)) * 100 
       : 0;
+    
+    // 디버깅: 회전율 계산 결과 확인
+    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 회전율 계산:`, {
+      totalSales,
+      remainingInventory,
+      denominator: remainingInventory + totalSales,
+      turnoverRate: Math.round(turnoverRate * 100) / 100,
+      calculation: `${totalSales} / (${remainingInventory} + ${totalSales}) * 100 = ${Math.round(turnoverRate * 100) / 100}%`
+    });
     
     // 거래처수 계산: 담당자가 관리하는 매장 수
     let storeCount = 0;
@@ -295,6 +306,13 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     
     // 잔여재고 점수 계산 (재고가 적을수록 높은 점수)
     const inventoryScore = remainingInventory === 0 ? 100 : Math.max(0, 100 - (remainingInventory * 10));
+    
+    // 디버깅: 잔여재고 점수 계산 결과 확인
+    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 잔여재고 점수 계산:`, {
+      remainingInventory,
+      inventoryScore,
+      calculation: remainingInventory === 0 ? '재고 0 → 100점' : `100 - (${remainingInventory} * 10) = ${inventoryScore}점`
+    });
     
     // 원시 점수 계산
     let rawScore = 0;
