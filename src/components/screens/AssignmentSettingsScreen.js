@@ -1358,8 +1358,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               ${Object.entries(previewData.agents).map(([agentId, agentData]) => {
                                 const agent = agents.find(a => a.contactId === agentId);
                 const totalQuantity = Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0);
-                // 실제 배정 점수는 첫 번째 모델의 averageScore 사용 (모든 모델이 동일한 점수를 가짐)
-                const avgScore = Object.values(agentData)[0]?.averageScore || 0;
+                // 모든 모델의 평균 점수 계산
+                const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || 0), 0) / Object.keys(agentData).length;
                 
                                   return `
                     <tr>
@@ -2625,11 +2625,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}>
                                   총 배정량
                                 </TableCell>
-                                <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }}>
-                                  배정 점수
+                                <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                  평균 배정점수
                                 </TableCell>
-                                <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }}>
-                                  점수 세부내역
+                                <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                  모델별 점수
                                 </TableCell>
                                 {/* 모델별 색상별 헤더 */}
                                 {Object.entries(previewData.models).map(([modelName, modelData]) => (
@@ -2679,8 +2679,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 .map(([agentId, agentData]) => {
                                   const agent = agents.find(a => a.contactId === agentId);
                                   const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                                  // 실제 배정 점수는 첫 번째 모델의 averageScore 사용 (모든 모델이 동일한 점수를 가짐)
-                                  const avgScore = Object.values(agentData)[0]?.averageScore || 0;
+                                  // 모든 모델의 평균 점수 계산
+                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || 0), 0) / Object.keys(agentData).length;
                                   
                                   return (
                                     <TableRow key={agentId}>
@@ -2700,34 +2700,23 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                         {Math.round(avgScore)}점
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
-                                        <Box sx={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
-                                          {(() => {
-                                            // 첫 번째 모델의 세부 점수 정보 가져오기
-                                            const firstModelData = Object.values(agentData)[0];
-                                            if (firstModelData?.details) {
-                                              const { details } = firstModelData;
-                                              const ratios = assignmentSettings.ratios;
-                                              
-                                              // 정규화된 값 계산 (rawScore와 동일한 방식)
-                                              const normalizedTurnoverRate = details.turnoverRate / 100;
-                                              const normalizedInventoryScore = details.inventoryScore / 100;
-                                              const normalizedStoreCount = Math.min(details.storeCount / 10, 1);
-                                              const normalizedSalesVolume = Math.min(details.salesVolume / 100, 1);
-                                              
-                                              // 각 항목별 점수 계산
-                                              const turnoverScore = Math.round((ratios.turnoverRate / 100) * normalizedTurnoverRate * 100);
-                                              const storeScore = Math.round((ratios.storeCount / 100) * normalizedStoreCount * 100);
-                                              const inventoryScore = Math.round((ratios.remainingInventory / 100) * normalizedInventoryScore * 100);
-                                              const salesScore = Math.round((ratios.salesVolume / 100) * normalizedSalesVolume * 100);
-                                              
-                                              return (
-                                                <div style={{ whiteSpace: 'nowrap' }}>
-                                                  회전율:{turnoverScore}점 거래처:{storeScore}점 재고:{inventoryScore}점 판매:{salesScore}점
+                                        <Box sx={{ fontSize: '0.6rem', lineHeight: 1.1 }}>
+                                          {Object.entries(agentData).map(([modelName, modelData]) => (
+                                            <div key={modelName} style={{ marginBottom: '3px' }}>
+                                              <div style={{ fontWeight: 'bold', fontSize: '0.65rem' }}>
+                                                {modelName}: {Math.round(modelData.averageScore || 0)}점
+                                              </div>
+                                              {modelData.colorScores && Object.entries(modelData.colorScores).map(([colorName, colorScore]) => (
+                                                <div key={colorName} style={{ 
+                                                  whiteSpace: 'nowrap', 
+                                                  marginLeft: '8px',
+                                                  color: colorScore.averageScore > 70 ? '#2e7d32' : colorScore.averageScore > 50 ? '#ed6c02' : '#d32f2f'
+                                                }}>
+                                                  {colorName}: {Math.round(colorScore.averageScore || 0)}점
                                                 </div>
-                                              );
-                                            }
-                                            return '점수 정보 없음';
-                                          })()}
+                                              ))}
+                                            </div>
+                                          ))}
                                         </Box>
                                       </TableCell>
                                       {/* 모델별 색상별 배정량 */}

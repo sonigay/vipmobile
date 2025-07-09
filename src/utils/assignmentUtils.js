@@ -144,8 +144,8 @@ const loadActivationDataBatch = async () => {
   }
 };
 
-// 원시 점수 계산 (정규화 전)
-const calculateRawScore = async (agent, model, settings, storeData) => {
+// 색상별 원시 점수 계산 (정규화 전)
+const calculateColorRawScore = async (agent, model, color, settings, storeData) => {
   const { ratios } = settings;
   
   try {
@@ -156,19 +156,33 @@ const calculateRawScore = async (agent, model, settings, storeData) => {
     const agentCurrentData = activationData.current.get(agent.target) || [];
     const agentPreviousData = activationData.previous.get(agent.target) || [];
     
-    // 모델별 데이터 필터링
+    // 모델+색상별 데이터 필터링 (색상 정보가 있는 경우)
+    const modelColorCurrentData = agentCurrentData.filter(record => 
+      record['모델'] === model && 
+      (record['색상'] === color || !record['색상']) // 색상 정보가 없으면 모델만으로 필터링
+    );
+    const modelColorPreviousData = agentPreviousData.filter(record => 
+      record['모델'] === model && 
+      (record['색상'] === color || !record['색상'])
+    );
+    
+    // 모델별 데이터 필터링 (색상별 데이터가 없을 경우 모델별로 계산)
     const modelCurrentData = agentCurrentData.filter(record => record['모델'] === model);
     const modelPreviousData = agentPreviousData.filter(record => record['모델'] === model);
     
-    // 수량 계산
-    const currentMonthSales = modelCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
-    const previousMonthSales = modelPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
+    // 색상별 수량 계산 (색상별 데이터가 있으면 사용, 없으면 모델별 데이터 사용)
+    const currentMonthSales = modelColorCurrentData.length > 0 
+      ? modelColorCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0)
+      : modelCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
+    const previousMonthSales = modelColorPreviousData.length > 0
+      ? modelColorPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0)
+      : modelPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
     const totalSales = currentMonthSales + previousMonthSales;
     
     // 보유재고 계산 (storeData에서 해당 모델의 재고량)
     const remainingInventory = storeData?.inventory?.[model]?.정상 || 0;
     
-    // 새로운 배정 비율 계산
+    // 색상별 회전율 계산
     const turnoverRate = remainingInventory + totalSales > 0 
       ? (totalSales / (remainingInventory + totalSales)) * 100 
       : 0;
@@ -177,27 +191,25 @@ const calculateRawScore = async (agent, model, settings, storeData) => {
     const salesVolume = totalSales; // 판매량 = 당월실적+전월실적
     
     // 잔여재고 점수 계산 (재고가 적을수록 높은 점수)
-    // 재고가 0이면 최고점(100), 재고가 많을수록 점수 감소
     const inventoryScore = remainingInventory === 0 ? 100 : Math.max(0, 100 - (remainingInventory * 10));
     
-    // 원시 점수 계산 (개통실적 데이터가 없는 경우에도 기본값 제공)
+    // 원시 점수 계산
     let rawScore = 0;
     
     if (totalSales > 0 || remainingInventory > 0 || storeCount > 0) {
-      // 실제 데이터가 있는 경우 - 정규화된 값 사용 (finalWeight와 동일한 방식)
-      const normalizedTurnoverRate = turnoverRate / 100; // 0-1 범위
-      const normalizedInventoryScore = inventoryScore / 100; // 0-1 범위
-      const normalizedStoreCount = Math.min(storeCount / 10, 1); // 0-1 범위 (최대 10개 기준)
-      const normalizedSalesVolume = Math.min(salesVolume / 100, 1); // 0-1 범위 (최대 100개 기준)
+      // 정규화된 값 사용
+      const normalizedTurnoverRate = turnoverRate / 100;
+      const normalizedInventoryScore = inventoryScore / 100;
+      const normalizedStoreCount = Math.min(storeCount / 10, 1);
+      const normalizedSalesVolume = Math.min(salesVolume / 100, 1);
       
       rawScore = (
         (ratios.turnoverRate / 100) * normalizedTurnoverRate +
         (ratios.remainingInventory / 100) * normalizedInventoryScore +
         (ratios.storeCount / 100) * normalizedStoreCount +
         (ratios.salesVolume / 100) * normalizedSalesVolume
-      ) * 100; // 0-100 범위로 변환
+      ) * 100;
     } else {
-      // 데이터가 없는 경우 기본 점수 (균등 배정을 위한 최소 점수)
       rawScore = 50;
     }
     
@@ -212,9 +224,14 @@ const calculateRawScore = async (agent, model, settings, storeData) => {
       }
     };
   } catch (error) {
-    console.error('원시 점수 계산 중 오류:', error);
+    console.error('색상별 원시 점수 계산 중 오류:', error);
     return { rawScore: 50, details: {} };
   }
+};
+
+// 모델별 원시 점수 계산 (기존 호환성을 위해 유지)
+const calculateRawScore = async (agent, model, settings, storeData) => {
+  return await calculateColorRawScore(agent, model, null, settings, storeData);
 };
 
 // 점수 정규화 (0-100 범위)
@@ -259,10 +276,10 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
   }
 };
 
-// 정확한 가중치 계산 (엑셀 공식 기반)
-const calculateAccurateWeights = async (agents, modelName, settings, storeData) => {
+// 색상별 정확한 가중치 계산
+const calculateColorAccurateWeights = async (agents, modelName, colorName, settings, storeData) => {
   const weightPromises = agents.map(async (agent) => {
-    const { rawScore, details } = await calculateRawScore(agent, modelName, settings, storeData);
+    const { rawScore, details } = await calculateColorRawScore(agent, modelName, colorName, settings, storeData);
     
     // 최종 가중치 (rawScore와 동일한 방식으로 계산)
     const finalWeight = rawScore / 100; // 0-1 범위로 변환
@@ -271,6 +288,11 @@ const calculateAccurateWeights = async (agents, modelName, settings, storeData) 
   });
   
   return await Promise.all(weightPromises);
+};
+
+// 모델별 정확한 가중치 계산 (기존 호환성을 위해 유지)
+const calculateAccurateWeights = async (agents, modelName, settings, storeData) => {
+  return await calculateColorAccurateWeights(agents, modelName, null, settings, storeData);
 };
 
 // 기본 배정량 계산 (버림 처리)
@@ -311,36 +333,44 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     return {};
   }
   
-  // 1단계: 정확한 가중치 계산
-  const weightedAgents = await calculateAccurateWeights(eligibleAgents, modelName, settings, storeData);
-  
-  // 2단계: 색상별로 개별 배정 계산
+  // 1단계: 색상별로 개별 배정 계산
   const colorAssignments = {};
+  const colorScores = {};
   
   for (const color of modelData.colors) {
     const colorQuantity = color.quantity || 0;
     if (colorQuantity > 0) {
+      // 해당 색상의 가중치 계산
+      const weightedAgents = await calculateColorAccurateWeights(eligibleAgents, modelName, color.name, settings, storeData);
+      
       // 해당 색상의 배정량 계산
       const colorBaseAssignments = calculateBaseAssignments(weightedAgents, colorQuantity);
       const colorAdjustedAssignments = adjustAssignments(colorBaseAssignments, colorQuantity);
       
       colorAssignments[color.name] = colorAdjustedAssignments;
+      colorScores[color.name] = weightedAgents;
     }
   }
   
-  // 3단계: 영업사원별로 색상별 배정량 통합
+  // 2단계: 영업사원별로 색상별 배정량 통합
   const assignments = {};
   
   eligibleAgents.forEach(agent => {
     const agentColorQuantities = {};
+    const agentColorScores = {};
     let totalAgentQuantity = 0;
     
-    // 각 색상별 배정량 합산
+    // 각 색상별 배정량과 점수 합산
     Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
       const agentColorAssignment = colorAssignmentList.find(item => item.agent.contactId === agent.contactId);
       const colorQuantity = agentColorAssignment ? agentColorAssignment.baseQuantity : 0;
+      const colorScore = colorScores[colorName].find(item => item.agent.contactId === agent.contactId);
       
       agentColorQuantities[colorName] = colorQuantity;
+      agentColorScores[colorName] = {
+        averageScore: colorScore?.rawScore || 0,
+        details: colorScore?.details || {}
+      };
       totalAgentQuantity += colorQuantity;
     });
     
@@ -350,16 +380,16 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
         office: agent.office,
         department: agent.department,
         quantity: totalAgentQuantity,
-        colorQuantities: agentColorQuantities, // 색상별 배정량 추가
-        finalWeight: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.finalWeight || 0,
-        averageScore: Math.max(0, Math.min(100, weightedAgents.find(item => item.agent.contactId === agent.contactId)?.rawScore || 50)),
+        colorQuantities: agentColorQuantities, // 색상별 배정량
+        colorScores: agentColorScores, // 색상별 점수
+        averageScore: Object.values(agentColorScores).reduce((sum, score) => sum + score.averageScore, 0) / Object.keys(agentColorScores).length, // 평균 점수
         colors: modelData.colors.map(color => color.name),
-        details: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.details || {}
+        details: Object.values(agentColorScores)[0]?.details || {} // 첫 번째 색상의 세부정보
       };
     }
   });
   
-  // 4단계: 검증 - 각 색상별 총 배정량 확인
+  // 3단계: 검증 - 각 색상별 총 배정량 확인
   Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
     const totalColorAssigned = colorAssignmentList.reduce((sum, item) => sum + item.baseQuantity, 0);
     const expectedColorQuantity = modelData.colors.find(color => color.name === colorName)?.quantity || 0;
@@ -375,7 +405,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
   const totalAssigned = Object.values(assignments).reduce((sum, assignment) => sum + assignment.quantity, 0);
   const totalExpected = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
   
-  console.log(`✅ 모델 ${modelName} 정확한 배정 완료:`, {
+  console.log(`✅ 모델 ${modelName} 색상별 정확한 배정 완료:`, {
     totalExpected,
     totalAssigned,
     difference: totalExpected - totalAssigned,
