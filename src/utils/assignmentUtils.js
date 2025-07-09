@@ -531,21 +531,23 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
   // 2단계: 상대적 정규화를 위한 최대/최소값 계산
   const maxSalesVolume = Math.max(...agentScores.map(item => item.details.salesVolume.detail));
   const maxStoreCount = Math.max(...agentScores.map(item => item.details.storeCount.detail));
-  const maxInventory = Math.max(...agentScores.map(item => item.details.remainingInventory.detail));
+  // 잔여재고는 이미 점수로 변환되어 있으므로 원본 점수 사용
+  const maxInventoryScore = Math.max(...agentScores.map(item => item.details.remainingInventory.value));
   
-  console.log(`📊 ${modelName}-${colorName} 상대적 비교 기준:`, {
-    maxSalesVolume,
-    maxStoreCount,
-    maxInventory,
-    agentCount: agents.length
-  });
+      console.log(`📊 ${modelName}-${colorName} 상대적 비교 기준:`, {
+      maxSalesVolume,
+      maxStoreCount,
+      maxInventoryScore,
+      agentCount: agents.length
+    });
   
   // 3단계: 상대적 정규화 적용
   const normalizedScores = agentScores.map(({ agent, rawScore, details }) => {
     // 상대적 정규화 (최대값 대비 비율)
     const relativeSalesVolume = maxSalesVolume > 0 ? (details.salesVolume.detail / maxSalesVolume) * 100 : 0;
     const relativeStoreCount = maxStoreCount > 0 ? (details.storeCount.detail / maxStoreCount) * 100 : 0;
-    const relativeInventoryScore = maxInventory > 0 ? Math.max(0, 100 - (details.remainingInventory.detail / maxInventory) * 100) : 100;
+    // 잔여재고 점수는 이미 정규화되어 있으므로 원본 점수 사용
+    const relativeInventoryScore = maxInventoryScore > 0 ? (details.remainingInventory.value / maxInventoryScore) * 100 : 100;
     
     // 새로운 상대적 점수 계산
     const relativeRawScore = (
