@@ -710,7 +710,8 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         turnoverRate: { value: Math.round(normalizedTurnoverRate), detail: Math.round(turnoverRate) },
         storeCount: { value: Math.round(normalizedStoreCount), detail: storeCount },
         remainingInventory: { value: Math.round(normalizedInventoryScore), detail: Math.round(remainingInventory) },
-        salesVolume: { value: Math.round(normalizedSalesVolume), detail: Math.round(salesVolume) }
+        salesVolume: { value: Math.round(normalizedSalesVolume), detail: Math.round(salesVolume) },
+        inventoryScore: { value: inventoryScore, detail: inventoryScore } // 원본 inventoryScore 값 추가
       }
     };
   } catch (error) {
@@ -780,9 +781,14 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
   // 잔여재고 점수는 (판매량 - 보유재고) * -1 공식으로 계산된 값으로 비교
   // 원본 inventoryScore 값을 사용하여 상대적 정규화 계산
   const inventoryScores = agentScores.map(item => {
-    const salesVolume = item.details.salesVolume.detail;
-    const remainingInventory = item.details.remainingInventory.detail;
-    return (salesVolume - remainingInventory) * -1;
+    // 원본 inventoryScore 값이 있으면 사용, 없으면 계산
+    if (item.details.inventoryScore && item.details.inventoryScore.value !== undefined) {
+      return item.details.inventoryScore.value;
+    } else {
+      const salesVolume = item.details.salesVolume.detail;
+      const remainingInventory = item.details.remainingInventory.detail;
+      return (salesVolume - remainingInventory) * -1;
+    }
   });
   const maxInventoryScore = Math.max(...inventoryScores);
   const minInventoryScore = Math.min(...inventoryScores);
@@ -914,6 +920,20 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     return {};
   }
   
+  // 거래처수가 0인 영업사원을 제외 (중복 필터링 방지)
+  const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
+  
+  if (filteredAgents.length === 0) {
+    console.log('⚠️ 거래처수가 있는 영업사원이 없어 배정을 중단합니다.');
+    return {};
+  }
+  
+  console.log(`🎯 calculateModelAssignment 필터링 결과:`, {
+    전체대상자: eligibleAgents.length,
+    거래처수필터링후: filteredAgents.length,
+    포함된인원: filteredAgents.map(agent => agent.target)
+  });
+  
   // 1단계: 색상별로 개별 배정 계산
   const colorAssignments = {};
   const colorScores = {};
@@ -922,7 +942,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     const colorQuantity = color.quantity || 0;
     if (colorQuantity > 0) {
       // 해당 색상의 가중치 계산
-      const weightedAgents = await calculateColorAccurateWeights(eligibleAgents, modelName, color.name, settings, storeData, modelData);
+      const weightedAgents = await calculateColorAccurateWeights(filteredAgents, modelName, color.name, settings, storeData, modelData);
       
       // 해당 색상의 배정량 계산
       const colorBaseAssignments = calculateBaseAssignments(weightedAgents, colorQuantity);
@@ -936,7 +956,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
   // 2단계: 영업사원별로 색상별 배정량 통합
   const assignments = {};
   
-  eligibleAgents.forEach(agent => {
+  filteredAgents.forEach(agent => {
     const agentColorQuantities = {};
     const agentColorScores = {};
     let totalAgentQuantity = 0;
