@@ -155,7 +155,7 @@ function AssignmentVisualization({ assignmentData, agents }) {
                   <th>영업사원</th>
                   <th>사무실</th>
                   <th>총 배정량</th>
-                  <th>평균 점수</th>
+                                          <th>배정 점수</th>
                 </tr>
               </thead>
               <tbody>

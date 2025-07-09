@@ -660,10 +660,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               const existingColorIndex = existingColors.findIndex(color => color.name === newColor.name);
               
               if (existingColorIndex >= 0) {
-                // 기존 색상이 있으면 수량 업데이트
+                // 기존 색상이 있으면 수량에 더하기
                 existingColors[existingColorIndex] = {
                   ...existingColors[existingColorIndex],
-                  quantity: newColor.quantity
+                  quantity: existingColors[existingColorIndex].quantity + newColor.quantity
                 };
               } else {
                 // 새로운 색상 추가
@@ -714,7 +714,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             const updatedColors = [...existingModel.colors];
             updatedColors[existingColorIndex] = {
               ...updatedColors[existingColorIndex],
-              quantity: newModel.quantity
+              quantity: updatedColors[existingColorIndex].quantity + newModel.quantity
             };
             
             return {
@@ -1299,7 +1299,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th>사무실</th>
                 <th>소속</th>
                 <th>총 배정량</th>
-                <th>평균 점수</th>
+                                        <th>배정 점수</th>
                 ${Object.keys(previewData.models).map(modelName => `
                   <th>${modelName}</th>
                 `).join('')}
@@ -1308,11 +1308,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             <tbody>
               ${Object.entries(previewData.agents).map(([agentId, agentData]) => `
                 <tr>
-                  <td>${agentData.agentName}</td>
-                  <td>${agentData.office}</td>
-                  <td>${agentData.department}</td>
+                  <td>${agentData.agentName || '미지정'}</td>
+                  <td>${agentData.office || '미지정'}</td>
+                  <td>${agentData.department || '미지정'}</td>
                   <td><strong>${Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0)}개</strong></td>
-                  <td>${Math.round(agentData.averageScore || 0)}점</td>
+                                          <td>${Math.round(agentData.averageScore || 50)}점</td>
                   ${Object.keys(previewData.models).map(modelName => `
                     <td>${agentData[modelName]?.quantity || '-'}</td>
                   `).join('')}
@@ -1339,7 +1339,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             <tbody>
               ${Object.entries(previewData.departments).map(([departmentName, departmentData]) => `
                 <tr>
-                  <td>${departmentName}</td>
+                  <td>${departmentName || '미지정'}</td>
                   <td>${departmentData.agentCount}명</td>
                   <td><strong>${departmentData.totalQuantity}개</strong></td>
                   <td>${departmentData.agentCount > 0 ? Math.round(departmentData.totalQuantity / departmentData.agentCount) : 0}개</td>
@@ -1578,7 +1578,20 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           agents: agents.slice(0, 3),
                           validAgents: validAgents.slice(0, 3)
                         });
-                        return validAgents.map((agent) => (
+                        return validAgents
+                          .sort((a, b) => {
+                            // 사무실별 정렬
+                            const officeCompare = (a.office || '').localeCompare(b.office || '');
+                            if (officeCompare !== 0) return officeCompare;
+                            
+                            // 사무실이 같으면 소속별 정렬
+                            const deptCompare = (a.department || '').localeCompare(b.department || '');
+                            if (deptCompare !== 0) return deptCompare;
+                            
+                            // 소속도 같으면 이름별 정렬
+                            return (a.target || '').localeCompare(b.target || '');
+                          })
+                          .map((agent) => (
                           <TableRow key={agent.contactId}>
                             <TableCell>{agent.target}</TableCell>
                             <TableCell>
@@ -2041,23 +2054,68 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <Grid container spacing={2}>
                   {Object.entries(assignmentSettings.models).map(([modelName, modelData]) => (
                     <Grid item xs={12} sm={6} md={4} key={modelName}>
-                      <Paper sx={{ p: 2 }}>
+                      <Paper 
+                        sx={{ 
+                          p: 2, 
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: '#f5f5f5',
+                            boxShadow: 2
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedModel(modelName);
+                          setNewModel(prev => ({
+                            ...prev,
+                            name: modelName,
+                            bulkQuantities: {}
+                          }));
+                          // 기존 색상 데이터를 bulkQuantities로 변환
+                          const bulkQuantities = {};
+                          modelData.colors.forEach(color => {
+                            bulkQuantities[color.name] = color.quantity;
+                          });
+                          setNewModel(prev => ({
+                            ...prev,
+                            bulkQuantities
+                          }));
+                          setShowModelDialog(true);
+                        }}
+                      >
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                           <Typography variant="subtitle1" fontWeight="bold">
                             {modelName}
                           </Typography>
-                          <IconButton size="small" onClick={() => handleDeleteModel(modelName)}>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteModel(modelName);
+                            }}
+                          >
                             <DeleteIcon />
                           </IconButton>
                         </Box>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          색상별 수량:
-                        </Typography>
-                        {modelData.colors.map((color, index) => (
-                          <Typography key={index} variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                            • {color.name}: {color.quantity}개
+                        <Box sx={{ mb: 1 }}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            색상별 수량:
                           </Typography>
-                        ))}
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {modelData.colors.map((color, index) => (
+                              <Chip
+                                key={index}
+                                label={`${color.name}: ${color.quantity}개`}
+                                size="small"
+                                variant="outlined"
+                                sx={{ 
+                                  fontSize: '0.75rem',
+                                  height: '24px',
+                                  '& .MuiChip-label': { px: 1 }
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
                         <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 'bold' }}>
                           총 수량: {modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0)}개
                         </Typography>
@@ -2450,7 +2508,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   총 배정량
                                 </TableCell>
                                 <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }}>
-                                  평균 점수
+                                  배정 점수
                                 </TableCell>
                                 {/* 모델별 색상별 헤더 */}
                                 {Object.entries(previewData.models).map(([modelName, modelData]) => (
