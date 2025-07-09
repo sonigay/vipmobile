@@ -626,6 +626,17 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       calculation: `(${salesVolume} - ${remainingInventory}) * -1 = ${inventoryScore}점`
     });
     
+    // 김수빈의 경우 더 상세한 로그
+    if (agent.target === '김수빈') {
+      console.log(`🚨 김수빈 잔여재고 점수 상세:`, {
+        salesVolume,
+        remainingInventory,
+        inventoryScore,
+        normalizedInventoryScore: Math.min(Math.max(inventoryScore, -50), 50) + 50,
+        calculation: `(${salesVolume} - ${remainingInventory}) * -1 = ${inventoryScore}점`
+      });
+    }
+    
     // 원시 점수 계산
     let rawScore = 0;
     
@@ -788,6 +799,28 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
     );
     
     const finalWeight = relativeRawScore / 100; // 0-1 범위로 변환
+    
+    // 디버깅: 김수빈의 경우 상세 로그 출력
+    if (agent.target === '김수빈') {
+      console.log(`🔍 김수빈 상대적 점수 계산 상세:`, {
+        agent: agent.target,
+        originalScores: {
+          turnoverRate: details.turnoverRate.value,
+          storeCount: details.storeCount.value,
+          remainingInventory: details.remainingInventory.value,
+          salesVolume: details.salesVolume.value
+        },
+        relativeScores: {
+          turnoverRate: details.turnoverRate.value,
+          storeCount: relativeStoreCount,
+          remainingInventory: relativeInventoryScore,
+          salesVolume: relativeSalesVolume
+        },
+        ratios: settings.ratios,
+        relativeRawScore,
+        finalWeight
+      });
+    }
     
     console.log(`🔍 상대적 점수 계산 - ${agent.target} (${modelName}-${colorName}):`, {
       originalRawScore: Math.round(rawScore * 100) / 100,
@@ -1023,6 +1056,17 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
     포함된인원: filteredAgents.map(agent => agent.target),
     제외된인원: eligibleAgents.filter(agent => !filteredAgents.find(fa => fa.contactId === agent.contactId)).map(agent => agent.target)
   });
+  
+  // 필터링된 영업사원이 없으면 빈 결과 반환
+  if (filteredAgents.length === 0) {
+    console.log('⚠️ 거래처수가 있는 영업사원이 없어 배정을 중단합니다.');
+    return {
+      agents: {},
+      offices: {},
+      departments: {},
+      models: {}
+    };
+  }
   
   const results = {
     agents: {},
