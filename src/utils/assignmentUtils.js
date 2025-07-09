@@ -568,12 +568,23 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     
     // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
     if (storeCount === 0) {
-      // 개통실적 데이터에서 고유한 출고처 수 추정 (구글 시트 필드명: '출고처')
+      // 개통실적 데이터에서 고유한 출고처 수 추정 (빈 값, 의미없는 값, 0 등 제외)
       const uniqueStores = new Set();
       agentCurrentData.forEach(record => {
         const storeName = record['출고처'];
-        if (storeName) {
-          uniqueStores.add(storeName);
+        if (
+          storeName &&
+          typeof storeName === 'string' &&
+          storeName.trim() !== '' &&
+          storeName !== '-' &&
+          storeName !== '미지정' &&
+          storeName !== '미정' &&
+          storeName !== '기타' &&
+          storeName !== '없음' &&
+          storeName !== '0' &&
+          storeName.trim() !== '0'
+        ) {
+          uniqueStores.add(storeName.trim());
         }
       });
       storeCount = uniqueStores.size;
@@ -581,6 +592,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       console.log(`🏪 ${agent.target} 거래처수 계산:`, {
         fromStoreData: storeData ? 'storeData에서 계산' : 'storeData 없음',
         fromActivationData: uniqueStores.size,
+        uniqueStores: Array.from(uniqueStores),
         finalStoreCount: storeCount
       });
     }

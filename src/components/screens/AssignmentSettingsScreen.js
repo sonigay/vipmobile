@@ -1271,7 +1271,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 {logic.emoji}
               </Box>
               <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>
-                {displayValue !== undefined ? Number(displayValue).toFixed(1) : '-'}
+                {displayValue !== undefined ? Math.round(Number(displayValue)) : '-'}
               </span>
               <span style={{ fontSize: '0.65rem', color: '#888' }}>{detailText}</span>
             </Box>
@@ -3046,7 +3046,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       </TableCell>
                                       
                                       {/* 영업사원별 배정량 */}
-                                      {isExpanded ? (() => {
+                                      {(() => {
                                         const groupedAgents = {};
                                         Object.entries(previewData.agents)
                                           .sort(([agentIdA, a], [agentIdB, b]) => {
@@ -3108,7 +3108,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                             );
                                           })
                                         );
-                                      })() : null}
+                                      })()}
                                     </TableRow>
                                   );
                                 })
