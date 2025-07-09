@@ -521,14 +521,15 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     }
     const salesVolume = totalSales; // 판매량 = 전월개통 숫자+당월개통 숫자
     
-    // 잔여재고 점수 계산 (재고가 적을수록 높은 점수)
-    const inventoryScore = remainingInventory === 0 ? 100 : Math.max(0, 100 - (remainingInventory * 10));
+    // 잔여재고 점수 계산: (판매량 - 보유재고) * -1 (숫자가 높을수록 배정량 높음)
+    const inventoryScore = (salesVolume - remainingInventory) * -1;
     
     // 디버깅: 잔여재고 점수 계산 결과 확인
     console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 잔여재고 점수 계산:`, {
+      salesVolume,
       remainingInventory,
       inventoryScore,
-      calculation: remainingInventory === 0 ? '재고 0 → 100점' : `100 - (${remainingInventory} * 10) = ${inventoryScore}점`
+      calculation: `(${salesVolume} - ${remainingInventory}) * -1 = ${inventoryScore}점`
     });
     
     // 원시 점수 계산
@@ -649,13 +650,15 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
   // 2단계: 상대적 정규화를 위한 최대/최소값 계산
   const maxSalesVolume = Math.max(...agentScores.map(item => item.details.salesVolume.detail));
   const maxStoreCount = Math.max(...agentScores.map(item => item.details.storeCount.detail));
-  // 잔여재고는 실제 재고 수량으로 비교
-  const maxInventoryCount = Math.max(...agentScores.map(item => item.details.remainingInventory.detail));
+  // 잔여재고 점수는 (판매량 - 보유재고) * -1 공식으로 계산된 값으로 비교
+  const maxInventoryScore = Math.max(...agentScores.map(item => item.details.remainingInventory.value));
+  const minInventoryScore = Math.min(...agentScores.map(item => item.details.remainingInventory.value));
   
       console.log(`📊 ${modelName}-${colorName} 상대적 비교 기준:`, {
       maxSalesVolume,
       maxStoreCount,
-      maxInventoryCount,
+      maxInventoryScore,
+      minInventoryScore,
       agentCount: agents.length
     });
   
@@ -664,8 +667,10 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
     // 상대적 정규화 (최대값 대비 비율)
     const relativeSalesVolume = maxSalesVolume > 0 ? (details.salesVolume.detail / maxSalesVolume) * 100 : 0;
     const relativeStoreCount = maxStoreCount > 0 ? (details.storeCount.detail / maxStoreCount) * 100 : 0;
-    // 잔여재고는 실제 재고 수량으로 상대적 비교
-    const relativeInventoryScore = maxInventoryCount > 0 ? (details.remainingInventory.detail / maxInventoryCount) * 100 : 100;
+    // 잔여재고 점수는 0-100 범위로 정규화 (최대값과 최소값 기준)
+    const relativeInventoryScore = maxInventoryScore !== minInventoryScore 
+      ? ((details.remainingInventory.value - minInventoryScore) / (maxInventoryScore - minInventoryScore)) * 100 
+      : 50;
     
     // 새로운 상대적 점수 계산
     const relativeRawScore = (
