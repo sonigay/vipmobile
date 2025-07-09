@@ -98,11 +98,13 @@ const loadActivationDataBatch = async () => {
   
   // 캐시가 유효한 경우 캐시된 데이터 반환
   if (activationDataCache && (now - activationDataTimestamp) < CACHE_DURATION) {
+    console.log('개통실적 데이터 캐시 사용');
     return activationDataCache;
   }
   
   try {
     const API_URL = process.env.REACT_APP_API_URL;
+    console.log('개통실적 데이터 로딩 시작 - API_URL:', API_URL);
     
     // 백엔드에서 제공하는 구글 시트 기반 개통실적 데이터 API 사용
     const [currentMonthResponse, previousMonthResponse] = await Promise.all([
@@ -110,12 +112,24 @@ const loadActivationDataBatch = async () => {
       fetch(`${API_URL}/api/activation-data/previous-month`)
     ]);
     
+    console.log('개통실적 API 응답 상태:', {
+      currentMonth: currentMonthResponse.status,
+      previousMonth: previousMonthResponse.status
+    });
+    
     if (!currentMonthResponse.ok || !previousMonthResponse.ok) {
-      throw new Error('개통실적 데이터 API 호출 실패');
+      throw new Error(`개통실적 데이터 API 호출 실패: ${currentMonthResponse.status} ${previousMonthResponse.status}`);
     }
     
     const currentMonthData = await currentMonthResponse.json();
     const previousMonthData = await previousMonthResponse.json();
+    
+    console.log('개통실적 데이터 로딩 결과:', {
+      currentMonthRecords: currentMonthData.length,
+      previousMonthRecords: previousMonthData.length,
+      sampleCurrentRecord: currentMonthData[0],
+      samplePreviousRecord: previousMonthData[0]
+    });
     
     // 데이터를 인덱싱하여 빠른 검색 가능
     const indexedData = {
