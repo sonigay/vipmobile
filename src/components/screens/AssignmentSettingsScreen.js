@@ -1213,6 +1213,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const ScoreDisplay = ({ scores, modelName, colorName }) => {
     if (!scores || Object.keys(scores).length === 0) return null;
     
+    // 디버깅: 실제 받은 데이터 구조 확인
+    console.log(`🎯 ScoreDisplay - ${modelName}-${colorName}:`, scores);
+    
     // 상세값 매핑
     const logicDetailLabel = {
       turnoverRate: v => `회전율: ${v !== undefined ? v + '%' : '-'}`,
@@ -2910,6 +2913,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 </TableCell>
                                 <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center" rowSpan={2}>
                                   총 배정량
+                                </TableCell>
+                                <TableCell align="center" rowSpan={2}>
+                                  색상
                                 </TableCell>
                                 {/* 영업사원별 헤더 - 그룹화 */}
                                 {(() => {

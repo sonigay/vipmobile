@@ -408,8 +408,15 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
       agentColorQuantities[colorName] = colorQuantity;
       agentColorScores[colorName] = {
         averageScore: colorScore?.rawScore || 0,
-        details: colorScore?.details || {} // 새로운 구조 {value, detail} 포함
+        details: colorScore?.details || {} // calculateColorRawScore에서 반환하는 새로운 구조
       };
+      
+      // 디버깅: 실제 전달되는 데이터 확인
+      console.log(`🔍 ${agent.target} - ${modelName}-${colorName} 점수 데이터:`, {
+        rawScore: colorScore?.rawScore,
+        details: colorScore?.details,
+        finalWeight: colorScore?.finalWeight
+      });
       totalAgentQuantity += colorQuantity;
     });
     
