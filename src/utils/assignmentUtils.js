@@ -294,12 +294,20 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       calculationMethod: modelColorCurrentData.length > 0 ? '색상별 개통합' : '모델별 개통합'
     });
     
-    // 재고 숫자 계산: 관리자모드와 동일한 구조로 처리
+    // 재고 숫자 계산: 담당자가 관리하는 매장의 재고만 계산
     let remainingInventory = 0;
     
     if (storeData && Array.isArray(storeData)) {
-      // 모든 매장의 재고에서 해당 모델명+색상의 수량을 합산
-      storeData.forEach(store => {
+      // 담당자가 관리하는 매장만 필터링
+      const agentStores = storeData.filter(store => 
+        store.manager === agent.target || 
+        store.담당자 === agent.target
+      );
+      
+      console.log(`🏪 ${agent.target} 담당 매장 수:`, agentStores.length);
+      
+      // 담당 매장의 재고에서 해당 모델명+색상의 수량을 합산
+      agentStores.forEach(store => {
         if (store.inventory) {
           // 카테고리별로 순회 (phones, wearables, tablets 등)
           Object.values(store.inventory).forEach(category => {
@@ -339,11 +347,15 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       remainingInventory,
       storeDataAvailable: !!storeData,
       storeDataLength: storeData?.length || 0,
+      agentStoresCount: storeData ? storeData.filter(store => 
+        store.manager === agent.target || store.담당자 === agent.target
+      ).length : 0,
       modelDataAvailable: !!modelData,
       colorCount: modelData?.colors?.length,
       calculationMethod: color ? '색상별 합산' : '모델별 균등분배',
       sampleStoreInventory: storeData?.[0]?.inventory?.[model] || 'no inventory',
-      allStoresWithModel: storeData?.filter(store => store.inventory?.[model]).length || 0
+      allStoresWithModel: storeData?.filter(store => store.inventory?.[model]).length || 0,
+      담당매장재고: '담당 매장만 계산'
     });
     
     // 회전율 계산: ((전월개통 숫자+당월개통 숫자) / (재고 숫자 + (전월개통 숫자+당월개통 숫자))) * 100
