@@ -145,7 +145,7 @@ const loadActivationDataBatch = async () => {
 };
 
 // 색상별 원시 점수 계산 (정규화 전)
-const calculateColorRawScore = async (agent, model, color, settings, storeData) => {
+const calculateColorRawScore = async (agent, model, color, settings, storeData, modelData = null) => {
   const { ratios } = settings;
   
   try {
@@ -179,8 +179,20 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData) 
       : modelPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
     const totalSales = currentMonthSales + previousMonthSales;
     
-    // 보유재고 계산 (storeData에서 해당 모델의 재고량)
-    const remainingInventory = storeData?.inventory?.[model]?.정상 || 0;
+    // 보유재고 계산 (storeData에서 해당 모델+색상의 재고량)
+    let remainingInventory = 0;
+    
+    if (color && storeData?.inventory?.[model]?.[color]) {
+      // 색상별 재고 정보가 있는 경우
+      remainingInventory = storeData.inventory[model][color].정상 || 0;
+    } else if (storeData?.inventory?.[model]?.정상) {
+      // 색상별 정보가 없으면 모델별 재고를 색상 개수로 나누어 균등 분배
+      const totalModelInventory = storeData.inventory[model].정상 || 0;
+      const colorCount = modelData?.colors?.length || 1;
+      remainingInventory = Math.floor(totalModelInventory / colorCount);
+    } else {
+      remainingInventory = 0;
+    }
     
     // 색상별 회전율 계산
     const turnoverRate = remainingInventory + totalSales > 0 
@@ -277,9 +289,9 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
 };
 
 // 색상별 정확한 가중치 계산
-const calculateColorAccurateWeights = async (agents, modelName, colorName, settings, storeData) => {
+const calculateColorAccurateWeights = async (agents, modelName, colorName, settings, storeData, modelData = null) => {
   const weightPromises = agents.map(async (agent) => {
-    const { rawScore, details } = await calculateColorRawScore(agent, modelName, colorName, settings, storeData);
+    const { rawScore, details } = await calculateColorRawScore(agent, modelName, colorName, settings, storeData, modelData);
     
     // 최종 가중치 (rawScore와 동일한 방식으로 계산)
     const finalWeight = rawScore / 100; // 0-1 범위로 변환
@@ -341,7 +353,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     const colorQuantity = color.quantity || 0;
     if (colorQuantity > 0) {
       // 해당 색상의 가중치 계산
-      const weightedAgents = await calculateColorAccurateWeights(eligibleAgents, modelName, color.name, settings, storeData);
+      const weightedAgents = await calculateColorAccurateWeights(eligibleAgents, modelName, color.name, settings, storeData, modelData);
       
       // 해당 색상의 배정량 계산
       const colorBaseAssignments = calculateBaseAssignments(weightedAgents, colorQuantity);
