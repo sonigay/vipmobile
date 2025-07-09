@@ -1344,9 +1344,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <table>
             <thead>
               <tr>
-                <th>영업사원</th>
                 <th>사무실</th>
                 <th>소속</th>
+                <th>영업사원</th>
                 <th>총 배정량</th>
                 <th>배정 점수</th>
                 ${Object.entries(previewData.models).map(([modelName, modelData]) => 
@@ -1356,17 +1356,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             </thead>
             <tbody>
               ${Object.entries(previewData.agents).map(([agentId, agentData]) => {
-                const agent = agents.find(a => a.contactId === agentId);
+                                const agent = agents.find(a => a.contactId === agentId);
                 const totalQuantity = Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0);
-                                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || 0), 0) / Object.keys(agentData).length;
+                // 실제 배정 점수는 첫 번째 모델의 averageScore 사용 (모든 모델이 동일한 점수를 가짐)
+                const avgScore = Object.values(agentData)[0]?.averageScore || 0;
                 
-                return `
-                  <tr>
-                    <td>${agent?.target || agentId}</td>
-                    <td>${agent?.office || '미지정'}</td>
-                    <td>${agent?.department || '미지정'}</td>
-                    <td><strong>${totalQuantity}개</strong></td>
-                    <td>${Math.round(avgScore)}점</td>
+                                  return `
+                    <tr>
+                      <td>${agent?.office || '미지정'}</td>
+                      <td>${agent?.department || '미지정'}</td>
+                      <td>${agent?.target || agentId}</td>
+                      <td><strong>${totalQuantity}개</strong></td>
+                      <td>${Math.round(avgScore)}점</td>
                     ${Object.entries(previewData.models).map(([modelName, modelData]) => 
                       modelData.colors.map(color => {
                         const modelAssignment = agentData[modelName];
@@ -2678,17 +2679,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 .map(([agentId, agentData]) => {
                                   const agent = agents.find(a => a.contactId === agentId);
                                   const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || 0), 0) / Object.keys(agentData).length;
+                                  // 실제 배정 점수는 첫 번째 모델의 averageScore 사용 (모든 모델이 동일한 점수를 가짐)
+                                  const avgScore = Object.values(agentData)[0]?.averageScore || 0;
                                   
                                   return (
                                     <TableRow key={agentId}>
-                                      <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                      <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         {agent?.office || '미지정'}
                                       </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                      <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         {agent?.department || '미지정'}
                                       </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                      <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         {agent?.target || agentId}
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
@@ -2697,20 +2699,30 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         {Math.round(avgScore)}점
                                       </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }}>
-                                        <Box sx={{ fontSize: '0.75rem', lineHeight: 1.2 }}>
+                                      <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
+                                        <Box sx={{ fontSize: '0.7rem', lineHeight: 1.1 }}>
                                           {(() => {
                                             // 첫 번째 모델의 세부 점수 정보 가져오기
                                             const firstModelData = Object.values(agentData)[0];
                                             if (firstModelData?.details) {
                                               const { details } = firstModelData;
                                               const ratios = assignmentSettings.ratios;
+                                              
+                                              // 정규화된 값 계산 (rawScore와 동일한 방식)
+                                              const normalizedTurnoverRate = details.turnoverRate / 100;
+                                              const normalizedInventoryScore = details.inventoryScore / 100;
+                                              const normalizedStoreCount = Math.min(details.storeCount / 10, 1);
+                                              const normalizedSalesVolume = Math.min(details.salesVolume / 100, 1);
+                                              
+                                              // 각 항목별 점수 계산
+                                              const turnoverScore = Math.round((ratios.turnoverRate / 100) * normalizedTurnoverRate * 100);
+                                              const storeScore = Math.round((ratios.storeCount / 100) * normalizedStoreCount * 100);
+                                              const inventoryScore = Math.round((ratios.remainingInventory / 100) * normalizedInventoryScore * 100);
+                                              const salesScore = Math.round((ratios.salesVolume / 100) * normalizedSalesVolume * 100);
+                                              
                                               return (
-                                                <div>
-                                                  <div>회전율: {details.turnoverRate}% ({Math.round(details.turnoverRate * ratios.turnoverRate / 100)}점)</div>
-                                                  <div>거래처: {details.storeCount}개 ({Math.round(details.storeCount * ratios.storeCount / 100)}점)</div>
-                                                  <div>재고: {details.remainingInventory}개 ({Math.round(details.inventoryScore * ratios.remainingInventory / 100)}점)</div>
-                                                  <div>판매: {details.salesVolume}개 ({Math.round(details.salesVolume * ratios.salesVolume / 100)}점)</div>
+                                                <div style={{ whiteSpace: 'nowrap' }}>
+                                                  회전율:{turnoverScore}점 거래처:{storeScore}점 재고:{inventoryScore}점 판매:{salesScore}점
                                                 </div>
                                               );
                                             }
