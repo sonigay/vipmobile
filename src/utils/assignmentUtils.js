@@ -241,10 +241,13 @@ export const calculateAssignmentScore = async (agent, model, settings, storeData
       rawScore: Math.round(rawScore * 100) / 100
     });
     
-    // 결과 캐싱
-    setCache(cacheKey, rawScore);
+    // 정규화된 점수 계산 (0-100 범위)
+    const normalizedScore = Math.max(0, Math.min(100, rawScore));
     
-    return rawScore;
+    // 결과 캐싱
+    setCache(cacheKey, normalizedScore);
+    
+    return normalizedScore;
   } catch (error) {
     console.error('배정 점수 계산 중 오류:', error);
     return 50; // 기본값
@@ -355,7 +358,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
         quantity: totalAgentQuantity,
         colorQuantities: agentColorQuantities, // 색상별 배정량 추가
         finalWeight: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.finalWeight || 0,
-        rawScore: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.rawScore || 0,
+        averageScore: Math.max(0, Math.min(100, weightedAgents.find(item => item.agent.contactId === agent.contactId)?.rawScore || 50)),
         colors: modelData.colors.map(color => color.name),
         details: weightedAgents.find(item => item.agent.contactId === agent.contactId)?.details || {}
       };

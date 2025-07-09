@@ -1308,11 +1308,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             <tbody>
               ${Object.entries(previewData.agents).map(([agentId, agentData]) => `
                 <tr>
-                  <td>${agentData.agentName || '미지정'}</td>
+                  <td>${agentData.agentName || agentData.name || '미지정'}</td>
                   <td>${agentData.office || '미지정'}</td>
                   <td>${agentData.department || '미지정'}</td>
                   <td><strong>${Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0)}개</strong></td>
-                                          <td>${Math.round(agentData.averageScore || 50)}점</td>
+                                          <td>${Math.round(agentData.averageScore || agentData.rawScore || 50)}점</td>
                   ${Object.keys(previewData.models).map(modelName => `
                     <td>${agentData[modelName]?.quantity || '-'}</td>
                   `).join('')}
@@ -1578,20 +1578,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           agents: agents.slice(0, 3),
                           validAgents: validAgents.slice(0, 3)
                         });
-                        return validAgents
-                          .sort((a, b) => {
-                            // 사무실별 정렬
-                            const officeCompare = (a.office || '').localeCompare(b.office || '');
-                            if (officeCompare !== 0) return officeCompare;
-                            
-                            // 사무실이 같으면 소속별 정렬
-                            const deptCompare = (a.department || '').localeCompare(b.department || '');
-                            if (deptCompare !== 0) return deptCompare;
-                            
-                            // 소속도 같으면 이름별 정렬
-                            return (a.target || '').localeCompare(b.target || '');
-                          })
-                          .map((agent) => (
+                        return validAgents.map((agent) => (
                           <TableRow key={agent.contactId}>
                             <TableCell>{agent.target}</TableCell>
                             <TableCell>
@@ -2100,19 +2087,53 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           <Typography variant="body2" color="text.secondary" gutterBottom>
                             색상별 수량:
                           </Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             {modelData.colors.map((color, index) => (
-                              <Chip
+                              <Box
                                 key={index}
-                                label={`${color.name}: ${color.quantity}개`}
-                                size="small"
-                                variant="outlined"
-                                sx={{ 
-                                  fontSize: '0.75rem',
-                                  height: '24px',
-                                  '& .MuiChip-label': { px: 1 }
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  p: 0.5,
+                                  borderRadius: 1,
+                                  backgroundColor: index % 2 === 0 ? '#f8f9fa' : '#ffffff',
+                                  border: '1px solid #e0e0e0'
                                 }}
-                              />
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Box
+                                    sx={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: '50%',
+                                      backgroundColor: color.name.toLowerCase().includes('블랙') ? '#000' :
+                                                     color.name.toLowerCase().includes('화이트') ? '#fff' :
+                                                     color.name.toLowerCase().includes('실버') ? '#c0c0c0' :
+                                                     color.name.toLowerCase().includes('블루') ? '#0066cc' :
+                                                     color.name.toLowerCase().includes('골드') ? '#ffd700' :
+                                                     color.name.toLowerCase().includes('핑크') ? '#ff69b4' :
+                                                     color.name.toLowerCase().includes('그린') ? '#228b22' :
+                                                     color.name.toLowerCase().includes('레드') ? '#dc143c' :
+                                                     '#ddd',
+                                      border: '1px solid #ccc'
+                                    }}
+                                  />
+                                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                                    {color.name}
+                                  </Typography>
+                                </Box>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    fontWeight: 'bold',
+                                    color: 'primary.main',
+                                    fontSize: '0.9rem'
+                                  }}
+                                >
+                                  {color.quantity}개
+                                </Typography>
+                              </Box>
                             ))}
                           </Box>
                         </Box>
@@ -2540,9 +2561,19 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             <TableBody>
                               {Object.entries(previewData.agents)
                                 .sort(([,a], [,b]) => {
-                                  const aTotal = Object.values(a).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                                  const bTotal = Object.values(b).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                                  return bTotal - aTotal;
+                                  const agentA = agents.find(agent => agent.contactId === Object.keys(a)[0]?.split('-')[0] || Object.keys(a)[0]);
+                                  const agentB = agents.find(agent => agent.contactId === Object.keys(b)[0]?.split('-')[0] || Object.keys(b)[0]);
+                                  
+                                  // 사무실별 정렬
+                                  const officeCompare = (agentA?.office || '').localeCompare(agentB?.office || '');
+                                  if (officeCompare !== 0) return officeCompare;
+                                  
+                                  // 사무실이 같으면 소속별 정렬
+                                  const deptCompare = (agentA?.department || '').localeCompare(agentB?.department || '');
+                                  if (deptCompare !== 0) return deptCompare;
+                                  
+                                  // 소속도 같으면 이름별 정렬
+                                  return (agentA?.target || '').localeCompare(agentB?.target || '');
                                 })
                                 .map(([agentId, agentData]) => {
                                   const agent = agents.find(a => a.contactId === agentId);
