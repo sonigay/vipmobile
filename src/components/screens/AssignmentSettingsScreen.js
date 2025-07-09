@@ -1235,6 +1235,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           let detailText = '';
           
           if (typeof score === 'object' && score !== null && 'value' in score && 'detail' in score) {
+            // 새로운 구조: {value: 정규화된점수, detail: 원본값}
             displayValue = score.value;
             detailText = logicDetailLabel[logicType]?.(score.detail);
           } else if (typeof score === 'object' && score !== null && 'detail' in score) {
@@ -1244,9 +1245,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             displayValue = score.value;
             detailText = logicDetailLabel[logicType]?.(score.value);
           } else {
+            // 기존 구조: 단순 값
             displayValue = score;
             detailText = logicDetailLabel[logicType]?.(score);
           }
+          
+          // 디버깅: 각 로직별 처리 결과 확인
+          console.log(`🎯 ${logicType}:`, { displayValue, detailText, originalScore: score });
           
           return (
             <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
