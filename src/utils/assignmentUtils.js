@@ -301,7 +301,9 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       const API_URL = process.env.REACT_APP_API_URL;
       
       // 담당재고확인 모드로 매장 데이터 요청 (includeShipped=true)
+      console.log(`🏪 ${agent.target} 재고 API 호출 시작:`, `${API_URL}/api/stores?includeShipped=true`);
       const storeResponse = await fetch(`${API_URL}/api/stores?includeShipped=true`);
+      console.log(`🏪 ${agent.target} 재고 API 응답 상태:`, storeResponse.status);
       
       if (storeResponse.ok) {
         const allStores = await storeResponse.json();
@@ -317,43 +319,71 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
           agentStoresCount: agentStores.length,
           agentTarget: agent.target,
           sampleStoreManager: allStores[0]?.manager,
-          sampleStore담당자: allStores[0]?.담당자
+          sampleStore담당자: allStores[0]?.담당자,
+          agentStores: agentStores.map(store => ({
+            name: store.name,
+            manager: store.manager,
+            담당자: store.담당자,
+            hasInventory: !!store.inventory
+          }))
         });
         
-        // 담당 매장의 재고에서 해당 모델명+색상의 수량을 합산
-        agentStores.forEach(store => {
-          if (store.inventory) {
-            // 카테고리별로 순회 (phones, wearables, tablets 등)
-            Object.values(store.inventory).forEach(category => {
-              if (typeof category === 'object' && category !== null) {
-                // 모델별로 순회
-                Object.entries(category).forEach(([categoryModel, modelData]) => {
-                  if (categoryModel === model && typeof modelData === 'object' && modelData !== null) {
-                    // 상태별로 순회 (정상, 이력, 불량)
-                    Object.entries(modelData).forEach(([status, statusData]) => {
-                      if (status === '정상' && typeof statusData === 'object' && statusData !== null) {
-                        if (color) {
-                          // 특정 색상의 재고
-                          const colorData = statusData[color];
-                          if (typeof colorData === 'object' && colorData && colorData.quantity) {
-                            remainingInventory += colorData.quantity || 0;
-                          }
-                        } else {
-                          // 모든 색상의 재고 합산
-                          Object.values(statusData).forEach(colorData => {
+                  // 담당 매장의 재고에서 해당 모델명+색상의 수량을 합산
+          let storeInventoryDetails = [];
+          
+          agentStores.forEach(store => {
+            if (store.inventory) {
+              let storeInventory = 0;
+              
+              // 카테고리별로 순회 (phones, wearables, tablets 등)
+              Object.values(store.inventory).forEach(category => {
+                if (typeof category === 'object' && category !== null) {
+                  // 모델별로 순회
+                  Object.entries(category).forEach(([categoryModel, modelData]) => {
+                    if (categoryModel === model && typeof modelData === 'object' && modelData !== null) {
+                      // 상태별로 순회 (정상, 이력, 불량)
+                      Object.entries(modelData).forEach(([status, statusData]) => {
+                        if (status === '정상' && typeof statusData === 'object' && statusData !== null) {
+                          if (color) {
+                            // 특정 색상의 재고
+                            const colorData = statusData[color];
                             if (typeof colorData === 'object' && colorData && colorData.quantity) {
-                              remainingInventory += colorData.quantity || 0;
+                              const qty = colorData.quantity || 0;
+                              remainingInventory += qty;
+                              storeInventory += qty;
                             }
-                          });
+                          } else {
+                            // 모든 색상의 재고 합산
+                            Object.values(statusData).forEach(colorData => {
+                              if (typeof colorData === 'object' && colorData && colorData.quantity) {
+                                const qty = colorData.quantity || 0;
+                                remainingInventory += qty;
+                                storeInventory += qty;
+                              }
+                            });
+                          }
                         }
-                      }
-                    });
-                  }
+                      });
+                    }
+                  });
+                }
+              });
+              
+              if (storeInventory > 0) {
+                storeInventoryDetails.push({
+                  storeName: store.name,
+                  inventory: storeInventory
                 });
               }
-            });
-          }
-        });
+            }
+          });
+          
+          console.log(`🏪 ${agent.target} (${model}-${color || '전체'}) 재고 계산 상세:`, {
+            totalRemainingInventory: remainingInventory,
+            storeInventoryDetails,
+            targetModel: model,
+            targetColor: color
+          });
       } else {
         console.error(`재고 데이터 API 호출 실패: ${storeResponse.status}`);
         // API 호출 실패 시 기존 storeData 사용
