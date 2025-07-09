@@ -1358,7 +1358,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               ${Object.entries(previewData.agents).map(([agentId, agentData]) => {
                 const agent = agents.find(a => a.contactId === agentId);
                 const totalQuantity = Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0);
-                const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || val.rawScore || 50), 0) / Object.keys(agentData).length;
+                                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || 0), 0) / Object.keys(agentData).length;
                 
                 return `
                   <tr>
@@ -2674,7 +2674,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 .map(([agentId, agentData]) => {
                                   const agent = agents.find(a => a.contactId === agentId);
                                   const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || val.rawScore || 50), 0) / Object.keys(agentData).length;
+                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || 0), 0) / Object.keys(agentData).length;
                                   
                                   return (
                                     <TableRow key={agentId}>
