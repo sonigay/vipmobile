@@ -296,6 +296,18 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
     // 최종 가중치 (rawScore와 동일한 방식으로 계산)
     const finalWeight = rawScore / 100; // 0-1 범위로 변환
     
+    console.log(`🔍 색상별 점수 계산 - ${agent.target} (${modelName}-${colorName}):`, {
+      rawScore: Math.round(rawScore * 100) / 100,
+      finalWeight: Math.round(finalWeight * 1000) / 1000,
+      details: {
+        turnoverRate: details.turnoverRate,
+        storeCount: details.storeCount,
+        remainingInventory: details.remainingInventory,
+        inventoryScore: details.inventoryScore,
+        salesVolume: details.salesVolume
+      }
+    });
+    
     return { agent, finalWeight, rawScore, details };
   });
   
@@ -409,7 +421,12 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
     console.log(`✅ 색상 ${colorName} 배정 검증:`, {
       expected: expectedColorQuantity,
       assigned: totalColorAssigned,
-      difference: expectedColorQuantity - totalColorAssigned
+      difference: expectedColorQuantity - totalColorAssigned,
+      agentScores: colorScores[colorName].map(item => ({
+        agent: item.agent.target,
+        score: Math.round(item.rawScore),
+        weight: Math.round(item.finalWeight * 100) / 100
+      }))
     });
   });
   
