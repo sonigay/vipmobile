@@ -170,18 +170,21 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     // 배치로드된 개통실적 데이터 사용
     const activationData = await loadActivationDataBatch();
     
-    // 담당자별 데이터 추출 (인덱싱된 데이터 사용)
-    const agentCurrentData = activationData.current.get(agent.target) || [];
-    const agentPreviousData = activationData.previous.get(agent.target) || [];
+    // 담당자별 데이터 추출 (인덱싱된 데이터 사용) - 선불개통 제외
+    const agentCurrentData = (activationData.current.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
+    const agentPreviousData = (activationData.previous.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
     
-    // 디버깅: 실제 데이터 구조 확인
-    console.log(`🔍 ${agent.target} 데이터 구조 확인:`, {
+    // 디버깅: 실제 데이터 구조 확인 (선불개통 제외 후)
+    console.log(`🔍 ${agent.target} 데이터 구조 확인 (선불개통 제외):`, {
       currentMonthRecords: agentCurrentData.length,
       previousMonthRecords: agentPreviousData.length,
       sampleCurrentRecord: agentCurrentData[0],
       samplePreviousRecord: agentPreviousData[0],
       targetModel: model,
-      targetColor: color
+      targetColor: color,
+      allCurrentRecords: agentCurrentData.slice(0, 3), // 처음 3개 레코드
+      allPreviousRecords: agentPreviousData.slice(0, 3), // 처음 3개 레코드
+      선불개통제외: '적용됨'
     });
     
     // 구글 시트 필드명 사용 (백엔드에서 이미 매핑됨)
@@ -198,6 +201,14 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     const modelCurrentData = agentCurrentData.filter(record => record['모델명'] === model);
     const modelPreviousData = agentPreviousData.filter(record => record['모델명'] === model);
     
+    // 디버깅: 필터링된 데이터 확인
+    console.log(`🔍 ${agent.target} 필터링된 데이터 확인:`, {
+      modelColorCurrentData: modelColorCurrentData.slice(0, 2), // 처음 2개 레코드
+      modelColorPreviousData: modelColorPreviousData.slice(0, 2), // 처음 2개 레코드
+      modelCurrentData: modelCurrentData.slice(0, 2), // 처음 2개 레코드
+      modelPreviousData: modelPreviousData.slice(0, 2) // 처음 2개 레코드
+    });
+    
     // 디버깅: 필터링 결과 확인
     console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 필터링 결과:`, {
       modelColorCurrentCount: modelColorCurrentData.length,
@@ -208,14 +219,56 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       sampleModelRecord: modelCurrentData[0]
     });
     
-    // 개통 숫자 계산: 해당 모델명+색상의 개통 기록의 '개통' 필드 합산
+    // 개통 숫자 계산: 관리자모드와 동일한 구조로 '개통' 필드 합산
     const currentMonthSales = modelColorCurrentData.length > 0
-      ? modelColorCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0)
-      : modelCurrentData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
+      ? modelColorCurrentData.reduce((sum, record) => {
+          // '개통' 필드가 숫자인 경우 그 값을, 아니면 1을 더함
+          const activationValue = record['개통'];
+          if (activationValue && !isNaN(parseInt(activationValue))) {
+            return sum + parseInt(activationValue);
+          } else {
+            return sum + 1; // 개통 기록이 있으면 1개로 계산
+          }
+        }, 0)
+      : modelCurrentData.reduce((sum, record) => {
+          const activationValue = record['개통'];
+          if (activationValue && !isNaN(parseInt(activationValue))) {
+            return sum + parseInt(activationValue);
+          } else {
+            return sum + 1;
+          }
+        }, 0);
+    
     const previousMonthSales = modelColorPreviousData.length > 0
-      ? modelColorPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0)
-      : modelPreviousData.reduce((sum, record) => sum + (parseInt(record['개통']) || 0), 0);
+      ? modelColorPreviousData.reduce((sum, record) => {
+          const activationValue = record['개통'];
+          if (activationValue && !isNaN(parseInt(activationValue))) {
+            return sum + parseInt(activationValue);
+          } else {
+            return sum + 1;
+          }
+        }, 0)
+      : modelPreviousData.reduce((sum, record) => {
+          const activationValue = record['개통'];
+          if (activationValue && !isNaN(parseInt(activationValue))) {
+            return sum + parseInt(activationValue);
+          } else {
+            return sum + 1;
+          }
+        }, 0);
+    
     const totalSales = currentMonthSales + previousMonthSales;
+    
+    // 디버깅: 개통 데이터 처리 결과 확인
+    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 개통 데이터 처리 결과:`, {
+      currentMonthSales,
+      previousMonthSales,
+      totalSales,
+      sampleCurrentRecord: modelColorCurrentData[0] || modelCurrentData[0],
+      samplePreviousRecord: modelColorPreviousData[0] || modelPreviousData[0],
+      currentMonthRecords: modelColorCurrentData.length || modelCurrentData.length,
+      previousMonthRecords: modelColorPreviousData.length || modelPreviousData.length
+    });
     
     // 디버깅: 개통 숫자 계산 결과 확인
     console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 개통 숫자 계산:`, {
@@ -227,22 +280,42 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       calculationMethod: modelColorCurrentData.length > 0 ? '색상별 개통합' : '모델별 개통합'
     });
     
-    // 재고 숫자 계산: 해당 모델명+색상의 재고 수량을 합산
+    // 재고 숫자 계산: 관리자모드와 동일한 구조로 처리
     let remainingInventory = 0;
     
     if (storeData && Array.isArray(storeData)) {
       // 모든 매장의 재고에서 해당 모델명+색상의 수량을 합산
       storeData.forEach(store => {
-        if (store.inventory && store.inventory[model]) {
-          if (color && store.inventory[model][color]) {
-            // 색상별 재고 정보가 있는 경우
-            remainingInventory += parseInt(store.inventory[model][color].정상 || 0);
-          } else if (store.inventory[model].정상) {
-            // 색상별 정보가 없으면 모델별 재고를 색상 개수로 나누어 균등 분배
-            const totalModelInventory = parseInt(store.inventory[model].정상 || 0);
-            const colorCount = modelData?.colors?.length || 1;
-            remainingInventory += Math.floor(totalModelInventory / colorCount);
-          }
+        if (store.inventory) {
+          // 카테고리별로 순회 (phones, wearables, tablets 등)
+          Object.values(store.inventory).forEach(category => {
+            if (typeof category === 'object' && category !== null) {
+              // 모델별로 순회
+              Object.entries(category).forEach(([categoryModel, modelData]) => {
+                if (categoryModel === model && typeof modelData === 'object' && modelData !== null) {
+                  // 상태별로 순회 (정상, 이력, 불량)
+                  Object.entries(modelData).forEach(([status, statusData]) => {
+                    if (status === '정상' && typeof statusData === 'object' && statusData !== null) {
+                      if (color) {
+                        // 특정 색상의 재고
+                        const colorData = statusData[color];
+                        if (typeof colorData === 'object' && colorData && colorData.quantity) {
+                          remainingInventory += colorData.quantity || 0;
+                        }
+                      } else {
+                        // 모든 색상의 재고 합산
+                        Object.values(statusData).forEach(colorData => {
+                          if (typeof colorData === 'object' && colorData && colorData.quantity) {
+                            remainingInventory += colorData.quantity || 0;
+                          }
+                        });
+                      }
+                    }
+                  });
+                }
+              });
+            }
+          });
         }
       });
     }
