@@ -1212,28 +1212,48 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 배정 점수 표시 컴포넌트
   const ScoreDisplay = ({ scores, modelName, colorName }) => {
     if (!scores || Object.keys(scores).length === 0) return null;
-    
+    // 상세값 매핑
+    const logicDetailLabel = {
+      turnoverRate: v => `회전율: ${v !== undefined ? v + '%' : '-'}`,
+      storeCount: v => `거래처수: ${v !== undefined ? v : '-'}`,
+      remainingInventory: v => `잔여재고: ${v !== undefined ? v : '-'}`,
+      inventoryScore: v => `재고점수: ${v !== undefined ? v : '-'}`,
+      salesVolume: v => `판매량: ${v !== undefined ? v : '-'}`,
+    };
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, fontSize: '0.7rem' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, fontSize: '0.7rem', mt: 0.5 }}>
         {Object.entries(scores).map(([logicType, score]) => {
           const logic = getLogicEmoji(logicType);
+          // 상세값이 있으면 같이 보여줌
+          let detail = '';
+          if (typeof score === 'object' && score !== null && 'value' in score && 'detail' in score) {
+            detail = logicDetailLabel[logicType]?.(score.detail);
+          } else if (typeof score === 'object' && score !== null && 'detail' in score) {
+            detail = logicDetailLabel[logicType]?.(score.detail);
+          } else if (typeof score === 'object' && score !== null && 'value' in score) {
+            detail = logicDetailLabel[logicType]?.(score.value);
+          } else {
+            detail = logicDetailLabel[logicType]?.(score);
+          }
+          const value = typeof score === 'object' && score !== null && 'value' in score ? score.value : score;
           return (
             <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Box sx={{ 
-                width: 12, 
-                height: 12, 
+                width: 14, 
+                height: 14, 
                 borderRadius: '50%', 
                 backgroundColor: logic.color,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.6rem',
+                fontSize: '0.7rem',
                 color: 'white',
                 fontWeight: 'bold'
               }}>
                 {logic.emoji}
               </Box>
-              <span style={{ fontSize: '0.65rem' }}>{Math.round(score)}</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>{value !== undefined ? Number(value).toFixed(2) : '-'}</span>
+              <span style={{ fontSize: '0.65rem', color: '#888' }}>{detail}</span>
             </Box>
           );
         })}
@@ -2696,20 +2716,45 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   
                                   return (
                                     <TableRow key={`${modelName}-${color.name}`}>
-                                      <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
-                                        {colorIndex === 0 ? (
-                                          <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1976d2' }}>
+                                      {colorIndex === 0 && (
+                                        <TableCell
+                                          sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
+                                          align="center"
+                                          rowSpan={modelData.colors.length}
+                                        >
+                                          <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1976d2', marginBottom: '8px' }}>
                                             {modelName}
                                           </div>
-                                        ) : null}
-                                        <div style={{ 
-                                          fontSize: '0.9rem',
-                                          color: colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f',
-                                          fontWeight: 'bold',
-                                          marginTop: colorIndex === 0 ? '8px' : '4px'
-                                        }}>
-                                          {color.name}
-                                        </div>
+                                          <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                                            {modelData.colors.length}개 색상
+                                          </div>
+                                        </TableCell>
+                                      )}
+                                      {colorIndex === 0 && (
+                                        <TableCell
+                                          sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}
+                                          align="center"
+                                          rowSpan={modelData.colors.length}
+                                        >
+                                          <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>
+                                            {totalModelQuantity}개
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '4px' }}>
+                                            모델 총합
+                                          </div>
+                                        </TableCell>
+                                      )}
+                                      <TableCell align="center">
+                                        <span style={{
+                                          display: 'inline-block',
+                                          padding: '2px 10px',
+                                          borderRadius: '12px',
+                                          background: '#f0f4ff',
+                                          color: '#1976d2',
+                                          fontWeight: 600,
+                                          fontSize: '0.95rem',
+                                          marginRight: 4
+                                        }}>{color.name}</span>
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
@@ -2975,20 +3020,45 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   
                                   return (
                                     <TableRow key={`${modelName}-${color.name}`}>
-                                      <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
-                                        {colorIndex === 0 ? (
-                                          <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1976d2' }}>
+                                      {colorIndex === 0 && (
+                                        <TableCell
+                                          sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
+                                          align="center"
+                                          rowSpan={modelData.colors.length}
+                                        >
+                                          <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1976d2', marginBottom: '8px' }}>
                                             {modelName}
                                           </div>
-                                        ) : null}
-                                        <div style={{ 
-                                          fontSize: '0.9rem',
-                                          color: colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f',
-                                          fontWeight: 'bold',
-                                          marginTop: colorIndex === 0 ? '8px' : '4px'
-                                        }}>
-                                          {color.name}
-                                        </div>
+                                          <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                                            {modelData.colors.length}개 색상
+                                          </div>
+                                        </TableCell>
+                                      )}
+                                      {colorIndex === 0 && (
+                                        <TableCell
+                                          sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}
+                                          align="center"
+                                          rowSpan={modelData.colors.length}
+                                        >
+                                          <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>
+                                            {totalModelQuantity}개
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '4px' }}>
+                                            모델 총합
+                                          </div>
+                                        </TableCell>
+                                      )}
+                                      <TableCell align="center">
+                                        <span style={{
+                                          display: 'inline-block',
+                                          padding: '2px 10px',
+                                          borderRadius: '12px',
+                                          background: '#f0f4ff',
+                                          color: '#1976d2',
+                                          fontWeight: 600,
+                                          fontSize: '0.95rem',
+                                          marginRight: 4
+                                        }}>{color.name}</span>
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
@@ -3198,20 +3268,45 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   
                                   return (
                                     <TableRow key={`${modelName}-${color.name}`}>
-                                      <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
-                                        {colorIndex === 0 ? (
-                                          <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1976d2' }}>
+                                      {colorIndex === 0 && (
+                                        <TableCell
+                                          sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
+                                          align="center"
+                                          rowSpan={modelData.colors.length}
+                                        >
+                                          <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1976d2', marginBottom: '8px' }}>
                                             {modelName}
                                           </div>
-                                        ) : null}
-                                        <div style={{ 
-                                          fontSize: '0.9rem',
-                                          color: colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f',
-                                          fontWeight: 'bold',
-                                          marginTop: colorIndex === 0 ? '8px' : '4px'
-                                        }}>
-                                          {color.name}
-                                        </div>
+                                          <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                                            {modelData.colors.length}개 색상
+                                          </div>
+                                        </TableCell>
+                                      )}
+                                      {colorIndex === 0 && (
+                                        <TableCell
+                                          sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}
+                                          align="center"
+                                          rowSpan={modelData.colors.length}
+                                        >
+                                          <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>
+                                            {totalModelQuantity}개
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '4px' }}>
+                                            모델 총합
+                                          </div>
+                                        </TableCell>
+                                      )}
+                                      <TableCell align="center">
+                                        <span style={{
+                                          display: 'inline-block',
+                                          padding: '2px 10px',
+                                          borderRadius: '12px',
+                                          background: '#f0f4ff',
+                                          color: '#1976d2',
+                                          fontWeight: 600,
+                                          fontSize: '0.95rem',
+                                          marginRight: 4
+                                        }}>{color.name}</span>
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
