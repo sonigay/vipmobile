@@ -3046,7 +3046,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       </TableCell>
                                       
                                       {/* 영업사원별 배정량 */}
-                                      {isExpanded && (() => {
+                                      {isExpanded ? (() => {
                                         const groupedAgents = {};
                                         Object.entries(previewData.agents)
                                           .sort(([agentIdA, a], [agentIdB, b]) => {
@@ -3108,11 +3108,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                             );
                                           })
                                         );
-                                      })()}
+                                      })() : null}
                                     </TableRow>
                                   );
-                                });
-                              })}
+                                })
+                              )}
                             </TableBody>
                           </Table>
                         </TableContainer>
