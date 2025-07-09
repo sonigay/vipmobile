@@ -161,8 +161,9 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
     // 거래처수가 0보다 큰 경우만 포함
     if (storeCount > 0) {
       filteredAgents.push(agent);
+      console.log(`✅ ${agent.target} 거래처수 ${storeCount}개로 배정목록에 포함`);
     } else {
-      console.log(`거래처수 0으로 배정목록에서 제외: ${agent.target} (${agent.office} ${agent.department})`);
+      console.log(`❌ 거래처수 0으로 배정목록에서 제외: ${agent.target} (${agent.office} ${agent.department})`);
     }
   }
   
@@ -1014,6 +1015,14 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
   
   // 거래처수 0인 인원을 배정목록에서 제거
   const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
+  
+  console.log(`🎯 배정 대상자 필터링 결과:`, {
+    전체대상자: eligibleAgents.length,
+    거래처수필터링후: filteredAgents.length,
+    제외된인원: eligibleAgents.length - filteredAgents.length,
+    포함된인원: filteredAgents.map(agent => agent.target),
+    제외된인원: eligibleAgents.filter(agent => !filteredAgents.find(fa => fa.contactId === agent.contactId)).map(agent => agent.target)
+  });
   
   const results = {
     agents: {},
