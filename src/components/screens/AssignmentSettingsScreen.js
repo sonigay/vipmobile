@@ -1218,7 +1218,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             th { background-color: #f2f2f2; font-weight: bold; }
             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 20px; }
             .company-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-            .company-logo { width: 80px; height: 80px; background: linear-gradient(135deg, #1976d2, #42a5f5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
+            .company-logo { width: 80px; height: 80px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
             .company-details { text-align: right; }
             .company-name { font-size: 18px; font-weight: bold; color: #1976d2; margin-bottom: 5px; }
             .document-title { font-size: 24px; font-weight: bold; color: #333; margin: 20px 0; }
@@ -1238,7 +1238,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <div class="header">
             <div class="company-info">
               <div class="company-logo">
-                VIP<br/>PLUS
+                <img src="/login.png" alt="VIP PLUS" style="width: 100%; height: 100%; object-fit: contain;">
               </div>
               <div class="company-details">
                 <div class="company-name">(주)브이아이피플러스</div>
@@ -1348,25 +1348,48 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th>사무실</th>
                 <th>소속</th>
                 <th>총 배정량</th>
-                                        <th>배정 점수</th>
-                ${Object.keys(previewData.models).map(modelName => `
-                  <th>${modelName}</th>
-                `).join('')}
+                <th>배정 점수</th>
+                ${Object.entries(previewData.models).map(([modelName, modelData]) => 
+                  modelData.colors.map(color => `<th>${modelName}<br/>${color.name}</th>`).join('')
+                ).join('')}
               </tr>
             </thead>
             <tbody>
-              ${Object.entries(previewData.agents).map(([agentId, agentData]) => `
-                <tr>
-                  <td>${agentData.agentName || agentData.name || '미지정'}</td>
-                  <td>${agentData.office || '미지정'}</td>
-                  <td>${agentData.department || '미지정'}</td>
-                  <td><strong>${Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0)}개</strong></td>
-                                          <td>${Math.round(agentData.averageScore || agentData.rawScore || 50)}점</td>
-                  ${Object.keys(previewData.models).map(modelName => `
-                    <td>${agentData[modelName]?.quantity || '-'}</td>
-                  `).join('')}
-                </tr>
-              `).join('')}
+              ${Object.entries(previewData.agents).map(([agentId, agentData]) => {
+                const agent = agents.find(a => a.contactId === agentId);
+                const totalQuantity = Object.values(agentData).filter(item => typeof item === 'object' && item.quantity).reduce((sum, model) => sum + (model.quantity || 0), 0);
+                const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || val.rawScore || 50), 0) / Object.keys(agentData).length;
+                
+                return `
+                  <tr>
+                    <td>${agent?.target || agentId}</td>
+                    <td>${agent?.office || '미지정'}</td>
+                    <td>${agent?.department || '미지정'}</td>
+                    <td><strong>${totalQuantity}개</strong></td>
+                    <td>${Math.round(avgScore)}점</td>
+                    ${Object.entries(previewData.models).map(([modelName, modelData]) => 
+                      modelData.colors.map(color => {
+                        const modelAssignment = agentData[modelName];
+                        let assignedQuantity = 0;
+                        
+                        if (modelAssignment) {
+                          if (modelAssignment.colorQuantities) {
+                            assignedQuantity = modelAssignment.colorQuantities[color.name] || 0;
+                          } else {
+                            const colorCount = modelData.colors.length;
+                            const baseQuantityPerColor = Math.floor((modelAssignment.quantity || 0) / colorCount);
+                            const remainder = (modelAssignment.quantity || 0) % colorCount;
+                            const colorIndex = modelData.colors.findIndex(c => c.name === color.name);
+                            assignedQuantity = baseQuantityPerColor + (colorIndex < remainder ? 1 : 0);
+                          }
+                        }
+                        
+                        return `<td>${assignedQuantity > 0 ? assignedQuantity + '개' : '-'}</td>`;
+                      }).join('')
+                    ).join('')}
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -2142,7 +2165,15 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           <Typography variant="body2" color="text.secondary" gutterBottom>
                             색상별 수량:
                           </Typography>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '6px',
+                            padding: '10px',
+                            backgroundColor: '#e3f2fd',
+                            borderRadius: '6px',
+                            border: '1px solid #bbdefb'
+                          }}>
                             {modelData.colors.map((color, index) => (
                               <Box
                                 key={index}
@@ -2150,17 +2181,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
-                                  p: 0.5,
-                                  borderRadius: 1,
-                                  backgroundColor: index % 2 === 0 ? '#f8f9fa' : '#ffffff',
-                                  border: '1px solid #e0e0e0'
+                                  padding: '6px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#fff',
+                                  border: '1px solid #e0e0e0',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                   <Box
                                     sx={{
-                                      width: 12,
-                                      height: 12,
+                                      width: 14,
+                                      height: 14,
                                       borderRadius: '50%',
                                       backgroundColor: color.name.toLowerCase().includes('블랙') ? '#000' :
                                                      color.name.toLowerCase().includes('화이트') ? '#fff' :
@@ -2171,10 +2203,15 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                                      color.name.toLowerCase().includes('그린') ? '#228b22' :
                                                      color.name.toLowerCase().includes('레드') ? '#dc143c' :
                                                      '#ddd',
-                                      border: '1px solid #ccc'
+                                      border: '1px solid #ccc',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
                                     }}
                                   />
-                                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                                  <Typography variant="body2" sx={{ 
+                                    fontSize: '0.8rem',
+                                    fontWeight: '500',
+                                    color: '#424242'
+                                  }}>
                                     {color.name}
                                   </Typography>
                                 </Box>
@@ -2182,8 +2219,12 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   variant="body2" 
                                   sx={{ 
                                     fontWeight: 'bold',
-                                    color: 'primary.main',
-                                    fontSize: '0.9rem'
+                                    color: '#1976d2',
+                                    backgroundColor: '#f3e5f5',
+                                    padding: '3px 8px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.75rem',
+                                    border: '1px solid #e1bee7'
                                   }}
                                 >
                                   {color.quantity}개
@@ -2615,9 +2656,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             </TableHead>
                             <TableBody>
                               {Object.entries(previewData.agents)
-                                .sort(([,a], [,b]) => {
-                                  const agentA = agents.find(agent => agent.contactId === Object.keys(a)[0]?.split('-')[0] || Object.keys(a)[0]);
-                                  const agentB = agents.find(agent => agent.contactId === Object.keys(b)[0]?.split('-')[0] || Object.keys(b)[0]);
+                                .sort(([agentIdA, a], [agentIdB, b]) => {
+                                  const agentA = agents.find(agent => agent.contactId === agentIdA);
+                                  const agentB = agents.find(agent => agent.contactId === agentIdB);
                                   
                                   // 사무실별 정렬
                                   const officeCompare = (agentA?.office || '').localeCompare(agentB?.office || '');
@@ -2633,7 +2674,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 .map(([agentId, agentData]) => {
                                   const agent = agents.find(a => a.contactId === agentId);
                                   const totalQuantity = Object.values(agentData).reduce((sum, val) => sum + (val.quantity || 0), 0);
-                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.score || 0), 0) / Object.keys(agentData).length;
+                                  const avgScore = Object.values(agentData).reduce((sum, val) => sum + (val.averageScore || val.rawScore || 50), 0) / Object.keys(agentData).length;
                                   
                                   return (
                                     <TableRow key={agentId}>
