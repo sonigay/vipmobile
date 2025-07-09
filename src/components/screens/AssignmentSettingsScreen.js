@@ -2613,19 +2613,22 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             <TableHead>
                               <TableRow>
                                 <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
-                                  영업사원
-                                </TableCell>
-                                <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
                                   사무실
                                 </TableCell>
-                                <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
                                   소속
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  영업사원
                                 </TableCell>
                                 <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}>
                                   총 배정량
                                 </TableCell>
                                 <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }}>
                                   배정 점수
+                                </TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                  점수 세부내역
                                 </TableCell>
                                 {/* 모델별 색상별 헤더 */}
                                 {Object.entries(previewData.models).map(([modelName, modelData]) => (
@@ -2640,6 +2643,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
                                 <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
                                 <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
+                                <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }}></TableCell>
                                 {/* 색상별 헤더 */}
                                 {Object.entries(previewData.models).map(([modelName, modelData]) => 
                                   modelData.colors.map((color, colorIndex) => (
@@ -2679,19 +2683,40 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                   return (
                                     <TableRow key={agentId}>
                                       <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}>
-                                        {agent?.target || agentId}
-                                      </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
                                         {agent?.office || '미지정'}
                                       </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                      <TableCell sx={{ position: 'sticky', left: 120, backgroundColor: 'background.paper', zIndex: 1 }}>
                                         {agent?.department || '미지정'}
+                                      </TableCell>
+                                      <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                        {agent?.target || agentId}
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 280, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         <strong>{totalQuantity}개</strong>
                                       </TableCell>
                                       <TableCell sx={{ position: 'sticky', left: 360, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
                                         {Math.round(avgScore)}점
+                                      </TableCell>
+                                      <TableCell sx={{ position: 'sticky', left: 440, backgroundColor: 'background.paper', zIndex: 1 }}>
+                                        <Box sx={{ fontSize: '0.75rem', lineHeight: 1.2 }}>
+                                          {(() => {
+                                            // 첫 번째 모델의 세부 점수 정보 가져오기
+                                            const firstModelData = Object.values(agentData)[0];
+                                            if (firstModelData?.details) {
+                                              const { details } = firstModelData;
+                                              const ratios = assignmentSettings.ratios;
+                                              return (
+                                                <div>
+                                                  <div>회전율: {details.turnoverRate}% ({Math.round(details.turnoverRate * ratios.turnoverRate / 100)}점)</div>
+                                                  <div>거래처: {details.storeCount}개 ({Math.round(details.storeCount * ratios.storeCount / 100)}점)</div>
+                                                  <div>재고: {details.remainingInventory}개 ({Math.round(details.inventoryScore * ratios.remainingInventory / 100)}점)</div>
+                                                  <div>판매: {details.salesVolume}개 ({Math.round(details.salesVolume * ratios.salesVolume / 100)}점)</div>
+                                                </div>
+                                              );
+                                            }
+                                            return '점수 정보 없음';
+                                          })()}
+                                        </Box>
                                       </TableCell>
                                       {/* 모델별 색상별 배정량 */}
                                       {Object.entries(previewData.models).map(([modelName, modelData]) => 

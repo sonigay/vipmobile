@@ -184,13 +184,18 @@ const calculateRawScore = async (agent, model, settings, storeData) => {
     let rawScore = 0;
     
     if (totalSales > 0 || remainingInventory > 0 || storeCount > 0) {
-      // 실제 데이터가 있는 경우
+      // 실제 데이터가 있는 경우 - 정규화된 값 사용 (finalWeight와 동일한 방식)
+      const normalizedTurnoverRate = turnoverRate / 100; // 0-1 범위
+      const normalizedInventoryScore = inventoryScore / 100; // 0-1 범위
+      const normalizedStoreCount = Math.min(storeCount / 10, 1); // 0-1 범위 (최대 10개 기준)
+      const normalizedSalesVolume = Math.min(salesVolume / 100, 1); // 0-1 범위 (최대 100개 기준)
+      
       rawScore = (
-        turnoverRate * (ratios.turnoverRate / 100) +
-        storeCount * (ratios.storeCount / 100) +
-        inventoryScore * (ratios.remainingInventory / 100) + // 잔여재고 점수 사용
-        salesVolume * (ratios.salesVolume / 100)
-      );
+        (ratios.turnoverRate / 100) * normalizedTurnoverRate +
+        (ratios.remainingInventory / 100) * normalizedInventoryScore +
+        (ratios.storeCount / 100) * normalizedStoreCount +
+        (ratios.salesVolume / 100) * normalizedSalesVolume
+      ) * 100; // 0-100 범위로 변환
     } else {
       // 데이터가 없는 경우 기본 점수 (균등 배정을 위한 최소 점수)
       rawScore = 50;
@@ -259,19 +264,8 @@ const calculateAccurateWeights = async (agents, modelName, settings, storeData) 
   const weightPromises = agents.map(async (agent) => {
     const { rawScore, details } = await calculateRawScore(agent, modelName, settings, storeData);
     
-    // 정규화된 가중치 계산 (엑셀 공식 기반)
-    const normalizedTurnoverRate = details.turnoverRate / 100; // 0-1 범위
-    const normalizedInventoryScore = details.inventoryScore / 100; // 0-1 범위
-    const normalizedStoreCount = Math.min(details.storeCount / 10, 1); // 0-1 범위 (최대 10개 기준)
-    const normalizedSalesVolume = Math.min(details.salesVolume / 100, 1); // 0-1 범위 (최대 100개 기준)
-    
-    // 최종 가중치 (비율 적용)
-    const finalWeight = (
-      (settings.ratios.turnoverRate / 100) * normalizedTurnoverRate +
-      (settings.ratios.remainingInventory / 100) * normalizedInventoryScore +
-      (settings.ratios.storeCount / 100) * normalizedStoreCount +
-      (settings.ratios.salesVolume / 100) * normalizedSalesVolume
-    );
+    // 최종 가중치 (rawScore와 동일한 방식으로 계산)
+    const finalWeight = rawScore / 100; // 0-1 범위로 변환
     
     return { agent, finalWeight, rawScore, details };
   });
