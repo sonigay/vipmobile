@@ -225,14 +225,29 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       rawScore = 50;
     }
     
+    // 각 로직별 정규화된 점수 계산 (0-100 범위)
+    const normalizedTurnoverRate = turnoverRate; // 이미 퍼센트 단위
+    const normalizedStoreCount = Math.min(storeCount / 10, 1) * 100; // 거래처수 정규화 (10개 기준)
+    const normalizedInventoryScore = inventoryScore; // 이미 0-100 범위
+    const normalizedSalesVolume = Math.min(salesVolume / 100, 1) * 100; // 판매량 정규화 (100개 기준)
+    
+    console.log(`🔍 상세 점수 계산 - ${agent.target} (${model}-${color || '전체'}):`, {
+      turnoverRate: { original: turnoverRate, normalized: normalizedTurnoverRate },
+      storeCount: { original: storeCount, normalized: normalizedStoreCount },
+      remainingInventory: { original: remainingInventory },
+      inventoryScore: { original: inventoryScore, normalized: normalizedInventoryScore },
+      salesVolume: { original: salesVolume, normalized: normalizedSalesVolume },
+      rawScore: Math.round(rawScore * 100) / 100
+    });
+    
     return {
       rawScore,
       details: {
-        turnoverRate: Math.round(turnoverRate * 100) / 100,
-        storeCount,
-        remainingInventory,
-        inventoryScore: Math.round(inventoryScore * 100) / 100,
-        salesVolume
+        turnoverRate: { value: Math.round(normalizedTurnoverRate * 100) / 100, detail: Math.round(turnoverRate * 100) / 100 },
+        storeCount: { value: Math.round(normalizedStoreCount * 100) / 100, detail: storeCount },
+        remainingInventory: { value: Math.round(normalizedInventoryScore * 100) / 100, detail: remainingInventory },
+        inventoryScore: { value: Math.round(normalizedInventoryScore * 100) / 100, detail: Math.round(inventoryScore * 100) / 100 },
+        salesVolume: { value: Math.round(normalizedSalesVolume * 100) / 100, detail: salesVolume }
       }
     };
   } catch (error) {

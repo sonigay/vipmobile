@@ -1212,6 +1212,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 배정 점수 표시 컴포넌트
   const ScoreDisplay = ({ scores, modelName, colorName }) => {
     if (!scores || Object.keys(scores).length === 0) return null;
+    
     // 상세값 매핑
     const logicDetailLabel = {
       turnoverRate: v => `회전율: ${v !== undefined ? v + '%' : '-'}`,
@@ -1220,22 +1221,30 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       inventoryScore: v => `재고점수: ${v !== undefined ? v : '-'}`,
       salesVolume: v => `판매량: ${v !== undefined ? v : '-'}`,
     };
+    
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, fontSize: '0.7rem', mt: 0.5 }}>
         {Object.entries(scores).map(([logicType, score]) => {
           const logic = getLogicEmoji(logicType);
-          // 상세값이 있으면 같이 보여줌
-          let detail = '';
+          
+          // 새로운 데이터 구조 처리 (value와 detail 분리)
+          let displayValue = 0;
+          let detailText = '';
+          
           if (typeof score === 'object' && score !== null && 'value' in score && 'detail' in score) {
-            detail = logicDetailLabel[logicType]?.(score.detail);
+            displayValue = score.value;
+            detailText = logicDetailLabel[logicType]?.(score.detail);
           } else if (typeof score === 'object' && score !== null && 'detail' in score) {
-            detail = logicDetailLabel[logicType]?.(score.detail);
+            displayValue = score.detail;
+            detailText = logicDetailLabel[logicType]?.(score.detail);
           } else if (typeof score === 'object' && score !== null && 'value' in score) {
-            detail = logicDetailLabel[logicType]?.(score.value);
+            displayValue = score.value;
+            detailText = logicDetailLabel[logicType]?.(score.value);
           } else {
-            detail = logicDetailLabel[logicType]?.(score);
+            displayValue = score;
+            detailText = logicDetailLabel[logicType]?.(score);
           }
-          const value = typeof score === 'object' && score !== null && 'value' in score ? score.value : score;
+          
           return (
             <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Box sx={{ 
@@ -1252,8 +1261,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               }}>
                 {logic.emoji}
               </Box>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>{value !== undefined ? Number(value).toFixed(2) : '-'}</span>
-              <span style={{ fontSize: '0.65rem', color: '#888' }}>{detail}</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>
+                {displayValue !== undefined ? Number(displayValue).toFixed(1) : '-'}
+              </span>
+              <span style={{ fontSize: '0.65rem', color: '#888' }}>{detailText}</span>
             </Box>
           );
         })}
