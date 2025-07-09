@@ -89,6 +89,54 @@ export const getSelectedTargets = (agents, settings) => {
   };
 };
 
+// 거래처수 0인 인원을 배정목록에서 제거하는 함수
+export const filterAgentsByStoreCount = async (agents, storeData) => {
+  const filteredAgents = [];
+  
+  for (const agent of agents) {
+    let storeCount = 0;
+    
+    // storeData에서 해당 담당자가 관리하는 매장 수 계산
+    if (storeData && Array.isArray(storeData)) {
+      storeCount = storeData.filter(store => 
+        store.manager === agent.target || 
+        store.담당자 === agent.target
+      ).length;
+    }
+    
+    // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
+    if (storeCount === 0) {
+      try {
+        const activationData = await loadActivationDataBatch();
+        const agentCurrentData = (activationData.current.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
+        
+        // 개통실적 데이터에서 고유한 출고처 수 추정
+        const uniqueStores = new Set();
+        agentCurrentData.forEach(record => {
+          const storeName = record['출고처'];
+          if (storeName) {
+            uniqueStores.add(storeName);
+          }
+        });
+        storeCount = uniqueStores.size;
+      } catch (error) {
+        console.error(`거래처수 계산 중 오류 (${agent.target}):`, error);
+        storeCount = 0;
+      }
+    }
+    
+    // 거래처수가 0보다 큰 경우만 포함
+    if (storeCount > 0) {
+      filteredAgents.push(agent);
+    } else {
+      console.log(`거래처수 0으로 배정목록에서 제외: ${agent.target} (${agent.office} ${agent.department})`);
+    }
+  }
+  
+  console.log(`거래처수 필터링 결과: ${agents.length}명 → ${filteredAgents.length}명`);
+  return filteredAgents;
+};
+
 // 개통실적 데이터 배치 로드 (성능 최적화)
 let activationDataCache = null;
 let activationDataTimestamp = 0;
@@ -906,6 +954,9 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
   const { models } = settings;
   const { eligibleAgents } = getSelectedTargets(agents, settings);
   
+  // 거래처수 0인 인원을 배정목록에서 제거
+  const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
+  
   const results = {
     agents: {},
     offices: {},
@@ -915,7 +966,7 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
   
   // 모든 모델의 배정을 병렬로 계산
   const modelPromises = Object.entries(models).map(async ([modelName, modelData]) => {
-    const modelAssignments = await calculateModelAssignment(modelName, modelData, eligibleAgents, settings, storeData);
+    const modelAssignments = await calculateModelAssignment(modelName, modelData, filteredAgents, settings, storeData);
     
     return {
       modelName,
@@ -947,10 +998,10 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
   });
   
   // 사무실별 집계
-  results.offices = aggregateOfficeAssignment(results.agents, eligibleAgents);
+  results.offices = aggregateOfficeAssignment(results.agents, filteredAgents);
   
   // 소속별 집계
-  results.departments = aggregateDepartmentAssignment(results.agents, eligibleAgents);
+  results.departments = aggregateDepartmentAssignment(results.agents, filteredAgents);
   
   return results;
 };
