@@ -1217,6 +1217,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     
     // 디버깅: 실제 받은 데이터 구조 확인
     console.log(`🎯 ScoreDisplay - ${modelName}-${colorName}:`, scores);
+    console.log(`🎯 ScoreDisplay 키 목록:`, Object.keys(scores));
+    console.log(`🎯 ScoreDisplay remainingInventory 존재 여부:`, 'remainingInventory' in scores);
+    console.log(`🎯 ScoreDisplay remainingInventory 값:`, scores.remainingInventory);
     
     // 상세값 매핑 (실제 배정 로직에 맞게 조정)
     const logicDetailLabel = {
