@@ -110,15 +110,21 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
         const activationData = await loadActivationDataBatch();
         const agentCurrentData = (activationData.current.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
         
-        // 개통실적 데이터에서 고유한 출고처 수 추정
+        // 개통실적 데이터에서 고유한 출고처 수 추정 (빈 값이나 의미없는 값 제외)
         const uniqueStores = new Set();
         agentCurrentData.forEach(record => {
           const storeName = record['출고처'];
-          if (storeName) {
-            uniqueStores.add(storeName);
+          if (storeName && storeName.trim() !== '' && storeName !== '-' && storeName !== '미지정' && storeName !== '기타') {
+            uniqueStores.add(storeName.trim());
           }
         });
         storeCount = uniqueStores.size;
+        
+        console.log(`🔍 ${agent.target} 거래처수 계산:`, {
+          totalRecords: agentCurrentData.length,
+          uniqueStores: Array.from(uniqueStores),
+          storeCount: storeCount
+        });
       } catch (error) {
         console.error(`거래처수 계산 중 오류 (${agent.target}):`, error);
         storeCount = 0;
@@ -586,7 +592,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     if (totalSales > 0 || remainingInventory > 0 || storeCount > 0) {
       // 정규화된 값 사용
       const normalizedTurnoverRate = turnoverRate / 100;
-      const normalizedInventoryScore = inventoryScore / 100;
+      const normalizedInventoryScore = Math.min(Math.max(inventoryScore / 50, -1), 1); // -50~50 범위를 -1~1로 정규화
       const normalizedStoreCount = Math.min(storeCount / 10, 1);
       const normalizedSalesVolume = Math.min(salesVolume / 100, 1);
       
@@ -605,7 +611,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     // 각 로직별 정규화된 점수 계산 (0-100 범위) - 더 현실적인 기준으로 조정
     const normalizedTurnoverRate = turnoverRate; // 이미 퍼센트 단위
     const normalizedStoreCount = Math.min(storeCount / 5, 1) * 100; // 거래처수 정규화 (5개 기준으로 조정)
-    const normalizedInventoryScore = inventoryScore; // 이미 0-100 범위
+    const normalizedInventoryScore = Math.min(Math.max(inventoryScore, -50), 50) + 50; // -50~50 범위를 0~100으로 변환
     const normalizedSalesVolume = Math.min(salesVolume / 50, 1) * 100; // 판매량 정규화 (50개 기준으로 조정)
     
     console.log(`🔍 상세 점수 계산 - ${agent.target} (${model}-${color || '전체'}):`, {

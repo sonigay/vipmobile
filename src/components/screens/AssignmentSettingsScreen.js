@@ -3010,28 +3010,13 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             </TableHead>
                             <TableBody>
                               {/* 모델별 행 */}
-                              {Object.entries(previewData.models).map(([modelName, modelData], modelIndex) => {
-                                // 해당 모델의 총 배정량 계산
-                                const totalModelQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                  const modelAssignment = agentData[modelName];
-                                  if (modelAssignment && modelAssignment.colorQuantities) {
-                                    return sum + Object.values(modelAssignment.colorQuantities).reduce((colorSum, qty) => colorSum + qty, 0);
-                                  }
-                                  return sum;
-                                }, 0);
-                                
-                                return modelData.colors.map((color, colorIndex) => {
-                                  // 해당 모델/색상의 총 배정량 계산
-                                  const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                    const modelAssignment = agentData[modelName];
-                                    if (modelAssignment && modelAssignment.colorQuantities) {
-                                      return sum + (modelAssignment.colorQuantities[color.name] || 0);
-                                    }
-                                    return sum;
-                                  }, 0);
+                              {Object.entries(previewData.models).map(([modelName, modelData], modelIndex) =>
+                                modelData.colors.map((color, colorIndex) => {
+                                  const colorKey = `${modelName}-${color.name}`;
+                                  const isExpanded = expandedColors[colorKey] !== false;
                                   
                                   return (
-                                    <TableRow key={`${modelName}-${color.name}`}>
+                                    <TableRow key={colorKey}>
                                       {colorIndex === 0 && (
                                         <TableCell
                                           sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
@@ -3046,7 +3031,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           </div>
                                         </TableCell>
                                       )}
-                                      <TableCell align="center">
+                                      <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !isExpanded }))}>
                                         <span style={{
                                           display: 'inline-block',
                                           padding: '2px 10px',
@@ -3057,10 +3042,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           fontSize: '0.95rem',
                                           marginRight: 4
                                         }}>{color.name}</span>
+                                        <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
                                       </TableCell>
                                       
                                       {/* 영업사원별 배정량 */}
-                                      {(() => {
+                                      {isExpanded && (() => {
                                         const groupedAgents = {};
                                         Object.entries(previewData.agents)
                                           .sort(([agentIdA, a], [agentIdB, b]) => {
