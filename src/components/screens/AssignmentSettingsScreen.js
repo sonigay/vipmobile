@@ -1207,9 +1207,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             table { width: 100%; border-collapse: collapse; margin: 10px 0; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; font-weight: bold; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .summary { margin: 20px 0; padding: 10px; background-color: #f9f9f9; }
-            .footer { margin-top: 20px; text-align: center; font-size: 12px; color: #666; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .company-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+            .company-logo { width: 80px; height: 80px; background: linear-gradient(135deg, #1976d2, #42a5f5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
+            .company-details { text-align: right; }
+            .company-name { font-size: 18px; font-weight: bold; color: #1976d2; margin-bottom: 5px; }
+            .document-title { font-size: 24px; font-weight: bold; color: #333; margin: 20px 0; }
+            .document-info { display: flex; justify-content: space-between; margin: 15px 0; font-size: 14px; color: #666; }
+            .summary { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 8px; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 15px; }
+            .signature-section { margin-top: 30px; display: flex; justify-content: space-between; }
+            .signature-box { width: 200px; text-align: center; }
+            .signature-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 10px; }
             @media print {
               body { margin: 0; }
               .no-print { display: none; }
@@ -1218,16 +1227,47 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         </head>
         <body>
           <div class="header">
-            <h1>재고 배정 현황</h1>
-            <p>출력일시: ${currentDate} ${currentTime}</p>
-            <p>배정 비율: 회전율 ${assignmentSettings.ratios.turnoverRate}% | 거래처수 ${assignmentSettings.ratios.storeCount}% | 잔여재고 ${assignmentSettings.ratios.remainingInventory}% | 판매량 ${assignmentSettings.ratios.salesVolume}%</p>
+            <div class="company-info">
+              <div class="company-logo">
+                VIP<br/>PLUS
+              </div>
+              <div class="company-details">
+                <div class="company-name">(주)브이아이피플러스</div>
+                <div>재고 배정 관리 시스템</div>
+                <div>문서번호: ASG-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}</div>
+              </div>
+            </div>
+            <div class="document-title">재고 배정 현황 보고서</div>
+            <div class="document-info">
+              <div>
+                <strong>출력일시:</strong> ${currentDate} ${currentTime}
+              </div>
+              <div>
+                <strong>문서유형:</strong> ${type === 'agent' ? '영업사원별' : type === 'office' ? '사무실별' : type === 'department' ? '소속별' : '모델별'} 배정 현황
+              </div>
+            </div>
+            <div style="margin: 15px 0; padding: 10px; background-color: #e3f2fd; border-radius: 5px; font-size: 14px;">
+              <strong>배정 비율 설정:</strong> 회전율 ${assignmentSettings.ratios.turnoverRate}% | 거래처수 ${assignmentSettings.ratios.storeCount}% | 잔여재고 ${assignmentSettings.ratios.remainingInventory}% | 판매량 ${assignmentSettings.ratios.salesVolume}%
+            </div>
           </div>
     `;
     
     const footer = `
+          <div class="signature-section">
+            <div class="signature-box">
+              <div class="signature-line">담당자</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line">검토자</div>
+            </div>
+            <div class="signature-box">
+              <div class="signature-line">승인자</div>
+            </div>
+          </div>
           <div class="footer">
-            <p>※ 이 문서는 시스템에서 자동 생성되었습니다.</p>
-            <p>※ 배정 비율은 각 영업사원의 성과 지표를 종합적으로 고려하여 계산됩니다.</p>
+            <p><strong>(주)브이아이피플러스</strong> | 재고 배정 관리 시스템</p>
+            <p>※ 이 문서는 시스템에서 자동 생성되었으며, 배정 비율은 각 영업사원의 성과 지표를 종합적으로 고려하여 계산됩니다.</p>
+            <p>※ 본 문서는 회사 내부 업무용으로만 사용되며, 외부 유출을 금지합니다.</p>
           </div>
         </body>
       </html>
