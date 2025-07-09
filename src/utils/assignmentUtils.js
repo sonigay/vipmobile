@@ -408,7 +408,7 @@ export const calculateModelAssignment = async (modelName, modelData, eligibleAge
       agentColorQuantities[colorName] = colorQuantity;
       agentColorScores[colorName] = {
         averageScore: colorScore?.rawScore || 0,
-        details: colorScore?.details || {}
+        details: colorScore?.details || {} // 새로운 구조 {value, detail} 포함
       };
       totalAgentQuantity += colorQuantity;
     });

@@ -2991,18 +2991,31 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                     });
                                   
                                   return Object.entries(groupedAgents).flatMap(([key, group]) =>
-                                    group.agents.map(({ agentId, agent }) => (
-                                      <TableCell key={agentId} align="center" sx={{ 
-                                        fontWeight: 'bold',
-                                        fontSize: '0.75rem',
-                                        minWidth: '120px',
-                                        backgroundColor: '#fafafa'
-                                      }}>
-                                        <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
-                                          {agent?.target || agentId}
-                                        </div>
-                                      </TableCell>
-                                    ))
+                                    group.agents.map(({ agentId, agent, agentData }) => {
+                                      // 각 영업사원의 총 배정수량 계산
+                                      const totalAgentQuantity = Object.values(agentData).reduce((sum, modelAssignment) => {
+                                        if (modelAssignment && modelAssignment.colorQuantities) {
+                                          return sum + Object.values(modelAssignment.colorQuantities).reduce((colorSum, qty) => colorSum + qty, 0);
+                                        }
+                                        return sum;
+                                      }, 0);
+                                      
+                                      return (
+                                        <TableCell key={agentId} align="center" sx={{ 
+                                          fontWeight: 'bold',
+                                          fontSize: '0.75rem',
+                                          minWidth: '120px',
+                                          backgroundColor: '#fafafa'
+                                        }}>
+                                          <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
+                                            {agent?.target || agentId}
+                                          </div>
+                                          <div style={{ fontSize: '0.65rem', color: 'text.secondary', marginTop: '2px' }}>
+                                            총 {totalAgentQuantity}개
+                                          </div>
+                                        </TableCell>
+                                      );
+                                    })
                                   );
                                 })()}
                               </TableRow>
@@ -3071,16 +3084,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           marginRight: 4
                                         }}>{color.name}</span>
                                       </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
-                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                          {totalQuantity}개
-                                        </div>
-                                        {colorIndex === 0 && (
-                                          <div style={{ fontSize: '0.7rem', color: 'text.secondary', marginTop: '2px' }}>
-                                            모델 총 {totalModelQuantity}개
-                                          </div>
-                                        )}
-                                      </TableCell>
+                                      
                                       {/* 영업사원별 배정량 */}
                                       {(() => {
                                         const groupedAgents = {};
