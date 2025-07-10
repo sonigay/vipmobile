@@ -452,10 +452,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 배정 미리보기
   const handlePreviewAssignment = async () => {
-    console.log('배정 미리보기 시작');
+    console.log('=== 배정 미리보기 시작 ===');
     console.log('API_BASE_URL:', API_BASE_URL);
     console.log('agents:', agents.length);
-    console.log('assignmentSettings:', assignmentSettings);
+    console.log('assignmentSettings:', JSON.stringify(assignmentSettings, null, 2));
     
     setIsLoadingPreview(true);
     setProgress(0);
@@ -471,9 +471,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       }
       
       // 배정 대상 확인
+      console.log('배정 대상 확인 시작...');
       const { eligibleAgents } = getSelectedTargets(agents, assignmentSettings);
       console.log('선택된 배정 대상:', eligibleAgents.length, '명');
-      console.log('선택된 대상 상세:', eligibleAgents);
+      console.log('선택된 대상 상세:', eligibleAgents.map(a => ({ name: a.target, office: a.office, department: a.department })));
       
       if (eligibleAgents.length === 0) {
         throw new Error('배정할 대상이 선택되지 않았습니다. 배정 설정에서 사무실, 소속, 또는 영업사원을 선택해주세요.');
@@ -482,6 +483,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 모델 확인
       const modelCount = Object.keys(assignmentSettings.models).length;
       console.log('설정된 모델 수:', modelCount);
+      console.log('설정된 모델들:', Object.keys(assignmentSettings.models));
       
       if (modelCount === 0) {
         throw new Error('배정할 모델이 설정되지 않았습니다. 모델을 추가해주세요.');
@@ -492,19 +494,40 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       const storeResponse = await fetch(`${API_BASE_URL}/api/stores`);
       
       if (!storeResponse.ok) {
+        const errorText = await storeResponse.text();
+        console.error('매장 데이터 요청 실패 상세:', {
+          status: storeResponse.status,
+          statusText: storeResponse.statusText,
+          errorText: errorText.substring(0, 500)
+        });
         throw new Error(`매장 데이터 요청 실패: ${storeResponse.status} ${storeResponse.statusText}`);
       }
       
       const storeData = await storeResponse.json();
       console.log('매장 데이터 로드 완료:', storeData.stores?.length || 0, '개 매장');
+      console.log('매장 데이터 샘플:', storeData.stores?.slice(0, 3));
       
       setProgress(30);
       setProgressMessage('개통실적 데이터를 로드하는 중...');
       
       // 새로운 배정 로직으로 계산
-      console.log('배정 계산 시작');
+      console.log('=== 배정 계산 시작 ===');
+      console.log('전달되는 파라미터:', {
+        agentsCount: agents.length,
+        settingsKeys: Object.keys(assignmentSettings),
+        storeDataKeys: Object.keys(storeData || {}),
+        storeDataLength: storeData?.stores?.length || 0
+      });
+      
       const preview = await calculateFullAssignment(agents, assignmentSettings, storeData);
-      console.log('배정 계산 완료:', preview);
+      console.log('=== 배정 계산 완료 ===');
+      console.log('배정 결과 구조:', {
+        agentsCount: Object.keys(preview.agents || {}).length,
+        officesCount: Object.keys(preview.offices || {}).length,
+        departmentsCount: Object.keys(preview.departments || {}).length,
+        modelsCount: Object.keys(preview.models || {}).length
+      });
+      console.log('배정 결과 상세:', JSON.stringify(preview, null, 2));
       
       setProgress(90);
       setProgressMessage('결과를 정리하는 중...');
@@ -523,9 +546,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       }, 1000);
       
     } catch (error) {
-      console.error('배정 미리보기 실패:', error);
-      console.error('에러 상세:', error.message);
+      console.error('=== 배정 미리보기 실패 ===');
+      console.error('에러 객체:', error);
+      console.error('에러 메시지:', error.message);
+      console.error('에러 스택:', error.stack);
+      console.error('에러 이름:', error.name);
+      
+      // 추가 디버깅 정보
+      if (error.cause) {
+        console.error('에러 원인:', error.cause);
+      }
+      
       setProgressMessage(`배정 계산 중 오류가 발생했습니다: ${error.message}`);
+      
+      // 사용자에게 더 자세한 에러 정보 제공
+      alert(`배정 계산 중 오류가 발생했습니다:\n\n${error.message}\n\n자세한 내용은 개발자 도구 콘솔을 확인해주세요.`);
     } finally {
       setIsLoadingPreview(false);
     }

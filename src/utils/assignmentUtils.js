@@ -915,117 +915,174 @@ const adjustAssignments = (baseAssignments, totalQuantity) => {
 
 // 색상별 배정 수량 계산 (정확한 100% 배정 보장 버전)
 export const calculateModelAssignment = async (modelName, modelData, eligibleAgents, settings, storeData) => {
-  if (eligibleAgents.length === 0) {
-    return {};
-  }
-  
-  // 거래처수가 0인 영업사원을 제외 (중복 필터링 방지)
-  const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
-  
-  if (filteredAgents.length === 0) {
-    console.log('⚠️ 거래처수가 있는 영업사원이 없어 배정을 중단합니다.');
-    return {};
-  }
-  
-  console.log(`🎯 calculateModelAssignment 필터링 결과:`, {
-    전체대상자: eligibleAgents.length,
-    거래처수필터링후: filteredAgents.length,
-    포함된인원: filteredAgents.map(agent => agent.target)
-  });
-  
-  // 1단계: 색상별로 개별 배정 계산
-  const colorAssignments = {};
-  const colorScores = {};
-  
-  for (const color of modelData.colors) {
-    const colorQuantity = color.quantity || 0;
-    if (colorQuantity > 0) {
-      // 해당 색상의 가중치 계산
-      const weightedAgents = await calculateColorAccurateWeights(filteredAgents, modelName, color.name, settings, storeData, modelData);
-      
-      // 해당 색상의 배정량 계산
-      const colorBaseAssignments = calculateBaseAssignments(weightedAgents, colorQuantity);
-      const colorAdjustedAssignments = adjustAssignments(colorBaseAssignments, colorQuantity);
-      
-      colorAssignments[color.name] = colorAdjustedAssignments;
-      colorScores[color.name] = weightedAgents;
-    }
-  }
-  
-  // 2단계: 영업사원별로 색상별 배정량 통합
-  const assignments = {};
-  
-  filteredAgents.forEach(agent => {
-    const agentColorQuantities = {};
-    const agentColorScores = {};
-    let totalAgentQuantity = 0;
+  try {
+    console.log(`=== calculateModelAssignment 시작: ${modelName} ===`);
+    console.log('입력 파라미터:', {
+      modelName,
+      modelDataColors: modelData?.colors?.length || 0,
+      eligibleAgentsCount: eligibleAgents?.length || 0,
+      settingsKeys: Object.keys(settings || {}),
+      storeDataType: typeof storeData
+    });
     
-    // 각 색상별 배정량과 점수 합산
+    if (eligibleAgents.length === 0) {
+      console.log('배정 대상자가 없어 빈 결과 반환');
+      return {};
+    }
+    
+    // 거래처수가 0인 영업사원을 제외 (중복 필터링 방지)
+    console.log('거래처수 필터링 시작...');
+    const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
+    
+    if (filteredAgents.length === 0) {
+      console.log('⚠️ 거래처수가 있는 영업사원이 없어 배정을 중단합니다.');
+      return {};
+    }
+    
+    console.log(`🎯 calculateModelAssignment 필터링 결과:`, {
+      전체대상자: eligibleAgents.length,
+      거래처수필터링후: filteredAgents.length,
+      포함된인원: filteredAgents.map(agent => agent.target)
+    });
+    
+    // 1단계: 색상별로 개별 배정 계산
+    console.log('색상별 배정 계산 시작...');
+    const colorAssignments = {};
+    const colorScores = {};
+    
+    for (const color of modelData.colors) {
+      try {
+        const colorQuantity = color.quantity || 0;
+        console.log(`색상 ${color.name} 처리 시작 (수량: ${colorQuantity})`);
+        
+        if (colorQuantity > 0) {
+          // 해당 색상의 가중치 계산
+          console.log(`색상 ${color.name} 가중치 계산 시작...`);
+          const weightedAgents = await calculateColorAccurateWeights(filteredAgents, modelName, color.name, settings, storeData, modelData);
+          console.log(`색상 ${color.name} 가중치 계산 완료:`, {
+            weightedAgentsCount: weightedAgents?.length || 0,
+            totalWeight: weightedAgents?.reduce((sum, agent) => sum + (agent.finalWeight || 0), 0) || 0
+          });
+          
+          // 해당 색상의 배정량 계산
+          console.log(`색상 ${color.name} 배정량 계산 시작...`);
+          const colorBaseAssignments = calculateBaseAssignments(weightedAgents, colorQuantity);
+          const colorAdjustedAssignments = adjustAssignments(colorBaseAssignments, colorQuantity);
+          
+          colorAssignments[color.name] = colorAdjustedAssignments;
+          colorScores[color.name] = weightedAgents;
+          
+          console.log(`색상 ${color.name} 배정 완료:`, {
+            baseAssignments: colorBaseAssignments.length,
+            adjustedAssignments: colorAdjustedAssignments.length,
+            totalAssigned: colorAdjustedAssignments.reduce((sum, item) => sum + (item.baseQuantity || 0), 0)
+          });
+        } else {
+          console.log(`색상 ${color.name} 수량이 0이므로 건너뜀`);
+        }
+      } catch (error) {
+        console.error(`색상 ${color.name} 처리 중 오류:`, error);
+        throw new Error(`색상 ${color.name} 배정 계산 실패: ${error.message}`);
+      }
+    }
+    
+    // 2단계: 영업사원별로 색상별 배정량 통합
+    console.log('영업사원별 배정량 통합 시작...');
+    const assignments = {};
+    
+    filteredAgents.forEach(agent => {
+      try {
+        const agentColorQuantities = {};
+        const agentColorScores = {};
+        let totalAgentQuantity = 0;
+        
+        // 각 색상별 배정량과 점수 합산
+        Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
+          const agentColorAssignment = colorAssignmentList.find(item => item.agent.contactId === agent.contactId);
+          const colorQuantity = agentColorAssignment ? agentColorAssignment.baseQuantity : 0;
+          const colorScore = colorScores[colorName].find(item => item.agent.contactId === agent.contactId);
+          
+          agentColorQuantities[colorName] = colorQuantity;
+          agentColorScores[colorName] = {
+            averageScore: colorScore?.rawScore || 0,
+            details: colorScore?.details || {} // calculateColorRawScore에서 반환하는 새로운 구조
+          };
+          
+          // 디버깅: 실제 전달되는 데이터 확인
+          console.log(`🔍 ${agent.target} - ${modelName}-${colorName} 점수 데이터:`, {
+            rawScore: colorScore?.rawScore,
+            details: colorScore?.details,
+            finalWeight: colorScore?.finalWeight
+          });
+          totalAgentQuantity += colorQuantity;
+        });
+        
+        if (totalAgentQuantity > 0) {
+          assignments[agent.contactId] = {
+            agentName: agent.target,
+            office: agent.office,
+            department: agent.department,
+            quantity: totalAgentQuantity,
+            colorQuantities: agentColorQuantities, // 색상별 배정량
+            colorScores: agentColorScores, // 색상별 점수
+            averageScore: Object.values(agentColorScores).reduce((sum, score) => sum + score.averageScore, 0) / Object.keys(agentColorScores).length, // 평균 점수
+            colors: modelData.colors.map(color => color.name),
+            details: Object.values(agentColorScores)[0]?.details || {} // 첫 번째 색상의 세부정보
+          };
+          
+          console.log(`✅ ${agent.target} 배정 완료:`, {
+            totalQuantity: totalAgentQuantity,
+            colorQuantities: agentColorQuantities
+          });
+        } else {
+          console.log(`❌ ${agent.target} 배정량 0으로 제외`);
+        }
+      } catch (error) {
+        console.error(`${agent.target} 배정 처리 중 오류:`, error);
+        throw new Error(`${agent.target} 배정 처리 실패: ${error.message}`);
+      }
+    });
+    
+    // 3단계: 검증 - 각 색상별 총 배정량 확인
+    console.log('색상별 배정 검증 시작...');
     Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
-      const agentColorAssignment = colorAssignmentList.find(item => item.agent.contactId === agent.contactId);
-      const colorQuantity = agentColorAssignment ? agentColorAssignment.baseQuantity : 0;
-      const colorScore = colorScores[colorName].find(item => item.agent.contactId === agent.contactId);
+      const totalColorAssigned = colorAssignmentList.reduce((sum, item) => sum + item.baseQuantity, 0);
+      const expectedColorQuantity = modelData.colors.find(color => color.name === colorName)?.quantity || 0;
       
-      agentColorQuantities[colorName] = colorQuantity;
-      agentColorScores[colorName] = {
-        averageScore: colorScore?.rawScore || 0,
-        details: colorScore?.details || {} // calculateColorRawScore에서 반환하는 새로운 구조
-      };
-      
-      // 디버깅: 실제 전달되는 데이터 확인
-      console.log(`🔍 ${agent.target} - ${modelName}-${colorName} 점수 데이터:`, {
-        rawScore: colorScore?.rawScore,
-        details: colorScore?.details,
-        finalWeight: colorScore?.finalWeight
+      console.log(`✅ 색상 ${colorName} 배정 검증:`, {
+        expected: expectedColorQuantity,
+        assigned: totalColorAssigned,
+        difference: expectedColorQuantity - totalColorAssigned,
+        agentScores: colorScores[colorName].map(item => ({
+          agent: item.agent.target,
+          score: Math.round(item.rawScore),
+          weight: Math.round(item.finalWeight * 100) / 100
+        }))
       });
-      totalAgentQuantity += colorQuantity;
     });
     
-    if (totalAgentQuantity > 0) {
-      assignments[agent.contactId] = {
-        agentName: agent.target,
-        office: agent.office,
-        department: agent.department,
-        quantity: totalAgentQuantity,
-        colorQuantities: agentColorQuantities, // 색상별 배정량
-        colorScores: agentColorScores, // 색상별 점수
-        averageScore: Object.values(agentColorScores).reduce((sum, score) => sum + score.averageScore, 0) / Object.keys(agentColorScores).length, // 평균 점수
-        colors: modelData.colors.map(color => color.name),
-        details: Object.values(agentColorScores)[0]?.details || {} // 첫 번째 색상의 세부정보
-      };
-    }
-  });
-  
-  // 3단계: 검증 - 각 색상별 총 배정량 확인
-  Object.entries(colorAssignments).forEach(([colorName, colorAssignmentList]) => {
-    const totalColorAssigned = colorAssignmentList.reduce((sum, item) => sum + item.baseQuantity, 0);
-    const expectedColorQuantity = modelData.colors.find(color => color.name === colorName)?.quantity || 0;
+    // 전체 검증
+    const totalAssigned = Object.values(assignments).reduce((sum, assignment) => sum + assignment.quantity, 0);
+    const totalExpected = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
     
-    console.log(`✅ 색상 ${colorName} 배정 검증:`, {
-      expected: expectedColorQuantity,
-      assigned: totalColorAssigned,
-      difference: expectedColorQuantity - totalColorAssigned,
-      agentScores: colorScores[colorName].map(item => ({
-        agent: item.agent.target,
-        score: Math.round(item.rawScore),
-        weight: Math.round(item.finalWeight * 100) / 100
-      }))
+    console.log(`✅ 모델 ${modelName} 색상별 정확한 배정 완료:`, {
+      totalExpected,
+      totalAssigned,
+      difference: totalExpected - totalAssigned,
+      agentCount: eligibleAgents.length,
+      colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`)
     });
-  });
-  
-  // 전체 검증
-  const totalAssigned = Object.values(assignments).reduce((sum, assignment) => sum + assignment.quantity, 0);
-  const totalExpected = modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0);
-  
-  console.log(`✅ 모델 ${modelName} 색상별 정확한 배정 완료:`, {
-    totalExpected,
-    totalAssigned,
-    difference: totalExpected - totalAssigned,
-    agentCount: eligibleAgents.length,
-    colors: modelData.colors.map(color => `${color.name}: ${color.quantity}개`)
-  });
-  
-  return assignments;
+    
+    return assignments;
+  } catch (error) {
+    console.error(`=== calculateModelAssignment 실패: ${modelName} ===`);
+    console.error('에러 객체:', error);
+    console.error('에러 메시지:', error.message);
+    console.error('에러 스택:', error.stack);
+    
+    // 에러를 다시 던져서 상위에서 처리할 수 있도록 함
+    throw error;
+  }
 };
 
 // 사무실별 배정 수량 집계
@@ -1084,78 +1141,127 @@ export const aggregateDepartmentAssignment = (assignments, eligibleAgents) => {
 
 // 전체 배정 계산 (최적화된 버전)
 export const calculateFullAssignment = async (agents, settings, storeData = null) => {
-  const { models } = settings;
-  const { eligibleAgents } = getSelectedTargets(agents, settings);
-  
-  // 거래처수 0인 인원을 배정목록에서 제거
-  const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
-  
-  console.log(`🎯 배정 대상자 필터링 결과:`, {
-    전체대상자: eligibleAgents.length,
-    거래처수필터링후: filteredAgents.length,
-    제외된인원: eligibleAgents.length - filteredAgents.length,
-    포함된인원: filteredAgents.map(agent => agent.target),
-    제외된인원: eligibleAgents.filter(agent => !filteredAgents.find(fa => fa.contactId === agent.contactId)).map(agent => agent.target)
-  });
-  
-  // 필터링된 영업사원이 없으면 빈 결과 반환
-  if (filteredAgents.length === 0) {
-    console.log('⚠️ 거래처수가 있는 영업사원이 없어 배정을 중단합니다.');
-    return {
+  try {
+    console.log('=== calculateFullAssignment 시작 ===');
+    console.log('입력 파라미터:', {
+      agentsCount: agents?.length || 0,
+      settingsKeys: Object.keys(settings || {}),
+      storeDataType: typeof storeData,
+      storeDataKeys: Object.keys(storeData || {}),
+      storeDataLength: storeData?.stores?.length || 0
+    });
+    
+    const { models } = settings;
+    console.log('모델 설정:', Object.keys(models || {}));
+    
+    const { eligibleAgents } = getSelectedTargets(agents, settings);
+    console.log('선택된 배정 대상:', eligibleAgents.length, '명');
+    
+    // 거래처수 0인 인원을 배정목록에서 제거
+    console.log('거래처수 필터링 시작...');
+    const filteredAgents = await filterAgentsByStoreCount(eligibleAgents, storeData);
+    
+    console.log(`🎯 배정 대상자 필터링 결과:`, {
+      전체대상자: eligibleAgents.length,
+      거래처수필터링후: filteredAgents.length,
+      제외된인원: eligibleAgents.length - filteredAgents.length,
+      포함된인원: filteredAgents.map(agent => agent.target),
+      제외된인원: eligibleAgents.filter(agent => !filteredAgents.find(fa => fa.contactId === agent.contactId)).map(agent => agent.target)
+    });
+    
+    // 필터링된 영업사원이 없으면 빈 결과 반환
+    if (filteredAgents.length === 0) {
+      console.log('⚠️ 거래처수가 있는 영업사원이 없어 배정을 중단합니다.');
+      return {
+        agents: {},
+        offices: {},
+        departments: {},
+        models: {}
+      };
+    }
+    
+    const results = {
       agents: {},
       offices: {},
       departments: {},
       models: {}
     };
-  }
-  
-  const results = {
-    agents: {},
-    offices: {},
-    departments: {},
-    models: {}
-  };
-  
-  // 모든 모델의 배정을 병렬로 계산
-  const modelPromises = Object.entries(models).map(async ([modelName, modelData]) => {
-    const modelAssignments = await calculateModelAssignment(modelName, modelData, filteredAgents, settings, storeData);
     
-    return {
-      modelName,
-      modelAssignments,
-      modelData
-    };
-  });
-  
-  const modelResults = await Promise.all(modelPromises);
-  
-  // 결과 통합 - 영업사원별로 모델별 배정 결과 그룹화
-  modelResults.forEach(({ modelName, modelAssignments, modelData }) => {
-    // 영업사원별 배정 결과를 모델별로 그룹화하여 저장
-    Object.entries(modelAssignments).forEach(([contactId, assignment]) => {
-      if (!results.agents[contactId]) {
-        results.agents[contactId] = {};
+    // 모든 모델의 배정을 병렬로 계산
+    console.log('모델별 배정 계산 시작...');
+    const modelPromises = Object.entries(models).map(async ([modelName, modelData]) => {
+      try {
+        console.log(`모델 ${modelName} 배정 계산 시작...`);
+        const modelAssignments = await calculateModelAssignment(modelName, modelData, filteredAgents, settings, storeData);
+        console.log(`모델 ${modelName} 배정 계산 완료:`, {
+          assignmentsCount: Object.keys(modelAssignments || {}).length,
+          totalAssigned: Object.values(modelAssignments || {}).reduce((sum, assignment) => sum + (assignment.quantity || 0), 0)
+        });
+        
+        return {
+          modelName,
+          modelAssignments,
+          modelData
+        };
+      } catch (error) {
+        console.error(`모델 ${modelName} 배정 계산 중 오류:`, error);
+        throw new Error(`모델 ${modelName} 배정 계산 실패: ${error.message}`);
       }
-      results.agents[contactId][modelName] = assignment;
     });
     
-    // 모델별 결과 저장
-    results.models[modelName] = {
-      name: modelName,
-      totalQuantity: modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0),
-      assignedQuantity: Object.values(modelAssignments).reduce((sum, assignment) => sum + assignment.quantity, 0),
-      assignments: modelAssignments,
-      colors: modelData.colors // 색상별 수량 정보 포함
-    };
-  });
-  
-  // 사무실별 집계
-  results.offices = aggregateOfficeAssignment(results.agents, filteredAgents);
-  
-  // 소속별 집계
-  results.departments = aggregateDepartmentAssignment(results.agents, filteredAgents);
-  
-  return results;
+    const modelResults = await Promise.all(modelPromises);
+    console.log('모든 모델 배정 계산 완료');
+    
+    // 결과 통합 - 영업사원별로 모델별 배정 결과 그룹화
+    console.log('결과 통합 시작...');
+    modelResults.forEach(({ modelName, modelAssignments, modelData }) => {
+      // 영업사원별 배정 결과를 모델별로 그룹화하여 저장
+      Object.entries(modelAssignments).forEach(([contactId, assignment]) => {
+        if (!results.agents[contactId]) {
+          results.agents[contactId] = {};
+        }
+        results.agents[contactId][modelName] = assignment;
+      });
+      
+      // 모델별 결과 저장
+      results.models[modelName] = {
+        name: modelName,
+        totalQuantity: modelData.colors.reduce((sum, color) => sum + (color.quantity || 0), 0),
+        assignedQuantity: Object.values(modelAssignments).reduce((sum, assignment) => sum + assignment.quantity, 0),
+        assignments: modelAssignments,
+        colors: modelData.colors // 색상별 수량 정보 포함
+      };
+    });
+    
+    // 사무실별 집계
+    console.log('사무실별 집계 시작...');
+    results.offices = aggregateOfficeAssignment(results.agents, filteredAgents);
+    
+    // 소속별 집계
+    console.log('소속별 집계 시작...');
+    results.departments = aggregateDepartmentAssignment(results.agents, filteredAgents);
+    
+    console.log('=== calculateFullAssignment 완료 ===');
+    console.log('최종 결과 요약:', {
+      agentsCount: Object.keys(results.agents).length,
+      officesCount: Object.keys(results.offices).length,
+      departmentsCount: Object.keys(results.departments).length,
+      modelsCount: Object.keys(results.models).length,
+      totalAssigned: Object.values(results.agents).reduce((sum, agentModels) => {
+        return sum + Object.values(agentModels).reduce((agentSum, assignment) => agentSum + (assignment.quantity || 0), 0);
+      }, 0)
+    });
+    
+    return results;
+  } catch (error) {
+    console.error('=== calculateFullAssignment 실패 ===');
+    console.error('에러 객체:', error);
+    console.error('에러 메시지:', error.message);
+    console.error('에러 스택:', error.stack);
+    
+    // 에러를 다시 던져서 상위에서 처리할 수 있도록 함
+    throw error;
+  }
 };
 
 // 캐시 정리 함수
