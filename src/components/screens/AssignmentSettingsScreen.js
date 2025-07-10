@@ -1318,6 +1318,20 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           if (logicType === 'remainingInventory') {
             if (remainingInventoryValue === null) return null;
             
+            // 잔여재고 점수 가져오기
+            const inventoryScore = scores.inventoryScore;
+            let scoreValue = 0;
+            
+            if (inventoryScore) {
+              if (typeof inventoryScore === 'object' && inventoryScore !== null && 'value' in inventoryScore) {
+                scoreValue = inventoryScore.value;
+              } else if (typeof inventoryScore === 'object' && inventoryScore !== null && 'detail' in inventoryScore) {
+                scoreValue = inventoryScore.detail;
+              } else {
+                scoreValue = inventoryScore;
+              }
+            }
+            
             return (
               <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Box sx={{ 
@@ -1335,7 +1349,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   📦
                 </Box>
                 <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>
-                  {remainingInventoryValue}
+                  {scoreValue !== undefined ? Math.round(Number(scoreValue)) : '-'}
                 </span>
                 <span style={{ fontSize: '0.65rem', color: '#888' }}>
                   잔여보유량: {remainingInventoryValue}개
