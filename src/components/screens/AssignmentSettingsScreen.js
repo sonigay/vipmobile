@@ -1551,6 +1551,23 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 사무실별 배정 현황 인쇄 (행 병합 적용)
       const officeRows = [];
       
+      // 각 사무실의 총 배정량 계산
+      const officeTotalQuantities = {};
+      Object.entries(previewData.offices).forEach(([officeName, officeData]) => {
+        let totalQuantity = 0;
+        Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+          modelData.colors.forEach(color => {
+            officeData.agents.forEach(agent => {
+              const agentAssignments = previewData.agents[agent.contactId];
+              if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
+                totalQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
+              }
+            });
+          });
+        });
+        officeTotalQuantities[officeName] = totalQuantity;
+      });
+      
       Object.entries(previewData.models).forEach(([modelName, modelData]) => {
         modelData.colors.forEach((color, colorIndex) => {
           // 해당 모델/색상의 총 배정량 계산
@@ -1613,7 +1630,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th>평균 배정량</th>
                 ${Object.entries(previewData.offices)
                   .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
-                  .map(([officeName, officeData]) => `<th>${officeName}<br/><small>${officeData.agentCount}명</small></th>`).join('')}
+                  .map(([officeName, officeData]) => `<th>${officeName}<br/><small>${officeData.agentCount}명</small><br/><strong>총 ${officeTotalQuantities[officeName]}대</strong></th>`).join('')}
               </tr>
             </thead>
             <tbody>
@@ -1747,6 +1764,23 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 소속별 배정 현황 인쇄 (행 병합 적용)
       const departmentRows = [];
       
+      // 각 소속의 총 배정량 계산
+      const departmentTotalQuantities = {};
+      Object.entries(previewData.departments).forEach(([deptName, deptData]) => {
+        let totalQuantity = 0;
+        Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+          modelData.colors.forEach(color => {
+            deptData.agents.forEach(agent => {
+              const agentAssignments = previewData.agents[agent.contactId];
+              if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
+                totalQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
+              }
+            });
+          });
+        });
+        departmentTotalQuantities[deptName] = totalQuantity;
+      });
+      
       Object.entries(previewData.models).forEach(([modelName, modelData]) => {
         modelData.colors.forEach((color, colorIndex) => {
           // 해당 모델/색상의 총 배정량 계산
@@ -1809,7 +1843,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th>평균 배정량</th>
                 ${Object.entries(previewData.departments)
                   .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
-                  .map(([deptName, deptData]) => `<th>${deptName || '미지정'}<br/><small>${deptData.agentCount}명</small></th>`).join('')}
+                  .map(([deptName, deptData]) => `<th>${deptName || '미지정'}<br/><small>${deptData.agentCount}명</small><br/><strong>총 ${departmentTotalQuantities[deptName]}대</strong></th>`).join('')}
               </tr>
             </thead>
             <tbody>
