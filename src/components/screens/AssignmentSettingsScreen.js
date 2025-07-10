@@ -110,7 +110,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [previewSubTab, setPreviewSubTab] = useState(0);
   const [showSharedSettingsDialog, setShowSharedSettingsDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [expandedColors, setExpandedColors] = useState({}); // 색상별 접기/펼치기 상태
+  const [expandedColors, setExpandedColors] = useState({}); // 색상별 접기/펼치기 상태 (기본값: 모두 닫힘)
   const [expandedLogicDetails, setExpandedLogicDetails] = useState({}); // 로직 세부사항 접기/펼치기 상태 (기본값: 모두 닫힘)
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
@@ -2826,34 +2826,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Button>
                         </Box>
                         
-                        {/* 총 합계 수량 표시 */}
-                        <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-                          <Typography variant="h6" gutterBottom>
-                            📊 총 배정 현황
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                            {Object.entries(previewData.models).map(([modelName, modelData]) => {
-                              const totalModelQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                const modelAssignment = agentData[modelName];
-                                if (modelAssignment && modelAssignment.colorQuantities) {
-                                  return sum + Object.values(modelAssignment.colorQuantities).reduce((colorSum, qty) => colorSum + qty, 0);
-                                }
-                                return sum;
-                              }, 0);
-                              
-                              return (
-                                <Box key={modelName} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                    {modelName}:
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                                    {totalModelQuantity}개
-                                  </Typography>
-                                </Box>
-                              );
-                            })}
-                          </Box>
-                        </Box>
+                        
                         
                         {/* 모델별 색상별 배정량 테이블 */}
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
@@ -2902,7 +2875,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                            fontSize: '0.95rem',
                                            marginRight: 4
                                          }}>{color.name}</span>
-                                         <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{expandedColors[colorKey] !== false ? '▲' : '▼'}</span>
+                                         <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{expandedColors[colorKey] === true ? '▲' : '▼'}</span>
                                        </TableCell>
                                        {Object.entries(previewData.offices)
                                         .sort(([a], [b]) => a.localeCompare(b))
@@ -2943,7 +2916,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           return (
                                             <TableCell key={`${officeName}-${modelName}-${color.name}`} align="center" sx={{ backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100', fontWeight: officeTotalQuantity > 0 ? 'bold' : 'normal', color: officeTotalQuantity > 0 ? 'primary.main' : 'text.secondary', borderRight: '2px solid #ddd' }}>
                                               <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{officeTotalQuantity > 0 ? `${officeTotalQuantity}개` : '-'}</div>
-                                              {officeTotalQuantity > 0 && expandedColors[colorKey] !== false && (
+                                              {officeTotalQuantity > 0 && expandedColors[colorKey] === true && (
                                                 <ScoreDisplay scores={aggregateScores} modelName={modelName} colorName={color.name} />
                                               )}
                                             </TableCell>
@@ -3132,7 +3105,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                               {Object.entries(previewData.models).map(([modelName, modelData], modelIndex) =>
                                 modelData.colors.map((color, colorIndex) => {
                                   const colorKey = `${modelName}-${color.name}`;
-                                  const isExpanded = expandedColors[colorKey] !== false;
+                                  const isExpanded = expandedColors[colorKey] === true;
                                   
                                   return (
                                     <TableRow key={colorKey}>
@@ -3264,34 +3237,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Button>
                         </Box>
                         
-                        {/* 총 합계 수량 표시 */}
-                        <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-                          <Typography variant="h6" gutterBottom>
-                            📊 총 배정 현황
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                            {Object.entries(previewData.models).map(([modelName, modelData]) => {
-                              const totalModelQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                const modelAssignment = agentData[modelName];
-                                if (modelAssignment && modelAssignment.colorQuantities) {
-                                  return sum + Object.values(modelAssignment.colorQuantities).reduce((colorSum, qty) => colorSum + qty, 0);
-                                }
-                                return sum;
-                              }, 0);
-                              
-                              return (
-                                <Box key={modelName} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                    {modelName}:
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                                    {totalModelQuantity}개
-                                  </Typography>
-                                </Box>
-                              );
-                            })}
-                          </Box>
-                        </Box>
+                        
                         
                         {/* 모델별 색상별 배정량 테이블 */}
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
@@ -3340,7 +3286,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                            fontSize: '0.95rem',
                                            marginRight: 4
                                          }}>{color.name}</span>
-                                         <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{expandedColors[colorKey] !== false ? '▲' : '▼'}</span>
+                                         <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{expandedColors[colorKey] === true ? '▲' : '▼'}</span>
                                        </TableCell>
                                        {Object.entries(previewData.departments)
                                         .sort(([a], [b]) => a.localeCompare(b))
@@ -3381,7 +3327,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           return (
                                             <TableCell key={`${deptName}-${modelName}-${color.name}`} align="center" sx={{ backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100', fontWeight: deptTotalQuantity > 0 ? 'bold' : 'normal', color: deptTotalQuantity > 0 ? 'primary.main' : 'text.secondary', borderRight: '2px solid #ddd' }}>
                                               <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{deptTotalQuantity > 0 ? `${deptTotalQuantity}개` : '-'}</div>
-                                              {deptTotalQuantity > 0 && expandedColors[colorKey] !== false && (
+                                              {deptTotalQuantity > 0 && expandedColors[colorKey] === true && (
                                                 <ScoreDisplay scores={aggregateScores} modelName={modelName} colorName={color.name} />
                                               )}
                                             </TableCell>
