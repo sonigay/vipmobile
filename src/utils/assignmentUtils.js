@@ -709,9 +709,8 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       details: {
         turnoverRate: { value: Math.round(normalizedTurnoverRate), detail: Math.round(turnoverRate) },
         storeCount: { value: Math.round(normalizedStoreCount), detail: storeCount },
-        remainingInventory: { value: Math.round(normalizedInventoryScore), detail: Math.round(remainingInventory) },
         salesVolume: { value: Math.round(normalizedSalesVolume), detail: Math.round(salesVolume) },
-        inventoryScore: { value: inventoryScore, detail: inventoryScore } // 원본 inventoryScore 값 추가
+        inventoryScore: { value: inventoryScore, detail: inventoryScore } // 잔여재고 점수만 표시
       }
     };
   } catch (error) {
@@ -869,8 +868,7 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
         ...details,
         salesVolume: { value: relativeSalesVolume, detail: details.salesVolume.detail },
         storeCount: { value: relativeStoreCount, detail: details.storeCount.detail },
-        remainingInventory: { value: relativeInventoryScore, detail: details.remainingInventory.detail },
-        inventoryScore: { value: currentInventoryScore, detail: currentInventoryScore } // 원본 inventoryScore 값 추가
+        inventoryScore: { value: currentInventoryScore, detail: currentInventoryScore } // 잔여재고 점수만 표시
       }
     };
   });
