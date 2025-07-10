@@ -111,7 +111,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [showSharedSettingsDialog, setShowSharedSettingsDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [expandedColors, setExpandedColors] = useState({}); // 색상별 접기/펼치기 상태
-  const [expandedLogicDetails, setExpandedLogicDetails] = useState({});
+  const [expandedLogicDetails, setExpandedLogicDetails] = useState({}); // 로직 세부사항 접기/펼치기 상태 (기본값: 모두 닫힘)
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
 
@@ -3013,7 +3013,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           </TableCell>
                                         )}
                                       </TableRow>
-                                      {isExpanded && expandedLogicDetails[colorKey] && (
+                                      {isExpanded && expandedLogicDetails[colorKey] === true && (
                                         <TableRow>
                                           <TableCell colSpan={2 + (() => {
                                             const groupedOffices = {};
@@ -3599,7 +3599,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           </TableCell>
                                         )}
                                       </TableRow>
-                                      {isExpanded && expandedLogicDetails[colorKey] && (
+                                      {isExpanded && expandedLogicDetails[colorKey] === true && (
                                         <TableRow>
                                           <TableCell colSpan={2 + (() => {
                                             const groupedDepartments = {};
