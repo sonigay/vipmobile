@@ -1316,6 +1316,56 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           // 디버깅: 각 로직별 처리 결과 확인
           console.log(`🎯 ${logicType}:`, { displayValue, detailText, originalScore: score });
           
+          // 잔여재고 점수인 경우 추가 정보 표시
+          if (logicType === 'inventoryScore' && scores.remainingInventory) {
+            const remainingInventoryValue = scores.remainingInventory.value || scores.remainingInventory.detail || scores.remainingInventory;
+            return (
+              <Box key={logicType} sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
+                {/* 잔여재고 점수 */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Box sx={{ 
+                    width: 14, 
+                    height: 14, 
+                    borderRadius: '50%', 
+                    backgroundColor: logic.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}>
+                    {logic.emoji}
+                  </Box>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>
+                    {displayValue !== undefined ? Math.round(Number(displayValue)) : '-'}
+                  </span>
+                  <span style={{ fontSize: '0.65rem', color: '#888' }}>{detailText}</span>
+                </Box>
+                {/* 실제 잔여재고 수량 */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
+                  <Box sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: '50%', 
+                    backgroundColor: '#ff9800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.6rem',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}>
+                    📦
+                  </Box>
+                  <span style={{ fontSize: '0.65rem', color: '#666' }}>
+                    잔여보유량: {remainingInventoryValue !== undefined ? remainingInventoryValue : '-'}개
+                  </span>
+                </Box>
+              </Box>
+            );
+          }
+          
           return (
             <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Box sx={{ 
