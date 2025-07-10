@@ -1318,7 +1318,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           
           // 잔여재고 점수인 경우 추가 정보 표시
           if (logicType === 'inventoryScore' && scores.remainingInventory) {
-            const remainingInventoryValue = scores.remainingInventory.value || scores.remainingInventory.detail || scores.remainingInventory;
+            let remainingInventoryValue = scores.remainingInventory.value || scores.remainingInventory.detail || scores.remainingInventory;
+            
+            // 객체인 경우 안전하게 처리
+            if (typeof remainingInventoryValue === 'object' && remainingInventoryValue !== null) {
+              remainingInventoryValue = remainingInventoryValue.value || remainingInventoryValue.detail || '-';
+            }
+            
+            // 숫자가 아닌 경우 안전하게 처리
+            if (typeof remainingInventoryValue !== 'number') {
+              remainingInventoryValue = '-';
+            }
+            
             return (
               <Box key={logicType} sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
                 {/* 잔여재고 점수 */}
@@ -1359,7 +1370,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     📦
                   </Box>
                   <span style={{ fontSize: '0.65rem', color: '#666' }}>
-                    잔여보유량: {remainingInventoryValue !== undefined ? remainingInventoryValue : '-'}개
+                    잔여보유량: {remainingInventoryValue !== '-' ? `${remainingInventoryValue}개` : '-'}
                   </span>
                 </Box>
               </Box>
