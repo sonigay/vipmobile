@@ -2510,7 +2510,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                             • <strong>거래처수:</strong> 많을수록 높은 점수 (거래처가 많은 영업사원 우선)
                           </Typography>
                           <Typography variant="body2">
-                            • <strong>잔여재고:</strong> (잔여재고 - 판매량) 공식으로 계산 (숫자가 높을수록 배정량 높음)
+                            • <strong>잔여재고:</strong> (판매량 - 잔여재고) 공식으로 계산 (숫자가 높을수록 배정량 높음)
                           </Typography>
                           <Typography variant="body2">
                             • <strong>판매량:</strong> 높을수록 높은 점수 (판매 실적이 좋은 영업사원 우선)

@@ -637,15 +637,15 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     }
     const salesVolume = totalSales; // 판매량 = 전월개통 숫자+당월개통 숫자
     
-    // 잔여재고 점수 계산: (잔여재고 - 판매량) (숫자가 높을수록 배정량 높음)
-    const inventoryScore = remainingInventory - salesVolume;
+    // 잔여재고 점수 계산: (판매량 - 잔여재고) (숫자가 높을수록 배정량 높음)
+    const inventoryScore = salesVolume - remainingInventory;
     
     // 디버깅: 잔여재고 점수 계산 결과 확인
     console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 잔여재고 점수 계산:`, {
       salesVolume,
       remainingInventory,
       inventoryScore,
-      calculation: `(${remainingInventory} - ${salesVolume}) = ${inventoryScore}점`
+      calculation: `(${salesVolume} - ${remainingInventory}) = ${inventoryScore}점`
     });
     
     // 김수빈의 경우 더 상세한 로그
@@ -655,7 +655,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         remainingInventory,
         inventoryScore,
         normalizedInventoryScore: Math.min(Math.max(inventoryScore, -50), 50) + 50,
-        calculation: `(${remainingInventory} - ${salesVolume}) = ${inventoryScore}점`
+        calculation: `(${salesVolume} - ${remainingInventory}) = ${inventoryScore}점`
       });
     }
     
@@ -777,7 +777,7 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
   // 2단계: 상대적 정규화를 위한 최대/최소값 계산
   const maxSalesVolume = Math.max(...agentScores.map(item => item.details.salesVolume.detail));
   const maxStoreCount = Math.max(...agentScores.map(item => item.details.storeCount.detail));
-  // 잔여재고 점수는 (잔여재고 - 판매량) 공식으로 계산된 값으로 비교
+  // 잔여재고 점수는 (판매량 - 잔여재고) 공식으로 계산된 값으로 비교
   // 원본 inventoryScore 값을 사용하여 상대적 정규화 계산
   const inventoryScores = agentScores.map(item => {
     // 원본 inventoryScore 값이 있으면 사용, 없으면 계산
@@ -786,7 +786,7 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
     } else {
       const salesVolume = item.details.salesVolume.detail;
       const remainingInventory = item.details.remainingInventory.detail;
-      return remainingInventory - salesVolume;
+      return salesVolume - remainingInventory;
     }
   });
   const maxInventoryScore = Math.max(...inventoryScores);
