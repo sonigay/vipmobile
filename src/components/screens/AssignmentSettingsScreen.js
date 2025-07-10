@@ -1579,8 +1579,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             return sum;
           }, 0);
           
-          // 해당 모델/색상의 평균 배정량 계산
-          const avgQuantity = totalQuantity / Object.keys(previewData.offices).length;
+
           
           const isFirstColor = colorIndex === 0;
           const rowspan = isFirstColor ? modelData.colors.length : 0;
@@ -1611,7 +1610,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               ${modelCell}
               <td><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
               <td><strong>${totalQuantity}개</strong></td>
-              <td>${Math.round(avgQuantity)}개</td>
               ${officeCells}
             </tr>
           `);
@@ -1627,7 +1625,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th>모델명</th>
                 <th>색상</th>
                 <th>총 배정량</th>
-                <th>평균 배정량</th>
                 ${Object.entries(previewData.offices)
                   .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
                   .map(([officeName, officeData]) => `<th>${officeName}<br/><small>${officeData.agentCount}명</small><br/><strong>총 ${officeTotalQuantities[officeName]}대</strong></th>`).join('')}
@@ -1685,16 +1682,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             return sum;
           }, 0);
           
-          // 해당 모델/색상의 평균 점수 계산
-          const scores = Object.values(previewData.agents).map(agentData => {
-            const modelAssignment = agentData[modelName];
-            if (modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]) {
-              return modelAssignment.colorScores[color.name].averageScore || 0;
-            }
-            return 0;
-          }).filter(score => score > 0);
-          
-          const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+
           
           const isFirstColor = colorIndex === 0;
           const rowspan = isFirstColor ? modelData.colors.length : 0;
@@ -1724,7 +1712,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               ${modelCell}
               <td><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
               <td><strong>${totalQuantity}개</strong></td>
-              <td>${Math.round(avgScore)}점</td>
               ${agentCells}
             </tr>
           `);
@@ -1772,7 +1759,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th rowspan="2">모델명</th>
                 <th rowspan="2">색상</th>
                 <th rowspan="2">총 배정량</th>
-                <th rowspan="2">평균 배정점수</th>
                 ${agentHeaders.join('')}
               </tr>
               <tr>
@@ -1817,8 +1803,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             return sum;
           }, 0);
           
-          // 해당 모델/색상의 평균 배정량 계산
-          const avgQuantity = totalQuantity / Object.keys(previewData.departments).length;
+
           
           const isFirstColor = colorIndex === 0;
           const rowspan = isFirstColor ? modelData.colors.length : 0;
@@ -1849,7 +1834,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               ${modelCell}
               <td><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
               <td><strong>${totalQuantity}개</strong></td>
-              <td>${Math.round(avgQuantity)}개</td>
               ${departmentCells}
             </tr>
           `);
@@ -1865,7 +1849,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 <th>모델명</th>
                 <th>색상</th>
                 <th>총 배정량</th>
-                <th>평균 배정량</th>
                 ${Object.entries(previewData.departments)
                   .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
                   .map(([deptName, deptData]) => `<th>${deptName || '미지정'}<br/><small>${deptData.agentCount}명</small><br/><strong>총 ${departmentTotalQuantities[deptName]}대</strong></th>`).join('')}
