@@ -22,14 +22,18 @@ import {
   MenuItem,
   Menu,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Collapse,
+  IconButton
 } from '@mui/material';
 import {
   Business as BusinessIcon,
   Person as PersonIcon,
   Download as DownloadIcon,
   PictureAsPdf as PdfIcon,
-  TableChart as ExcelIcon
+  TableChart as ExcelIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon
 } from '@mui/icons-material';
 import { getAssignmentSettings, calculateFullAssignment } from '../../utils/assignmentUtils';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
@@ -39,6 +43,8 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
   const [assignmentSettings, setAssignmentSettings] = useState({});
   const [selectedOffice, setSelectedOffice] = useState('all');
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
+  const [expandedColors, setExpandedColors] = useState({});
+  const [expandedOffices, setExpandedOffices] = useState({});
 
   // 담당자 데이터 로드
   useEffect(() => {
@@ -146,6 +152,18 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
     return Array.from(officeSet).sort();
   }, [agents]);
 
+  // 배정 로직별 이모지 및 색상 매핑
+  const getLogicEmoji = (logicType) => {
+    switch (logicType) {
+      case 'turnoverRate': return { emoji: '🔄', color: '#4caf50', name: '회전율' };
+      case 'storeCount': return { emoji: '🏪', color: '#2196f3', name: '거래처수' };
+      case 'salesVolume': return { emoji: '📈', color: '#f44336', name: '판매량' };
+      case 'inventoryScore': return { emoji: '📦', color: '#ff9800', name: '잔여재고' };
+      case 'remainingInventory': return { emoji: '📦', color: '#ff9800', name: '잔여재고' };
+      default: return { emoji: '❓', color: '#9e9e9e', name: '기타' };
+    }
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 */}
@@ -212,163 +230,161 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
           </Card>
         )}
 
-        {/* 사무실별 통계 카드 */}
-        {!isLoading && (
-          <>
-            {/* 요약 정보 */}
-            <Paper sx={{ p: 2, mb: 3 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={3}>
-                  <Typography variant="h6" color="primary">
-                    총 사무실: {Object.keys(officeStats).length}개
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Typography variant="h6" color="primary">
-                    총 영업사원: {Object.values(officeStats).reduce((sum, office) => sum + office.agentCount, 0)}명
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Typography variant="h6" color="primary">
-                    총 배정량: {Object.values(officeStats).reduce((sum, office) => sum + office.totalAssignment, 0)}개
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Typography variant="h6" color="primary">
-                    모델 수: {assignmentSettings.models ? Object.keys(assignmentSettings.models).length : 0}개
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
-
-            {/* 사무실별 통계 카드 */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              {selectedOfficeData.map((officeData) => (
-                <Grid item xs={12} md={4} key={officeData.office}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <BusinessIcon sx={{ mr: 2, color: 'primary.main' }} />
-                        <Typography variant="h6">
-                          {officeData.office}
-                        </Typography>
-                      </Box>
-                      <Typography variant="h4" color="primary" gutterBottom>
-                        {officeData.agentCount}명
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        영업사원 수
-                      </Typography>
-                      <Typography variant="h5" color="secondary" gutterBottom>
-                        {officeData.totalAssignment}개
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        총 배정 수량
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </>
-        )}
-
         {/* 사무실별 상세 테이블 */}
         {!isLoading && selectedOfficeData.map((officeData) => (
           <Card key={officeData.office} sx={{ mb: 3 }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                {officeData.office} - 모델별 배정 현황
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="h6">
+                  {officeData.office} - 배정 상세 현황
+                </Typography>
+                <IconButton
+                  onClick={() => setExpandedOffices(prev => ({ ...prev, [officeData.office]: !prev[officeData.office] }))}
+                >
+                  {expandedOffices[officeData.office] ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                </IconButton>
+              </Box>
               
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>모델명</TableCell>
-                      <TableCell>색상</TableCell>
-                      <TableCell align="center">전체 수량</TableCell>
-                      <TableCell align="center">배정 수량</TableCell>
-                      <TableCell align="center">배정률</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.values(officeData.models).map((model) => (
-                      <TableRow key={model.name}>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {model.name}
-                          </Typography>
+              <Collapse in={expandedOffices[officeData.office]}>
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center" rowSpan={2}>
+                          모델/색상
                         </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                            {model.colors.map((color, index) => (
-                              <Chip
-                                key={index}
-                                label={color}
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontSize: '0.7rem' }}
-                              />
-                            ))}
-                          </Box>
+                        <TableCell align="center" rowSpan={2}>
+                          색상
                         </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2">
-                            {model.totalQuantity}개
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            label={`${model.assignedQuantity}개`}
-                            color={model.assignedQuantity > 0 ? 'primary' : 'default'}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2" color="text.secondary">
-                            {model.totalQuantity > 0 
-                              ? Math.round((model.assignedQuantity / model.totalQuantity) * 100)
-                              : 0}%
-                          </Typography>
+                        <TableCell align="center" colSpan={officeData.agents.length} sx={{ 
+                          fontWeight: 'bold',
+                          fontSize: '0.75rem',
+                          backgroundColor: '#f5f5f5',
+                          borderRight: '2px solid #ddd'
+                        }}>
+                          <div>{officeData.office}</div>
+                          <div>영업사원</div>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
-        ))}
-
-        {/* 영업사원 목록 */}
-        {!isLoading && selectedOfficeData.map((officeData) => (
-          <Card key={`${officeData.office}-agents`}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                {officeData.office} - 영업사원 목록
-              </Typography>
-              
-              <Grid container spacing={2}>
-                {officeData.agents.map((agent) => (
-                  <Grid item xs={12} sm={6} md={4} key={agent.contactId}>
-                    <Paper sx={{ p: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                        <Typography variant="subtitle2" fontWeight="medium">
-                          {agent.target}
-                        </Typography>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        소속: {agent.department || '미지정'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        자격: {agent.qualification || '미지정'}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
+                      <TableRow>
+                        {officeData.agents.map((agent) => (
+                          <TableCell key={agent.contactId} align="center" sx={{ 
+                            fontWeight: 'bold',
+                            fontSize: '0.75rem',
+                            minWidth: '120px',
+                            backgroundColor: '#fafafa'
+                          }}>
+                            <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
+                              {agent.target}
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'text.secondary', marginTop: '2px' }}>
+                              총 {Object.values(agent.assignments || {}).reduce((sum, assignment) => sum + assignment.quantity, 0)}개
+                            </div>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.values(officeData.models).map((model) =>
+                        model.colors.map((color, colorIndex) => {
+                          const colorKey = `${model.name}-${color.name}`;
+                          const isExpanded = expandedColors[colorKey] !== false;
+                          
+                          return (
+                            <TableRow key={colorKey}>
+                              {colorIndex === 0 && (
+                                <TableCell
+                                  sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
+                                  align="center"
+                                  rowSpan={model.colors.length}
+                                >
+                                  <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1976d2', marginBottom: '8px' }}>
+                                    {model.name}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                                    {model.colors.length}개 색상
+                                  </div>
+                                </TableCell>
+                              )}
+                              <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !isExpanded }))}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '2px 10px',
+                                  borderRadius: '12px',
+                                  background: '#f0f4ff',
+                                  color: '#1976d2',
+                                  fontWeight: 600,
+                                  fontSize: '0.95rem',
+                                  marginRight: 4
+                                }}>{color.name}</span>
+                                <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
+                              </TableCell>
+                              
+                              {officeData.agents.map((agent) => {
+                                const agentAssignment = agent.assignments?.[`${model.name}-${color.name}`];
+                                const quantity = agentAssignment?.quantity || 0;
+                                
+                                return (
+                                  <TableCell key={agent.contactId} align="center">
+                                    {isExpanded ? (
+                                      <Box>
+                                        <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1976d2' }}>
+                                          {quantity}개
+                                        </div>
+                                        {agentAssignment?.scores && (
+                                          <Box sx={{ mt: 1, fontSize: '0.7rem' }}>
+                                            {Object.entries(agentAssignment.scores).map(([logicType, score]) => {
+                                              const logic = getLogicEmoji(logicType);
+                                              if (!logic || !score) return null;
+                                              
+                                              let displayValue = 0;
+                                              if (typeof score === 'object' && score !== null && 'value' in score) {
+                                                displayValue = score.value;
+                                              } else {
+                                                displayValue = score;
+                                              }
+                                              
+                                              return (
+                                                <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                                  <Box sx={{ 
+                                                    width: 12, 
+                                                    height: 12, 
+                                                    borderRadius: '50%', 
+                                                    backgroundColor: logic.color,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '0.6rem',
+                                                    color: 'white',
+                                                    fontWeight: 'bold'
+                                                  }}>
+                                                    {logic.emoji}
+                                                  </Box>
+                                                  <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>
+                                                    {Math.round(Number(displayValue))}
+                                                  </span>
+                                                </Box>
+                                              );
+                                            })}
+                                          </Box>
+                                        )}
+                                      </Box>
+                                    ) : (
+                                      <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1976d2' }}>
+                                        {quantity}개
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Collapse>
             </CardContent>
           </Card>
         ))}

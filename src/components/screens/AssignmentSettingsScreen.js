@@ -3072,35 +3072,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Button>
                         </Box>
                         
-                        {/* 총 합계 수량 표시 */}
-                        <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-                          <Typography variant="h6" gutterBottom>
-                            📊 총 배정 현황
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                            {Object.entries(previewData.models).map(([modelName, modelData]) => {
-                              const totalModelQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                const modelAssignment = agentData[modelName];
-                                if (modelAssignment && modelAssignment.colorQuantities) {
-                                  return sum + Object.values(modelAssignment.colorQuantities).reduce((colorSum, qty) => colorSum + qty, 0);
-                                }
-                                return sum;
-                              }, 0);
-                              
-                              return (
-                                <Box key={modelName} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                    {modelName}:
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                                    {totalModelQuantity}개
-                                  </Typography>
-                                </Box>
-                              );
-                            })}
-                          </Box>
-                        </Box>
-                        
                         {/* 배정 로직 설명 */}
                         <Box sx={{ mb: 2, p: 1, backgroundColor: '#e3f2fd', borderRadius: 1, fontSize: '0.8rem' }}>
                           <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
