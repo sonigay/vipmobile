@@ -710,6 +710,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         turnoverRate: { value: Math.round(normalizedTurnoverRate), detail: Math.round(turnoverRate) },
         storeCount: { value: Math.round(normalizedStoreCount), detail: storeCount },
         salesVolume: { value: Math.round(normalizedSalesVolume), detail: Math.round(salesVolume) },
+        remainingInventory: { value: remainingInventory, detail: remainingInventory },
         inventoryScore: { value: inventoryScore, detail: inventoryScore } // 잔여재고 점수만 표시
       }
     };
@@ -800,8 +801,8 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
       agentCount: agents.length,
       inventoryScores: inventoryScores.map((score, i) => ({
         agent: agentScores[i].agent.target,
-        salesVolume: agentScores[i].details.salesVolume.detail,
-        remainingInventory: agentScores[i].details.remainingInventory.detail,
+        salesVolume: agentScores[i].details?.salesVolume?.detail || 0,
+        remainingInventory: agentScores[i].details?.remainingInventory?.detail || 0,
         inventoryScore: score
       }))
     });
@@ -809,8 +810,8 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
   // 3단계: 상대적 정규화 적용
   const normalizedScores = agentScores.map(({ agent, rawScore, details }, index) => {
     // 상대적 정규화 (최대값 대비 비율)
-    const relativeSalesVolume = maxSalesVolume > 0 ? (details.salesVolume.detail / maxSalesVolume) * 100 : 0;
-    const relativeStoreCount = maxStoreCount > 0 ? (details.storeCount.detail / maxStoreCount) * 100 : 0;
+    const relativeSalesVolume = maxSalesVolume > 0 ? ((details?.salesVolume?.detail || 0) / maxSalesVolume) * 100 : 0;
+    const relativeStoreCount = maxStoreCount > 0 ? ((details?.storeCount?.detail || 0) / maxStoreCount) * 100 : 0;
     // 잔여재고 점수는 0-100 범위로 정규화 (최대값과 최소값 기준)
     const currentInventoryScore = inventoryScores[index];
     const relativeInventoryScore = maxInventoryScore !== minInventoryScore 
@@ -866,8 +867,8 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
       rawScore: relativeRawScore, 
       details: {
         ...details,
-        salesVolume: { value: relativeSalesVolume, detail: details.salesVolume.detail },
-        storeCount: { value: relativeStoreCount, detail: details.storeCount.detail },
+        salesVolume: { value: relativeSalesVolume, detail: details?.salesVolume?.detail || 0 },
+        storeCount: { value: relativeStoreCount, detail: details?.storeCount?.detail || 0 },
         inventoryScore: { value: currentInventoryScore, detail: currentInventoryScore } // 잔여재고 점수만 표시
       }
     };

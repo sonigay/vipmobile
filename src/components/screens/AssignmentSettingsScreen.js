@@ -110,7 +110,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [showSharedSettingsDialog, setShowSharedSettingsDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [expandedColors, setExpandedColors] = useState({}); // 색상별 접기/펼치기 상태
-  const [expandedLogicDetails, setExpandedLogicDetails] = useState({}); // 배정 로직 세부사항 접기/펼치기 상태
+  const [expandedLogicDetails, setExpandedLogicDetails] = useState({});
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
 
   // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
@@ -532,7 +534,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgress(90);
       setProgressMessage('결과를 정리하는 중...');
       
+      console.log('=== setPreviewData 호출 전 ===');
+      console.log('설정할 preview 데이터:', preview);
+      console.log('preview 데이터 구조:', {
+        agentsCount: Object.keys(preview.agents || {}).length,
+        officesCount: Object.keys(preview.offices || {}).length,
+        departmentsCount: Object.keys(preview.departments || {}).length,
+        modelsCount: Object.keys(preview.models || {}).length
+      });
+      
       setPreviewData(preview);
+      
+      console.log('=== setPreviewData 호출 후 ===');
       
       // 미리보기에서는 알림을 전송하지 않음 (실제 배정 확정 시에만 전송)
       
@@ -559,8 +572,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       setProgressMessage(`배정 계산 중 오류가 발생했습니다: ${error.message}`);
       
-      // 사용자에게 더 자세한 에러 정보 제공
-      alert(`배정 계산 중 오류가 발생했습니다:\n\n${error.message}\n\n자세한 내용은 개발자 도구 콘솔을 확인해주세요.`);
+      // 사용자에게 더 자세한 에러 정보 제공 (복사 가능한 형태)
+      const errorDetails = `배정 계산 중 오류가 발생했습니다:
+
+에러 메시지: ${error.message}
+에러 이름: ${error.name}
+에러 스택: ${error.stack}
+
+자세한 내용은 개발자 도구 콘솔을 확인해주세요.`;
+
+      // 복사 가능한 에러 다이얼로그 표시
+      setErrorDetails(errorDetails);
+      setShowErrorDialog(true);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -1736,6 +1759,32 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     }
   };
 
+  // previewData 상태 변경 추적
+  useEffect(() => {
+    console.log('=== previewData 상태 변경 ===');
+    console.log('previewData:', previewData);
+    console.log('previewData 타입:', typeof previewData);
+    console.log('previewData가 null인가?', previewData === null);
+    console.log('previewData가 undefined인가?', previewData === undefined);
+    
+    if (previewData) {
+      console.log('previewData 구조:', {
+        agentsCount: Object.keys(previewData.agents || {}).length,
+        officesCount: Object.keys(previewData.offices || {}).length,
+        departmentsCount: Object.keys(previewData.departments || {}).length,
+        modelsCount: Object.keys(previewData.models || {}).length
+      });
+      console.log('previewData 상세:', JSON.stringify(previewData, null, 2));
+    }
+  }, [previewData]);
+
+  // activeTab 상태 변경 추적
+  useEffect(() => {
+    console.log('=== activeTab 상태 변경 ===');
+    console.log('현재 탭:', activeTab);
+    console.log('previewData 존재 여부:', !!previewData);
+  }, [activeTab, previewData]);
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 */}
@@ -2473,26 +2522,32 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         {/* 미리보기 탭 */}
         {activeTab === 1 && (
           <Box>
-            {!previewData ? (
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    배정 미리보기
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    배정 설정을 완료한 후 미리보기를 실행하세요.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={handlePreviewAssignment}
-                    startIcon={<PreviewIcon />}
-                    disabled={isLoadingPreview}
-                  >
-                    {isLoadingPreview ? '계산중...' : '배정 준비하기'}
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
+            {(() => {
+              console.log('=== 미리보기 탭 렌더링 ===');
+              console.log('previewData 상태:', previewData);
+              console.log('previewData가 falsy인가?', !previewData);
+              console.log('isLoadingPreview:', isLoadingPreview);
+              
+              return !previewData ? (
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      배정 미리보기
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      배정 설정을 완료한 후 미리보기를 실행하세요.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      onClick={handlePreviewAssignment}
+                      startIcon={<PreviewIcon />}
+                      disabled={isLoadingPreview}
+                    >
+                      {isLoadingPreview ? '계산중...' : '배정 준비하기'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
               <Box>
                 {/* 배정 비율 설명 */}
                 <Accordion sx={{ mb: 3 }}>
@@ -3374,6 +3429,63 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           />
         )}
       </Box>
+
+      {/* 에러 다이얼로그 */}
+      <Dialog open={showErrorDialog} onClose={() => setShowErrorDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" color="error">
+              🚨 배정 계산 중 오류가 발생했습니다
+            </Typography>
+            <IconButton onClick={() => setShowErrorDialog(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              에러 내용을 복사하여 개발팀에 전달해주세요.
+            </Typography>
+          </Box>
+          <TextField
+            fullWidth
+            multiline
+            rows={10}
+            value={errorDetails}
+            variant="outlined"
+            InputProps={{
+              readOnly: true,
+              style: { fontFamily: 'monospace', fontSize: '0.875rem' }
+            }}
+            sx={{ mb: 2 }}
+          />
+          <Box display="flex" justifyContent="flex-end" gap={1}>
+            <Button
+              variant="contained"
+              onClick={() => {
+                navigator.clipboard.writeText(errorDetails).then(() => {
+                  alert('에러 내용이 클립보드에 복사되었습니다.');
+                }).catch(() => {
+                  // 폴백: 텍스트 선택 후 복사
+                  const textArea = document.createElement('textarea');
+                  textArea.value = errorDetails;
+                  document.body.appendChild(textArea);
+                  textArea.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(textArea);
+                  alert('에러 내용이 클립보드에 복사되었습니다.');
+                });
+              }}
+            >
+              에러 내용 복사
+            </Button>
+            <Button onClick={() => setShowErrorDialog(false)}>
+              닫기
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {/* 모델 추가 다이얼로그 */}
       <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="lg" fullWidth>
