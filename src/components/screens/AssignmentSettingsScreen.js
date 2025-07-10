@@ -2771,7 +2771,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">
-                            사무실별 모델/색상 배정 현황
+                            사무실별 모델/색상 배정 현황 (전체 {Object.keys(previewData.offices).length}개 사무실)
                           </Typography>
                           <Button
                             variant="outlined"
@@ -2820,38 +2820,80 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center" rowSpan={2}>
                                   모델/색상
                                 </TableCell>
-                                {/* 사무실별 헤더 */}
-                                {Object.entries(previewData.offices)
-                                  .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
-                                  .map(([officeName, officeData]) => (
-                                    <TableCell key={officeName} align="center" colSpan={1} sx={{ 
-                                      fontWeight: 'bold',
-                                      fontSize: '0.75rem',
-                                      backgroundColor: '#f5f5f5',
-                                      borderRight: '2px solid #ddd'
-                                    }}>
-                                      <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
-                                        {officeName}
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: 'text.secondary' }}>
-                                        {officeData.agentCount}명
-                                      </div>
-                                    </TableCell>
-                                  ))}
+                                <TableCell align="center" rowSpan={2}>
+                                  색상
+                                </TableCell>
+                                {/* 사무실별 헤더 - 그룹화 */}
+                                {(() => {
+                                  // 사무실별로 그룹화
+                                  const groupedOffices = {};
+                                  Object.entries(previewData.offices).forEach(([officeName, officeData]) => {
+                                    if (!groupedOffices[officeName]) {
+                                      groupedOffices[officeName] = {
+                                        office: officeName,
+                                        agents: officeData.agents || []
+                                      };
+                                    }
+                                  });
+                                  
+                                  return Object.entries(groupedOffices)
+                                    .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
+                                    .map(([officeName, officeData]) => (
+                                      <TableCell key={officeName} align="center" colSpan={officeData.agents.length || 1} sx={{ 
+                                        fontWeight: 'bold',
+                                        fontSize: '0.75rem',
+                                        backgroundColor: '#f5f5f5',
+                                        borderRight: '2px solid #ddd'
+                                      }}>
+                                        <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
+                                          {officeName}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                          {officeData.agents.length}명
+                                        </div>
+                                      </TableCell>
+                                    ));
+                                })()}
                               </TableRow>
                               <TableRow>
-                                {/* 사무실별 개별 헤더 */}
-                                {Object.entries(previewData.offices)
-                                  .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
-                                  .map(([officeName, officeData]) => (
-                                    <TableCell key={officeName} align="center" sx={{ 
-                                      fontWeight: 'bold',
-                                      fontSize: '0.75rem',
-                                      backgroundColor: '#fafafa'
-                                    }}>
-                                      배정량
-                                    </TableCell>
-                                  ))}
+                                {/* 사무실별 개별 영업사원 헤더 */}
+                                {(() => {
+                                  const groupedOffices = {};
+                                  Object.entries(previewData.offices).forEach(([officeName, officeData]) => {
+                                    if (!groupedOffices[officeName]) {
+                                      groupedOffices[officeName] = {
+                                        office: officeName,
+                                        agents: officeData.agents || []
+                                      };
+                                    }
+                                  });
+                                  
+                                  return Object.entries(groupedOffices)
+                                    .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
+                                    .flatMap(([officeName, officeData]) => 
+                                      officeData.agents.length > 0 
+                                        ? officeData.agents.map(agent => (
+                                            <TableCell key={`${officeName}-${agent.contactId}`} align="center" sx={{ 
+                                              fontWeight: 'bold',
+                                              fontSize: '0.7rem',
+                                              backgroundColor: '#fafafa',
+                                              borderRight: officeData.agents.indexOf(agent) === officeData.agents.length - 1 ? '2px solid #ddd' : '1px solid #ddd'
+                                            }}>
+                                              {agent.target}
+                                            </TableCell>
+                                          ))
+                                        : [(
+                                            <TableCell key={officeName} align="center" sx={{ 
+                                              fontWeight: 'bold',
+                                              fontSize: '0.7rem',
+                                              backgroundColor: '#fafafa',
+                                              borderRight: '2px solid #ddd'
+                                            }}>
+                                              -
+                                            </TableCell>
+                                          )]
+                                    );
+                                })()}
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -2859,6 +2901,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 modelData.colors.map((color, colorIndex) => {
                                   const colorKey = `${modelName}-${color.name}`;
                                   const isExpanded = expandedColors[colorKey] !== false;
+                                  
                                   return (
                                     <React.Fragment key={colorKey}>
                                       <TableRow>
@@ -2889,29 +2932,54 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           }}>{color.name}</span>
                                           <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
                                         </TableCell>
-                                        {isExpanded && Object.entries(previewData.offices)
-                                          .sort(([officeNameA], [officeNameB]) => officeNameA.localeCompare(officeNameB))
-                                          .map(([officeName, officeData]) => {
-                                            let officeQuantity = 0;
-                                            officeData.agents.forEach(agent => {
-                                              const agentAssignments = previewData.agents[agent.contactId];
-                                              if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
-                                                officeQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
-                                              }
-                                            });
-                                            return (
-                                              <TableCell key={`${officeName}-${modelName}-${color.name}`} align="center" sx={{
-                                                backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
-                                                fontWeight: officeQuantity > 0 ? 'bold' : 'normal',
-                                                color: officeQuantity > 0 ? 'primary.main' : 'text.secondary',
-                                                borderRight: '2px solid #ddd'
-                                              }}>
-                                                <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                                  {officeQuantity > 0 ? `${officeQuantity}개` : '-'}
-                                                </div>
-                                              </TableCell>
+                                        {isExpanded && (() => {
+                                          const groupedOffices = {};
+                                          Object.entries(previewData.offices).forEach(([officeName, officeData]) => {
+                                            if (!groupedOffices[officeName]) {
+                                              groupedOffices[officeName] = {
+                                                office: officeName,
+                                                agents: officeData.agents || []
+                                              };
+                                            }
+                                          });
+                                          
+                                          return Object.entries(groupedOffices)
+                                            .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
+                                            .flatMap(([officeName, officeData]) => 
+                                              officeData.agents.length > 0 
+                                                ? officeData.agents.map(agent => {
+                                                    const agentAssignments = previewData.agents[agent.contactId];
+                                                    const assignedQuantity = agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities 
+                                                      ? agentAssignments[modelName].colorQuantities[color.name] || 0 
+                                                      : 0;
+                                                    const colorScores = agentAssignments?.[modelName]?.colorScores?.[color.name]?.details;
+                                                    
+                                                    return (
+                                                      <TableCell key={`${officeName}-${agent.contactId}-${modelName}-${color.name}`} align="center" sx={{ 
+                                                        backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                                        fontWeight: assignedQuantity > 0 ? 'bold' : 'normal',
+                                                        color: assignedQuantity > 0 ? 'primary.main' : 'text.secondary',
+                                                        borderRight: officeData.agents.indexOf(agent) === officeData.agents.length - 1 ? '2px solid #ddd' : '1px solid #ddd'
+                                                      }}>
+                                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                                          {assignedQuantity > 0 ? `${assignedQuantity}개` : '-'}
+                                                        </div>
+                                                        {assignedQuantity > 0 && colorScores && isExpanded && (
+                                                          <ScoreDisplay scores={colorScores} modelName={modelName} colorName={color.name} />
+                                                        )}
+                                                      </TableCell>
+                                                    );
+                                                  })
+                                                : [(
+                                                    <TableCell key={`${officeName}-${modelName}-${color.name}`} align="center" sx={{ 
+                                                      backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                                      borderRight: '2px solid #ddd'
+                                                    }}>
+                                                      -
+                                                    </TableCell>
+                                                  )]
                                             );
-                                          })}
+                                        })()}
                                         {isExpanded && (
                                           <TableCell align="center">
                                             <button
@@ -2928,7 +2996,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                       </TableRow>
                                       {isExpanded && expandedLogicDetails[colorKey] && (
                                         <TableRow>
-                                          <TableCell colSpan={2 + Object.keys(previewData.offices).length} style={{ background: '#f5faff', fontSize: '0.9em' }}>
+                                          <TableCell colSpan={2 + (() => {
+                                            const groupedOffices = {};
+                                            Object.entries(previewData.offices).forEach(([officeName, officeData]) => {
+                                              if (!groupedOffices[officeName]) {
+                                                groupedOffices[officeName] = {
+                                                  office: officeName,
+                                                  agents: officeData.agents || []
+                                                };
+                                              }
+                                            });
+                                            return Object.values(groupedOffices).reduce((sum, officeData) => sum + (officeData.agents.length || 1), 0);
+                                          })()} style={{ background: '#f5faff', fontSize: '0.9em' }}>
                                             <ScoreDisplay
                                               scores={Object.values(previewData.agents)[0]?.[modelName]?.colorScores?.[color.name]?.details || {}}
                                               modelName={modelName}
@@ -2948,9 +3027,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         {/* 테이블 설명 */}
                         <Box sx={{ mt: 1 }}>
                           <Typography variant="caption" color="text.secondary">
-                            • 각 셀은 해당 사무실이 배정받은 모델/색상별 수량을 표시합니다.<br/>
+                            • 각 셀은 해당 영업사원이 배정받은 모델/색상별 수량을 표시합니다.<br/>
                             • '-' 표시는 해당 모델/색상에 배정되지 않았음을 의미합니다.<br/>
-                            • 색상별 배정량은 영업사원별 배정량을 균등 분배하여 계산됩니다.
+                            • 사무실별로 그룹화되어 있으며, 각 영업사원의 배정량을 개별적으로 확인할 수 있습니다.
                           </Typography>
                         </Box>
                       </Box>
@@ -3278,7 +3357,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">
-                            소속별 모델/색상 배정 현황
+                            소속별 모델/색상 배정 현황 (전체 {Object.keys(previewData.departments).length}개 소속)
                           </Typography>
                           <Button
                             variant="outlined"
@@ -3327,131 +3406,206 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 <TableCell sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }} align="center" rowSpan={2}>
                                   모델/색상
                                 </TableCell>
-                                {/* 소속별 헤더 */}
-                                {Object.entries(previewData.departments)
-                                  .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
-                                  .map(([deptName, deptData]) => (
-                                    <TableCell key={deptName} align="center" colSpan={1} sx={{ 
-                                      fontWeight: 'bold',
-                                      fontSize: '0.75rem',
-                                      backgroundColor: '#f5f5f5',
-                                      borderRight: '2px solid #ddd'
-                                    }}>
-                                      <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
-                                        {deptName || '미지정'}
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: 'text.secondary' }}>
-                                        {deptData.agentCount}명
-                                      </div>
-                                    </TableCell>
-                                  ))}
+                                <TableCell align="center" rowSpan={2}>
+                                  색상
+                                </TableCell>
+                                {/* 소속별 헤더 - 그룹화 */}
+                                {(() => {
+                                  // 소속별로 그룹화
+                                  const groupedDepartments = {};
+                                  Object.entries(previewData.departments).forEach(([deptName, deptData]) => {
+                                    if (!groupedDepartments[deptName]) {
+                                      groupedDepartments[deptName] = {
+                                        department: deptName,
+                                        agents: deptData.agents || []
+                                      };
+                                    }
+                                  });
+                                  
+                                  return Object.entries(groupedDepartments)
+                                    .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
+                                    .map(([deptName, deptData]) => (
+                                      <TableCell key={deptName} align="center" colSpan={deptData.agents.length || 1} sx={{ 
+                                        fontWeight: 'bold',
+                                        fontSize: '0.75rem',
+                                        backgroundColor: '#f5f5f5',
+                                        borderRight: '2px solid #ddd'
+                                      }}>
+                                        <div style={{ fontWeight: 'bold', color: '#1976d2' }}>
+                                          {deptName || '미지정'}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                          {deptData.agents.length}명
+                                        </div>
+                                      </TableCell>
+                                    ));
+                                })()}
                               </TableRow>
                               <TableRow>
-                                {/* 소속별 개별 헤더 */}
-                                {Object.entries(previewData.departments)
-                                  .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
-                                  .map(([deptName, deptData]) => (
-                                    <TableCell key={deptName} align="center" sx={{ 
-                                      fontWeight: 'bold',
-                                      fontSize: '0.75rem',
-                                      backgroundColor: '#fafafa'
-                                    }}>
-                                      배정량
-                                    </TableCell>
-                                  ))}
+                                {/* 소속별 개별 영업사원 헤더 */}
+                                {(() => {
+                                  const groupedDepartments = {};
+                                  Object.entries(previewData.departments).forEach(([deptName, deptData]) => {
+                                    if (!groupedDepartments[deptName]) {
+                                      groupedDepartments[deptName] = {
+                                        department: deptName,
+                                        agents: deptData.agents || []
+                                      };
+                                    }
+                                  });
+                                  
+                                  return Object.entries(groupedDepartments)
+                                    .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
+                                    .flatMap(([deptName, deptData]) => 
+                                      deptData.agents.length > 0 
+                                        ? deptData.agents.map(agent => (
+                                            <TableCell key={`${deptName}-${agent.contactId}`} align="center" sx={{ 
+                                              fontWeight: 'bold',
+                                              fontSize: '0.7rem',
+                                              backgroundColor: '#fafafa',
+                                              borderRight: deptData.agents.indexOf(agent) === deptData.agents.length - 1 ? '2px solid #ddd' : '1px solid #ddd'
+                                            }}>
+                                              {agent.target}
+                                            </TableCell>
+                                          ))
+                                        : [(
+                                            <TableCell key={deptName} align="center" sx={{ 
+                                              fontWeight: 'bold',
+                                              fontSize: '0.7rem',
+                                              backgroundColor: '#fafafa',
+                                              borderRight: '2px solid #ddd'
+                                            }}>
+                                              -
+                                            </TableCell>
+                                          )]
+                                    );
+                                })()}
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {/* 모델별 행 */}
-                              {Object.entries(previewData.models).map(([modelName, modelData], modelIndex) => {
-                                // 해당 모델의 총 배정량 계산
-                                const totalModelQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                  const modelAssignment = agentData[modelName];
-                                  if (modelAssignment && modelAssignment.colorQuantities) {
-                                    return sum + Object.values(modelAssignment.colorQuantities).reduce((colorSum, qty) => colorSum + qty, 0);
-                                  }
-                                  return sum;
-                                }, 0);
-                                
-                                return modelData.colors.map((color, colorIndex) => {
-                                  // 해당 모델/색상의 총 배정량 계산
-                                  const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                                    const modelAssignment = agentData[modelName];
-                                    if (modelAssignment && modelAssignment.colorQuantities) {
-                                      return sum + (modelAssignment.colorQuantities[color.name] || 0);
-                                    }
-                                    return sum;
-                                  }, 0);
+                              {Object.entries(previewData.models).map(([modelName, modelData], modelIndex) =>
+                                modelData.colors.map((color, colorIndex) => {
+                                  const colorKey = `${modelName}-${color.name}`;
+                                  const isExpanded = expandedColors[colorKey] !== false;
                                   
                                   return (
-                                    <TableRow key={`${modelName}-${color.name}`}>
-                                      {colorIndex === 0 && (
-                                        <TableCell
-                                          sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
-                                          align="center"
-                                          rowSpan={modelData.colors.length}
-                                        >
-                                          <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1976d2', marginBottom: '8px' }}>
-                                            {modelName}
-                                          </div>
-                                          <div style={{ fontSize: '0.8rem', color: '#888' }}>
-                                            {modelData.colors.length}개 색상
-                                          </div>
-                                        </TableCell>
-                                      )}
-                                      <TableCell align="center">
-                                        <span style={{
-                                          display: 'inline-block',
-                                          padding: '2px 10px',
-                                          borderRadius: '12px',
-                                          background: '#f0f4ff',
-                                          color: '#1976d2',
-                                          fontWeight: 600,
-                                          fontSize: '0.95rem',
-                                          marginRight: 4
-                                        }}>{color.name}</span>
-                                      </TableCell>
-                                      <TableCell sx={{ position: 'sticky', left: 200, backgroundColor: 'background.paper', zIndex: 1 }} align="center">
-                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                          {totalQuantity}개
-                                        </div>
+                                    <React.Fragment key={colorKey}>
+                                      <TableRow>
                                         {colorIndex === 0 && (
-                                          <div style={{ fontSize: '0.7rem', color: 'text.secondary', marginTop: '2px' }}>
-                                            모델 총 {totalModelQuantity}개
-                                          </div>
+                                          <TableCell
+                                            sx={{ position: 'sticky', left: 0, backgroundColor: 'background.paper', zIndex: 1 }}
+                                            align="center"
+                                            rowSpan={modelData.colors.length}
+                                          >
+                                            <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#1976d2', marginBottom: '8px' }}>
+                                              {modelName}
+                                            </div>
+                                            <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                                              {modelData.colors.length}개 색상
+                                            </div>
+                                          </TableCell>
                                         )}
-                                      </TableCell>
-                                      {/* 소속별 배정량 */}
-                                      {Object.entries(previewData.departments)
-                                        .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
-                                        .map(([deptName, deptData]) => {
-                                          // 해당 소속의 모델/색상별 배정량 계산
-                                          let deptQuantity = 0;
-                                          
-                                          deptData.agents.forEach(agent => {
-                                            const agentAssignments = previewData.agents[agent.contactId];
-                                            if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
-                                              deptQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
+                                        <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !isExpanded }))}>
+                                          <span style={{
+                                            display: 'inline-block',
+                                            padding: '2px 10px',
+                                            borderRadius: '12px',
+                                            background: '#f0f4ff',
+                                            color: '#1976d2',
+                                            fontWeight: 600,
+                                            fontSize: '0.95rem',
+                                            marginRight: 4
+                                          }}>{color.name}</span>
+                                          <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
+                                        </TableCell>
+                                        {isExpanded && (() => {
+                                          const groupedDepartments = {};
+                                          Object.entries(previewData.departments).forEach(([deptName, deptData]) => {
+                                            if (!groupedDepartments[deptName]) {
+                                              groupedDepartments[deptName] = {
+                                                department: deptName,
+                                                agents: deptData.agents || []
+                                              };
                                             }
                                           });
                                           
-                                          return (
-                                            <TableCell key={`${deptName}-${modelName}-${color.name}`} align="center" sx={{ 
-                                              backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
-                                              fontWeight: deptQuantity > 0 ? 'bold' : 'normal',
-                                              color: deptQuantity > 0 ? 'primary.main' : 'text.secondary',
-                                              borderRight: '2px solid #ddd'
-                                            }}>
-                                              <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                                {deptQuantity > 0 ? `${deptQuantity}개` : '-'}
-                                              </div>
-                                            </TableCell>
-                                          );
-                                        })}
-                                    </TableRow>
+                                          return Object.entries(groupedDepartments)
+                                            .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
+                                            .flatMap(([deptName, deptData]) => 
+                                              deptData.agents.length > 0 
+                                                ? deptData.agents.map(agent => {
+                                                    const agentAssignments = previewData.agents[agent.contactId];
+                                                    const assignedQuantity = agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities 
+                                                      ? agentAssignments[modelName].colorQuantities[color.name] || 0 
+                                                      : 0;
+                                                    const colorScores = agentAssignments?.[modelName]?.colorScores?.[color.name]?.details;
+                                                    
+                                                    return (
+                                                      <TableCell key={`${deptName}-${agent.contactId}-${modelName}-${color.name}`} align="center" sx={{ 
+                                                        backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                                        fontWeight: assignedQuantity > 0 ? 'bold' : 'normal',
+                                                        color: assignedQuantity > 0 ? 'primary.main' : 'text.secondary',
+                                                        borderRight: deptData.agents.indexOf(agent) === deptData.agents.length - 1 ? '2px solid #ddd' : '1px solid #ddd'
+                                                      }}>
+                                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                                          {assignedQuantity > 0 ? `${assignedQuantity}개` : '-'}
+                                                        </div>
+                                                        {assignedQuantity > 0 && colorScores && isExpanded && (
+                                                          <ScoreDisplay scores={colorScores} modelName={modelName} colorName={color.name} />
+                                                        )}
+                                                      </TableCell>
+                                                    );
+                                                  })
+                                                : [(
+                                                    <TableCell key={`${deptName}-${modelName}-${color.name}`} align="center" sx={{ 
+                                                      backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100',
+                                                      borderRight: '2px solid #ddd'
+                                                    }}>
+                                                      -
+                                                    </TableCell>
+                                                  )]
+                                            );
+                                        })()}
+                                        {isExpanded && (
+                                          <TableCell align="center">
+                                            <button
+                                              style={{ fontSize: '0.8em', padding: '2px 8px', borderRadius: 6, border: '1px solid #bbb', background: '#f9f9f9', cursor: 'pointer' }}
+                                              onClick={e => {
+                                                e.stopPropagation();
+                                                setExpandedLogicDetails(prev => ({ ...prev, [colorKey]: !prev[colorKey] }));
+                                              }}
+                                            >
+                                              {expandedLogicDetails[colorKey] ? '세부사항 닫기' : '배정로직 세부'}
+                                            </button>
+                                          </TableCell>
+                                        )}
+                                      </TableRow>
+                                      {isExpanded && expandedLogicDetails[colorKey] && (
+                                        <TableRow>
+                                          <TableCell colSpan={2 + (() => {
+                                            const groupedDepartments = {};
+                                            Object.entries(previewData.departments).forEach(([deptName, deptData]) => {
+                                              if (!groupedDepartments[deptName]) {
+                                                groupedDepartments[deptName] = {
+                                                  department: deptName,
+                                                  agents: deptData.agents || []
+                                                };
+                                              }
+                                            });
+                                            return Object.values(groupedDepartments).reduce((sum, deptData) => sum + (deptData.agents.length || 1), 0);
+                                          })()} style={{ background: '#f5faff', fontSize: '0.9em' }}>
+                                            <ScoreDisplay
+                                              scores={Object.values(previewData.agents)[0]?.[modelName]?.colorScores?.[color.name]?.details || {}}
+                                              modelName={modelName}
+                                              colorName={color.name}
+                                            />
+                                          </TableCell>
+                                        </TableRow>
+                                      )}
+                                    </React.Fragment>
                                   );
-                                });
-                              })}
+                                })
+                              )}
                             </TableBody>
                           </Table>
                         </TableContainer>
@@ -3459,9 +3613,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         {/* 테이블 설명 */}
                         <Box sx={{ mt: 1 }}>
                           <Typography variant="caption" color="text.secondary">
-                            • 각 셀은 해당 소속이 배정받은 모델/색상별 수량을 표시합니다.<br/>
+                            • 각 셀은 해당 영업사원이 배정받은 모델/색상별 수량을 표시합니다.<br/>
                             • '-' 표시는 해당 모델/색상에 배정되지 않았음을 의미합니다.<br/>
-                            • 색상별 배정량은 영업사원별 배정량을 균등 분배하여 계산됩니다.
+                            • 소속별로 그룹화되어 있으며, 각 영업사원의 배정량을 개별적으로 확인할 수 있습니다.
                           </Typography>
                         </Box>
                       </Box>
