@@ -869,7 +869,8 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
         ...details,
         salesVolume: { value: relativeSalesVolume, detail: details.salesVolume.detail },
         storeCount: { value: relativeStoreCount, detail: details.storeCount.detail },
-        remainingInventory: { value: relativeInventoryScore, detail: details.remainingInventory.detail }
+        remainingInventory: { value: relativeInventoryScore, detail: details.remainingInventory.detail },
+        inventoryScore: { value: currentInventoryScore, detail: currentInventoryScore } // 원본 inventoryScore 값 추가
       }
     };
   });

@@ -1207,6 +1207,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       case 'storeCount': return { emoji: '🏪', color: '#2196f3', name: '거래처수' };
       case 'remainingInventory': return { emoji: '📦', color: '#ff9800', name: '잔여재고' };
       case 'salesVolume': return { emoji: '📈', color: '#f44336', name: '판매량' };
+      case 'inventoryScore': return { emoji: '📦', color: '#ff9800', name: '잔여재고점수' };
       default: return { emoji: '❓', color: '#9e9e9e', name: '기타' };
     }
   };
@@ -1227,6 +1228,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       storeCount: v => `거래처수: ${v !== undefined ? v : '-'}`,
       remainingInventory: v => `잔여재고: ${v !== undefined ? v : '-'}`,
       salesVolume: v => `판매량: ${v !== undefined ? v : '-'}`,
+      inventoryScore: v => `잔여재고점수: ${v !== undefined ? v : '-'}`,
     };
     
     return (
