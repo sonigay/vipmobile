@@ -1731,15 +1731,27 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         });
       });
       
-      const agentHeaders = Object.values(groupedAgents).map(group => {
+      // 영업사원별 헤더 생성 - 사무실/소속이 같은 경우에만 병합
+      const agentHeaders = [];
+      Object.values(groupedAgents).forEach(group => {
         const isOfficeSameAsDept = group.office === group.department;
-        const headerText = isOfficeSameAsDept ? 
-          `${group.office}<br/><strong>${group.agents.map(({ agent }) => agent?.target || '미지정').join('<br/>')}</strong>` :
-          `${group.office}<br/>${group.department}<br/><strong>${group.agents.map(({ agent }) => agent?.target || '미지정').join('<br/>')}</strong>`;
         
-        const colspan = group.agents.length;
-        return `<th colspan="${colspan}">${headerText}</th>`;
-      }).join('');
+        if (isOfficeSameAsDept) {
+          // 사무실과 소속이 같은 경우: 사무실명만 표시하고 영업사원들은 개별 헤더로
+          agentHeaders.push(`<th colspan="${group.agents.length}">${group.office}</th>`);
+        } else {
+          // 사무실과 소속이 다른 경우: 사무실명과 소속명을 병합하여 표시하고 영업사원들은 개별 헤더로
+          agentHeaders.push(`<th colspan="${group.agents.length}">${group.office}<br/>${group.department}</th>`);
+        }
+      });
+      
+      // 영업사원별 개별 헤더 행 추가
+      const agentIndividualHeaders = [];
+      Object.values(groupedAgents).forEach(group => {
+        group.agents.forEach(({ agent }) => {
+          agentIndividualHeaders.push(`<th>${agent?.target || '미지정'}</th>`);
+        });
+      });
       
       printContent = header + `
         <div class="summary">
@@ -1747,11 +1759,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           <table>
             <thead>
               <tr>
-                <th>모델명</th>
-                <th>색상</th>
-                <th>총 배정량</th>
-                <th>평균 배정점수</th>
-                ${agentHeaders}
+                <th rowspan="2">모델명</th>
+                <th rowspan="2">색상</th>
+                <th rowspan="2">총 배정량</th>
+                <th rowspan="2">평균 배정점수</th>
+                ${agentHeaders.join('')}
+              </tr>
+              <tr>
+                ${agentIndividualHeaders.join('')}
               </tr>
             </thead>
             <tbody>
@@ -2962,11 +2977,30 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 </TableCell>
                                 {Object.entries(previewData.offices)
                                   .sort(([a], [b]) => a.localeCompare(b))
-                                  .map(([officeName]) => (
-                                    <TableCell key={officeName} align="center" sx={{ fontWeight: 'bold', fontSize: '0.75rem', backgroundColor: '#f5f5f5', borderRight: '2px solid #ddd' }}>
-                                      <div style={{ fontWeight: 'bold', color: '#1976d2' }}>{officeName}</div>
-                                    </TableCell>
-                                  ))}
+                                  .map(([officeName, officeData]) => {
+                                    // 각 사무실의 총 배정량 계산
+                                    const officeTotalQuantity = officeData.agents.reduce((sum, agent) => {
+                                      const agentAssignments = previewData.agents[agent.contactId];
+                                      if (agentAssignments) {
+                                        Object.values(previewData.models).forEach(modelData => {
+                                          modelData.colors.forEach(color => {
+                                            if (agentAssignments[modelData.name] && agentAssignments[modelData.name].colorQuantities) {
+                                              sum += agentAssignments[modelData.name].colorQuantities[color.name] || 0;
+                                            }
+                                          });
+                                        });
+                                      }
+                                      return sum;
+                                    }, 0);
+                                    
+                                    return (
+                                      <TableCell key={officeName} align="center" sx={{ fontWeight: 'bold', fontSize: '0.75rem', backgroundColor: '#f5f5f5', borderRight: '2px solid #ddd' }}>
+                                        <div style={{ fontWeight: 'bold', color: '#1976d2' }}>{officeName}</div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666' }}>{officeData.agentCount}명</div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d32f2f' }}>총 {officeTotalQuantity}대</div>
+                                      </TableCell>
+                                    );
+                                  })}
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -3484,11 +3518,30 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                 </TableCell>
                                 {Object.entries(previewData.departments)
                                   .sort(([a], [b]) => a.localeCompare(b))
-                                  .map(([deptName]) => (
-                                    <TableCell key={deptName} align="center" sx={{ fontWeight: 'bold', fontSize: '0.75rem', backgroundColor: '#f5f5f5', borderRight: '2px solid #ddd' }}>
-                                      <div style={{ fontWeight: 'bold', color: '#1976d2' }}>{deptName || '미지정'}</div>
-                                    </TableCell>
-                                  ))}
+                                  .map(([deptName, deptData]) => {
+                                    // 각 소속의 총 배정량 계산
+                                    const deptTotalQuantity = deptData.agents.reduce((sum, agent) => {
+                                      const agentAssignments = previewData.agents[agent.contactId];
+                                      if (agentAssignments) {
+                                        Object.values(previewData.models).forEach(modelData => {
+                                          modelData.colors.forEach(color => {
+                                            if (agentAssignments[modelData.name] && agentAssignments[modelData.name].colorQuantities) {
+                                              sum += agentAssignments[modelData.name].colorQuantities[color.name] || 0;
+                                            }
+                                          });
+                                        });
+                                      }
+                                      return sum;
+                                    }, 0);
+                                    
+                                    return (
+                                      <TableCell key={deptName} align="center" sx={{ fontWeight: 'bold', fontSize: '0.75rem', backgroundColor: '#f5f5f5', borderRight: '2px solid #ddd' }}>
+                                        <div style={{ fontWeight: 'bold', color: '#1976d2' }}>{deptName || '미지정'}</div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666' }}>{deptData.agentCount}명</div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d32f2f' }}>총 {deptTotalQuantity}대</div>
+                                      </TableCell>
+                                    );
+                                  })}
                               </TableRow>
                             </TableHead>
                             <TableBody>
