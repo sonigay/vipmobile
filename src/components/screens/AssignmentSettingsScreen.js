@@ -1748,8 +1748,18 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       // 영업사원별 개별 헤더 행 추가
       const agentIndividualHeaders = [];
       Object.values(groupedAgents).forEach(group => {
-        group.agents.forEach(({ agent }) => {
-          agentIndividualHeaders.push(`<th>${agent?.target || '미지정'}</th>`);
+        group.agents.forEach(({ agent, agentData }) => {
+          // 각 영업사원의 총 배정량 계산
+          const agentTotalQuantity = Object.values(previewData.models).reduce((sum, modelData) => {
+            modelData.colors.forEach(color => {
+              if (agentData[modelData.name] && agentData[modelData.name].colorQuantities) {
+                sum += agentData[modelData.name].colorQuantities[color.name] || 0;
+              }
+            });
+            return sum;
+          }, 0);
+          
+          agentIndividualHeaders.push(`<th>${agent?.target || '미지정'}<br/><strong>총 ${agentTotalQuantity}대</strong></th>`);
         });
       });
       
