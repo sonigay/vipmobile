@@ -1265,7 +1265,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       case 'turnoverRate': return { emoji: '🔄', color: '#4caf50', name: '회전율' };
       case 'storeCount': return { emoji: '🏪', color: '#2196f3', name: '거래처수' };
       case 'salesVolume': return { emoji: '📈', color: '#f44336', name: '판매량' };
-      case 'inventoryScore': return { emoji: '📦', color: '#ff9800', name: '잔여재고점수' };
+      case 'inventoryScore': return { emoji: '📦', color: '#ff9800', name: '잔여재고' };
+      case 'remainingInventory': return { emoji: '📦', color: '#ff9800', name: '잔여재고' };
       default: return { emoji: '❓', color: '#9e9e9e', name: '기타' };
     }
   };
