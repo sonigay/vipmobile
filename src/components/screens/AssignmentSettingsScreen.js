@@ -2894,19 +2894,60 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                         </TableCell>
                                       )}
                                       <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !prev[colorKey] }))}>
-                                         <span style={{
-                                           display: 'inline-block',
-                                           padding: '2px 10px',
-                                           borderRadius: '12px',
-                                           background: '#f0f4ff',
-                                           color: '#1976d2',
-                                           fontWeight: 600,
-                                           fontSize: '0.95rem',
-                                           marginRight: 4
-                                         }}>{color.name}</span>
-                                         <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{expandedColors[colorKey] === true ? '▲' : '▼'}</span>
-                                       </TableCell>
-                                       {Object.entries(previewData.offices)
+                                        {(() => {
+                                          // 해당 색상의 총 배정량 계산
+                                          const totalColorQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
+                                            const modelAssignment = agentData[modelName];
+                                            if (modelAssignment && modelAssignment.colorQuantities) {
+                                              return sum + (modelAssignment.colorQuantities[color.name] || 0);
+                                            }
+                                            return sum;
+                                          }, 0);
+                                          
+                                          return (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                              {/* 왼쪽: 총 배정량 */}
+                                              <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 0.5,
+                                                minWidth: '60px'
+                                              }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                                  {totalColorQuantity}개
+                                                </Typography>
+                                              </Box>
+                                              
+                                              {/* 중앙: 색상 이름 */}
+                                              <span style={{
+                                                display: 'inline-block',
+                                                padding: '2px 10px',
+                                                borderRadius: '12px',
+                                                background: '#f0f4ff',
+                                                color: '#1976d2',
+                                                fontWeight: 600,
+                                                fontSize: '0.95rem'
+                                              }}>{color.name}</span>
+                                              
+                                              {/* 오른쪽: 접기/펼치기 상태 */}
+                                              <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 0.5,
+                                                minWidth: '80px'
+                                              }}>
+                                                <span style={{ fontSize: '0.8em', color: '#888' }}>
+                                                  {expandedColors[colorKey] === true ? '▲' : '▼'}
+                                                </span>
+                                                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
+                                                  {expandedColors[colorKey] === true ? '상세닫기' : '상세열기'}
+                                                </Typography>
+                                              </Box>
+                                            </Box>
+                                          );
+                                        })()}
+                                      </TableCell>
+                                      {Object.entries(previewData.offices)
                                         .sort(([a], [b]) => a.localeCompare(b))
                                         .map(([officeName, officeData]) => {
                                           // 해당 사무실의 해당 모델/색상 총 배정량 계산
@@ -3153,17 +3194,58 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                         </TableCell>
                                       )}
                                       <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !isExpanded }))}>
-                                        <span style={{
-                                          display: 'inline-block',
-                                          padding: '2px 10px',
-                                          borderRadius: '12px',
-                                          background: '#f0f4ff',
-                                          color: '#1976d2',
-                                          fontWeight: 600,
-                                          fontSize: '0.95rem',
-                                          marginRight: 4
-                                        }}>{color.name}</span>
-                                        <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
+                                        {(() => {
+                                          // 해당 색상의 총 배정량 계산
+                                          const totalColorQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
+                                            const modelAssignment = agentData[modelName];
+                                            if (modelAssignment && modelAssignment.colorQuantities) {
+                                              return sum + (modelAssignment.colorQuantities[color.name] || 0);
+                                            }
+                                            return sum;
+                                          }, 0);
+                                          
+                                          return (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                              {/* 왼쪽: 총 배정량 */}
+                                              <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 0.5,
+                                                minWidth: '60px'
+                                              }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                                  {totalColorQuantity}개
+                                                </Typography>
+                                              </Box>
+                                              
+                                              {/* 중앙: 색상 이름 */}
+                                              <span style={{
+                                                display: 'inline-block',
+                                                padding: '2px 10px',
+                                                borderRadius: '12px',
+                                                background: '#f0f4ff',
+                                                color: '#1976d2',
+                                                fontWeight: 600,
+                                                fontSize: '0.95rem'
+                                              }}>{color.name}</span>
+                                              
+                                              {/* 오른쪽: 접기/펼치기 상태 */}
+                                              <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 0.5,
+                                                minWidth: '80px'
+                                              }}>
+                                                <span style={{ fontSize: '0.8em', color: '#888' }}>
+                                                  {isExpanded ? '▲' : '▼'}
+                                                </span>
+                                                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
+                                                  {isExpanded ? '상세닫기' : '상세열기'}
+                                                </Typography>
+                                              </Box>
+                                            </Box>
+                                          );
+                                        })()}
                                       </TableCell>
                                       
                                       {/* 영업사원별 배정량 */}
@@ -3334,18 +3416,59 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                         </TableCell>
                                       )}
                                       <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !prev[colorKey] }))}>
-                                         <span style={{
-                                           display: 'inline-block',
-                                           padding: '2px 10px',
-                                           borderRadius: '12px',
-                                           background: '#f0f4ff',
-                                           color: '#1976d2',
-                                           fontWeight: 600,
-                                           fontSize: '0.95rem',
-                                           marginRight: 4
-                                         }}>{color.name}</span>
-                                         <span style={{ marginLeft: 6, fontSize: '0.8em', color: '#888' }}>{expandedColors[colorKey] === true ? '▲' : '▼'}</span>
-                                       </TableCell>
+                                        {(() => {
+                                          // 해당 색상의 총 배정량 계산
+                                          const totalColorQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
+                                            const modelAssignment = agentData[modelName];
+                                            if (modelAssignment && modelAssignment.colorQuantities) {
+                                              return sum + (modelAssignment.colorQuantities[color.name] || 0);
+                                            }
+                                            return sum;
+                                          }, 0);
+                                          
+                                          return (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                              {/* 왼쪽: 총 배정량 */}
+                                              <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 0.5,
+                                                minWidth: '60px'
+                                              }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                                  {totalColorQuantity}개
+                                                </Typography>
+                                              </Box>
+                                              
+                                              {/* 중앙: 색상 이름 */}
+                                              <span style={{
+                                                display: 'inline-block',
+                                                padding: '2px 10px',
+                                                borderRadius: '12px',
+                                                background: '#f0f4ff',
+                                                color: '#1976d2',
+                                                fontWeight: 600,
+                                                fontSize: '0.95rem'
+                                              }}>{color.name}</span>
+                                              
+                                              {/* 오른쪽: 접기/펼치기 상태 */}
+                                              <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 0.5,
+                                                minWidth: '80px'
+                                              }}>
+                                                <span style={{ fontSize: '0.8em', color: '#888' }}>
+                                                  {expandedColors[colorKey] === true ? '▲' : '▼'}
+                                                </span>
+                                                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: '#666' }}>
+                                                  {expandedColors[colorKey] === true ? '상세닫기' : '상세열기'}
+                                                </Typography>
+                                              </Box>
+                                            </Box>
+                                          );
+                                        })()}
+                                      </TableCell>
                                        {Object.entries(previewData.departments)
                                         .sort(([a], [b]) => a.localeCompare(b))
                                         .map(([deptName, deptData]) => {
