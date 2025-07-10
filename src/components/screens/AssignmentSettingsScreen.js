@@ -2826,7 +2826,36 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Button>
                         </Box>
                         
-                        
+                        {/* 배정 로직 설명 */}
+                        <Box sx={{ mb: 2, p: 1, backgroundColor: '#fff3e0', borderRadius: 1, fontSize: '0.8rem' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                            배정 로직: 
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 0.5 }}>
+                            {Object.entries(assignmentSettings.ratios).map(([logicType, ratio]) => {
+                              const logic = getLogicEmoji(logicType);
+                              return (
+                                <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Box sx={{ 
+                                    width: 16, 
+                                    height: 16, 
+                                    borderRadius: '50%', 
+                                    backgroundColor: logic.color,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.7rem',
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    {logic.emoji}
+                                  </Box>
+                                  <span>{logic.name} {ratio}%</span>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        </Box>
                         
                         {/* 모델별 색상별 배정량 테이블 */}
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
@@ -3237,7 +3266,36 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Button>
                         </Box>
                         
-                        
+                        {/* 배정 로직 설명 */}
+                        <Box sx={{ mb: 2, p: 1, backgroundColor: '#fce4ec', borderRadius: 1, fontSize: '0.8rem' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                            배정 로직: 
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 0.5 }}>
+                            {Object.entries(assignmentSettings.ratios).map(([logicType, ratio]) => {
+                              const logic = getLogicEmoji(logicType);
+                              return (
+                                <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Box sx={{ 
+                                    width: 16, 
+                                    height: 16, 
+                                    borderRadius: '50%', 
+                                    backgroundColor: logic.color,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.7rem',
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    {logic.emoji}
+                                  </Box>
+                                  <span>{logic.name} {ratio}%</span>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        </Box>
                         
                         {/* 모델별 색상별 배정량 테이블 */}
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflow: 'auto' }}>
