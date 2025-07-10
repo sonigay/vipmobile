@@ -2527,27 +2527,28 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               console.log('previewData 상태:', previewData);
               console.log('previewData가 falsy인가?', !previewData);
               console.log('isLoadingPreview:', isLoadingPreview);
-              
-              return !previewData ? (
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      배정 미리보기
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      배정 설정을 완료한 후 미리보기를 실행하세요.
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      onClick={handlePreviewAssignment}
-                      startIcon={<PreviewIcon />}
-                      disabled={isLoadingPreview}
-                    >
-                      {isLoadingPreview ? '계산중...' : '배정 준비하기'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
+            })()}
+            
+            {!previewData ? (
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    배정 미리보기
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    배정 설정을 완료한 후 미리보기를 실행하세요.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={handlePreviewAssignment}
+                    startIcon={<PreviewIcon />}
+                    disabled={isLoadingPreview}
+                  >
+                    {isLoadingPreview ? '계산중...' : '배정 준비하기'}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
               <Box>
                 {/* 배정 비율 설명 */}
                 <Accordion sx={{ mb: 3 }}>
