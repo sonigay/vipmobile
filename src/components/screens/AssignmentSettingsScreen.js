@@ -1285,13 +1285,68 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       turnoverRate: v => `회전율: ${v !== undefined ? v + '%' : '-'}`,
       storeCount: v => `거래처수: ${v !== undefined ? v : '-'}`,
       salesVolume: v => `판매량: ${v !== undefined ? v : '-'}`,
-      inventoryScore: v => `잔여재고점수: ${v !== undefined ? v : '-'}`,
     };
+    
+    // 순서 정의: 회전율 → 거래처수 → 잔여보유량 → 판매량
+    const displayOrder = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+    
+    // 잔여보유량 값 추출
+    let remainingInventoryValue = null;
+    if (scores.remainingInventory) {
+      remainingInventoryValue = scores.remainingInventory.value || scores.remainingInventory.detail || scores.remainingInventory;
+      
+      // 객체인 경우 안전하게 처리
+      if (typeof remainingInventoryValue === 'object' && remainingInventoryValue !== null) {
+        remainingInventoryValue = remainingInventoryValue.value || remainingInventoryValue.detail || null;
+      }
+      
+      // 숫자가 아닌 경우 null로 처리
+      if (typeof remainingInventoryValue !== 'number') {
+        remainingInventoryValue = null;
+      }
+    }
     
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, fontSize: '0.7rem', mt: 0.5 }}>
-        {Object.entries(scores).map(([logicType, score]) => {
+        {displayOrder.map((logicType) => {
+          // inventoryScore는 건너뛰고 remainingInventory만 처리
+          if (logicType === 'inventoryScore') return null;
+          
           const logic = getLogicEmoji(logicType);
+          
+          // 잔여보유량인 경우 특별 처리
+          if (logicType === 'remainingInventory') {
+            if (remainingInventoryValue === null) return null;
+            
+            return (
+              <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ 
+                  width: 14, 
+                  height: 14, 
+                  borderRadius: '50%', 
+                  backgroundColor: '#ff9800',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.7rem',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}>
+                  📦
+                </Box>
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>
+                  {remainingInventoryValue}
+                </span>
+                <span style={{ fontSize: '0.65rem', color: '#888' }}>
+                  잔여보유량: {remainingInventoryValue}개
+                </span>
+              </Box>
+            );
+          }
+          
+          // 일반 점수 처리
+          const score = scores[logicType];
+          if (!score) return null;
           
           // 새로운 데이터 구조 처리 (value와 detail 분리)
           let displayValue = 0;
@@ -1315,67 +1370,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           
           // 디버깅: 각 로직별 처리 결과 확인
           console.log(`🎯 ${logicType}:`, { displayValue, detailText, originalScore: score });
-          
-          // 잔여재고 점수인 경우 추가 정보 표시
-          if (logicType === 'inventoryScore' && scores.remainingInventory) {
-            let remainingInventoryValue = scores.remainingInventory.value || scores.remainingInventory.detail || scores.remainingInventory;
-            
-            // 객체인 경우 안전하게 처리
-            if (typeof remainingInventoryValue === 'object' && remainingInventoryValue !== null) {
-              remainingInventoryValue = remainingInventoryValue.value || remainingInventoryValue.detail || '-';
-            }
-            
-            // 숫자가 아닌 경우 안전하게 처리
-            if (typeof remainingInventoryValue !== 'number') {
-              remainingInventoryValue = '-';
-            }
-            
-            return (
-              <Box key={logicType} sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
-                {/* 잔여재고 점수 */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Box sx={{ 
-                    width: 14, 
-                    height: 14, 
-                    borderRadius: '50%', 
-                    backgroundColor: logic.color,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.7rem',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }}>
-                    {logic.emoji}
-                  </Box>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, marginRight: 2 }}>
-                    {displayValue !== undefined ? Math.round(Number(displayValue)) : '-'}
-                  </span>
-                  <span style={{ fontSize: '0.65rem', color: '#888' }}>{detailText}</span>
-                </Box>
-                {/* 실제 잔여재고 수량 */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
-                  <Box sx={{ 
-                    width: 12, 
-                    height: 12, 
-                    borderRadius: '50%', 
-                    backgroundColor: '#ff9800',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.6rem',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }}>
-                    📦
-                  </Box>
-                  <span style={{ fontSize: '0.65rem', color: '#666' }}>
-                    잔여보유량: {remainingInventoryValue !== '-' ? `${remainingInventoryValue}개` : '-'}
-                  </span>
-                </Box>
-              </Box>
-            );
-          }
           
           return (
             <Box key={logicType} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
