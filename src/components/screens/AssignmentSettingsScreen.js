@@ -62,7 +62,8 @@ import {
   Help as HelpIcon,
   Share as ShareIcon,
   Download as DownloadIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { calculateFullAssignment, clearAssignmentCache, getSelectedTargets } from '../../utils/assignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
