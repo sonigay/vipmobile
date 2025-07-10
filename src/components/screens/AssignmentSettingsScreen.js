@@ -1548,14 +1548,67 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         </div>
       ` + footer;
     } else if (type === 'office') {
-      // 사무실별 배정 현황 인쇄
+      // 사무실별 배정 현황 인쇄 (행 병합 적용)
+      const officeRows = [];
+      
+      Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+        modelData.colors.forEach((color, colorIndex) => {
+          // 해당 모델/색상의 총 배정량 계산
+          const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
+            const modelAssignment = agentData[modelName];
+            if (modelAssignment && modelAssignment.colorQuantities) {
+              return sum + (modelAssignment.colorQuantities[color.name] || 0);
+            }
+            return sum;
+          }, 0);
+          
+          // 해당 모델/색상의 평균 배정량 계산
+          const avgQuantity = totalQuantity / Object.keys(previewData.offices).length;
+          
+          const isFirstColor = colorIndex === 0;
+          const rowspan = isFirstColor ? modelData.colors.length : 0;
+          
+          const modelCell = isFirstColor ? 
+            `<td rowspan="${rowspan}" style="vertical-align: middle;"><strong>${modelName}</strong></td>` : '';
+          
+          const officeCells = Object.entries(previewData.offices)
+            .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
+            .map(([officeName, officeData]) => {
+              // 해당 사무실의 모델/색상별 배정량 계산
+              let officeQuantity = 0;
+              
+              officeData.agents.forEach(agent => {
+                const agentAssignments = previewData.agents[agent.contactId];
+                if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
+                  officeQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
+                }
+              });
+              
+              return `<td style="background-color: ${colorIndex % 2 === 0 ? '#f5f5f5' : '#fafafa'}; font-weight: ${officeQuantity > 0 ? 'bold' : 'normal'}; color: ${officeQuantity > 0 ? '#1976d2' : '#666'};">
+                ${officeQuantity > 0 ? officeQuantity + '개' : '-'}
+              </td>`;
+            }).join('');
+          
+          officeRows.push(`
+            <tr>
+              ${modelCell}
+              <td><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
+              <td><strong>${totalQuantity}개</strong></td>
+              <td>${Math.round(avgQuantity)}개</td>
+              ${officeCells}
+            </tr>
+          `);
+        });
+      });
+      
       printContent = header + `
         <div class="summary">
           <h2>사무실별 배정 현황</h2>
           <table>
             <thead>
               <tr>
-                <th>모델/색상</th>
+                <th>모델명</th>
+                <th>색상</th>
                 <th>총 배정량</th>
                 <th>평균 배정량</th>
                 ${Object.entries(previewData.offices)
@@ -1564,150 +1617,194 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </tr>
             </thead>
             <tbody>
-              ${Object.entries(previewData.models).map(([modelName, modelData]) => 
-                modelData.colors.map((color, colorIndex) => {
-                  // 해당 모델/색상의 총 배정량 계산
-                  const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                    const modelAssignment = agentData[modelName];
-                    if (modelAssignment && modelAssignment.colorQuantities) {
-                      return sum + (modelAssignment.colorQuantities[color.name] || 0);
-                    }
-                    return sum;
-                  }, 0);
-                  
-                  // 해당 모델/색상의 평균 배정량 계산
-                  const avgQuantity = totalQuantity / Object.keys(previewData.offices).length;
-                  
-                  return `
-                    <tr>
-                      <td><strong>${modelName}</strong><br/><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
-                      <td><strong>${totalQuantity}개</strong></td>
-                      <td>${Math.round(avgQuantity)}개</td>
-                      ${Object.entries(previewData.offices)
-                        .sort(([officeNameA, a], [officeNameB, b]) => officeNameA.localeCompare(officeNameB))
-                        .map(([officeName, officeData]) => {
-                          // 해당 사무실의 모델/색상별 배정량 계산
-                          let officeQuantity = 0;
-                          
-                          officeData.agents.forEach(agent => {
-                            const agentAssignments = previewData.agents[agent.contactId];
-                            if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
-                              officeQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
-                            }
-                          });
-                          
-                          return `<td style="background-color: ${colorIndex % 2 === 0 ? '#f5f5f5' : '#fafafa'}; font-weight: ${officeQuantity > 0 ? 'bold' : 'normal'}; color: ${officeQuantity > 0 ? '#1976d2' : '#666'};">
-                            ${officeQuantity > 0 ? officeQuantity + '개' : '-'}
-                          </td>`;
-                        }).join('')}
-                    </tr>
-                  `;
-                }).join('')
-              ).join('')}
+              ${officeRows.join('')}
             </tbody>
           </table>
         </div>
       ` + footer;
     } else if (type === 'agent') {
-      // 영업사원별 배정 현황 인쇄
+      // 영업사원별 배정 현황 인쇄 (열 병합 + 행 병합 적용)
+      const agentRows = [];
+      
+      // 영업사원들을 사무실/소속별로 그룹화
+      const groupedAgents = {};
+      Object.entries(previewData.agents)
+        .sort(([agentIdA, a], [agentIdB, b]) => {
+          const agentA = agents.find(agent => agent.contactId === agentIdA);
+          const agentB = agents.find(agent => agent.contactId === agentIdB);
+          
+          const officeCompare = (agentA?.office || '').localeCompare(agentB?.office || '');
+          if (officeCompare !== 0) return officeCompare;
+          
+          const deptCompare = (agentA?.department || '').localeCompare(agentB?.department || '');
+          if (deptCompare !== 0) return deptCompare;
+          
+          return (agentA?.target || '').localeCompare(agentB?.target || '');
+        })
+        .forEach(([agentId, agentData]) => {
+          const agent = agents.find(a => a.contactId === agentId);
+          const office = agent?.office || '미지정';
+          const department = agent?.department || '미지정';
+          const key = `${office}|${department}`;
+          
+          if (!groupedAgents[key]) {
+            groupedAgents[key] = {
+              office,
+              department,
+              agents: []
+            };
+          }
+          groupedAgents[key].agents.push({ agentId, agentData, agent });
+        });
+      
+      Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+        modelData.colors.forEach((color, colorIndex) => {
+          // 해당 모델/색상의 총 배정량 계산
+          const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
+            const modelAssignment = agentData[modelName];
+            if (modelAssignment && modelAssignment.colorQuantities) {
+              return sum + (modelAssignment.colorQuantities[color.name] || 0);
+            }
+            return sum;
+          }, 0);
+          
+          // 해당 모델/색상의 평균 점수 계산
+          const scores = Object.values(previewData.agents).map(agentData => {
+            const modelAssignment = agentData[modelName];
+            if (modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]) {
+              return modelAssignment.colorScores[color.name].averageScore || 0;
+            }
+            return 0;
+          }).filter(score => score > 0);
+          
+          const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+          
+          const isFirstColor = colorIndex === 0;
+          const rowspan = isFirstColor ? modelData.colors.length : 0;
+          
+          const modelCell = isFirstColor ? 
+            `<td rowspan="${rowspan}" style="vertical-align: middle;"><strong>${modelName}</strong></td>` : '';
+          
+          const agentCells = Object.values(groupedAgents).map(group => {
+            const groupAgents = group.agents.map(({ agentId, agentData }) => {
+              const modelAssignment = agentData[modelName];
+              let assignedQuantity = 0;
+              
+              if (modelAssignment && modelAssignment.colorQuantities) {
+                assignedQuantity = modelAssignment.colorQuantities[color.name] || 0;
+              }
+              
+              return `<td style="background-color: ${colorIndex % 2 === 0 ? '#f5f5f5' : '#fafafa'}; font-weight: ${assignedQuantity > 0 ? 'bold' : 'normal'}; color: ${assignedQuantity > 0 ? '#1976d2' : '#666'};">
+                ${assignedQuantity > 0 ? assignedQuantity + '개' : '-'}
+              </td>`;
+            }).join('');
+            
+            return groupAgents;
+          }).join('');
+          
+          agentRows.push(`
+            <tr>
+              ${modelCell}
+              <td><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
+              <td><strong>${totalQuantity}개</strong></td>
+              <td>${Math.round(avgScore)}점</td>
+              ${agentCells}
+            </tr>
+          `);
+        });
+      });
+      
+      const agentHeaders = Object.values(groupedAgents).map(group => {
+        const isOfficeSameAsDept = group.office === group.department;
+        const headerText = isOfficeSameAsDept ? 
+          `${group.office}<br/><strong>${group.agents.map(({ agent }) => agent?.target || '미지정').join('<br/>')}</strong>` :
+          `${group.office}<br/>${group.department}<br/><strong>${group.agents.map(({ agent }) => agent?.target || '미지정').join('<br/>')}</strong>`;
+        
+        const colspan = group.agents.length;
+        return `<th colspan="${colspan}">${headerText}</th>`;
+      }).join('');
+      
       printContent = header + `
         <div class="summary">
           <h2>영업사원별 배정 현황 (전체 ${Object.keys(previewData.agents).length}명)</h2>
           <table>
             <thead>
               <tr>
-                <th>모델/색상</th>
+                <th>모델명</th>
+                <th>색상</th>
                 <th>총 배정량</th>
                 <th>평균 배정점수</th>
-                ${Object.entries(previewData.agents)
-                  .sort(([agentIdA, a], [agentIdB, b]) => {
-                    const agentA = agents.find(agent => agent.contactId === agentIdA);
-                    const agentB = agents.find(agent => agent.contactId === agentIdB);
-                    
-                    const officeCompare = (agentA?.office || '').localeCompare(agentB?.office || '');
-                    if (officeCompare !== 0) return officeCompare;
-                    
-                    const deptCompare = (agentA?.department || '').localeCompare(agentB?.department || '');
-                    if (deptCompare !== 0) return deptCompare;
-                    
-                    return (agentA?.target || '').localeCompare(agentB?.target || '');
-                  })
-                  .map(([agentId, agentData]) => {
-                    const agent = agents.find(a => a.contactId === agentId);
-                    return `<th>${agent?.office || '미지정'}<br/>${agent?.department || '미지정'}<br/><strong>${agent?.target || agentId}</strong></th>`;
-                  }).join('')}
+                ${agentHeaders}
               </tr>
             </thead>
             <tbody>
-              ${Object.entries(previewData.models).map(([modelName, modelData]) => 
-                modelData.colors.map((color, colorIndex) => {
-                  // 해당 모델/색상의 총 배정량 계산
-                  const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                    const modelAssignment = agentData[modelName];
-                    if (modelAssignment && modelAssignment.colorQuantities) {
-                      return sum + (modelAssignment.colorQuantities[color.name] || 0);
-                    }
-                    return sum;
-                  }, 0);
-                  
-                  // 해당 모델/색상의 평균 점수 계산
-                  const scores = Object.values(previewData.agents).map(agentData => {
-                    const modelAssignment = agentData[modelName];
-                    if (modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]) {
-                      return modelAssignment.colorScores[color.name].averageScore || 0;
-                    }
-                    return 0;
-                  }).filter(score => score > 0);
-                  
-                  const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
-                  
-                  return `
-                    <tr>
-                      <td><strong>${modelName}</strong><br/><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
-                      <td><strong>${totalQuantity}개</strong></td>
-                      <td>${Math.round(avgScore)}점</td>
-                      ${Object.entries(previewData.agents)
-                        .sort(([agentIdA, a], [agentIdB, b]) => {
-                          const agentA = agents.find(agent => agent.contactId === agentIdA);
-                          const agentB = agents.find(agent => agent.contactId === agentIdB);
-                          
-                          const officeCompare = (agentA?.office || '').localeCompare(agentB?.office || '');
-                          if (officeCompare !== 0) return officeCompare;
-                          
-                          const deptCompare = (agentA?.department || '').localeCompare(agentB?.department || '');
-                          if (deptCompare !== 0) return deptCompare;
-                          
-                          return (agentA?.target || '').localeCompare(agentB?.target || '');
-                        })
-                        .map(([agentId, agentData]) => {
-                          const modelAssignment = agentData[modelName];
-                          let assignedQuantity = 0;
-                          
-                          if (modelAssignment && modelAssignment.colorQuantities) {
-                            assignedQuantity = modelAssignment.colorQuantities[color.name] || 0;
-                          }
-                          
-                          return `<td style="background-color: ${colorIndex % 2 === 0 ? '#f5f5f5' : '#fafafa'}; font-weight: ${assignedQuantity > 0 ? 'bold' : 'normal'}; color: ${assignedQuantity > 0 ? '#1976d2' : '#666'};">
-                            ${assignedQuantity > 0 ? assignedQuantity + '개' : '-'}
-                          </td>`;
-                        }).join('')}
-                    </tr>
-                  `;
-                }).join('')
-              ).join('')}
+              ${agentRows.join('')}
             </tbody>
           </table>
         </div>
       ` + footer;
     } else if (type === 'department') {
-      // 소속별 배정 현황 인쇄
+      // 소속별 배정 현황 인쇄 (행 병합 적용)
+      const departmentRows = [];
+      
+      Object.entries(previewData.models).forEach(([modelName, modelData]) => {
+        modelData.colors.forEach((color, colorIndex) => {
+          // 해당 모델/색상의 총 배정량 계산
+          const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
+            const modelAssignment = agentData[modelName];
+            if (modelAssignment && modelAssignment.colorQuantities) {
+              return sum + (modelAssignment.colorQuantities[color.name] || 0);
+            }
+            return sum;
+          }, 0);
+          
+          // 해당 모델/색상의 평균 배정량 계산
+          const avgQuantity = totalQuantity / Object.keys(previewData.departments).length;
+          
+          const isFirstColor = colorIndex === 0;
+          const rowspan = isFirstColor ? modelData.colors.length : 0;
+          
+          const modelCell = isFirstColor ? 
+            `<td rowspan="${rowspan}" style="vertical-align: middle;"><strong>${modelName}</strong></td>` : '';
+          
+          const departmentCells = Object.entries(previewData.departments)
+            .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
+            .map(([deptName, deptData]) => {
+              // 해당 소속의 모델/색상별 배정량 계산
+              let deptQuantity = 0;
+              
+              deptData.agents.forEach(agent => {
+                const agentAssignments = previewData.agents[agent.contactId];
+                if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
+                  deptQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
+                }
+              });
+              
+              return `<td style="background-color: ${colorIndex % 2 === 0 ? '#f5f5f5' : '#fafafa'}; font-weight: ${deptQuantity > 0 ? 'bold' : 'normal'}; color: ${deptQuantity > 0 ? '#1976d2' : '#666'};">
+                ${deptQuantity > 0 ? deptQuantity + '개' : '-'}
+              </td>`;
+            }).join('');
+          
+          departmentRows.push(`
+            <tr>
+              ${modelCell}
+              <td><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
+              <td><strong>${totalQuantity}개</strong></td>
+              <td>${Math.round(avgQuantity)}개</td>
+              ${departmentCells}
+            </tr>
+          `);
+        });
+      });
+      
       printContent = header + `
         <div class="summary">
           <h2>소속별 배정 현황</h2>
           <table>
             <thead>
               <tr>
-                <th>모델/색상</th>
+                <th>모델명</th>
+                <th>색상</th>
                 <th>총 배정량</th>
                 <th>평균 배정량</th>
                 ${Object.entries(previewData.departments)
@@ -1716,46 +1813,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               </tr>
             </thead>
             <tbody>
-              ${Object.entries(previewData.models).map(([modelName, modelData]) => 
-                modelData.colors.map((color, colorIndex) => {
-                  // 해당 모델/색상의 총 배정량 계산
-                  const totalQuantity = Object.values(previewData.agents).reduce((sum, agentData) => {
-                    const modelAssignment = agentData[modelName];
-                    if (modelAssignment && modelAssignment.colorQuantities) {
-                      return sum + (modelAssignment.colorQuantities[color.name] || 0);
-                    }
-                    return sum;
-                  }, 0);
-                  
-                  // 해당 모델/색상의 평균 배정량 계산
-                  const avgQuantity = totalQuantity / Object.keys(previewData.departments).length;
-                  
-                  return `
-                    <tr>
-                      <td><strong>${modelName}</strong><br/><span style="color: ${colorIndex % 2 === 0 ? '#1976d2' : '#d32f2f'}; font-weight: bold;">${color.name}</span></td>
-                      <td><strong>${totalQuantity}개</strong></td>
-                      <td>${Math.round(avgQuantity)}개</td>
-                      ${Object.entries(previewData.departments)
-                        .sort(([deptNameA, a], [deptNameB, b]) => deptNameA.localeCompare(deptNameB))
-                        .map(([deptName, deptData]) => {
-                          // 해당 소속의 모델/색상별 배정량 계산
-                          let deptQuantity = 0;
-                          
-                          deptData.agents.forEach(agent => {
-                            const agentAssignments = previewData.agents[agent.contactId];
-                            if (agentAssignments && agentAssignments[modelName] && agentAssignments[modelName].colorQuantities) {
-                              deptQuantity += agentAssignments[modelName].colorQuantities[color.name] || 0;
-                            }
-                          });
-                          
-                          return `<td style="background-color: ${colorIndex % 2 === 0 ? '#f5f5f5' : '#fafafa'}; font-weight: ${deptQuantity > 0 ? 'bold' : 'normal'}; color: ${deptQuantity > 0 ? '#1976d2' : '#666'};">
-                            ${deptQuantity > 0 ? deptQuantity + '개' : '-'}
-                          </td>`;
-                        }).join('')}
-                    </tr>
-                  `;
-                }).join('')
-              ).join('')}
+              ${departmentRows.join('')}
             </tbody>
           </table>
         </div>
