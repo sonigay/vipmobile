@@ -475,12 +475,35 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       // 배정 대상 확인
       console.log('배정 대상 확인 시작...');
-      const { eligibleAgents } = getSelectedTargets(agents, assignmentSettings);
+      const { eligibleAgents, selectedOffices, selectedDepartments, selectedAgentIds } = getSelectedTargets(agents, assignmentSettings);
       console.log('선택된 배정 대상:', eligibleAgents.length, '명');
       console.log('선택된 대상 상세:', eligibleAgents.map(a => ({ name: a.target, office: a.office, department: a.department })));
       
       if (eligibleAgents.length === 0) {
-        throw new Error('배정할 대상이 선택되지 않았습니다. 배정 설정에서 사무실, 소속, 또는 영업사원을 선택해주세요.');
+        // 더 자세한 안내 메시지 생성
+        let errorMessage = '배정할 대상이 선택되지 않았습니다.\n\n';
+        
+        if (selectedOffices.length === 0 && selectedDepartments.length === 0 && selectedAgentIds.length === 0) {
+          errorMessage += '📋 배정 설정에서 다음 중 하나를 선택해주세요:\n';
+          errorMessage += '• 사무실 선택\n';
+          errorMessage += '• 소속 선택\n';
+          errorMessage += '• 개별 영업사원 선택\n\n';
+          errorMessage += '💡 팁: 사무실과 소속을 모두 선택하면 해당 조건에 맞는 영업사원들이 자동으로 포함됩니다.';
+        } else {
+          errorMessage += '현재 선택된 항목:\n';
+          if (selectedOffices.length > 0) {
+            errorMessage += `• 사무실: ${selectedOffices.join(', ')}\n`;
+          }
+          if (selectedDepartments.length > 0) {
+            errorMessage += `• 소속: ${selectedDepartments.join(', ')}\n`;
+          }
+          if (selectedAgentIds.length > 0) {
+            errorMessage += `• 영업사원: ${selectedAgentIds.length}명\n`;
+          }
+          errorMessage += '\n선택된 조건에 맞는 영업사원이 없습니다. 다른 조건을 선택해주세요.';
+        }
+        
+        throw new Error(errorMessage);
       }
       
       // 모델 확인
@@ -489,7 +512,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       console.log('설정된 모델들:', Object.keys(assignmentSettings.models));
       
       if (modelCount === 0) {
-        throw new Error('배정할 모델이 설정되지 않았습니다. 모델을 추가해주세요.');
+        throw new Error('배정할 모델이 설정되지 않았습니다.\n\n📱 모델 추가 버튼을 클릭하여 배정할 모델을 추가해주세요.');
       }
       
       // 매장 데이터 가져오기 (재고 정보용)
@@ -2868,7 +2891,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           <div style={{ fontSize: '0.8rem', color: '#888' }}>{modelData.colors.length}개 색상</div>
                                         </TableCell>
                                       )}
-                                                                             <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !prev[colorKey] }))}>
+                                      <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !prev[colorKey] }))}>
                                          <span style={{
                                            display: 'inline-block',
                                            padding: '2px 10px',
@@ -2892,9 +2915,37 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                               : 0;
                                             return sum + assignedQuantity;
                                           }, 0);
+                                          // 집계된 점수 정보 생성 (회전율, 거래처수, 잔여보유량, 판매량 등)
+                                          let aggregateScores = {};
+                                          if (officeData.agents.length > 0) {
+                                            // 각 agent의 colorScores를 합산/평균 등으로 집계
+                                            const colorScoresList = officeData.agents.map(agent => {
+                                              const agentAssignments = previewData.agents[agent.contactId];
+                                              const modelAssignment = agentAssignments && agentAssignments[modelName];
+                                              return modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]
+                                                ? modelAssignment.colorScores[color.name].details
+                                                : null;
+                                            }).filter(Boolean);
+                                            // 평균값 계산 (단순 평균)
+                                            const keys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+                                            keys.forEach(key => {
+                                              const values = colorScoresList.map(score => {
+                                                if (!score || !score[key]) return undefined;
+                                                if (typeof score[key] === 'object' && score[key] !== null && 'detail' in score[key]) return score[key].detail;
+                                                if (typeof score[key] === 'object' && score[key] !== null && 'value' in score[key]) return score[key].value;
+                                                return score[key];
+                                              }).filter(v => v !== undefined && v !== null);
+                                              if (values.length > 0) {
+                                                aggregateScores[key] = values.reduce((a, b) => a + b, 0) / values.length;
+                                              }
+                                            });
+                                          }
                                           return (
                                             <TableCell key={`${officeName}-${modelName}-${color.name}`} align="center" sx={{ backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100', fontWeight: officeTotalQuantity > 0 ? 'bold' : 'normal', color: officeTotalQuantity > 0 ? 'primary.main' : 'text.secondary', borderRight: '2px solid #ddd' }}>
                                               <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{officeTotalQuantity > 0 ? `${officeTotalQuantity}개` : '-'}</div>
+                                              {officeTotalQuantity > 0 && expandedColors[colorKey] !== false && (
+                                                <ScoreDisplay scores={aggregateScores} modelName={modelName} colorName={color.name} />
+                                              )}
                                             </TableCell>
                                           );
                                         })}
@@ -3278,7 +3329,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                           <div style={{ fontSize: '0.8rem', color: '#888' }}>{modelData.colors.length}개 색상</div>
                                         </TableCell>
                                       )}
-                                                                             <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !prev[colorKey] }))}>
+                                      <TableCell align="center" style={{ cursor: 'pointer' }} onClick={() => setExpandedColors(prev => ({ ...prev, [colorKey]: !prev[colorKey] }))}>
                                          <span style={{
                                            display: 'inline-block',
                                            padding: '2px 10px',
@@ -3302,9 +3353,37 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                               : 0;
                                             return sum + assignedQuantity;
                                           }, 0);
+                                          // 집계된 점수 정보 생성 (회전율, 거래처수, 잔여보유량, 판매량 등)
+                                          let aggregateScores = {};
+                                          if (deptData.agents.length > 0) {
+                                            // 각 agent의 colorScores를 합산/평균 등으로 집계
+                                            const colorScoresList = deptData.agents.map(agent => {
+                                              const agentAssignments = previewData.agents[agent.contactId];
+                                              const modelAssignment = agentAssignments && agentAssignments[modelName];
+                                              return modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]
+                                                ? modelAssignment.colorScores[color.name].details
+                                                : null;
+                                            }).filter(Boolean);
+                                            // 평균값 계산 (단순 평균)
+                                            const keys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+                                            keys.forEach(key => {
+                                              const values = colorScoresList.map(score => {
+                                                if (!score || !score[key]) return undefined;
+                                                if (typeof score[key] === 'object' && score[key] !== null && 'detail' in score[key]) return score[key].detail;
+                                                if (typeof score[key] === 'object' && score[key] !== null && 'value' in score[key]) return score[key].value;
+                                                return score[key];
+                                              }).filter(v => v !== undefined && v !== null);
+                                              if (values.length > 0) {
+                                                aggregateScores[key] = values.reduce((a, b) => a + b, 0) / values.length;
+                                              }
+                                            });
+                                          }
                                           return (
                                             <TableCell key={`${deptName}-${modelName}-${color.name}`} align="center" sx={{ backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100', fontWeight: deptTotalQuantity > 0 ? 'bold' : 'normal', color: deptTotalQuantity > 0 ? 'primary.main' : 'text.secondary', borderRight: '2px solid #ddd' }}>
                                               <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{deptTotalQuantity > 0 ? `${deptTotalQuantity}개` : '-'}</div>
+                                              {deptTotalQuantity > 0 && expandedColors[colorKey] !== false && (
+                                                <ScoreDisplay scores={aggregateScores} modelName={modelName} colorName={color.name} />
+                                              )}
                                             </TableCell>
                                           );
                                         })}
