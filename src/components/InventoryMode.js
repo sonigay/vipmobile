@@ -56,7 +56,8 @@ import {
   Watch as WatchIcon,
   Tablet as TabletIcon,
   Settings as SettingsIcon,
-  AccountTree as AccountTreeIcon
+  AccountTree as AccountTreeIcon,
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { fetchData } from '../api';
 import UpdateProgressPopup from './UpdateProgressPopup';
@@ -101,7 +102,7 @@ const LoadingSkeleton = () => (
   </Box>
 );
 
-function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUserName }) {
+function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUserName, onModeChange, availableModes }) {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -553,6 +554,24 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
                 재고배정
               </Button>
             </Box>
+            
+            {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+            {onModeChange && availableModes && availableModes.length > 1 && (
+              <Button
+                color="inherit"
+                onClick={onModeChange}
+                startIcon={<SwapHorizIcon />}
+                sx={{ 
+                  ml: 2,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)'
+                  }
+                }}
+              >
+                모드 변경
+              </Button>
+            )}
             
             <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
               로그아웃

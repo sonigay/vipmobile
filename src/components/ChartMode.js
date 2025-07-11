@@ -9,10 +9,11 @@ import {
   Paper
 } from '@mui/material';
 import {
-  BarChart as BarChartIcon
+  BarChart as BarChartIcon,
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 
-function ChartMode({ onLogout, loggedInStore }) {
+function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handleBackToMain = () => {
     // 메인 화면으로 돌아가기 (모드 선택 팝업 표시)
     window.location.reload();
@@ -28,6 +29,25 @@ function ChartMode({ onLogout, loggedInStore }) {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             장표 모드
           </Typography>
+          
+          {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+          {onModeChange && availableModes && availableModes.length > 1 && (
+            <Button
+              color="inherit"
+              onClick={onModeChange}
+              startIcon={<SwapHorizIcon />}
+              sx={{ 
+                mr: 2,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              모드 변경
+            </Button>
+          )}
+          
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>

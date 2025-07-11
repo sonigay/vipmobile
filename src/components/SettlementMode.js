@@ -16,9 +16,10 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import * as XLSX from 'xlsx';
 
-function SettlementMode({ onLogout, loggedInStore, settlementUserName }) {
+function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeChange, availableModes }) {
   const [excelData, setExcelData] = useState(null);
   const [originalFileName, setOriginalFileName] = useState(''); // 원본 파일명 저장
   const [isLoading, setIsLoading] = useState(false);
@@ -109,6 +110,26 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName }) {
             <Typography variant="body2" color="text.secondary">
               {settlementUserName} ({loggedInStore?.id})
             </Typography>
+            
+            {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+            {onModeChange && availableModes && availableModes.length > 1 && (
+              <Button
+                variant="outlined"
+                onClick={onModeChange}
+                startIcon={<SwapHorizIcon />}
+                sx={{ 
+                  borderColor: '#1976d2',
+                  color: '#1976d2',
+                  '&:hover': { 
+                    borderColor: '#1565c0',
+                    backgroundColor: 'rgba(25, 118, 210, 0.04)'
+                  }
+                }}
+              >
+                모드 변경
+              </Button>
+            )}
+            
             <Button 
               variant="outlined" 
               onClick={onLogout}

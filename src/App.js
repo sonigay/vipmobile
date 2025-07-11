@@ -1829,6 +1829,12 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           settlementUserName={settlementUserName}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
         />
       </ThemeProvider>
     );
@@ -1842,6 +1848,12 @@ function App() {
         <InspectionMode 
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
         />
       </ThemeProvider>
     );
@@ -1855,6 +1867,12 @@ function App() {
         <ChartMode 
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
         />
       </ThemeProvider>
     );
@@ -1868,6 +1886,12 @@ function App() {
         <PolicyMode 
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
         />
       </ThemeProvider>
     );
@@ -1881,6 +1905,12 @@ function App() {
         <InventoryMode 
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
         />
       </ThemeProvider>
     );
