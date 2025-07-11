@@ -164,6 +164,7 @@ function App() {
   const [showModeSelection, setShowModeSelection] = useState(false);
   const [availableModes, setAvailableModes] = useState([]);
   const [pendingLoginData, setPendingLoginData] = useState(null);
+  const [modeSelectionRequired, setModeSelectionRequired] = useState(false);
   
   // 현재 사용자의 사용 가능한 모드 목록 가져오기
   const getCurrentUserAvailableModes = () => {
@@ -1153,6 +1154,7 @@ function App() {
         setAvailableModes(availableModes);
         setPendingLoginData(store);
         setShowModeSelection(true);
+        setModeSelectionRequired(true);
         return;
       }
     }
@@ -1395,6 +1397,7 @@ function App() {
     // 상태 초기화
     setPendingLoginData(null);
     setShowModeSelection(false);
+    setModeSelectionRequired(false);
   };
 
   const handleLogout = () => {
@@ -1883,8 +1886,8 @@ function App() {
     );
   }
 
-  // 모드 선택 팝업이 표시되는 동안 중립적인 화면 렌더링
-  if (showModeSelection) {
+  // 모드 선택 팝업이 표시되거나 모드 선택이 필요한 동안 중립적인 화면 렌더링
+  if (showModeSelection || modeSelectionRequired) {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
@@ -1914,7 +1917,11 @@ function App() {
         {/* 모드 선택 팝업 */}
         <ModeSelectionPopup
           open={showModeSelection}
-          onClose={() => setShowModeSelection(false)}
+          onClose={() => {
+            // 팝업 취소 시에도 중립 화면 유지
+            setShowModeSelection(false);
+            // modeSelectionRequired는 유지하여 중립 화면 계속 표시
+          }}
           onModeSelect={handleModeSelect}
           availableModes={availableModes}
           loggedInStore={loggedInStore}
