@@ -107,10 +107,19 @@ const ModeSelectionPopup = ({
   };
 
   const handleModeSelect = (mode) => {
+    console.log('ModeSelectionPopup handleModeSelect 호출됨:', mode);
+    console.log('isModeSwitch:', isModeSwitch);
+    console.log('onModeSwitch 존재:', !!onModeSwitch);
+    console.log('onModeSelect 존재:', !!onModeSelect);
+    
     if (isModeSwitch && onModeSwitch) {
+      console.log('모드 전환 핸들러 호출');
       onModeSwitch(mode);
     } else if (onModeSelect) {
+      console.log('초기 로그인 모드 선택 핸들러 호출');
       onModeSelect(mode);
+    } else {
+      console.log('적절한 핸들러가 없음');
     }
     onClose();
   };

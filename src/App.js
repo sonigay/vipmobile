@@ -1403,7 +1403,15 @@ function App() {
 
   // 모드 전환 핸들러 (이미 로그인된 상태에서)
   const handleModeSwitch = (selectedMode) => {
-    if (!loggedInStore) return;
+    console.log('handleModeSwitch 호출됨:', selectedMode);
+    console.log('현재 loggedInStore:', loggedInStore);
+    
+    if (!loggedInStore) {
+      console.log('loggedInStore가 없어서 모드 전환 불가');
+      return;
+    }
+    
+    console.log('모드 전환 시작:', selectedMode);
     
     // 모든 모드 상태 초기화
     setIsAgentMode(false);
@@ -1416,30 +1424,39 @@ function App() {
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
       case 'agent':
+        console.log('관리자 모드로 전환');
         setIsAgentMode(true);
         break;
       case 'inventory':
+        console.log('재고 모드로 전환');
         setIsInventoryMode(true);
         break;
       case 'settlement':
+        console.log('정산 모드로 전환');
         setIsSettlementMode(true);
         break;
       case 'inspection':
+        console.log('검수 모드로 전환');
         setIsInspectionMode(true);
         break;
       case 'chart':
+        console.log('장표 모드로 전환');
         setIsChartMode(true);
         break;
       case 'policy':
+        console.log('정책 모드로 전환');
         setIsPolicyMode(true);
         break;
       default:
+        console.log('알 수 없는 모드:', selectedMode);
         break;
     }
     
     // 모드 선택 팝업 닫기
     setShowModeSelection(false);
     setModeSelectionRequired(false);
+    
+    console.log('모드 전환 완료');
   };
 
   const handleLogout = () => {
@@ -1994,9 +2011,12 @@ function App() {
                 <Button
                   variant="outlined"
                   onClick={() => {
+                    console.log('중립 화면 모드 전환 버튼 클릭됨');
                     const currentModes = getCurrentUserAvailableModes();
+                    console.log('사용 가능한 모드:', currentModes);
                     setAvailableModes(currentModes);
                     setShowModeSelection(true);
+                    console.log('모드 선택 팝업 열기 완료');
                   }}
                   startIcon={<SwapHorizIcon />}
                   sx={{ 
