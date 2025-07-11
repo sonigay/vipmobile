@@ -1889,9 +1889,12 @@ function App() {
           loggedInStore={loggedInStore} 
           settlementUserName={settlementUserName}
           onModeChange={() => {
+            console.log('App.js SettlementMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
+            console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             setShowModeSelection(true);
+            console.log('SettlementMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1908,9 +1911,12 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
+            console.log('App.js InspectionMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
+            console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             setShowModeSelection(true);
+            console.log('InspectionMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1927,9 +1933,12 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
+            console.log('App.js ChartMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
+            console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             setShowModeSelection(true);
+            console.log('ChartMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1946,9 +1955,12 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
+            console.log('App.js PolicyMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
+            console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             setShowModeSelection(true);
+            console.log('PolicyMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1965,9 +1977,12 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
+            console.log('App.js InventoryMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
+            console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             setShowModeSelection(true);
+            console.log('InventoryMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
