@@ -115,7 +115,12 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
             {onModeChange && availableModes && availableModes.length > 1 && (
               <Button
                 variant="outlined"
-                onClick={onModeChange}
+                onClick={() => {
+                  console.log('SettlementMode 모드 전환 버튼 클릭됨');
+                  console.log('onModeChange 존재:', !!onModeChange);
+                  console.log('availableModes:', availableModes);
+                  onModeChange();
+                }}
                 startIcon={<SwapHorizIcon />}
                 sx={{ 
                   borderColor: '#1976d2',
