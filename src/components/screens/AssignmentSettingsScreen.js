@@ -852,6 +852,69 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setSelectedColor('');
       setIsEditMode(false);
       setShowModelDialog(false);
+    } else if (newModel.name && newModel.color && newModel.quantity > 0) {
+      // 수기 입력 방식 (모델명, 색상, 수량을 직접 입력한 경우)
+      const modelColor = newModel.color;
+      
+      setAssignmentSettings(prev => {
+        const existingModel = prev.models[modelName];
+        
+        if (existingModel) {
+          const existingColorIndex = existingModel.colors.findIndex(color => color.name === modelColor);
+          
+          if (existingColorIndex >= 0) {
+            const updatedColors = [...existingModel.colors];
+            const currentQuantity = updatedColors[existingColorIndex].quantity;
+            const newQuantity = isEditMode ? newModel.quantity : currentQuantity + newModel.quantity;
+            
+            updatedColors[existingColorIndex] = {
+              ...updatedColors[existingColorIndex],
+              quantity: newQuantity
+            };
+            
+            return {
+              ...prev,
+              models: {
+                ...prev.models,
+                [modelName]: {
+                  ...existingModel,
+                  colors: updatedColors
+                }
+              }
+            };
+          } else {
+            return {
+              ...prev,
+              models: {
+                ...prev.models,
+                [modelName]: {
+                  ...existingModel,
+                  colors: [
+                    ...existingModel.colors,
+                    { name: modelColor, quantity: newModel.quantity }
+                  ]
+                }
+              }
+            };
+          }
+        } else {
+          return {
+            ...prev,
+            models: {
+              ...prev.models,
+              [modelName]: {
+                colors: [{ name: modelColor, quantity: newModel.quantity }]
+              }
+            }
+          };
+        }
+      });
+      
+      setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
+      setSelectedModel('');
+      setSelectedColor('');
+      setIsEditMode(false);
+      setShowModelDialog(false);
     }
   };
 
