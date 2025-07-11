@@ -9,7 +9,8 @@ import {
   Inventory as InventoryIcon,
   Assignment as AssignmentIcon,
   Business as BusinessIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { 
   subscribeToPushNotifications, 
@@ -21,7 +22,7 @@ import {
   debugPushNotificationStatus
 } from '../utils/pushNotificationUtils';
 
-function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data }) {
+function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -480,6 +481,22 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
           )}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+          {onModeChange && availableModes && availableModes.length > 1 && (
+            <Tooltip title="모드 변경">
+              <IconButton
+                color="inherit"
+                onClick={onModeChange}
+                sx={{ 
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 1
+                }}
+              >
+                <SwapHorizIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+          
           {/* 푸시 알림 설정 버튼 */}
           <Tooltip title="푸시 알림 설정">
             <IconButton

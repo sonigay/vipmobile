@@ -165,6 +165,19 @@ function App() {
   const [availableModes, setAvailableModes] = useState([]);
   const [pendingLoginData, setPendingLoginData] = useState(null);
   
+  // 현재 사용자의 사용 가능한 모드 목록 가져오기
+  const getCurrentUserAvailableModes = () => {
+    if (!loggedInStore) return [];
+    
+    if (loggedInStore.modePermissions) {
+      return Object.entries(loggedInStore.modePermissions)
+        .filter(([mode, hasPermission]) => hasPermission)
+        .map(([mode]) => mode);
+    }
+    
+    return [];
+  };
+  
   // 알림 시스템 및 모바일 최적화 초기화 제거 (재고 모드로 이동)
 
   // 배정 모드 핸들러 제거 (재고 모드로 이동)
@@ -1942,6 +1955,12 @@ function App() {
             activationData={activationData}
             agentTarget={agentTarget}
             data={data}
+            onModeChange={() => {
+              const currentModes = getCurrentUserAvailableModes();
+              setAvailableModes(currentModes);
+              setShowModeSelection(true);
+            }}
+            availableModes={availableModes}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
