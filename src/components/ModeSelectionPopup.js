@@ -16,6 +16,9 @@ import {
   Business as BusinessIcon,
   Inventory as InventoryIcon,
   AccountBalance as SettlementIcon,
+  Assignment as AssignmentIcon,
+  BarChart as BarChartIcon,
+  Policy as PolicyIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 
@@ -61,6 +64,42 @@ const ModeSelectionPopup = ({
         '정산 데이터 처리',
         '파일 형식 검증',
         '데이터 내보내기'
+      ]
+    },
+    inspection: {
+      title: '검수 모드',
+      description: '검수 및 품질 관리 시스템',
+      icon: <AssignmentIcon sx={{ fontSize: 40, color: '#7b1fa2' }} />,
+      color: '#7b1fa2',
+      features: [
+        '검수 프로세스 관리',
+        '품질 기준 설정',
+        '검수 결과 기록',
+        '검수 리포트 생성'
+      ]
+    },
+    chart: {
+      title: '장표 모드',
+      description: '장표 및 차트 생성 시스템',
+      icon: <BarChartIcon sx={{ fontSize: 40, color: '#e91e63' }} />,
+      color: '#e91e63',
+      features: [
+        '차트 및 그래프 생성',
+        '데이터 시각화',
+        '장표 템플릿 관리',
+        '보고서 자동 생성'
+      ]
+    },
+    policy: {
+      title: '정책 모드',
+      description: '정책 및 규정 관리 시스템',
+      icon: <PolicyIcon sx={{ fontSize: 40, color: '#00bcd4' }} />,
+      color: '#00bcd4',
+      features: [
+        '정책 문서 관리',
+        '규정 업데이트',
+        '정책 공지사항',
+        '정책 이력 추적'
       ]
     }
   };

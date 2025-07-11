@@ -1716,20 +1716,29 @@ app.post('/api/login', async (req, res) => {
         console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
         console.log('Step 6: Processing agent login...');
         
-        // F열: 재고모드 권한, G열: 정산모드 권한 확인
+        // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 장표모드 권한, J열: 정책모드 권한 확인
         const hasInventoryPermission = agent[5] === 'O'; // F열
         const hasSettlementPermission = agent[6] === 'O'; // G열
+        const hasInspectionPermission = agent[7] === 'O'; // H열
+        const hasChartPermission = agent[8] === 'O'; // I열
+        const hasPolicyPermission = agent[9] === 'O'; // J열
         
         console.log('Step 6.5: Permission check:', {
           inventory: hasInventoryPermission,
-          settlement: hasSettlementPermission
+          settlement: hasSettlementPermission,
+          inspection: hasInspectionPermission,
+          chart: hasChartPermission,
+          policy: hasPolicyPermission
         });
         
         // 다중 권한이 있는 경우 권한 정보 포함
         const modePermissions = {
           agent: true, // 관리자 모드는 기본
           inventory: hasInventoryPermission,
-          settlement: hasSettlementPermission
+          settlement: hasSettlementPermission,
+          inspection: hasInspectionPermission,
+          chart: hasChartPermission,
+          policy: hasPolicyPermission
         };
         
         // 디스코드로 로그인 로그 전송
@@ -1743,7 +1752,7 @@ app.post('/api/login', async (req, res) => {
               fields: [
                 {
                   name: '관리자 정보',
-                  value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}`
+                  value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}`
                 },
                 {
                   name: '접속 정보',

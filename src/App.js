@@ -25,6 +25,9 @@ import StoreInfoTable from './components/StoreInfoTable';
 import UpdatePopup from './components/UpdatePopup';
 import UpdateProgressPopup from './components/UpdateProgressPopup';
 import ModeSelectionPopup from './components/ModeSelectionPopup';
+import InspectionMode from './components/InspectionMode';
+import ChartMode from './components/ChartMode';
+import PolicyMode from './components/PolicyMode';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
@@ -114,6 +117,12 @@ function App() {
   // 정산모드 관련 상태 추가
   const [isSettlementMode, setIsSettlementMode] = useState(false);
   const [settlementUserName, setSettlementUserName] = useState(''); // 정산모드 접속자 이름 추가
+  // 검수모드 관련 상태 추가
+  const [isInspectionMode, setIsInspectionMode] = useState(false);
+  // 장표모드 관련 상태 추가
+  const [isChartMode, setIsChartMode] = useState(false);
+  // 정책모드 관련 상태 추가
+  const [isPolicyMode, setIsPolicyMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1141,12 +1150,78 @@ function App() {
 
   // 실제 로그인 처리 함수
   const processLogin = (store) => {
+    // 검수모드인지 확인
+    if (store.isInspection) {
+      console.log('로그인: 검수모드');
+      setIsInspectionMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isInspection: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isChart: false,
+        isPolicy: false,
+        store: store
+      }));
+    }
+    // 장표모드인지 확인
+    else if (store.isChart) {
+      console.log('로그인: 장표모드');
+      setIsChartMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsPolicyMode(false);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isChart: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isPolicy: false,
+        store: store
+      }));
+    }
+    // 정책모드인지 확인
+    else if (store.isPolicy) {
+      console.log('로그인: 정책모드');
+      setIsPolicyMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isPolicy: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        store: store
+      }));
+    }
     // 정산모드인지 확인
-    if (store.isSettlement) {
+    else if (store.isSettlement) {
       console.log('로그인: 정산모드');
       setIsSettlementMode(true);
       setIsInventoryMode(false);
       setIsAgentMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
       
       setSettlementUserName(store.manager || '정산관리자');
       console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
@@ -1156,6 +1231,9 @@ function App() {
         isSettlement: true,
         isInventory: false,
         isAgent: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
         store: store,
         settlementUserName: store.manager || '정산관리자'
       }));
@@ -1166,6 +1244,9 @@ function App() {
       setIsInventoryMode(true);
       setIsAgentMode(false);
       setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
       
       setInventoryUserName(store.manager || '재고관리자');
       console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
@@ -1182,6 +1263,9 @@ function App() {
         isInventory: true,
         isAgent: false,
         isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
         store: store,
         inventoryUserName: store.manager || '재고관리자'
       }));
@@ -1192,6 +1276,9 @@ function App() {
       setIsAgentMode(true);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
       setAgentTarget(store.target);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
@@ -1209,6 +1296,9 @@ function App() {
         isAgent: true,
         isInventory: false,
         isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
         store: store,
         agentTarget: store.target,
         agentQualification: store.qualification,
@@ -1223,6 +1313,9 @@ function App() {
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -1236,6 +1329,9 @@ function App() {
         isAgent: false,
         isInventory: false,
         isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
         store: store
       }));
     }
@@ -1253,16 +1349,49 @@ function App() {
         modifiedStore.isAgent = true;
         modifiedStore.isInventory = false;
         modifiedStore.isSettlement = false;
+        modifiedStore.isInspection = false;
+        modifiedStore.isChart = false;
+        modifiedStore.isPolicy = false;
         break;
       case 'inventory':
         modifiedStore.isAgent = false;
         modifiedStore.isInventory = true;
         modifiedStore.isSettlement = false;
+        modifiedStore.isInspection = false;
+        modifiedStore.isChart = false;
+        modifiedStore.isPolicy = false;
         break;
       case 'settlement':
         modifiedStore.isAgent = false;
         modifiedStore.isInventory = false;
         modifiedStore.isSettlement = true;
+        modifiedStore.isInspection = false;
+        modifiedStore.isChart = false;
+        modifiedStore.isPolicy = false;
+        break;
+      case 'inspection':
+        modifiedStore.isAgent = false;
+        modifiedStore.isInventory = false;
+        modifiedStore.isSettlement = false;
+        modifiedStore.isInspection = true;
+        modifiedStore.isChart = false;
+        modifiedStore.isPolicy = false;
+        break;
+      case 'chart':
+        modifiedStore.isAgent = false;
+        modifiedStore.isInventory = false;
+        modifiedStore.isSettlement = false;
+        modifiedStore.isInspection = false;
+        modifiedStore.isChart = true;
+        modifiedStore.isPolicy = false;
+        break;
+      case 'policy':
+        modifiedStore.isAgent = false;
+        modifiedStore.isInventory = false;
+        modifiedStore.isSettlement = false;
+        modifiedStore.isInspection = false;
+        modifiedStore.isChart = false;
+        modifiedStore.isPolicy = true;
         break;
       default:
         break;
@@ -1296,6 +1425,12 @@ function App() {
     // 정산모드 상태 초기화
     setIsSettlementMode(false);
     setSettlementUserName(''); // 정산모드 접속자 이름 초기화
+    // 검수모드 상태 초기화
+    setIsInspectionMode(false);
+    // 장표모드 상태 초기화
+    setIsChartMode(false);
+    // 정책모드 상태 초기화
+    setIsPolicyMode(false);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -1699,6 +1834,45 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           settlementUserName={settlementUserName}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 검수모드일 때는 별도 화면 렌더링
+  if (isInspectionMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <InspectionMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 장표모드일 때는 별도 화면 렌더링
+  if (isChartMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ChartMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 정책모드일 때는 별도 화면 렌더링
+  if (isPolicyMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <PolicyMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
         />
       </ThemeProvider>
     );
