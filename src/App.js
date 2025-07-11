@@ -1344,53 +1344,32 @@ function App() {
     // 선택된 모드에 따라 store 객체 수정
     const modifiedStore = { ...pendingLoginData };
     
+    // 모든 모드 플래그 초기화
+    modifiedStore.isAgent = false;
+    modifiedStore.isInventory = false;
+    modifiedStore.isSettlement = false;
+    modifiedStore.isInspection = false;
+    modifiedStore.isChart = false;
+    modifiedStore.isPolicy = false;
+    
+    // 선택된 모드만 true로 설정
     switch (selectedMode) {
       case 'agent':
         modifiedStore.isAgent = true;
-        modifiedStore.isInventory = false;
-        modifiedStore.isSettlement = false;
-        modifiedStore.isInspection = false;
-        modifiedStore.isChart = false;
-        modifiedStore.isPolicy = false;
         break;
       case 'inventory':
-        modifiedStore.isAgent = false;
         modifiedStore.isInventory = true;
-        modifiedStore.isSettlement = false;
-        modifiedStore.isInspection = false;
-        modifiedStore.isChart = false;
-        modifiedStore.isPolicy = false;
         break;
       case 'settlement':
-        modifiedStore.isAgent = false;
-        modifiedStore.isInventory = false;
         modifiedStore.isSettlement = true;
-        modifiedStore.isInspection = false;
-        modifiedStore.isChart = false;
-        modifiedStore.isPolicy = false;
         break;
       case 'inspection':
-        modifiedStore.isAgent = false;
-        modifiedStore.isInventory = false;
-        modifiedStore.isSettlement = false;
         modifiedStore.isInspection = true;
-        modifiedStore.isChart = false;
-        modifiedStore.isPolicy = false;
         break;
       case 'chart':
-        modifiedStore.isAgent = false;
-        modifiedStore.isInventory = false;
-        modifiedStore.isSettlement = false;
-        modifiedStore.isInspection = false;
         modifiedStore.isChart = true;
-        modifiedStore.isPolicy = false;
         break;
       case 'policy':
-        modifiedStore.isAgent = false;
-        modifiedStore.isInventory = false;
-        modifiedStore.isSettlement = false;
-        modifiedStore.isInspection = false;
-        modifiedStore.isChart = false;
         modifiedStore.isPolicy = true;
         break;
       default:
@@ -1887,6 +1866,37 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
         />
+      </ThemeProvider>
+    );
+  }
+
+  // 모드 선택 팝업이 표시되는 동안 중립적인 화면 렌더링
+  if (showModeSelection) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Container maxWidth="xl" sx={{ 
+          height: '100vh', 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Box sx={{ 
+            textAlign: 'center',
+            p: 4,
+            borderRadius: 2,
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: 3
+          }}>
+            <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
+              모드 선택 중...
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              사용할 모드를 선택해주세요.
+            </Typography>
+          </Box>
+        </Container>
       </ThemeProvider>
     );
   }
