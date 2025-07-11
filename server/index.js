@@ -288,6 +288,7 @@ const STORE_SHEET_NAME = '폰클출고처데이터';
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터';  // 당월 개통실적 데이터
 const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터(전월)';  // 전월 개통실적 데이터
+const UPDATE_SHEET_NAME = '어플업데이트';  // 업데이트 내용 관리 시트 추가
 
 // Kakao geocoding 함수 (개선된 버전)
 async function geocodeAddressWithKakao(address, retryCount = 0) {
@@ -969,10 +970,151 @@ async function getGitUpdateHistory() {
   }
 }
 
-// 업데이트 히스토리 가져오기
+// 구글시트에 업데이트 내용 자동 입력
+async function updateGoogleSheetWithGitHistory() {
+  try {
+    console.log('Git 커밋 히스토리를 구글시트에 자동 입력 시작...');
+    
+    // Git 히스토리 가져오기
+    const gitHistory = await getGitUpdateHistory();
+    
+    if (gitHistory.length === 0) {
+      console.log('Git 히스토리가 없어서 업데이트 시트 입력을 건너뜁니다.');
+      return;
+    }
+    
+    // 기존 시트 데이터 확인
+    let existingData = [];
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: UPDATE_SHEET_NAME
+      });
+      existingData = response.data.values || [];
+    } catch (error) {
+      console.log('업데이트 시트가 없거나 비어있습니다. 새로 생성합니다.');
+    }
+    
+    // 헤더 행 준비
+    const headerRow = ['버전', '날짜', '제목', '타입', '상태', '변경사항1', '변경사항2'];
+    
+    // 새로운 데이터 행 준비
+    const newRows = gitHistory.map(update => {
+      const [year, month, day] = update.date.split('-');
+      const version = `${year}.${month}.${day}`;
+      
+      // 변경사항을 2개로 제한 (F열, G열)
+      const change1 = update.changes[0] || '';
+      const change2 = update.changes[1] || '';
+      
+      // 타입 결정 (커밋 메시지 기반)
+      let type = 'feature';
+      if (update.title.toLowerCase().includes('fix') || update.title.toLowerCase().includes('bug')) {
+        type = 'bugfix';
+      } else if (update.title.toLowerCase().includes('security')) {
+        type = 'security';
+      } else if (update.title.toLowerCase().includes('system') || update.title.toLowerCase().includes('performance')) {
+        type = 'system';
+      }
+      
+      return [
+        version,           // A열: 버전
+        update.date,       // B열: 날짜
+        update.title,      // C열: 제목
+        type,              // D열: 타입
+        '활성',            // E열: 상태 (기본값: 활성)
+        change1,           // F열: 변경사항1
+        change2            // G열: 변경사항2
+      ];
+    });
+    
+    // 기존 데이터와 새 데이터 병합 (중복 제거)
+    const existingVersions = new Set();
+    if (existingData.length > 1) { // 헤더 제외
+      existingData.slice(1).forEach(row => {
+        if (row[0]) existingVersions.add(row[0]); // A열: 버전
+      });
+    }
+    
+    // 중복되지 않은 새 데이터만 필터링
+    const uniqueNewRows = newRows.filter(row => !existingVersions.has(row[0]));
+    
+    if (uniqueNewRows.length === 0) {
+      console.log('새로운 업데이트 내용이 없습니다.');
+      return;
+    }
+    
+    // 시트에 데이터 입력
+    const allRows = [headerRow, ...uniqueNewRows];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${UPDATE_SHEET_NAME}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: allRows
+      }
+    });
+    
+    console.log(`업데이트 시트에 ${uniqueNewRows.length}개의 새로운 업데이트 내용이 입력되었습니다.`);
+    
+  } catch (error) {
+    console.error('구글시트 업데이트 내용 입력 실패:', error);
+  }
+}
+
+// 구글시트에서 업데이트 내용 읽어오기
+async function getUpdateHistoryFromSheet() {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: UPDATE_SHEET_NAME
+    });
+    
+    const data = response.data.values || [];
+    if (data.length <= 1) { // 헤더만 있거나 데이터가 없는 경우
+      return [];
+    }
+    
+    // 헤더 제거하고 데이터 파싱
+    const rows = data.slice(1);
+    const updateHistory = rows
+      .filter(row => row.length >= 5 && row[4] === '활성') // 상태가 '활성'인 것만
+      .map(row => {
+        const version = row[0] || '';
+        const date = row[1] || '';
+        const title = row[2] || '';
+        const type = row[3] || 'feature';
+        const change1 = row[5] || '';
+        const change2 = row[6] || '';
+        
+        // 변경사항 배열 생성
+        const changes = [];
+        if (change1) changes.push(change1);
+        if (change2) changes.push(change2);
+        
+        return {
+          version,
+          date,
+          title,
+          changes,
+          type,
+          timestamp: new Date(date).getTime()
+        };
+      })
+      .sort((a, b) => b.timestamp - a.timestamp); // 최신순 정렬
+    
+    return updateHistory;
+  } catch (error) {
+    console.error('구글시트에서 업데이트 내용 읽기 실패:', error);
+    return [];
+  }
+}
+
+// 업데이트 히스토리 가져오기 (구글시트 기반)
 app.get('/api/updates', async (req, res) => {
   try {
-    const updateHistory = await getGitUpdateHistory();
+    const updateHistory = await getUpdateHistoryFromSheet();
     
     res.json({
       success: true,
@@ -1903,6 +2045,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
     
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
     setInterval(checkAndUpdateAddresses, 3600000);
+    
+    // Git 커밋 히스토리를 구글시트에 자동 입력
+    console.log('Git 커밋 히스토리를 구글시트에 자동 입력합니다...');
+    await updateGoogleSheetWithGitHistory();
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
   }

@@ -1,7 +1,7 @@
 // 동적 업데이트 내용 관리 시스템
 let cachedUpdateHistory = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
+const CACHE_DURATION = 1 * 60 * 1000; // 1분 캐시 (단축)
 
 // 서버에서 업데이트 히스토리 가져오기
 export const fetchUpdateHistory = async () => {
