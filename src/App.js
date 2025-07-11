@@ -1893,6 +1893,8 @@ function App() {
             const currentModes = getCurrentUserAvailableModes();
             console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsSettlementMode(false);
             setShowModeSelection(true);
             console.log('SettlementMode 모드 선택 팝업 열기 완료');
           }}
@@ -1915,6 +1917,8 @@ function App() {
             const currentModes = getCurrentUserAvailableModes();
             console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsInspectionMode(false);
             setShowModeSelection(true);
             console.log('InspectionMode 모드 선택 팝업 열기 완료');
           }}
@@ -1937,6 +1941,8 @@ function App() {
             const currentModes = getCurrentUserAvailableModes();
             console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsChartMode(false);
             setShowModeSelection(true);
             console.log('ChartMode 모드 선택 팝업 열기 완료');
           }}
@@ -1959,6 +1965,8 @@ function App() {
             const currentModes = getCurrentUserAvailableModes();
             console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsPolicyMode(false);
             setShowModeSelection(true);
             console.log('PolicyMode 모드 선택 팝업 열기 완료');
           }}
@@ -1981,6 +1989,8 @@ function App() {
             const currentModes = getCurrentUserAvailableModes();
             console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsInventoryMode(false);
             setShowModeSelection(true);
             console.log('InventoryMode 모드 선택 팝업 열기 완료');
           }}
