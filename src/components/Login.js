@@ -183,13 +183,32 @@ function Login({ onLogin }) {
             isAgent: true,
             target: data.agentInfo.target,
             qualification: data.agentInfo.qualification,
-            contactId: data.agentInfo.contactId
+            contactId: data.agentInfo.contactId,
+            modePermissions: data.modePermissions // 다중 권한 정보 추가
+          });
+        } else if (data.isInventory) {
+          // 재고 관리자인 경우
+          onLogin({
+            ...data.storeInfo,
+            isInventory: true,
+            isAgent: false,
+            isSettlement: false
+          });
+        } else if (data.isSettlement) {
+          // 정산 관리자인 경우
+          onLogin({
+            ...data.storeInfo,
+            isSettlement: true,
+            isAgent: false,
+            isInventory: false
           });
         } else {
           // 일반 매장인 경우
           onLogin({
             ...data.storeInfo,
-            isAgent: false
+            isAgent: false,
+            isInventory: false,
+            isSettlement: false
           });
         }
       } else {

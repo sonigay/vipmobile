@@ -24,6 +24,7 @@ import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import UpdatePopup from './components/UpdatePopup';
 import UpdateProgressPopup from './components/UpdateProgressPopup';
+import ModeSelectionPopup from './components/ModeSelectionPopup';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
@@ -150,27 +151,10 @@ function App() {
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [notificationList, setNotificationList] = useState([]);
 
-
-  // 재고모드 접속 아이디 목록
-  const INVENTORY_MODE_IDS = [
-    "JEGO306891",  // 경수
-    "JEGO315835",  // 경인
-    "JEGO314942",  // 호남
-    "JEGO316558",  // 동서울
-    "JEGO316254",  // 호남2
-    "VIP3473",     // 김수빈
-    "VIP4464",     // 홍기현
-    "VIP8119",     // 홍남옥
-    "VIP8062",     // 이병각
-    "VIP6741",     // 이형주
-    "VIP6965"      // 정광영
-  ];
-
-  // 정산모드 접속 아이디 목록
-  const SETTLEMENT_MODE_IDS = [
-    "JUNGSAN1620",  // 함용주
-    "JUNGSAN8119"   // 홍남옥
-  ];
+  // 모드 선택 팝업 상태
+  const [showModeSelection, setShowModeSelection] = useState(false);
+  const [availableModes, setAvailableModes] = useState([]);
+  const [pendingLoginData, setPendingLoginData] = useState(null);
   
   // 알림 시스템 및 모바일 최적화 초기화 제거 (재고 모드로 이동)
 
@@ -1134,22 +1118,38 @@ function App() {
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
+    // 관리자 모드이고 다중 권한이 있는 경우 모드 선택 팝업 표시
+    if (store.isAgent && store.modePermissions) {
+      const availableModes = Object.entries(store.modePermissions)
+        .filter(([mode, hasPermission]) => hasPermission)
+        .map(([mode]) => mode);
+      
+      console.log('다중 권한 확인:', availableModes);
+      
+      if (availableModes.length > 1) {
+        // 다중 권한이 있는 경우 모드 선택 팝업 표시
+        setAvailableModes(availableModes);
+        setPendingLoginData(store);
+        setShowModeSelection(true);
+        return;
+      }
+    }
+    
+    // 단일 권한이거나 일반 매장인 경우 바로 로그인 처리
+    processLogin(store);
+  };
+
+  // 실제 로그인 처리 함수
+  const processLogin = (store) => {
     // 정산모드인지 확인
-    if (SETTLEMENT_MODE_IDS.includes(store.id)) {
+    if (store.isSettlement) {
       console.log('로그인: 정산모드');
       setIsSettlementMode(true);
       setIsInventoryMode(false);
       setIsAgentMode(false);
       
-      // 정산모드 접속자 이름 설정
-      const settlementUserNames = {
-        'JUNGSAN1620': '함용주',
-        'JUNGSAN8119': '홍남옥'
-      };
-      
-      const userName = settlementUserNames[store.id] || '정산관리자';
-      setSettlementUserName(userName);
-      console.log(`정산모드 접속자: ${userName}`);
+      setSettlementUserName(store.manager || '정산관리자');
+      console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1157,34 +1157,18 @@ function App() {
         isInventory: false,
         isAgent: false,
         store: store,
-        settlementUserName: userName
+        settlementUserName: store.manager || '정산관리자'
       }));
     }
-    // 재고모드인지 확인 (백엔드 응답의 isInventory 플래그 우선 확인)
-    else if (store.isInventory || INVENTORY_MODE_IDS.includes(store.id)) {
+    // 재고모드인지 확인
+    else if (store.isInventory) {
       console.log('로그인: 재고모드');
       setIsInventoryMode(true);
       setIsAgentMode(false);
       setIsSettlementMode(false);
       
-      // 재고모드 접속자 이름 설정
-      const inventoryUserNames = {
-        'JEGO306891': '경수',
-        'JEGO315835': '경인',
-        'JEGO314942': '호남',
-        'JEGO316558': '동서울',
-        'JEGO316254': '호남2',
-        'VIP3473': '김수빈',
-        'VIP4464': '홍기현',
-        'VIP8119': '홍남옥',
-        'VIP8062': '이병각',
-        'VIP6741': '이형주',
-        'VIP6965': '정광영'
-      };
-      
-      const userName = inventoryUserNames[store.id] || '재고관리자';
-      setInventoryUserName(userName);
-      console.log(`재고모드 접속자: ${userName}`);
+      setInventoryUserName(store.manager || '재고관리자');
+      console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
       
       // 재고모드에서는 서울시청을 중심으로 전체 지역 보기
       setUserLocation({
@@ -1199,7 +1183,7 @@ function App() {
         isAgent: false,
         isSettlement: false,
         store: store,
-        inventoryUserName: userName
+        inventoryUserName: store.manager || '재고관리자'
       }));
     }
     // 관리자 모드인지 확인
@@ -1255,6 +1239,41 @@ function App() {
         store: store
       }));
     }
+  };
+
+  // 모드 선택 핸들러
+  const handleModeSelect = (selectedMode) => {
+    if (!pendingLoginData) return;
+    
+    // 선택된 모드에 따라 store 객체 수정
+    const modifiedStore = { ...pendingLoginData };
+    
+    switch (selectedMode) {
+      case 'agent':
+        modifiedStore.isAgent = true;
+        modifiedStore.isInventory = false;
+        modifiedStore.isSettlement = false;
+        break;
+      case 'inventory':
+        modifiedStore.isAgent = false;
+        modifiedStore.isInventory = true;
+        modifiedStore.isSettlement = false;
+        break;
+      case 'settlement':
+        modifiedStore.isAgent = false;
+        modifiedStore.isInventory = false;
+        modifiedStore.isSettlement = true;
+        break;
+      default:
+        break;
+    }
+    
+    // 수정된 store로 로그인 처리
+    processLogin(modifiedStore);
+    
+    // 상태 초기화
+    setPendingLoginData(null);
+    setShowModeSelection(false);
   };
 
   const handleLogout = () => {
@@ -2201,6 +2220,18 @@ function App() {
 
       {/* 알림 시스템 */}
                     {/* 알림 시스템 제거 (재고 모드로 이동) */}
+
+      {/* 모드 선택 팝업 */}
+      <ModeSelectionPopup
+        open={showModeSelection}
+        onClose={() => {
+          setShowModeSelection(false);
+          setPendingLoginData(null);
+        }}
+        availableModes={availableModes}
+        onModeSelect={handleModeSelect}
+        userName={pendingLoginData?.target || '사용자'}
+      />
     </ThemeProvider>
   );
 }

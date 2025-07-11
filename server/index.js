@@ -1558,140 +1558,7 @@ app.post('/api/login', async (req, res) => {
     console.log(`Login attempt with ID: ${storeId}`);
     console.log('Step 1: Starting login process...');
     
-    // 재고모드 전용 ID 목록
-    const INVENTORY_MODE_IDS = [
-      "JEGO306891",  // 경수
-      "JEGO315835",  // 경인
-      "JEGO314942",  // 호남
-      "JEGO316558",  // 동서울
-      "JEGO316254",  // 호남2
-      "VIP3473",     // 김수빈
-      "VIP4464",     // 홍기현
-      "VIP8119",     // 홍남옥
-      "VIP8062",     // 이병각
-      "VIP6741",     // 이형주
-      "VIP6965"      // 정광영
-    ];
-
-    // 정산모드 전용 ID 목록
-    const SETTLEMENT_MODE_IDS = [
-      "JUNGSAN1620",  // 함용주
-      "JUNGSAN8119"   // 홍남옥
-    ];
-    
-    // 정산모드 ID인지 먼저 확인
-    if (SETTLEMENT_MODE_IDS.includes(storeId)) {
-      console.log(`Step 1.5: Settlement mode ID detected: ${storeId}`);
-      
-      // 정산모드 접속자 이름 설정
-      const settlementUserNames = {
-        'JUNGSAN1620': '함용주',
-        'JUNGSAN8119': '홍남옥'
-      };
-      
-      const userName = settlementUserNames[storeId] || '정산관리자';
-      
-      // 디스코드로 로그인 로그 전송
-      if (DISCORD_LOGGING_ENABLED) {
-        try {
-          const embedData = {
-            title: '정산모드 로그인',
-            color: 16711680, // 빨간색
-            timestamp: new Date().toISOString(),
-            userType: 'settlement', // 정산모드 타입 지정
-            fields: [
-              {
-                name: '정산모드 정보',
-                value: `ID: ${storeId}\n이름: ${userName}\n모드: 정산관리 전용`
-              },
-              {
-                name: '접속 정보',
-                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
-              }
-            ],
-            footer: {
-              text: '(주)브이아이피플러스 정산모드 로그인'
-            }
-          };
-          
-          await sendLogToDiscord(embedData);
-        } catch (logError) {
-          console.error('정산모드 로그인 로그 전송 실패:', logError.message);
-          // 로그 전송 실패해도 로그인은 허용
-        }
-      }
-      
-      console.log('Step 1.6: Settlement mode login successful, sending response...');
-      return res.json({
-        success: true,
-        isAgent: false,
-        isInventory: false,
-        isSettlement: true,
-        storeInfo: {
-          id: storeId,
-          name: '정산관리 모드',
-          manager: userName,
-          address: '',
-          latitude: 37.5665,
-          longitude: 126.9780,
-          phone: ''
-        }
-      });
-    }
-
-    // 재고모드 ID인지 확인
-    if (INVENTORY_MODE_IDS.includes(storeId)) {
-      console.log(`Step 1.7: Inventory mode ID detected: ${storeId}`);
-      
-      // 디스코드로 로그인 로그 전송
-      if (DISCORD_LOGGING_ENABLED) {
-        try {
-          const embedData = {
-            title: '재고모드 로그인',
-            color: 16776960, // 노란색
-            timestamp: new Date().toISOString(),
-            userType: 'inventory', // 재고모드 타입 지정
-            fields: [
-              {
-                name: '재고모드 정보',
-                value: `ID: ${storeId}\n모드: 재고관리 전용`
-              },
-              {
-                name: '접속 정보',
-                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
-              }
-            ],
-            footer: {
-              text: '(주)브이아이피플러스 재고모드 로그인'
-            }
-          };
-          
-          await sendLogToDiscord(embedData);
-        } catch (logError) {
-          console.error('재고모드 로그인 로그 전송 실패:', logError.message);
-          // 로그 전송 실패해도 로그인은 허용
-        }
-      }
-      
-      console.log('Step 1.8: Inventory mode login successful, sending response...');
-      return res.json({
-        success: true,
-        isAgent: false,
-        isInventory: true,
-        isSettlement: false,
-        storeInfo: {
-          id: storeId,
-          name: '재고관리 모드',
-          manager: '재고관리자',
-          address: '',
-          latitude: 37.5665,
-          longitude: 126.9780,
-          phone: ''
-        }
-      });
-    }
-    
-    // 1. 먼저 대리점 관리자 ID인지 확인
+    // 1. 먼저 대리점 관리자 ID인지 확인 (구글시트 기반)
     console.log('Step 2: Checking if ID is agent...');
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
     console.log('Step 3: Agent sheet data fetched, rows:', agentValues ? agentValues.length : 0);
@@ -1707,6 +1574,22 @@ app.post('/api/login', async (req, res) => {
         console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
         console.log('Step 6: Processing agent login...');
         
+        // F열: 재고모드 권한, G열: 정산모드 권한 확인
+        const hasInventoryPermission = agent[5] === 'O'; // F열
+        const hasSettlementPermission = agent[6] === 'O'; // G열
+        
+        console.log('Step 6.5: Permission check:', {
+          inventory: hasInventoryPermission,
+          settlement: hasSettlementPermission
+        });
+        
+        // 다중 권한이 있는 경우 권한 정보 포함
+        const modePermissions = {
+          agent: true, // 관리자 모드는 기본
+          inventory: hasInventoryPermission,
+          settlement: hasSettlementPermission
+        };
+        
         // 디스코드로 로그인 로그 전송
         if (DISCORD_LOGGING_ENABLED) {
           try {
@@ -1718,7 +1601,7 @@ app.post('/api/login', async (req, res) => {
               fields: [
                 {
                   name: '관리자 정보',
-                  value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}`
+                  value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}`
                 },
                 {
                   name: '접속 정보',
@@ -1741,12 +1624,13 @@ app.post('/api/login', async (req, res) => {
         return res.json({
           success: true,
           isAgent: true,
+          modePermissions: modePermissions,
           agentInfo: {
             target: agent[0] || '',       // A열: 대상
             qualification: agent[1] || '', // B열: 자격
             contactId: agent[2] || '',     // C열: 연락처(아이디)
-            office: agent[3] || '',        // D열: 사무실 (새로 추가)
-            department: agent[4] || ''     // E열: 소속 (새로 추가)
+            office: agent[3] || '',        // D열: 사무실
+            department: agent[4] || ''     // E열: 소속
           }
         });
       }
