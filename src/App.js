@@ -1897,6 +1897,15 @@ function App() {
             </Typography>
           </Box>
         </Container>
+        
+        {/* 모드 선택 팝업 */}
+        <ModeSelectionPopup
+          open={showModeSelection}
+          onClose={() => setShowModeSelection(false)}
+          onModeSelect={handleModeSelect}
+          availableModes={availableModes}
+          loggedInStore={loggedInStore}
+        />
       </ThemeProvider>
     );
   }
