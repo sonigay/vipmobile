@@ -1127,14 +1127,7 @@ function App() {
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
-    // 관리자 권한이 있는 사용자는 항상 관리자모드로 접속
-    if (store.isAgent) {
-      console.log('관리자 권한 사용자 - 관리자모드로 바로 접속');
-      processLogin(store);
-      return;
-    }
-    
-    // 일반 사용자 중 다중 권한이 있는 경우 모드 선택 팝업 표시
+    // 다중 권한이 있는 경우 모드 선택 팝업 표시 (관리자 포함)
     if (store.modePermissions) {
       const availableModes = Object.entries(store.modePermissions)
         .filter(([mode, hasPermission]) => hasPermission)
