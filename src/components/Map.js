@@ -127,6 +127,26 @@ function Map({
     }
   }, [userLocation]);
 
+  // 컴포넌트 언마운트 시 지도 정리
+  useEffect(() => {
+    return () => {
+      if (map) {
+        try {
+          // 지도 이벤트 리스너 제거
+          map.off();
+          // 지도 컨테이너 정리
+          if (map._container) {
+            map._container.innerHTML = '';
+          }
+          // 지도 인스턴스 정리
+          map.remove();
+        } catch (error) {
+          console.warn('지도 정리 중 오류:', error);
+        }
+      }
+    };
+  }, [map]);
+
   // 재고 수량 계산 함수
   const calculateInventory = useCallback((store) => {
     if (!store.inventory) return 0;
@@ -509,7 +529,7 @@ function Map({
   return (
     <Paper sx={mapContainerStyle}>
       <MapContainer
-        key={mapKey}
+        key={`map-${isAgentMode ? 'agent' : 'store'}-${currentView || 'default'}-${mapKey}`}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={mapZoom}
         style={containerStyle}
