@@ -36,6 +36,7 @@ import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpda
 import './mobile.css';
 import PersonIcon from '@mui/icons-material/Person';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { 
   Table, 
   TableBody, 
@@ -1924,9 +1925,70 @@ function App() {
         <Container maxWidth="xl" sx={{ 
           height: '100vh', 
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center'
         }}>
+          {/* 헤더 영역 */}
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            p: 2, 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              모드 선택
+            </Typography>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+              {availableModes && availableModes.length > 1 && (
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    const currentModes = getCurrentUserAvailableModes();
+                    setAvailableModes(currentModes);
+                    setShowModeSelection(true);
+                  }}
+                  startIcon={<SwapHorizIcon />}
+                  sx={{ 
+                    borderColor: '#1976d2',
+                    color: '#1976d2',
+                    '&:hover': { 
+                      borderColor: '#1565c0',
+                      backgroundColor: 'rgba(25, 118, 210, 0.04)'
+                    }
+                  }}
+                >
+                  모드 변경
+                </Button>
+              )}
+              
+              <Button 
+                variant="outlined" 
+                onClick={handleLogout}
+                sx={{ 
+                  borderColor: '#d32f2f',
+                  color: '#d32f2f',
+                  '&:hover': { 
+                    borderColor: '#c62828',
+                    backgroundColor: 'rgba(211, 47, 47, 0.04)'
+                  }
+                }}
+              >
+                로그아웃
+              </Button>
+            </Box>
+          </Box>
+          
+          {/* 메인 콘텐츠 */}
           <Box sx={{ 
             textAlign: 'center',
             p: 4,
@@ -1942,20 +2004,20 @@ function App() {
               사용할 모드를 선택해주세요.
             </Typography>
           </Box>
-        </Container>
         
-        {/* 모드 선택 팝업 */}
-        <ModeSelectionPopup
-          open={showModeSelection}
-          onClose={() => {
-            // 팝업 취소 시에도 중립 화면 유지
-            setShowModeSelection(false);
-            // modeSelectionRequired는 유지하여 중립 화면 계속 표시
-          }}
-          onModeSelect={handleModeSelect}
-          availableModes={availableModes}
-          loggedInStore={loggedInStore}
-        />
+                  {/* 모드 선택 팝업 */}
+          <ModeSelectionPopup
+            open={showModeSelection}
+            onClose={() => {
+              // 팝업 취소 시에도 중립 화면 유지
+              setShowModeSelection(false);
+              // modeSelectionRequired는 유지하여 중립 화면 계속 표시
+            }}
+            onModeSelect={handleModeSelect}
+            availableModes={availableModes}
+            loggedInStore={loggedInStore}
+          />
+        </Container>
       </ThemeProvider>
     );
   }
