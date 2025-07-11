@@ -1353,7 +1353,7 @@ function App() {
     }
   };
 
-  // 모드 선택 핸들러
+  // 모드 선택 핸들러 (초기 로그인 시)
   const handleModeSelect = (selectedMode) => {
     if (!pendingLoginData) return;
     
@@ -1397,6 +1397,47 @@ function App() {
     
     // 상태 초기화
     setPendingLoginData(null);
+    setShowModeSelection(false);
+    setModeSelectionRequired(false);
+  };
+
+  // 모드 전환 핸들러 (이미 로그인된 상태에서)
+  const handleModeSwitch = (selectedMode) => {
+    if (!loggedInStore) return;
+    
+    // 모든 모드 상태 초기화
+    setIsAgentMode(false);
+    setIsInventoryMode(false);
+    setIsSettlementMode(false);
+    setIsInspectionMode(false);
+    setIsChartMode(false);
+    setIsPolicyMode(false);
+    
+    // 선택된 모드만 true로 설정
+    switch (selectedMode) {
+      case 'agent':
+        setIsAgentMode(true);
+        break;
+      case 'inventory':
+        setIsInventoryMode(true);
+        break;
+      case 'settlement':
+        setIsSettlementMode(true);
+        break;
+      case 'inspection':
+        setIsInspectionMode(true);
+        break;
+      case 'chart':
+        setIsChartMode(true);
+        break;
+      case 'policy':
+        setIsPolicyMode(true);
+        break;
+      default:
+        break;
+    }
+    
+    // 모드 선택 팝업 닫기
     setShowModeSelection(false);
     setModeSelectionRequired(false);
   };
@@ -2014,6 +2055,8 @@ function App() {
               // modeSelectionRequired는 유지하여 중립 화면 계속 표시
             }}
             onModeSelect={handleModeSelect}
+            onModeSwitch={handleModeSwitch}
+            isModeSwitch={true}
             availableModes={availableModes}
             loggedInStore={loggedInStore}
           />
@@ -2541,6 +2584,8 @@ function App() {
         }}
         availableModes={availableModes}
         onModeSelect={handleModeSelect}
+        onModeSwitch={handleModeSwitch}
+        isModeSwitch={false}
         userName={pendingLoginData?.target || '사용자'}
       />
     </ThemeProvider>

@@ -27,6 +27,8 @@ const ModeSelectionPopup = ({
   onClose, 
   availableModes, 
   onModeSelect, 
+  onModeSwitch,
+  isModeSwitch = false,
   userName = '사용자' 
 }) => {
   const modeConfigs = {
@@ -105,7 +107,11 @@ const ModeSelectionPopup = ({
   };
 
   const handleModeSelect = (mode) => {
-    onModeSelect(mode);
+    if (isModeSwitch && onModeSwitch) {
+      onModeSwitch(mode);
+    } else if (onModeSelect) {
+      onModeSelect(mode);
+    }
     onClose();
   };
 
