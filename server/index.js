@@ -2844,22 +2844,39 @@ app.get('/api/inspection-data', async (req, res) => {
       } else {
         // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
         if (!field) {
-          differences.push({
-            key,
-            type: 'manual_only',
-            field: '전체',
-            fieldKey: 'all',
-            correctValue: '수기초에만 존재',
-            incorrectValue: '없음',
-            manualRow: manualData.index,
-            systemRow: null,
-            assignedAgent: ''
-          });
+          // 가입번호를 정규표현식으로 정확히 비교
+          const manualKey = manualData.row[0]?.toString().trim() || '';
+          let isReallyManualOnly = true;
+          
+          // 폰클데이터에서 가입번호와 유사한 값이 있는지 확인
+          for (const [systemKey, systemData] of systemMap) {
+            const systemKeyTrimmed = systemKey.toString().trim();
+            if (manualKey === systemKeyTrimmed || 
+                manualKey.includes(systemKeyTrimmed) || 
+                systemKeyTrimmed.includes(manualKey)) {
+              isReallyManualOnly = false;
+              break;
+            }
+          }
+          
+          if (isReallyManualOnly) {
+            differences.push({
+              key,
+              type: 'manual_only',
+              field: '전체',
+              fieldKey: 'all',
+              correctValue: '수기초에만 존재',
+              incorrectValue: '없음',
+              manualRow: manualData.index,
+              systemRow: null,
+              assignedAgent: ''
+            });
+          }
         }
       }
     }
 
-    // 시스템에만 있는 데이터도 확인 (필드 필터링이 있을 때는 제외)
+    // 수기초에 없는 데이터도 확인 (필드 필터링이 있을 때는 제외)
     if (!field) {
       for (const [key, systemData] of systemMap) {
         if (!manualMap.has(key)) {
@@ -2869,7 +2886,7 @@ app.get('/api/inspection-data', async (req, res) => {
             field: '전체',
             fieldKey: 'all',
             correctValue: '없음',
-            incorrectValue: '시스템에만 존재',
+            incorrectValue: '수기초에 없음',
             manualRow: null,
             systemRow: systemData.index,
             assignedAgent: systemData.row[69] || '' // BR열: 등록직원
@@ -2878,14 +2895,22 @@ app.get('/api/inspection-data', async (req, res) => {
       }
     }
 
+    // 처리자 이름에서 괄호 제거하는 함수
+    function cleanAgentName(agentName) {
+      if (!agentName) return '';
+      // 괄호와 괄호 안의 내용 제거 (예: "홍길동 (RM)" → "홍길동")
+      return agentName.toString().replace(/\s*\([^)]*\)/g, '').trim();
+    }
+
     // 뷰에 따른 필터링
     let filteredDifferences = differences;
     if (view === 'personal' && userId) {
       console.log(`개인담당 필터링: userId=${userId}, 전체 차이점=${differences.length}개`);
       console.log('등록직원 목록:', [...new Set(differences.map(d => d.assignedAgent))]);
+      console.log('정리된 등록직원 목록:', [...new Set(differences.map(d => cleanAgentName(d.assignedAgent)))]);
       
       filteredDifferences = differences.filter(diff => 
-        diff.assignedAgent === userId
+        cleanAgentName(diff.assignedAgent) === cleanAgentName(userId)
       );
       
       console.log(`필터링 후 차이점: ${filteredDifferences.length}개`);
@@ -3285,6 +3310,12 @@ app.get('/api/inspection/completion-status', async (req, res) => {
 // 컬럼 매칭 설정 (수기초 컬럼 ↔ 폰클개통데이터 컬럼)
 const COLUMN_MATCHING_CONFIG = [
   {
+    manualField: { name: '가입번호', key: 'subscription_id', column: 0 }, // A열
+    systemField: { name: '메모1', key: 'memo1', column: 66 }, // BO열
+    regex: null, // 직접 비교
+    description: '가입번호 직접 비교'
+  },
+  {
     manualField: { name: '대리점코드', key: 'store_code', column: 5 }, // F열
     systemField: { name: '메모2', key: 'memo2', column: 67 }, // BP열
     regex: '\\d{6}', // 6자리 숫자 추출
@@ -3292,12 +3323,25 @@ const COLUMN_MATCHING_CONFIG = [
   }
 ];
 
-// 정규표현식으로 값 추출
+// 정규표현식으로 값 추출 (쉼표, 슬래시, 띄어쓰기 구분하여 모든 숫자 추출)
 function extractValueWithRegex(value, regex) {
   if (!regex || !value) return value;
   try {
-    const matches = value.toString().match(new RegExp(regex, 'g'));
-    return matches ? matches.join(', ') : '';
+    // 쉼표, 슬래시, 띄어쓰기로 분리
+    const parts = value.toString().split(/[,/\\s]+/);
+    
+    // 모든 부분에서 정규표현식 매치 찾기
+    const allMatches = [];
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed) {
+        const matches = trimmed.match(new RegExp(regex, 'g'));
+        if (matches) {
+          allMatches.push(...matches);
+        }
+      }
+    }
+    return allMatches.join(', '); // 모든 매치를 쉼표로 연결하여 반환
   } catch (error) {
     console.error('정규표현식 오류:', error);
     return value;
@@ -3328,6 +3372,21 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
     if (regex) {
       manualValue = extractValueWithRegex(manualValue, regex);
       systemValue = extractValueWithRegex(systemValue, regex);
+      
+      // 대리점코드의 경우: 수기초 값이 폰클데이터에 포함되어 있으면 일치로 처리
+      if (manualField.key === 'store_code' && manualValue && systemValue) {
+        const manualCodes = manualValue.split(', ').map(code => code.trim());
+        const systemCodes = systemValue.split(', ').map(code => code.trim());
+        
+        // 수기초의 대리점코드가 폰클데이터에 하나라도 포함되어 있으면 일치
+        const hasMatch = manualCodes.some(manualCode => 
+          systemCodes.some(systemCode => manualCode === systemCode)
+        );
+        
+        if (hasMatch) {
+          return; // 일치하므로 차이점으로 기록하지 않음
+        }
+      }
     }
     
     // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
