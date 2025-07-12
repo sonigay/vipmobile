@@ -2775,20 +2775,20 @@ app.post('/api/push/send-all', async (req, res) => {
   }
 });
 
-// 검수모드 데이터 가져오기 (캐싱 적용)
+// 검수모드 데이터 가져오기 (보안 강화된 캐싱 적용)
 app.get('/api/inspection-data', async (req, res) => {
   const { view = 'personal', userId, field } = req.query;
   const cacheKey = `inspection_data_${view}_${userId}_${field || 'all'}`;
   
-  // 캐시에서 먼저 확인
+  // 캐시에서 먼저 확인 (보안 TTL 적용)
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log('캐시된 검수 데이터 반환');
+    console.log('캐시된 검수 데이터 반환 (보안 TTL 적용)');
     return res.json(cachedData);
   }
   
   try {
-    console.log('검수 데이터 처리 시작...');
+    console.log('검수 데이터 처리 시작... (개인정보 보안 처리 포함)');
     const startTime = Date.now();
     
     // 수기초와 폰클개통데이터 병렬 로드
@@ -2859,7 +2859,7 @@ app.get('/api/inspection-data', async (req, res) => {
       }
     }
 
-              // 시스템에만 있는 데이터도 확인 (필드 필터링이 있을 때는 제외)
+    // 시스템에만 있는 데이터도 확인 (필드 필터링이 있을 때는 제외)
     if (!field) {
       for (const [key, systemData] of systemMap) {
         if (!manualMap.has(key)) {
@@ -2886,19 +2886,23 @@ app.get('/api/inspection-data', async (req, res) => {
       );
     }
 
+    // 개인정보 보안 처리: 마스킹 및 해시화
+    const secureDifferences = securityUtils.createSafeDataStructure(filteredDifferences);
+
     const result = {
-      differences: filteredDifferences,
-      total: filteredDifferences.length,
-      manualOnly: filteredDifferences.filter(d => d.type === 'manual_only').length,
-      systemOnly: filteredDifferences.filter(d => d.type === 'system_only').length,
-      mismatched: filteredDifferences.filter(d => d.type === 'mismatch').length
+      differences: secureDifferences,
+      total: secureDifferences.length,
+      manualOnly: secureDifferences.filter(d => d.type === 'manual_only').length,
+      systemOnly: secureDifferences.filter(d => d.type === 'system_only').length,
+      mismatched: secureDifferences.filter(d => d.type === 'mismatch').length,
+      securityNote: '개인정보는 마스킹 처리되었습니다.'
     };
 
     const processingTime = Date.now() - startTime;
-    console.log(`검수 데이터 처리 완료: ${result.total}개 차이점, ${processingTime}ms 소요`);
+    console.log(`검수 데이터 처리 완료: ${result.total}개 차이점, ${processingTime}ms 소요 (보안 처리 포함)`);
     
-    // 캐시에 저장 (5분 TTL)
-    cacheUtils.set(cacheKey, result);
+    // 보안 강화된 캐시에 저장 (2분 TTL)
+    cacheUtils.set(cacheKey, result, SECURE_CACHE_TTL);
     
     res.json(result);
   } catch (error) {
@@ -2962,7 +2966,17 @@ function compareRows(manualRow, systemRow, key, targetField = null) {
   return differences;
 }
 
-// 검수 완료 상태 업데이트
+// 해시화된 ID를 원본 키로 변환하는 함수
+function findOriginalKeyFromHash(hashId, differences) {
+  for (const diff of differences) {
+    if (securityUtils.hashPersonalInfo(diff.key) === hashId) {
+      return diff.key;
+    }
+  }
+  return null;
+}
+
+// 검수 완료 상태 업데이트 (해시화된 ID 처리)
 app.post('/api/inspection/complete', async (req, res) => {
   try {
     const { itemId, userId, status } = req.body;
@@ -2974,12 +2988,27 @@ app.post('/api/inspection/complete', async (req, res) => {
       });
     }
 
+    // 해시화된 ID를 원본 키로 변환
+    let originalKey = itemId;
+    // 캐시에서 원본 데이터 찾기
+    const cacheKeys = Array.from(cache.keys()).filter(key => key.includes('inspection_data'));
+    for (const cacheKey of cacheKeys) {
+      const cachedData = cacheUtils.get(cacheKey);
+      if (cachedData && cachedData.differences) {
+        const foundKey = findOriginalKeyFromHash(itemId, cachedData.differences);
+        if (foundKey) {
+          originalKey = foundKey;
+          break;
+        }
+      }
+    }
+
     // 검수결과 시트에 완료 상태 기록
     const completionData = [
       [
         new Date().toISOString(), // 완료일시
         userId,                   // 처리자
-        itemId,                   // 항목 ID
+        originalKey,              // 원본 항목 ID
         status || '완료',         // 상태
         '처리완료'                // 비고
       ]
@@ -3379,6 +3408,456 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
 
   return differences;
 }
+
+// 검수 완료 상태 업데이트
+app.post('/api/inspection/complete', async (req, res) => {
+  try {
+    const { itemId, userId, status } = req.body;
+    
+    if (!itemId || !userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID and User ID are required' 
+      });
+    }
+
+    // 검수결과 시트에 완료 상태 기록
+    const completionData = [
+      [
+        new Date().toISOString(), // 완료일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        status || '완료',         // 상태
+        '처리완료'                // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: completionData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '검수 완료 상태가 업데이트되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating inspection completion:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update inspection completion', 
+      message: error.message 
+    });
+  }
+});
+
+// 정규화 데이터 저장
+app.post('/api/inspection/normalize', async (req, res) => {
+  try {
+    const { itemId, userId, originalValue, normalizedValue, field } = req.body;
+    
+    if (!itemId || !userId || !normalizedValue) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID, User ID, and normalized value are required' 
+      });
+    }
+
+    // 정규화이력 시트에 기록
+    const normalizationData = [
+      [
+        new Date().toISOString(), // 정규화일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        field,                    // 필드명
+        originalValue || '',      // 원본값
+        normalizedValue,          // 정규화값
+        '수동정규화'              // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${NORMALIZATION_HISTORY_SHEET_NAME}!A:G`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: normalizationData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '정규화 데이터가 저장되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error saving normalization data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to save normalization data', 
+      message: error.message 
+    });
+  }
+});
+
+// 폰클개통데이터 수정 API
+app.post('/api/inspection/update-system-data', async (req, res) => {
+  try {
+    const { itemId, userId, field, correctValue, systemRow } = req.body;
+    
+    if (!itemId || !userId || !field || !correctValue || systemRow === null) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID, User ID, field, correct value, and system row are required' 
+      });
+    }
+
+    // 필드명에 따른 컬럼 인덱스 매핑
+    const fieldToColumnMap = {
+      '이름': 1,      // B열
+      '전화번호': 2,   // C열
+      '주소': 3,      // D열
+      '생년월일': 4,  // E열
+      '성별': 5,      // F열
+      // 더 많은 필드 매핑 추가 가능
+    };
+
+    const columnIndex = fieldToColumnMap[field];
+    if (columnIndex === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid field name' 
+      });
+    }
+
+    // 폰클개통데이터 시트에서 해당 행의 특정 컬럼 수정
+    const range = `${CURRENT_MONTH_ACTIVATION_SHEET_NAME}!${String.fromCharCode(65 + columnIndex)}${systemRow}`;
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: range,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [[correctValue]]
+      }
+    });
+
+    // 수정 이력 시트에 기록
+    const updateHistoryData = [
+      [
+        new Date().toISOString(), // 수정일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        field,                    // 필드명
+        correctValue,             // 수정된 값
+        '폰클개통데이터 수정'     // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:F`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: updateHistoryData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '폰클개통데이터가 성공적으로 수정되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating system data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update system data', 
+      message: error.message 
+    });
+  }
+});
+
+// 사용 가능한 필드 목록 조회 API
+app.get('/api/inspection/available-fields', async (req, res) => {
+  try {
+    const fields = COLUMN_MAPPINGS.map(mapping => ({
+      key: mapping.key,
+      name: mapping.name
+    }));
+
+    res.json({ 
+      success: true, 
+      fields 
+    });
+  } catch (error) {
+    console.error('Error fetching available fields:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch available fields', 
+      message: error.message 
+    });
+  }
+});
+
+// 필드별 고유값 조회 API
+app.get('/api/inspection/field-values', async (req, res) => {
+  try {
+    const { field } = req.query;
+    
+    if (!field) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Field name is required' 
+      });
+    }
+
+    // 필드명에 따른 컬럼 인덱스 매핑
+    const fieldMapping = COLUMN_MAPPINGS.find(mapping => mapping.name === field);
+    if (!fieldMapping) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid field name' 
+      });
+    }
+
+    const columnIndex = fieldMapping.manual;
+
+    // 수기초와 폰클개통데이터에서 해당 필드의 모든 값 수집
+    const [manualValues, systemValues] = await Promise.all([
+      getSheetValues(MANUAL_DATA_SHEET_NAME),
+      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME)
+    ]);
+
+    const allValues = new Set();
+
+    // 수기초에서 값 수집
+    if (manualValues && manualValues.length > 1) {
+      manualValues.slice(1).forEach(row => {
+        if (row.length > columnIndex && row[columnIndex]) {
+          allValues.add(row[columnIndex].toString().trim());
+        }
+      });
+    }
+
+    // 폰클개통데이터에서 값 수집
+    if (systemValues && systemValues.length > 1) {
+      systemValues.slice(1).forEach(row => {
+        if (row.length > columnIndex && row[columnIndex]) {
+          allValues.add(row[columnIndex].toString().trim());
+        }
+      });
+    }
+
+    // 정규화 이력에서도 값 수집
+    try {
+      const normalizationResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${NORMALIZATION_HISTORY_SHEET_NAME}!A:G`
+      });
+      
+      if (normalizationResponse.data.values && normalizationResponse.data.values.length > 1) {
+        normalizationResponse.data.values.slice(1).forEach(row => {
+          if (row.length >= 6 && row[3] === field && row[5]) { // 필드명이 일치하고 정규화값이 있는 경우
+            allValues.add(row[5].toString().trim());
+          }
+        });
+      }
+    } catch (error) {
+      // 정규화 이력 시트가 없거나 비어있는 경우 무시
+      console.log('정규화 이력 시트가 없거나 비어있습니다.');
+    }
+
+    const uniqueValues = Array.from(allValues).filter(value => value).sort();
+
+    res.json({ 
+      success: true, 
+      field,
+      values: uniqueValues 
+    });
+  } catch (error) {
+    console.error('Error fetching field values:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch field values', 
+      message: error.message 
+    });
+  }
+});
+
+// 검수 완료 상태 조회
+app.get('/api/inspection/completion-status', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User ID is required' 
+      });
+    }
+
+    // 검수결과 시트에서 해당 사용자의 완료 항목 조회
+    let completionData = [];
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`
+      });
+      completionData = response.data.values || [];
+    } catch (error) {
+      // 시트가 없거나 비어있는 경우 빈 배열 반환
+      console.log('검수결과 시트가 없거나 비어있습니다.');
+    }
+
+    // 헤더 제거하고 해당 사용자의 완료 항목만 필터링
+    const userCompletions = completionData
+      .slice(1) // 헤더 제거
+      .filter(row => row.length >= 3 && row[1] === userId) // 처리자 ID가 일치하는 항목
+      .map(row => row[2]); // 항목 ID만 추출
+
+    res.json({ 
+      success: true, 
+      completedItems: userCompletions 
+    });
+  } catch (error) {
+    console.error('Error fetching completion status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch completion status', 
+      message: error.message 
+    });
+  }
+});
+
+// 개인정보 보안 유틸리티 함수들
+const securityUtils = {
+  // 개인정보 마스킹 함수
+  maskPersonalInfo: (value, type = 'default') => {
+    if (!value || typeof value !== 'string') return value;
+    
+    const trimmed = value.toString().trim();
+    if (!trimmed) return value;
+    
+    switch (type) {
+      case 'name':
+        // 이름: 첫 글자만 보이고 나머지는 *
+        return trimmed.length > 1 ? trimmed[0] + '*'.repeat(trimmed.length - 1) : '*';
+      
+      case 'phone':
+        // 전화번호: 앞 3자리와 뒤 4자리만 보이고 중간은 *
+        if (trimmed.length >= 7) {
+          return trimmed.substring(0, 3) + '*'.repeat(trimmed.length - 7) + trimmed.substring(trimmed.length - 4);
+        }
+        return '*'.repeat(trimmed.length);
+      
+      case 'address':
+        // 주소: 시/도까지만 보이고 나머지는 *
+        const addressParts = trimmed.split(' ');
+        if (addressParts.length > 1) {
+          return addressParts[0] + ' ' + '*'.repeat(trimmed.length - addressParts[0].length - 1);
+        }
+        return '*'.repeat(trimmed.length);
+      
+      case 'birthdate':
+        // 생년월일: 년도만 보이고 월일은 *
+        if (trimmed.length >= 4) {
+          return trimmed.substring(0, 4) + '*'.repeat(trimmed.length - 4);
+        }
+        return '*'.repeat(trimmed.length);
+      
+      default:
+        // 기본: 전체를 *로 마스킹
+        return '*'.repeat(trimmed.length);
+    }
+  },
+  
+  // 개인정보 해시 함수 (간단한 해시)
+  hashPersonalInfo: (value) => {
+    if (!value || typeof value !== 'string') return '';
+    const trimmed = value.toString().trim();
+    if (!trimmed) return '';
+    
+    // 간단한 해시 함수 (실제 운영에서는 더 강력한 해시 사용 권장)
+    let hash = 0;
+    for (let i = 0; i < trimmed.length; i++) {
+      const char = trimmed.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // 32bit 정수로 변환
+    }
+    return Math.abs(hash).toString(36);
+  },
+  
+  // 안전한 데이터 구조 생성
+  createSafeDataStructure: (differences) => {
+    return differences.map(diff => {
+      const safeDiff = {
+        id: securityUtils.hashPersonalInfo(diff.key), // 개인정보 해시화
+        type: diff.type,
+        field: diff.field,
+        fieldKey: diff.fieldKey,
+        manualRow: diff.manualRow,
+        systemRow: diff.systemRow,
+        assignedAgent: diff.assignedAgent,
+        // 개인정보는 마스킹된 값만 전송
+        correctValue: securityUtils.maskPersonalInfo(diff.correctValue, getFieldType(diff.fieldKey)),
+        incorrectValue: securityUtils.maskPersonalInfo(diff.incorrectValue, getFieldType(diff.fieldKey)),
+        // 원본 키는 해시화
+        originalKey: securityUtils.hashPersonalInfo(diff.key)
+      };
+      
+      // 필드 타입에 따른 추가 마스킹
+      if (diff.fieldKey === 'name') {
+        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'name');
+        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'name');
+      } else if (diff.fieldKey === 'phone') {
+        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'phone');
+        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'phone');
+      } else if (diff.fieldKey === 'address') {
+        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'address');
+        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'address');
+      } else if (diff.fieldKey === 'birthdate') {
+        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'birthdate');
+        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'birthdate');
+      }
+      
+      return safeDiff;
+    });
+  }
+};
+
+// 필드 타입 판별 함수
+function getFieldType(fieldKey) {
+  const fieldTypeMap = {
+    'name': 'name',
+    'phone': 'phone', 
+    'address': 'address',
+    'birthdate': 'birthdate',
+    'gender': 'default',
+    'type': 'default',
+    'model': 'default',
+    'plan': 'default',
+    'store': 'default'
+  };
+  return fieldTypeMap[fieldKey] || 'default';
+}
+
+// 개인정보 포함 캐시 TTL 단축 (보안 강화)
+const SECURE_CACHE_TTL = 2 * 60 * 1000; // 2분 (기존 5분에서 단축)
 
 // 검수 완료 상태 업데이트
 app.post('/api/inspection/complete', async (req, res) => {

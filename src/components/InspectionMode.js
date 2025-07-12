@@ -90,7 +90,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     isLoadingValues: false
   });
   
-  // 완료된 항목 추적
+  // 완료된 항목 추적 (해시화된 ID 사용)
   const [completedItems, setCompletedItems] = useState(new Set());
   
   // 완료 상태 로드
@@ -163,14 +163,14 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     loadCompletionStatus();
   }, [loadInspectionData, loadCompletionStatus, selectedField]);
 
-  // 필터링된 데이터
+  // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
     if (!inspectionData?.differences) return [];
     
-    // 완료 상태를 포함한 데이터
+    // 완료 상태를 포함한 데이터 (해시화된 ID 사용)
     const differencesWithCompletion = inspectionData.differences.map(diff => ({
       ...diff,
-      completed: completedItems.has(diff.key)
+      completed: completedItems.has(diff.id || diff.originalKey) // 해시화된 ID 사용
     }));
     
     return filterDifferences(differencesWithCompletion, filters);
@@ -195,19 +195,19 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     return extractAssignedAgents(inspectionData.differences);
   }, [inspectionData]);
 
-  // 검수 완료 처리
+  // 검수 완료 처리 (해시화된 ID 사용)
   const handleComplete = async (item) => {
     if (!loggedInStore?.contactId) return;
     
     try {
       const response = await updateInspectionCompletion(
-        item.key,
+        item.id || item.originalKey, // 해시화된 ID 사용
         loggedInStore.contactId,
         '완료'
       );
       
       if (response.success) {
-        setCompletedItems(prev => new Set([...prev, item.key]));
+        setCompletedItems(prev => new Set([...prev, item.id || item.originalKey]));
         // 완료 상태 다시 로드
         loadCompletionStatus();
       } else {
@@ -256,13 +256,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   };
 
-  // 폰클개통데이터 수정 처리
+  // 폰클개통데이터 수정 처리 (해시화된 ID 사용)
   const handleUpdateSystemData = async (item) => {
     if (!loggedInStore?.contactId || !item.systemRow) return;
     
     try {
       const response = await updateSystemData(
-        item.key,
+        item.id || item.originalKey, // 해시화된 ID 사용
         loggedInStore.contactId,
         item.field,
         item.correctValue,
@@ -285,7 +285,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   };
 
-  // 정규화 저장
+  // 정규화 저장 (해시화된 ID 사용)
   const handleSaveNormalization = async () => {
     const { item, normalizedValue } = normalizeDialog;
     
@@ -293,7 +293,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     
     try {
       const response = await saveNormalizationData(
-        item.key,
+        item.id || item.originalKey, // 해시화된 ID 사용
         loggedInStore.contactId,
         item.correctValue || item.incorrectValue,
         normalizedValue.trim(),
