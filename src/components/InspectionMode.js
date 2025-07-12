@@ -214,27 +214,27 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   const filteredData = useMemo(() => {
     if (!inspectionData?.differences) return [];
     
-    // 완료 상태를 포함한 데이터 (해시화된 ID 사용)
+    // 완료 상태를 포함한 데이터 (수정완료 상태도 포함)
     const differencesWithCompletion = inspectionData.differences.map(diff => ({
       ...diff,
-      completed: completedItems.has(diff.id || diff.originalKey) // 해시화된 ID 사용
+      completed: completedItems.has(diff.id || diff.originalKey) || modificationCompletedItems.has(diff.originalKey || diff.key)
     }));
     
     return filterDifferences(differencesWithCompletion, filters);
-  }, [inspectionData, filters, completedItems]);
+  }, [inspectionData, filters, completedItems, modificationCompletedItems]);
 
   // 통계 계산
   const statistics = useMemo(() => {
     if (!inspectionData?.differences) return null;
     
-    // 완료 상태를 포함한 통계 계산
+    // 완료 상태를 포함한 통계 계산 (수정완료 상태도 포함)
     const differencesWithCompletion = inspectionData.differences.map(diff => ({
       ...diff,
-      completed: completedItems.has(diff.key)
+      completed: completedItems.has(diff.key) || modificationCompletedItems.has(diff.originalKey || diff.key)
     }));
     
     return calculateStatistics(differencesWithCompletion);
-  }, [inspectionData, completedItems]);
+  }, [inspectionData, completedItems, modificationCompletedItems]);
 
   // 처리자 목록
   const assignedAgents = useMemo(() => {
