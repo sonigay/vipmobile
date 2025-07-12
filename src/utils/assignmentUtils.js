@@ -150,29 +150,56 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
         const normalizedAgentName = normalizeAgentName(agent.target);
         const uniqueStores = new Set();
         
-        // 정규화된 이름과 매칭되는 모든 담당자의 개통실적에서 출고처 수집
-        Object.entries(activationData.current).forEach(([agentName, records]) => {
-          const agentNameNormalized = normalizeAgentName(agentName);
-          if (agentNameNormalized === normalizedAgentName) {
-            records.forEach(record => {
-              const storeName = record['출고처'];
-              if (
-                storeName &&
-                typeof storeName === 'string' &&
-                storeName.trim() !== '' &&
-                storeName !== '-' &&
-                storeName !== '미지정' &&
-                storeName !== '미정' &&
-                storeName !== '기타' &&
-                storeName !== '없음' &&
-                storeName !== '0' &&
-                storeName.trim() !== '0'
-              ) {
-                uniqueStores.add(storeName.trim());
-              }
-            });
+        // 정규화된 이름과 매칭되는 모든 담당자의 개통실적에서 출고처 수집 (Map 객체 처리)
+        if (activationData.current instanceof Map) {
+          // Map 객체인 경우 entries() 메서드 사용
+          for (const [agentName, records] of activationData.current.entries()) {
+            const agentNameNormalized = normalizeAgentName(agentName);
+            if (agentNameNormalized === normalizedAgentName) {
+              records.forEach(record => {
+                const storeName = record['출고처'];
+                if (
+                  storeName &&
+                  typeof storeName === 'string' &&
+                  storeName.trim() !== '' &&
+                  storeName !== '-' &&
+                  storeName !== '미지정' &&
+                  storeName !== '미정' &&
+                  storeName !== '기타' &&
+                  storeName !== '없음' &&
+                  storeName !== '0' &&
+                  storeName.trim() !== '0'
+                ) {
+                  uniqueStores.add(storeName.trim());
+                }
+              });
+            }
           }
-        });
+        } else {
+          // 일반 객체인 경우 Object.entries() 사용
+          Object.entries(activationData.current).forEach(([agentName, records]) => {
+            const agentNameNormalized = normalizeAgentName(agentName);
+            if (agentNameNormalized === normalizedAgentName) {
+              records.forEach(record => {
+                const storeName = record['출고처'];
+                if (
+                  storeName &&
+                  typeof storeName === 'string' &&
+                  storeName.trim() !== '' &&
+                  storeName !== '-' &&
+                  storeName !== '미지정' &&
+                  storeName !== '미정' &&
+                  storeName !== '기타' &&
+                  storeName !== '없음' &&
+                  storeName !== '0' &&
+                  storeName.trim() !== '0'
+                ) {
+                  uniqueStores.add(storeName.trim());
+                }
+              });
+            }
+          });
+        }
         storeCount = uniqueStores.size;
         
         console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
@@ -310,22 +337,46 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     let agentCurrentData = [];
     let agentPreviousData = [];
     
-    // 해당 정규화된 이름을 가진 모든 담당자의 개통실적을 합산
-    Object.entries(activationData.current).forEach(([agentName, records]) => {
-      const agentNameNormalized = normalizeAgentName(agentName);
-      if (agentNameNormalized === normalizedAgentName) {
-        const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
-        agentCurrentData = agentCurrentData.concat(filteredRecords);
+    // 해당 정규화된 이름을 가진 모든 담당자의 개통실적을 합산 (Map 객체 처리)
+    if (activationData.current instanceof Map) {
+      // Map 객체인 경우 entries() 메서드 사용
+      for (const [agentName, records] of activationData.current.entries()) {
+        const agentNameNormalized = normalizeAgentName(agentName);
+        if (agentNameNormalized === normalizedAgentName) {
+          const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
+          agentCurrentData = agentCurrentData.concat(filteredRecords);
+        }
       }
-    });
+    } else {
+      // 일반 객체인 경우 Object.entries() 사용
+      Object.entries(activationData.current).forEach(([agentName, records]) => {
+        const agentNameNormalized = normalizeAgentName(agentName);
+        if (agentNameNormalized === normalizedAgentName) {
+          const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
+          agentCurrentData = agentCurrentData.concat(filteredRecords);
+        }
+      });
+    }
     
-    Object.entries(activationData.previous).forEach(([agentName, records]) => {
-      const agentNameNormalized = normalizeAgentName(agentName);
-      if (agentNameNormalized === normalizedAgentName) {
-        const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
-        agentPreviousData = agentPreviousData.concat(filteredRecords);
+    if (activationData.previous instanceof Map) {
+      // Map 객체인 경우 entries() 메서드 사용
+      for (const [agentName, records] of activationData.previous.entries()) {
+        const agentNameNormalized = normalizeAgentName(agentName);
+        if (agentNameNormalized === normalizedAgentName) {
+          const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
+          agentPreviousData = agentPreviousData.concat(filteredRecords);
+        }
       }
-    });
+    } else {
+      // 일반 객체인 경우 Object.entries() 사용
+      Object.entries(activationData.previous).forEach(([agentName, records]) => {
+        const agentNameNormalized = normalizeAgentName(agentName);
+        if (agentNameNormalized === normalizedAgentName) {
+          const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
+          agentPreviousData = agentPreviousData.concat(filteredRecords);
+        }
+      });
+    }
     
     console.log(`🔍 정규화된 담당자 "${normalizedAgentName}" (${agent.target}) 개통실적 데이터 수집:`, {
       원본담당자: agent.target,
