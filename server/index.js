@@ -2919,57 +2919,7 @@ app.get('/api/inspection-data', async (req, res) => {
   }
 });
 
-// 비교할 컬럼 매핑 정의 (수기초 컬럼 -> 폰클개통데이터 컬럼)
-const COLUMN_MAPPINGS = [
-  { manual: 1, system: 1, name: '이름', key: 'name' },           // B열
-  { manual: 2, system: 2, name: '전화번호', key: 'phone' },      // C열
-  { manual: 3, system: 3, name: '주소', key: 'address' },        // D열
-  { manual: 4, system: 4, name: '생년월일', key: 'birthdate' },  // E열
-  { manual: 5, system: 5, name: '성별', key: 'gender' },         // F열
-  { manual: 6, system: 6, name: '유형값', key: 'type' },         // G열
-  { manual: 7, system: 7, name: '모델명', key: 'model' },        // H열
-  { manual: 8, system: 8, name: '요금제', key: 'plan' },         // I열
-  { manual: 9, system: 9, name: '대리점', key: 'store' },        // J열
-  // 더 많은 컬럼 매핑 추가 가능
-];
-
-// 행 비교 함수 (수기초 기준으로 정확한 값 판단)
-function compareRows(manualRow, systemRow, key, targetField = null) {
-  const differences = [];
-  
-  // 특정 필드만 비교하거나 전체 필드 비교
-  const mappingsToCompare = targetField 
-    ? COLUMN_MAPPINGS.filter(mapping => mapping.key === targetField)
-    : COLUMN_MAPPINGS;
-
-  mappingsToCompare.forEach(mapping => {
-    // 배열 범위 체크
-    if (manualRow.length <= mapping.manual || systemRow.length <= mapping.system) {
-      return;
-    }
-    
-    const manualValue = manualRow[mapping.manual] || '';
-    const systemValue = systemRow[mapping.system] || '';
-    
-    // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
-    if (manualValue.toString().trim() !== systemValue.toString().trim() && 
-        (manualValue.toString().trim() || systemValue.toString().trim())) {
-      differences.push({
-        key,
-        type: 'mismatch',
-        field: mapping.name,
-        fieldKey: mapping.key,
-        correctValue: manualValue.toString().trim(), // 수기초가 정확한 값
-        incorrectValue: systemValue.toString().trim(), // 폰클개통데이터가 잘못된 값
-        manualRow: null,
-        systemRow: null,
-        assignedAgent: systemRow[69] || '' // BR열: 등록직원
-      });
-    }
-  });
-
-  return differences;
-}
+// 기존 COLUMN_MAPPINGS와 compareRows 함수는 제거됨 (compareDynamicColumns로 통합)
 
 // 해시화된 ID를 원본 키로 변환하는 함수
 function findOriginalKeyFromHash(hashId, differences) {
@@ -3339,20 +3289,7 @@ const COLUMN_MATCHING_CONFIG = [
     systemField: { name: '메모2', key: 'memo2', column: 67 }, // BP열
     regex: '\\d{6}', // 6자리 숫자 추출
     description: '대리점코드 6자리 숫자 비교'
-  },
-  {
-    manualField: { name: '이름', key: 'name', column: 1 }, // B열
-    systemField: { name: '이름', key: 'name', column: 1 }, // B열
-    regex: null, // 직접 비교
-    description: '이름 직접 비교'
-  },
-  {
-    manualField: { name: '전화번호', key: 'phone', column: 2 }, // C열
-    systemField: { name: '전화번호', key: 'phone', column: 2 }, // C열
-    regex: null,
-    description: '전화번호 직접 비교'
-  },
-  // 더 많은 매칭 설정 추가 가능
+  }
 ];
 
 // 정규표현식으로 값 추출
