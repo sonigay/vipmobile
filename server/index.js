@@ -106,6 +106,15 @@ const cacheUtils = {
       valid: validItems.length,
       expired: cache.size - validItems.length
     };
+  },
+  
+  // 캐시 패턴 삭제
+  deletePattern: (pattern) => {
+    for (const key of cache.keys()) {
+      if (key.startsWith(pattern)) {
+        cache.delete(key);
+      }
+    }
   }
 };
 
@@ -2775,6 +2784,180 @@ app.post('/api/push/send-all', async (req, res) => {
   }
 });
 
+// 컬럼 설정 관리 API
+app.get('/api/inspection/columns', async (req, res) => {
+  try {
+    // 현재 컬럼 설정 반환
+    const columnSettings = {
+      manualKeyColumn: 'A', // 수기초 가입번호 컬럼
+      manualKeyColumnName: '가입번호',
+      systemKeyColumn: 'BO', // 폰클개통데이터 메모1 컬럼
+      systemKeyColumnName: '메모1',
+      systemAgentColumn: 'BR', // 폰클개통데이터 등록직원 컬럼
+      systemAgentColumnName: '등록직원',
+      systemMemo2Column: 'BP', // 폰클개통데이터 메모2 컬럼
+      systemMemo2ColumnName: '메모2',
+      // 동적 매칭 설정
+      dynamicMappings: [
+        {
+          key: 'store_code',
+          manualColumn: 'F',
+          manualColumnName: '대리점코드',
+          systemColumn: 'BP',
+          systemColumnName: '메모2',
+          description: '대리점코드 비교 (메모2에서 숫자 추출)',
+          regex: '\\d+',
+          enabled: true
+        }
+      ]
+    };
+    
+    res.json({
+      success: true,
+      settings: columnSettings
+    });
+  } catch (error) {
+    console.error('Error fetching column settings:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch column settings', 
+      message: error.message 
+    });
+  }
+});
+
+// 컬럼 설정 업데이트 API
+app.post('/api/inspection/columns', async (req, res) => {
+  try {
+    const { settings } = req.body;
+    
+    if (!settings) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Settings are required' 
+      });
+    }
+
+    // 설정을 검수설정 시트에 저장
+    const settingsData = [
+      [
+        new Date().toISOString(), // 설정일시
+        JSON.stringify(settings), // 설정 JSON
+        '컬럼설정업데이트'        // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_SETTINGS_SHEET_NAME}!A:C`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: settingsData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.deletePattern('inspection_data_*');
+
+    res.json({ 
+      success: true, 
+      message: '컬럼 설정이 업데이트되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating column settings:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update column settings', 
+      message: error.message 
+    });
+  }
+});
+
+// 수정완료 상태 조회 API
+app.get('/api/inspection/modification-completion-status', async (req, res) => {
+  try {
+    // 검수결과 시트에서 수정완료 상태 조회
+    const resultValues = await getSheetValues(INSPECTION_RESULT_SHEET_NAME);
+    if (!resultValues) {
+      return res.json({ modificationCompletedItems: [] });
+    }
+
+    const resultRows = resultValues.slice(1); // 헤더 제거
+    const modificationCompletedItems = [];
+
+    resultRows.forEach(row => {
+      if (row.length >= 4 && row[3] === '수정완료') { // D열: 상태가 '수정완료'인 경우
+        const itemId = row[2]; // C열: 항목 ID
+        if (itemId) {
+          modificationCompletedItems.push(itemId);
+        }
+      }
+    });
+
+    res.json({ 
+      modificationCompletedItems,
+      total: modificationCompletedItems.length
+    });
+  } catch (error) {
+    console.error('Error fetching modification completion status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch modification completion status', 
+      message: error.message 
+    });
+  }
+});
+
+// 수정완료 상태 업데이트 API
+app.post('/api/inspection/modification-complete', async (req, res) => {
+  try {
+    const { itemId, userId, isCompleted } = req.body;
+    
+    if (!itemId || !userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID and User ID are required' 
+      });
+    }
+
+    // 수정완료 상태를 검수결과 시트에 기록
+    const completionData = [
+      [
+        new Date().toISOString(), // 완료일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        isCompleted ? '수정완료' : '수정대기', // 상태
+        isCompleted ? '수정완료체크' : '수정대기체크' // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: completionData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '수정완료 상태가 업데이트되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating modification completion:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update modification completion', 
+      message: error.message 
+    });
+  }
+});
+
 // 검수모드 데이터 가져오기 (보안 강화된 캐싱 적용)
 app.get('/api/inspection-data', async (req, res) => {
   const { view = 'personal', userId, field } = req.query;
@@ -3367,16 +3550,10 @@ app.get('/api/inspection/completion-status', async (req, res) => {
 // 컬럼 매칭 설정 (수기초 컬럼 ↔ 폰클개통데이터 컬럼)
 const COLUMN_MATCHING_CONFIG = [
   {
-    manualField: { name: '가입번호', key: 'subscription_id', column: 0 }, // A열
-    systemField: { name: '메모1', key: 'memo1', column: 66 }, // BO열
-    regex: null, // 직접 비교
-    description: '가입번호 직접 비교'
-  },
-  {
     manualField: { name: '대리점코드', key: 'store_code', column: 5 }, // F열
     systemField: { name: '메모2', key: 'memo2', column: 67 }, // BP열
-    regex: '\\d{6}', // 6자리 숫자 추출
-    description: '대리점코드 6자리 숫자 비교'
+    regex: '\\d+', // 숫자 추출 (6자리 제한 제거)
+    description: '대리점코드 비교 (메모2에서 숫자 추출)'
   }
 ];
 

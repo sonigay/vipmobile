@@ -256,3 +256,71 @@ export function calculateStatistics(differences) {
 
   return stats;
 } 
+
+// 컬럼 설정 조회
+export async function fetchColumnSettings() {
+  try {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const response = await fetch(`${API_URL}/api/inspection/columns`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || '컬럼 설정 조회 실패');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('컬럼 설정 조회 오류:', error);
+    throw error;
+  }
+}
+
+// 컬럼 설정 업데이트
+export async function updateColumnSettings(settings) {
+  try {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const response = await fetch(`${API_URL}/api/inspection/columns`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ settings }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || '컬럼 설정 업데이트 실패');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('컬럼 설정 업데이트 오류:', error);
+    throw error;
+  }
+}
+
+// 수정완료 상태 업데이트
+export async function updateModificationComplete(itemId, userId, isCompleted) {
+  try {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const response = await fetch(`${API_URL}/api/inspection/modification-complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ itemId, userId, isCompleted }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || '수정완료 상태 업데이트 실패');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('수정완료 상태 업데이트 오류:', error);
+    throw error;
+  }
+} 

@@ -63,7 +63,10 @@ import {
   getDifferenceTypeLabel,
   filterDifferences,
   extractAssignedAgents,
-  calculateStatistics
+  calculateStatistics,
+  fetchColumnSettings,
+  updateColumnSettings,
+  updateModificationComplete
 } from '../utils/inspectionUtils';
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -76,7 +79,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   // 필터 상태
   const [filters, setFilters] = useState({
     searchTerm: '',
-    type: 'all',
+    type: 'mismatch', // 초기값을 '값 불일치'로 변경
     assignedAgent: 'all',
     completionStatus: 'all'
   });
@@ -110,9 +113,47 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   }, [loggedInStore?.contactId]);
 
+  // 수정완료 상태 로드
+  const loadModificationCompletionStatus = useCallback(async () => {
+    try {
+      // 검수결과 시트에서 수정완료 상태 로드
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status`);
+      if (response.ok) {
+        const data = await response.json();
+        const modificationCompletedSet = new Set(data.modificationCompletedItems || []);
+        setModificationCompletedItems(modificationCompletedSet);
+      }
+    } catch (error) {
+      console.error('수정완료 상태 로드 오류:', error);
+    }
+  }, []);
+
   // 비교 컬럼 상태
   const [fieldOptions, setFieldOptions] = useState([]);
   const [selectedField, setSelectedField] = useState('all');
+  
+  // 컬럼 설정 상태
+  const [columnSettings, setColumnSettings] = useState(null);
+  const [columnSettingsDialog, setColumnSettingsDialog] = useState({
+    open: false,
+    settings: null,
+    isEditing: false
+  });
+  
+  // 수정완료 상태 추적
+  const [modificationCompletedItems, setModificationCompletedItems] = useState(new Set());
+
+  // 컬럼 설정 로드
+  const loadColumnSettings = useCallback(async () => {
+    try {
+      const response = await fetchColumnSettings();
+      if (response.success) {
+        setColumnSettings(response.settings);
+      }
+    } catch (error) {
+      console.error('컬럼 설정 로드 오류:', error);
+    }
+  }, []);
 
   // 필드 목록 불러오기
   useEffect(() => {
@@ -125,7 +166,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       }
     }
     loadFields();
-  }, []);
+    loadColumnSettings();
+  }, [loadColumnSettings]);
 
   // 사용자 권한 확인
   const hasOverviewPermission = loggedInStore?.modePermissions?.inspectionOverview;
@@ -161,7 +203,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   useEffect(() => {
     loadInspectionData();
     loadCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus, selectedField]);
+    loadModificationCompletionStatus();
+  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
 
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
@@ -194,6 +237,52 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     if (!inspectionData?.differences) return [];
     return extractAssignedAgents(inspectionData.differences);
   }, [inspectionData]);
+
+  // 수정완료 상태 처리
+  const handleModificationComplete = async (item, isCompleted) => {
+    if (!loggedInStore?.contactId) return;
+    
+    try {
+      await updateModificationComplete(item.id || item.originalKey, loggedInStore.contactId, isCompleted);
+      
+      // 로컬 상태 업데이트
+      setModificationCompletedItems(prev => {
+        const newSet = new Set(prev);
+        if (isCompleted) {
+          newSet.add(item.id || item.originalKey);
+        } else {
+          newSet.delete(item.id || item.originalKey);
+        }
+        return newSet;
+      });
+    } catch (error) {
+      console.error('수정완료 상태 업데이트 오류:', error);
+      alert('수정완료 상태 업데이트에 실패했습니다.');
+    }
+  };
+
+  // 컬럼 설정 다이얼로그 열기
+  const handleOpenColumnSettings = () => {
+    setColumnSettingsDialog({
+      open: true,
+      settings: columnSettings,
+      isEditing: false
+    });
+  };
+
+  // 컬럼 설정 저장
+  const handleSaveColumnSettings = async (settings) => {
+    try {
+      await updateColumnSettings(settings);
+      setColumnSettings(settings);
+      setColumnSettingsDialog({ open: false, settings: null, isEditing: false });
+      // 데이터 재로딩
+      loadInspectionData();
+    } catch (error) {
+      console.error('컬럼 설정 저장 오류:', error);
+      alert('컬럼 설정 저장에 실패했습니다.');
+    }
+  };
 
   // 검수 완료 처리 (해시화된 ID 사용)
   const handleComplete = async (item) => {
@@ -462,8 +551,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Box>
         )}
 
-        {/* 비교 컬럼 선택 드롭다운 */}
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+        {/* 컬럼 설정 및 비교 컬럼 선택 */}
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleOpenColumnSettings}
+            startIcon={<EditIcon />}
+          >
+            컬럼 설정
+          </Button>
+          
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>비교할 컬럼</InputLabel>
             <Select
@@ -485,6 +583,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
               ))}
             </Select>
           </FormControl>
+          
           {selectedField !== 'all' && (
             <Typography variant="body2" color="text.secondary">
               {fieldOptions.find(f => f.key === selectedField)?.description}
@@ -624,10 +723,10 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                 <TableRow>
                   <TableCell>가입번호</TableCell>
                   <TableCell>타입</TableCell>
-                  <TableCell>필드</TableCell>
-                  <TableCell>정확한 값 (수기초)</TableCell>
-                  <TableCell>잘못된 값 (폰클개통데이터)</TableCell>
-                  {currentView === 'overview' && <TableCell>처리자</TableCell>}
+                  <TableCell>수기초값 ({columnSettings?.manualKeyColumnName || '가입번호'})</TableCell>
+                  <TableCell>폰클데이터값 ({columnSettings?.systemMemo2ColumnName || '메모2'})</TableCell>
+                  <TableCell>처리자</TableCell>
+                  <TableCell>수정완료</TableCell>
                   <TableCell>상태</TableCell>
                   <TableCell>작업</TableCell>
                 </TableRow>
@@ -635,13 +734,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={currentView === 'overview' ? 8 : 7} align="center">
+                    <TableCell colSpan={8} align="center">
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={currentView === 'overview' ? 8 : 7} align="center">
+                    <TableCell colSpan={8} align="center">
                       데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -659,18 +758,27 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                           }}
                         />
                       </TableCell>
-                      <TableCell>{item.field}</TableCell>
                       <TableCell sx={{ maxWidth: 200, wordBreak: 'break-word', color: 'success.main', fontWeight: 'bold' }}>
                         {item.correctValue}
                       </TableCell>
                       <TableCell sx={{ maxWidth: 200, wordBreak: 'break-word', color: 'error.main' }}>
                         {item.incorrectValue}
                       </TableCell>
-                      {currentView === 'overview' && (
-                        <TableCell>{item.assignedAgent}</TableCell>
-                      )}
+                      <TableCell>{item.assignedAgent}</TableCell>
                       <TableCell>
-                        {completedItems.has(item.originalKey || item.key) ? (
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={modificationCompletedItems.has(item.originalKey || item.key)}
+                              onChange={(e) => handleModificationComplete(item, e.target.checked)}
+                              size="small"
+                            />
+                          }
+                          label=""
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {modificationCompletedItems.has(item.originalKey || item.key) ? (
                           <Chip
                             icon={<CheckCircleIcon />}
                             label="완료"
@@ -698,34 +806,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                               </IconButton>
                             </Tooltip>
                           )}
-                          {item.type === 'mismatch' && item.systemRow && (
-                            <Tooltip title="폰클개통데이터 수정">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleUpdateSystemData(item)}
-                                color="warning"
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          <Tooltip title="정규화">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleNormalize(item)}
-                              color="primary"
-                            >
-                              <NormalizeIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="상세보기">
-                            <IconButton
-                              size="small"
-                              color="info"
-                            >
-                              <VisibilityIcon />
-                            </IconButton>
-                          </Tooltip>
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -737,6 +817,153 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         </Paper>
         )}
       </Container>
+
+      {/* 컬럼 설정 다이얼로그 */}
+      <Dialog 
+        open={columnSettingsDialog.open} 
+        onClose={() => setColumnSettingsDialog({ open: false, settings: null, isEditing: false })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          컬럼 설정
+          {!columnSettingsDialog.isEditing && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setColumnSettingsDialog(prev => ({ ...prev, isEditing: true }))}
+              sx={{ ml: 2 }}
+            >
+              수정
+            </Button>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          {columnSettingsDialog.settings && (
+            <Box sx={{ mt: 2 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2 }}>기본 컬럼 설정</Typography>
+                  
+                  <TextField
+                    fullWidth
+                    label="수기초 가입번호 컬럼"
+                    value={columnSettingsDialog.settings.manualKeyColumn}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="수기초 가입번호 컬럼명"
+                    value={columnSettingsDialog.settings.manualKeyColumnName}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="폰클개통데이터 메모1 컬럼"
+                    value={columnSettingsDialog.settings.systemKeyColumn}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="폰클개통데이터 메모1 컬럼명"
+                    value={columnSettingsDialog.settings.systemKeyColumnName}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2 }}>추가 컬럼 설정</Typography>
+                  
+                  <TextField
+                    fullWidth
+                    label="폰클개통데이터 등록직원 컬럼"
+                    value={columnSettingsDialog.settings.systemAgentColumn}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="폰클개통데이터 등록직원 컬럼명"
+                    value={columnSettingsDialog.settings.systemAgentColumnName}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="폰클개통데이터 메모2 컬럼"
+                    value={columnSettingsDialog.settings.systemMemo2Column}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="폰클개통데이터 메모2 컬럼명"
+                    value={columnSettingsDialog.settings.systemMemo2ColumnName}
+                    disabled={!columnSettingsDialog.isEditing}
+                    sx={{ mb: 2 }}
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="h6" sx={{ mb: 2 }}>동적 매칭 설정</Typography>
+                  {columnSettingsDialog.settings.dynamicMappings?.map((mapping, index) => (
+                    <Paper key={index} sx={{ p: 2, mb: 2 }}>
+                      <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                        {mapping.description}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="수기초 컬럼"
+                            value={mapping.manualColumn}
+                            disabled={!columnSettingsDialog.isEditing}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="폰클개통데이터 컬럼"
+                            value={mapping.systemColumn}
+                            disabled={!columnSettingsDialog.isEditing}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  ))}
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setColumnSettingsDialog({ open: false, settings: null, isEditing: false })}
+          >
+            닫기
+          </Button>
+          {columnSettingsDialog.isEditing && (
+            <Button 
+              onClick={() => handleSaveColumnSettings(columnSettingsDialog.settings)}
+              variant="contained"
+            >
+              저장
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* 정규화 다이얼로그 */}
       <Dialog 
