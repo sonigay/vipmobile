@@ -2838,7 +2838,7 @@ app.get('/api/inspection-data', async (req, res) => {
             ...diff,
             manualRow: manualData.index,
             systemRow: systemData.index,
-            assignedAgent: systemData.row[69] || '' // BR열: 등록직원
+            assignedAgent: systemData.row[69] || '' // BR열: 등록직원 (이미 compareDynamicColumns에서 설정됨)
           });
         });
       } else {
@@ -2881,9 +2881,14 @@ app.get('/api/inspection-data', async (req, res) => {
     // 뷰에 따른 필터링
     let filteredDifferences = differences;
     if (view === 'personal' && userId) {
+      console.log(`개인담당 필터링: userId=${userId}, 전체 차이점=${differences.length}개`);
+      console.log('등록직원 목록:', [...new Set(differences.map(d => d.assignedAgent))]);
+      
       filteredDifferences = differences.filter(diff => 
         diff.assignedAgent === userId
       );
+      
+      console.log(`필터링 후 차이점: ${filteredDifferences.length}개`);
     }
 
     // 개인정보 보안 처리: 마스킹 및 해시화
