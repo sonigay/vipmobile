@@ -345,6 +345,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         <Typography variant="h4" component="div" sx={{ color }}>
           {value}
         </Typography>
+        {inspectionData?.securityNote && (
+          <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
+            {inspectionData.securityNote}
+          </Typography>
+        )}
       </CardContent>
     </Card>
   );

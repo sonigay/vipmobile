@@ -2895,7 +2895,7 @@ app.get('/api/inspection-data', async (req, res) => {
       manualOnly: secureDifferences.filter(d => d.type === 'manual_only').length,
       systemOnly: secureDifferences.filter(d => d.type === 'system_only').length,
       mismatched: secureDifferences.filter(d => d.type === 'mismatch').length,
-      securityNote: '개인정보는 마스킹 처리되었습니다.'
+      securityNote: '검수자는 실제 값을 확인할 수 있습니다. ID는 해시화되어 보안이 유지됩니다.'
     };
 
     const processingTime = Date.now() - startTime;
@@ -3802,7 +3802,7 @@ const securityUtils = {
     return Math.abs(hash).toString(36);
   },
   
-  // 안전한 데이터 구조 생성
+  // 안전한 데이터 구조 생성 (검수자는 실제 값 볼 수 있음)
   createSafeDataStructure: (differences) => {
     return differences.map(diff => {
       const safeDiff = {
@@ -3813,27 +3813,12 @@ const securityUtils = {
         manualRow: diff.manualRow,
         systemRow: diff.systemRow,
         assignedAgent: diff.assignedAgent,
-        // 개인정보는 마스킹된 값만 전송
-        correctValue: securityUtils.maskPersonalInfo(diff.correctValue, getFieldType(diff.fieldKey)),
-        incorrectValue: securityUtils.maskPersonalInfo(diff.incorrectValue, getFieldType(diff.fieldKey)),
+        // 검수자는 실제 값을 볼 수 있도록 원본 값 전송
+        correctValue: diff.correctValue,
+        incorrectValue: diff.incorrectValue,
         // 원본 키는 해시화
         originalKey: securityUtils.hashPersonalInfo(diff.key)
       };
-      
-      // 필드 타입에 따른 추가 마스킹
-      if (diff.fieldKey === 'name') {
-        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'name');
-        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'name');
-      } else if (diff.fieldKey === 'phone') {
-        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'phone');
-        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'phone');
-      } else if (diff.fieldKey === 'address') {
-        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'address');
-        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'address');
-      } else if (diff.fieldKey === 'birthdate') {
-        safeDiff.correctValue = securityUtils.maskPersonalInfo(diff.correctValue, 'birthdate');
-        safeDiff.incorrectValue = securityUtils.maskPersonalInfo(diff.incorrectValue, 'birthdate');
-      }
       
       return safeDiff;
     });
