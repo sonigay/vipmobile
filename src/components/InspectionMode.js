@@ -399,8 +399,42 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Alert>
         )}
 
+        {/* 로딩 상태 표시 */}
+        {isLoading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <CircularProgress size={60} sx={{ mb: 2 }} />
+              <Typography variant="h6" color="text.secondary">
+                검수 데이터를 불러오는 중...
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
+        {/* 데이터 없음 상태 표시 */}
+        {!isLoading && (!inspectionData || !inspectionData.differences) && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <InfoIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                검수할 데이터가 없습니다
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                수기초와 폰클개통데이터를 비교할 차이점이 없거나 데이터를 불러올 수 없습니다.
+              </Typography>
+              <Button 
+                variant="outlined" 
+                onClick={loadInspectionData}
+                startIcon={<RefreshIcon />}
+              >
+                다시 시도
+              </Button>
+            </Box>
+          </Box>
+        )}
+
         {/* 통계 카드 */}
-        {statistics && (
+        {!isLoading && statistics && (
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={6} md={3}>
               <StatCard
@@ -438,7 +472,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         )}
 
         {/* 진행률 바 */}
-        {statistics && statistics.total > 0 && (
+        {!isLoading && statistics && statistics.total > 0 && (
           <Box sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <Typography variant="body2" sx={{ mr: 1 }}>
@@ -457,7 +491,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         )}
 
         {/* 필터 패널 */}
-        <Paper sx={{ p: 2, mb: 2 }}>
+        {!isLoading && inspectionData && inspectionData.differences && (
+          <Paper sx={{ p: 2, mb: 2 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} sm={6} md={3}>
               <TextField
@@ -521,7 +556,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         </Paper>
 
         {/* 데이터 테이블 */}
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        {!isLoading && inspectionData && inspectionData.differences && (
+          <Paper sx={{ width: '100%', overflow: 'hidden' }}>
           <TableContainer sx={{ maxHeight: 600 }}>
             <Table stickyHeader>
               <TableHead>
@@ -639,6 +675,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             </Table>
           </TableContainer>
         </Paper>
+        )}
       </Container>
 
       {/* 정규화 다이얼로그 */}
