@@ -89,6 +89,13 @@ export const getSelectedTargets = (agents, settings) => {
   };
 };
 
+// 담당자명 정규화 함수 (괄호 제거)
+function normalizeAgentName(agentName) {
+  if (!agentName || typeof agentName !== 'string') return agentName;
+  // 괄호와 그 안의 내용 제거 (예: "홍기현(별도)" → "홍기현")
+  return agentName.replace(/\s*\([^)]*\)/g, '').trim();
+}
+
 // 거래처수 0인 인원을 배정목록에서 제거하는 함수
 export const filterAgentsByStoreCount = async (agents, storeData) => {
   const filteredAgents = [];
@@ -96,13 +103,23 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
   for (const agent of agents) {
     let storeCount = 0;
     
-    // storeData에서 해당 담당자가 관리하는 매장 수 계산
+    // storeData에서 해당 담당자가 관리하는 매장 수 계산 (정규화 적용)
     if (storeData && Array.isArray(storeData)) {
-      storeCount = storeData.filter(store => 
-        store.manager === agent.target || 
-        store.담당자 === agent.target ||
-        store.name === agent.target // 담당자가 본인 이름의 업체명을 가진 경우
-      ).length;
+      const normalizedAgentName = normalizeAgentName(agent.target);
+      const uniqueStoreIds = new Set();
+      
+      // 정규화된 이름과 매칭되는 모든 담당자의 매장을 수집
+      storeData.forEach(store => {
+        const storeManagerNormalized = normalizeAgentName(store.manager);
+        const store담당자Normalized = normalizeAgentName(store.담당자);
+        
+        if (storeManagerNormalized === normalizedAgentName || 
+            store담당자Normalized === normalizedAgentName) {
+          uniqueStoreIds.add(store.id || store.name);
+        }
+      });
+      
+      storeCount = uniqueStoreIds.size;
       
       // 김수빈의 경우 더 상세한 로그
       if (agent.target === '김수빈') {
@@ -126,52 +143,52 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
       }
     }
     
-    // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
+    // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정 (정규화 적용)
     if (storeCount === 0) {
       try {
         const activationData = await loadActivationDataBatch();
-        const agentCurrentData = (activationData.current.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
-        
-        // 개통실적 데이터에서 고유한 출고처 수 추정 (빈 값, 의미없는 값, 0 등 제외)
+        const normalizedAgentName = normalizeAgentName(agent.target);
         const uniqueStores = new Set();
-        agentCurrentData.forEach(record => {
-          const storeName = record['출고처'];
-          if (
-            storeName &&
-            typeof storeName === 'string' &&
-            storeName.trim() !== '' &&
-            storeName !== '-' &&
-            storeName !== '미지정' &&
-            storeName !== '미정' &&
-            storeName !== '기타' &&
-            storeName !== '없음' &&
-            storeName !== '0' &&
-            storeName.trim() !== '0'
-          ) {
-            uniqueStores.add(storeName.trim());
+        
+        // 정규화된 이름과 매칭되는 모든 담당자의 개통실적에서 출고처 수집
+        Object.entries(activationData.current).forEach(([agentName, records]) => {
+          const agentNameNormalized = normalizeAgentName(agentName);
+          if (agentNameNormalized === normalizedAgentName) {
+            records.forEach(record => {
+              const storeName = record['출고처'];
+              if (
+                storeName &&
+                typeof storeName === 'string' &&
+                storeName.trim() !== '' &&
+                storeName !== '-' &&
+                storeName !== '미지정' &&
+                storeName !== '미정' &&
+                storeName !== '기타' &&
+                storeName !== '없음' &&
+                storeName !== '0' &&
+                storeName.trim() !== '0'
+              ) {
+                uniqueStores.add(storeName.trim());
+              }
+            });
           }
         });
         storeCount = uniqueStores.size;
         
-        console.log(`🔍 ${agent.target} 거래처수 계산:`, {
-          totalRecords: agentCurrentData.length,
-          uniqueStores: Array.from(uniqueStores),
-          storeCount: storeCount
+        console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
+          원본담당자: agent.target,
+          정규화된이름: normalizedAgentName,
+          고유매장수: storeCount,
+          매장목록: Array.from(uniqueStores)
         });
         
         // 김수빈인 경우 더 자세한 정보 출력
         if (agent.target === '김수빈') {
-          console.log('🚨 김수빈 상세 거래처 정보:', {
-            agentName: agent.target,
-            totalRecords: agentCurrentData.length,
-            allStores: agentCurrentData.map(record => record['출고처']).filter(Boolean),
-            uniqueStores: Array.from(uniqueStores),
-            storeCount: storeCount,
-            sampleRecords: agentCurrentData.slice(0, 3).map(record => ({
-              출고처: record['출고처'],
-              모델명: record['모델명'],
-              개통: record['개통']
-            }))
+          console.log('🚨 김수빈 정규화된 상세 거래처 정보:', {
+            원본담당자: agent.target,
+            정규화된이름: normalizedAgentName,
+            고유매장수: storeCount,
+            매장목록: Array.from(uniqueStores)
           });
         }
       } catch (error) {
@@ -183,13 +200,13 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
     // 거래처수가 0보다 큰 경우만 포함
     if (storeCount > 0) {
       filteredAgents.push(agent);
-      console.log(`✅ ${agent.target} 거래처수 ${storeCount}개로 배정목록에 포함`);
+      console.log(`✅ ${agent.target} 정규화된 거래처수 ${storeCount}개로 배정목록에 포함`);
     } else {
-      console.log(`❌ 거래처수 0으로 배정목록에서 제외: ${agent.target} (${agent.office} ${agent.department})`);
+      console.log(`❌ 정규화된 거래처수 0으로 배정목록에서 제외: ${agent.target} (${agent.office} ${agent.department})`);
     }
   }
   
-  console.log(`거래처수 필터링 결과: ${agents.length}명 → ${filteredAgents.length}명`);
+  console.log(`정규화된 거래처수 필터링 결과: ${agents.length}명 → ${filteredAgents.length}명`);
   return filteredAgents;
 };
 
