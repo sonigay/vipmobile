@@ -2909,9 +2909,18 @@ app.get('/api/inspection-data', async (req, res) => {
       console.log('등록직원 목록:', [...new Set(differences.map(d => d.assignedAgent))]);
       console.log('정리된 등록직원 목록:', [...new Set(differences.map(d => cleanAgentName(d.assignedAgent)))]);
       
-      filteredDifferences = differences.filter(diff => 
-        cleanAgentName(diff.assignedAgent) === cleanAgentName(userId)
-      );
+      // 사용자 ID와 정리된 등록직원 이름을 비교
+      const cleanUserId = cleanAgentName(userId);
+      console.log(`정리된 사용자 ID: ${cleanUserId}`);
+      
+      filteredDifferences = differences.filter(diff => {
+        const cleanAgent = cleanAgentName(diff.assignedAgent);
+        const isMatch = cleanAgent === cleanUserId;
+        if (isMatch) {
+          console.log(`매칭됨: "${cleanAgent}" === "${cleanUserId}"`);
+        }
+        return isMatch;
+      });
       
       console.log(`필터링 후 차이점: ${filteredDifferences.length}개`);
     }
@@ -3817,8 +3826,8 @@ const securityUtils = {
         // 검수자는 실제 값을 볼 수 있도록 원본 값 전송
         correctValue: diff.correctValue,
         incorrectValue: diff.incorrectValue,
-        // 원본 키는 해시화
-        originalKey: securityUtils.hashPersonalInfo(diff.key)
+        // 가입번호는 화면에 표시되어야 하므로 원본 값 유지
+        originalKey: diff.key
       };
       
       return safeDiff;

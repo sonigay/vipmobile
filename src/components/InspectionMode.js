@@ -362,6 +362,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           <AssignmentIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             검수 모드
+            {loggedInStore?.name && (
+              <Typography variant="body2" component="span" sx={{ ml: 2, opacity: 0.8 }}>
+                ({loggedInStore.name})
+              </Typography>
+            )}
           </Typography>
           
           {/* 뷰 전환 버튼 */}
