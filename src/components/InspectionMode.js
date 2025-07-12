@@ -44,7 +44,7 @@ import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
-  Normalize as NormalizeIcon,
+  AutoFixHigh as NormalizeIcon,
   Person as PersonIcon,
   Business as BusinessIcon,
   TrendingUp as TrendingUpIcon,
