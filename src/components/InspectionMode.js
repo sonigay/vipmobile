@@ -367,7 +367,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     setCurrentView(view);
     setFilters({
       searchTerm: '',
-      type: 'all',
+      type: 'mismatch', // 값 불일치로 변경
       assignedAgent: 'all',
       completionStatus: 'all'
     });
