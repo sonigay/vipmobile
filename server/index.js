@@ -2898,8 +2898,18 @@ app.get('/api/inspection-data', async (req, res) => {
     // 처리자 이름에서 괄호 제거하는 함수
     function cleanAgentName(agentName) {
       if (!agentName) return '';
+      let cleaned = agentName.toString();
+      
       // 괄호와 괄호 안의 내용 제거 (예: "홍길동 (RM)" → "홍길동")
-      return agentName.toString().replace(/\s*\([^)]*\)/g, '').trim();
+      cleaned = cleaned.replace(/\s*\([^)]*\)/g, '');
+      
+      // 앞뒤 공백 제거
+      cleaned = cleaned.trim();
+      
+      // 빈 문자열이면 원본 반환
+      if (!cleaned) return agentName.toString().trim();
+      
+      return cleaned;
     }
 
     // 뷰에 따른 필터링
@@ -2911,18 +2921,30 @@ app.get('/api/inspection-data', async (req, res) => {
       
       // 사용자 ID와 정리된 등록직원 이름을 비교
       const cleanUserId = cleanAgentName(userId);
-      console.log(`정리된 사용자 ID: ${cleanUserId}`);
+      console.log(`정리된 사용자 ID: "${cleanUserId}"`);
       
+      // 매칭 시도 로그
+      let matchCount = 0;
       filteredDifferences = differences.filter(diff => {
         const cleanAgent = cleanAgentName(diff.assignedAgent);
         const isMatch = cleanAgent === cleanUserId;
         if (isMatch) {
-          console.log(`매칭됨: "${cleanAgent}" === "${cleanUserId}"`);
+          matchCount++;
+          console.log(`매칭됨 ${matchCount}: "${cleanAgent}" === "${cleanUserId}"`);
+        } else {
+          console.log(`매칭 안됨: "${cleanAgent}" !== "${cleanUserId}"`);
         }
         return isMatch;
       });
       
-      console.log(`필터링 후 차이점: ${filteredDifferences.length}개`);
+      console.log(`필터링 후 차이점: ${filteredDifferences.length}개 (매칭된 항목: ${matchCount}개)`);
+      
+      // 매칭이 안 된 경우 원본 값들도 로그
+      if (filteredDifferences.length === 0) {
+        console.log('매칭 실패 - 원본 값들:');
+        console.log('사용자 ID 원본:', userId);
+        console.log('등록직원 원본들:', [...new Set(differences.map(d => d.assignedAgent))]);
+      }
     }
 
     // 개인정보 보안 처리: 마스킹 및 해시화

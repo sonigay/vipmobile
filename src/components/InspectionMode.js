@@ -647,8 +647,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                   </TableRow>
                 ) : (
                   filteredData.map((item, index) => (
-                    <TableRow key={`${item.key}-${index}`}>
-                      <TableCell>{item.key}</TableCell>
+                    <TableRow key={`${item.originalKey || item.key}-${index}`}>
+                      <TableCell>{item.originalKey || item.key}</TableCell>
                       <TableCell>
                         <Chip
                           label={getDifferenceTypeLabel(item.type)}
@@ -670,7 +670,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                         <TableCell>{item.assignedAgent}</TableCell>
                       )}
                       <TableCell>
-                        {completedItems.has(item.key) ? (
+                        {completedItems.has(item.originalKey || item.key) ? (
                           <Chip
                             icon={<CheckCircleIcon />}
                             label="완료"
@@ -687,7 +687,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                          {!completedItems.has(item.key) && (
+                          {!completedItems.has(item.originalKey || item.key) && (
                             <Tooltip title="완료 처리">
                               <IconButton
                                 size="small"
@@ -749,7 +749,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         <DialogContent>
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              가입번호: {normalizeDialog.item?.key}
+              가입번호: {normalizeDialog.item?.originalKey || normalizeDialog.item?.key}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               필드: {normalizeDialog.item?.field}
