@@ -58,6 +58,7 @@ import {
   saveNormalizationData,
   updateSystemData,
   fetchFieldValues,
+  fetchAvailableFields,
   getDifferenceTypeColor,
   getDifferenceTypeLabel,
   filterDifferences,
@@ -109,10 +110,27 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   }, [loggedInStore?.contactId]);
 
+  // 비교 컬럼 상태
+  const [fieldOptions, setFieldOptions] = useState([]);
+  const [selectedField, setSelectedField] = useState('all');
+
+  // 필드 목록 불러오기
+  useEffect(() => {
+    async function loadFields() {
+      const response = await fetchAvailableFields();
+      if (response.success) {
+        setFieldOptions([{ key: 'all', name: '전체' }, ...response.data.fields]);
+      } else {
+        setFieldOptions([{ key: 'all', name: '전체' }]);
+      }
+    }
+    loadFields();
+  }, []);
+
   // 사용자 권한 확인
   const hasOverviewPermission = loggedInStore?.modePermissions?.inspectionOverview;
 
-  // 데이터 로딩
+  // 데이터 로딩 (필드 변경 시 재로딩)
   const loadInspectionData = useCallback(async () => {
     if (!loggedInStore?.contactId) return;
     
@@ -122,7 +140,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     try {
       const response = await fetchInspectionData(
         currentView, 
-        currentView === 'personal' ? loggedInStore.contactId : null
+        currentView === 'personal' ? loggedInStore.contactId : null,
+        selectedField !== 'all' ? selectedField : undefined
       );
       
       if (response.success) {
@@ -136,13 +155,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     } finally {
       setIsLoading(false);
     }
-  }, [currentView, loggedInStore?.contactId]);
+  }, [currentView, loggedInStore?.contactId, selectedField]);
 
-  // 초기 데이터 로딩
+  // 필드 변경 시 데이터 재로딩
   useEffect(() => {
     loadInspectionData();
     loadCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus]);
+  }, [loadInspectionData, loadCompletionStatus, selectedField]);
 
   // 필터링된 데이터
   const filteredData = useMemo(() => {
@@ -432,6 +451,36 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             </Box>
           </Box>
         )}
+
+        {/* 비교 컬럼 선택 드롭다운 */}
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>비교할 컬럼</InputLabel>
+            <Select
+              value={selectedField}
+              label="비교할 컬럼"
+              onChange={e => setSelectedField(e.target.value)}
+            >
+              {fieldOptions.map(option => (
+                <MenuItem key={option.key} value={option.key}>
+                  <Box>
+                    <Typography variant="body2">{option.name}</Typography>
+                    {option.description && (
+                      <Typography variant="caption" color="text.secondary">
+                        {option.description}
+                      </Typography>
+                    )}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {selectedField !== 'all' && (
+            <Typography variant="body2" color="text.secondary">
+              {fieldOptions.find(f => f.key === selectedField)?.description}
+            </Typography>
+          )}
+        </Box>
 
         {/* 통계 카드 */}
         {!isLoading && statistics && (

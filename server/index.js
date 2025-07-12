@@ -2777,8 +2777,8 @@ app.post('/api/push/send-all', async (req, res) => {
 
 // 검수모드 데이터 가져오기 (캐싱 적용)
 app.get('/api/inspection-data', async (req, res) => {
-  const { view = 'personal', userId } = req.query;
-  const cacheKey = `inspection_data_${view}_${userId}`;
+  const { view = 'personal', userId, field } = req.query;
+  const cacheKey = `inspection_data_${view}_${userId}_${field || 'all'}`;
   
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
@@ -2832,7 +2832,7 @@ app.get('/api/inspection-data', async (req, res) => {
       
       if (systemData) {
         // 두 데이터가 모두 있는 경우 비교
-        const rowDifferences = compareRows(manualData.row, systemData.row, key);
+        const rowDifferences = compareDynamicColumns(manualData.row, systemData.row, key, field);
         rowDifferences.forEach(diff => {
           differences.push({
             ...diff,
@@ -2842,27 +2842,32 @@ app.get('/api/inspection-data', async (req, res) => {
           });
         });
       } else {
-        // 수기초에만 있는 데이터
-        differences.push({
-          key,
-          type: 'manual_only',
-          field: '전체',
-          correctValue: '수기초에만 존재',
-          incorrectValue: '없음',
-          manualRow: manualData.index,
-          systemRow: null,
-          assignedAgent: ''
-        });
+        // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
+        if (!field) {
+          differences.push({
+            key,
+            type: 'manual_only',
+            field: '전체',
+            fieldKey: 'all',
+            correctValue: '수기초에만 존재',
+            incorrectValue: '없음',
+            manualRow: manualData.index,
+            systemRow: null,
+            assignedAgent: ''
+          });
+        }
       }
     }
 
-          // 시스템에만 있는 데이터도 확인
+              // 시스템에만 있는 데이터도 확인 (필드 필터링이 있을 때는 제외)
+    if (!field) {
       for (const [key, systemData] of systemMap) {
         if (!manualMap.has(key)) {
           differences.push({
             key,
             type: 'system_only',
             field: '전체',
+            fieldKey: 'all',
             correctValue: '없음',
             incorrectValue: '시스템에만 존재',
             manualRow: null,
@@ -2871,6 +2876,7 @@ app.get('/api/inspection-data', async (req, res) => {
           });
         }
       }
+    }
 
     // 뷰에 따른 필터링
     let filteredDifferences = differences;
@@ -2904,22 +2910,30 @@ app.get('/api/inspection-data', async (req, res) => {
   }
 });
 
+// 비교할 컬럼 매핑 정의 (수기초 컬럼 -> 폰클개통데이터 컬럼)
+const COLUMN_MAPPINGS = [
+  { manual: 1, system: 1, name: '이름', key: 'name' },           // B열
+  { manual: 2, system: 2, name: '전화번호', key: 'phone' },      // C열
+  { manual: 3, system: 3, name: '주소', key: 'address' },        // D열
+  { manual: 4, system: 4, name: '생년월일', key: 'birthdate' },  // E열
+  { manual: 5, system: 5, name: '성별', key: 'gender' },         // F열
+  { manual: 6, system: 6, name: '유형값', key: 'type' },         // G열
+  { manual: 7, system: 7, name: '모델명', key: 'model' },        // H열
+  { manual: 8, system: 8, name: '요금제', key: 'plan' },         // I열
+  { manual: 9, system: 9, name: '대리점', key: 'store' },        // J열
+  // 더 많은 컬럼 매핑 추가 가능
+];
+
 // 행 비교 함수 (수기초 기준으로 정확한 값 판단)
-function compareRows(manualRow, systemRow, key) {
+function compareRows(manualRow, systemRow, key, targetField = null) {
   const differences = [];
   
-  // 비교할 컬럼 매핑 (수기초 컬럼 -> 폰클개통데이터 컬럼)
-  // 실제 시트 구조에 맞게 수정 필요
-  const columnMappings = [
-    { manual: 1, system: 1, name: '이름' },      // B열
-    { manual: 2, system: 2, name: '전화번호' },   // C열
-    { manual: 3, system: 3, name: '주소' },      // D열
-    { manual: 4, system: 4, name: '생년월일' },  // E열
-    { manual: 5, system: 5, name: '성별' },      // F열
-    // 더 많은 컬럼 매핑 추가 가능
-  ];
+  // 특정 필드만 비교하거나 전체 필드 비교
+  const mappingsToCompare = targetField 
+    ? COLUMN_MAPPINGS.filter(mapping => mapping.key === targetField)
+    : COLUMN_MAPPINGS;
 
-  columnMappings.forEach(mapping => {
+  mappingsToCompare.forEach(mapping => {
     // 배열 범위 체크
     if (manualRow.length <= mapping.manual || systemRow.length <= mapping.system) {
       return;
@@ -2935,6 +2949,7 @@ function compareRows(manualRow, systemRow, key) {
         key,
         type: 'mismatch',
         field: mapping.name,
+        fieldKey: mapping.key,
         correctValue: manualValue.toString().trim(), // 수기초가 정확한 값
         incorrectValue: systemValue.toString().trim(), // 폰클개통데이터가 잘못된 값
         manualRow: null,
@@ -3130,6 +3145,29 @@ app.post('/api/inspection/update-system-data', async (req, res) => {
   }
 });
 
+// 사용 가능한 필드 목록 조회 API
+app.get('/api/inspection/available-fields', async (req, res) => {
+  try {
+    const fields = COLUMN_MATCHING_CONFIG.map(config => ({
+      key: config.manualField.key,
+      name: config.manualField.name,
+      description: config.description
+    }));
+
+    res.json({ 
+      success: true, 
+      fields 
+    });
+  } catch (error) {
+    console.error('Error fetching available fields:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch available fields', 
+      message: error.message 
+    });
+  }
+});
+
 // 필드별 고유값 조회 API
 app.get('/api/inspection/field-values', async (req, res) => {
   try {
@@ -3139,6 +3177,320 @@ app.get('/api/inspection/field-values', async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         error: 'Field name is required' 
+      });
+    }
+
+    // 필드명에 따른 컬럼 인덱스 매핑
+    const fieldMapping = COLUMN_MAPPINGS.find(mapping => mapping.name === field);
+    if (!fieldMapping) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid field name' 
+      });
+    }
+
+    const columnIndex = fieldMapping.manual;
+
+    // 수기초와 폰클개통데이터에서 해당 필드의 모든 값 수집
+    const [manualValues, systemValues] = await Promise.all([
+      getSheetValues(MANUAL_DATA_SHEET_NAME),
+      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME)
+    ]);
+
+    const allValues = new Set();
+
+    // 수기초에서 값 수집
+    if (manualValues && manualValues.length > 1) {
+      manualValues.slice(1).forEach(row => {
+        if (row.length > columnIndex && row[columnIndex]) {
+          allValues.add(row[columnIndex].toString().trim());
+        }
+      });
+    }
+
+    // 폰클개통데이터에서 값 수집
+    if (systemValues && systemValues.length > 1) {
+      systemValues.slice(1).forEach(row => {
+        if (row.length > columnIndex && row[columnIndex]) {
+          allValues.add(row[columnIndex].toString().trim());
+        }
+      });
+    }
+
+    // 정규화 이력에서도 값 수집
+    try {
+      const normalizationResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${NORMALIZATION_HISTORY_SHEET_NAME}!A:G`
+      });
+      
+      if (normalizationResponse.data.values && normalizationResponse.data.values.length > 1) {
+        normalizationResponse.data.values.slice(1).forEach(row => {
+          if (row.length >= 6 && row[3] === field && row[5]) { // 필드명이 일치하고 정규화값이 있는 경우
+            allValues.add(row[5].toString().trim());
+          }
+        });
+      }
+    } catch (error) {
+      // 정규화 이력 시트가 없거나 비어있는 경우 무시
+      console.log('정규화 이력 시트가 없거나 비어있습니다.');
+    }
+
+    const uniqueValues = Array.from(allValues).filter(value => value).sort();
+
+    res.json({ 
+      success: true, 
+      field,
+      values: uniqueValues 
+    });
+  } catch (error) {
+    console.error('Error fetching field values:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch field values', 
+      message: error.message 
+    });
+  }
+});
+
+// 검수 완료 상태 조회
+app.get('/api/inspection/completion-status', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User ID is required' 
+      });
+    }
+
+    // 검수결과 시트에서 해당 사용자의 완료 항목 조회
+    let completionData = [];
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`
+      });
+      completionData = response.data.values || [];
+    } catch (error) {
+      // 시트가 없거나 비어있는 경우 빈 배열 반환
+      console.log('검수결과 시트가 없거나 비어있습니다.');
+    }
+
+    // 헤더 제거하고 해당 사용자의 완료 항목만 필터링
+    const userCompletions = completionData
+      .slice(1) // 헤더 제거
+      .filter(row => row.length >= 3 && row[1] === userId) // 처리자 ID가 일치하는 항목
+      .map(row => row[2]); // 항목 ID만 추출
+
+    res.json({ 
+      success: true, 
+      completedItems: userCompletions 
+    });
+  } catch (error) {
+    console.error('Error fetching completion status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch completion status', 
+      message: error.message 
+    });
+  }
+});
+
+// 컬럼 매칭 설정 (수기초 컬럼 ↔ 폰클개통데이터 컬럼)
+const COLUMN_MATCHING_CONFIG = [
+  {
+    manualField: { name: '대리점코드', key: 'store_code', column: 5 }, // F열
+    systemField: { name: '메모2', key: 'memo2', column: 67 }, // BP열
+    regex: '\\d{6}', // 6자리 숫자 추출
+    description: '대리점코드 6자리 숫자 비교'
+  },
+  {
+    manualField: { name: '이름', key: 'name', column: 1 }, // B열
+    systemField: { name: '이름', key: 'name', column: 1 }, // B열
+    regex: null, // 직접 비교
+    description: '이름 직접 비교'
+  },
+  {
+    manualField: { name: '전화번호', key: 'phone', column: 2 }, // C열
+    systemField: { name: '전화번호', key: 'phone', column: 2 }, // C열
+    regex: null,
+    description: '전화번호 직접 비교'
+  },
+  // 더 많은 매칭 설정 추가 가능
+];
+
+// 정규표현식으로 값 추출
+function extractValueWithRegex(value, regex) {
+  if (!regex || !value) return value;
+  try {
+    const matches = value.toString().match(new RegExp(regex, 'g'));
+    return matches ? matches.join(', ') : '';
+  } catch (error) {
+    console.error('정규표현식 오류:', error);
+    return value;
+  }
+}
+
+// 동적 컬럼 비교 함수
+function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
+  const differences = [];
+  
+  // 특정 필드만 비교하거나 전체 필드 비교
+  const mappingsToCompare = targetField 
+    ? COLUMN_MATCHING_CONFIG.filter(config => config.manualField.key === targetField)
+    : COLUMN_MATCHING_CONFIG;
+
+  mappingsToCompare.forEach(config => {
+    const { manualField, systemField, regex, description } = config;
+    
+    // 배열 범위 체크
+    if (manualRow.length <= manualField.column || systemRow.length <= systemField.column) {
+      return;
+    }
+    
+    let manualValue = manualRow[manualField.column] || '';
+    let systemValue = systemRow[systemField.column] || '';
+    
+    // 정규표현식이 있으면 값 추출
+    if (regex) {
+      manualValue = extractValueWithRegex(manualValue, regex);
+      systemValue = extractValueWithRegex(systemValue, regex);
+    }
+    
+    // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+    if (manualValue.toString().trim() !== systemValue.toString().trim() && 
+        (manualValue.toString().trim() || systemValue.toString().trim())) {
+      differences.push({
+        key,
+        type: 'mismatch',
+        field: manualField.name,
+        fieldKey: manualField.key,
+        correctValue: manualValue.toString().trim(),
+        incorrectValue: systemValue.toString().trim(),
+        description,
+        manualRow: null,
+        systemRow: null,
+        assignedAgent: systemRow[69] || '' // BR열: 등록직원
+      });
+    }
+  });
+
+  return differences;
+}
+
+// 검수 완료 상태 업데이트
+app.post('/api/inspection/complete', async (req, res) => {
+  try {
+    const { itemId, userId, status } = req.body;
+    
+    if (!itemId || !userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID and User ID are required' 
+      });
+    }
+
+    // 검수결과 시트에 완료 상태 기록
+    const completionData = [
+      [
+        new Date().toISOString(), // 완료일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        status || '완료',         // 상태
+        '처리완료'                // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: completionData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '검수 완료 상태가 업데이트되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating inspection completion:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update inspection completion', 
+      message: error.message 
+    });
+  }
+});
+
+// 정규화 데이터 저장
+app.post('/api/inspection/normalize', async (req, res) => {
+  try {
+    const { itemId, userId, originalValue, normalizedValue, field } = req.body;
+    
+    if (!itemId || !userId || !normalizedValue) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID, User ID, and normalized value are required' 
+      });
+    }
+
+    // 정규화이력 시트에 기록
+    const normalizationData = [
+      [
+        new Date().toISOString(), // 정규화일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        field,                    // 필드명
+        originalValue || '',      // 원본값
+        normalizedValue,          // 정규화값
+        '수동정규화'              // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${NORMALIZATION_HISTORY_SHEET_NAME}!A:G`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: normalizationData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '정규화 데이터가 저장되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error saving normalization data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to save normalization data', 
+      message: error.message 
+    });
+  }
+});
+
+// 폰클개통데이터 수정 API
+app.post('/api/inspection/update-system-data', async (req, res) => {
+  try {
+    const { itemId, userId, field, correctValue, systemRow } = req.body;
+    
+    if (!itemId || !userId || !field || !correctValue || systemRow === null) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID, User ID, field, correct value, and system row are required' 
       });
     }
 
@@ -3159,6 +3511,102 @@ app.get('/api/inspection/field-values', async (req, res) => {
         error: 'Invalid field name' 
       });
     }
+
+    // 폰클개통데이터 시트에서 해당 행의 특정 컬럼 수정
+    const range = `${CURRENT_MONTH_ACTIVATION_SHEET_NAME}!${String.fromCharCode(65 + columnIndex)}${systemRow}`;
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: range,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [[correctValue]]
+      }
+    });
+
+    // 수정 이력 시트에 기록
+    const updateHistoryData = [
+      [
+        new Date().toISOString(), // 수정일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        field,                    // 필드명
+        correctValue,             // 수정된 값
+        '폰클개통데이터 수정'     // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:F`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: updateHistoryData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '폰클개통데이터가 성공적으로 수정되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating system data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update system data', 
+      message: error.message 
+    });
+  }
+});
+
+// 사용 가능한 필드 목록 조회 API
+app.get('/api/inspection/available-fields', async (req, res) => {
+  try {
+    const fields = COLUMN_MAPPINGS.map(mapping => ({
+      key: mapping.key,
+      name: mapping.name
+    }));
+
+    res.json({ 
+      success: true, 
+      fields 
+    });
+  } catch (error) {
+    console.error('Error fetching available fields:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch available fields', 
+      message: error.message 
+    });
+  }
+});
+
+// 필드별 고유값 조회 API
+app.get('/api/inspection/field-values', async (req, res) => {
+  try {
+    const { field } = req.query;
+    
+    if (!field) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Field name is required' 
+      });
+    }
+
+    // 필드명에 따른 컬럼 인덱스 매핑
+    const fieldMapping = COLUMN_MAPPINGS.find(mapping => mapping.name === field);
+    if (!fieldMapping) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid field name' 
+      });
+    }
+
+    const columnIndex = fieldMapping.manual;
 
     // 수기초와 폰클개통데이터에서 해당 필드의 모든 값 수집
     const [manualValues, systemValues] = await Promise.all([

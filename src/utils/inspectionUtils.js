@@ -147,6 +147,21 @@ export async function fetchFieldValues(field) {
   }
 }
 
+// 비교 가능한 필드 목록 조회
+export async function fetchAvailableFields() {
+  try {
+    const response = await fetch(`${API_URL}/api/inspection/available-fields`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('필드 목록 조회 오류:', error);
+    return { success: false, error };
+  }
+}
+
 // 차이점 타입별 색상 반환
 export function getDifferenceTypeColor(type) {
   switch (type) {
