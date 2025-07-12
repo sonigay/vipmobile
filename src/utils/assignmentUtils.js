@@ -647,15 +647,33 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       calculation: `${totalSales} / (${remainingInventory} + ${totalSales}) * 100 = ${Math.round(turnoverRate * 100) / 100}%`
     });
     
-    // 거래처수 계산: 담당자가 관리하는 매장 수
+    // 거래처수 계산: 담당자가 관리하는 매장 수 (정규화 적용)
     let storeCount = 0;
     
-    // storeData에서 해당 담당자가 관리하는 매장 수 계산
+    // storeData에서 해당 담당자가 관리하는 매장 수 계산 (정규화 적용)
     if (storeData && Array.isArray(storeData)) {
-      storeCount = storeData.filter(store => 
-        store.manager === agent.target || 
-        store.담당자 === agent.target
-      ).length;
+      const normalizedAgentName = normalizeAgentName(agent.target);
+      const uniqueStoreIds = new Set();
+      
+      // 정규화된 이름과 매칭되는 모든 담당자의 매장을 수집
+      storeData.forEach(store => {
+        const storeManagerNormalized = normalizeAgentName(store.manager);
+        const store담당자Normalized = normalizeAgentName(store.담당자);
+        
+        if (storeManagerNormalized === normalizedAgentName || 
+            store담당자Normalized === normalizedAgentName) {
+          uniqueStoreIds.add(store.id || store.name);
+        }
+      });
+      
+      storeCount = uniqueStoreIds.size;
+      
+      console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
+        원본담당자: agent.target,
+        정규화된이름: normalizedAgentName,
+        고유매장수: storeCount,
+        매장목록: Array.from(uniqueStoreIds)
+      });
     }
     
     // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
