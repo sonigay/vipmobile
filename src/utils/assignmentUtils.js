@@ -305,9 +305,34 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     // 배치로드된 개통실적 데이터 사용
     const activationData = await loadActivationDataBatch();
     
-    // 담당자별 데이터 추출 (인덱싱된 데이터 사용) - 선불개통 제외
-    const agentCurrentData = (activationData.current.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
-    const agentPreviousData = (activationData.previous.get(agent.target) || []).filter(record => record['개통'] !== '선불개통');
+    // 정규화된 담당자명으로 개통실적 데이터 추출
+    const normalizedAgentName = normalizeAgentName(agent.target);
+    let agentCurrentData = [];
+    let agentPreviousData = [];
+    
+    // 해당 정규화된 이름을 가진 모든 담당자의 개통실적을 합산
+    Object.entries(activationData.current).forEach(([agentName, records]) => {
+      const agentNameNormalized = normalizeAgentName(agentName);
+      if (agentNameNormalized === normalizedAgentName) {
+        const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
+        agentCurrentData = agentCurrentData.concat(filteredRecords);
+      }
+    });
+    
+    Object.entries(activationData.previous).forEach(([agentName, records]) => {
+      const agentNameNormalized = normalizeAgentName(agentName);
+      if (agentNameNormalized === normalizedAgentName) {
+        const filteredRecords = records.filter(record => record['개통'] !== '선불개통');
+        agentPreviousData = agentPreviousData.concat(filteredRecords);
+      }
+    });
+    
+    console.log(`🔍 정규화된 담당자 "${normalizedAgentName}" (${agent.target}) 개통실적 데이터 수집:`, {
+      원본담당자: agent.target,
+      정규화된이름: normalizedAgentName,
+      당월개통기록: agentCurrentData.length,
+      전월개통기록: agentPreviousData.length
+    });
     
     // 디버깅: 실제 데이터 구조 확인 (선불개통 제외 후)
     console.log(`🔍 ${agent.target} 데이터 구조 확인 (선불개통 제외):`, {
@@ -429,18 +454,19 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       if (storeResponse.ok) {
         const allStores = await storeResponse.json();
         
-        // 담당자가 관리하는 매장만 필터링
-        const agentStores = allStores.filter(store => 
-          store.manager === agent.target || 
-          store.담당자 === agent.target
-        );
+        // 정규화된 담당자명으로 매장 필터링
+        const agentStores = allStores.filter(store => {
+          const storeManagerNormalized = normalizeAgentName(store.manager);
+          const store담당자Normalized = normalizeAgentName(store.담당자);
+          return storeManagerNormalized === normalizedAgentName || 
+                 store담당자Normalized === normalizedAgentName;
+        });
         
-        console.log(`🏪 ${agent.target} 담당재고확인 API 결과:`, {
+        console.log(`🏪 ${agent.target} 정규화된 담당재고확인 API 결과:`, {
+          원본담당자: agent.target,
+          정규화된이름: normalizedAgentName,
           totalStores: allStores.length,
           agentStoresCount: agentStores.length,
-          agentTarget: agent.target,
-          sampleStoreManager: allStores[0]?.manager,
-          sampleStore담당자: allStores[0]?.담당자,
           agentStores: agentStores.map(store => ({
             name: store.name,
             manager: store.manager,
@@ -499,20 +525,24 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
             }
           });
           
-          console.log(`🏪 ${agent.target} (${model}-${color || '전체'}) 재고 계산 상세:`, {
-            totalRemainingInventory: remainingInventory,
-            storeInventoryDetails,
-            targetModel: model,
-            targetColor: color
-          });
+                  console.log(`🏪 ${agent.target} (${model}-${color || '전체'}) 정규화된 재고 계산 상세:`, {
+          원본담당자: agent.target,
+          정규화된이름: normalizedAgentName,
+          totalRemainingInventory: remainingInventory,
+          storeInventoryDetails,
+          targetModel: model,
+          targetColor: color
+        });
       } else {
         console.error(`재고 데이터 API 호출 실패: ${storeResponse.status}`);
-        // API 호출 실패 시 기존 storeData 사용
+        // API 호출 실패 시 기존 storeData 사용 (정규화 적용)
         if (storeData && Array.isArray(storeData)) {
-          const agentStores = storeData.filter(store => 
-            store.manager === agent.target || 
-            store.담당자 === agent.target
-          );
+          const agentStores = storeData.filter(store => {
+            const storeManagerNormalized = normalizeAgentName(store.manager);
+            const store담당자Normalized = normalizeAgentName(store.담당자);
+            return storeManagerNormalized === normalizedAgentName || 
+                   store담당자Normalized === normalizedAgentName;
+          });
           
           agentStores.forEach(store => {
             if (store.inventory) {
@@ -546,12 +576,14 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       }
     } catch (error) {
       console.error(`재고 데이터 가져오기 오류:`, error);
-      // 오류 발생 시 기존 storeData 사용
+      // 오류 발생 시 기존 storeData 사용 (정규화 적용)
       if (storeData && Array.isArray(storeData)) {
-        const agentStores = storeData.filter(store => 
-          store.manager === agent.target || 
-          store.담당자 === agent.target
-        );
+        const agentStores = storeData.filter(store => {
+          const storeManagerNormalized = normalizeAgentName(store.manager);
+          const store담당자Normalized = normalizeAgentName(store.담당자);
+          return storeManagerNormalized === normalizedAgentName || 
+                 store담당자Normalized === normalizedAgentName;
+        });
         
         agentStores.forEach(store => {
           if (store.inventory) {
@@ -585,7 +617,9 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
     }
     
     // 디버깅: 재고 숫자 계산 결과 확인
-    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 재고 숫자 계산:`, {
+    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 정규화된 재고 숫자 계산:`, {
+      원본담당자: agent.target,
+      정규화된이름: normalizedAgentName,
       remainingInventory,
       storeDataAvailable: !!storeData,
       storeDataLength: storeData?.length || 0,
@@ -594,7 +628,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       calculationMethod: color ? '색상별 합산' : '모델별 균등분배',
       sampleStoreInventory: storeData?.[0]?.inventory?.[model] || 'no inventory',
       allStoresWithModel: storeData?.filter(store => store.inventory?.[model]).length || 0,
-      담당매장재고: '백엔드 API 사용'
+      담당매장재고: '정규화된 백엔드 API 사용'
     });
     
     // 회전율 계산: ((전월개통 숫자+당월개통 숫자) / (재고 숫자 + (전월개통 숫자+당월개통 숫자))) * 100
@@ -603,7 +637,9 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       : 0;
     
     // 디버깅: 회전율 계산 결과 확인
-    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 회전율 계산:`, {
+    console.log(`🔍 ${agent.target} (${model}-${color || '전체'}) 정규화된 회전율 계산:`, {
+      원본담당자: agent.target,
+      정규화된이름: normalizedAgentName,
       totalSales,
       remainingInventory,
       denominator: remainingInventory + totalSales,
