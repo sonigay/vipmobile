@@ -65,8 +65,7 @@ import {
   extractAssignedAgents,
   calculateStatistics,
   fetchColumnSettings,
-  updateColumnSettings,
-  updateModificationComplete
+  updateColumnSettings
 } from '../utils/inspectionUtils';
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -113,20 +112,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   }, [loggedInStore?.contactId]);
 
-  // 수정완료 상태 로드
-  const loadModificationCompletionStatus = useCallback(async () => {
-    try {
-      // 검수결과 시트에서 수정완료 상태 로드
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status`);
-      if (response.ok) {
-        const data = await response.json();
-        const modificationCompletedSet = new Set(data.modificationCompletedItems || []);
-        setModificationCompletedItems(modificationCompletedSet);
-      }
-    } catch (error) {
-      console.error('수정완료 상태 로드 오류:', error);
-    }
-  }, []);
+
 
   // 비교 컬럼 상태
   const [fieldOptions, setFieldOptions] = useState([]);
@@ -203,8 +189,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   useEffect(() => {
     loadInspectionData();
     loadCompletionStatus();
-    loadModificationCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
+  }, [loadInspectionData, loadCompletionStatus, selectedField]);
 
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
@@ -238,27 +223,18 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     return extractAssignedAgents(inspectionData.differences);
   }, [inspectionData]);
 
-  // 수정완료 상태 처리
-  const handleModificationComplete = async (item, isCompleted) => {
-    if (!loggedInStore?.contactId) return;
-    
-    try {
-      await updateModificationComplete(item.id || item.originalKey, loggedInStore.contactId, isCompleted);
-      
-      // 로컬 상태 업데이트
-      setModificationCompletedItems(prev => {
-        const newSet = new Set(prev);
-        if (isCompleted) {
-          newSet.add(item.id || item.originalKey);
-        } else {
-          newSet.delete(item.id || item.originalKey);
-        }
-        return newSet;
-      });
-    } catch (error) {
-      console.error('수정완료 상태 업데이트 오류:', error);
-      alert('수정완료 상태 업데이트에 실패했습니다.');
-    }
+  // 수정완료 상태 처리 (로컬 상태만 동기화)
+  const handleModificationComplete = (item, isCompleted) => {
+    // 로컬 상태만 업데이트 (서버 API 호출 없음)
+    setModificationCompletedItems(prev => {
+      const newSet = new Set(prev);
+      if (isCompleted) {
+        newSet.add(item.id || item.originalKey);
+      } else {
+        newSet.delete(item.id || item.originalKey);
+      }
+      return newSet;
+    });
   };
 
   // 컬럼 설정 다이얼로그 열기
@@ -284,29 +260,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   };
 
-  // 검수 완료 처리 (해시화된 ID 사용)
-  const handleComplete = async (item) => {
-    if (!loggedInStore?.contactId) return;
-    
-    try {
-      const response = await updateInspectionCompletion(
-        item.id || item.originalKey, // 해시화된 ID 사용
-        loggedInStore.contactId,
-        '완료'
-      );
-      
-      if (response.success) {
-        setCompletedItems(prev => new Set([...prev, item.id || item.originalKey]));
-        // 완료 상태 다시 로드
-        loadCompletionStatus();
-      } else {
-        setError('완료 처리에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('완료 처리 오류:', error);
-      setError('완료 처리 중 오류가 발생했습니다.');
-    }
-  };
+
 
   // 정규화 다이얼로그 열기
   const handleNormalize = async (item) => {
@@ -363,8 +317,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         setError(null);
         // 데이터 다시 로드
         loadInspectionData();
-        // 완료 처리
-        await handleComplete(item);
       } else {
         setError('폰클개통데이터 수정에 실패했습니다.');
       }
@@ -728,19 +680,18 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                   <TableCell>처리자</TableCell>
                   <TableCell>수정완료</TableCell>
                   <TableCell>상태</TableCell>
-                  <TableCell>작업</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={7} align="center">
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={7} align="center">
                       데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -792,21 +743,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                             size="small"
                           />
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {!completedItems.has(item.originalKey || item.key) && (
-                            <Tooltip title="완료 처리">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleComplete(item)}
-                                color="success"
-                              >
-                                <CheckCircleIcon />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
                       </TableCell>
                     </TableRow>
                   ))
