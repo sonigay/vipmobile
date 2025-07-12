@@ -675,7 +675,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                 <TableRow>
                   <TableCell>가입번호</TableCell>
                   <TableCell>타입</TableCell>
-                  <TableCell>수기초값 ({columnSettings?.manualKeyColumnName || '가입번호'})</TableCell>
+                  <TableCell>수기초값 (대리점코드)</TableCell>
                   <TableCell>폰클데이터값 ({columnSettings?.systemMemo2ColumnName || '메모2'})</TableCell>
                   <TableCell>처리자</TableCell>
                   <TableCell>수정완료</TableCell>
