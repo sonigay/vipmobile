@@ -289,6 +289,9 @@ const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관
 const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터';  // 당월 개통실적 데이터
 const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터(전월)';  // 전월 개통실적 데이터
 const UPDATE_SHEET_NAME = '어플업데이트';  // 업데이트 내용 관리 시트 추가
+const MANUAL_DATA_SHEET_NAME = '수기초';  // 수기초 데이터
+const INSPECTION_RESULT_SHEET_NAME = '검수결과';  // 검수 결과 데이터
+const NORMALIZATION_HISTORY_SHEET_NAME = '정규화이력';  // 정규화 이력 데이터
 
 // Kakao geocoding 함수 (개선된 버전)
 async function geocodeAddressWithKakao(address, retryCount = 0) {
@@ -1716,19 +1719,21 @@ app.post('/api/login', async (req, res) => {
         console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
         console.log('Step 6: Processing agent login...');
         
-        // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 장표모드 권한, J열: 정책모드 권한 확인
+        // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 장표모드 권한, J열: 정책모드 권한, K열: 검수전체현황 권한 확인
         const hasInventoryPermission = agent[5] === 'O'; // F열
         const hasSettlementPermission = agent[6] === 'O'; // G열
         const hasInspectionPermission = agent[7] === 'O'; // H열
         const hasChartPermission = agent[8] === 'O'; // I열
         const hasPolicyPermission = agent[9] === 'O'; // J열
+        const hasInspectionOverviewPermission = agent[10] === 'O'; // K열
         
         console.log('Step 6.5: Permission check:', {
           inventory: hasInventoryPermission,
           settlement: hasSettlementPermission,
           inspection: hasInspectionPermission,
           chart: hasChartPermission,
-          policy: hasPolicyPermission
+          policy: hasPolicyPermission,
+          inspectionOverview: hasInspectionOverviewPermission
         });
         
         // 다중 권한이 있는 경우 권한 정보 포함
@@ -1738,7 +1743,8 @@ app.post('/api/login', async (req, res) => {
           settlement: hasSettlementPermission,
           inspection: hasInspectionPermission,
           chart: hasChartPermission,
-          policy: hasPolicyPermission
+          policy: hasPolicyPermission,
+          inspectionOverview: hasInspectionOverviewPermission
         };
         
         // 디스코드로 로그인 로그 전송
@@ -1749,11 +1755,11 @@ app.post('/api/login', async (req, res) => {
               color: 15844367, // 보라색
               timestamp: new Date().toISOString(),
               userType: 'agent', // 관리자 타입 지정
-              fields: [
-                {
-                  name: '관리자 정보',
-                  value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}`
-                },
+                              fields: [
+                  {
+                    name: '관리자 정보',
+                    value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}`
+                  },
                 {
                   name: '접속 정보',
                   value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
@@ -2766,6 +2772,498 @@ app.post('/api/push/send-all', async (req, res) => {
   } catch (error) {
     console.error('푸시 알림 전송 오류:', error);
     res.status(500).json({ success: false, error: '푸시 알림 전송 실패' });
+  }
+});
+
+// 검수모드 데이터 가져오기 (캐싱 적용)
+app.get('/api/inspection-data', async (req, res) => {
+  const { view = 'personal', userId } = req.query;
+  const cacheKey = `inspection_data_${view}_${userId}`;
+  
+  // 캐시에서 먼저 확인
+  const cachedData = cacheUtils.get(cacheKey);
+  if (cachedData) {
+    console.log('캐시된 검수 데이터 반환');
+    return res.json(cachedData);
+  }
+  
+  try {
+    console.log('검수 데이터 처리 시작...');
+    const startTime = Date.now();
+    
+    // 수기초와 폰클개통데이터 병렬 로드
+    const [manualValues, systemValues] = await Promise.all([
+      getSheetValues(MANUAL_DATA_SHEET_NAME),
+      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME)
+    ]);
+    
+    if (!manualValues || !systemValues) {
+      throw new Error('Failed to fetch data from sheets');
+    }
+
+    // 헤더 제거
+    const manualRows = manualValues.slice(1);
+    const systemRows = systemValues.slice(1);
+
+    // 데이터 비교 및 차이점 찾기
+    const differences = [];
+    const manualMap = new Map();
+    const systemMap = new Map();
+
+    // 수기초 데이터 인덱싱 (A열: 가입번호 기준)
+    manualRows.forEach((row, index) => {
+      if (row.length > 0 && row[0]) {
+        const key = row[0].toString().trim();
+        manualMap.set(key, { row, index: index + 2 }); // +2는 헤더와 1-based 인덱스 때문
+      }
+    });
+
+    // 폰클개통데이터 인덱싱 (BO열: 메모1 기준)
+    systemRows.forEach((row, index) => {
+      if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
+        const key = row[66].toString().trim();
+        systemMap.set(key, { row, index: index + 2 });
+      }
+    });
+
+    // 차이점 찾기
+    for (const [key, manualData] of manualMap) {
+      const systemData = systemMap.get(key);
+      
+      if (systemData) {
+        // 두 데이터가 모두 있는 경우 비교
+        const rowDifferences = compareRows(manualData.row, systemData.row, key);
+        rowDifferences.forEach(diff => {
+          differences.push({
+            ...diff,
+            manualRow: manualData.index,
+            systemRow: systemData.index,
+            assignedAgent: systemData.row[69] || '' // BR열: 등록직원
+          });
+        });
+      } else {
+        // 수기초에만 있는 데이터
+        differences.push({
+          key,
+          type: 'manual_only',
+          field: '전체',
+          correctValue: '수기초에만 존재',
+          incorrectValue: '없음',
+          manualRow: manualData.index,
+          systemRow: null,
+          assignedAgent: ''
+        });
+      }
+    }
+
+          // 시스템에만 있는 데이터도 확인
+      for (const [key, systemData] of systemMap) {
+        if (!manualMap.has(key)) {
+          differences.push({
+            key,
+            type: 'system_only',
+            field: '전체',
+            correctValue: '없음',
+            incorrectValue: '시스템에만 존재',
+            manualRow: null,
+            systemRow: systemData.index,
+            assignedAgent: systemData.row[69] || '' // BR열: 등록직원
+          });
+        }
+      }
+
+    // 뷰에 따른 필터링
+    let filteredDifferences = differences;
+    if (view === 'personal' && userId) {
+      filteredDifferences = differences.filter(diff => 
+        diff.assignedAgent === userId
+      );
+    }
+
+    const result = {
+      differences: filteredDifferences,
+      total: filteredDifferences.length,
+      manualOnly: filteredDifferences.filter(d => d.type === 'manual_only').length,
+      systemOnly: filteredDifferences.filter(d => d.type === 'system_only').length,
+      mismatched: filteredDifferences.filter(d => d.type === 'mismatch').length
+    };
+
+    const processingTime = Date.now() - startTime;
+    console.log(`검수 데이터 처리 완료: ${result.total}개 차이점, ${processingTime}ms 소요`);
+    
+    // 캐시에 저장 (5분 TTL)
+    cacheUtils.set(cacheKey, result);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching inspection data:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch inspection data', 
+      message: error.message 
+    });
+  }
+});
+
+// 행 비교 함수 (수기초 기준으로 정확한 값 판단)
+function compareRows(manualRow, systemRow, key) {
+  const differences = [];
+  
+  // 비교할 컬럼 매핑 (수기초 컬럼 -> 폰클개통데이터 컬럼)
+  // 실제 시트 구조에 맞게 수정 필요
+  const columnMappings = [
+    { manual: 1, system: 1, name: '이름' },      // B열
+    { manual: 2, system: 2, name: '전화번호' },   // C열
+    { manual: 3, system: 3, name: '주소' },      // D열
+    { manual: 4, system: 4, name: '생년월일' },  // E열
+    { manual: 5, system: 5, name: '성별' },      // F열
+    // 더 많은 컬럼 매핑 추가 가능
+  ];
+
+  columnMappings.forEach(mapping => {
+    // 배열 범위 체크
+    if (manualRow.length <= mapping.manual || systemRow.length <= mapping.system) {
+      return;
+    }
+    
+    const manualValue = manualRow[mapping.manual] || '';
+    const systemValue = systemRow[mapping.system] || '';
+    
+    // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+    if (manualValue.toString().trim() !== systemValue.toString().trim() && 
+        (manualValue.toString().trim() || systemValue.toString().trim())) {
+      differences.push({
+        key,
+        type: 'mismatch',
+        field: mapping.name,
+        correctValue: manualValue.toString().trim(), // 수기초가 정확한 값
+        incorrectValue: systemValue.toString().trim(), // 폰클개통데이터가 잘못된 값
+        manualRow: null,
+        systemRow: null,
+        assignedAgent: systemRow[69] || '' // BR열: 등록직원
+      });
+    }
+  });
+
+  return differences;
+}
+
+// 검수 완료 상태 업데이트
+app.post('/api/inspection/complete', async (req, res) => {
+  try {
+    const { itemId, userId, status } = req.body;
+    
+    if (!itemId || !userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID and User ID are required' 
+      });
+    }
+
+    // 검수결과 시트에 완료 상태 기록
+    const completionData = [
+      [
+        new Date().toISOString(), // 완료일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        status || '완료',         // 상태
+        '처리완료'                // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: completionData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '검수 완료 상태가 업데이트되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating inspection completion:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update inspection completion', 
+      message: error.message 
+    });
+  }
+});
+
+// 정규화 데이터 저장
+app.post('/api/inspection/normalize', async (req, res) => {
+  try {
+    const { itemId, userId, originalValue, normalizedValue, field } = req.body;
+    
+    if (!itemId || !userId || !normalizedValue) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID, User ID, and normalized value are required' 
+      });
+    }
+
+    // 정규화이력 시트에 기록
+    const normalizationData = [
+      [
+        new Date().toISOString(), // 정규화일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        field,                    // 필드명
+        originalValue || '',      // 원본값
+        normalizedValue,          // 정규화값
+        '수동정규화'              // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${NORMALIZATION_HISTORY_SHEET_NAME}!A:G`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: normalizationData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '정규화 데이터가 저장되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error saving normalization data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to save normalization data', 
+      message: error.message 
+    });
+  }
+});
+
+// 폰클개통데이터 수정 API
+app.post('/api/inspection/update-system-data', async (req, res) => {
+  try {
+    const { itemId, userId, field, correctValue, systemRow } = req.body;
+    
+    if (!itemId || !userId || !field || !correctValue || systemRow === null) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID, User ID, field, correct value, and system row are required' 
+      });
+    }
+
+    // 필드명에 따른 컬럼 인덱스 매핑
+    const fieldToColumnMap = {
+      '이름': 1,      // B열
+      '전화번호': 2,   // C열
+      '주소': 3,      // D열
+      '생년월일': 4,  // E열
+      '성별': 5,      // F열
+      // 더 많은 필드 매핑 추가 가능
+    };
+
+    const columnIndex = fieldToColumnMap[field];
+    if (columnIndex === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid field name' 
+      });
+    }
+
+    // 폰클개통데이터 시트에서 해당 행의 특정 컬럼 수정
+    const range = `${CURRENT_MONTH_ACTIVATION_SHEET_NAME}!${String.fromCharCode(65 + columnIndex)}${systemRow}`;
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: range,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [[correctValue]]
+      }
+    });
+
+    // 수정 이력 시트에 기록
+    const updateHistoryData = [
+      [
+        new Date().toISOString(), // 수정일시
+        userId,                   // 처리자
+        itemId,                   // 항목 ID
+        field,                    // 필드명
+        correctValue,             // 수정된 값
+        '폰클개통데이터 수정'     // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${INSPECTION_RESULT_SHEET_NAME}!A:F`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: updateHistoryData
+      }
+    });
+
+    // 캐시 무효화
+    cacheUtils.delete(`inspection_data_personal_${userId}`);
+    cacheUtils.delete(`inspection_data_overview_${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: '폰클개통데이터가 성공적으로 수정되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating system data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update system data', 
+      message: error.message 
+    });
+  }
+});
+
+// 필드별 고유값 조회 API
+app.get('/api/inspection/field-values', async (req, res) => {
+  try {
+    const { field } = req.query;
+    
+    if (!field) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Field name is required' 
+      });
+    }
+
+    // 필드명에 따른 컬럼 인덱스 매핑
+    const fieldToColumnMap = {
+      '이름': 1,      // B열
+      '전화번호': 2,   // C열
+      '주소': 3,      // D열
+      '생년월일': 4,  // E열
+      '성별': 5,      // F열
+      // 더 많은 필드 매핑 추가 가능
+    };
+
+    const columnIndex = fieldToColumnMap[field];
+    if (columnIndex === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid field name' 
+      });
+    }
+
+    // 수기초와 폰클개통데이터에서 해당 필드의 모든 값 수집
+    const [manualValues, systemValues] = await Promise.all([
+      getSheetValues(MANUAL_DATA_SHEET_NAME),
+      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME)
+    ]);
+
+    const allValues = new Set();
+
+    // 수기초에서 값 수집
+    if (manualValues && manualValues.length > 1) {
+      manualValues.slice(1).forEach(row => {
+        if (row.length > columnIndex && row[columnIndex]) {
+          allValues.add(row[columnIndex].toString().trim());
+        }
+      });
+    }
+
+    // 폰클개통데이터에서 값 수집
+    if (systemValues && systemValues.length > 1) {
+      systemValues.slice(1).forEach(row => {
+        if (row.length > columnIndex && row[columnIndex]) {
+          allValues.add(row[columnIndex].toString().trim());
+        }
+      });
+    }
+
+    // 정규화 이력에서도 값 수집
+    try {
+      const normalizationResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${NORMALIZATION_HISTORY_SHEET_NAME}!A:G`
+      });
+      
+      if (normalizationResponse.data.values && normalizationResponse.data.values.length > 1) {
+        normalizationResponse.data.values.slice(1).forEach(row => {
+          if (row.length >= 6 && row[3] === field && row[5]) { // 필드명이 일치하고 정규화값이 있는 경우
+            allValues.add(row[5].toString().trim());
+          }
+        });
+      }
+    } catch (error) {
+      // 정규화 이력 시트가 없거나 비어있는 경우 무시
+      console.log('정규화 이력 시트가 없거나 비어있습니다.');
+    }
+
+    const uniqueValues = Array.from(allValues).filter(value => value).sort();
+
+    res.json({ 
+      success: true, 
+      field,
+      values: uniqueValues 
+    });
+  } catch (error) {
+    console.error('Error fetching field values:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch field values', 
+      message: error.message 
+    });
+  }
+});
+
+// 검수 완료 상태 조회
+app.get('/api/inspection/completion-status', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User ID is required' 
+      });
+    }
+
+    // 검수결과 시트에서 해당 사용자의 완료 항목 조회
+    let completionData = [];
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`
+      });
+      completionData = response.data.values || [];
+    } catch (error) {
+      // 시트가 없거나 비어있는 경우 빈 배열 반환
+      console.log('검수결과 시트가 없거나 비어있습니다.');
+    }
+
+    // 헤더 제거하고 해당 사용자의 완료 항목만 필터링
+    const userCompletions = completionData
+      .slice(1) // 헤더 제거
+      .filter(row => row.length >= 3 && row[1] === userId) // 처리자 ID가 일치하는 항목
+      .map(row => row[2]); // 항목 ID만 추출
+
+    res.json({ 
+      success: true, 
+      completedItems: userCompletions 
+    });
+  } catch (error) {
+    console.error('Error fetching completion status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch completion status', 
+      message: error.message 
+    });
   }
 });
 
