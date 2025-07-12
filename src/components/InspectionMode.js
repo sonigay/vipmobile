@@ -65,7 +65,8 @@ import {
   extractAssignedAgents,
   calculateStatistics,
   fetchColumnSettings,
-  updateColumnSettings
+  updateColumnSettings,
+  updateModificationComplete
 } from '../utils/inspectionUtils';
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -111,6 +112,23 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       console.error('완료 상태 로드 오류:', error);
     }
   }, [loggedInStore?.contactId]);
+
+  // 수정완료 상태 로드
+  const loadModificationCompletionStatus = useCallback(async () => {
+    if (!loggedInStore?.contactId) return;
+    
+    try {
+      // 현재 뷰에 따라 수정완료 상태 로드
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inspection/modification-completion-status?userId=${loggedInStore.contactId}&view=${currentView}`);
+      if (response.ok) {
+        const data = await response.json();
+        const completedSet = new Set(data.completedItems || []);
+        setModificationCompletedItems(completedSet);
+      }
+    } catch (error) {
+      console.error('수정완료 상태 로드 오류:', error);
+    }
+  }, [loggedInStore?.contactId, currentView]);
 
 
 
@@ -189,7 +207,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   useEffect(() => {
     loadInspectionData();
     loadCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus, selectedField]);
+    loadModificationCompletionStatus();
+  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
 
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
@@ -223,18 +242,32 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     return extractAssignedAgents(inspectionData.differences);
   }, [inspectionData]);
 
-  // 수정완료 상태 처리 (로컬 상태만 동기화)
-  const handleModificationComplete = (item, isCompleted) => {
-    // 로컬 상태만 업데이트 (서버 API 호출 없음)
-    setModificationCompletedItems(prev => {
-      const newSet = new Set(prev);
-      if (isCompleted) {
-        newSet.add(item.id || item.originalKey);
-      } else {
-        newSet.delete(item.id || item.originalKey);
-      }
-      return newSet;
-    });
+  // 수정완료 상태 처리 (서버에 저장)
+  const handleModificationComplete = async (item, isCompleted) => {
+    if (!loggedInStore?.contactId) return;
+    
+    try {
+      // 서버에 상태 업데이트
+      await updateModificationComplete(
+        item.originalKey || item.key, 
+        loggedInStore.contactId, 
+        isCompleted
+      );
+      
+      // 로컬 상태 업데이트
+      setModificationCompletedItems(prev => {
+        const newSet = new Set(prev);
+        if (isCompleted) {
+          newSet.add(item.originalKey || item.key);
+        } else {
+          newSet.delete(item.originalKey || item.key);
+        }
+        return newSet;
+      });
+    } catch (error) {
+      console.error('수정완료 상태 업데이트 오류:', error);
+      alert('수정완료 상태 업데이트에 실패했습니다.');
+    }
   };
 
   // 컬럼 설정 다이얼로그 열기

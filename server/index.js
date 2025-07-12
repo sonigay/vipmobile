@@ -2873,30 +2873,40 @@ app.post('/api/inspection/columns', async (req, res) => {
   }
 });
 
+// 수정완료 상태를 메모리에서 관리 (서버 재시작시 초기화)
+const modificationCompletionStatus = new Map(); // itemId -> {userId, isCompleted, timestamp}
+
 // 수정완료 상태 조회 API
 app.get('/api/inspection/modification-completion-status', async (req, res) => {
   try {
-    // 검수결과 시트에서 수정완료 상태 조회
-    const resultValues = await getSheetValues(INSPECTION_RESULT_SHEET_NAME);
-    if (!resultValues) {
-      return res.json({ modificationCompletedItems: [] });
+    const { userId, view = 'personal' } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User ID is required' 
+      });
     }
 
-    const resultRows = resultValues.slice(1); // 헤더 제거
-    const modificationCompletedItems = [];
-
-    resultRows.forEach(row => {
-      if (row.length >= 4 && row[3] === '수정완료') { // D열: 상태가 '수정완료'인 경우
-        const itemId = row[2]; // C열: 항목 ID
-        if (itemId) {
-          modificationCompletedItems.push(itemId);
+    // 메모리에서 수정완료 항목들 조회
+    const completedItems = [];
+    for (const [itemId, status] of modificationCompletionStatus) {
+      if (status.isCompleted) {
+        if (view === 'personal') {
+          // 개인현황: 해당 사용자의 항목만
+          if (status.userId === userId) {
+            completedItems.push(itemId);
+          }
+        } else {
+          // 전체현황: 모든 사용자의 항목
+          completedItems.push(itemId);
         }
       }
-    });
+    }
 
     res.json({ 
-      modificationCompletedItems,
-      total: modificationCompletedItems.length
+      completedItems,
+      total: completedItems.length
     });
   } catch (error) {
     console.error('Error fetching modification completion status:', error);
@@ -2920,29 +2930,14 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
       });
     }
 
-    // 수정완료 상태를 검수결과 시트에 기록
-    const completionData = [
-      [
-        new Date().toISOString(), // 완료일시
-        userId,                   // 처리자
-        itemId,                   // 항목 ID
-        isCompleted ? '수정완료' : '수정대기', // 상태
-        isCompleted ? '수정완료체크' : '수정대기체크' // 비고
-      ]
-    ];
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${INSPECTION_RESULT_SHEET_NAME}!A:E`,
-      valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: completionData
-      }
+    // 메모리에 상태 저장
+    modificationCompletionStatus.set(itemId, {
+      userId,
+      isCompleted,
+      timestamp: new Date().toISOString()
     });
 
-    // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    console.log(`수정완료 상태 업데이트: ${itemId} - ${userId} - ${isCompleted ? '완료' : '대기'}`);
 
     res.json({ 
       success: true, 
