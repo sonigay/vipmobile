@@ -554,6 +554,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             </Grid>
           </Grid>
         </Paper>
+        )}
 
         {/* 데이터 테이블 */}
         {!isLoading && inspectionData && inspectionData.differences && (
