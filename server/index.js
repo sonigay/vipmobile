@@ -2919,20 +2919,45 @@ app.get('/api/inspection-data', async (req, res) => {
       console.log('등록직원 목록:', [...new Set(differences.map(d => d.assignedAgent))]);
       console.log('정리된 등록직원 목록:', [...new Set(differences.map(d => cleanAgentName(d.assignedAgent)))]);
       
-      // 사용자 ID와 정리된 등록직원 이름을 비교
-      const cleanUserId = cleanAgentName(userId);
-      console.log(`정리된 사용자 ID: "${cleanUserId}"`);
+      // 사용자 ID가 전화번호인지 확인하고, 전화번호인 경우 대리점 관리자 시트에서 이름을 찾기
+      let userName = userId;
+      
+      // 전화번호 패턴 확인 (010으로 시작하는 11자리)
+      if (/^010\d{8}$/.test(userId)) {
+        console.log(`전화번호 감지: ${userId}, 대리점 관리자 시트에서 이름 검색 중...`);
+        
+        try {
+          const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+          if (agentValues) {
+            const agentRows = agentValues.slice(1);
+            const agent = agentRows.find(row => row[2] === userId); // C열: 연락처(아이디)
+            
+            if (agent) {
+              userName = agent[0]; // A열: 대상 (이름)
+              console.log(`대리점 관리자 시트에서 이름 찾음: "${userName}" (전화번호: ${userId})`);
+            } else {
+              console.log(`대리점 관리자 시트에서 전화번호 ${userId}에 해당하는 이름을 찾을 수 없음`);
+            }
+          }
+        } catch (error) {
+          console.error('대리점 관리자 시트 조회 중 오류:', error);
+        }
+      }
+      
+      // 사용자 이름과 정리된 등록직원 이름을 비교
+      const cleanUserName = cleanAgentName(userName);
+      console.log(`정리된 사용자 이름: "${cleanUserName}" (원본: "${userName}")`);
       
       // 매칭 시도 로그
       let matchCount = 0;
       filteredDifferences = differences.filter(diff => {
         const cleanAgent = cleanAgentName(diff.assignedAgent);
-        const isMatch = cleanAgent === cleanUserId;
+        const isMatch = cleanAgent === cleanUserName;
         if (isMatch) {
           matchCount++;
-          console.log(`매칭됨 ${matchCount}: "${cleanAgent}" === "${cleanUserId}"`);
+          console.log(`매칭됨 ${matchCount}: "${cleanAgent}" === "${cleanUserName}"`);
         } else {
-          console.log(`매칭 안됨: "${cleanAgent}" !== "${cleanUserId}"`);
+          console.log(`매칭 안됨: "${cleanAgent}" !== "${cleanUserName}"`);
         }
         return isMatch;
       });
@@ -2943,6 +2968,7 @@ app.get('/api/inspection-data', async (req, res) => {
       if (filteredDifferences.length === 0) {
         console.log('매칭 실패 - 원본 값들:');
         console.log('사용자 ID 원본:', userId);
+        console.log('사용자 이름:', userName);
         console.log('등록직원 원본들:', [...new Set(differences.map(d => d.assignedAgent))]);
       }
     }
