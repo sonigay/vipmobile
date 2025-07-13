@@ -326,4 +326,29 @@ export async function updateModificationComplete(itemId, userId, isCompleted) {
     console.error('수정완료 상태 업데이트 오류:', error);
     throw error;
   }
+}
+
+// 수정완료 내용 업데이트
+export async function updateModificationNotes(itemId, userId, notes) {
+  try {
+    const API_URL = process.env.REACT_APP_API_URL;
+    const response = await fetch(`${API_URL}/api/inspection/modification-notes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ itemId, userId, notes }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || '수정완료 내용 업데이트 실패');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('수정완료 내용 업데이트 오류:', error);
+    throw error;
+  }
 } 

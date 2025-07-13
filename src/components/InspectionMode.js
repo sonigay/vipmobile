@@ -66,7 +66,8 @@ import {
   calculateStatistics,
   fetchColumnSettings,
   updateColumnSettings,
-  updateModificationComplete
+  updateModificationComplete,
+  updateModificationNotes
 } from '../utils/inspectionUtils';
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -124,11 +125,22 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         const data = await response.json();
         const completedSet = new Set(data.completedItems || []);
         setModificationCompletedItems(completedSet);
+        
+        // 내용 데이터도 함께 로드하여 inspectionData에 업데이트
+        if (data.notes && inspectionData?.differences) {
+          setInspectionData(prev => ({
+            ...prev,
+            differences: prev.differences.map(diff => ({
+              ...diff,
+              notes: data.notes[diff.originalKey || diff.key] || ''
+            }))
+          }));
+        }
       }
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
     }
-  }, [loggedInStore?.contactId, currentView]);
+  }, [loggedInStore?.contactId, currentView, inspectionData]);
 
 
 
@@ -267,6 +279,37 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     } catch (error) {
       console.error('수정완료 상태 업데이트 오류:', error);
       alert('수정완료 상태 업데이트에 실패했습니다.');
+    }
+  };
+
+  // 내용 변경 처리 (서버에 저장)
+  const handleNotesChange = async (item, notes) => {
+    if (!loggedInStore?.contactId) return;
+    
+    try {
+      // 서버에 내용 업데이트
+      await updateModificationNotes(
+        item.originalKey || item.key, 
+        loggedInStore.contactId, 
+        notes
+      );
+      
+      // 로컬 상태 업데이트
+      setInspectionData(prev => {
+        if (!prev?.differences) return prev;
+        
+        return {
+          ...prev,
+          differences: prev.differences.map(diff => 
+            (diff.originalKey || diff.key) === (item.originalKey || item.key)
+              ? { ...diff, notes }
+              : diff
+          )
+        };
+      });
+    } catch (error) {
+      console.error('내용 업데이트 오류:', error);
+      alert('내용 업데이트에 실패했습니다.');
     }
   };
 
@@ -721,6 +764,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                   <TableCell>처리자</TableCell>
                   <TableCell>수정완료</TableCell>
                   <TableCell>상태</TableCell>
+                  <TableCell>내용</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -788,6 +832,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                             size="small"
                           />
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          placeholder="수정 불가 사유 등"
+                          value={item.notes || ''}
+                          onChange={(e) => handleNotesChange(item, e.target.value)}
+                          multiline
+                          rows={1}
+                          sx={{ minWidth: 200, maxWidth: 300 }}
+                        />
                       </TableCell>
                     </TableRow>
                   ))

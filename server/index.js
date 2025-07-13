@@ -2931,6 +2931,7 @@ app.post('/api/inspection/columns', async (req, res) => {
 
 // 수정완료 상태를 메모리에서 관리 (서버 재시작시 초기화)
 const modificationCompletionStatus = new Map(); // itemId -> {userId, isCompleted, timestamp}
+const modificationNotes = new Map(); // itemId -> {userId, notes, timestamp}
 
 // 수정완료 상태 조회 API
 app.get('/api/inspection/modification-completion-status', async (req, res) => {
@@ -2946,22 +2947,35 @@ app.get('/api/inspection/modification-completion-status', async (req, res) => {
 
     // 메모리에서 수정완료 항목들 조회
     const completedItems = [];
+    const notesData = {};
+    
     for (const [itemId, status] of modificationCompletionStatus) {
       if (status.isCompleted) {
         if (view === 'personal') {
           // 개인현황: 해당 사용자의 항목만
           if (status.userId === userId) {
             completedItems.push(itemId);
+            // 해당 항목의 내용도 함께 조회
+            const notes = modificationNotes.get(itemId);
+            if (notes && notes.userId === userId) {
+              notesData[itemId] = notes.notes;
+            }
           }
         } else {
           // 전체현황: 모든 사용자의 항목
           completedItems.push(itemId);
+          // 해당 항목의 내용도 함께 조회
+          const notes = modificationNotes.get(itemId);
+          if (notes) {
+            notesData[itemId] = notes.notes;
+          }
         }
       }
     }
 
     res.json({ 
       completedItems,
+      notes: notesData,
       total: completedItems.length
     });
   } catch (error) {
@@ -3004,6 +3018,41 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to update modification completion', 
+      message: error.message 
+    });
+  }
+});
+
+// 수정완료 내용 업데이트 API
+app.post('/api/inspection/modification-notes', async (req, res) => {
+  try {
+    const { itemId, userId, notes } = req.body;
+    
+    if (!itemId || !userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Item ID and User ID are required' 
+      });
+    }
+
+    // 메모리에 내용 저장
+    modificationNotes.set(itemId, {
+      userId,
+      notes: notes || '',
+      timestamp: new Date().toISOString()
+    });
+
+    console.log(`수정완료 내용 업데이트: ${itemId} - ${userId} - ${notes}`);
+
+    res.json({ 
+      success: true, 
+      message: '수정완료 내용이 업데이트되었습니다.' 
+    });
+  } catch (error) {
+    console.error('Error updating modification notes:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update modification notes', 
       message: error.message 
     });
   }
