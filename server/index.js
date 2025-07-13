@@ -3855,18 +3855,18 @@ function normalizeActivationType(manualRow, systemRow) {
     // 디버깅: 실제 값 확인
     console.log(`수기초 정규화 디버깅 - 가입구분: "${joinType}", 이전사업자: "${prevOperator}", 기변타겟구분: "${changeTarget}", 배열길이: ${manualRow.length}`);
     
-    // 수기초 정규화 로직 (더 유연하게)
-    if (joinType.includes('신규') && joinType.includes('MNP')) {
-      manualType = 'MNP';
-    } else if (joinType.includes('신규')) {
+    // 수기초 정규화 로직 (정확한 매칭)
+    if (joinType === '신규일반개통') {
       manualType = '신규';
-    } else if (joinType.includes('재가입')) {
+    } else if (joinType === '신규MNP') {
+      manualType = 'MNP';
+    } else if (joinType === '재가입일반개통') {
       if (changeTarget && changeTarget.includes('기변C')) {
         manualType = '보상(C타겟)';
       } else {
         manualType = '보상';
       }
-    } else if (joinType.includes('기변')) {
+    } else if (joinType === '정책기변일반개통') {
       if (changeTarget && changeTarget.includes('기변C')) {
         manualType = '기변(C타겟)';
       } else {
@@ -3888,18 +3888,18 @@ function normalizeActivationType(manualRow, systemRow) {
     // 디버깅: 실제 값 확인
     console.log(`폰클 정규화 디버깅 - 개통: "${activationType}", 환수서비스: "${returnService}", 배열길이: ${systemRow.length}`);
     
-    // 폰클 정규화 로직 (더 유연하게)
-    if (activationType.includes('신규')) {
+    // 폰클 정규화 로직 (정확한 매칭)
+    if (activationType === '신규') {
       systemType = '신규';
-    } else if (activationType.includes('MNP')) {
+    } else if (activationType === 'MNP') {
       systemType = 'MNP';
-    } else if (activationType.includes('보상')) {
+    } else if (activationType === '보상') {
       if (returnService && returnService.includes('C타겟')) {
         systemType = '보상(C타겟)';
       } else {
         systemType = '보상';
       }
-    } else if (activationType.includes('기변')) {
+    } else if (activationType === '기변') {
       if (returnService && returnService.includes('C타겟')) {
         systemType = '기변(C타겟)';
       } else {
