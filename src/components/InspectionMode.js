@@ -517,6 +517,33 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     });
   };
 
+  // 중복 타입 관련 함수들
+  const getDuplicateTypeLabel = (duplicateType) => {
+    switch (duplicateType) {
+      case 'manual_duplicate':
+        return '수기초중복';
+      case 'system_duplicate':
+        return '폰클중복';
+      case 'both_duplicate':
+        return '양쪽중복';
+      default:
+        return '중복';
+    }
+  };
+
+  const getDuplicateTypeColor = (duplicateType) => {
+    switch (duplicateType) {
+      case 'manual_duplicate':
+        return 'info';
+      case 'system_duplicate':
+        return 'warning';
+      case 'both_duplicate':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
   // 통계 카드 컴포넌트
   const StatCard = ({ title, value, color, icon }) => (
     <Card sx={{ height: '100%' }}>
@@ -839,21 +866,43 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                     <TableRow 
                       key={`${item.originalKey || item.key}-${index}`}
                       sx={{ 
-                        backgroundColor: item.isDuplicate ? '#fff3e0' : 'inherit',
+                        backgroundColor: item.isDuplicate ? 
+                          (item.duplicateType === 'manual_duplicate' ? '#e3f2fd' :
+                           item.duplicateType === 'system_duplicate' ? '#fff3e0' :
+                           item.duplicateType === 'both_duplicate' ? '#ffebee' : '#fff3e0') : 'inherit',
                         '&:hover': {
-                          backgroundColor: item.isDuplicate ? '#ffe0b2' : 'inherit'
+                          backgroundColor: item.isDuplicate ? 
+                            (item.duplicateType === 'manual_duplicate' ? '#bbdefb' :
+                             item.duplicateType === 'system_duplicate' ? '#ffe0b2' :
+                             item.duplicateType === 'both_duplicate' ? '#ffcdd2' : '#ffe0b2') : 'inherit'
                         }
                       }}
                     >
                       <TableCell>{item.originalKey || item.key}</TableCell>
                       <TableCell>
                         {item.isDuplicate && (
-                          <Chip
-                            label="가번중복"
-                            size="small"
-                            color="warning"
-                            sx={{ fontWeight: 'bold' }}
-                          />
+                          <Box>
+                            <Chip
+                              label={getDuplicateTypeLabel(item.duplicateType)}
+                              size="small"
+                              color={getDuplicateTypeColor(item.duplicateType)}
+                              sx={{ fontWeight: 'bold', mb: 1 }}
+                            />
+                            {item.duplicateInfo && (
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  display: 'block', 
+                                  fontSize: '0.7rem',
+                                  color: 'text.secondary',
+                                  wordBreak: 'break-word',
+                                  maxWidth: 200
+                                }}
+                              >
+                                {item.duplicateInfo}
+                              </Typography>
+                            )}
+                          </Box>
                         )}
                       </TableCell>
                       <TableCell>

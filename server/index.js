@@ -3052,21 +3052,86 @@ app.get('/api/inspection-data', async (req, res) => {
       }
     });
 
+    // 중복 분석 함수들
+    function analyzeDuplicateDifferences(duplicateRows) {
+      if (duplicateRows.length <= 1) return '';
+      
+      const differences = [];
+      const baseRow = duplicateRows[0];
+      
+      for (let i = 1; i < duplicateRows.length; i++) {
+        const currentRow = duplicateRows[i];
+        const rowDifferences = [];
+        
+        // 모델명 비교 (N열: 13번째 컬럼)
+        if (baseRow[13] !== currentRow[13]) {
+          rowDifferences.push(`모델명: ${baseRow[13] || '없음'} vs ${currentRow[13] || '없음'}`);
+        }
+        
+        // 개통일 비교 (B열: 1번째 컬럼)
+        if (baseRow[1] !== currentRow[1]) {
+          rowDifferences.push(`개통일: ${baseRow[1] || '없음'} vs ${currentRow[1] || '없음'}`);
+        }
+        
+        // 입고처 비교 (G열: 6번째 컬럼)
+        if (baseRow[6] !== currentRow[6]) {
+          rowDifferences.push(`입고처: ${baseRow[6] || '없음'} vs ${currentRow[6] || '없음'}`);
+        }
+        
+        if (rowDifferences.length > 0) {
+          differences.push(`중복${i}: ${rowDifferences.join(', ')}`);
+        } else {
+          differences.push(`중복${i}: 완전동일`);
+        }
+      }
+      
+      return differences.join(' | ');
+    }
+    
+    function getDuplicateType(manualDuplicates, systemDuplicates) {
+      if (manualDuplicates && systemDuplicates) return 'both_duplicate';
+      if (manualDuplicates) return 'manual_duplicate';
+      if (systemDuplicates) return 'system_duplicate';
+      return 'no_duplicate';
+    }
+    
+    // 수기초 데이터 인덱싱 (A열: 가입번호 기준) - 중복 감지 포함
+    const manualDuplicateKeys = new Set();
+    const manualDuplicateGroups = new Map();
+    
+    manualRows.forEach((row, index) => {
+      if (row.length > 0 && row[0]) {
+        const key = row[0].toString().trim();
+        
+        if (manualMap.has(key)) {
+          manualDuplicateKeys.add(key);
+          if (!manualDuplicateGroups.has(key)) {
+            manualDuplicateGroups.set(key, [manualMap.get(key)]);
+          }
+          manualDuplicateGroups.get(key).push({ row, index: index + 2 });
+        } else {
+          manualMap.set(key, { row, index: index + 2 });
+        }
+      }
+    });
+    
     // 폰클개통데이터 인덱싱 (BO열: 메모1 기준) - 중복 가입번호 처리
-    const duplicateKeys = new Set(); // 중복된 가입번호 추적
+    const systemDuplicateKeys = new Set();
+    const systemDuplicateGroups = new Map();
     
     systemRows.forEach((row, index) => {
       if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
         const key = row[66].toString().trim();
         
-
-        
-        // 같은 가입번호가 이미 있는 경우 중복으로 표시
         if (systemMap.has(key)) {
-          duplicateKeys.add(key);
+          systemDuplicateKeys.add(key);
+          if (!systemDuplicateGroups.has(key)) {
+            systemDuplicateGroups.set(key, [systemMap.get(key)]);
+          }
+          systemDuplicateGroups.get(key).push({ row, index: index + 2 });
+        } else {
+          systemMap.set(key, { row, index: index + 2 });
         }
-        
-        systemMap.set(key, { row, index: index + 2 });
       }
     });
 
@@ -3074,26 +3139,35 @@ app.get('/api/inspection-data', async (req, res) => {
     for (const [key, manualData] of manualMap) {
       const systemData = systemMap.get(key);
       
-
-      
       if (systemData) {
+        // 중복 타입 결정
+        const isManualDuplicate = manualDuplicateKeys.has(key);
+        const isSystemDuplicate = systemDuplicateKeys.has(key);
+        const duplicateType = getDuplicateType(isManualDuplicate, isSystemDuplicate);
+        
+        // 중복 정보 생성
+        let duplicateInfo = '';
+        if (isSystemDuplicate && systemDuplicateGroups.has(key)) {
+          const systemDuplicates = systemDuplicateGroups.get(key);
+          duplicateInfo = analyzeDuplicateDifferences(systemDuplicates.map(item => item.row));
+        }
+        
         // 두 데이터가 모두 있는 경우 비교
         const rowDifferences = compareDynamicColumns(manualData.row, systemData.row, key, field);
-        
-
         
         rowDifferences.forEach(diff => {
           differences.push({
             ...diff,
             manualRow: manualData.index,
             systemRow: systemData.index,
-            assignedAgent: systemData.row[69] || '', // BR열: 등록직원 (이미 compareDynamicColumns에서 설정됨)
-            isDuplicate: duplicateKeys.has(key) // 중복 가입번호 여부
+            assignedAgent: systemData.row[69] || '', // BR열: 등록직원
+            isDuplicate: isManualDuplicate || isSystemDuplicate,
+            duplicateType: duplicateType,
+            duplicateInfo: duplicateInfo
           });
         });
-
         
-                // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
+        // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
         if (!field) {
           // 가입번호를 정규표현식으로 정확히 비교
           const manualKey = manualData.row[0]?.toString().trim() || '';
@@ -3120,28 +3194,67 @@ app.get('/api/inspection-data', async (req, res) => {
               incorrectValue: '없음',
               manualRow: manualData.index,
               systemRow: null,
-              assignedAgent: ''
+              assignedAgent: '',
+              isDuplicate: isManualDuplicate,
+              duplicateType: isManualDuplicate ? 'manual_duplicate' : 'no_duplicate',
+              duplicateInfo: isManualDuplicate && manualDuplicateGroups.has(key) ? 
+                analyzeDuplicateDifferences(manualDuplicateGroups.get(key).map(item => item.row)) : ''
             });
           }
         }
       }
     }
 
-    // 중복 가입번호에 대한 별도 차이점 추가
-    for (const duplicateKey of duplicateKeys) {
-      if (manualMap.has(duplicateKey)) {
+    // 중복 가입번호에 대한 별도 차이점 추가 (개선된 버전)
+    const allDuplicateKeys = new Set([...manualDuplicateKeys, ...systemDuplicateKeys]);
+    
+    for (const duplicateKey of allDuplicateKeys) {
+      const isManualDuplicate = manualDuplicateKeys.has(duplicateKey);
+      const isSystemDuplicate = systemDuplicateKeys.has(duplicateKey);
+      const duplicateType = getDuplicateType(isManualDuplicate, isSystemDuplicate);
+      
+      let duplicateInfo = '';
+      let description = '';
+      
+      if (isManualDuplicate && isSystemDuplicate) {
+        // 양쪽 모두 중복
+        description = '수기초와 폰클 데이터 모두에 동일한 가입번호가 여러 행에 존재합니다.';
+        if (manualDuplicateGroups.has(duplicateKey)) {
+          duplicateInfo += `수기초중복: ${analyzeDuplicateDifferences(manualDuplicateGroups.get(duplicateKey).map(item => item.row))} | `;
+        }
+        if (systemDuplicateGroups.has(duplicateKey)) {
+          duplicateInfo += `폰클중복: ${analyzeDuplicateDifferences(systemDuplicateGroups.get(duplicateKey).map(item => item.row))}`;
+        }
+      } else if (isManualDuplicate) {
+        // 수기초만 중복
+        description = '수기초 데이터에 동일한 가입번호가 여러 행에 존재합니다.';
+        if (manualDuplicateGroups.has(duplicateKey)) {
+          duplicateInfo = analyzeDuplicateDifferences(manualDuplicateGroups.get(duplicateKey).map(item => item.row));
+        }
+      } else if (isSystemDuplicate) {
+        // 폰클데이터만 중복
+        description = '폰클 데이터에 동일한 가입번호가 여러 행에 존재합니다.';
+        if (systemDuplicateGroups.has(duplicateKey)) {
+          duplicateInfo = analyzeDuplicateDifferences(systemDuplicateGroups.get(duplicateKey).map(item => item.row));
+        }
+      }
+      
+      // 이미 매칭된 데이터가 있는 경우 중복 정보만 추가하고, 없는 경우 별도 차이점으로 추가
+      if (!manualMap.has(duplicateKey) || !systemMap.has(duplicateKey)) {
         differences.push({
           key: duplicateKey,
           type: 'duplicate',
           field: '가입번호 중복',
           fieldKey: 'duplicate_subscription',
-          correctValue: '수기초 데이터',
-          incorrectValue: '폰클 데이터 중복',
-          description: '폰클 데이터에 동일한 가입번호가 여러 행에 존재합니다.',
-          manualRow: manualMap.get(duplicateKey).index,
-          systemRow: systemMap.get(duplicateKey).index,
-          assignedAgent: systemMap.get(duplicateKey).row[69] || '',
-          isDuplicate: true
+          correctValue: isManualDuplicate ? '수기초 데이터' : '없음',
+          incorrectValue: isSystemDuplicate ? '폰클 데이터 중복' : '없음',
+          description: description,
+          manualRow: manualMap.has(duplicateKey) ? manualMap.get(duplicateKey).index : null,
+          systemRow: systemMap.has(duplicateKey) ? systemMap.get(duplicateKey).index : null,
+          assignedAgent: systemMap.has(duplicateKey) ? systemMap.get(duplicateKey).row[69] || '' : '',
+          isDuplicate: true,
+          duplicateType: duplicateType,
+          duplicateInfo: duplicateInfo
         });
       }
     }
@@ -3150,6 +3263,14 @@ app.get('/api/inspection-data', async (req, res) => {
     if (!field) {
       for (const [key, systemData] of systemMap) {
         if (!manualMap.has(key)) {
+          const isSystemDuplicate = systemDuplicateKeys.has(key);
+          let duplicateInfo = '';
+          
+          if (isSystemDuplicate && systemDuplicateGroups.has(key)) {
+            const systemDuplicates = systemDuplicateGroups.get(key);
+            duplicateInfo = analyzeDuplicateDifferences(systemDuplicates.map(item => item.row));
+          }
+          
           differences.push({
             key,
             type: 'system_only',
@@ -3159,7 +3280,10 @@ app.get('/api/inspection-data', async (req, res) => {
             incorrectValue: '수기초에 없음',
             manualRow: null,
             systemRow: systemData.index,
-            assignedAgent: systemData.row[69] || '' // BR열: 등록직원
+            assignedAgent: systemData.row[69] || '', // BR열: 등록직원
+            isDuplicate: isSystemDuplicate,
+            duplicateType: isSystemDuplicate ? 'system_duplicate' : 'no_duplicate',
+            duplicateInfo: duplicateInfo
           });
         }
       }
@@ -4273,7 +4397,11 @@ const securityUtils = {
         correctValue: diff.correctValue,
         incorrectValue: diff.incorrectValue,
         // 가입번호는 화면에 표시되어야 하므로 원본 값 유지
-        originalKey: diff.key
+        originalKey: diff.key,
+        // 중복 관련 정보 추가
+        isDuplicate: diff.isDuplicate || false,
+        duplicateType: diff.duplicateType || 'no_duplicate',
+        duplicateInfo: diff.duplicateInfo || ''
       };
       
       return safeDiff;
