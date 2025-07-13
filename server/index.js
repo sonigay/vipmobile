@@ -3942,6 +3942,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       // AN열 최종영업정책이 "BLANK"인 경우 비교 제외
       const finalPolicy = manualRow[39] || ''; // AN열: 최종영업정책
       if (finalPolicy.toString().trim().toUpperCase() === 'BLANK') {
+        console.log(`모델명 비교 제외: key=${key}, 최종영업정책=BLANK`);
         return;
       }
       
@@ -3965,7 +3966,15 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const manualCombined = `${normalizedManualModel}(${normalizedManualSerial})`;
       const systemCombined = `${normalizedSystemModel}(${normalizedSystemSerial})`;
       
-
+      // 디버깅: 특정 가입번호의 모델명 비교 로그
+      if (key === '516697159306') {
+        console.log(`모델명 비교 디버깅 - 가입번호: ${key}`);
+        console.log(`수기초: 모델=${manualModel}, 일련번호=${manualSerial}`);
+        console.log(`폰클: 모델=${systemModel}, 일련번호=${systemSerial}`);
+        console.log(`정규화 후 수기초: ${manualCombined}`);
+        console.log(`정규화 후 폰클: ${systemCombined}`);
+        console.log(`비교 결과: ${manualCombined !== systemCombined ? '다름' : '같음'}`);
+      }
       
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
       if (manualCombined !== systemCombined && 
