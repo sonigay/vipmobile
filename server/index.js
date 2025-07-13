@@ -3635,6 +3635,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
     ? COLUMN_MATCHING_CONFIG.filter(config => config.manualField.key === targetField)
     : COLUMN_MATCHING_CONFIG;
 
+  console.log(`compareDynamicColumns 호출: targetField=${targetField}, mappingsToCompare=${mappingsToCompare.length}개`);
+
   mappingsToCompare.forEach(config => {
     const { manualField, systemField, regex, description } = config;
     

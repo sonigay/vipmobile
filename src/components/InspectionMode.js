@@ -551,17 +551,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Box>
         )}
 
-        {/* 컬럼 설정 및 비교 컬럼 선택 */}
+        {/* 비교 컬럼 선택 */}
         <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleOpenColumnSettings}
-            startIcon={<EditIcon />}
-          >
-            컬럼 설정
-          </Button>
-          
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>비교할 컬럼</InputLabel>
             <Select
@@ -714,25 +705,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         </Paper>
         )}
 
-        {/* 검수 항목별 설정 버튼 */}
-        <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<EditIcon />}
-            onClick={() => handleOpenColumnSettings('store_code')}
-          >
-            대리점코드 설정
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<EditIcon />}
-            onClick={() => handleOpenColumnSettings('activation_datetime')}
-          >
-            개통일시분 설정
-          </Button>
-        </Box>
+
 
         {/* 데이터 테이블 */}
         {!isLoading && inspectionData && inspectionData.differences && (
