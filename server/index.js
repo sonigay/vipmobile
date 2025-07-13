@@ -2864,6 +2864,15 @@ app.get('/api/inspection/columns', async (req, res) => {
           systemColumnNames: ['개통일', '개통시', '개통분'],
           description: '개통일시분 비교 (초 제외, 24시간 형식)',
           enabled: true
+        },
+        {
+          key: 'model_serial',
+          manualColumns: ['AD', 'AS'],
+          manualColumnNames: ['개통모델', '판매모델일련번호'],
+          systemColumns: ['N', 'P'],
+          systemColumnNames: ['모델명', '일련번호'],
+          description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)',
+          enabled: true
         }
       ]
     };
@@ -3659,6 +3668,11 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '개통일시분', key: 'activation_datetime', column: 20 }, // U열
     systemField: { name: '개통일시분', key: 'activation_datetime', column: 1 }, // B열
     description: '개통일시분 비교 (초 제외, 24시간 형식)'
+  },
+  {
+    manualField: { name: '모델명(일련번호)', key: 'model_serial', column: 29 }, // AD열
+    systemField: { name: '모델명(일련번호)', key: 'model_serial', column: 13 }, // N열
+    description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)'
   }
 ];
 
@@ -3684,6 +3698,39 @@ function extractValueWithRegex(value, regex) {
   } catch (error) {
     console.error('정규표현식 오류:', error);
     return value;
+  }
+}
+
+// 모델명 정규화 함수
+function normalizeModelName(modelName) {
+  if (!modelName) return '';
+  
+  let normalized = modelName.toString().trim();
+  
+  // 언더스코어를 제거하고 G를 제거
+  normalized = normalized.replace(/_/g, '').replace(/G$/i, '');
+  
+  return normalized;
+}
+
+// 일련번호 정규화 함수
+function normalizeSerialNumber(serialNumber) {
+  if (!serialNumber) return '';
+  
+  let serial = serialNumber.toString().trim();
+  
+  // 숫자인지 확인
+  if (/^\d+$/.test(serial)) {
+    // 숫자인 경우 뒤에서 6자리만 사용
+    if (serial.length >= 6) {
+      return serial.slice(-6);
+    } else {
+      // 6자리 미만인 경우 앞에 0을 붙여서 6자리로 만듦
+      return serial.padStart(6, '0');
+    }
+  } else {
+    // 영문이 포함된 경우 그대로 반환
+    return serial;
   }
 }
 
@@ -3729,6 +3776,47 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           correctValue: manualDateTime,
           incorrectValue: systemDateTime,
           description: '개통일시분 비교 (초 제외, 24시간 형식)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 모델명(일련번호) 비교 로직
+    if (manualField.key === 'model_serial') {
+      // 배열 범위 체크 (AD=29, AS=44, N=13, P=15)
+      if (manualRow.length <= 44 || systemRow.length <= 15) {
+        return;
+      }
+      
+      const manualModel = manualRow[29] || ''; // AD열: 개통모델
+      const manualSerial = manualRow[44] || ''; // AS열: 판매모델일련번호
+      const systemModel = systemRow[13] || '';  // N열: 모델명
+      const systemSerial = systemRow[15] || ''; // P열: 일련번호
+      
+      // 모델명과 일련번호 정규화
+      const normalizedManualModel = normalizeModelName(manualModel);
+      const normalizedSystemModel = normalizeModelName(systemModel);
+      const normalizedManualSerial = normalizeSerialNumber(manualSerial);
+      const normalizedSystemSerial = normalizeSerialNumber(systemSerial);
+      
+      // 모델명과 일련번호를 조합하여 비교
+      const manualCombined = `${normalizedManualModel}(${normalizedManualSerial})`;
+      const systemCombined = `${normalizedSystemModel}(${normalizedSystemSerial})`;
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualCombined !== systemCombined && 
+          (manualCombined || systemCombined)) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '모델명(일련번호)',
+          fieldKey: 'model_serial',
+          correctValue: manualCombined,
+          incorrectValue: systemCombined,
+          description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
