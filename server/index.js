@@ -4526,10 +4526,11 @@ function normalizeConversionSupport(manualRow, systemRow) {
 
 // 프리할부상이 정규화 함수
 function normalizePreInstallment(manualRow, systemRow) {
-  // 수기초 데이터 정규화 (AV열)
+  // 수기초 데이터 정규화 (AV열+BL열)
   let manualPreInstallment = '';
-  if (manualRow.length > 47) { // 최소 AV열(47)은 있어야 함
-    const avValue = (manualRow[47] || '').toString().trim(); // AV열
+  if (manualRow.length > 63) { // 최소 BL열(63)은 있어야 함
+    const avValue = (manualRow[47] || '').toString().trim(); // AV열: 프리할부상이
+    const blValue = (manualRow[63] || '').toString().trim(); // BL열
     const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
@@ -4537,7 +4538,10 @@ function normalizePreInstallment(manualRow, systemRow) {
       return { manualPreInstallment: '', systemPreInstallment: '' }; // 검수 대상에서 제외
     }
     
-    manualPreInstallment = normalizeNumberFormat(avValue);
+    // 숫자 더하기 연산으로 정규화: AV + BL
+    const values = [avValue, blValue].filter(v => v);
+    const sum = addNumbers(values);
+    manualPreInstallment = normalizeNumberFormat(sum);
   }
   
   // 폰클 데이터 정규화 (AB열-AS열-AC열-AE열)
