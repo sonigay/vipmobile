@@ -3836,6 +3836,7 @@ function normalizeActivationType(manualRow, systemRow) {
     const joinType = (manualRow[10] || '').toString().trim(); // K열: 가입구분
     const prevOperator = (manualRow[40] || '').toString().trim(); // AO열: 이전사업자
     const changeTarget = (manualRow[80] || '').toString().trim(); // CC열: 기변타겟구분
+    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
     
     // 수기초 정규화 로직
     if (joinType === '신규') {
@@ -3857,6 +3858,11 @@ function normalizeActivationType(manualRow, systemRow) {
         manualType = '기변';
       }
     }
+    
+    // 중고 조건 확인 (AN열에 "BLANK"가 있으면 "중고-" 접두사 추가)
+    if (finalPolicy && finalPolicy.includes('BLANK')) {
+      manualType = `중고-${manualType}`;
+    }
   }
   
   // 폰클 데이터 정규화 (L열, X열 조합)
@@ -3864,27 +3870,40 @@ function normalizeActivationType(manualRow, systemRow) {
   if (systemRow.length > 23) { // 최소 X열(23)은 있어야 함
     const activationType = (systemRow[11] || '').toString().trim(); // L열: 개통
     const returnService = (systemRow[23] || '').toString().trim(); // X열: 환수서비스
+    const columnI = (systemRow[8] || '').toString().trim(); // I열
+    const columnE = (systemRow[4] || '').toString().trim(); // E열
     
-    // 폰클 정규화 로직
-    if (activationType === '신규') {
-      if (!returnService.includes('C타겟')) {
-        systemType = '신규';
+    // 선불개통 조건 먼저 확인
+    if (activationType && activationType.includes('선불개통')) {
+      systemType = '선불개통';
+      
+      // 중고 조건 확인 (I열/E열에 "중고" 포함)
+      if ((columnI && columnI.includes('중고')) || 
+          (columnE && columnE.includes('중고'))) {
+        systemType = `중고-${systemType}`;
       }
-    } else if (activationType === 'MNP') {
-      if (!returnService.includes('C타겟')) {
-        systemType = 'MNP';
-      }
-    } else if (activationType === '보상') {
-      if (returnService.includes('C타겟')) {
-        systemType = '보상(C타겟)';
-      } else {
-        systemType = '보상';
-      }
-    } else if (activationType === '기변') {
-      if (returnService.includes('C타겟')) {
-        systemType = '기변(C타겟)';
-      } else {
-        systemType = '기변';
+    } else {
+      // 기존 폰클 정규화 로직
+      if (activationType === '신규') {
+        if (!returnService.includes('C타겟')) {
+          systemType = '신규';
+        }
+      } else if (activationType === 'MNP') {
+        if (!returnService.includes('C타겟')) {
+          systemType = 'MNP';
+        }
+      } else if (activationType === '보상') {
+        if (returnService.includes('C타겟')) {
+          systemType = '보상(C타겟)';
+        } else {
+          systemType = '보상';
+        }
+      } else if (activationType === '기변') {
+        if (returnService.includes('C타겟')) {
+          systemType = '기변(C타겟)';
+        } else {
+          systemType = '기변';
+        }
       }
     }
   }
