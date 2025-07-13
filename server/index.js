@@ -3770,6 +3770,11 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '모델명(일련번호)', key: 'model_serial', column: 29 }, // AD열
     systemField: { name: '모델명(일련번호)', key: 'model_serial', column: 13 }, // N열
     description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)'
+  },
+  {
+    manualField: { name: '개통유형', key: 'activation_type', column: 10 }, // K열
+    systemField: { name: '개통유형', key: 'activation_type', column: 11 }, // L열
+    description: '개통유형 및 C타겟차감대상 비교 (가입구분+이전사업자+기변타겟구분 정규화)'
   }
 ];
 
@@ -3836,6 +3841,64 @@ function normalizeSerialNumber(serialNumber) {
     const result = serial.replace(/^0+/, '');
     return result;
   }
+}
+
+// 개통유형 정규화 함수
+function normalizeActivationType(manualRow, systemRow) {
+  // 수기초 데이터 정규화
+  let manualType = '';
+  if (manualRow.length > 40) { // K열(10), AO열(40), CC열(80) 체크
+    const joinType = (manualRow[10] || '').toString().trim(); // K열: 가입구분
+    const prevOperator = (manualRow[40] || '').toString().trim(); // AO열: 이전사업자
+    const changeTarget = (manualRow[80] || '').toString().trim(); // CC열: 기변타겟구분
+    
+    // 수기초 정규화 로직
+    if (joinType === '신규일반개통') {
+      manualType = '신규';
+    } else if (joinType === '신규MNP') {
+      manualType = 'MNP';
+    } else if (joinType === '재가입일반개통') {
+      if (changeTarget && changeTarget.includes('C타겟')) {
+        manualType = '보상(C타겟)';
+      } else {
+        manualType = '보상';
+      }
+    } else if (joinType === '정책기변일반개통') {
+      if (changeTarget && changeTarget.includes('C타겟')) {
+        manualType = '기변(C타겟)';
+      } else {
+        manualType = '기변';
+      }
+    }
+  }
+  
+  // 폰클 데이터 정규화
+  let systemType = '';
+  if (systemRow.length > 23) { // L열(11), X열(23) 체크
+    const joinType = (systemRow[11] || '').toString().trim(); // L열: 가입구분
+    const returnService = (systemRow[23] || '').toString().trim(); // X열: 환수서비스
+    
+    // 폰클 정규화 로직
+    if (joinType === '신규') {
+      systemType = '신규';
+    } else if (joinType === 'MNP') {
+      systemType = 'MNP';
+    } else if (joinType === '보상') {
+      if (returnService && returnService.includes('C타겟')) {
+        systemType = '보상(C타겟)';
+      } else {
+        systemType = '보상';
+      }
+    } else if (joinType === '기변') {
+      if (returnService && returnService.includes('C타겟')) {
+        systemType = '기변(C타겟)';
+      } else {
+        systemType = '기변';
+      }
+    }
+  }
+  
+  return { manualType, systemType };
 }
 
 // 동적 컬럼 비교 함수
@@ -3934,6 +3997,36 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           correctValue: manualCombined,
           incorrectValue: systemCombined,
           description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 개통유형 비교 로직
+    if (manualField.key === 'activation_type') {
+      // 배열 범위 체크 (K=10, AO=40, CC=80, L=11, X=23)
+      if (manualRow.length <= 80 || systemRow.length <= 23) {
+        return;
+      }
+      
+      // 개통유형 정규화
+      const { manualType, systemType } = normalizeActivationType(manualRow, systemRow);
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualType !== systemType && 
+          (manualType || systemType)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '개통유형',
+          fieldKey: 'activation_type',
+          correctValue: manualType || '정규화 불가',
+          incorrectValue: systemType || '정규화 불가',
+          description: '개통유형 및 C타겟차감대상 비교 (가입구분+이전사업자+기변타겟구분 정규화)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
