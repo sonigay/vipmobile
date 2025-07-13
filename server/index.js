@@ -3074,6 +3074,7 @@ app.get('/api/inspection-data', async (req, res) => {
         if (systemData) {
           console.log(`폰클 데이터 매핑 키 (BO열): "${systemData.row[66] || ''}"`);
           console.log(`폰클 데이터 전체 길이: ${systemData.row.length}`);
+          console.log(`폰클 데이터 전체 컬럼 (0-20): ${systemData.row.slice(0, 21).map((val, idx) => `${idx}:"${val || ''}"`).join(', ')}`);
         }
       }
       
@@ -3658,7 +3659,7 @@ function extractValueWithRegex(value, regex) {
 }
 
 // 디버깅 대상 시리얼번호 목록
-const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306', '528501', 'SM-L305N'];
+const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306', '528501', 'SM-L305N', '177366', '1230343'];
 const DEBUG_SUBSCRIPTION_NUMBERS = ['500225775943', '516697159306'];
 
 // 모델명 정규화 함수
