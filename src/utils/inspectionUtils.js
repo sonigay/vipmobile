@@ -218,6 +218,11 @@ export function filterDifferences(differences, filters) {
     filtered = filtered.filter(diff => diff.type === filters.type);
   }
 
+  // 중복 타입 필터링
+  if (filters.duplicateType && filters.duplicateType !== 'all') {
+    filtered = filtered.filter(diff => diff.duplicateType === filters.duplicateType);
+  }
+
   // 처리자 필터링
   if (filters.assignedAgent && filters.assignedAgent !== 'all') {
     filtered = filtered.filter(diff => diff.assignedAgent === filters.assignedAgent);
