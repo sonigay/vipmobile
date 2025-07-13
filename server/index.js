@@ -3974,10 +3974,10 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
       return { manualPos: '', systemPos: '' }; // 검수 대상에서 제외
     }
     
-    // 수기초 정규화: H열 & VLOOKUP 결과
+    // 수기초 정규화: H열 & (VLOOKUP 결과)
     if (salesPos && storeData) {
       const vlookupResult = vlookupPosCodeToStoreName(salesPos, storeData);
-      manualPos = vlookupResult || salesPos; // VLOOKUP 결과가 있으면 사용, 없으면 원본값
+      manualPos = vlookupResult ? `${salesPos} & (${vlookupResult})` : salesPos;
     } else {
       manualPos = salesPos;
     }
@@ -3991,9 +3991,9 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
     // 폰클 정규화: VLOOKUP 결과 & G열
     if (storeCode && storeData) {
       const vlookupResult = vlookupStoreNameToPosCode(storeCode, storeData);
-      systemPos = vlookupResult || storeCode; // VLOOKUP 결과가 있으면 사용, 없으면 원본값
+      systemPos = vlookupResult ? `${vlookupResult} & (${storeCode})` : `(${storeCode})`;
     } else {
-      systemPos = storeCode;
+      systemPos = storeCode ? `(${storeCode})` : '';
     }
   }
   
