@@ -2796,7 +2796,13 @@ function normalizeActivationDateTime(manualDate, manualTime, systemDate, systemH
       if (date && time && time.length >= 4) {
         const hour = time.substring(0, 2);
         const minute = time.substring(2, 4);
-        manualDateTime = `${date} ${hour}:${minute}`;
+        
+        // 수기초 분값을 5분 단위로 내림차순 처리
+        const minuteNum = parseInt(minute, 10);
+        const normalizedMinute = Math.floor(minuteNum / 5) * 5;
+        const normalizedMinuteStr = normalizedMinute.toString().padStart(2, '0');
+        
+        manualDateTime = `${date} ${hour}:${normalizedMinuteStr}`;
       }
     }
     

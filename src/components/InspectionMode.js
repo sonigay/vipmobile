@@ -551,13 +551,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Box>
         )}
 
-        {/* 비교 컬럼 선택 */}
+        {/* 검수대상항목 선택 */}
         <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>비교할 컬럼</InputLabel>
+            <InputLabel>검수대상항목</InputLabel>
             <Select
               value={selectedField}
-              label="비교할 컬럼"
+              label="검수대상항목"
               onChange={e => setSelectedField(e.target.value)}
             >
               {fieldOptions.map(option => (
