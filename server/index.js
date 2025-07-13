@@ -3853,7 +3853,13 @@ function normalizeActivationType(manualRow, systemRow) {
     const changeTarget = manualRow.length > 80 ? (manualRow[80] || '').toString().trim() : ''; // CC열: 기변타겟구분
     
     // 디버깅: 실제 값 확인
-    console.log(`수기초 정규화 디버깅 - 가입구분: "${joinType}", 이전사업자: "${prevOperator}", 기변타겟구분: "${changeTarget}", 배열길이: ${manualRow.length}`);
+    console.log(`수기초 정규화 디버깅 - 가입구분: "${joinType}" (길이: ${joinType.length})`, joinType);
+    console.log(`수기초 정규화 디버깅 - 이전사업자: "${prevOperator}"`, prevOperator);
+    console.log(`수기초 정규화 디버깅 - 기변타겟구분: "${changeTarget}"`, changeTarget);
+    console.log(`수기초 정규화 디버깅 - 배열길이: ${manualRow.length}`);
+    console.log(`수기초 정규화 디버깅 - K열(10) 원본값:`, manualRow[10]);
+    console.log(`수기초 정규화 디버깅 - AO열(40) 원본값:`, manualRow[40]);
+    console.log(`수기초 정규화 디버깅 - CC열(80) 원본값:`, manualRow[80]);
     
     // 수기초 정규화 로직 (요청사항대로)
     if (joinType === '신규일반개통') {
