@@ -4107,6 +4107,11 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '요금제', key: 'plan', column: 37 }, // AL열
     systemField: { name: '요금제', key: 'plan', column: 21 }, // V열
     description: '요금제 비교 (VLOOKUP 방식 정규화, AN열 BLANK 제외)'
+  },
+  {
+    manualField: { name: '출고가상이', key: 'shipping_virtual', column: 47 }, // AV열
+    systemField: { name: '출고가상이', key: 'shipping_virtual', column: 27 }, // AB열
+    description: '출고가상이 비교 (더하기 방식 정규화)'
   }
 ];
 
@@ -4353,6 +4358,34 @@ function normalizePlan(manualRow, systemRow, planData = null) {
   return { manualPlan, systemPlan, manualPlanType, systemPlanType };
 }
 
+// 출고가상이 정규화 함수
+function normalizeShippingVirtual(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (AV열+AZ열+AW열+BK열+BM열+BN열+BL열)
+  let manualShipping = '';
+  if (manualRow.length > 63) { // 최소 BN열(63)은 있어야 함
+    const avValue = (manualRow[47] || '').toString().trim(); // AV열
+    const azValue = (manualRow[51] || '').toString().trim(); // AZ열
+    const awValue = (manualRow[48] || '').toString().trim(); // AW열
+    const bkValue = (manualRow[62] || '').toString().trim(); // BK열
+    const bmValue = (manualRow[64] || '').toString().trim(); // BM열
+    const bnValue = (manualRow[63] || '').toString().trim(); // BN열
+    const blValue = (manualRow[65] || '').toString().trim(); // BL열
+    
+    // 더하기 방식으로 정규화
+    const values = [avValue, azValue, awValue, bkValue, bmValue, bnValue, blValue].filter(v => v);
+    manualShipping = values.join('+');
+  }
+  
+  // 폰클 데이터 정규화 (AB열)
+  let systemShipping = '';
+  if (systemRow.length > 27) { // 최소 AB열(27)은 있어야 함
+    const abValue = (systemRow[27] || '').toString().trim(); // AB열: 출고가상이
+    systemShipping = abValue;
+  }
+  
+  return { manualShipping, systemShipping };
+}
+
 // 동적 컬럼 비교 함수
 function compareDynamicColumns(manualRow, systemRow, key, targetField = null, storeData = null, planData = null) {
   const differences = [];
@@ -4559,6 +4592,36 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
         assignedAgent: systemRow[69] || '' // BR열: 등록직원
       });
     }
+      return;
+    }
+    
+    // 출고가상이 비교 로직
+    if (manualField.key === 'shipping_virtual') {
+      // 배열 범위 체크 (AV=47, AZ=51, AW=48, BK=62, BM=64, BN=63, BL=65, AB=27)
+      if (manualRow.length <= 65 || systemRow.length <= 27) {
+        return;
+      }
+      
+      // 출고가상이 정규화
+      const { manualShipping, systemShipping } = normalizeShippingVirtual(manualRow, systemRow);
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualShipping !== systemShipping && 
+          (manualShipping || systemShipping)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '출고가상이',
+          fieldKey: 'shipping_virtual',
+          correctValue: manualShipping || '정규화 불가',
+          incorrectValue: systemShipping || '정규화 불가',
+          description: '출고가상이 비교 (더하기 방식 정규화)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
       return;
     }
     
