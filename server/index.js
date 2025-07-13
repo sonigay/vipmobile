@@ -51,49 +51,37 @@ const cacheUtils = {
       const firstKey = cache.keys().next().value;
       cache.delete(firstKey);
     }
-    
-    console.log(`캐시 저장: ${key} (TTL: ${new Date(now + ttl).toLocaleTimeString()})`);
   },
   
   // 캐시에서 데이터 가져오기
   get: (key) => {
     const item = cache.get(key);
     if (!item) {
-      console.log(`캐시 미스: ${key}`);
       return null;
     }
     
     const now = Date.now();
     if (now > item.ttl) {
       cache.delete(key);
-      console.log(`캐시 만료: ${key}`);
       return null;
     }
     
-    console.log(`캐시 히트: ${key}`);
     return item.data;
   },
   
   // 캐시 삭제
   delete: (key) => {
     cache.delete(key);
-    console.log(`캐시 삭제: ${key}`);
   },
   
   // 캐시 전체 정리 (만료된 항목들)
   cleanup: () => {
     const now = Date.now();
-    let deletedCount = 0;
     
     for (const [key, item] of cache.entries()) {
       if (now > item.ttl) {
         cache.delete(key);
-        deletedCount++;
       }
-    }
-    
-    if (deletedCount > 0) {
-      console.log(`캐시 정리 완료: ${deletedCount}개 항목 삭제`);
     }
   },
   
@@ -312,7 +300,6 @@ async function geocodeAddressWithKakao(address, retryCount = 0) {
   // 주소 전처리
   const cleanAddress = address.toString().trim();
   if (!cleanAddress) {
-    console.log('빈 주소로 geocoding 시도 중단');
     return null;
   }
   
@@ -320,15 +307,12 @@ async function geocodeAddressWithKakao(address, retryCount = 0) {
   let processedAddress = cleanAddress;
   if (!cleanAddress.includes('시') && !cleanAddress.includes('구') && !cleanAddress.includes('군')) {
     processedAddress = `경기도 ${cleanAddress}`;
-    console.log(`주소 전처리: "${cleanAddress}" → "${processedAddress}"`);
   }
   
   const encodedAddress = encodeURIComponent(processedAddress);
   const url = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
   
   try {
-    console.log(`Geocoding 시도 (${retryCount + 1}/3): ${processedAddress}`);
-    
     const response = await fetch(url, {
       headers: {
         'Authorization': `KakaoAK ${apiKey}`
@@ -339,7 +323,6 @@ async function geocodeAddressWithKakao(address, retryCount = 0) {
     if (!response.ok) {
       if (response.status === 429) {
         // 할당량 초과
-        console.log('Kakao API 할당량 초과, 5초 대기 후 재시도');
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (retryCount < 2) {
           return await geocodeAddressWithKakao(address, retryCount + 1);
@@ -356,10 +339,8 @@ async function geocodeAddressWithKakao(address, retryCount = 0) {
         latitude: parseFloat(doc.y),
         longitude: parseFloat(doc.x)
       };
-      console.log(`Geocoding 성공: ${processedAddress} → (${result.latitude}, ${result.longitude})`);
       return result;
     } else {
-      console.log(`Geocoding 결과 없음: ${processedAddress}`);
       return null;
     }
   } catch (error) {
@@ -367,7 +348,6 @@ async function geocodeAddressWithKakao(address, retryCount = 0) {
     
     // 네트워크 오류나 일시적 오류인 경우 재시도
     if (retryCount < 2 && (error.message.includes('fetch') || error.message.includes('timeout'))) {
-      console.log('네트워크 오류로 인한 재시도...');
       await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1))); // 지수 백오프
       return await geocodeAddressWithKakao(address, retryCount + 1);
     }
@@ -410,7 +390,6 @@ async function getSheetValues(sheetName) {
   }
   
   try {
-    console.log(`Google Sheets API 호출: ${sheetName}`);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: sheetName
@@ -702,9 +681,6 @@ app.get('/api/stores', async (req, res) => {
       const today = new Date();
       threeDaysAgo = new Date(today);
       threeDaysAgo.setDate(today.getDate() - 3);
-      console.log(`3일 이내 출고재고 제외 모드 - 기준일: ${threeDaysAgo.toISOString()}`);
-    } else {
-      console.log('모든 재고 포함 모드');
     }
 
     // 매장별 재고 데이터 매핑
@@ -812,9 +788,6 @@ app.get('/api/stores', async (req, res) => {
       })
       .filter(store => store !== null); // null 값 제거
 
-    const processingTime = Date.now() - startTime;
-    console.log(`매장 데이터 처리 완료: ${stores.length}개 매장, 제외된 재고: ${excludedCount}개, ${processingTime}ms 소요`);
-    
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, stores);
     
@@ -835,12 +808,10 @@ app.get('/api/models', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedModels = cacheUtils.get(cacheKey);
   if (cachedModels) {
-    console.log('캐시된 모델 데이터 반환');
     return res.json(cachedModels);
   }
   
   try {
-    console.log('모델 데이터 처리 시작...');
     const startTime = Date.now();
     
     const inventoryValues = await getSheetValues(INVENTORY_SHEET_NAME);
@@ -880,9 +851,6 @@ app.get('/api/models', async (req, res) => {
       return acc;
     }, {});
 
-    const processingTime = Date.now() - startTime;
-    console.log(`모델 데이터 처리 완료: ${Object.keys(result).length}개 모델, ${processingTime}ms 소요`);
-    
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, result);
     
@@ -1786,7 +1754,6 @@ app.post('/api/login', async (req, res) => {
           }
         }
         
-        console.log('Step 7: Agent login successful, sending response...');
         return res.json({
           success: true,
           isAgent: true,
@@ -1803,34 +1770,18 @@ app.post('/api/login', async (req, res) => {
     }
     
     // 2. 대리점 관리자가 아닌 경우 일반 매장으로 검색
-    console.log('Step 8: Not an agent, checking if ID is store...');
     const storeValues = await getSheetValues(STORE_SHEET_NAME);
-    console.log('Step 9: Store sheet data fetched, rows:', storeValues ? storeValues.length : 0);
     
     if (!storeValues) {
-      console.log('Step 9.5: Store sheet data is null or empty');
       throw new Error('Failed to fetch data from store sheet');
     }
     
     const storeRows = storeValues.slice(1);
-    console.log('Step 10: Store rows (excluding header):', storeRows.length);
-    
-    // 매장 ID 검색을 위한 디버깅 로그 추가
-    console.log('Step 10.5: Searching for store ID:', storeId);
-    console.log('Step 10.6: First few store IDs for comparison:');
-    storeRows.slice(0, 5).forEach((row, index) => {
-      console.log(`  Row ${index + 1}: "${row[7]}" (type: ${typeof row[7]})`);
-    });
     
     const foundStoreRow = storeRows.find(row => {
       const rowId = row[7];
-      const match = rowId === storeId;
-      if (match) {
-        console.log(`Step 10.7: Found matching store ID: "${rowId}"`);
-      }
-      return match;
+      return rowId === storeId;
     }); // G열: 매장 ID로 수정
-    console.log('Step 11: Store search result:', foundStoreRow ? 'Found' : 'Not found');
     
     if (foundStoreRow) {
       const store = {
@@ -1842,9 +1793,6 @@ app.post('/api/login', async (req, res) => {
         longitude: parseFloat(foundStoreRow[1] || '0'),  // B열: 경도
         phone: foundStoreRow[11] || ''              // L열: 연락처 추가
       };
-      
-      console.log(`Found store: ${store.name}`);
-      console.log('Step 12: Processing store login...');
       
       // 디스코드로 로그인 로그 전송
       if (DISCORD_LOGGING_ENABLED) {
@@ -1876,7 +1824,6 @@ app.post('/api/login', async (req, res) => {
         }
       }
       
-      console.log('Step 13: Store login successful, sending response...');
       return res.json({
         success: true,
         isAgent: false,
@@ -1885,7 +1832,6 @@ app.post('/api/login', async (req, res) => {
     }
     
     // 3. 매장 ID도 아닌 경우
-    console.log('Step 14: ID not found in either agent or store sheets');
     return res.status(404).json({
       success: false,
       error: 'Store not found'
@@ -1905,8 +1851,6 @@ app.post('/api/login', async (req, res) => {
 // 주기적으로 주소 업데이트를 확인하고 실행하는 함수
 async function checkAndUpdateAddresses() {
   try {
-    console.log('Checking for addresses that need updating...');
-    
     const storeValues = await getSheetValues(STORE_SHEET_NAME);
     if (!storeValues) {
       throw new Error('Failed to fetch data from store sheet');
@@ -1929,13 +1873,11 @@ async function checkAndUpdateAddresses() {
             range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
             values: [["", ""]]
           });
-          console.log(`Cleared coordinates for store without address at row ${i + 2}`);
           continue;
         }
         
         // 주소가 있는 경우 geocoding 실행
         try {
-          console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
@@ -1943,17 +1885,9 @@ async function checkAndUpdateAddresses() {
               range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
               values: [[latitude, longitude]]
             });
-            console.log(`✅ 좌표 업데이트 성공: ${address}`);
-            console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
-          } else {
-            console.log(`❌ Geocoding 결과 없음: ${address}`);
-            // geocoding 실패 시 기존 좌표 유지 (삭제하지 않음)
-            console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
           }
         } catch (error) {
-          console.error(`❌ Geocoding 오류: ${address}`, error.message);
-          // geocoding 오류 시 기존 좌표 유지 (삭제하지 않음)
-          console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
+          console.error(`Geocoding 오류: ${address}`, error.message);
         }
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
@@ -1961,7 +1895,6 @@ async function checkAndUpdateAddresses() {
           range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
           values: [["", ""]]
         });
-        console.log(`Cleared coordinates for unused store at row ${i + 2}`);
       }
       // API 할당량 제한을 피하기 위한 지연 (사용 매장만)
       if (status === "사용") await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1976,9 +1909,6 @@ async function checkAndUpdateAddresses() {
           data: updates
         }
       });
-      console.log(`Successfully updated ${updates.length} coordinates`);
-    } else {
-      console.log('No coordinates to update');
     }
   } catch (error) {
     console.error('Error in checkAndUpdateAddresses:', error);
@@ -3716,6 +3646,9 @@ function extractValueWithRegex(value, regex) {
   }
 }
 
+// 디버깅 대상 시리얼번호 목록
+const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306'];
+
 // 모델명 정규화 함수
 function normalizeModelName(modelName) {
   if (!modelName) return '';
@@ -3734,18 +3667,44 @@ function normalizeSerialNumber(serialNumber) {
   
   let serial = serialNumber.toString().trim();
   
+  // 디버깅 대상 시리얼번호인지 확인
+  const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(serial);
+  
+  if (isDebugTarget) {
+    console.log(`=== 디버깅 대상 시리얼번호 정규화 시작: ${serial} ===`);
+    console.log(`원본 시리얼번호: "${serial}"`);
+  }
+  
   // 숫자인지 확인
   if (/^\d+$/.test(serial)) {
     // 숫자인 경우 뒤에서 6자리만 사용
     if (serial.length >= 6) {
-      return serial.slice(-6);
+      const result = serial.slice(-6);
+      if (isDebugTarget) {
+        console.log(`숫자 시리얼번호 (6자리 이상): 뒤에서 6자리 추출`);
+        console.log(`결과: "${result}"`);
+        console.log(`=== 디버깅 대상 시리얼번호 정규화 완료: ${serial} ===`);
+      }
+      return result;
     } else {
       // 6자리 미만인 경우 앞에 0을 붙여서 6자리로 만듦
-      return serial.padStart(6, '0');
+      const result = serial.padStart(6, '0');
+      if (isDebugTarget) {
+        console.log(`숫자 시리얼번호 (6자리 미만): 앞에 0 추가하여 6자리로 만듦`);
+        console.log(`결과: "${result}"`);
+        console.log(`=== 디버깅 대상 시리얼번호 정규화 완료: ${serial} ===`);
+      }
+      return result;
     }
   } else {
     // 영문이 포함된 경우 앞의 0들을 제거하고 반환
-    return serial.replace(/^0+/, '');
+    const result = serial.replace(/^0+/, '');
+    if (isDebugTarget) {
+      console.log(`영문 포함 시리얼번호: 앞의 0들 제거`);
+      console.log(`결과: "${result}"`);
+      console.log(`=== 디버깅 대상 시리얼번호 정규화 완료: ${serial} ===`);
+    }
+    return result;
   }
 }
 
@@ -3819,9 +3778,14 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const systemModel = systemRow[13] || '';  // N열: 모델명
       const systemSerial = systemRow[15] || ''; // P열: 일련번호
       
-      console.log(`모델명 비교 원본 데이터: key=${key}`);
-      console.log(`  수기초 - 모델: "${manualModel}", 일련번호: "${manualSerial}"`);
-      console.log(`  폰클 - 모델: "${systemModel}", 일련번호: "${systemSerial}"`);
+      // 디버깅 대상 시리얼번호인지 확인
+      const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(manualSerial) || DEBUG_SERIAL_NUMBERS.includes(systemSerial);
+      
+      if (isDebugTarget) {
+        console.log(`\n=== 디버깅 대상 모델명 비교 시작: key=${key} ===`);
+        console.log(`수기초 시리얼번호: "${manualSerial}"`);
+        console.log(`폰클 시리얼번호: "${systemSerial}"`);
+      }
       
       // 모델명과 일련번호 정규화
       const normalizedManualModel = normalizeModelName(manualModel);
@@ -3829,23 +3793,32 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const normalizedManualSerial = normalizeSerialNumber(manualSerial);
       const normalizedSystemSerial = normalizeSerialNumber(systemSerial);
       
-      console.log(`모델명 비교 정규화 결과: key=${key}`);
-      console.log(`  수기초 정규화 - 모델: "${normalizedManualModel}", 일련번호: "${normalizedManualSerial}"`);
-      console.log(`  폰클 정규화 - 모델: "${normalizedSystemModel}", 일련번호: "${normalizedSystemSerial}"`);
+      if (isDebugTarget) {
+        console.log(`\n=== 정규화 결과 ===`);
+        console.log(`수기초 - 모델: "${manualModel}" → "${normalizedManualModel}"`);
+        console.log(`수기초 - 일련번호: "${manualSerial}" → "${normalizedManualSerial}"`);
+        console.log(`폰클 - 모델: "${systemModel}" → "${normalizedSystemModel}"`);
+        console.log(`폰클 - 일련번호: "${systemSerial}" → "${normalizedSystemSerial}"`);
+      }
       
       // 모델명과 일련번호를 조합하여 비교
       const manualCombined = `${normalizedManualModel}(${normalizedManualSerial})`;
       const systemCombined = `${normalizedSystemModel}(${normalizedSystemSerial})`;
       
-      console.log(`모델명 비교 최종 결과: key=${key}`);
-      console.log(`  수기초 조합: "${manualCombined}"`);
-      console.log(`  폰클 조합: "${systemCombined}"`);
-      console.log(`  일치 여부: ${manualCombined === systemCombined}`);
+      if (isDebugTarget) {
+        console.log(`\n=== 최종 비교 결과 ===`);
+        console.log(`수기초 조합: "${manualCombined}"`);
+        console.log(`폰클 조합: "${systemCombined}"`);
+        console.log(`일치 여부: ${manualCombined === systemCombined ? '일치' : '불일치'}`);
+      }
       
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
       if (manualCombined !== systemCombined && 
           (manualCombined || systemCombined)) {
-        console.log(`모델명 차이점 기록: key=${key}, manual="${manualCombined}", system="${systemCombined}"`);
+        if (isDebugTarget) {
+          console.log(`\n=== 차이점 기록 ===`);
+          console.log(`차이점 발견! 수기초: "${manualCombined}", 폰클: "${systemCombined}"`);
+        }
         differences.push({
           key,
           type: 'mismatch',
@@ -3859,7 +3832,14 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
       } else {
-        console.log(`모델명 일치 또는 제외: key=${key}`);
+        if (isDebugTarget) {
+          console.log(`\n=== 결과 ===`);
+          console.log(`일치하거나 제외됨`);
+        }
+      }
+      
+      if (isDebugTarget) {
+        console.log(`=== 디버깅 대상 모델명 비교 완료: key=${key} ===\n`);
       }
       return;
     }

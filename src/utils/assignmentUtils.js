@@ -122,25 +122,7 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
       storeCount = uniqueStoreIds.size;
       
       // 김수빈의 경우 더 상세한 로그
-      if (agent.target === '김수빈') {
-        const matchingStores = storeData.filter(store => 
-          store.manager === agent.target || 
-          store.담당자 === agent.target ||
-          store.name === agent.target
-        );
-        console.log('🚨 김수빈 매장 매칭 결과:', {
-          totalStores: storeData.length,
-          matchingStores: matchingStores.map(store => ({
-            name: store.name,
-            manager: store.manager,
-            담당자: store.담당자,
-            matchType: store.manager === agent.target ? 'manager' : 
-                      store.담당자 === agent.target ? '담당자' : 
-                      store.name === agent.target ? 'name' : 'none'
-          })),
-          storeCount
-        });
-      }
+
     }
     
     // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정 (정규화 적용)
@@ -209,15 +191,7 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
           매장목록: Array.from(uniqueStores)
         });
         
-        // 김수빈인 경우 더 자세한 정보 출력
-        if (agent.target === '김수빈') {
-          console.log('🚨 김수빈 정규화된 상세 거래처 정보:', {
-            원본담당자: agent.target,
-            정규화된이름: normalizedAgentName,
-            고유매장수: storeCount,
-            매장목록: Array.from(uniqueStores)
-          });
-        }
+
       } catch (error) {
         console.error(`거래처수 계산 중 오류 (${agent.target}):`, error);
         storeCount = 0;
@@ -770,16 +744,7 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
       calculation: `(${salesVolume} - ${remainingInventory}) = ${inventoryScore}점`
     });
     
-    // 김수빈의 경우 더 상세한 로그
-    if (agent.target === '김수빈') {
-      console.log(`🚨 김수빈 잔여재고 점수 상세:`, {
-        salesVolume,
-        remainingInventory,
-        inventoryScore,
-        normalizedInventoryScore: Math.min(Math.max(inventoryScore, -50), 50) + 50,
-        calculation: `(${salesVolume} - ${remainingInventory}) = ${inventoryScore}점`
-      });
-    }
+
     
     // 원시 점수 계산
     let rawScore = 0;
@@ -948,40 +913,7 @@ const calculateColorAccurateWeights = async (agents, modelName, colorName, setti
       (settings.ratios.salesVolume / 100) * relativeSalesVolume
     );
     
-    const finalWeight = relativeRawScore / 100; // 0-1 범위로 변환
-    
-    // 디버깅: 김수빈의 경우 상세 로그 출력
-    if (agent.target === '김수빈') {
-      console.log(`🔍 김수빈 상대적 점수 계산 상세:`, {
-        agent: agent.target,
-        originalScores: {
-          turnoverRate: details.turnoverRate.value,
-          storeCount: details.storeCount.value,
-          remainingInventory: details.remainingInventory.value,
-          salesVolume: details.salesVolume.value
-        },
-        relativeScores: {
-          turnoverRate: details.turnoverRate.value,
-          storeCount: relativeStoreCount,
-          remainingInventory: relativeInventoryScore,
-          salesVolume: relativeSalesVolume
-        },
-        ratios: settings.ratios,
-        relativeRawScore,
-        finalWeight
-      });
-    }
-    
-    console.log(`🔍 상대적 점수 계산 - ${agent.target} (${modelName}-${colorName}):`, {
-      originalRawScore: Math.round(rawScore * 100) / 100,
-      relativeRawScore: Math.round(relativeRawScore * 100) / 100,
-      finalWeight: Math.round(finalWeight * 1000) / 1000,
-      relativeScores: {
-        salesVolume: Math.round(relativeSalesVolume * 100) / 100,
-        storeCount: Math.round(relativeStoreCount * 100) / 100,
-        inventoryScore: Math.round(relativeInventoryScore * 100) / 100
-      }
-    });
+        const finalWeight = relativeRawScore / 100; // 0-1 범위로 변환
     
     return { 
       agent, 
