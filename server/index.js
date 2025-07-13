@@ -3064,9 +3064,27 @@ app.get('/api/inspection-data', async (req, res) => {
     for (const [key, manualData] of manualMap) {
       const systemData = systemMap.get(key);
       
+      // 디버깅 대상 가입번호인지 확인
+      const isDebugTarget = DEBUG_SUBSCRIPTION_NUMBERS.includes(key);
+      
+      if (isDebugTarget) {
+        console.log(`\n=== 디버깅 대상 가입번호 처리 시작: ${key} ===`);
+        console.log(`수기초 데이터 존재: ${!!manualData}`);
+        console.log(`폰클 데이터 존재: ${!!systemData}`);
+      }
+      
       if (systemData) {
         // 두 데이터가 모두 있는 경우 비교
         const rowDifferences = compareDynamicColumns(manualData.row, systemData.row, key, field);
+        
+        if (isDebugTarget) {
+          console.log(`\n=== ${key} 차이점 분석 결과 ===`);
+          console.log(`발견된 차이점 수: ${rowDifferences.length}개`);
+          rowDifferences.forEach((diff, index) => {
+            console.log(`차이점 ${index + 1}: ${diff.field} - 수기초: "${diff.correctValue}", 폰클: "${diff.incorrectValue}"`);
+          });
+        }
+        
         rowDifferences.forEach(diff => {
           differences.push({
             ...diff,
@@ -3076,7 +3094,12 @@ app.get('/api/inspection-data', async (req, res) => {
           });
         });
       } else {
-        // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
+        if (isDebugTarget) {
+          console.log(`\n=== ${key} 폰클 데이터 없음 ===`);
+          console.log(`수기초에만 존재하는 데이터입니다.`);
+        }
+        
+                // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
         if (!field) {
           // 가입번호를 정규표현식으로 정확히 비교
           const manualKey = manualData.row[0]?.toString().trim() || '';
@@ -3631,7 +3654,8 @@ function extractValueWithRegex(value, regex) {
 }
 
 // 디버깅 대상 시리얼번호 목록
-const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306'];
+const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306', '528501', 'SM-L305N'];
+const DEBUG_SUBSCRIPTION_NUMBERS = ['500225775943', '516697159306'];
 
 // 모델명 정규화 함수
 function normalizeModelName(modelName) {
