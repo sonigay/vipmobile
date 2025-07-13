@@ -140,7 +140,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     } catch (error) {
       console.error('수정완료 상태 로드 오류:', error);
     }
-  }, [loggedInStore?.contactId, currentView, inspectionData]);
+  }, [loggedInStore?.contactId, currentView]);
 
 
 
