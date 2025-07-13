@@ -646,17 +646,13 @@ app.get('/api/stores', async (req, res) => {
   const { includeShipped = 'true' } = req.query; // 쿼리 파라미터로 출고 제외 여부 제어
   const cacheKey = `processed_stores_data_${includeShipped}`;
   
-  // console.log(`매장 데이터 요청 - includeShipped: ${includeShipped}, 캐시키: ${cacheKey}`);
-  
   // 캐시에서 먼저 확인
   const cachedStores = cacheUtils.get(cacheKey);
   if (cachedStores) {
-    // console.log(`캐시된 매장 데이터 반환 (${cachedStores.length}개 매장)`);
     return res.json(cachedStores);
   }
   
   try {
-    // console.log('매장 데이터 처리 시작...');
     const startTime = Date.now();
     
     const [inventoryValues, storeValues] = await Promise.all([
@@ -1163,15 +1159,13 @@ app.get('/api/agents', async (req, res) => {
 app.get('/api/activation-data/current-month', async (req, res) => {
   const cacheKey = 'current_month_activation_data';
   
-  // 캐시에서 먼저 확인
-  const cachedData = cacheUtils.get(cacheKey);
-  if (cachedData) {
-    // console.log('캐시된 당월 개통실적 데이터 반환');
-    return res.json(cachedData);
-  }
-  
-  try {
-    // console.log('당월 개통실적 데이터 처리 시작...');
+      // 캐시에서 먼저 확인
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+    
+    try {
     const startTime = Date.now();
     
     const activationValues = await getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
@@ -1201,7 +1195,6 @@ app.get('/api/activation-data/current-month', async (req, res) => {
       });
     
     const processingTime = Date.now() - startTime;
-    // console.log(`당월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, activationData);
@@ -1220,15 +1213,13 @@ app.get('/api/activation-data/current-month', async (req, res) => {
 app.get('/api/activation-data/previous-month', async (req, res) => {
   const cacheKey = 'previous_month_activation_data';
   
-  // 캐시에서 먼저 확인
-  const cachedData = cacheUtils.get(cacheKey);
-  if (cachedData) {
-    // console.log('캐시된 전월 개통실적 데이터 반환');
-    return res.json(cachedData);
-  }
-  
-  try {
-    // console.log('전월 개통실적 데이터 처리 시작...');
+      // 캐시에서 먼저 확인
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+    
+    try {
     const startTime = Date.now();
     
     const activationValues = await getSheetValues(PREVIOUS_MONTH_ACTIVATION_SHEET_NAME);
@@ -1258,7 +1249,6 @@ app.get('/api/activation-data/previous-month', async (req, res) => {
       });
     
     const processingTime = Date.now() - startTime;
-    // console.log(`전월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, activationData);
@@ -1277,15 +1267,13 @@ app.get('/api/activation-data/previous-month', async (req, res) => {
 app.get('/api/activation-data/by-date', async (req, res) => {
   const cacheKey = 'activation_data_by_date';
   
-  // 캐시에서 먼저 확인
-  const cachedData = cacheUtils.get(cacheKey);
-  if (cachedData) {
-    // console.log('캐시된 날짜별 개통실적 데이터 반환');
-    return res.json(cachedData);
-  }
-  
-  try {
-    // console.log('날짜별 개통실적 데이터 처리 시작...');
+      // 캐시에서 먼저 확인
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+    
+    try {
     const startTime = Date.now();
     
     const activationValues = await getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
@@ -1360,7 +1348,6 @@ app.get('/api/activation-data/by-date', async (req, res) => {
     });
     
     const processingTime = Date.now() - startTime;
-    // console.log(`날짜별 개통실적 데이터 처리 완료: ${Object.keys(dateStats).length}개 날짜, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, dateStats);
@@ -1380,15 +1367,13 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
   const { date } = req.params;
   const cacheKey = `activation_date_comparison_${date}`;
   
-  // 캐시에서 먼저 확인
-  const cachedData = cacheUtils.get(cacheKey);
-  if (cachedData) {
-    // console.log(`캐시된 날짜 비교 데이터 반환: ${date}`);
-    return res.json(cachedData);
-  }
-  
-  try {
-    // console.log(`날짜 비교 데이터 처리 시작: ${date}`);
+      // 캐시에서 먼저 확인
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+    
+    try {
     const startTime = Date.now();
     
     // 당월과 전월 데이터 모두 가져오기
@@ -2034,9 +2019,9 @@ const server = app.listen(port, '0.0.0.0', async () => {
                 .setTimestamp()
                 .setFooter({ text: '(주)브이아이피플러스 서버 알림' });
                 
-              console.log('종료 알림 전송 시도 중...');
+              // console.log('종료 알림 전송 시도 중...');
               const sentMessage = await channel.send({ content: '@everyone', embeds: [shutdownEmbed] });
-              console.log(`서버 종료 알림 메시지가 Discord로 전송되었습니다. 메시지 ID: ${sentMessage.id}`);
+              // console.log(`서버 종료 알림 메시지가 Discord로 전송되었습니다. 메시지 ID: ${sentMessage.id}`);
             }
           } catch (error) {
             console.error('Discord 채널 접근 또는 메시지 전송 실패:', error);
