@@ -3057,6 +3057,15 @@ app.get('/api/inspection-data', async (req, res) => {
       if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
         const key = row[66].toString().trim();
         systemMap.set(key, { row, index: index + 2 });
+        
+        // 디버깅 대상 가입번호인 경우 매핑 과정 로그
+        if (DEBUG_SUBSCRIPTION_NUMBERS.includes(key)) {
+          console.log(`\n=== 폰클 데이터 매핑: ${key} ===`);
+          console.log(`행 인덱스: ${index + 2}`);
+          console.log(`BO열(66) 값: "${row[66]}"`);
+          console.log(`N열(13) 값: "${row[13] || ''}"`);
+          console.log(`P열(15) 값: "${row[15] || ''}"`);
+        }
       }
     });
 
@@ -3075,6 +3084,7 @@ app.get('/api/inspection-data', async (req, res) => {
           console.log(`폰클 데이터 매핑 키 (BO열): "${systemData.row[66] || ''}"`);
           console.log(`폰클 데이터 전체 길이: ${systemData.row.length}`);
           console.log(`폰클 데이터 전체 컬럼 (0-20): ${systemData.row.slice(0, 21).map((val, idx) => `${idx}:"${val || ''}"`).join(', ')}`);
+          console.log(`폰클 데이터 모델 관련 컬럼: N(13)="${systemData.row[13] || ''}", P(15)="${systemData.row[15] || ''}", O(14)="${systemData.row[14] || ''}", Q(16)="${systemData.row[16] || ''}"`);
         }
       }
       
@@ -3660,7 +3670,7 @@ function extractValueWithRegex(value, regex) {
 
 // 디버깅 대상 시리얼번호 목록
 const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306', '528501', 'SM-L305N', '177366', '1230343'];
-const DEBUG_SUBSCRIPTION_NUMBERS = ['500225775943', '516697159306'];
+const DEBUG_SUBSCRIPTION_NUMBERS = ['500225775943', '516697159306', 'TEST_NORMAL'];
 
 // 모델명 정규화 함수
 function normalizeModelName(modelName) {
