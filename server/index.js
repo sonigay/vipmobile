@@ -3845,76 +3845,63 @@ function normalizeSerialNumber(serialNumber) {
 
 // 개통유형 정규화 함수
 function normalizeActivationType(manualRow, systemRow) {
-  // 수기초 데이터 정규화
+  // 수기초 데이터 정규화 (K열, AO열, CC열 조합)
   let manualType = '';
-  if (manualRow.length > 10) { // 최소 K열(10)은 있어야 함
+  if (manualRow.length > 80) { // 최소 CC열(80)은 있어야 함
     const joinType = (manualRow[10] || '').toString().trim(); // K열: 가입구분
-    const prevOperator = manualRow.length > 40 ? (manualRow[40] || '').toString().trim() : ''; // AO열: 이전사업자
-    const changeTarget = manualRow.length > 80 ? (manualRow[80] || '').toString().trim() : ''; // CC열: 기변타겟구분
+    const prevOperator = (manualRow[40] || '').toString().trim(); // AO열: 이전사업자
+    const changeTarget = (manualRow[80] || '').toString().trim(); // CC열: 기변타겟구분
     
-    // 디버깅: 실제 값 확인
-    console.log(`수기초 정규화 디버깅 - 가입구분: "${joinType}" (길이: ${joinType.length})`, joinType);
-    console.log(`수기초 정규화 디버깅 - 이전사업자: "${prevOperator}"`, prevOperator);
-    console.log(`수기초 정규화 디버깅 - 기변타겟구분: "${changeTarget}"`, changeTarget);
-    console.log(`수기초 정규화 디버깅 - 배열길이: ${manualRow.length}`);
-    console.log(`수기초 정규화 디버깅 - K열(10) 원본값:`, manualRow[10]);
-    console.log(`수기초 정규화 디버깅 - AO열(40) 원본값:`, manualRow[40]);
-    console.log(`수기초 정규화 디버깅 - CC열(80) 원본값:`, manualRow[80]);
-    
-    // 수기초 정규화 로직 (수정된 요청사항대로)
+    // 수기초 정규화 로직
     if (joinType === '신규') {
-      // 신규인 경우 이전사업자 확인
-      if (prevOperator && prevOperator !== '일반개통') {
-        manualType = 'MNP';
-      } else {
+      if (prevOperator && prevOperator.includes('일반개통')) {
         manualType = '신규';
+      } else {
+        manualType = 'MNP';
       }
-    } else if (joinType === '재가입일반개통') {
-      manualType = '보상';
-    } else if (joinType === '정책기변일반개통') {
-      manualType = '기변';
-    } else if (joinType === '재가입일반개통기변C') {
-      manualType = '보상(C타겟)';
-    } else if (joinType === '정책기변일반개통기변C') {
-      manualType = '기변(C타겟)';
+    } else if (joinType === '재가입') {
+      if (changeTarget && changeTarget.includes('기변C')) {
+        manualType = '보상(C타겟)';
+      } else {
+        manualType = '보상';
+      }
+    } else if (joinType === '정책기변') {
+      if (changeTarget && changeTarget.includes('기변C')) {
+        manualType = '기변(C타겟)';
+      } else {
+        manualType = '기변';
+      }
     }
-    
-    console.log(`수기초 정규화 결과: "${manualType}"`);
-  } else {
-    console.log(`수기초 배열 길이 부족: ${manualRow.length} (필요: > 10)`);
   }
   
-  // 폰클 데이터 정규화
+  // 폰클 데이터 정규화 (L열, X열 조합)
   let systemType = '';
-  if (systemRow.length > 11) { // 최소 L열(11)은 있어야 함
+  if (systemRow.length > 23) { // 최소 X열(23)은 있어야 함
     const activationType = (systemRow[11] || '').toString().trim(); // L열: 개통
-    const returnService = systemRow.length > 23 ? (systemRow[23] || '').toString().trim() : ''; // X열: 환수서비스
+    const returnService = (systemRow[23] || '').toString().trim(); // X열: 환수서비스
     
-    // 디버깅: 실제 값 확인
-    console.log(`폰클 정규화 디버깅 - 개통: "${activationType}", 환수서비스: "${returnService}", 배열길이: ${systemRow.length}`);
-    
-    // 폰클 정규화 로직 (요청사항대로)
+    // 폰클 정규화 로직
     if (activationType === '신규') {
-      systemType = '신규';
+      if (!returnService.includes('C타겟')) {
+        systemType = '신규';
+      }
     } else if (activationType === 'MNP') {
-      systemType = 'MNP';
-    } else if (activationType === '보상') {
-      if (returnService && returnService.includes('C타겟')) {
+      if (!returnService.includes('C타겟')) {
+        systemType = 'MNP';
+      }
+    } else if (activationType === '재가입') {
+      if (returnService.includes('C타겟')) {
         systemType = '보상(C타겟)';
       } else {
         systemType = '보상';
       }
     } else if (activationType === '기변') {
-      if (returnService && returnService.includes('C타겟')) {
+      if (returnService.includes('C타겟')) {
         systemType = '기변(C타겟)';
       } else {
         systemType = '기변';
       }
     }
-    
-    console.log(`폰클 정규화 결과: "${systemType}"`);
-  } else {
-    console.log(`폰클 배열 길이 부족: ${systemRow.length} (필요: > 11)`);
   }
   
   return { manualType, systemType };
