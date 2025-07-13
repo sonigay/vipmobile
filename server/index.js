@@ -3852,6 +3852,9 @@ function normalizeActivationType(manualRow, systemRow) {
     const prevOperator = manualRow.length > 40 ? (manualRow[40] || '').toString().trim() : ''; // AO열: 이전사업자
     const changeTarget = manualRow.length > 80 ? (manualRow[80] || '').toString().trim() : ''; // CC열: 기변타겟구분
     
+    // 디버깅: 실제 값 확인
+    console.log(`수기초 정규화 디버깅 - 가입구분: "${joinType}", 이전사업자: "${prevOperator}", 기변타겟구분: "${changeTarget}", 배열길이: ${manualRow.length}`);
+    
     // 수기초 정규화 로직 (더 유연하게)
     if (joinType.includes('신규') && joinType.includes('MNP')) {
       manualType = 'MNP';
@@ -3870,6 +3873,10 @@ function normalizeActivationType(manualRow, systemRow) {
         manualType = '기변';
       }
     }
+    
+    console.log(`수기초 정규화 결과: "${manualType}"`);
+  } else {
+    console.log(`수기초 배열 길이 부족: ${manualRow.length} (필요: > 10)`);
   }
   
   // 폰클 데이터 정규화
@@ -3878,24 +3885,31 @@ function normalizeActivationType(manualRow, systemRow) {
     const joinType = (systemRow[11] || '').toString().trim(); // L열: 가입구분
     const returnService = systemRow.length > 23 ? (systemRow[23] || '').toString().trim() : ''; // X열: 환수서비스
     
-    // 폰클 정규화 로직
-    if (joinType === '신규') {
+    // 디버깅: 실제 값 확인
+    console.log(`폰클 정규화 디버깅 - 가입구분: "${joinType}", 환수서비스: "${returnService}", 배열길이: ${systemRow.length}`);
+    
+    // 폰클 정규화 로직 (더 유연하게)
+    if (joinType.includes('신규')) {
       systemType = '신규';
-    } else if (joinType === 'MNP') {
+    } else if (joinType.includes('MNP')) {
       systemType = 'MNP';
-    } else if (joinType === '보상') {
+    } else if (joinType.includes('보상')) {
       if (returnService && returnService.includes('C타겟')) {
         systemType = '보상(C타겟)';
       } else {
         systemType = '보상';
       }
-    } else if (joinType === '기변') {
+    } else if (joinType.includes('기변')) {
       if (returnService && returnService.includes('C타겟')) {
         systemType = '기변(C타겟)';
       } else {
         systemType = '기변';
       }
     }
+    
+    console.log(`폰클 정규화 결과: "${systemType}"`);
+  } else {
+    console.log(`폰클 배열 길이 부족: ${systemRow.length} (필요: > 11)`);
   }
   
   return { manualType, systemType };
