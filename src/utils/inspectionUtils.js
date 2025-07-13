@@ -1,14 +1,17 @@
 const API_URL = process.env.REACT_APP_API_URL;
 
 // 검수 데이터 가져오기
-export async function fetchInspectionData(view = 'personal', userId = null) {
+export async function fetchInspectionData(view = 'personal', userId = null, field = null) {
   try {
-    console.log('검수 데이터 요청 중...', { view, userId });
+    console.log('검수 데이터 요청 중...', { view, userId, field });
     const startTime = Date.now();
     
     const params = new URLSearchParams({ view });
     if (userId) {
       params.append('userId', userId);
+    }
+    if (field) {
+      params.append('field', field);
     }
     
     const response = await fetch(`${API_URL}/api/inspection-data?${params}`);
