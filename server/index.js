@@ -4419,14 +4419,14 @@ function normalizePlan(manualRow, systemRow, planData = null) {
 function normalizeShippingVirtual(manualRow, systemRow) {
   // 수기초 데이터 정규화 (AV열+AZ열+AW열+BK열+BM열+BN열+BL열)
   let manualShipping = '';
-  if (manualRow.length > 63) { // 최소 BN열(63)은 있어야 함
+  if (manualRow.length > 65) { // 최소 BN열(65)은 있어야 함
     const avValue = (manualRow[47] || '').toString().trim(); // AV열
     const azValue = (manualRow[51] || '').toString().trim(); // AZ열
     const awValue = (manualRow[48] || '').toString().trim(); // AW열
     const bkValue = (manualRow[62] || '').toString().trim(); // BK열
     const bmValue = (manualRow[64] || '').toString().trim(); // BM열
-    const bnValue = (manualRow[63] || '').toString().trim(); // BN열
-    const blValue = (manualRow[65] || '').toString().trim(); // BL열
+    const bnValue = (manualRow[65] || '').toString().trim(); // BN열
+    const blValue = (manualRow[66] || '').toString().trim(); // BL열
     const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
@@ -4454,8 +4454,8 @@ function normalizeShippingVirtual(manualRow, systemRow) {
 function normalizeSupportContract(manualRow, systemRow) {
   // 수기초 데이터 정규화 (BH열 또는 BK열)
   let manualSupport = '';
-  if (manualRow.length > 61) { // 최소 BH열(61)은 있어야 함
-    const bhValue = (manualRow[61] || '').toString().trim(); // BH열
+  if (manualRow.length > 62) { // 최소 BK열(62)은 있어야 함
+    const bhValue = (manualRow[59] || '').toString().trim(); // BH열
     const bkValue = (manualRow[62] || '').toString().trim(); // BK열
     const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
     
@@ -4465,9 +4465,12 @@ function normalizeSupportContract(manualRow, systemRow) {
     }
     
     // 선택방식 정규화: BH열에 "선택" 포함 시 "선택약정할인", 아니면 BK열
+    console.log(`BH열 값: "${bhValue}", BK열 값: "${bkValue}"`);
     if (bhValue && bhValue.includes('선택')) {
+      console.log('BH열에 "선택" 포함됨 → "선택약정할인" 설정');
       manualSupport = '선택약정할인';
     } else {
+      console.log('BH열에 "선택" 없음 → BK열 숫자 형식으로 정규화');
       manualSupport = normalizeNumberFormat(bkValue);
     }
   }
@@ -4478,9 +4481,12 @@ function normalizeSupportContract(manualRow, systemRow) {
     const acValue = (systemRow[28] || '').toString().trim(); // AC열: 지원금 및 약정상이
     
     // 선택방식 정규화: AC열에 "선택" 포함 시 "선택약정할인", 아니면 숫자 형식
+    console.log(`AC열 값: "${acValue}"`);
     if (acValue && acValue.includes('선택')) {
+      console.log('AC열에 "선택" 포함됨 → "선택약정할인" 설정');
       systemSupport = '선택약정할인';
     } else {
+      console.log('AC열에 "선택" 없음 → 숫자 형식으로 정규화');
       systemSupport = normalizeNumberFormat(acValue);
     }
   }
@@ -4492,9 +4498,9 @@ function normalizeSupportContract(manualRow, systemRow) {
 function normalizeConversionSupport(manualRow, systemRow) {
   // 수기초 데이터 정규화 (BM열+BN열)
   let manualConversion = '';
-  if (manualRow.length > 63) { // 최소 BN열(63)은 있어야 함
+  if (manualRow.length > 65) { // 최소 BN열(65)은 있어야 함
     const bmValue = (manualRow[64] || '').toString().trim(); // BM열
-    const bnValue = (manualRow[63] || '').toString().trim(); // BN열
+    const bnValue = (manualRow[65] || '').toString().trim(); // BN열
     const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
