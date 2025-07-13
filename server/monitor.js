@@ -33,9 +33,9 @@ function loadStatus() {
     if (fs.existsSync(STATUS_FILE)) {
       const data = fs.readFileSync(STATUS_FILE, 'utf8');
       lastStatus = JSON.parse(data);
-      console.log('이전 상태 로드됨:', lastStatus);
+      // console.log('이전 상태 로드됨:', lastStatus);
     } else {
-      console.log('상태 파일이, 새로운 파일을 생성합니다.');
+              // console.log('상태 파일이, 새로운 파일을 생성합니다.');
       saveStatus();
     }
   } catch (error) {
@@ -64,33 +64,33 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
   });
   
   discordBot.once('ready', () => {
-    console.log(`모니터링 봇이 준비되었습니다: ${discordBot.user.tag}`);
+    // console.log(`모니터링 봇이 준비되었습니다: ${discordBot.user.tag}`);
   });
   
   discordBot.login(DISCORD_BOT_TOKEN)
-    .then(() => console.log('Discord 봇 로그인 성공'))
+    .then(() => { /* console.log('Discord 봇 로그인 성공') */ })
     .catch(error => console.error('Discord 봇 로그인 실패:', error));
 }
 
 // Discord 알림 전송
 async function sendDiscordAlert(online) {
   if (!DISCORD_LOGGING_ENABLED || !discordBot) {
-    console.log('Discord 봇이 초기화되지 않았거나 로깅이 비활성화되었습니다.');
+    // console.log('Discord 봇이 초기화되지 않았거나 로깅이 비활성화되었습니다.');
     return;
   }
   
   // 봇이 준비되지 않았다면 10초까지 대기
   if (!discordBot.isReady()) {
-    console.log('Discord 봇이 아직 준비되지 않았습니다. 최대 10초 대기...');
+          // console.log('Discord 봇이 아직 준비되지 않았습니다. 최대 10초 대기...');
     for (let i = 0; i < 10; i++) {
       if (discordBot.isReady()) break;
       await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`대기 중... ${i+1}초 경과`);
+              // console.log(`대기 중... ${i+1}초 경과`);
     }
   }
   
   if (!discordBot.isReady()) {
-    console.log('최대 대기 시간을 초과했지만 Discord 봇이 아직 준비되지 않았습니다.');
+          // console.log('최대 대기 시간을 초과했지만 Discord 봇이 아직 준비되지 않았습니다.');
     return;
   }
   
@@ -126,9 +126,9 @@ async function sendDiscordAlert(online) {
     
     embed.setFooter({ text: '(주)브이아이피플러스 서버 모니터링' });
     
-    console.log('Discord 알림 전송 시도 중...');
+    // console.log('Discord 알림 전송 시도 중...');
     const message = await channel.send({ content: '@everyone', embeds: [embed] });
-    console.log(`Discord 알림 전송 성공: 서버 ${online ? '복구' : '다운'}, 메시지 ID: ${message.id}`);
+          // console.log(`Discord 알림 전송 성공: 서버 ${online ? '복구' : '다운'}, 메시지 ID: ${message.id}`);
     
     // 알림 전송 상태 업데이트
     lastStatus.notified = true;
@@ -143,17 +143,17 @@ async function sendDiscordAlert(online) {
 
 // 서버 상태 확인
 async function checkServerStatus() {
-  console.log(`서버 상태 확인 중... (${new Date().toLocaleString()})`);
+      // console.log(`서버 상태 확인 중... (${new Date().toLocaleString()})`);
   lastStatus.lastChecked = new Date().toISOString();
   
   try {
     const response = await fetch(SERVER_URL, { timeout: 10000 });
     if (response.ok) {
-      console.log('서버 온라인 확인됨');
+      // console.log('서버 온라인 확인됨');
       
       // 서버가 다시 온라인 상태가 되었을 때
       if (!lastStatus.online && lastStatus.lastOffline) {
-        console.log('서버가 다시 온라인 상태가 되었습니다.');
+        // console.log('서버가 다시 온라인 상태가 되었습니다.');
         await sendDiscordAlert(true);
       }
       
@@ -173,10 +173,10 @@ async function checkServerStatus() {
 
 // 서버 다운 처리
 async function handleServerDown(reason) {
-  console.log(`서버 다운 감지: ${reason}`);
+        // console.log(`서버 다운 감지: ${reason}`);
   
   lastStatus.retryCount++;
-  console.log(`재시도 횟수: ${lastStatus.retryCount}/${MAX_RETRIES}`);
+      // console.log(`재시도 횟수: ${lastStatus.retryCount}/${MAX_RETRIES}`);
   
   if (lastStatus.retryCount >= MAX_RETRIES) {
     if (lastStatus.online || !lastStatus.notified) {
@@ -190,7 +190,7 @@ async function handleServerDown(reason) {
 
 // 모니터링 시작
 function startMonitoring() {
-  console.log(`서버 모니터링 시작 - 간격: ${CHECK_INTERVAL}ms`);
+  // console.log(`서버 모니터링 시작 - 간격: ${CHECK_INTERVAL}ms`);
   loadStatus();
   
   // 첫 번째 검사 즉시 실행

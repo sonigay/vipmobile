@@ -60,14 +60,14 @@ const logActivity = async (activityData) => {
     const loggingEnabled = process.env.REACT_APP_LOGGING_ENABLED === 'true';
     
     if (!loggingEnabled) {
-      console.log('활동 로깅이 비활성화되어 있습니다.');
+      // console.log('활동 로깅이 비활성화되어 있습니다.');
       return;
     }
     
-    console.log('활동 로깅 데이터:', activityData);
+    // console.log('활동 로깅 데이터:', activityData);
     
     // 서버로 전송
-    console.log(`로그 전송 URL: ${API_URL}/api/log-activity`);
+    // console.log(`로그 전송 URL: ${API_URL}/api/log-activity`);
     const response = await fetch(`${API_URL}/api/log-activity`, {
       method: 'POST',
       headers: {
@@ -77,13 +77,13 @@ const logActivity = async (activityData) => {
     });
     
     const data = await response.json();
-    console.log('로그 전송 응답:', data);
+          // console.log('로그 전송 응답:', data);
     
     if (!response.ok) {
       throw new Error(`서버 응답 오류: ${response.status} ${response.statusText}`);
     }
     
-    console.log('활동 로깅 성공!');
+          // console.log('활동 로깅 성공!');
   } catch (error) {
     console.error('활동 로깅 실패:', error);
     console.error('활동 데이터:', activityData);
@@ -206,7 +206,7 @@ function App() {
 
   // 캐시 클릭 핸들러 (자동 캐시 정리 + 새로고침)
   const handleCacheClick = useCallback(() => {
-    console.log('캐시 정리 및 새로고침 시작');
+    // console.log('캐시 정리 및 새로고침 시작');
     
     // Service Worker에 캐시 정리 메시지 전송
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -232,7 +232,7 @@ function App() {
   // 개통실적 데이터 로드 함수
   const loadActivationData = useCallback(async () => {
     try {
-      console.log('개통실적 데이터 로딩 시작...');
+      // console.log('개통실적 데이터 로딩 시작...');
       
       // 당월, 전월, 날짜별 데이터 병렬 로드
       const [currentData, previousData, dateData] = await Promise.all([
@@ -252,9 +252,9 @@ function App() {
       
       setActivationData(filteredData);
       setActivationDataByDate(dateData);
-      console.log('개통실적 데이터 로딩 완료');
-      console.log('날짜별 데이터:', dateData);
-      console.log('날짜별 데이터 키들:', Object.keys(dateData || {}));
+              // console.log('개통실적 데이터 로딩 완료');
+        // console.log('날짜별 데이터:', dateData);
+        // console.log('날짜별 데이터 키들:', Object.keys(dateData || {}));
     } catch (error) {
       console.error('개통실적 데이터 로딩 실패:', error);
       setActivationData(null);
@@ -265,7 +265,7 @@ function App() {
   // 특정 날짜의 개통실적 데이터 로드 함수
   const loadActivationDataForDate = useCallback(async (date) => {
     try {
-      console.log(`특정 날짜 개통실적 데이터 로딩 시작: ${date}`);
+      // console.log(`특정 날짜 개통실적 데이터 로딩 시작: ${date}`);
       
       const dateComparisonData = await fetchActivationDateComparison(date);
       
@@ -293,21 +293,21 @@ function App() {
       });
       
       setActivationData(filteredData);
-      console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
-      console.log('날짜 비교 데이터:', filteredData);
+              // console.log(`특정 날짜 개통실적 데이터 로딩 완료: ${date}`);
+        // console.log('날짜 비교 데이터:', filteredData);
       
       // 전월 데이터 디버깅
       const storesWithPreviousData = Object.values(filteredData).filter(store => store.previousMonth > 0);
-      console.log(`프론트엔드 - 전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
-      if (storesWithPreviousData.length > 0) {
-        console.log('프론트엔드 - 전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
-          storeName: store.storeName,
-          previousMonth: store.previousMonth,
-          currentMonth: store.currentMonth
-        })));
-      } else {
-        console.log('프론트엔드 - 전월 데이터가 있는 매장이 없습니다.');
-      }
+              // console.log(`프론트엔드 - 전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
+              if (storesWithPreviousData.length > 0) {
+          // console.log('프론트엔드 - 전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
+          //   storeName: store.storeName,
+          //   previousMonth: store.previousMonth,
+          //   currentMonth: store.currentMonth
+          // })));
+        } else {
+          // console.log('프론트엔드 - 전월 데이터가 있는 매장이 없습니다.');
+        }
     } catch (error) {
       console.error(`특정 날짜 개통실적 데이터 로딩 실패: ${date}`, error);
       setActivationData(null);
@@ -486,9 +486,9 @@ function App() {
   const getActivationDateOptions = useCallback(() => {
     if (!activationDataByDate) return [];
     
-    console.log('=== 날짜 옵션 생성 디버깅 ===');
-    console.log('activationDataByDate:', activationDataByDate);
-    console.log('사용 가능한 날짜들:', Object.keys(activationDataByDate));
+    // console.log('=== 날짜 옵션 생성 디버깅 ===');
+    // console.log('activationDataByDate:', activationDataByDate);
+    // console.log('사용 가능한 날짜들:', Object.keys(activationDataByDate));
     
     const dateOptions = [];
     const today = new Date();
@@ -502,7 +502,7 @@ function App() {
       // 해당 날짜에 데이터가 있는지 확인
       const hasData = activationDataByDate[dateKey] && Object.keys(activationDataByDate[dateKey]).length > 0;
       
-      console.log(`날짜 ${dateKey}: 데이터 있음 = ${hasData}`);
+              // console.log(`날짜 ${dateKey}: 데이터 있음 = ${hasData}`);
       
       // 데이터가 있거나 오늘 날짜인 경우 추가
       if (hasData || i === 0) {
@@ -520,7 +520,7 @@ function App() {
       }
     }
     
-    console.log('최종 날짜 옵션:', dateOptions);
+    // console.log('최종 날짜 옵션:', dateOptions);
     return dateOptions;
   }, [activationDataByDate]);
 
@@ -725,7 +725,7 @@ function App() {
       if (shouldCheckForUpdates()) {
         const hasNew = await hasNewDeployment();
         if (hasNew) {
-          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+          // console.log('새로운 배포 감지 - 자동 로그아웃 실행');
           await performAutoLogout();
           // 업데이트 진행 팝업 표시
           setShowUpdateProgressPopup(true);
@@ -792,19 +792,19 @@ function App() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {
-        console.log('Service Worker 메시지 수신:', event.data);
+        // console.log('Service Worker 메시지 수신:', event.data);
         
         if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
-          console.log('Service Worker에서 자동 로그아웃 요청 받음');
+                      // console.log('Service Worker에서 자동 로그아웃 요청 받음');
           performAutoLogout();
           setShowUpdateProgressPopup(true);
         } else if (event.data && event.data.type === 'PLAY_NOTIFICATION_SOUND') {
-          console.log('알림 사운드 재생 요청 받음:', event.data.soundUrl);
+                      // console.log('알림 사운드 재생 요청 받음:', event.data.soundUrl);
           try {
             const audio = new Audio(event.data.soundUrl);
             audio.volume = 0.5;
             audio.play().catch(error => {
-              console.log('알림 사운드 재생 실패:', error);
+              // console.log('알림 사운드 재생 실패:', error);
             });
           } catch (error) {
             console.error('알림 사운드 로드 실패:', error);
@@ -824,7 +824,7 @@ function App() {
           const updates = await getUnreadUpdates();
           setUnreadUpdates(updates);
           setShowUpdatePopup(true);
-          console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
+          // console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
         }
       } catch (error) {
         console.error('업데이트 확인 중 오류:', error);
@@ -843,7 +843,7 @@ function App() {
       return stores || [];
     }
 
-    console.log(`담당자별 재고 필터링 시작: ${agentTarget}`);
+    // console.log(`담당자별 재고 필터링 시작: ${agentTarget}`);
     
     return stores.filter(store => {
       if (!store.manager) return false;
@@ -862,10 +862,10 @@ function App() {
 
   // 재고 필터링 함수 (상태 변수들 뒤에 정의)
   const filterStores = useCallback((stores, selectedModel, selectedColor, userLocation, searchRadius) => {
-    console.log('재고 필터링 시작:', { selectedModel, selectedColor });
+    // console.log('재고 필터링 시작:', { selectedModel, selectedColor });
     
     if (!stores || !Array.isArray(stores)) {
-      console.log('매장 데이터가 없거나 유효하지 않음');
+              // console.log('매장 데이터가 없거나 유효하지 않음');
       return [];
     }
 
@@ -898,7 +898,7 @@ function App() {
             }
           });
           hasInventory = totalQuantity > 0;
-          console.log(`매장 [${store.name}] - ${selectedModel}${selectedColor ? ` ${selectedColor}` : ''} 재고: ${totalQuantity}`);
+          // console.log(`매장 [${store.name}] - ${selectedModel}${selectedColor ? ` ${selectedColor}` : ''} 재고: ${totalQuantity}`);
         } else {
           // 모델이 선택되지 않은 경우: 모든 재고 합계 확인
           Object.values(store.inventory).forEach(category => {
@@ -917,7 +917,7 @@ function App() {
             }
           });
           hasInventory = totalQuantity > 0;
-          console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
+                      // console.log(`매장 [${store.name}] - 전체 재고: ${totalQuantity}`);
         }
       }
       
@@ -959,17 +959,17 @@ function App() {
     
     setIsLoading(true);
     try {
-      console.log('데이터 로딩 시작');
+      // console.log('데이터 로딩 시작');
       
       // 전체재고확인에서는 3일 이내 출고재고 제외, 담당재고확인에서는 모든 재고 포함
       const includeShipped = isAgentMode && currentView === 'assigned' ? true : false;
       
-      console.log('재고 데이터 요청 설정:', {
-        isAgentMode,
-        currentView,
-        includeShipped,
-        설명: includeShipped ? '담당재고확인 - 3일 이내 출고재고 포함' : '전체재고확인 - 3일 이내 출고재고 제외'
-      });
+              // console.log('재고 데이터 요청 설정:', {
+              //   isAgentMode,
+              //   currentView,
+              //   includeShipped,
+              //   설명: includeShipped ? '담당재고확인 - 3일 이내 출고재고 포함' : '전체재고확인 - 3일 이내 출고재고 제외'
+              // });
       
       // 캐시 무효화를 위한 타임스탬프 추가
       const timestamp = Date.now();
@@ -978,15 +978,15 @@ function App() {
         fetchModels()
       ]);
 
-      console.log('매장 응답 전체:', storesResponse);
-      console.log('모델 응답 전체:', modelsResponse);
+      // console.log('매장 응답 전체:', storesResponse);
+      // console.log('모델 응답 전체:', modelsResponse);
 
       if (storesResponse.success && modelsResponse.success) {
         // 데이터 구조 자세히 로깅
-        console.log('모델 데이터 원본:', modelsResponse.data);
+        // console.log('모델 데이터 원본:', modelsResponse.data);
         const models = Object.keys(modelsResponse.data || {}).sort();
-        console.log('추출된 모델 목록:', models);
-        console.log('모델별 색상 데이터:', modelsResponse.data);
+        // console.log('추출된 모델 목록:', models);
+        // console.log('모델별 색상 데이터:', modelsResponse.data);
 
         // 데이터 설정 전 최종 확인
         const finalData = {
@@ -994,7 +994,7 @@ function App() {
           models: models,
           colorsByModel: modelsResponse.data,
         };
-        console.log('최종 설정될 데이터:', finalData);
+        // console.log('최종 설정될 데이터:', finalData);
 
         // 데이터 설정과 동시에 필터링된 매장 목록 초기화
         setData(finalData);
@@ -1002,7 +1002,7 @@ function App() {
         
         // 강제로 필터링 useEffect 트리거
         setTimeout(() => {
-          console.log('필터링 강제 실행');
+          // console.log('필터링 강제 실행');
         }, 0);
       } else {
         console.error('데이터 로딩 실패 상세:', { 
@@ -1034,16 +1034,16 @@ function App() {
   // 로그인한 매장 정보 업데이트 (재고 정보 포함)
   useEffect(() => {
     if (isLoggedIn && data?.stores && loggedInStore) {
-      console.log('로그인 매장 재고 정보 업데이트 시작');
+      // console.log('로그인 매장 재고 정보 업데이트 시작');
       
       // 로그인한 매장의 최신 정보 찾기
       const updatedStore = data.stores.find(store => store.id === loggedInStore.id);
       
       if (updatedStore) {
-        console.log('로그인 매장 최신 정보 발견:', {
-          매장명: updatedStore.name,
-          재고: updatedStore.inventory
-        });
+        // console.log('로그인 매장 최신 정보 발견:', {
+        //   매장명: updatedStore.name,
+        //   재고: updatedStore.inventory
+        // });
         
         // 로그인 매장 정보 업데이트
         setLoggedInStore(updatedStore);
@@ -1074,15 +1074,15 @@ function App() {
   // 매장 필터링
   useEffect(() => {
     if (!data?.stores) {
-      console.log('매장 데이터가 없음');
+      // console.log('매장 데이터가 없음');
       return;
     }
 
-    console.log('필터링 시작:', {
-      총매장수: data.stores.length,
-      관리자모드: isAgentMode,
-      현재뷰: currentView
-    });
+    // console.log('필터링 시작:', {
+    //   총매장수: data.stores.length,
+    //   관리자모드: isAgentMode,
+    //   현재뷰: currentView
+    // });
 
     try {
       // 1. 기본 매장 목록 복사
@@ -1094,7 +1094,7 @@ function App() {
       // 2. 관리자 모드에서 담당자별 필터링 적용
       if (isAgentMode && currentView === 'assigned' && agentTarget) {
         filtered = filterStoresByAgent(filtered, agentTarget);
-        console.log(`담당자별 필터링 결과: ${filtered.length}개 매장`);
+        // console.log(`담당자별 필터링 결과: ${filtered.length}개 매장`);
       }
 
       // 3. 거리 계산
@@ -1121,13 +1121,13 @@ function App() {
       }
 
       // 4. 결과 로깅
-      console.log('필터링 결과:', {
-        총매장수: data.stores.length,
-        필터링된매장수: filtered.length,
-        검색반경: selectedRadius ? `${selectedRadius/1000}km` : '없음',
-        관리자모드: isAgentMode,
-        현재뷰: currentView
-      });
+      // console.log('필터링 결과:', {
+      //   총매장수: data.stores.length,
+      //   필터링된매장수: filtered.length,
+      //   검색반경: selectedRadius ? `${selectedRadius/1000}km` : '없음',
+      //   관리자모드: isAgentMode,
+      //   현재뷰: currentView
+      // });
 
       setFilteredStores(filtered);
     } catch (error) {
@@ -1146,7 +1146,7 @@ function App() {
         .filter(([mode, hasPermission]) => hasPermission)
         .map(([mode]) => mode);
       
-      console.log('다중 권한 확인:', availableModes);
+      // console.log('다중 권한 확인:', availableModes);
       
       if (availableModes.length > 1) {
         // 다중 권한이 있는 경우 모드 선택 팝업 표시

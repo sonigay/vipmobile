@@ -27,9 +27,6 @@ webpush.setVapidDetails(
 // 푸시 구독 저장소 (실제로는 데이터베이스 사용 권장)
 const pushSubscriptions = new Map();
 
-console.log('VAPID Public Key:', vapidKeys.publicKey);
-console.log('VAPID Private Key:', vapidKeys.privateKey);
-
 // 캐싱 시스템 설정
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5분 (5 * 60 * 1000ms)
@@ -138,10 +135,10 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
     
     // 봇 준비 이벤트
     discordBot.once('ready', () => {
-      console.log(`봇이 준비되었습니다: ${discordBot.user.tag}`);
+      // console.log(`봇이 준비되었습니다: ${discordBot.user.tag}`);
     });
     
-    console.log('디스코드 봇 모듈 로딩 성공');
+    // console.log('디스코드 봇 모듈 로딩 성공');
   } catch (error) {
     console.error('디스코드 봇 모듈 로딩 실패:', error.message);
   }
@@ -178,9 +175,9 @@ process.on('uncaughtException', async (error) => {
                 .setTimestamp()
                 .setFooter({ text: '(주)브이아이피플러스 서버 오류 알림' });
                 
-              console.log('충돌 알림 전송 시도 중...');
+              // console.log('충돌 알림 전송 시도 중...');
               await channel.send({ content: '@everyone', embeds: [crashEmbed] });
-              console.log('서버 충돌 알림 메시지가 Discord로 전송되었습니다.');
+              // console.log('서버 충돌 알림 메시지가 Discord로 전송되었습니다.');
             }
           } catch (discordError) {
             console.error('Discord 충돌 알림 전송 실패:', discordError);
@@ -232,7 +229,7 @@ process.on('unhandledRejection', async (reason, promise) => {
             .setFooter({ text: '(주)브이아이피플러스 서버 경고 알림' });
             
           await channel.send({ embeds: [warningEmbed] });
-          console.log('서버 경고 알림 메시지가 Discord로 전송되었습니다.');
+          // console.log('서버 경고 알림 메시지가 Discord로 전송되었습니다.');
         }
       }
     } catch (discordError) {
@@ -245,7 +242,7 @@ process.on('unhandledRejection', async (reason, promise) => {
 
 // 모든 요청에 대한 로깅 미들웨어
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  // console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
@@ -411,20 +408,20 @@ async function getSheetValues(sheetName) {
 async function sendLogToDiscord(embedData) {
   // 필요한 설정이 없으면 로깅 안함
   if (!DISCORD_LOGGING_ENABLED) {
-    console.log('Discord 로깅이 비활성화되었습니다.');
+    // console.log('Discord 로깅이 비활성화되었습니다.');
     return;
   }
 
   // 봇 객체가 초기화되지 않은 경우
   if (!discordBot || !EmbedBuilder) {
-    console.log('Discord 봇이 초기화되지 않았습니다. 로그를 전송할 수 없습니다.');
+    // console.log('Discord 봇이 초기화되지 않았습니다. 로그를 전송할 수 없습니다.');
     return;
   }
 
   try {
     // 봇이 연결되었는지 확인
     if (!discordBot.isReady()) {
-      console.log('Discord 봇이 아직 준비되지 않았습니다. 메시지를 보낼 수 없습니다.');
+      // console.log('Discord 봇이 아직 준비되지 않았습니다. 메시지를 보낼 수 없습니다.');
       return;
     }
 
@@ -434,20 +431,20 @@ async function sendLogToDiscord(embedData) {
     
     if (userType === 'agent') {
       channelId = DISCORD_AGENT_CHANNEL_ID;
-      console.log('관리자 로그 전송 - 채널 ID:', channelId);
+      // console.log('관리자 로그 전송 - 채널 ID:', channelId);
     } else {
       channelId = DISCORD_STORE_CHANNEL_ID;
-      console.log('일반 매장 로그 전송 - 채널 ID:', channelId);
+      // console.log('일반 매장 로그 전송 - 채널 ID:', channelId);
     }
     
     // 채널 ID가 없으면 로깅 중단
     if (!channelId) {
-      console.log(`${userType} 유형의 Discord 채널 ID가 설정되지 않았습니다.`);
+      // console.log(`${userType} 유형의 Discord 채널 ID가 설정되지 않았습니다.`);
       return;
     }
 
-    console.log('Discord 채널에 메시지 전송 시도...');
-    console.log('Discord 채널 ID:', channelId);
+    // console.log('Discord 채널에 메시지 전송 시도...');
+    // console.log('Discord 채널 ID:', channelId);
     
     // 채널 가져오기 시도
     let channel = null;
@@ -464,7 +461,7 @@ async function sendLogToDiscord(embedData) {
       return;
     }
 
-    console.log(`채널 찾음: ${channel.name} (${channel.id}), 메시지 전송 중...`);
+            // console.log(`채널 찾음: ${channel.name} (${channel.id}), 메시지 전송 중...`);
     
     try {
       // EmbedBuilder 생성
@@ -491,7 +488,7 @@ async function sendLogToDiscord(embedData) {
       
       // 메시지 전송 시도
       const sentMessage = await channel.send({ embeds: [embed] });
-      console.log(`Discord 메시지 전송 성공! 메시지 ID: ${sentMessage.id}`);
+              // console.log(`Discord 메시지 전송 성공! 메시지 ID: ${sentMessage.id}`);
       return true;
     } catch (embedError) {
       console.error('Embed 생성 또는 전송 중 오류:', embedError.message);
@@ -555,7 +552,7 @@ app.post('/api/cache-refresh', (req, res) => {
 // 주소를 위도/경도로 변환하여 시트에 업데이트
 app.post('/api/update-coordinates', async (req, res) => {
   try {
-    console.log('Updating coordinates...');
+    // console.log('Updating coordinates...');
     
     const storeValues = await getSheetValues(STORE_SHEET_NAME);
     if (!storeValues) {
@@ -578,13 +575,13 @@ app.post('/api/update-coordinates', async (req, res) => {
             range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
             values: [["", ""]]
           });
-          console.log(`Cleared coordinates for store without address at row ${i + 2}`);
+          // console.log(`Cleared coordinates for store without address at row ${i + 2}`);
           continue;
         }
         
         // 주소가 있는 경우 geocoding 실행
         try {
-          console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
+          // console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
@@ -592,17 +589,17 @@ app.post('/api/update-coordinates', async (req, res) => {
               range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
               values: [[latitude, longitude]]
             });
-            console.log(`✅ 좌표 업데이트 성공: ${address}`);
-            console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
+                          // console.log(`✅ 좌표 업데이트 성공: ${address}`);
+              // console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
           } else {
-            console.log(`❌ Geocoding 결과 없음: ${address}`);
+                          // console.log(`❌ Geocoding 결과 없음: ${address}`);
             // geocoding 실패 시 기존 좌표 유지 (삭제하지 않음)
-            console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
+            // console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
           }
         } catch (error) {
           console.error(`❌ Geocoding 오류: ${address}`, error.message);
           // geocoding 오류 시 기존 좌표 유지 (삭제하지 않음)
-          console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
+          // console.log(`⚠️ 기존 좌표 유지 (삭제하지 않음): ${address}`);
         }
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
@@ -610,7 +607,7 @@ app.post('/api/update-coordinates', async (req, res) => {
           range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
           values: [["", ""]]
         });
-        console.log(`Cleared coordinates for unused store at row ${i + 2}`);
+        // console.log(`Cleared coordinates for unused store at row ${i + 2}`);
       }
       // API 할당량 제한을 피하기 위한 지연 (사용 매장만)
       if (status === "사용") await new Promise(resolve => setTimeout(resolve, 1000));
@@ -625,9 +622,9 @@ app.post('/api/update-coordinates', async (req, res) => {
           data: updates
         }
       });
-      console.log(`Successfully updated ${updates.length} coordinates`);
+      // console.log(`Successfully updated ${updates.length} coordinates`);
     } else {
-      console.log('No coordinates to update');
+      // console.log('No coordinates to update');
     }
 
     res.json({ 
@@ -649,17 +646,17 @@ app.get('/api/stores', async (req, res) => {
   const { includeShipped = 'true' } = req.query; // 쿼리 파라미터로 출고 제외 여부 제어
   const cacheKey = `processed_stores_data_${includeShipped}`;
   
-  console.log(`매장 데이터 요청 - includeShipped: ${includeShipped}, 캐시키: ${cacheKey}`);
+  // console.log(`매장 데이터 요청 - includeShipped: ${includeShipped}, 캐시키: ${cacheKey}`);
   
   // 캐시에서 먼저 확인
   const cachedStores = cacheUtils.get(cacheKey);
   if (cachedStores) {
-    console.log(`캐시된 매장 데이터 반환 (${cachedStores.length}개 매장)`);
+    // console.log(`캐시된 매장 데이터 반환 (${cachedStores.length}개 매장)`);
     return res.json(cachedStores);
   }
   
   try {
-    console.log('매장 데이터 처리 시작...');
+    // console.log('매장 데이터 처리 시작...');
     const startTime = Date.now();
     
     const [inventoryValues, storeValues] = await Promise.all([
@@ -953,13 +950,13 @@ async function getGitUpdateHistory() {
 // 구글시트에 업데이트 내용 자동 입력
 async function updateGoogleSheetWithGitHistory() {
   try {
-    console.log('Git 커밋 히스토리를 구글시트에 자동 입력 시작...');
+    // console.log('Git 커밋 히스토리를 구글시트에 자동 입력 시작...');
     
     // Git 히스토리 가져오기
     const gitHistory = await getGitUpdateHistory();
     
     if (gitHistory.length === 0) {
-      console.log('Git 히스토리가 없어서 업데이트 시트 입력을 건너뜁니다.');
+      // console.log('Git 히스토리가 없어서 업데이트 시트 입력을 건너뜁니다.');
       return;
     }
     
@@ -972,7 +969,7 @@ async function updateGoogleSheetWithGitHistory() {
       });
       existingData = response.data.values || [];
     } catch (error) {
-      console.log('업데이트 시트가 없거나 비어있습니다. 새로 생성합니다.');
+      // console.log('업데이트 시트가 없거나 비어있습니다. 새로 생성합니다.');
     }
     
     // 헤더 행 준비
@@ -1020,7 +1017,7 @@ async function updateGoogleSheetWithGitHistory() {
     const uniqueNewRows = newRows.filter(row => !existingVersions.has(row[0]));
     
     if (uniqueNewRows.length === 0) {
-      console.log('새로운 업데이트 내용이 없습니다.');
+      // console.log('새로운 업데이트 내용이 없습니다.');
       return;
     }
     
@@ -1036,7 +1033,7 @@ async function updateGoogleSheetWithGitHistory() {
       }
     });
     
-    console.log(`업데이트 시트에 ${uniqueNewRows.length}개의 새로운 업데이트 내용이 입력되었습니다.`);
+          // console.log(`업데이트 시트에 ${uniqueNewRows.length}개의 새로운 업데이트 내용이 입력되었습니다.`);
     
   } catch (error) {
     console.error('구글시트 업데이트 내용 입력 실패:', error);
@@ -1118,12 +1115,12 @@ app.get('/api/agents', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedAgents = cacheUtils.get(cacheKey);
   if (cachedAgents) {
-    console.log('캐시된 대리점 데이터 반환');
+    // console.log('캐시된 대리점 데이터 반환');
     return res.json(cachedAgents);
   }
   
   try {
-    console.log('대리점 데이터 처리 시작...');
+    // console.log('대리점 데이터 처리 시작...');
     const startTime = Date.now();
     
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
@@ -1147,7 +1144,7 @@ app.get('/api/agents', async (req, res) => {
     }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
     
     const processingTime = Date.now() - startTime;
-    console.log(`대리점 데이터 처리 완료: ${agents.length}개 대리점, ${processingTime}ms 소요`);
+    // console.log(`대리점 데이터 처리 완료: ${agents.length}개 대리점, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, agents);
@@ -1169,12 +1166,12 @@ app.get('/api/activation-data/current-month', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log('캐시된 당월 개통실적 데이터 반환');
+    // console.log('캐시된 당월 개통실적 데이터 반환');
     return res.json(cachedData);
   }
   
   try {
-    console.log('당월 개통실적 데이터 처리 시작...');
+    // console.log('당월 개통실적 데이터 처리 시작...');
     const startTime = Date.now();
     
     const activationValues = await getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
@@ -1204,7 +1201,7 @@ app.get('/api/activation-data/current-month', async (req, res) => {
       });
     
     const processingTime = Date.now() - startTime;
-    console.log(`당월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
+    // console.log(`당월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, activationData);
@@ -1226,12 +1223,12 @@ app.get('/api/activation-data/previous-month', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log('캐시된 전월 개통실적 데이터 반환');
+    // console.log('캐시된 전월 개통실적 데이터 반환');
     return res.json(cachedData);
   }
   
   try {
-    console.log('전월 개통실적 데이터 처리 시작...');
+    // console.log('전월 개통실적 데이터 처리 시작...');
     const startTime = Date.now();
     
     const activationValues = await getSheetValues(PREVIOUS_MONTH_ACTIVATION_SHEET_NAME);
@@ -1261,7 +1258,7 @@ app.get('/api/activation-data/previous-month', async (req, res) => {
       });
     
     const processingTime = Date.now() - startTime;
-    console.log(`전월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
+    // console.log(`전월 개통실적 데이터 처리 완료: ${activationData.length}개 레코드, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, activationData);
@@ -1283,12 +1280,12 @@ app.get('/api/activation-data/by-date', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log('캐시된 날짜별 개통실적 데이터 반환');
+    // console.log('캐시된 날짜별 개통실적 데이터 반환');
     return res.json(cachedData);
   }
   
   try {
-    console.log('날짜별 개통실적 데이터 처리 시작...');
+    // console.log('날짜별 개통실적 데이터 처리 시작...');
     const startTime = Date.now();
     
     const activationValues = await getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
@@ -1363,7 +1360,7 @@ app.get('/api/activation-data/by-date', async (req, res) => {
     });
     
     const processingTime = Date.now() - startTime;
-    console.log(`날짜별 개통실적 데이터 처리 완료: ${Object.keys(dateStats).length}개 날짜, ${processingTime}ms 소요`);
+    // console.log(`날짜별 개통실적 데이터 처리 완료: ${Object.keys(dateStats).length}개 날짜, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, dateStats);
@@ -1386,12 +1383,12 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log(`캐시된 날짜 비교 데이터 반환: ${date}`);
+    // console.log(`캐시된 날짜 비교 데이터 반환: ${date}`);
     return res.json(cachedData);
   }
   
   try {
-    console.log(`날짜 비교 데이터 처리 시작: ${date}`);
+    // console.log(`날짜 비교 데이터 처리 시작: ${date}`);
     const startTime = Date.now();
     
     // 당월과 전월 데이터 모두 가져오기
@@ -1467,11 +1464,11 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
     });
     
     // 전월 데이터 처리 (같은 일자)
-    console.log(`전월 데이터 처리 시작 - 요청 날짜: ${date}`);
-    console.log(`전월 데이터 행 수: ${previousMonthRows.length}`);
+    // console.log(`전월 데이터 처리 시작 - 요청 날짜: ${date}`);
+    // console.log(`전월 데이터 행 수: ${previousMonthRows.length}`);
     
     const targetDay = new Date(date).getDate();
-    console.log(`전월 비교 대상 일자: ${targetDay}일`);
+    // console.log(`전월 비교 대상 일자: ${targetDay}일`);
     
     let processedPreviousCount = 0;
     
@@ -1512,7 +1509,7 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
       processedPreviousCount++;
       if (processedPreviousCount <= 5) { // 처음 5개만 로그 출력
         const day = new Date(normalizedDate).getDate();
-        console.log(`전월 데이터 매칭: ${store} - ${activationDate} -> ${day}일`);
+        // console.log(`전월 데이터 매칭: ${store} - ${activationDate} -> ${day}일`);
       }
       
       if (!comparisonData[store]) {
@@ -1541,16 +1538,16 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
     });
     
     const processingTime = Date.now() - startTime;
-    console.log(`날짜 비교 데이터 처리 완료: ${date}, ${Object.keys(comparisonData).length}개 매장, ${processingTime}ms 소요`);
+    // console.log(`날짜 비교 데이터 처리 완료: ${date}, ${Object.keys(comparisonData).length}개 매장, ${processingTime}ms 소요`);
     
     // 전월 데이터 요약 로그
     const storesWithPreviousData = Object.values(comparisonData).filter(store => store.previousMonth > 0);
-    console.log(`전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
+    // console.log(`전월 데이터가 있는 매장 수: ${storesWithPreviousData.length}`);
     if (storesWithPreviousData.length > 0) {
-      console.log('전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
-        storeName: store.storeName,
-        previousMonth: store.previousMonth
-      })));
+      // console.log('전월 데이터가 있는 매장들:', storesWithPreviousData.map(store => ({
+      //   storeName: store.storeName,
+      //   previousMonth: store.previousMonth
+      // })));
     }
     
     // 캐시에 저장 (5분 TTL)
@@ -1677,24 +1674,24 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
-    console.log(`Login attempt with ID: ${storeId}`);
-    console.log('Step 1: Starting login process...');
+    // console.log(`Login attempt with ID: ${storeId}`);
+    // console.log('Step 1: Starting login process...');
     
     // 1. 먼저 대리점 관리자 ID인지 확인 (구글시트 기반)
-    console.log('Step 2: Checking if ID is agent...');
+    // console.log('Step 2: Checking if ID is agent...');
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
-    console.log('Step 3: Agent sheet data fetched, rows:', agentValues ? agentValues.length : 0);
+    // console.log('Step 3: Agent sheet data fetched, rows:', agentValues ? agentValues.length : 0);
     
     if (agentValues) {
       const agentRows = agentValues.slice(1);
-      console.log('Step 4: Agent rows (excluding header):', agentRows.length);
+      // console.log('Step 4: Agent rows (excluding header):', agentRows.length);
       
       const agent = agentRows.find(row => row[2] === storeId); // C열: 연락처(아이디)
-      console.log('Step 5: Agent search result:', agent ? 'Found' : 'Not found');
+      // console.log('Step 5: Agent search result:', agent ? 'Found' : 'Not found');
       
       if (agent) {
-        console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
-        console.log('Step 6: Processing agent login...');
+        // console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
+        // console.log('Step 6: Processing agent login...');
         
         // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 장표모드 권한, J열: 정책모드 권한, K열: 검수전체현황 권한 확인
         const hasInventoryPermission = agent[5] === 'O'; // F열
@@ -1704,14 +1701,14 @@ app.post('/api/login', async (req, res) => {
         const hasPolicyPermission = agent[9] === 'O'; // J열
         const hasInspectionOverviewPermission = agent[10] === 'O'; // K열
         
-        console.log('Step 6.5: Permission check:', {
-          inventory: hasInventoryPermission,
-          settlement: hasSettlementPermission,
-          inspection: hasInspectionPermission,
-          chart: hasChartPermission,
-          policy: hasPolicyPermission,
-          inspectionOverview: hasInspectionOverviewPermission
-        });
+        // console.log('Step 6.5: Permission check:', {
+        //   inventory: hasInventoryPermission,
+        //   settlement: hasSettlementPermission,
+        //   inspection: hasInspectionPermission,
+        //   chart: hasChartPermission,
+        //   policy: hasPolicyPermission,
+        //   inspectionOverview: hasInspectionOverviewPermission
+        // });
         
         // 다중 권한이 있는 경우 권한 정보 포함
         const modePermissions = {
@@ -1918,37 +1915,37 @@ async function checkAndUpdateAddresses() {
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
-    console.log(`서버가 포트 ${port}에서 실행 중입니다`);
-    console.log(`VAPID Public Key: ${vapidKeys.publicKey}`);
+    // console.log(`서버가 포트 ${port}에서 실행 중입니다`);
+    // console.log(`VAPID Public Key: ${vapidKeys.publicKey}`);
     
     // 환경변수 디버깅 (민감한 정보는 로깅하지 않음)
-    console.log('Discord 봇 환경변수 상태:');
-    console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
-    console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
-    console.log('- DISCORD_AGENT_CHANNEL_ID 설정됨:', !!process.env.DISCORD_AGENT_CHANNEL_ID);
-    console.log('- DISCORD_STORE_CHANNEL_ID 설정됨:', !!process.env.DISCORD_STORE_CHANNEL_ID);
-    console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
+          // console.log('Discord 봇 환경변수 상태:');
+      // console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
+      // console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
+      // console.log('- DISCORD_AGENT_CHANNEL_ID 설정됨:', !!process.env.DISCORD_AGENT_CHANNEL_ID);
+      // console.log('- DISCORD_STORE_CHANNEL_ID 설정됨:', !!process.env.DISCORD_STORE_CHANNEL_ID);
+      // console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
     
     // 무료 Geocoding 서비스 상태
-    console.log('무료 Geocoding 서비스 상태:');
-    console.log('- Photon API (Komoot): 사용 가능 (무료)');
-    console.log('- Nominatim API (OpenStreetMap): 사용 가능 (무료)');
-    console.log('- Pelias API (Mapzen): 사용 가능 (무료)');
-    console.log('- 총 3개 무료 서비스로 정확도 향상');
+          // console.log('무료 Geocoding 서비스 상태:');
+      // console.log('- Photon API (Komoot): 사용 가능 (무료)');
+      // console.log('- Nominatim API (OpenStreetMap): 사용 가능 (무료)');
+      // console.log('- Pelias API (Mapzen): 사용 가능 (무료)');
+      // console.log('- 총 3개 무료 서비스로 정확도 향상');
     
     // 봇 로그인 (서버 시작 후)
     if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN && discordBot) {
-      console.log('서버 시작 후 Discord 봇 로그인 시도...');
+      // console.log('서버 시작 후 Discord 봇 로그인 시도...');
       try {
         await discordBot.login(DISCORD_BOT_TOKEN);
-        console.log('Discord 봇 연결 성공!');
+                  // console.log('Discord 봇 연결 성공!');
         
         // 관리자 채널 연결 테스트
         if (DISCORD_AGENT_CHANNEL_ID) {
           try {
             const agentChannel = await discordBot.channels.fetch(DISCORD_AGENT_CHANNEL_ID);
             if (agentChannel) {
-              console.log(`관리자 채널 '${agentChannel.name}' 연결 성공!`);
+              // console.log(`관리자 채널 '${agentChannel.name}' 연결 성공!`);
             }
           } catch (agentChannelError) {
             console.error('관리자 채널 연결 실패:', agentChannelError.message);
@@ -1960,7 +1957,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
           try {
             const storeChannel = await discordBot.channels.fetch(DISCORD_STORE_CHANNEL_ID);
             if (storeChannel) {
-              console.log(`일반 매장 채널 '${storeChannel.name}' 연결 성공!`);
+              // console.log(`일반 매장 채널 '${storeChannel.name}' 연결 성공!`);
             }
           } catch (storeChannelError) {
             console.error('일반 매장 채널 연결 실패:', storeChannelError.message);
@@ -1971,7 +1968,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
         if (DISCORD_CHANNEL_ID) {
           const channel = await discordBot.channels.fetch(DISCORD_CHANNEL_ID);
           if (channel) {
-            console.log(`채널 '${channel.name}' 연결 성공!`);
+            // console.log(`채널 '${channel.name}' 연결 성공!`);
             
             // 테스트 메시지 전송
             const testEmbed = new EmbedBuilder()
@@ -1982,7 +1979,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
               .setFooter({ text: '(주)브이아이피플러스 서버' });
               
             await channel.send({ embeds: [testEmbed] });
-            console.log('서버 시작 알림 메시지 전송됨');
+            // console.log('서버 시작 알림 메시지 전송됨');
           }
         }
       } catch (error) {
@@ -1990,18 +1987,18 @@ const server = app.listen(port, '0.0.0.0', async () => {
         console.error('Discord 봇은 비활성화 상태로 서버가 계속 실행됩니다.');
       }
     } else {
-      console.log('Discord 봇 기능이 비활성화되었거나 설정이 완료되지 않았습니다.');
+              // console.log('Discord 봇 기능이 비활성화되었거나 설정이 완료되지 않았습니다.');
     }
     
     // 주소 업데이트 함수 호출
-    console.log('모든 사용 중인 주소에 대해 위도/경도 값을 업데이트합니다...');
+          // console.log('모든 사용 중인 주소에 대해 위도/경도 값을 업데이트합니다...');
     await checkAndUpdateAddresses();
     
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
     setInterval(checkAndUpdateAddresses, 3600000);
     
     // Git 커밋 히스토리를 구글시트에 자동 입력
-    console.log('Git 커밋 히스토리를 구글시트에 자동 입력합니다...');
+          // console.log('Git 커밋 히스토리를 구글시트에 자동 입력합니다...');
     await updateGoogleSheetWithGitHistory();
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
@@ -2011,18 +2008,18 @@ const server = app.listen(port, '0.0.0.0', async () => {
   process.exit(1);
 });
 
-// 정상적인 종료 처리
-process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM signal. Shutting down gracefully...');
-  
-  // Discord에 서버 종료 알림 전송
-  if (DISCORD_LOGGING_ENABLED && discordBot) {
-    try {
-      // 봇 준비 상태 확인
-      if (!discordBot.isReady()) {
-        console.log('Discord 봇이 아직 준비되지 않았습니다. 5초 대기 후 재시도...');
-        await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
-      }
+  // 정상적인 종료 처리
+  process.on('SIGTERM', async () => {
+    // console.log('Received SIGTERM signal. Shutting down gracefully...');
+    
+    // Discord에 서버 종료 알림 전송
+    if (DISCORD_LOGGING_ENABLED && discordBot) {
+      try {
+        // 봇 준비 상태 확인
+        if (!discordBot.isReady()) {
+          // console.log('Discord 봇이 아직 준비되지 않았습니다. 5초 대기 후 재시도...');
+          await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
+        }
       
       if (discordBot.isReady()) {
         // 기본 채널에 알림 전송
@@ -2070,7 +2067,7 @@ process.on('SIGTERM', async () => {
 
 // SIGINT 처리 (Ctrl+C)
 process.on('SIGINT', async () => {
-  console.log('Received SIGINT signal (Ctrl+C). Shutting down gracefully...');
+  // console.log('Received SIGINT signal (Ctrl+C). Shutting down gracefully...');
   
   // Discord에 서버 종료 알림 전송
   if (DISCORD_LOGGING_ENABLED && discordBot) {
