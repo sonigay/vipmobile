@@ -76,6 +76,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   const [inspectionData, setInspectionData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc' - 기본값을 오름차순으로 설정
   
   // 필터 상태
   const [filters, setFilters] = useState({
@@ -237,8 +238,22 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       completed: completedItems.has(diff.id || diff.originalKey) || modificationCompletedItems.has(diff.originalKey || diff.key)
     }));
     
-    return filterDifferences(differencesWithCompletion, filters);
-  }, [inspectionData, filters, completedItems, modificationCompletedItems]);
+    let filtered = filterDifferences(differencesWithCompletion, filters);
+    
+    // 가입번호 기준 정렬
+    filtered.sort((a, b) => {
+      const keyA = (a.originalKey || a.key || '').toString();
+      const keyB = (b.originalKey || b.key || '').toString();
+      
+      if (sortOrder === 'asc') {
+        return keyA.localeCompare(keyB);
+      } else {
+        return keyB.localeCompare(keyA);
+      }
+    });
+    
+    return filtered;
+  }, [inspectionData, filters, completedItems, modificationCompletedItems, sortOrder]);
 
   // 통계 계산
   const statistics = useMemo(() => {
@@ -526,8 +541,10 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         return '폰클중복';
       case 'both_duplicate':
         return '양쪽중복';
+      case 'no_duplicate':
+        return ''; // 빈 공란
       default:
-        return '중복';
+        return '';
     }
   };
 
@@ -837,8 +854,19 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>가입번호</TableCell>
-                  <TableCell>중복</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      가입번호
+                      <IconButton
+                        size="small"
+                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        sx={{ p: 0.5 }}
+                      >
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                  <TableCell>가입번호중복</TableCell>
                   <TableCell>타입</TableCell>
                   <TableCell>수기초값</TableCell>
                   <TableCell>폰클데이터값</TableCell>
@@ -866,21 +894,21 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                     <TableRow 
                       key={`${item.originalKey || item.key}-${index}`}
                       sx={{ 
-                        backgroundColor: item.isDuplicate ? 
+                        backgroundColor: item.isDuplicate && item.duplicateType !== 'no_duplicate' ? 
                           (item.duplicateType === 'manual_duplicate' ? '#e3f2fd' :
                            item.duplicateType === 'system_duplicate' ? '#fff3e0' :
-                           item.duplicateType === 'both_duplicate' ? '#ffebee' : '#fff3e0') : 'inherit',
+                           item.duplicateType === 'both_duplicate' ? '#ffebee' : 'inherit') : 'inherit',
                         '&:hover': {
-                          backgroundColor: item.isDuplicate ? 
+                          backgroundColor: item.isDuplicate && item.duplicateType !== 'no_duplicate' ? 
                             (item.duplicateType === 'manual_duplicate' ? '#bbdefb' :
                              item.duplicateType === 'system_duplicate' ? '#ffe0b2' :
-                             item.duplicateType === 'both_duplicate' ? '#ffcdd2' : '#ffe0b2') : 'inherit'
+                             item.duplicateType === 'both_duplicate' ? '#ffcdd2' : 'inherit') : 'inherit'
                         }
                       }}
                     >
                       <TableCell>{item.originalKey || item.key}</TableCell>
                       <TableCell>
-                        {item.isDuplicate && (
+                        {item.isDuplicate && item.duplicateType !== 'no_duplicate' && (
                           <Box>
                             <Chip
                               label={getDuplicateTypeLabel(item.duplicateType)}
