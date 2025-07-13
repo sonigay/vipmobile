@@ -282,8 +282,24 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     }
   };
 
-  // 내용 변경 처리 (서버에 저장)
-  const handleNotesChange = async (item, notes) => {
+  // 내용 편집 모드 시작
+  const handleEditNotes = (item) => {
+    setInspectionData(prev => {
+      if (!prev?.differences) return prev;
+      
+      return {
+        ...prev,
+        differences: prev.differences.map(diff => 
+          (diff.originalKey || diff.key) === (item.originalKey || item.key)
+            ? { ...diff, isEditingNotes: true }
+            : diff
+        )
+      };
+    });
+  };
+
+  // 내용 저장
+  const handleSaveNotes = async (item) => {
     if (!loggedInStore?.contactId) return;
     
     try {
@@ -291,10 +307,10 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       await updateModificationNotes(
         item.originalKey || item.key, 
         loggedInStore.contactId, 
-        notes
+        item.notes || ''
       );
       
-      // 로컬 상태 업데이트
+      // 편집 모드 종료
       setInspectionData(prev => {
         if (!prev?.differences) return prev;
         
@@ -302,7 +318,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           ...prev,
           differences: prev.differences.map(diff => 
             (diff.originalKey || diff.key) === (item.originalKey || item.key)
-              ? { ...diff, notes }
+              ? { ...diff, isEditingNotes: false }
               : diff
           )
         };
@@ -311,6 +327,38 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       console.error('내용 업데이트 오류:', error);
       alert('내용 업데이트에 실패했습니다.');
     }
+  };
+
+  // 내용 편집 취소
+  const handleCancelNotes = (item) => {
+    setInspectionData(prev => {
+      if (!prev?.differences) return prev;
+      
+      return {
+        ...prev,
+        differences: prev.differences.map(diff => 
+          (diff.originalKey || diff.key) === (item.originalKey || item.key)
+            ? { ...diff, isEditingNotes: false }
+            : diff
+        )
+      };
+    });
+  };
+
+  // 내용 변경 처리 (로컬 상태만 업데이트)
+  const handleNotesChange = (item, notes) => {
+    setInspectionData(prev => {
+      if (!prev?.differences) return prev;
+      
+      return {
+        ...prev,
+        differences: prev.differences.map(diff => 
+          (diff.originalKey || diff.key) === (item.originalKey || item.key)
+            ? { ...diff, notes }
+            : diff
+        )
+      };
+    });
   };
 
   // 컬럼 설정 다이얼로그 열기
@@ -834,15 +882,58 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                         )}
                       </TableCell>
                       <TableCell>
-                        <TextField
-                          size="small"
-                          placeholder="수정 불가 사유 등"
-                          value={item.notes || ''}
-                          onChange={(e) => handleNotesChange(item, e.target.value)}
-                          multiline
-                          rows={1}
-                          sx={{ minWidth: 200, maxWidth: 300 }}
-                        />
+                        {item.notes ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" sx={{ flex: 1, wordBreak: 'break-word' }}>
+                              {item.notes}
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEditNotes(item)}
+                              sx={{ p: 0.5 }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        ) : (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditNotes(item)}
+                            sx={{ p: 0.5 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                        {item.isEditingNotes && (
+                          <Box sx={{ mt: 1 }}>
+                            <TextField
+                              size="small"
+                              placeholder="수정 불가 사유 등"
+                              value={item.notes || ''}
+                              onChange={(e) => handleNotesChange(item, e.target.value)}
+                              multiline
+                              rows={2}
+                              fullWidth
+                              sx={{ mb: 1 }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => handleSaveNotes(item)}
+                              >
+                                확인
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleCancelNotes(item)}
+                              >
+                                취소
+                              </Button>
+                            </Box>
+                          </Box>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
