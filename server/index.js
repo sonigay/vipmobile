@@ -3052,20 +3052,21 @@ app.get('/api/inspection-data', async (req, res) => {
       }
     });
 
-    // 폰클개통데이터 인덱싱 (BO열: 메모1 기준)
+    // 폰클개통데이터 인덱싱 (BO열: 메모1 기준) - 중복 가입번호 처리
+    const duplicateKeys = new Set(); // 중복된 가입번호 추적
+    
     systemRows.forEach((row, index) => {
       if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
         const key = row[66].toString().trim();
-        systemMap.set(key, { row, index: index + 2 });
         
-        // 디버깅 대상 가입번호인 경우 매핑 과정 로그
-        if (DEBUG_SUBSCRIPTION_NUMBERS.includes(key)) {
-          console.log(`\n=== 폰클 데이터 매핑: ${key} ===`);
-          console.log(`행 인덱스: ${index + 2}`);
-          console.log(`BO열(66) 값: "${row[66]}"`);
-          console.log(`N열(13) 값: "${row[13] || ''}"`);
-          console.log(`P열(15) 값: "${row[15] || ''}"`);
+
+        
+        // 같은 가입번호가 이미 있는 경우 중복으로 표시
+        if (systemMap.has(key)) {
+          duplicateKeys.add(key);
         }
+        
+        systemMap.set(key, { row, index: index + 2 });
       }
     });
 
@@ -3073,46 +3074,24 @@ app.get('/api/inspection-data', async (req, res) => {
     for (const [key, manualData] of manualMap) {
       const systemData = systemMap.get(key);
       
-      // 디버깅 대상 가입번호인지 확인
-      const isDebugTarget = DEBUG_SUBSCRIPTION_NUMBERS.includes(key);
-      
-      if (isDebugTarget) {
-        console.log(`\n=== 디버깅 대상 가입번호 처리 시작: ${key} ===`);
-        console.log(`수기초 데이터 존재: ${!!manualData}`);
-        console.log(`폰클 데이터 존재: ${!!systemData}`);
-        if (systemData) {
-          console.log(`폰클 데이터 매핑 키 (BO열): "${systemData.row[66] || ''}"`);
-          console.log(`폰클 데이터 전체 길이: ${systemData.row.length}`);
-          console.log(`폰클 데이터 전체 컬럼 (0-20): ${systemData.row.slice(0, 21).map((val, idx) => `${idx}:"${val || ''}"`).join(', ')}`);
-          console.log(`폰클 데이터 모델 관련 컬럼: N(13)="${systemData.row[13] || ''}", P(15)="${systemData.row[15] || ''}", O(14)="${systemData.row[14] || ''}", Q(16)="${systemData.row[16] || ''}"`);
-        }
-      }
+
       
       if (systemData) {
         // 두 데이터가 모두 있는 경우 비교
         const rowDifferences = compareDynamicColumns(manualData.row, systemData.row, key, field);
         
-        if (isDebugTarget) {
-          console.log(`\n=== ${key} 차이점 분석 결과 ===`);
-          console.log(`발견된 차이점 수: ${rowDifferences.length}개`);
-          rowDifferences.forEach((diff, index) => {
-            console.log(`차이점 ${index + 1}: ${diff.field} - 수기초: "${diff.correctValue}", 폰클: "${diff.incorrectValue}"`);
-          });
-        }
+
         
         rowDifferences.forEach(diff => {
           differences.push({
             ...diff,
             manualRow: manualData.index,
             systemRow: systemData.index,
-            assignedAgent: systemData.row[69] || '' // BR열: 등록직원 (이미 compareDynamicColumns에서 설정됨)
+            assignedAgent: systemData.row[69] || '', // BR열: 등록직원 (이미 compareDynamicColumns에서 설정됨)
+            isDuplicate: duplicateKeys.has(key) // 중복 가입번호 여부
           });
         });
-      } else {
-        if (isDebugTarget) {
-          console.log(`\n=== ${key} 폰클 데이터 없음 ===`);
-          console.log(`수기초에만 존재하는 데이터입니다.`);
-        }
+
         
                 // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
         if (!field) {
@@ -3145,6 +3124,25 @@ app.get('/api/inspection-data', async (req, res) => {
             });
           }
         }
+      }
+    }
+
+    // 중복 가입번호에 대한 별도 차이점 추가
+    for (const duplicateKey of duplicateKeys) {
+      if (manualMap.has(duplicateKey)) {
+        differences.push({
+          key: duplicateKey,
+          type: 'duplicate',
+          field: '가입번호 중복',
+          fieldKey: 'duplicate_subscription',
+          correctValue: '수기초 데이터',
+          incorrectValue: '폰클 데이터 중복',
+          description: '폰클 데이터에 동일한 가입번호가 여러 행에 존재합니다.',
+          manualRow: manualMap.get(duplicateKey).index,
+          systemRow: systemMap.get(duplicateKey).index,
+          assignedAgent: systemMap.get(duplicateKey).row[69] || '',
+          isDuplicate: true
+        });
       }
     }
 
@@ -3668,9 +3666,9 @@ function extractValueWithRegex(value, regex) {
   }
 }
 
-// 디버깅 대상 시리얼번호 목록
-const DEBUG_SERIAL_NUMBERS = ['500225775943', '516697159306', '528501', 'SM-L305N', '177366', '1230343'];
-const DEBUG_SUBSCRIPTION_NUMBERS = ['500225775943', '516697159306', 'TEST_NORMAL'];
+// 디버깅 대상 시리얼번호 목록 (필요시에만 사용)
+const DEBUG_SERIAL_NUMBERS = [];
+const DEBUG_SUBSCRIPTION_NUMBERS = [];
 
 // 모델명 정규화 함수
 function normalizeModelName(modelName) {
@@ -3690,43 +3688,24 @@ function normalizeSerialNumber(serialNumber) {
   
   let serial = serialNumber.toString().trim();
   
-  // 디버깅 대상 시리얼번호인지 확인
-  const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(serial);
-  
-  if (isDebugTarget) {
-    console.log(`=== 디버깅 대상 시리얼번호 정규화 시작: ${serial} ===`);
-    console.log(`원본 시리얼번호: "${serial}"`);
-  }
+        // 디버깅 대상 시리얼번호인지 확인 (필요시에만 사용)
+      const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(serial);
   
   // 숫자인지 확인
   if (/^\d+$/.test(serial)) {
     // 숫자인 경우 뒤에서 6자리만 사용
     if (serial.length >= 6) {
       const result = serial.slice(-6);
-      if (isDebugTarget) {
-        console.log(`숫자 시리얼번호 (6자리 이상): 뒤에서 6자리 추출`);
-        console.log(`결과: "${result}"`);
-        console.log(`=== 디버깅 대상 시리얼번호 정규화 완료: ${serial} ===`);
-      }
+
       return result;
     } else {
       // 6자리 미만인 경우 앞에 0을 붙여서 6자리로 만듦
       const result = serial.padStart(6, '0');
-      if (isDebugTarget) {
-        console.log(`숫자 시리얼번호 (6자리 미만): 앞에 0 추가하여 6자리로 만듦`);
-        console.log(`결과: "${result}"`);
-        console.log(`=== 디버깅 대상 시리얼번호 정규화 완료: ${serial} ===`);
-      }
       return result;
     }
-  } else {
-    // 영문이 포함된 경우 앞의 0들을 제거하고 반환
-    const result = serial.replace(/^0+/, '');
-    if (isDebugTarget) {
-      console.log(`영문 포함 시리얼번호: 앞의 0들 제거`);
-      console.log(`결과: "${result}"`);
-      console.log(`=== 디버깅 대상 시리얼번호 정규화 완료: ${serial} ===`);
-    }
+      } else {
+      // 영문이 포함된 경우 앞의 0들을 제거하고 반환
+      const result = serial.replace(/^0+/, '');
     return result;
   }
 }
@@ -3798,18 +3777,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const systemModel = systemRow[13] || '';  // N열: 모델명
       const systemSerial = systemRow[15] || ''; // P열: 일련번호
       
-      // 디버깅 대상 시리얼번호인지 확인
+      // 디버깅 대상 시리얼번호인지 확인 (필요시에만 사용)
       const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(manualSerial) || DEBUG_SERIAL_NUMBERS.includes(systemSerial);
-      
-      if (isDebugTarget) {
-        console.log(`\n=== 디버깅 대상 모델명 비교 시작: key=${key} ===`);
-        console.log(`수기초 데이터 - AD열(29): "${manualRow[29] || ''}", AE열(30): "${manualRow[30] || ''}"`);
-        console.log(`수기초 시리얼번호: "${manualSerial}"`);
-        console.log(`폰클 시리얼번호: "${systemSerial}"`);
-        console.log(`폰클 전체 데이터 (N열, P열): N="${systemRow[13] || ''}", P="${systemRow[15] || ''}"`);
-        console.log(`폰클 데이터 길이: ${systemRow.length}`);
-        console.log(`수기초 데이터 길이: ${manualRow.length}`);
-      }
       
       // 모델명과 일련번호 정규화
       const normalizedManualModel = normalizeModelName(manualModel);
@@ -3817,32 +3786,18 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const normalizedManualSerial = normalizeSerialNumber(manualSerial);
       const normalizedSystemSerial = normalizeSerialNumber(systemSerial);
       
-      if (isDebugTarget) {
-        console.log(`\n=== 정규화 결과 ===`);
-        console.log(`수기초 - 모델: "${manualModel}" → "${normalizedManualModel}"`);
-        console.log(`수기초 - 일련번호: "${manualSerial}" → "${normalizedManualSerial}"`);
-        console.log(`폰클 - 모델: "${systemModel}" → "${normalizedSystemModel}"`);
-        console.log(`폰클 - 일련번호: "${systemSerial}" → "${normalizedSystemSerial}"`);
-      }
+
       
       // 모델명과 일련번호를 조합하여 비교
       const manualCombined = `${normalizedManualModel}(${normalizedManualSerial})`;
       const systemCombined = `${normalizedSystemModel}(${normalizedSystemSerial})`;
       
-      if (isDebugTarget) {
-        console.log(`\n=== 최종 비교 결과 ===`);
-        console.log(`수기초 조합: "${manualCombined}"`);
-        console.log(`폰클 조합: "${systemCombined}"`);
-        console.log(`일치 여부: ${manualCombined === systemCombined ? '일치' : '불일치'}`);
-      }
+
       
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
       if (manualCombined !== systemCombined && 
           (manualCombined || systemCombined)) {
-        if (isDebugTarget) {
-          console.log(`\n=== 차이점 기록 ===`);
-          console.log(`차이점 발견! 수기초: "${manualCombined}", 폰클: "${systemCombined}"`);
-        }
+
         differences.push({
           key,
           type: 'mismatch',
@@ -3855,16 +3810,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
-      } else {
-        if (isDebugTarget) {
-          console.log(`\n=== 결과 ===`);
-          console.log(`일치하거나 제외됨`);
-        }
-      }
-      
-      if (isDebugTarget) {
-        console.log(`=== 디버깅 대상 모델명 비교 완료: key=${key} ===\n`);
-      }
+
       return;
     }
     

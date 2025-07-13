@@ -811,6 +811,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
               <TableHead>
                 <TableRow>
                   <TableCell>가입번호</TableCell>
+                  <TableCell>중복</TableCell>
                   <TableCell>타입</TableCell>
                   <TableCell>수기초값</TableCell>
                   <TableCell>폰클데이터값</TableCell>
@@ -835,8 +836,26 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                   </TableRow>
                 ) : (
                   filteredData.map((item, index) => (
-                    <TableRow key={`${item.originalKey || item.key}-${index}`}>
+                    <TableRow 
+                      key={`${item.originalKey || item.key}-${index}`}
+                      sx={{ 
+                        backgroundColor: item.isDuplicate ? '#fff3e0' : 'inherit',
+                        '&:hover': {
+                          backgroundColor: item.isDuplicate ? '#ffe0b2' : 'inherit'
+                        }
+                      }}
+                    >
                       <TableCell>{item.originalKey || item.key}</TableCell>
+                      <TableCell>
+                        {item.isDuplicate && (
+                          <Chip
+                            label="가번중복"
+                            size="small"
+                            color="warning"
+                            sx={{ fontWeight: 'bold' }}
+                          />
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Chip
                           label={getDifferenceTypeLabel(item.type)}

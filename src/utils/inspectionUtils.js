@@ -174,6 +174,8 @@ export function getDifferenceTypeColor(type) {
       return '#f44336'; // 빨간색
     case 'mismatch':
       return '#2196f3'; // 파란색
+    case 'duplicate':
+      return '#9c27b0'; // 보라색
     default:
       return '#757575'; // 회색
   }
@@ -188,6 +190,8 @@ export function getDifferenceTypeLabel(type) {
       return '시스템만';
     case 'mismatch':
       return '값 불일치';
+    case 'duplicate':
+      return '가입번호중복';
     default:
       return '알 수 없음';
   }
@@ -251,6 +255,7 @@ export function calculateStatistics(differences) {
     manualOnly: differences.filter(d => d.type === 'manual_only').length,
     systemOnly: differences.filter(d => d.type === 'system_only').length,
     mismatched: differences.filter(d => d.type === 'mismatch').length,
+    duplicate: differences.filter(d => d.type === 'duplicate').length,
     completed: differences.filter(d => d.completed).length,
     pending: differences.filter(d => !d.completed).length
   };
