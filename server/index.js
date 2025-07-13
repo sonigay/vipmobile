@@ -404,6 +404,50 @@ async function getSheetValues(sheetName) {
   }
 }
 
+// VLOOKUP 함수 (폰클출고처데이터에서 POS코드로 업체명 찾기)
+function vlookupPosCodeToStoreName(posCode, storeData) {
+  if (!posCode || !storeData || storeData.length === 0) {
+    return null;
+  }
+  
+  const searchPosCode = posCode.toString().trim();
+  
+  // H열(POS코드)에서 검색하여 G열(업체명) 반환
+  for (let i = 1; i < storeData.length; i++) { // 헤더 제외하고 검색
+    const row = storeData[i];
+    if (row && row.length > 7) { // 최소 H열(7)은 있어야 함
+      const storePosCode = (row[7] || '').toString().trim(); // H열: POS코드
+      if (storePosCode === searchPosCode) {
+        return (row[6] || '').toString().trim(); // G열: 업체명
+      }
+    }
+  }
+  
+  return null;
+}
+
+// VLOOKUP 함수 (폰클출고처데이터에서 업체명으로 POS코드 찾기)
+function vlookupStoreNameToPosCode(storeName, storeData) {
+  if (!storeName || !storeData || storeData.length === 0) {
+    return null;
+  }
+  
+  const searchStoreName = storeName.toString().trim();
+  
+  // G열(업체명)에서 검색하여 H열(POS코드) 반환
+  for (let i = 1; i < storeData.length; i++) { // 헤더 제외하고 검색
+    const row = storeData[i];
+    if (row && row.length > 7) { // 최소 H열(7)은 있어야 함
+      const rowStoreName = (row[6] || '').toString().trim(); // G열: 업체명
+      if (rowStoreName === searchStoreName) {
+        return (row[7] || '').toString().trim(); // H열: POS코드
+      }
+    }
+  }
+  
+  return null;
+}
+
 // Discord로 로그 메시지 전송 함수
 async function sendLogToDiscord(embedData) {
   // 필요한 설정이 없으면 로깅 안함
@@ -3010,10 +3054,11 @@ app.get('/api/inspection-data', async (req, res) => {
     console.log('검수 데이터 처리 시작... (개인정보 보안 처리 포함)');
     const startTime = Date.now();
     
-    // 수기초와 폰클개통데이터 병렬 로드
-    const [manualValues, systemValues] = await Promise.all([
+    // 수기초, 폰클개통데이터, 폰클출고처데이터 병렬 로드
+    const [manualValues, systemValues, storeValues] = await Promise.all([
       getSheetValues(MANUAL_DATA_SHEET_NAME),
-      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME)
+      getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME),
+      getSheetValues(STORE_SHEET_NAME)
     ]);
     
     if (!manualValues || !systemValues) {
@@ -3175,10 +3220,10 @@ app.get('/api/inspection-data', async (req, res) => {
       
       // 수기초 데이터가 있는 경우
       if (manualItems.length > 0) {
-        manualItems.forEach(manualItem => {
+        for (const manualItem of manualItems) {
           // 폰클 데이터가 있는 경우 - 각 폰클 데이터와 비교
           if (systemItems.length > 0) {
-            systemItems.forEach(systemItem => {
+            for (const systemItem of systemItems) {
               // 중복 타입 결정
               const duplicateType = getDuplicateType(isManualDuplicate, isSystemDuplicate);
               
@@ -3201,7 +3246,7 @@ app.get('/api/inspection-data', async (req, res) => {
               }
               
               // 두 데이터 비교
-              const rowDifferences = compareDynamicColumns(manualItem.row, systemItem.row, key, field);
+              const rowDifferences = compareDynamicColumns(manualItem.row, systemItem.row, key, field, storeValues);
               
               rowDifferences.forEach(diff => {
                 differences.push({
@@ -3214,7 +3259,7 @@ app.get('/api/inspection-data', async (req, res) => {
                   duplicateInfo: duplicateInfo
                 });
               });
-            });
+            }
           } else {
             // 수기초에만 있는 데이터
             if (!field) {
@@ -3246,7 +3291,7 @@ app.get('/api/inspection-data', async (req, res) => {
               });
             }
           }
-        });
+        }
       } else {
         // 폰클에만 있는 데이터
         if (!field) {
@@ -3760,6 +3805,11 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '개통유형', key: 'activation_type', column: 10 }, // K열
     systemField: { name: '개통유형', key: 'activation_type', column: 11 }, // L열
     description: '개통유형 및 C타겟차감대상 비교 (가입구분+이전사업자+기변타겟구분 정규화)'
+  },
+  {
+    manualField: { name: '실판매POS', key: 'sales_pos', column: 7 }, // H열
+    systemField: { name: '실판매POS', key: 'sales_pos', column: 6 }, // G열
+    description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)'
   }
 ];
 
@@ -3911,8 +3961,47 @@ function normalizeActivationType(manualRow, systemRow) {
   return { manualType, systemType };
 }
 
+// 실판매POS 정규화 함수
+function normalizeSalesPos(manualRow, systemRow, storeData = null) {
+  // 수기초 데이터 정규화 (H열)
+  let manualPos = '';
+  if (manualRow.length > 7) { // 최소 H열(7)은 있어야 함
+    const salesPos = (manualRow[7] || '').toString().trim(); // H열: 실판매POS
+    const strategyOnline = (manualRow[8] || '').toString().trim(); // I열: 전략온라인 체크
+    
+    // 전략온라인 제외 조건
+    if (strategyOnline && strategyOnline.includes('전략온라인')) {
+      return { manualPos: '', systemPos: '' }; // 검수 대상에서 제외
+    }
+    
+    // 수기초 정규화: H열 & VLOOKUP 결과
+    if (salesPos && storeData) {
+      const vlookupResult = vlookupPosCodeToStoreName(salesPos, storeData);
+      manualPos = vlookupResult || salesPos; // VLOOKUP 결과가 있으면 사용, 없으면 원본값
+    } else {
+      manualPos = salesPos;
+    }
+  }
+  
+  // 폰클 데이터 정규화 (G열)
+  let systemPos = '';
+  if (systemRow.length > 6) { // 최소 G열(6)은 있어야 함
+    const storeCode = (systemRow[6] || '').toString().trim(); // G열: 출고처
+    
+    // 폰클 정규화: VLOOKUP 결과 & G열
+    if (storeCode && storeData) {
+      const vlookupResult = vlookupStoreNameToPosCode(storeCode, storeData);
+      systemPos = vlookupResult || storeCode; // VLOOKUP 결과가 있으면 사용, 없으면 원본값
+    } else {
+      systemPos = storeCode;
+    }
+  }
+  
+  return { manualPos, systemPos };
+}
+
 // 동적 컬럼 비교 함수
-function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
+function compareDynamicColumns(manualRow, systemRow, key, targetField = null, storeData = null) {
   const differences = [];
   
   // 특정 필드만 비교하거나 전체 필드 비교
@@ -4037,6 +4126,41 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           correctValue: manualType || '정규화 불가',
           incorrectValue: systemType || '정규화 불가',
           description: '개통유형 및 C타겟차감대상 비교 (가입구분+이전사업자+기변타겟구분 정규화)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 실판매POS 비교 로직
+    if (manualField.key === 'sales_pos') {
+      // 배열 범위 체크 (H=7, I=8, G=6)
+      if (manualRow.length <= 8 || systemRow.length <= 6) {
+        return;
+      }
+      
+      // 실판매POS 정규화
+      const { manualPos, systemPos } = normalizeSalesPos(manualRow, systemRow, storeData);
+      
+      // 전략온라인 제외 조건으로 인해 빈 값이 반환된 경우 비교 제외
+      if (!manualPos && !systemPos) {
+        return;
+      }
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualPos !== systemPos && 
+          (manualPos || systemPos)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '실판매POS',
+          fieldKey: 'sales_pos',
+          correctValue: manualPos || '정규화 불가',
+          incorrectValue: systemPos || '정규화 불가',
+          description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
