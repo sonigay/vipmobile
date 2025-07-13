@@ -206,6 +206,7 @@ export function filterDifferences(differences, filters) {
     const term = filters.searchTerm.toLowerCase();
     filtered = filtered.filter(diff => 
       (diff.key && diff.key.toLowerCase().includes(term)) ||
+      (diff.originalKey && diff.originalKey.toLowerCase().includes(term)) ||
       (diff.field && diff.field.toLowerCase().includes(term)) ||
       (diff.correctValue && diff.correctValue.toLowerCase().includes(term)) ||
       (diff.incorrectValue && diff.incorrectValue.toLowerCase().includes(term)) ||
