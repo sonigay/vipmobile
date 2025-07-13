@@ -799,21 +799,6 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>타입</InputLabel>
-                <Select
-                  value={filters.type}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
-                  label="타입"
-                >
-                  <MenuItem value="all">전체</MenuItem>
-                  <MenuItem value="manual_only">수기초만</MenuItem>
-                  <MenuItem value="system_only">시스템만</MenuItem>
-                  <MenuItem value="mismatch">값 불일치</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth size="small">
                 <InputLabel>중복 타입</InputLabel>
                 <Select
                   value={filters.duplicateType}
@@ -825,6 +810,21 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                   <MenuItem value="manual_duplicate">수기초중복</MenuItem>
                   <MenuItem value="system_duplicate">폰클중복</MenuItem>
                   <MenuItem value="both_duplicate">양쪽중복</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>타입</InputLabel>
+                <Select
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange('type', e.target.value)}
+                  label="타입"
+                >
+                  <MenuItem value="all">전체</MenuItem>
+                  <MenuItem value="manual_only">수기초만</MenuItem>
+                  <MenuItem value="system_only">시스템만</MenuItem>
+                  <MenuItem value="mismatch">값 불일치</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

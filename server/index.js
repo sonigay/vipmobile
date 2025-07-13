@@ -3101,25 +3101,25 @@ app.get('/api/inspection-data', async (req, res) => {
         const otherRow = duplicateRows[i];
         const rowDifferences = [];
         
+        // 입고처 비교 (E열: 4번째 컬럼)
+        if (currentRow[4] !== otherRow[4]) {
+          rowDifferences.push(`${currentRow[4] || '없음'} vs ${otherRow[4] || '없음'}`);
+        }
+        
         // 모델명 비교 (N열: 13번째 컬럼)
         if (currentRow[13] !== otherRow[13]) {
-          rowDifferences.push(`모델명: ${currentRow[13] || '없음'} vs ${otherRow[13] || '없음'}`);
+          rowDifferences.push(`${currentRow[13] || '모델명없음'} vs ${otherRow[13] || '모델명없음'}`);
         }
         
         // 개통유형 비교 (L열: 11번째 컬럼)
         if (currentRow[11] !== otherRow[11]) {
-          rowDifferences.push(`개통유형: ${currentRow[11] || '없음'} vs ${otherRow[11] || '없음'}`);
-        }
-        
-        // 입고처 비교 (E열: 4번째 컬럼)
-        if (currentRow[4] !== otherRow[4]) {
-          rowDifferences.push(`입고처: ${currentRow[4] || '없음'} vs ${otherRow[4] || '없음'}`);
+          rowDifferences.push(`${currentRow[11] || '개통유형없음'} vs ${otherRow[11] || '개통유형없음'}`);
         }
         
         if (rowDifferences.length > 0) {
-          differences.push(`다른행${i + 1}: ${rowDifferences.join(', ')}`);
+          differences.push(`${rowDifferences.join(' ')}`);
         } else {
-          differences.push(`다른행${i + 1}: 완전동일`);
+          differences.push(`완전동일`);
         }
       }
       
@@ -3151,6 +3151,7 @@ app.get('/api/inspection-data', async (req, res) => {
         const key = row[0].toString().trim();
         
         if (manualMap.has(key)) {
+          // 이미 있는 키라면 중복 그룹에 추가
           if (!manualDuplicateGroups.has(key)) {
             manualDuplicateGroups.set(key, [manualMap.get(key)]);
           }
@@ -3177,6 +3178,7 @@ app.get('/api/inspection-data', async (req, res) => {
         const key = row[66].toString().trim();
         
         if (systemMap.has(key)) {
+          // 이미 있는 키라면 중복 그룹에 추가
           if (!systemDuplicateGroups.has(key)) {
             systemDuplicateGroups.set(key, [systemMap.get(key)]);
           }
