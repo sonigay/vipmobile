@@ -3704,8 +3704,6 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
     ? COLUMN_MATCHING_CONFIG.filter(config => config.manualField.key === targetField)
     : COLUMN_MATCHING_CONFIG;
 
-  console.log(`compareDynamicColumns 호출: targetField=${targetField}, mappingsToCompare=${mappingsToCompare.length}개`);
-
   mappingsToCompare.forEach(config => {
     const { manualField, systemField, regex, description } = config;
     
@@ -3756,7 +3754,6 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       // AN열 최종영업정책이 "BLANK"인 경우 비교 제외
       const finalPolicy = manualRow[39] || ''; // AN열: 최종영업정책
       if (finalPolicy.toString().trim().toUpperCase() === 'BLANK') {
-        console.log(`BLANK 정책 제외: key=${key}, finalPolicy=${finalPolicy}`);
         return;
       }
       
