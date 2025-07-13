@@ -287,6 +287,7 @@ const UPDATE_SHEET_NAME = '어플업데이트';  // 업데이트 내용 관리 �
 const MANUAL_DATA_SHEET_NAME = '수기초';  // 수기초 데이터
 const INSPECTION_RESULT_SHEET_NAME = '검수결과';  // 검수 결과 데이터
 const NORMALIZATION_HISTORY_SHEET_NAME = '정규화이력';  // 정규화 이력 데이터
+const INSPECTION_MEMO_SHEET_NAME = '여직원검수데이터메모';  // 여직원 검수 데이터 메모 시트 추가
 
 // Kakao geocoding 함수 (개선된 버전)
 async function geocodeAddressWithKakao(address, retryCount = 0) {
@@ -447,6 +448,165 @@ function vlookupStoreNameToPosCode(storeName, storeData) {
   }
   
   return null;
+}
+
+// 여직원검수데이터메모 시트 관리 함수들
+async function loadInspectionMemoData() {
+  try {
+    const memoData = await getSheetValues(INSPECTION_MEMO_SHEET_NAME);
+    if (!memoData || memoData.length <= 1) {
+      return { completionStatus: new Map(), notes: new Map() };
+    }
+    
+    const completionStatus = new Map();
+    const notes = new Map();
+    
+    // 헤더 제외하고 데이터 처리
+    for (let i = 1; i < memoData.length; i++) {
+      const row = memoData[i];
+      if (row && row.length >= 6) {
+        const subscriptionNumber = (row[0] || '').toString().trim(); // A열: 가입번호
+        const userId = (row[1] || '').toString().trim(); // B열: 사용자ID
+        const isCompleted = (row[2] || '').toString().trim() === '완료'; // C열: 완료상태
+        const memoContent = (row[3] || '').toString().trim(); // D열: 메모내용
+        const updateTime = (row[4] || '').toString().trim(); // E열: 업데이트시간
+        const fieldType = (row[5] || '').toString().trim(); // F열: 필드구분
+        
+        if (subscriptionNumber && userId) {
+          // 완료상태 저장
+          if (isCompleted) {
+            completionStatus.set(subscriptionNumber, {
+              userId,
+              isCompleted: true,
+              timestamp: updateTime || new Date().toISOString()
+            });
+          }
+          
+          // 메모내용 저장
+          if (memoContent) {
+            notes.set(subscriptionNumber, {
+              userId,
+              notes: memoContent,
+              timestamp: updateTime || new Date().toISOString()
+            });
+          }
+        }
+      }
+    }
+    
+    return { completionStatus, notes };
+  } catch (error) {
+    console.error('여직원검수데이터메모 시트 로드 실패:', error);
+    return { completionStatus: new Map(), notes: new Map() };
+  }
+}
+
+async function saveInspectionMemoData(completionStatus, notes) {
+  try {
+    // 헤더 행
+    const headerRow = ['가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분'];
+    
+    // 데이터 행들 생성
+    const dataRows = [];
+    
+    // 완료상태 데이터
+    for (const [subscriptionNumber, status] of completionStatus) {
+      if (status.isCompleted) {
+        dataRows.push([
+          subscriptionNumber,
+          status.userId,
+          '완료',
+          '', // 메모는 별도로 처리
+          status.timestamp,
+          '전체'
+        ]);
+      }
+    }
+    
+    // 메모내용 데이터
+    for (const [subscriptionNumber, noteData] of notes) {
+      const existingRowIndex = dataRows.findIndex(row => row[0] === subscriptionNumber);
+      if (existingRowIndex >= 0) {
+        // 기존 행에 메모 추가
+        dataRows[existingRowIndex][3] = noteData.notes;
+        dataRows[existingRowIndex][4] = noteData.timestamp;
+      } else {
+        // 새 행 생성
+        dataRows.push([
+          subscriptionNumber,
+          noteData.userId,
+          '대기',
+          noteData.notes,
+          noteData.timestamp,
+          '전체'
+        ]);
+      }
+    }
+    
+    // 시트 전체 삭제 후 새 데이터로 업데이트
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: INSPECTION_MEMO_SHEET_NAME
+    });
+    
+    if (dataRows.length > 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [headerRow, ...dataRows]
+        }
+      });
+    }
+    
+    console.log(`여직원검수데이터메모 시트 저장 완료: ${dataRows.length}개 항목`);
+  } catch (error) {
+    console.error('여직원검수데이터메모 시트 저장 실패:', error);
+  }
+}
+
+async function cleanupInspectionMemoData(currentInspectionKeys) {
+  try {
+    const memoData = await getSheetValues(INSPECTION_MEMO_SHEET_NAME);
+    if (!memoData || memoData.length <= 1) {
+      return;
+    }
+    
+    // 현재 검수 대상에 있는 가입번호만 필터링
+    const validRows = [memoData[0]]; // 헤더 유지
+    
+    for (let i = 1; i < memoData.length; i++) {
+      const row = memoData[i];
+      if (row && row.length > 0) {
+        const subscriptionNumber = (row[0] || '').toString().trim();
+        if (currentInspectionKeys.has(subscriptionNumber)) {
+          validRows.push(row);
+        }
+      }
+    }
+    
+    // 시트 업데이트 (유효한 데이터만 유지)
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: INSPECTION_MEMO_SHEET_NAME
+    });
+    
+    if (validRows.length > 1) { // 헤더 외에 데이터가 있는 경우
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: validRows
+        }
+      });
+    }
+    
+    console.log(`여직원검수데이터메모 시트 정리 완료: ${validRows.length - 1}개 항목 유지`);
+  } catch (error) {
+    console.error('여직원검수데이터메모 시트 정리 실패:', error);
+  }
 }
 
 // 요금제 VLOOKUP 함수들
@@ -2980,9 +3140,27 @@ app.post('/api/inspection/columns', async (req, res) => {
   }
 });
 
-// 수정완료 상태를 메모리에서 관리 (서버 재시작시 초기화)
-const modificationCompletionStatus = new Map(); // itemId -> {userId, isCompleted, timestamp}
-const modificationNotes = new Map(); // itemId -> {userId, notes, timestamp}
+// 수정완료 상태를 시트에서 관리 (서버 재시작시에도 유지)
+let modificationCompletionStatus = new Map(); // itemId -> {userId, isCompleted, timestamp}
+let modificationNotes = new Map(); // itemId -> {userId, notes, timestamp}
+
+// 서버 시작 시 시트에서 데이터 로드
+async function initializeInspectionMemoData() {
+  try {
+    console.log('여직원검수데이터메모 시트에서 데이터 로드 중...');
+    const { completionStatus, notes } = await loadInspectionMemoData();
+    modificationCompletionStatus = completionStatus;
+    modificationNotes = notes;
+    console.log(`여직원검수데이터메모 로드 완료: 완료상태 ${completionStatus.size}개, 메모 ${notes.size}개`);
+  } catch (error) {
+    console.error('여직원검수데이터메모 초기화 실패:', error);
+    modificationCompletionStatus = new Map();
+    modificationNotes = new Map();
+  }
+}
+
+// 서버 시작 시 초기화 실행
+initializeInspectionMemoData();
 
 // 수정완료 상태 조회 API
 app.get('/api/inspection/modification-completion-status', async (req, res) => {
@@ -3067,11 +3245,18 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
     }
 
     // 메모리에 상태 저장
-    modificationCompletionStatus.set(itemId, {
-      userId,
-      isCompleted,
-      timestamp: new Date().toISOString()
-    });
+    if (isCompleted) {
+      modificationCompletionStatus.set(itemId, {
+        userId,
+        isCompleted,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      modificationCompletionStatus.delete(itemId);
+    }
+
+    // 시트에 저장
+    await saveInspectionMemoData(modificationCompletionStatus, modificationNotes);
 
     console.log(`수정완료 상태 업데이트: ${itemId} - ${userId} - ${isCompleted ? '완료' : '대기'}`);
 
@@ -3102,11 +3287,18 @@ app.post('/api/inspection/modification-notes', async (req, res) => {
     }
 
     // 메모리에 내용 저장
-    modificationNotes.set(itemId, {
-      userId,
-      notes: notes || '',
-      timestamp: new Date().toISOString()
-    });
+    if (notes && notes.trim()) {
+      modificationNotes.set(itemId, {
+        userId,
+        notes: notes.trim(),
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      modificationNotes.delete(itemId);
+    }
+
+    // 시트에 저장
+    await saveInspectionMemoData(modificationCompletionStatus, modificationNotes);
 
     console.log(`수정완료 내용 업데이트: ${itemId} - ${userId} - ${notes}`);
 
@@ -3481,6 +3673,19 @@ app.get('/api/inspection-data', async (req, res) => {
 
     // 개인정보 보안 처리: 마스킹 및 해시화
     const secureDifferences = securityUtils.createSafeDataStructure(filteredDifferences);
+
+    // 현재 검수 대상 가입번호 목록 생성 (자동 정리용)
+    const currentInspectionKeys = new Set();
+    secureDifferences.forEach(diff => {
+      if (diff.key) {
+        currentInspectionKeys.add(diff.key);
+      }
+    });
+
+    // 여직원검수데이터메모 시트 자동 정리 (백그라운드에서 실행)
+    cleanupInspectionMemoData(currentInspectionKeys).catch(error => {
+      console.error('여직원검수데이터메모 시트 정리 실패:', error);
+    });
 
     const result = {
       differences: secureDifferences,
