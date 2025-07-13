@@ -2074,7 +2074,7 @@ process.on('SIGINT', async () => {
     try {
       // 봇 준비 상태 확인
       if (!discordBot.isReady()) {
-        console.log('Discord 봇이 아직 준비되지 않았습니다. 5초 대기 후 재시도...');
+        // console.log('Discord 봇이 아직 준비되지 않았습니다. 5초 대기 후 재시도...');
         await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
       }
       
@@ -2161,8 +2161,8 @@ app.get('/api/assignment/history', async (req, res) => {
 });
 
 app.post('/api/assignment/complete', async (req, res) => {
-  console.log('=== 배정 완료 API 호출됨 ===');
-  console.log('요청 본문:', JSON.stringify(req.body, null, 2));
+  // console.log('=== 배정 완료 API 호출됨 ===');
+  // console.log('요청 본문:', JSON.stringify(req.body, null, 2));
   
   try {
     const {
@@ -2195,8 +2195,8 @@ app.post('/api/assignment/complete', async (req, res) => {
       status: 'completed'
     };
     
-    console.log('새로운 배정 완료:', assignment);
-    console.log('배정 대상자:', { target_offices, target_departments, target_agents });
+    // console.log('새로운 배정 완료:', assignment);
+    // console.log('배정 대상자:', { target_offices, target_departments, target_agents });
     
     // 배정 대상자에게만 알림 전송 (실제 배정된 수량이 있는 경우에만)
     if (actualQuantity > 0) {
@@ -2208,17 +2208,17 @@ app.post('/api/assignment/complete', async (req, res) => {
         timestamp: new Date()
       };
       
-      console.log('알림 전송 시작:', {
-        notification,
-        targetOffices: target_offices,
-        targetDepartments: target_departments,
-        targetAgents: target_agents
-      });
+      // console.log('알림 전송 시작:', {
+      //   notification,
+      //   targetOffices: target_offices,
+      //   targetDepartments: target_departments,
+      //   targetAgents: target_agents
+      // });
       
       // 대상자 필터링하여 알림 전송
       await sendNotificationToTargetAgents(notification, target_offices, target_departments, target_agents);
     } else {
-      console.log('배정된 수량이 0이므로 알림을 전송하지 않습니다.');
+      // console.log('배정된 수량이 0이므로 알림을 전송하지 않습니다.');
     }
     
     res.json({ success: true, assignment });

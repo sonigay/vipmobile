@@ -7,11 +7,11 @@ export const extractAvailableModels = (data) => {
   const modelColors = new Map(); // 모델별 사용 가능한 색상
 
   if (!data || !Array.isArray(data)) {
-    console.log('extractAvailableModels: 데이터가 없거나 배열이 아님');
+    // console.log('extractAvailableModels: 데이터가 없거나 배열이 아님');
     return { models: [], colors: [], modelColors: new Map() };
   }
 
-  console.log('extractAvailableModels: 데이터 처리 시작, 매장 수:', data.length);
+  // console.log('extractAvailableModels: 데이터 처리 시작, 매장 수:', data.length);
 
   data.forEach((store, index) => {
     if (store.inventory) {
@@ -40,7 +40,7 @@ export const extractAvailableModels = (data) => {
         }
       });
     } else {
-      console.log(`매장 ${index + 1} (${store.name || store.id}): inventory 없음`);
+      // console.log(`매장 ${index + 1} (${store.name || store.id}): inventory 없음`);
     }
   });
 
@@ -55,7 +55,7 @@ export const extractAvailableModels = (data) => {
     )
   };
 
-  console.log('extractAvailableModels 결과:', result);
+  // console.log('extractAvailableModels 결과:', result);
   return result;
 };
 

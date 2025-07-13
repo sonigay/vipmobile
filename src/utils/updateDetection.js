@@ -58,15 +58,15 @@ export const hasNewDeployment = async () => {
     const currentVersion = await getCurrentBuildVersion();
     const storedVersion = getStoredBuildVersion();
     
-    console.log('배포 버전 체크:', { currentVersion, storedVersion });
+    // console.log('배포 버전 체크:', { currentVersion, storedVersion });
     
     // 버전이 다르고, 저장된 버전이 '0'이 아닌 경우에만 새로운 배포로 간주
     const hasNew = currentVersion !== storedVersion && storedVersion !== '0';
     
     if (hasNew) {
-      console.log('새로운 배포 감지됨');
+      // console.log('새로운 배포 감지됨');
     } else {
-      console.log('새로운 배포 없음 또는 초기 로드');
+      // console.log('새로운 배포 없음 또는 초기 로드');
     }
     
     return hasNew;
@@ -79,7 +79,7 @@ export const hasNewDeployment = async () => {
 // 자동 로그아웃 실행
 export const performAutoLogout = async () => {
   try {
-    console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+    // console.log('새로운 배포 감지 - 자동 로그아웃 실행');
     
     // 현재 빌드 버전 저장 (로그아웃 전에 저장)
     const currentVersion = await getCurrentBuildVersion();
@@ -93,7 +93,7 @@ export const performAutoLogout = async () => {
     // localStorage.removeItem('lastUpdateVersion'); // 업데이트 버전 정보 보존
     // localStorage.removeItem('hideUpdateUntilDate'); // 업데이트 숨김 설정 보존
     
-    console.log('자동 로그아웃 완료 (업데이트 버전 정보 보존)');
+    // console.log('자동 로그아웃 완료 (업데이트 버전 정보 보존)');
     return true;
   } catch (error) {
     console.error('자동 로그아웃 실패:', error);
@@ -141,7 +141,7 @@ export const checkServiceWorkerUpdate = () => {
       registrations.forEach(registration => {
         if (registration.waiting) {
           hasUpdate = true;
-          console.log('Service Worker 업데이트 대기 중');
+          // console.log('Service Worker 업데이트 대기 중');
         }
       });
       

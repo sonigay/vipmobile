@@ -3,7 +3,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 // 검수 데이터 가져오기
 export async function fetchInspectionData(view = 'personal', userId = null, field = null) {
   try {
-    console.log('검수 데이터 요청 중...', { view, userId, field });
+    // console.log('검수 데이터 요청 중...', { view, userId, field });
     const startTime = Date.now();
     
     const params = new URLSearchParams({ view });
@@ -23,7 +23,7 @@ export async function fetchInspectionData(view = 'personal', userId = null, fiel
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
-    console.log(`검수 데이터 요청 완료: ${fetchTime}ms, 차이점 수: ${data.total}개`);
+    // console.log(`검수 데이터 요청 완료: ${fetchTime}ms, 차이점 수: ${data.total}개`);
     
     return { success: true, data };
   } catch (error) {
@@ -35,7 +35,7 @@ export async function fetchInspectionData(view = 'personal', userId = null, fiel
 // 검수 완료 상태 업데이트
 export async function updateInspectionCompletion(itemId, userId, status = '완료') {
   try {
-    console.log('검수 완료 상태 업데이트 중...', { itemId, userId, status });
+    // console.log('검수 완료 상태 업데이트 중...', { itemId, userId, status });
     
     const response = await fetch(`${API_URL}/api/inspection/complete`, {
       method: 'POST',
@@ -54,7 +54,7 @@ export async function updateInspectionCompletion(itemId, userId, status = '완�
     }
     
     const result = await response.json();
-    console.log('검수 완료 상태 업데이트 성공:', result);
+    // console.log('검수 완료 상태 업데이트 성공:', result);
     
     return { success: true, data: result };
   } catch (error) {
@@ -66,7 +66,7 @@ export async function updateInspectionCompletion(itemId, userId, status = '완�
 // 정규화 데이터 저장
 export async function saveNormalizationData(itemId, userId, originalValue, normalizedValue, field) {
   try {
-    console.log('정규화 데이터 저장 중...', { itemId, userId, field, normalizedValue });
+    // console.log('정규화 데이터 저장 중...', { itemId, userId, field, normalizedValue });
     
     const response = await fetch(`${API_URL}/api/inspection/normalize`, {
       method: 'POST',
@@ -87,7 +87,7 @@ export async function saveNormalizationData(itemId, userId, originalValue, norma
     }
     
     const result = await response.json();
-    console.log('정규화 데이터 저장 성공:', result);
+    // console.log('정규화 데이터 저장 성공:', result);
     
     return { success: true, data: result };
   } catch (error) {
@@ -99,7 +99,7 @@ export async function saveNormalizationData(itemId, userId, originalValue, norma
 // 폰클개통데이터 수정
 export async function updateSystemData(itemId, userId, field, correctValue, systemRow) {
   try {
-    console.log('폰클개통데이터 수정 중...', { itemId, userId, field, correctValue, systemRow });
+    // console.log('폰클개통데이터 수정 중...', { itemId, userId, field, correctValue, systemRow });
     
     const response = await fetch(`${API_URL}/api/inspection/update-system-data`, {
       method: 'POST',
@@ -120,7 +120,7 @@ export async function updateSystemData(itemId, userId, field, correctValue, syst
     }
     
     const result = await response.json();
-    console.log('폰클개통데이터 수정 성공:', result);
+    // console.log('폰클개통데이터 수정 성공:', result);
     
     return { success: true, data: result };
   } catch (error) {
@@ -132,7 +132,7 @@ export async function updateSystemData(itemId, userId, field, correctValue, syst
 // 필드별 고유값 조회
 export async function fetchFieldValues(field) {
   try {
-    console.log('필드값 조회 중...', { field });
+    // console.log('필드값 조회 중...', { field });
     
     const response = await fetch(`${API_URL}/api/inspection/field-values?field=${encodeURIComponent(field)}`);
     
@@ -141,7 +141,7 @@ export async function fetchFieldValues(field) {
     }
     
     const result = await response.json();
-    console.log('필드값 조회 성공:', result);
+    // console.log('필드값 조회 성공:', result);
     
     return { success: true, data: result };
   } catch (error) {

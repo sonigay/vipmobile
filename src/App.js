@@ -1166,7 +1166,7 @@ function App() {
   const processLogin = (store) => {
     // 검수모드인지 확인
     if (store.isInspection) {
-      console.log('로그인: 검수모드');
+      // console.log('로그인: 검수모드');
       setIsInspectionMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1187,7 +1187,7 @@ function App() {
     }
     // 장표모드인지 확인
     else if (store.isChart) {
-      console.log('로그인: 장표모드');
+      // console.log('로그인: 장표모드');
       setIsChartMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1208,7 +1208,7 @@ function App() {
     }
     // 정책모드인지 확인
     else if (store.isPolicy) {
-      console.log('로그인: 정책모드');
+      // console.log('로그인: 정책모드');
       setIsPolicyMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1229,7 +1229,7 @@ function App() {
     }
     // 정산모드인지 확인
     else if (store.isSettlement) {
-      console.log('로그인: 정산모드');
+      // console.log('로그인: 정산모드');
       setIsSettlementMode(true);
       setIsInventoryMode(false);
       setIsAgentMode(false);
@@ -1238,7 +1238,7 @@ function App() {
       setIsPolicyMode(false);
       
       setSettlementUserName(store.manager || '정산관리자');
-      console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
+              // console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1254,7 +1254,7 @@ function App() {
     }
     // 재고모드인지 확인
     else if (store.isInventory) {
-      console.log('로그인: 재고모드');
+      // console.log('로그인: 재고모드');
       setIsInventoryMode(true);
       setIsAgentMode(false);
       setIsSettlementMode(false);
@@ -1263,7 +1263,7 @@ function App() {
       setIsPolicyMode(false);
       
       setInventoryUserName(store.manager || '재고관리자');
-      console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
+              // console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
       
       // 재고모드에서는 서울시청을 중심으로 전체 지역 보기
       setUserLocation({
@@ -1286,7 +1286,7 @@ function App() {
     }
     // 관리자 모드인지 확인
     else if (store.isAgent) {
-      console.log('로그인: 관리자 모드');
+      // console.log('로그인: 관리자 모드');
       setIsAgentMode(true);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -1323,7 +1323,7 @@ function App() {
       // 관리자 모드일 때 개통실적 데이터 로드
       loadActivationData();
     } else {
-      console.log('로그인: 일반 매장 모드');
+      // console.log('로그인: 일반 매장 모드');
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -1401,15 +1401,15 @@ function App() {
 
   // 모드 전환 핸들러 (이미 로그인된 상태에서)
   const handleModeSwitch = (selectedMode) => {
-    console.log('handleModeSwitch 호출됨:', selectedMode);
-    console.log('현재 loggedInStore:', loggedInStore);
+      // console.log('handleModeSwitch 호출됨:', selectedMode);
+  // console.log('현재 loggedInStore:', loggedInStore);
     
     if (!loggedInStore) {
-      console.log('loggedInStore가 없어서 모드 전환 불가');
-      return;
-    }
-    
-    console.log('모드 전환 시작:', selectedMode);
+          // console.log('loggedInStore가 없어서 모드 전환 불가');
+    return;
+  }
+
+  // console.log('모드 전환 시작:', selectedMode);
     
     // 모든 모드 상태 초기화
     setIsAgentMode(false);
@@ -1422,31 +1422,31 @@ function App() {
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
       case 'agent':
-        console.log('관리자 모드로 전환');
+        // console.log('관리자 모드로 전환');
         setIsAgentMode(true);
         break;
       case 'inventory':
-        console.log('재고 모드로 전환');
+        // console.log('재고 모드로 전환');
         setIsInventoryMode(true);
         break;
       case 'settlement':
-        console.log('정산 모드로 전환');
+        // console.log('정산 모드로 전환');
         setIsSettlementMode(true);
         break;
       case 'inspection':
-        console.log('검수 모드로 전환');
+        // console.log('검수 모드로 전환');
         setIsInspectionMode(true);
         break;
       case 'chart':
-        console.log('장표 모드로 전환');
+        // console.log('장표 모드로 전환');
         setIsChartMode(true);
         break;
       case 'policy':
-        console.log('정책 모드로 전환');
+        // console.log('정책 모드로 전환');
         setIsPolicyMode(true);
         break;
       default:
-        console.log('알 수 없는 모드:', selectedMode);
+        // console.log('알 수 없는 모드:', selectedMode);
         break;
     }
     
@@ -1454,7 +1454,7 @@ function App() {
     setShowModeSelection(false);
     setModeSelectionRequired(false);
     
-    console.log('모드 전환 완료');
+    // console.log('모드 전환 완료');
   };
 
   const handleLogout = () => {
@@ -1491,14 +1491,14 @@ function App() {
   };
 
   const handleModelSelect = useCallback((model) => {
-    console.log('선택된 모델 변경:', model);
+    // console.log('선택된 모델 변경:', model);
     setSelectedModel(model);
     setSelectedColor('');  // 색상 선택 초기화
     setFilteredStores([]); // 검색 결과 초기화
     
     // 모델 검색 로그 전송
     if (loggedInStore) {
-      console.log('모델 선택 로그 전송 시작:', model);
+      // console.log('모델 선택 로그 전송 시작:', model);
       logActivity({
         userId: loggedInStore.id,
         userType: isAgentMode ? 'agent' : 'store',
@@ -1516,13 +1516,13 @@ function App() {
   }, [loadData, loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleColorSelect = useCallback((color) => {
-    console.log('선택된 색상 변경:', color);
+    // console.log('선택된 색상 변경:', color);
     setSelectedColor(color);
     setFilteredStores([]); // 검색 결과 초기화
     
     // 색상 검색 로그 전송
     if (loggedInStore && selectedModel) {
-      console.log('색상 선택 로그 전송 시작:', color, '모델:', selectedModel);
+      // console.log('색상 선택 로그 전송 시작:', color, '모델:', selectedModel);
       logActivity({
         userId: loggedInStore.id,
         userType: isAgentMode ? 'agent' : 'store',
@@ -1541,12 +1541,12 @@ function App() {
   }, [loadData, loggedInStore, selectedModel, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleRadiusSelect = useCallback((radius) => {
-    console.log('선택된 반경 변경:', radius);
+    // console.log('선택된 반경 변경:', radius);
     setSelectedRadius(radius);
   }, []);
 
   const handleStoreSelect = useCallback((store) => {
-    console.log('선택된 매장:', store);
+    // console.log('선택된 매장:', store);
     setSelectedStore(store);
   }, []);
 
@@ -1568,15 +1568,15 @@ function App() {
       return storeName.includes(searchTerm) || managerName.includes(searchTerm);
     });
     
-    console.log(`검색어: "${query}" - 검색 결과: ${filtered.length}개`);
-    console.log('검색된 매장들:', filtered.map(s => ({ name: s.name, manager: s.manager })));
+    // console.log(`검색어: "${query}" - 검색 결과: ${filtered.length}개`);
+    // console.log('검색된 매장들:', filtered.map(s => ({ name: s.name, manager: s.manager })));
     
     setSearchResults(filtered);
   }, [data?.stores]);
 
   // 검색된 매장으로 지도 이동
   const handleSearchResultSelect = useCallback((store) => {
-    console.log('검색 결과 선택:', store);
+    // console.log('검색 결과 선택:', store);
     setSelectedStore(store);
     setRequestedStore(store); // 요청점검색으로 선택된 매장 저장
     setSearchQuery('');
@@ -1587,14 +1587,14 @@ function App() {
       const lat = parseFloat(store.latitude);
       const lng = parseFloat(store.longitude);
       
-      console.log('지도 이동 좌표:', lat, lng);
+      // console.log('지도 이동 좌표:', lat, lng);
       
       // 먼저 userLocation 변경
       setUserLocation({ lat, lng });
       
       // 강제 확대 실행 (약간의 지연 후)
       setTimeout(() => {
-        console.log('강제 확대 상태 설정');
+        // console.log('강제 확대 상태 설정');
         setForceZoomToStore({ lat, lng });
       }, 100);
     }
@@ -1639,7 +1639,7 @@ function App() {
   // 재고 확인 뷰 변경 핸들러
   const handleViewChange = useCallback((view) => {
     setCurrentView(view);
-    console.log(`재고 확인 뷰 변경: ${view}`);
+    // console.log(`재고 확인 뷰 변경: ${view}`);
     
     // 로컬 스토리지에 현재 뷰 상태 저장
     const savedLoginState = localStorage.getItem('loginState');
@@ -1655,7 +1655,7 @@ function App() {
     
     // 관리자모드에서 뷰가 변경되면 데이터 다시 로드 (캐시 무효화)
     if (isAgentMode && isLoggedIn) {
-      console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
+      // console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
       // 캐시 무효화를 위해 약간의 지연 후 데이터 로드
       setTimeout(() => {
         loadData();
@@ -1673,13 +1673,13 @@ function App() {
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(0, 0, 0, 0); // 다음날 자정으로 설정
       setHideUntilDate(tomorrow);
-      console.log('오늘 하루 보지 않기 설정 완료:', tomorrow);
+      // console.log('오늘 하루 보지 않기 설정 완료:', tomorrow);
     } else {
       // 마지막 업데이트 버전을 현재 버전으로 설정
       if (unreadUpdates.length > 0) {
         const latestVersion = unreadUpdates[0].version;
         setLastUpdateVersion(latestVersion);
-        console.log('업데이트 확인 완료:', latestVersion);
+        // console.log('업데이트 확인 완료:', latestVersion);
       }
     }
   }, [unreadUpdates]);
@@ -1692,10 +1692,10 @@ function App() {
         const updates = await getUnreadUpdates();
         setUnreadUpdates(updates);
         setShowUpdatePopup(true);
-        console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
+        // console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
       } else {
         // 최신 버전인 경우 업데이트 진행 팝업을 표시하지 않고 바로 닫기
-        console.log('업데이트 확인 - 최신 버전입니다');
+        // console.log('업데이트 확인 - 최신 버전입니다');
         // 최신 버전임을 알리는 간단한 알림만 표시
         alert('현재 최신 버전을 사용하고 있습니다.');
       }
@@ -1791,7 +1791,7 @@ function App() {
 
   const showNotificationToast = useCallback((notification) => {
     // 토스트 알림 표시 로직
-    console.log('새로운 배정 알림:', notification);
+    // console.log('새로운 배정 알림:', notification);
     playNotificationSound();
     setUnreadNotifications(prev => prev + 1);
     
@@ -1827,11 +1827,11 @@ function App() {
   // 실시간 알림 수신 설정
   useEffect(() => {
     if (isAgentMode && loggedInStore) {
-      console.log('SSE 연결 시도:', {
-        userId: loggedInStore.id,
-        userName: loggedInStore.name,
-        isAgentMode
-      });
+      // console.log('SSE 연결 시도:', {
+      //   userId: loggedInStore.id,
+      //   userName: loggedInStore.name,
+      //   isAgentMode
+      // });
       
       const eventSource = new EventSource(`${process.env.REACT_APP_API_URL}/api/notifications/stream?user_id=${loggedInStore.id}`);
       
@@ -1844,11 +1844,11 @@ function App() {
 
       eventSource.onerror = (error) => {
         console.error('실시간 알림 연결 오류:', error);
-        console.log('SSE 연결 상태:', eventSource.readyState);
+        // console.log('SSE 연결 상태:', eventSource.readyState);
         // 연결이 끊어진 경우 5초 후 재연결 시도
         setTimeout(() => {
           if (eventSource.readyState === EventSource.CLOSED) {
-            console.log('SSE 재연결 시도...');
+            // console.log('SSE 재연결 시도...');
             // 재연결 로직은 useEffect의 의존성 배열에 의해 자동으로 처리됨
           }
         }, 5000);
@@ -1887,14 +1887,14 @@ function App() {
           loggedInStore={loggedInStore} 
           settlementUserName={settlementUserName}
           onModeChange={() => {
-            console.log('App.js SettlementMode onModeChange 호출됨');
+            // console.log('App.js SettlementMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
-            console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             // 현재 모드 비활성화
             setIsSettlementMode(false);
             setShowModeSelection(true);
-            console.log('SettlementMode 모드 선택 팝업 열기 완료');
+            // console.log('SettlementMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1911,14 +1911,14 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
-            console.log('App.js InspectionMode onModeChange 호출됨');
+            // console.log('App.js InspectionMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
-            console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             // 현재 모드 비활성화
             setIsInspectionMode(false);
             setShowModeSelection(true);
-            console.log('InspectionMode 모드 선택 팝업 열기 완료');
+            // console.log('InspectionMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1935,14 +1935,14 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
-            console.log('App.js ChartMode onModeChange 호출됨');
+            // console.log('App.js ChartMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
-            console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             // 현재 모드 비활성화
             setIsChartMode(false);
             setShowModeSelection(true);
-            console.log('ChartMode 모드 선택 팝업 열기 완료');
+            // console.log('ChartMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -1959,7 +1959,7 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
-            console.log('App.js PolicyMode onModeChange 호출됨');
+            // console.log('App.js PolicyMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
             console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
@@ -1983,14 +1983,14 @@ function App() {
           onLogout={handleLogout} 
           loggedInStore={loggedInStore} 
           onModeChange={() => {
-            console.log('App.js InventoryMode onModeChange 호출됨');
+            // console.log('App.js InventoryMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
-            console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
             setAvailableModes(currentModes);
             // 현재 모드 비활성화
             setIsInventoryMode(false);
             setShowModeSelection(true);
-            console.log('InventoryMode 모드 선택 팝업 열기 완료');
+            // console.log('InventoryMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />
@@ -2034,12 +2034,12 @@ function App() {
                 <Button
                   variant="outlined"
                   onClick={() => {
-                    console.log('중립 화면 모드 전환 버튼 클릭됨');
+                    // console.log('중립 화면 모드 전환 버튼 클릭됨');
                     const currentModes = getCurrentUserAvailableModes();
-                    console.log('사용 가능한 모드:', currentModes);
+                    // console.log('사용 가능한 모드:', currentModes);
                     setAvailableModes(currentModes);
                     setShowModeSelection(true);
-                    console.log('모드 선택 팝업 열기 완료');
+                    // console.log('모드 선택 팝업 열기 완료');
                   }}
                   startIcon={<SwapHorizIcon />}
                   sx={{ 

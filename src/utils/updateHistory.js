@@ -24,13 +24,13 @@ export const fetchUpdateHistory = async () => {
     
     // 404나 다른 오류 시 기본 데이터 반환
     if (!response.ok) {
-      console.log(`업데이트 API 응답 오류: ${response.status} - 기본 데이터 사용`);
+      // console.log(`업데이트 API 응답 오류: ${response.status} - 기본 데이터 사용`);
       return getDefaultUpdateHistory();
     }
     
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
-      console.log('업데이트 API가 JSON을 반환하지 않음 - 기본 데이터 사용');
+      // console.log('업데이트 API가 JSON을 반환하지 않음 - 기본 데이터 사용');
       return getDefaultUpdateHistory();
     }
     
@@ -40,12 +40,12 @@ export const fetchUpdateHistory = async () => {
       lastFetchTime = now;
       return result.data;
     } else {
-      console.log('업데이트 API 응답 형식이 올바르지 않음 - 기본 데이터 사용');
+      // console.log('업데이트 API 응답 형식이 올바르지 않음 - 기본 데이터 사용');
       return getDefaultUpdateHistory();
     }
   } catch (error) {
     // 네트워크 오류나 기타 예외 시 기본 데이터 반환
-    console.log('업데이트 API 호출 실패 - 기본 데이터 사용:', error.message);
+    // console.log('업데이트 API 호출 실패 - 기본 데이터 사용:', error.message);
     return getDefaultUpdateHistory();
   }
 };
@@ -123,7 +123,7 @@ export const hasNewUpdates = async () => {
   // 오늘 하루 보지 않기 설정 확인
   const hideUntil = getHideUntilDate();
   if (hideUntil && new Date() < hideUntil) {
-    console.log('오늘 하루 보지 않기 설정으로 인해 업데이트 팝업 숨김');
+    // console.log('오늘 하루 보지 않기 설정으로 인해 업데이트 팝업 숨김');
     return false;
   }
 

@@ -136,7 +136,7 @@ class MobileOptimizationManager {
   // 디바이스 타입 변경 콜백
   onDeviceTypeChange(newDeviceType) {
     // 디바이스 타입 변경 시 필요한 조치
-    console.log('디바이스 타입 변경:', newDeviceType);
+    // console.log('디바이스 타입 변경:', newDeviceType);
     
     // 모바일로 변경 시 사이드바 닫기
     if (newDeviceType === DEVICE_TYPES.MOBILE) {
@@ -146,7 +146,7 @@ class MobileOptimizationManager {
 
   // 화면 방향 변경 콜백
   onOrientationChange(newOrientation) {
-    console.log('화면 방향 변경:', newOrientation);
+    // console.log('화면 방향 변경:', newOrientation);
     
     // 방향 변경 시 레이아웃 조정
     this.adjustLayoutForOrientation(newOrientation);
@@ -331,22 +331,22 @@ class MobileOptimizationManager {
   // 스와이프 제스처 처리
   handleSwipeRight() {
     // 오른쪽 스와이프 - 이전 페이지 또는 사이드바 열기
-    console.log('오른쪽 스와이프');
+    // console.log('오른쪽 스와이프');
   }
 
   handleSwipeLeft() {
     // 왼쪽 스와이프 - 다음 페이지 또는 사이드바 닫기
-    console.log('왼쪽 스와이프');
+    // console.log('왼쪽 스와이프');
   }
 
   handleSwipeUp() {
     // 위쪽 스와이프 - 새로고침 또는 위로 스크롤
-    console.log('위쪽 스와이프');
+    // console.log('위쪽 스와이프');
   }
 
   handleSwipeDown() {
     // 아래쪽 스와이프 - 새로고침 또는 아래로 스크롤
-    console.log('아래쪽 스와이프');
+    // console.log('아래쪽 스와이프');
   }
 
   // 성능 최적화
@@ -407,7 +407,7 @@ class MobileOptimizationManager {
       if (window.performance && window.performance.memory) {
         const memory = window.performance.memory;
         if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.8) {
-          console.warn('메모리 사용량이 높습니다. 정리를 시작합니다.');
+          // console.warn('메모리 사용량이 높습니다. 정리를 시작합니다.');
           // 가비지 컬렉션 유도
           if (window.gc) {
             window.gc();
