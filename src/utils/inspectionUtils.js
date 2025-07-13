@@ -185,9 +185,9 @@ export function getDifferenceTypeColor(type) {
 export function getDifferenceTypeLabel(type) {
   switch (type) {
     case 'manual_only':
-      return '수기초만';
+      return '폰클내용없음';
     case 'system_only':
-      return '시스템만';
+      return '수기초내용없음';
     case 'mismatch':
       return '값 불일치';
     case 'duplicate':
