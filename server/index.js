@@ -2814,7 +2814,13 @@ function normalizeActivationDateTime(manualDate, manualTime, systemDate, systemH
       const minute = systemMinute.toString().replace('분', '').trim();
       
       if (date && hour && minute) {
-        systemDateTime = `${date} ${hour}:${minute}`;
+        // 폰클개통데이터 시값과 분값을 2자리 형식으로 정규화
+        const hourNum = parseInt(hour, 10);
+        const minuteNum = parseInt(minute, 10);
+        const normalizedHourStr = hourNum.toString().padStart(2, '0');
+        const normalizedMinuteStr = minuteNum.toString().padStart(2, '0');
+        
+        systemDateTime = `${date} ${normalizedHourStr}:${normalizedMinuteStr}`;
       }
     }
     
