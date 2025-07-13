@@ -822,8 +822,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                   label="타입"
                 >
                   <MenuItem value="all">전체</MenuItem>
-                  <MenuItem value="manual_only">수기초만</MenuItem>
-                  <MenuItem value="system_only">시스템만</MenuItem>
+                  <MenuItem value="manual_only">수기초내용없음</MenuItem>
+                  <MenuItem value="system_only">폰클내용없음</MenuItem>
                   <MenuItem value="mismatch">값 불일치</MenuItem>
                 </Select>
               </FormControl>
