@@ -10,7 +10,10 @@
 
 [build.environment]
   CI = "false"
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--prefer-offline --no-audit"
+  GENERATE_SOURCEMAP = "false"
+  INLINE_RUNTIME_CHUNK = "false"
 
 [[headers]]
   for = "/static/js/*.js"
