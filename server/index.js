@@ -3810,7 +3810,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
-
+      }
       return;
     }
     
