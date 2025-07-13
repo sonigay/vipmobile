@@ -3861,11 +3861,14 @@ function normalizeActivationType(manualRow, systemRow) {
     console.log(`수기초 정규화 디버깅 - AO열(40) 원본값:`, manualRow[40]);
     console.log(`수기초 정규화 디버깅 - CC열(80) 원본값:`, manualRow[80]);
     
-    // 수기초 정규화 로직 (요청사항대로)
-    if (joinType === '신규일반개통') {
-      manualType = '신규';
-    } else if (joinType === '신규MNP') {
-      manualType = 'MNP';
+    // 수기초 정규화 로직 (수정된 요청사항대로)
+    if (joinType === '신규') {
+      // 신규인 경우 이전사업자 확인
+      if (prevOperator && prevOperator !== '일반개통') {
+        manualType = 'MNP';
+      } else {
+        manualType = '신규';
+      }
     } else if (joinType === '재가입일반개통') {
       manualType = '보상';
     } else if (joinType === '정책기변일반개통') {
