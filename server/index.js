@@ -4112,6 +4112,11 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '출고가상이', key: 'shipping_virtual', column: 47 }, // AV열
     systemField: { name: '출고가상이', key: 'shipping_virtual', column: 27 }, // AB열
     description: '출고가상이 비교 (더하기 방식 정규화)'
+  },
+  {
+    manualField: { name: '지원금 및 약정상이', key: 'support_contract', column: 85 }, // DH열
+    systemField: { name: '지원금 및 약정상이', key: 'support_contract', column: 28 }, // AC열
+    description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)'
   }
 ];
 
@@ -4386,6 +4391,38 @@ function normalizeShippingVirtual(manualRow, systemRow) {
   return { manualShipping, systemShipping };
 }
 
+// 지원금 및 약정상이 정규화 함수
+function normalizeSupportContract(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DH열 또는 BK열)
+  let manualSupport = '';
+  if (manualRow.length > 85) { // 최소 DH열(85)은 있어야 함
+    const dhValue = (manualRow[85] || '').toString().trim(); // DH열
+    const bkValue = (manualRow[62] || '').toString().trim(); // BK열
+    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+    
+    // AN열에 "BLANK" 포함되어있으면 대상에서 제외
+    if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
+      return { manualSupport: '', systemSupport: '' }; // 검수 대상에서 제외
+    }
+    
+    // 선택방식 정규화: DH열에 "선택" 포함 시 "선택약정할인", 아니면 BK열
+    if (dhValue && dhValue.includes('선택')) {
+      manualSupport = '선택약정할인';
+    } else {
+      manualSupport = bkValue;
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AC열)
+  let systemSupport = '';
+  if (systemRow.length > 28) { // 최소 AC열(28)은 있어야 함
+    const acValue = (systemRow[28] || '').toString().trim(); // AC열: 지원금 및 약정상이
+    systemSupport = acValue;
+  }
+  
+  return { manualSupport, systemSupport };
+}
+
 // 동적 컬럼 비교 함수
 function compareDynamicColumns(manualRow, systemRow, key, targetField = null, storeData = null, planData = null) {
   const differences = [];
@@ -4617,6 +4654,41 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           correctValue: manualShipping || '정규화 불가',
           incorrectValue: systemShipping || '정규화 불가',
           description: '출고가상이 비교 (더하기 방식 정규화)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 지원금 및 약정상이 비교 로직
+    if (manualField.key === 'support_contract') {
+      // 배열 범위 체크 (DH=85, BK=62, AN=39, AC=28)
+      if (manualRow.length <= 85 || systemRow.length <= 28) {
+        return;
+      }
+      
+      // 지원금 및 약정상이 정규화
+      const { manualSupport, systemSupport } = normalizeSupportContract(manualRow, systemRow);
+      
+      // AN열 BLANK 제외 조건으로 인해 빈 값이 반환된 경우 비교 제외
+      if (!manualSupport && !systemSupport) {
+        return;
+      }
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualSupport !== systemSupport && 
+          (manualSupport || systemSupport)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '지원금 및 약정상이',
+          fieldKey: 'support_contract',
+          correctValue: manualSupport || '정규화 불가',
+          incorrectValue: systemSupport || '정규화 불가',
+          description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
