@@ -191,15 +191,7 @@ export async function fetchData(includeShipped = true, timestamp = null) {
         });
       }
 
-      if (store.name === "승텔레콤(인천부평)") {
-        console.log('\n=== 승텔레콤 매장 데이터 변환 ===');
-        console.log('원본 데이터:', {
-          매장명: store.name,
-          inventory: store.inventory
-        });
-        console.log('변환된 phoneData:', phoneData);
-        console.log('phoneData 항목 수:', phoneData.length);
-      }
+
 
       // phoneCount 계산 (모든 모델의 수량 합계)
       const phoneCount = phoneData.reduce((sum, item) => sum + (item.quantity || 0), 0);

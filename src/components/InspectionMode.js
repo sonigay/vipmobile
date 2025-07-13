@@ -222,6 +222,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     loadModificationCompletionStatus();
   }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
 
+  // 뷰 변경 시 수정완료 상태 재로딩
+  useEffect(() => {
+    loadModificationCompletionStatus();
+  }, [currentView, loadModificationCompletionStatus]);
+
   // 필터링된 데이터 (해시화된 ID 사용)
   const filteredData = useMemo(() => {
     if (!inspectionData?.differences) return [];

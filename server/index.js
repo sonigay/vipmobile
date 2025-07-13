@@ -2973,11 +2973,26 @@ app.get('/api/inspection/modification-completion-status', async (req, res) => {
         } else {
           // 전체현황: 모든 사용자의 항목
           completedItems.push(itemId);
-          // 해당 항목의 내용도 함께 조회
+          // 해당 항목의 내용도 함께 조회 (모든 사용자의 내용)
           const notes = modificationNotes.get(itemId);
           if (notes) {
             notesData[itemId] = notes.notes;
           }
+        }
+      }
+    }
+    
+    // 수정완료 상태가 없어도 내용이 있는 경우 포함
+    for (const [itemId, notes] of modificationNotes) {
+      if (!notesData[itemId]) {
+        if (view === 'personal') {
+          // 개인현황: 해당 사용자의 내용만
+          if (notes.userId === userId) {
+            notesData[itemId] = notes.notes;
+          }
+        } else {
+          // 전체현황: 모든 사용자의 내용
+          notesData[itemId] = notes.notes;
         }
       }
     }
