@@ -3151,6 +3151,11 @@ app.get('/api/inspection-data', async (req, res) => {
       if (row.length > 0 && row[0]) {
         const key = row[0].toString().trim();
         manualMap.set(key, { row, index: index + 2 });
+        
+        // 특정 가입번호 디버깅
+        if (key === '516697159306') {
+          console.log(`수기초 데이터 발견: key=${key}, 행=${index + 2}, 모델=${row[29] || ''}, 일련번호=${row[30] || ''}`);
+        }
       }
     });
     
@@ -3182,6 +3187,11 @@ app.get('/api/inspection-data', async (req, res) => {
       if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
         const key = row[66].toString().trim();
         systemMap.set(key, { row, index: index + 2 });
+        
+        // 특정 가입번호 디버깅
+        if (key === '516697159306') {
+          console.log(`폰클 데이터 발견: key=${key}, 행=${index + 2}, 모델=${row[13] || ''}, 일련번호=${row[15] || ''}`);
+        }
       }
     });
     
@@ -3194,6 +3204,11 @@ app.get('/api/inspection-data', async (req, res) => {
           systemDuplicateGroups.set(key, []);
         }
         systemDuplicateGroups.get(key).push({ row, index: index + 2 });
+        
+        // 특정 가입번호의 모든 중복 데이터 확인
+        if (key === '516697159306') {
+          console.log(`폰클 중복 데이터 추가: key=${key}, 행=${index + 2}, 모델=${row[13] || ''}, 일련번호=${row[15] || ''}`);
+        }
       }
     });
     
@@ -3201,6 +3216,14 @@ app.get('/api/inspection-data', async (req, res) => {
     for (const [key, group] of systemDuplicateGroups) {
       if (group.length > 1) {
         systemDuplicateKeys.add(key);
+        
+        // 특정 가입번호의 중복 처리 결과 확인
+        if (key === '516697159306') {
+          console.log(`폰클 중복 처리 완료: key=${key}, 중복 개수=${group.length}`);
+          group.forEach((item, idx) => {
+            console.log(`  중복 ${idx + 1}: 행=${item.index}, 모델=${item.row[13] || ''}, 일련번호=${item.row[15] || ''}`);
+          });
+        }
       }
     }
 
@@ -3861,24 +3884,17 @@ function normalizeSerialNumber(serialNumber) {
   
   let serial = serialNumber.toString().trim();
   
-        // 디버깅 대상 시리얼번호인지 확인 (필요시에만 사용)
-      const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(serial);
+  // 디버깅 대상 시리얼번호인지 확인 (필요시에만 사용)
+  const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(serial);
   
   // 숫자인지 확인
   if (/^\d+$/.test(serial)) {
-    // 숫자인 경우 뒤에서 6자리만 사용
-    if (serial.length >= 6) {
-      const result = serial.slice(-6);
-
-      return result;
-    } else {
-      // 6자리 미만인 경우 앞에 0을 붙여서 6자리로 만듦
-      const result = serial.padStart(6, '0');
-      return result;
-    }
-      } else {
-      // 영문이 포함된 경우 앞의 0들을 제거하고 반환
-      const result = serial.replace(/^0+/, '');
+    // 숫자인 경우 앞의 0만 제거하고 반환 (뒤에서 6자리 제한 제거)
+    const result = serial.replace(/^0+/, '');
+    return result;
+  } else {
+    // 영문이 포함된 경우 앞의 0들을 제거하고 반환
+    const result = serial.replace(/^0+/, '');
     return result;
   }
 }
