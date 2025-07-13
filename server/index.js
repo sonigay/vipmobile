@@ -4195,6 +4195,47 @@ function normalizeSerialNumber(serialNumber) {
   }
 }
 
+// 숫자 서식 정규화 함수 (#,### 형식)
+function normalizeNumberFormat(value) {
+  if (!value) return '';
+  
+  const strValue = value.toString().trim();
+  
+  // 숫자만 추출 (쉼표, 공백, 기타 문자 제거)
+  const numericValue = strValue.replace(/[^\d.-]/g, '');
+  
+  if (!numericValue || numericValue === '-') return '';
+  
+  // 숫자로 변환
+  const num = parseFloat(numericValue);
+  if (isNaN(num)) return '';
+  
+  // #,### 형식으로 포맷팅
+  return num.toLocaleString();
+}
+
+// 숫자 더하기 연산 함수
+function addNumbers(values) {
+  let sum = 0;
+  for (const value of values) {
+    if (value) {
+      const numericValue = value.toString().replace(/[^\d.-]/g, '');
+      const num = parseFloat(numericValue);
+      if (!isNaN(num)) {
+        sum += num;
+      }
+    }
+  }
+  return sum;
+}
+
+// 숫자 빼기 연산 함수
+function subtractNumbers(value1, value2) {
+  const num1 = parseFloat(value1.toString().replace(/[^\d.-]/g, '')) || 0;
+  const num2 = parseFloat(value2.toString().replace(/[^\d.-]/g, '')) || 0;
+  return num1 - num2;
+}
+
 // 개통유형 정규화 함수
 function normalizeActivationType(manualRow, systemRow) {
   // 수기초 데이터 정규화 (K열, AO열, CC열 조합)
@@ -4386,16 +4427,17 @@ function normalizeShippingVirtual(manualRow, systemRow) {
     const bnValue = (manualRow[63] || '').toString().trim(); // BN열
     const blValue = (manualRow[65] || '').toString().trim(); // BL열
     
-    // 더하기 방식으로 정규화
+    // 숫자 더하기 연산으로 정규화
     const values = [avValue, azValue, awValue, bkValue, bmValue, bnValue, blValue].filter(v => v);
-    manualShipping = values.join('+');
+    const sum = addNumbers(values);
+    manualShipping = normalizeNumberFormat(sum);
   }
   
   // 폰클 데이터 정규화 (AB열)
   let systemShipping = '';
   if (systemRow.length > 27) { // 최소 AB열(27)은 있어야 함
     const abValue = (systemRow[27] || '').toString().trim(); // AB열: 출고가상이
-    systemShipping = abValue;
+    systemShipping = normalizeNumberFormat(abValue);
   }
   
   return { manualShipping, systemShipping };
@@ -4419,7 +4461,7 @@ function normalizeSupportContract(manualRow, systemRow) {
     if (dhValue && dhValue.includes('선택')) {
       manualSupport = '선택약정할인';
     } else {
-      manualSupport = bkValue;
+      manualSupport = normalizeNumberFormat(bkValue);
     }
   }
   
@@ -4427,7 +4469,7 @@ function normalizeSupportContract(manualRow, systemRow) {
   let systemSupport = '';
   if (systemRow.length > 28) { // 최소 AC열(28)은 있어야 함
     const acValue = (systemRow[28] || '').toString().trim(); // AC열: 지원금 및 약정상이
-    systemSupport = acValue;
+    systemSupport = normalizeNumberFormat(acValue);
   }
   
   return { manualSupport, systemSupport };
@@ -4447,16 +4489,17 @@ function normalizeConversionSupport(manualRow, systemRow) {
       return { manualConversion: '', systemConversion: '' }; // 검수 대상에서 제외
     }
     
-    // 더하기 방식 정규화
+    // 숫자 더하기 연산으로 정규화
     const values = [bmValue, bnValue].filter(v => v);
-    manualConversion = values.join('+');
+    const sum = addNumbers(values);
+    manualConversion = normalizeNumberFormat(sum);
   }
   
   // 폰클 데이터 정규화 (AE열)
   let systemConversion = '';
   if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
     const aeValue = (systemRow[30] || '').toString().trim(); // AE열: 전환지원금상이
-    systemConversion = aeValue;
+    systemConversion = normalizeNumberFormat(aeValue);
   }
   
   return { manualConversion, systemConversion };
@@ -4475,7 +4518,7 @@ function normalizePreInstallment(manualRow, systemRow) {
       return { manualPreInstallment: '', systemPreInstallment: '' }; // 검수 대상에서 제외
     }
     
-    manualPreInstallment = avValue;
+    manualPreInstallment = normalizeNumberFormat(avValue);
   }
   
   // 폰클 데이터 정규화 (AB열-AS열)
@@ -4484,14 +4527,9 @@ function normalizePreInstallment(manualRow, systemRow) {
     const abValue = (systemRow[27] || '').toString().trim(); // AB열
     const asValue = (systemRow[44] || '').toString().trim(); // AS열
     
-    // 빼기 방식 정규화
-    if (abValue && asValue) {
-      systemPreInstallment = `${abValue}-${asValue}`;
-    } else if (abValue) {
-      systemPreInstallment = abValue;
-    } else if (asValue) {
-      systemPreInstallment = `-${asValue}`;
-    }
+    // 숫자 빼기 연산으로 정규화
+    const difference = subtractNumbers(abValue, asValue);
+    systemPreInstallment = normalizeNumberFormat(difference);
   }
   
   return { manualPreInstallment, systemPreInstallment };
