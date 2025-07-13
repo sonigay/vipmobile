@@ -3729,8 +3729,8 @@ function normalizeSerialNumber(serialNumber) {
       return serial.padStart(6, '0');
     }
   } else {
-    // 영문이 포함된 경우 그대로 반환
-    return serial;
+    // 영문이 포함된 경우 앞의 0들을 제거하고 반환
+    return serial.replace(/^0+/, '');
   }
 }
 
@@ -3786,8 +3786,14 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
     
     // 모델명(일련번호) 비교 로직
     if (manualField.key === 'model_serial') {
-      // 배열 범위 체크 (AD=29, AS=44, N=13, P=15)
+      // 배열 범위 체크 (AD=29, AS=44, AN=39, N=13, P=15)
       if (manualRow.length <= 44 || systemRow.length <= 15) {
+        return;
+      }
+      
+      // AN열 최종영업정책이 "BLANK"인 경우 비교 제외
+      const finalPolicy = manualRow[39] || ''; // AN열: 최종영업정책
+      if (finalPolicy.toString().trim().toUpperCase() === 'BLANK') {
         return;
       }
       
