@@ -3788,12 +3788,14 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
     if (manualField.key === 'model_serial') {
       // 배열 범위 체크 (AD=29, AS=44, AN=39, N=13, P=15)
       if (manualRow.length <= 44 || systemRow.length <= 15) {
+        console.log(`모델명 비교 범위 체크 실패: key=${key}, manualRow.length=${manualRow.length}, systemRow.length=${systemRow.length}`);
         return;
       }
       
       // AN열 최종영업정책이 "BLANK"인 경우 비교 제외
       const finalPolicy = manualRow[39] || ''; // AN열: 최종영업정책
       if (finalPolicy.toString().trim().toUpperCase() === 'BLANK') {
+        console.log(`BLANK 정책 제외: key=${key}, finalPolicy=${finalPolicy}`);
         return;
       }
       
@@ -3802,19 +3804,33 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const systemModel = systemRow[13] || '';  // N열: 모델명
       const systemSerial = systemRow[15] || ''; // P열: 일련번호
       
+      console.log(`모델명 비교 원본 데이터: key=${key}`);
+      console.log(`  수기초 - 모델: "${manualModel}", 일련번호: "${manualSerial}"`);
+      console.log(`  폰클 - 모델: "${systemModel}", 일련번호: "${systemSerial}"`);
+      
       // 모델명과 일련번호 정규화
       const normalizedManualModel = normalizeModelName(manualModel);
       const normalizedSystemModel = normalizeModelName(systemModel);
       const normalizedManualSerial = normalizeSerialNumber(manualSerial);
       const normalizedSystemSerial = normalizeSerialNumber(systemSerial);
       
+      console.log(`모델명 비교 정규화 결과: key=${key}`);
+      console.log(`  수기초 정규화 - 모델: "${normalizedManualModel}", 일련번호: "${normalizedManualSerial}"`);
+      console.log(`  폰클 정규화 - 모델: "${normalizedSystemModel}", 일련번호: "${normalizedSystemSerial}"`);
+      
       // 모델명과 일련번호를 조합하여 비교
       const manualCombined = `${normalizedManualModel}(${normalizedManualSerial})`;
       const systemCombined = `${normalizedSystemModel}(${normalizedSystemSerial})`;
       
+      console.log(`모델명 비교 최종 결과: key=${key}`);
+      console.log(`  수기초 조합: "${manualCombined}"`);
+      console.log(`  폰클 조합: "${systemCombined}"`);
+      console.log(`  일치 여부: ${manualCombined === systemCombined}`);
+      
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
       if (manualCombined !== systemCombined && 
           (manualCombined || systemCombined)) {
+        console.log(`모델명 차이점 기록: key=${key}, manual="${manualCombined}", system="${systemCombined}"`);
         differences.push({
           key,
           type: 'mismatch',
@@ -3827,6 +3843,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
+      } else {
+        console.log(`모델명 일치 또는 제외: key=${key}`);
       }
       return;
     }
