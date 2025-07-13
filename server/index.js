@@ -3847,24 +3847,24 @@ function normalizeSerialNumber(serialNumber) {
 function normalizeActivationType(manualRow, systemRow) {
   // 수기초 데이터 정규화
   let manualType = '';
-  if (manualRow.length > 40) { // K열(10), AO열(40), CC열(80) 체크
+  if (manualRow.length > 10) { // 최소 K열(10)은 있어야 함
     const joinType = (manualRow[10] || '').toString().trim(); // K열: 가입구분
-    const prevOperator = (manualRow[40] || '').toString().trim(); // AO열: 이전사업자
-    const changeTarget = (manualRow[80] || '').toString().trim(); // CC열: 기변타겟구분
+    const prevOperator = manualRow.length > 40 ? (manualRow[40] || '').toString().trim() : ''; // AO열: 이전사업자
+    const changeTarget = manualRow.length > 80 ? (manualRow[80] || '').toString().trim() : ''; // CC열: 기변타겟구분
     
-    // 수기초 정규화 로직
-    if (joinType === '신규일반개통') {
-      manualType = '신규';
-    } else if (joinType === '신규MNP') {
+    // 수기초 정규화 로직 (더 유연하게)
+    if (joinType.includes('신규') && joinType.includes('MNP')) {
       manualType = 'MNP';
-    } else if (joinType === '재가입일반개통') {
-      if (changeTarget && changeTarget.includes('C타겟')) {
+    } else if (joinType.includes('신규')) {
+      manualType = '신규';
+    } else if (joinType.includes('재가입')) {
+      if (changeTarget && changeTarget.includes('기변C')) {
         manualType = '보상(C타겟)';
       } else {
         manualType = '보상';
       }
-    } else if (joinType === '정책기변일반개통') {
-      if (changeTarget && changeTarget.includes('C타겟')) {
+    } else if (joinType.includes('기변')) {
+      if (changeTarget && changeTarget.includes('기변C')) {
         manualType = '기변(C타겟)';
       } else {
         manualType = '기변';
@@ -3874,9 +3874,9 @@ function normalizeActivationType(manualRow, systemRow) {
   
   // 폰클 데이터 정규화
   let systemType = '';
-  if (systemRow.length > 23) { // L열(11), X열(23) 체크
+  if (systemRow.length > 11) { // 최소 L열(11)은 있어야 함
     const joinType = (systemRow[11] || '').toString().trim(); // L열: 가입구분
-    const returnService = (systemRow[23] || '').toString().trim(); // X열: 환수서비스
+    const returnService = systemRow.length > 23 ? (systemRow[23] || '').toString().trim() : ''; // X열: 환수서비스
     
     // 폰클 정규화 로직
     if (joinType === '신규') {
