@@ -3142,220 +3142,156 @@ app.get('/api/inspection-data', async (req, res) => {
       return 'no_duplicate';
     }
     
-    // 수기초 데이터 인덱싱 (A열: 가입번호 기준) - 중복 감지 포함
-    const manualDuplicateKeys = new Set();
-    const manualDuplicateGroups = new Map();
+    // 단순하고 심플한 행값 기반 처리 로직
+    const allRows = [];
     
-    // 먼저 모든 수기초 데이터를 manualMap에 추가
+    // 모든 수기초 데이터 추가
     manualRows.forEach((row, index) => {
       if (row.length > 0 && row[0]) {
         const key = row[0].toString().trim();
-        manualMap.set(key, { row, index: index + 2 });
-        
-        // 특정 가입번호 디버깅
-        if (key === '516697159306') {
-          console.log(`수기초 데이터 발견: key=${key}, 행=${index + 2}, 모델=${row[29] || ''}, 일련번호=${row[30] || ''}`);
-        }
-      }
-    });
-    
-    // 그 다음 중복을 감지
-    manualRows.forEach((row, index) => {
-      if (row.length > 0 && row[0]) {
-        const key = row[0].toString().trim();
-        
-        if (!manualDuplicateGroups.has(key)) {
-          manualDuplicateGroups.set(key, []);
-        }
-        manualDuplicateGroups.get(key).push({ row, index: index + 2 });
-      }
-    });
-    
-    // 실제로 2개 이상인 경우만 중복으로 처리
-    for (const [key, group] of manualDuplicateGroups) {
-      if (group.length > 1) {
-        manualDuplicateKeys.add(key);
-      }
-    }
-    
-    // 폰클개통데이터 인덱싱 (BO열: 메모1 기준) - 중복 가입번호 처리
-    const systemDuplicateKeys = new Set();
-    const systemDuplicateGroups = new Map();
-    
-    // 먼저 모든 폰클데이터를 systemMap에 추가
-    systemRows.forEach((row, index) => {
-      if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
-        const key = row[66].toString().trim();
-        systemMap.set(key, { row, index: index + 2 });
-        
-        // 특정 가입번호 디버깅
-        if (key === '516697159306') {
-          console.log(`폰클 데이터 발견: key=${key}, 행=${index + 2}, 모델=${row[13] || ''}, 일련번호=${row[15] || ''}`);
-        }
-      }
-    });
-    
-    // 그 다음 중복을 감지
-    systemRows.forEach((row, index) => {
-      if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
-        const key = row[66].toString().trim();
-        
-        if (!systemDuplicateGroups.has(key)) {
-          systemDuplicateGroups.set(key, []);
-        }
-        systemDuplicateGroups.get(key).push({ row, index: index + 2 });
-        
-        // 특정 가입번호의 모든 중복 데이터 확인
-        if (key === '516697159306') {
-          console.log(`폰클 중복 데이터 추가: key=${key}, 행=${index + 2}, 모델=${row[13] || ''}, 일련번호=${row[15] || ''}`);
-        }
-      }
-    });
-    
-    // 실제로 2개 이상인 경우만 중복으로 처리
-    for (const [key, group] of systemDuplicateGroups) {
-      if (group.length > 1) {
-        systemDuplicateKeys.add(key);
-        
-        // 특정 가입번호의 중복 처리 결과 확인
-        if (key === '516697159306') {
-          console.log(`폰클 중복 처리 완료: key=${key}, 중복 개수=${group.length}`);
-          group.forEach((item, idx) => {
-            console.log(`  중복 ${idx + 1}: 행=${item.index}, 모델=${item.row[13] || ''}, 일련번호=${item.row[15] || ''}`);
-          });
-        }
-      }
-    }
-
-    // 차이점 찾기
-    for (const [key, manualData] of manualMap) {
-      const systemData = systemMap.get(key);
-      
-      if (systemData) {
-        // 중복 타입 결정
-        const isManualDuplicate = manualDuplicateKeys.has(key);
-        const isSystemDuplicate = systemDuplicateKeys.has(key);
-        const duplicateType = getDuplicateType(isManualDuplicate, isSystemDuplicate);
-        
-        // 중복 정보 생성 - 각 행별로 개별적인 정보 생성
-        let duplicateInfo = '';
-        if (isSystemDuplicate && systemDuplicateGroups.has(key)) {
-          const systemDuplicates = systemDuplicateGroups.get(key);
-          // 현재 행의 인덱스를 찾아서 개별적인 중복 정보 생성
-          const currentRowIndex = systemDuplicates.findIndex(item => item.index === systemData.index);
-          if (currentRowIndex !== -1) {
-            duplicateInfo = generateIndividualDuplicateInfo(
-              systemDuplicates.map(item => item.row), 
-              currentRowIndex, 
-              'system_duplicate'
-            );
-          }
-        } else if (isManualDuplicate && manualDuplicateGroups.has(key)) {
-          const manualDuplicates = manualDuplicateGroups.get(key);
-          // 현재 행의 인덱스를 찾아서 개별적인 중복 정보 생성
-          const currentRowIndex = manualDuplicates.findIndex(item => item.index === manualData.index);
-          if (currentRowIndex !== -1) {
-            duplicateInfo = generateIndividualDuplicateInfo(
-              manualDuplicates.map(item => item.row), 
-              currentRowIndex, 
-              'manual_duplicate'
-            );
-          }
-        }
-        
-        // 두 데이터가 모두 있는 경우 비교
-        const rowDifferences = compareDynamicColumns(manualData.row, systemData.row, key, field);
-        
-        rowDifferences.forEach(diff => {
-          differences.push({
-            ...diff,
-            manualRow: manualData.index,
-            systemRow: systemData.index,
-            assignedAgent: systemData.row[69] || '', // BR열: 등록직원
-            isDuplicate: isManualDuplicate || isSystemDuplicate,
-            duplicateType: duplicateType,
-            duplicateInfo: duplicateInfo
-          });
+        allRows.push({
+          key,
+          row,
+          index: index + 2,
+          source: 'manual'
         });
-        
-        // 수기초에만 있는 데이터 (필드 필터링이 있을 때는 제외)
-        if (!field) {
-          // 가입번호를 정규표현식으로 정확히 비교
-          const manualKey = manualData.row[0]?.toString().trim() || '';
-          let isReallyManualOnly = true;
-          
-          // 폰클데이터에서 가입번호와 유사한 값이 있는지 확인
-          for (const [systemKey, systemData] of systemMap) {
-            const systemKeyTrimmed = systemKey.toString().trim();
-            if (manualKey === systemKeyTrimmed || 
-                manualKey.includes(systemKeyTrimmed) || 
-                systemKeyTrimmed.includes(manualKey)) {
-              isReallyManualOnly = false;
-              break;
+      }
+    });
+    
+    // 모든 폰클 데이터 추가
+    systemRows.forEach((row, index) => {
+      if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
+        const key = row[66].toString().trim();
+        allRows.push({
+          key,
+          row,
+          index: index + 2,
+          source: 'system'
+        });
+      }
+    });
+    
+    // 가입번호별로 그룹화하여 중복 감지
+    const groupsByKey = new Map();
+    allRows.forEach(item => {
+      if (!groupsByKey.has(item.key)) {
+        groupsByKey.set(item.key, []);
+      }
+      groupsByKey.get(item.key).push(item);
+    });
+    
+    // 각 가입번호 그룹별로 처리
+    for (const [key, group] of groupsByKey) {
+      const manualItems = group.filter(item => item.source === 'manual');
+      const systemItems = group.filter(item => item.source === 'system');
+      
+      const isManualDuplicate = manualItems.length > 1;
+      const isSystemDuplicate = systemItems.length > 1;
+      
+      // 수기초 데이터가 있는 경우
+      if (manualItems.length > 0) {
+        manualItems.forEach(manualItem => {
+          // 폰클 데이터가 있는 경우 - 각 폰클 데이터와 비교
+          if (systemItems.length > 0) {
+            systemItems.forEach(systemItem => {
+              // 중복 타입 결정
+              const duplicateType = getDuplicateType(isManualDuplicate, isSystemDuplicate);
+              
+              // 중복 정보 생성
+              let duplicateInfo = '';
+              if (isSystemDuplicate) {
+                const systemIndex = systemItems.findIndex(item => item.index === systemItem.index);
+                duplicateInfo = generateIndividualDuplicateInfo(
+                  systemItems.map(item => item.row), 
+                  systemIndex, 
+                  'system_duplicate'
+                );
+              } else if (isManualDuplicate) {
+                const manualIndex = manualItems.findIndex(item => item.index === manualItem.index);
+                duplicateInfo = generateIndividualDuplicateInfo(
+                  manualItems.map(item => item.row), 
+                  manualIndex, 
+                  'manual_duplicate'
+                );
+              }
+              
+              // 두 데이터 비교
+              const rowDifferences = compareDynamicColumns(manualItem.row, systemItem.row, key, field);
+              
+              rowDifferences.forEach(diff => {
+                differences.push({
+                  ...diff,
+                  manualRow: manualItem.index,
+                  systemRow: systemItem.index,
+                  assignedAgent: systemItem.row[69] || '', // BR열: 등록직원
+                  isDuplicate: isManualDuplicate || isSystemDuplicate,
+                  duplicateType: duplicateType,
+                  duplicateInfo: duplicateInfo
+                });
+              });
+            });
+          } else {
+            // 수기초에만 있는 데이터
+            if (!field) {
+              const duplicateType = isManualDuplicate ? 'manual_duplicate' : 'no_duplicate';
+              let duplicateInfo = '';
+              
+              if (isManualDuplicate) {
+                const manualIndex = manualItems.findIndex(item => item.index === manualItem.index);
+                duplicateInfo = generateIndividualDuplicateInfo(
+                  manualItems.map(item => item.row), 
+                  manualIndex, 
+                  'manual_duplicate'
+                );
+              }
+              
+              differences.push({
+                key,
+                type: 'manual_only',
+                field: '전체',
+                fieldKey: 'all',
+                correctValue: '수기초에만 존재',
+                incorrectValue: '없음',
+                manualRow: manualItem.index,
+                systemRow: null,
+                assignedAgent: '',
+                isDuplicate: isManualDuplicate,
+                duplicateType: duplicateType,
+                duplicateInfo: duplicateInfo
+              });
             }
           }
-          
-          if (isReallyManualOnly) {
-            differences.push({
-              key,
-              type: 'manual_only',
-              field: '전체',
-              fieldKey: 'all',
-              correctValue: '수기초에만 존재',
-              incorrectValue: '없음',
-              manualRow: manualData.index,
-              systemRow: null,
-              assignedAgent: '',
-              isDuplicate: isManualDuplicate,
-              duplicateType: isManualDuplicate ? 'manual_duplicate' : 'no_duplicate',
-              duplicateInfo: isManualDuplicate && manualDuplicateGroups.has(key) ? 
-                generateIndividualDuplicateInfo(
-                  manualDuplicateGroups.get(key).map(item => item.row),
-                  manualDuplicateGroups.get(key).findIndex(item => item.index === manualData.index),
-                  'manual_duplicate'
-                ) : ''
-            });
-          }
-        }
-      }
-    }
-
-    // 중복 가입번호에 대한 별도 차이점 추가 (개선된 버전)
-    // 이 부분은 제거 - 이미 위에서 각 행별로 중복 정보가 처리되고 있음
-
-    // 수기초에 없는 데이터도 확인 (필드 필터링이 있을 때는 제외)
-    if (!field) {
-      for (const [key, systemData] of systemMap) {
-        if (!manualMap.has(key)) {
-          const isSystemDuplicate = systemDuplicateKeys.has(key);
-          let duplicateInfo = '';
-          
-          if (isSystemDuplicate && systemDuplicateGroups.has(key)) {
-            const systemDuplicates = systemDuplicateGroups.get(key);
-            // 현재 행의 인덱스를 찾아서 개별적인 중복 정보 생성
-            const currentRowIndex = systemDuplicates.findIndex(item => item.index === systemData.index);
-            if (currentRowIndex !== -1) {
+        });
+      } else {
+        // 폰클에만 있는 데이터
+        if (!field) {
+          systemItems.forEach(systemItem => {
+            const duplicateType = isSystemDuplicate ? 'system_duplicate' : 'no_duplicate';
+            let duplicateInfo = '';
+            
+            if (isSystemDuplicate) {
+              const systemIndex = systemItems.findIndex(item => item.index === systemItem.index);
               duplicateInfo = generateIndividualDuplicateInfo(
-                systemDuplicates.map(item => item.row), 
-                currentRowIndex, 
+                systemItems.map(item => item.row), 
+                systemIndex, 
                 'system_duplicate'
               );
             }
-          }
-          
-          differences.push({
-            key,
-            type: 'system_only',
-            field: '전체',
-            fieldKey: 'all',
-            correctValue: '없음',
-            incorrectValue: '수기초에 없음',
-            manualRow: null,
-            systemRow: systemData.index,
-            assignedAgent: systemData.row[69] || '', // BR열: 등록직원
-            isDuplicate: isSystemDuplicate,
-            duplicateType: isSystemDuplicate ? 'system_duplicate' : 'no_duplicate',
-            duplicateInfo: duplicateInfo
+            
+            differences.push({
+              key,
+              type: 'system_only',
+              field: '전체',
+              fieldKey: 'all',
+              correctValue: '없음',
+              incorrectValue: '수기초에 없음',
+              manualRow: null,
+              systemRow: systemItem.index,
+              assignedAgent: systemItem.row[69] || '', // BR열: 등록직원
+              isDuplicate: isSystemDuplicate,
+              duplicateType: duplicateType,
+              duplicateInfo: duplicateInfo
+            });
           });
         }
       }
@@ -3958,7 +3894,6 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       // AN열 최종영업정책이 "BLANK"인 경우 비교 제외
       const finalPolicy = manualRow[39] || ''; // AN열: 최종영업정책
       if (finalPolicy.toString().trim().toUpperCase() === 'BLANK') {
-        console.log(`모델명 비교 제외: key=${key}, 최종영업정책=BLANK`);
         return;
       }
       
@@ -3982,15 +3917,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       const manualCombined = `${normalizedManualModel}(${normalizedManualSerial})`;
       const systemCombined = `${normalizedSystemModel}(${normalizedSystemSerial})`;
       
-      // 디버깅: 특정 가입번호의 모델명 비교 로그
-      if (key === '516697159306') {
-        console.log(`모델명 비교 디버깅 - 가입번호: ${key}`);
-        console.log(`수기초: 모델=${manualModel}, 일련번호=${manualSerial}`);
-        console.log(`폰클: 모델=${systemModel}, 일련번호=${systemSerial}`);
-        console.log(`정규화 후 수기초: ${manualCombined}`);
-        console.log(`정규화 후 폰클: ${systemCombined}`);
-        console.log(`비교 결과: ${manualCombined !== systemCombined ? '다름' : '같음'}`);
-      }
+
       
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
       if (manualCombined !== systemCombined && 
