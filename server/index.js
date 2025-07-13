@@ -3874,7 +3874,7 @@ function normalizeActivationType(manualRow, systemRow) {
       if (!returnService.includes('C타겟')) {
         systemType = 'MNP';
       }
-    } else if (activationType === '재가입') {
+    } else if (activationType === '보상') {
       if (returnService.includes('C타겟')) {
         systemType = '보상(C타겟)';
       } else {
