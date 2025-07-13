@@ -3882,24 +3882,24 @@ function normalizeActivationType(manualRow, systemRow) {
   // 폰클 데이터 정규화
   let systemType = '';
   if (systemRow.length > 11) { // 최소 L열(11)은 있어야 함
-    const joinType = (systemRow[11] || '').toString().trim(); // L열: 가입구분
+    const activationType = (systemRow[11] || '').toString().trim(); // L열: 개통
     const returnService = systemRow.length > 23 ? (systemRow[23] || '').toString().trim() : ''; // X열: 환수서비스
     
     // 디버깅: 실제 값 확인
-    console.log(`폰클 정규화 디버깅 - 가입구분: "${joinType}", 환수서비스: "${returnService}", 배열길이: ${systemRow.length}`);
+    console.log(`폰클 정규화 디버깅 - 개통: "${activationType}", 환수서비스: "${returnService}", 배열길이: ${systemRow.length}`);
     
     // 폰클 정규화 로직 (더 유연하게)
-    if (joinType.includes('신규')) {
+    if (activationType.includes('신규')) {
       systemType = '신규';
-    } else if (joinType.includes('MNP')) {
+    } else if (activationType.includes('MNP')) {
       systemType = 'MNP';
-    } else if (joinType.includes('보상')) {
+    } else if (activationType.includes('보상')) {
       if (returnService && returnService.includes('C타겟')) {
         systemType = '보상(C타겟)';
       } else {
         systemType = '보상';
       }
-    } else if (joinType.includes('기변')) {
+    } else if (activationType.includes('기변')) {
       if (returnService && returnService.includes('C타겟')) {
         systemType = '기변(C타겟)';
       } else {
