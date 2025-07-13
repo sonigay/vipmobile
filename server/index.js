@@ -2784,6 +2784,41 @@ app.post('/api/push/send-all', async (req, res) => {
   }
 });
 
+// 개통일시분 정규화 함수
+function normalizeActivationDateTime(manualDate, manualTime, systemDate, systemHour, systemMinute) {
+  try {
+    // 수기초 데이터 정규화
+    let manualDateTime = '';
+    if (manualDate && manualTime) {
+      const date = manualDate.trim();
+      const time = manualTime.toString().trim();
+      
+      if (date && time && time.length >= 4) {
+        const hour = time.substring(0, 2);
+        const minute = time.substring(2, 4);
+        manualDateTime = `${date} ${hour}:${minute}`;
+      }
+    }
+    
+    // 폰클개통데이터 정규화
+    let systemDateTime = '';
+    if (systemDate && systemHour && systemMinute) {
+      const date = systemDate.trim();
+      const hour = systemHour.toString().replace('시', '').trim();
+      const minute = systemMinute.toString().replace('분', '').trim();
+      
+      if (date && hour && minute) {
+        systemDateTime = `${date} ${hour}:${minute}`;
+      }
+    }
+    
+    return { manualDateTime, systemDateTime };
+  } catch (error) {
+    console.error('개통일시분 정규화 오류:', error);
+    return { manualDateTime: '', systemDateTime: '' };
+  }
+}
+
 // 컬럼 설정 관리 API
 app.get('/api/inspection/columns', async (req, res) => {
   try {
@@ -2807,6 +2842,15 @@ app.get('/api/inspection/columns', async (req, res) => {
           systemColumnName: '메모2',
           description: '대리점코드 비교 (메모2에서 숫자 추출)',
           regex: '\\d+',
+          enabled: true
+        },
+        {
+          key: 'activation_datetime',
+          manualColumns: ['U', 'V'],
+          manualColumnNames: ['가입일자', '개통시간'],
+          systemColumns: ['B', 'C', 'D'],
+          systemColumnNames: ['개통일', '개통시', '개통분'],
+          description: '개통일시분 비교 (초 제외, 24시간 형식)',
           enabled: true
         }
       ]
@@ -3549,6 +3593,11 @@ const COLUMN_MATCHING_CONFIG = [
     systemField: { name: '메모2', key: 'memo2', column: 67 }, // BP열
     regex: '\\d+', // 숫자 추출 (6자리 제한 제거)
     description: '대리점코드 비교 (메모2에서 숫자 추출)'
+  },
+  {
+    manualField: { name: '개통일시분', key: 'activation_datetime', column: 20 }, // U열
+    systemField: { name: '개통일시분', key: 'activation_datetime', column: 1 }, // B열
+    description: '개통일시분 비교 (초 제외, 24시간 형식)'
   }
 ];
 
@@ -3589,6 +3638,43 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
   mappingsToCompare.forEach(config => {
     const { manualField, systemField, regex, description } = config;
     
+    // 개통일시분 비교 로직
+    if (manualField.key === 'activation_datetime') {
+      // 배열 범위 체크
+      if (manualRow.length <= 20 || systemRow.length <= 3) { // U=20, B=1, C=2, D=3
+        return;
+      }
+      
+      const manualDate = manualRow[20] || ''; // U열: 가입일자
+      const manualTime = manualRow[21] || ''; // V열: 개통시간
+      const systemDate = systemRow[1] || '';  // B열: 개통일
+      const systemHour = systemRow[2] || '';  // C열: 개통시
+      const systemMinute = systemRow[3] || ''; // D열: 개통분
+      
+      // 개통일시분 정규화
+      const { manualDateTime, systemDateTime } = normalizeActivationDateTime(
+        manualDate, manualTime, systemDate, systemHour, systemMinute
+      );
+      
+      // 정규화된 값이 있고 다르면 차이점으로 기록
+      if (manualDateTime && systemDateTime && manualDateTime !== systemDateTime) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '개통일시분',
+          fieldKey: 'activation_datetime',
+          correctValue: manualDateTime,
+          incorrectValue: systemDateTime,
+          description: '개통일시분 비교 (초 제외, 24시간 형식)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 기존 비교 로직 (대리점코드 등)
     // 배열 범위 체크
     if (manualRow.length <= manualField.column || systemRow.length <= systemField.column) {
       return;

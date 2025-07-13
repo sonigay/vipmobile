@@ -271,12 +271,27 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   };
 
   // 컬럼 설정 다이얼로그 열기
-  const handleOpenColumnSettings = () => {
-    setColumnSettingsDialog({
-      open: true,
-      settings: columnSettings,
-      isEditing: false
-    });
+  const handleOpenColumnSettings = (fieldKey = null) => {
+    if (columnSettings) {
+      // 특정 필드의 설정만 필터링
+      let filteredSettings = columnSettings;
+      if (fieldKey) {
+        const filteredMappings = columnSettings.dynamicMappings?.filter(
+          mapping => mapping.key === fieldKey
+        ) || [];
+        filteredSettings = {
+          ...columnSettings,
+          dynamicMappings: filteredMappings
+        };
+      }
+      
+      setColumnSettingsDialog({
+        open: true,
+        settings: filteredSettings,
+        isEditing: false,
+        selectedField: fieldKey
+      });
+    }
   };
 
   // 컬럼 설정 저장
@@ -699,6 +714,26 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         </Paper>
         )}
 
+        {/* 검수 항목별 설정 버튼 */}
+        <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<EditIcon />}
+            onClick={() => handleOpenColumnSettings('store_code')}
+          >
+            대리점코드 설정
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<EditIcon />}
+            onClick={() => handleOpenColumnSettings('activation_datetime')}
+          >
+            개통일시분 설정
+          </Button>
+        </Box>
+
         {/* 데이터 테이블 */}
         {!isLoading && inspectionData && inspectionData.differences && (
           <Paper sx={{ width: '100%', overflow: 'hidden' }}>
@@ -708,8 +743,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                 <TableRow>
                   <TableCell>가입번호</TableCell>
                   <TableCell>타입</TableCell>
-                  <TableCell>수기초값 (대리점코드)</TableCell>
-                  <TableCell>폰클데이터값 ({columnSettings?.systemMemo2ColumnName || '메모2'})</TableCell>
+                  <TableCell>수기초값</TableCell>
+                  <TableCell>폰클데이터값</TableCell>
                   <TableCell>처리자</TableCell>
                   <TableCell>수정완료</TableCell>
                   <TableCell>상태</TableCell>
@@ -743,10 +778,14 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                         />
                       </TableCell>
                       <TableCell sx={{ maxWidth: 200, wordBreak: 'break-word', color: 'success.main', fontWeight: 'bold' }}>
-                        {item.correctValue}
+                        {item.fieldKey === 'activation_datetime' ? 
+                          `수기초: ${item.correctValue}` : 
+                          item.correctValue}
                       </TableCell>
                       <TableCell sx={{ maxWidth: 200, wordBreak: 'break-word', color: 'error.main' }}>
-                        {item.incorrectValue}
+                        {item.fieldKey === 'activation_datetime' ? 
+                          `폰클: ${item.incorrectValue}` : 
+                          item.incorrectValue}
                       </TableCell>
                       <TableCell>{item.assignedAgent}</TableCell>
                       <TableCell>
@@ -795,7 +834,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
         fullWidth
       >
         <DialogTitle>
-          컬럼 설정
+          {columnSettingsDialog.selectedField === 'store_code' ? '대리점코드 설정' :
+           columnSettingsDialog.selectedField === 'activation_datetime' ? '개통일시분 설정' :
+           '컬럼 설정'}
           {!columnSettingsDialog.isEditing && (
             <Button
               variant="outlined"
