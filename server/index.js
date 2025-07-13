@@ -3820,16 +3820,19 @@ function normalizeSerialNumber(serialNumber) {
   
   let serial = serialNumber.toString().trim();
   
-  // 디버깅 대상 시리얼번호인지 확인 (필요시에만 사용)
-  const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(serial);
-  
   // 숫자인지 확인
   if (/^\d+$/.test(serial)) {
-    // 숫자인 경우 앞의 0만 제거하고 반환 (뒤에서 6자리 제한 제거)
-    const result = serial.replace(/^0+/, '');
-    return result;
+    // 숫자인 경우: 오른쪽에서부터 6자리로 맞춤
+    // 6자리보다 부족한 경우 왼쪽에 0을 붙여서 6자리로 맞춤
+    if (serial.length > 6) {
+      // 6자리보다 긴 경우: 오른쪽에서 6자리만 사용
+      return serial.slice(-6);
+    } else {
+      // 6자리보다 짧은 경우: 왼쪽에 0을 붙여서 6자리로 맞춤
+      return serial.padStart(6, '0');
+    }
   } else {
-    // 영문이 포함된 경우 앞의 0들을 제거하고 반환
+    // 영문이 포함된 경우: 앞의 0들을 제거하고 반환
     const result = serial.replace(/^0+/, '');
     return result;
   }
