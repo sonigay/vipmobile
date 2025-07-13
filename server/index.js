@@ -870,7 +870,7 @@ async function getGitUpdateHistory() {
     
     // 최근 30일간의 커밋 히스토리 가져오기
     const { stdout } = await execAsync('git log --since="30 days ago" --pretty=format:"%h|%ad|%s" --date=short', { 
-      cwd: process.cwd(),
+      cwd: __dirname, // 서버 파일이 있는 디렉토리 (Git 저장소 루트)
       timeout: 10000 
     });
     
