@@ -4197,7 +4197,8 @@ function normalizeSerialNumber(serialNumber) {
 
 // 숫자 서식 정규화 함수 (#,### 형식)
 function normalizeNumberFormat(value) {
-  if (!value) return '';
+  // 0값도 유효한 값으로 처리
+  if (value === null || value === undefined || value === '') return '';
   
   const strValue = value.toString().trim();
   
@@ -4426,6 +4427,12 @@ function normalizeShippingVirtual(manualRow, systemRow) {
     const bmValue = (manualRow[64] || '').toString().trim(); // BM열
     const bnValue = (manualRow[63] || '').toString().trim(); // BN열
     const blValue = (manualRow[65] || '').toString().trim(); // BL열
+    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+    
+    // AN열에 "BLANK" 포함되어있으면 대상에서 제외
+    if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
+      return { manualShipping: '', systemShipping: '' }; // 검수 대상에서 제외
+    }
     
     // 숫자 더하기 연산으로 정규화
     const values = [avValue, azValue, awValue, bkValue, bmValue, bnValue, blValue].filter(v => v);
@@ -4445,10 +4452,10 @@ function normalizeShippingVirtual(manualRow, systemRow) {
 
 // 지원금 및 약정상이 정규화 함수
 function normalizeSupportContract(manualRow, systemRow) {
-  // 수기초 데이터 정규화 (DH열 또는 BK열)
+  // 수기초 데이터 정규화 (BH열 또는 BK열)
   let manualSupport = '';
-  if (manualRow.length > 85) { // 최소 DH열(85)은 있어야 함
-    const dhValue = (manualRow[85] || '').toString().trim(); // DH열
+  if (manualRow.length > 61) { // 최소 BH열(61)은 있어야 함
+    const bhValue = (manualRow[61] || '').toString().trim(); // BH열
     const bkValue = (manualRow[62] || '').toString().trim(); // BK열
     const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
     
@@ -4457,8 +4464,8 @@ function normalizeSupportContract(manualRow, systemRow) {
       return { manualSupport: '', systemSupport: '' }; // 검수 대상에서 제외
     }
     
-    // 선택방식 정규화: DH열에 "선택" 포함 시 "선택약정할인", 아니면 BK열
-    if (dhValue && dhValue.includes('선택')) {
+    // 선택방식 정규화: BH열에 "선택" 포함 시 "선택약정할인", 아니면 BK열
+    if (bhValue && bhValue.includes('선택')) {
       manualSupport = '선택약정할인';
     } else {
       manualSupport = normalizeNumberFormat(bkValue);
@@ -4469,7 +4476,13 @@ function normalizeSupportContract(manualRow, systemRow) {
   let systemSupport = '';
   if (systemRow.length > 28) { // 최소 AC열(28)은 있어야 함
     const acValue = (systemRow[28] || '').toString().trim(); // AC열: 지원금 및 약정상이
-    systemSupport = normalizeNumberFormat(acValue);
+    
+    // 선택방식 정규화: AC열에 "선택" 포함 시 "선택약정할인", 아니면 숫자 형식
+    if (acValue && acValue.includes('선택')) {
+      systemSupport = '선택약정할인';
+    } else {
+      systemSupport = normalizeNumberFormat(acValue);
+    }
   }
   
   return { manualSupport, systemSupport };
@@ -4521,15 +4534,19 @@ function normalizePreInstallment(manualRow, systemRow) {
     manualPreInstallment = normalizeNumberFormat(avValue);
   }
   
-  // 폰클 데이터 정규화 (AB열-AS열)
+  // 폰클 데이터 정규화 (AB열-AS열-AC열-AE열)
   let systemPreInstallment = '';
-  if (systemRow.length > 44) { // 최소 AS열(44)은 있어야 함
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
     const abValue = (systemRow[27] || '').toString().trim(); // AB열
     const asValue = (systemRow[44] || '').toString().trim(); // AS열
+    const acValue = (systemRow[28] || '').toString().trim(); // AC열
+    const aeValue = (systemRow[30] || '').toString().trim(); // AE열
     
-    // 숫자 빼기 연산으로 정규화
-    const difference = subtractNumbers(abValue, asValue);
-    systemPreInstallment = normalizeNumberFormat(difference);
+    // 숫자 빼기 연산으로 정규화: AB - AS - AC - AE
+    let result = subtractNumbers(abValue, asValue);
+    result = subtractNumbers(result, acValue);
+    result = subtractNumbers(result, aeValue);
+    systemPreInstallment = normalizeNumberFormat(result);
   }
   
   return { manualPreInstallment, systemPreInstallment };
@@ -4754,6 +4771,11 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 출고가상이 정규화
       const { manualShipping, systemShipping } = normalizeShippingVirtual(manualRow, systemRow);
       
+      // AN열 BLANK 제외 조건으로 인해 빈 값이 반환된 경우 비교 제외
+      if (!manualShipping && !systemShipping) {
+        return;
+      }
+      
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
       if (manualShipping !== systemShipping && 
           (manualShipping || systemShipping)) {
@@ -4765,7 +4787,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'shipping_virtual',
           correctValue: manualShipping || '정규화 불가',
           incorrectValue: systemShipping || '정규화 불가',
-          description: '출고가상이 비교 (더하기 방식 정규화)',
+          description: '출고가상이 비교 (더하기 방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
