@@ -279,6 +279,7 @@ if (!GOOGLE_PRIVATE_KEY) {
 // 시트 이름 설정
 const INVENTORY_SHEET_NAME = '폰클재고데이터';
 const STORE_SHEET_NAME = '폰클출고처데이터';
+const PLAN_SHEET_NAME = '무선요금제군';  // 무선요금제군 시트 추가
 const AGENT_SHEET_NAME = '대리점아이디관리';  // 대리점 아이디 관리 시트 추가
 const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터';  // 당월 개통실적 데이터
 const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터(전월)';  // 전월 개통실적 데이터
@@ -441,6 +442,91 @@ function vlookupStoreNameToPosCode(storeName, storeData) {
       const rowStoreName = (row[6] || '').toString().trim(); // G열: 업체명
       if (rowStoreName === searchStoreName) {
         return (row[7] || '').toString().trim(); // H열: POS코드
+      }
+    }
+  }
+  
+  return null;
+}
+
+// 요금제 VLOOKUP 함수들
+function vlookupPlanNameToPlanCode(planName, planData) {
+  if (!planName || !planData || planData.length === 0) {
+    return null;
+  }
+  
+  const searchPlanName = planName.toString().trim();
+  
+  // N열(요금제명)에서 검색하여 O열(요금제코드) 반환
+  for (let i = 1; i < planData.length; i++) { // 헤더 제외하고 검색
+    const row = planData[i];
+    if (row && row.length > 14) { // 최소 O열(14)은 있어야 함
+      const rowPlanName = (row[13] || '').toString().trim(); // N열: 요금제명
+      if (rowPlanName === searchPlanName) {
+        return (row[14] || '').toString().trim(); // O열: 요금제코드
+      }
+    }
+  }
+  
+  return null;
+}
+
+function vlookupPlanNameToPlanType(planName, planData) {
+  if (!planName || !planData || planData.length === 0) {
+    return null;
+  }
+  
+  const searchPlanName = planName.toString().trim();
+  
+  // N열(요금제명)에서 검색하여 U열(요금제구분) 반환
+  for (let i = 1; i < planData.length; i++) { // 헤더 제외하고 검색
+    const row = planData[i];
+    if (row && row.length > 20) { // 최소 U열(20)은 있어야 함
+      const rowPlanName = (row[13] || '').toString().trim(); // N열: 요금제명
+      if (rowPlanName === searchPlanName) {
+        return (row[20] || '').toString().trim(); // U열: 요금제구분
+      }
+    }
+  }
+  
+  return null;
+}
+
+function vlookupPlanCodeToPlanName(planCode, planData) {
+  if (!planCode || !planData || planData.length === 0) {
+    return null;
+  }
+  
+  const searchPlanCode = planCode.toString().trim();
+  
+  // O열(요금제코드)에서 검색하여 N열(요금제명) 반환
+  for (let i = 1; i < planData.length; i++) { // 헤더 제외하고 검색
+    const row = planData[i];
+    if (row && row.length > 14) { // 최소 O열(14)은 있어야 함
+      const rowPlanCode = (row[14] || '').toString().trim(); // O열: 요금제코드
+      if (rowPlanCode === searchPlanCode) {
+        return (row[13] || '').toString().trim(); // N열: 요금제명
+      }
+    }
+  }
+  
+  return null;
+}
+
+function vlookupPlanCodeToPlanType(planCode, planData) {
+  if (!planCode || !planData || planData.length === 0) {
+    return null;
+  }
+  
+  const searchPlanCode = planCode.toString().trim();
+  
+  // O열(요금제코드)에서 검색하여 U열(요금제구분) 반환
+  for (let i = 1; i < planData.length; i++) { // 헤더 제외하고 검색
+    const row = planData[i];
+    if (row && row.length > 20) { // 최소 U열(20)은 있어야 함
+      const rowPlanCode = (row[14] || '').toString().trim(); // O열: 요금제코드
+      if (rowPlanCode === searchPlanCode) {
+        return (row[20] || '').toString().trim(); // U열: 요금제구분
       }
     }
   }
@@ -3054,11 +3140,12 @@ app.get('/api/inspection-data', async (req, res) => {
     console.log('검수 데이터 처리 시작... (개인정보 보안 처리 포함)');
     const startTime = Date.now();
     
-    // 수기초, 폰클개통데이터, 폰클출고처데이터 병렬 로드
-    const [manualValues, systemValues, storeValues] = await Promise.all([
+    // 수기초, 폰클개통데이터, 폰클출고처데이터, 무선요금제군 병렬 로드
+    const [manualValues, systemValues, storeValues, planValues] = await Promise.all([
       getSheetValues(MANUAL_DATA_SHEET_NAME),
       getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME),
-      getSheetValues(STORE_SHEET_NAME)
+      getSheetValues(STORE_SHEET_NAME),
+      getSheetValues(PLAN_SHEET_NAME)
     ]);
     
     if (!manualValues || !systemValues) {
@@ -3246,7 +3333,7 @@ app.get('/api/inspection-data', async (req, res) => {
               }
               
               // 두 데이터 비교
-              const rowDifferences = compareDynamicColumns(manualItem.row, systemItem.row, key, field, storeValues);
+              const rowDifferences = compareDynamicColumns(manualItem.row, systemItem.row, key, field, storeValues, planValues);
               
               rowDifferences.forEach(diff => {
                 differences.push({
@@ -3810,6 +3897,11 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '실판매POS', key: 'sales_pos', column: 7 }, // H열
     systemField: { name: '실판매POS', key: 'sales_pos', column: 6 }, // G열
     description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)'
+  },
+  {
+    manualField: { name: '요금제', key: 'plan', column: 37 }, // AL열
+    systemField: { name: '요금제', key: 'plan', column: 21 }, // V열
+    description: '요금제 비교 (VLOOKUP 방식 정규화, AN열 BLANK 제외)'
   }
 ];
 
@@ -4000,8 +4092,60 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
   return { manualPos, systemPos };
 }
 
+// 요금제 정규화 함수
+function normalizePlan(manualRow, systemRow, planData = null) {
+  // 수기초 데이터 정규화 (AL열)
+  let manualPlan = '';
+  if (manualRow.length > 37) { // 최소 AL열(37)은 있어야 함
+    const planName = (manualRow[37] || '').toString().trim(); // AL열: 최종요금제
+    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+    
+    // AN열에 "BLANK" 문구 포함건은 대상에서 제외
+    if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
+      return { manualPlan: '', systemPlan: '' }; // 검수 대상에서 제외
+    }
+    
+    // 수기초 정규화: AL열 & (VLOOKUP1) & (VLOOKUP2)
+    if (planName && planData) {
+      const vlookup1 = vlookupPlanNameToPlanCode(planName, planData);
+      const vlookup2 = vlookupPlanNameToPlanType(planName, planData);
+      
+      const parts = [planName];
+      if (vlookup1) parts.push(`(${vlookup1})`);
+      if (vlookup2) parts.push(`(${vlookup2})`);
+      
+      manualPlan = parts.join(' & ');
+    } else {
+      manualPlan = planName;
+    }
+  }
+  
+  // 폰클 데이터 정규화 (V열)
+  let systemPlan = '';
+  if (systemRow.length > 21) { // 최소 V열(21)은 있어야 함
+    const planCode = (systemRow[21] || '').toString().trim(); // V열: 요금제
+    
+    // 폰클 정규화: VLOOKUP1 & (V열) & (VLOOKUP2)
+    if (planCode && planData) {
+      const vlookup1 = vlookupPlanCodeToPlanName(planCode, planData);
+      const vlookup2 = vlookupPlanCodeToPlanType(planCode, planData);
+      
+      const parts = [];
+      if (vlookup1) parts.push(vlookup1);
+      parts.push(`(${planCode})`);
+      if (vlookup2) parts.push(`(${vlookup2})`);
+      
+      systemPlan = parts.join(' & ');
+    } else {
+      systemPlan = planCode ? `(${planCode})` : '';
+    }
+  }
+  
+  return { manualPlan, systemPlan };
+}
+
 // 동적 컬럼 비교 함수
-function compareDynamicColumns(manualRow, systemRow, key, targetField = null, storeData = null) {
+function compareDynamicColumns(manualRow, systemRow, key, targetField = null, storeData = null, planData = null) {
   const differences = [];
   
   // 특정 필드만 비교하거나 전체 필드 비교
@@ -4161,6 +4305,41 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           correctValue: manualPos || '정규화 불가',
           incorrectValue: systemPos || '정규화 불가',
           description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 요금제 비교 로직
+    if (manualField.key === 'plan') {
+      // 배열 범위 체크 (AL=37, AN=39, V=21)
+      if (manualRow.length <= 39 || systemRow.length <= 21) {
+        return;
+      }
+      
+      // 요금제 정규화
+      const { manualPlan, systemPlan } = normalizePlan(manualRow, systemRow, planData);
+      
+      // AN열 BLANK 제외 조건으로 인해 빈 값이 반환된 경우 비교 제외
+      if (!manualPlan && !systemPlan) {
+        return;
+      }
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualPlan !== systemPlan && 
+          (manualPlan || systemPlan)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '요금제',
+          fieldKey: 'plan',
+          correctValue: manualPlan || '정규화 불가',
+          incorrectValue: systemPlan || '정규화 불가',
+          description: '요금제 비교 (VLOOKUP 방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
