@@ -3071,6 +3071,10 @@ app.get('/api/inspection-data', async (req, res) => {
         console.log(`\n=== 디버깅 대상 가입번호 처리 시작: ${key} ===`);
         console.log(`수기초 데이터 존재: ${!!manualData}`);
         console.log(`폰클 데이터 존재: ${!!systemData}`);
+        if (systemData) {
+          console.log(`폰클 데이터 매핑 키 (BO열): "${systemData.row[66] || ''}"`);
+          console.log(`폰클 데이터 전체 길이: ${systemData.row.length}`);
+        }
       }
       
       if (systemData) {
@@ -3766,8 +3770,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
     
     // 모델명(일련번호) 비교 로직
     if (manualField.key === 'model_serial') {
-      // 배열 범위 체크 (AD=29, AS=44, AN=39, N=13, P=15)
-      if (manualRow.length <= 44 || systemRow.length <= 15) {
+      // 배열 범위 체크 (AD=29, AE=30, AN=39, N=13, P=15)
+      if (manualRow.length <= 30 || systemRow.length <= 15) {
         console.log(`모델명 비교 범위 체크 실패: key=${key}, manualRow.length=${manualRow.length}, systemRow.length=${systemRow.length}`);
         return;
       }
@@ -3779,7 +3783,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       }
       
       const manualModel = manualRow[29] || ''; // AD열: 개통모델
-      const manualSerial = manualRow[44] || ''; // AS열: 판매모델일련번호
+      const manualSerial = manualRow[30] || ''; // AE열: 개통모델일련번호
       const systemModel = systemRow[13] || '';  // N열: 모델명
       const systemSerial = systemRow[15] || ''; // P열: 일련번호
       
@@ -3788,8 +3792,12 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null) {
       
       if (isDebugTarget) {
         console.log(`\n=== 디버깅 대상 모델명 비교 시작: key=${key} ===`);
+        console.log(`수기초 데이터 - AD열(29): "${manualRow[29] || ''}", AE열(30): "${manualRow[30] || ''}"`);
         console.log(`수기초 시리얼번호: "${manualSerial}"`);
         console.log(`폰클 시리얼번호: "${systemSerial}"`);
+        console.log(`폰클 전체 데이터 (N열, P열): N="${systemRow[13] || ''}", P="${systemRow[15] || ''}"`);
+        console.log(`폰클 데이터 길이: ${systemRow.length}`);
+        console.log(`수기초 데이터 길이: ${manualRow.length}`);
       }
       
       // 모델명과 일련번호 정규화
