@@ -3192,22 +3192,9 @@ app.get('/api/inspection-data', async (req, res) => {
         const isMatch = cleanAgent === cleanUserName;
         if (isMatch) {
           matchCount++;
-          console.log(`매칭됨 ${matchCount}: "${cleanAgent}" === "${cleanUserName}"`);
-        } else {
-          console.log(`매칭 안됨: "${cleanAgent}" !== "${cleanUserName}"`);
         }
         return isMatch;
       });
-      
-      console.log(`필터링 후 차이점: ${filteredDifferences.length}개 (매칭된 항목: ${matchCount}개)`);
-      
-      // 매칭이 안 된 경우 원본 값들도 로그
-      if (filteredDifferences.length === 0) {
-        console.log('매칭 실패 - 원본 값들:');
-        console.log('사용자 ID 원본:', userId);
-        console.log('사용자 이름:', userName);
-        console.log('등록직원 원본들:', [...new Set(differences.map(d => d.assignedAgent))]);
-      }
     }
 
     // 개인정보 보안 처리: 마스킹 및 해시화

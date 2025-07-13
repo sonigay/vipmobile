@@ -854,9 +854,7 @@ function App() {
       
       const isMatch = managerPrefix === agentPrefix;
       
-      if (isMatch) {
-        console.log(`담당자 매칭: ${store.manager} (${store.name})`);
-      }
+
       
       return isMatch;
     });
