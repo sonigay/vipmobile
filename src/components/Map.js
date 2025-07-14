@@ -178,7 +178,6 @@ function Map({
   const [mapZoom, setMapZoom] = useState(isAgentMode ? 9 : 12);
   const [mapKey, setMapKey] = useState(0);
   const [isMapInitialized, setIsMapInitialized] = useState(false);
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
   const initialLoadRef = useRef(true);
   const previousSelectedStoreRef = useRef(null);
   const mapRef = useRef(null);
