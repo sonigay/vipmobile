@@ -2499,16 +2499,16 @@ function App() {
                 />
               )}
               {currentView !== 'activation' && (
-              <Box sx={{ 
-                flex: 1,
-                height: isMapExpanded ? '90vh' : { xs: '50vh', sm: '60vh', md: '70vh' },
-                position: 'relative',
-                borderRadius: 1,
-                boxShadow: 2,
-                overflow: 'hidden',
-                transition: 'height 0.3s ease-in-out'
-              }}>
-                                  <Map
+                <Box sx={{ 
+                  flex: 1,
+                  height: isMapExpanded ? '85vh' : { xs: '50vh', sm: '60vh', md: '70vh' },
+                  position: 'relative',
+                  borderRadius: 1,
+                  boxShadow: 2,
+                  overflow: 'hidden',
+                  transition: 'height 0.3s ease-in-out'
+                }}>
+                  <Map
                     userLocation={userLocation}
                     filteredStores={isAgentMode && currentView === 'assigned' && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
                     selectedStore={selectedStore}
@@ -2529,7 +2529,7 @@ function App() {
                     isMapExpanded={isMapExpanded}
                     onMapExpandToggle={() => setIsMapExpanded(!isMapExpanded)}
                   />
-              </Box>
+                </Box>
               )}
             </>
           )}

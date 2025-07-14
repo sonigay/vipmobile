@@ -91,8 +91,19 @@ function ForceZoomUpdater({ forceZoomToStore }) {
 }
 
 // 지도 뷰 업데이트를 위한 컴포넌트
-function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
+function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomToStore }) {
   const map = useMap();
+  
+  // 각 모드별 줌 레벨 설정
+  const getModeZoom = () => {
+    if (isAgentMode) {
+      if (currentView === 'all') return 10;      // 전체재고확인
+      if (currentView === 'assigned') return 11; // 담당재고확인
+      if (currentView === 'activation') return 12; // 담당개통확인
+      return 10; // 기본값
+    }
+    return 12; // 일반 매장 모드
+  };
   
   useEffect(() => {
     // 강제 확대가 진행 중이면 MapUpdater 비활성화 (지도 위치 유지)
@@ -112,14 +123,15 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
                 animate: true,
                 duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
               });
-              if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-                map.setZoom(isAgentMode ? 12 : 15, {
+              const modeZoom = getModeZoom();
+              if (map.getZoom() > modeZoom) {
+                map.setZoom(modeZoom, {
                   animate: true,
                   duration: 1.5
                 });
               }
             } else if (center) {
-              map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12), {
+              map.setView([center.lat, center.lng], zoom || getModeZoom(), {
                 animate: true,
                 duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
               });
@@ -141,7 +153,7 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
     };
     
     attemptUpdate();
-  }, [map, center, bounds, zoom, isAgentMode, forceZoomToStore]);
+  }, [map, center, bounds, zoom, isAgentMode, currentView, forceZoomToStore]);
   
   return null;
 }
@@ -171,7 +183,19 @@ function Map({
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
-  const [mapZoom, setMapZoom] = useState(isAgentMode ? 9 : 12);
+  
+  // 각 모드별 초기 줌 레벨 설정
+  const getInitialZoom = () => {
+    if (isAgentMode) {
+      if (currentView === 'all') return 10;      // 전체재고확인
+      if (currentView === 'assigned') return 11; // 담당재고확인
+      if (currentView === 'activation') return 12; // 담당개통확인
+      return 10; // 기본값
+    }
+    return 12; // 일반 매장 모드
+  };
+  
+  const [mapZoom, setMapZoom] = useState(getInitialZoom());
   const [mapKey, setMapKey] = useState(0);
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const initialLoadRef = useRef(true);
@@ -654,6 +678,7 @@ function Map({
           bounds={mapBounds} 
           zoom={mapZoom}
           isAgentMode={isAgentMode}
+          currentView={currentView}
           forceZoomToStore={forceZoomToStore}
         />
         
