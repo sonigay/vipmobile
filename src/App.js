@@ -749,7 +749,9 @@ function App() {
         // 관리자 모드 상태 복원
         if (parsedState.isAgent) {
           setIsAgentMode(true);
-          setAgentTarget(parsedState.agentTarget || '');
+          // agentTarget이 비어있으면 store.name에서 추출
+          const agentTarget = parsedState.agentTarget || parsedState.store?.name || '';
+          setAgentTarget(agentTarget);
           setAgentQualification(parsedState.agentQualification || '');
           setAgentContactId(parsedState.agentContactId || '');
           setCurrentView(parsedState.currentView || 'all');
@@ -760,6 +762,11 @@ function App() {
             lng: 126.8309,
           });
           setSelectedRadius(80000);
+          
+          // 관리자 모드일 때 개통실적 데이터 로드
+          setTimeout(() => {
+            loadActivationData();
+          }, 100);
         } else if (parsedState.isInventory) {
           // 재고모드 상태 복원
           setIsInventoryMode(true);

@@ -41,22 +41,50 @@ function ForceZoomUpdater({ forceZoomToStore }) {
       const { lat, lng } = forceZoomToStore;
       console.log('ForceZoomUpdater 실행:', lat, lng, '지도 인스턴스:', map);
       
+      const attemptZoom = (attemptCount = 0) => {
         try {
-        // 지도가 완전히 로드된 후에 확대 실행
-        const timer = setTimeout(() => {
-          if (map && map._loaded) {
-          map.setView([lat, lng], 14, {
-            animate: true,
-            duration: 1
-          });
-            console.log('ForceZoomUpdater 확대 완료');
+          // 지도가 완전히 로드되었는지 확인
+          if (map && map._loaded && map._container) {
+            // 지도 패널 크기 확인 (컨테이너 크기로 대체 가능)
+            const container = map._container;
+            const panelSize = map._size || { x: container.offsetWidth, y: container.offsetHeight };
+            
+            if (panelSize.x > 0 && panelSize.y > 0) {
+              map.setView([lat, lng], 14, {
+                animate: true,
+                duration: 1
+              });
+              console.log('ForceZoomUpdater 확대 완료');
+              return;
+            } else if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+              // 컨테이너 크기로 대체
+              map.setView([lat, lng], 14, {
+                animate: true,
+                duration: 1
+              });
+              console.log('ForceZoomUpdater 확대 완료 (컨테이너 크기 사용)');
+              return;
+            }
           }
-        }, 100);
           
-        return () => clearTimeout(timer);
+          // 재시도 로직 (최대 10회, 200ms 간격)
+          if (attemptCount < 10) {
+            console.log(`ForceZoomUpdater 재시도 ${attemptCount + 1}/10`);
+            setTimeout(() => attemptZoom(attemptCount + 1), 200);
+          } else {
+            console.warn('ForceZoomUpdater 최대 재시도 횟수 초과');
+          }
         } catch (error) {
           console.error('ForceZoomUpdater 오류:', error);
-      }
+          // 오류 발생 시에도 재시도
+          if (attemptCount < 10) {
+            setTimeout(() => attemptZoom(attemptCount + 1), 200);
+          }
+        }
+      };
+      
+      // 초기 시도
+      setTimeout(() => attemptZoom(), 100);
     }
   }, [forceZoomToStore, map]);
   
@@ -74,16 +102,40 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
       return;
     }
     
-    if (map && map._loaded) {
-    if (bounds) {
-      map.fitBounds(bounds);
-      if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-        map.setZoom(isAgentMode ? 12 : 15);
+    const attemptUpdate = (attemptCount = 0) => {
+      try {
+        if (map && map._loaded && map._container) {
+          const container = map._container;
+          const panelSize = map._size || { x: container.offsetWidth, y: container.offsetHeight };
+          
+          if (panelSize.x > 0 && panelSize.y > 0 || container.offsetWidth > 0 && container.offsetHeight > 0) {
+            if (bounds) {
+              map.fitBounds(bounds);
+              if (map.getZoom() > (isAgentMode ? 12 : 15)) {
+                map.setZoom(isAgentMode ? 12 : 15);
+              }
+            } else if (center) {
+              map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
+            }
+            console.log('MapUpdater 업데이트 완료');
+            return;
+          }
+        }
+        
+        // 재시도 로직 (최대 5회, 300ms 간격)
+        if (attemptCount < 5) {
+          console.log(`MapUpdater 재시도 ${attemptCount + 1}/5`);
+          setTimeout(() => attemptUpdate(attemptCount + 1), 300);
+        }
+      } catch (error) {
+        console.error('MapUpdater 오류:', error);
+        if (attemptCount < 5) {
+          setTimeout(() => attemptUpdate(attemptCount + 1), 300);
+        }
       }
-    } else if (center) {
-      map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
-      }
-    }
+    };
+    
+    attemptUpdate();
   }, [map, center, bounds, zoom, isAgentMode, forceZoomToStore]);
   
   return null;
