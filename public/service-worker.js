@@ -7,7 +7,8 @@ const getCacheName = () => {
 };
 
 const CACHE_NAME = getCacheName();
-const BUILD_VERSION = Date.now().toString(); // 빌드 버전 정보
+// 고정된 빌드 버전 (실제 배포 시 변경됨)
+const BUILD_VERSION = '1752512625742'; // 새로운 빌드 버전 (업데이트 테스트)
 const urlsToCache = [
   '/',
   '/index.html',

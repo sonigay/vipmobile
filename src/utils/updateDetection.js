@@ -107,11 +107,11 @@ export const hasNewDeployment = async () => {
     const storedFrontendVersion = getStoredBuildVersion();
     const storedBackendVersion = getStoredBackendVersion();
     
-    // 프론트엔드 업데이트 체크
-    const hasFrontendUpdate = currentFrontendVersion !== storedFrontendVersion && storedFrontendVersion !== '0';
+    // 프론트엔드 업데이트 체크 (첫 실행 시에도 감지)
+    const hasFrontendUpdate = currentFrontendVersion !== storedFrontendVersion;
     
-    // 백엔드 업데이트 체크
-    const hasBackendUpdate = currentBackendVersion !== storedBackendVersion && storedBackendVersion !== '0';
+    // 백엔드 업데이트 체크 (첫 실행 시에도 감지)
+    const hasBackendUpdate = currentBackendVersion !== storedBackendVersion;
     
     console.log('업데이트 체크:', {
       frontend: { current: currentFrontendVersion, stored: storedFrontendVersion, hasUpdate: hasFrontendUpdate },
