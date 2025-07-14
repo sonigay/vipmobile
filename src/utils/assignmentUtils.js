@@ -1254,7 +1254,7 @@ export const aggregateOfficeAssignmentWithScores = (assignments, eligibleAgents)
           colorScores.averageScore = colorScores.scores.reduce((sum, score) => sum + score.score, 0) / colorScores.scores.length;
           
           // 세부 점수 정보 집계 (평균값)
-          const detailKeys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+          const detailKeys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume', 'inventoryScore'];
           detailKeys.forEach(key => {
             const validDetails = colorScores.scores
               .map(score => score.details[key])
@@ -1346,7 +1346,7 @@ export const aggregateDepartmentAssignmentWithScores = (assignments, eligibleAge
           colorScores.averageScore = colorScores.scores.reduce((sum, score) => sum + score.score, 0) / colorScores.scores.length;
           
           // 세부 점수 정보 집계 (평균값)
-          const detailKeys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+          const detailKeys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume', 'inventoryScore'];
           detailKeys.forEach(key => {
             const validDetails = colorScores.scores
               .map(score => score.details[key])
