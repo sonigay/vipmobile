@@ -754,7 +754,9 @@ function App() {
           console.log('로그인 상태 복원 - agentTarget 설정:', { 
             parsedAgentTarget: parsedState.agentTarget, 
             storeName: parsedState.store?.name, 
-            finalTarget: agentTarget 
+            finalTarget: agentTarget,
+            parsedStateKeys: Object.keys(parsedState),
+            storeKeys: parsedState.store ? Object.keys(parsedState.store) : []
           });
           setAgentTarget(agentTarget);
           setAgentQualification(parsedState.agentQualification || '');
@@ -1314,7 +1316,12 @@ function App() {
       
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
       const agentTarget = store.target || store.name || '';
-      console.log('관리자 모드 agentTarget 설정:', { storeTarget: store.target, storeName: store.name, finalTarget: agentTarget });
+      console.log('관리자 모드 agentTarget 설정:', { 
+        storeTarget: store.target, 
+        storeName: store.name, 
+        finalTarget: agentTarget,
+        storeKeys: Object.keys(store)
+      });
       setAgentTarget(agentTarget);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
