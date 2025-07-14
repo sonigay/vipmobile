@@ -22,8 +22,7 @@ import {
 } from './utils/activationService';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
-import UpdatePopup from './components/UpdatePopup';
-import UpdateProgressPopup from './components/UpdateProgressPopup';
+
 import ModeSelectionPopup from './components/ModeSelectionPopup';
 import InspectionMode from './components/InspectionMode';
 import ChartMode from './components/ChartMode';
@@ -140,11 +139,6 @@ function App() {
   const [deviceInfo, setDeviceInfo] = useState(null);
   // 캐시 상태
   const [cacheStatus, setCacheStatus] = useState(null);
-  // 업데이트 팝업 상태
-  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
-  const [unreadUpdates, setUnreadUpdates] = useState([]);
-  // 새로운 업데이트 진행 팝업 상태
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
   // 개통실적 데이터 상태
   const [activationData, setActivationData] = useState(null);
   // 개통실적 날짜별 데이터 상태
@@ -828,12 +822,60 @@ function App() {
     // 로그인 상태와 관계없이 앱 시작 시 업데이트 체크
     const checkForUpdates = async () => {
       try {
-        const hasNew = await hasNewUpdates();
+        // 하이브리드 업데이트 체크 (프론트엔드 + 백엔드)
+        const hasNew = await hasNewDeployment();
+        
         if (hasNew) {
-          const updates = await getUnreadUpdates();
-          setUnreadUpdates(updates);
-          setShowUpdatePopup(true);
-          // console.log('새로운 업데이트 발견, 팝업 표시:', updates.length, '개');
+          // 업데이트가 있으면 즉시 강제 로그아웃 및 앱 재시작
+          console.log('새로운 업데이트 발견 - 하이브리드 시스템');
+          
+          // 사용자에게 업데이트 알림
+          const shouldUpdate = window.confirm(
+            '업데이트 내용이 있습니다.\n\n' +
+            '업데이트를 적용하시겠습니까?\n\n' +
+            '확인을 누르면 앱이 재시작됩니다.'
+          );
+          
+          if (shouldUpdate) {
+            // 로그인 상태 저장 (재시작 후 복원용)
+            const currentLoginState = localStorage.getItem('loginState');
+            
+            // 업데이트 플래그 설정
+            localStorage.setItem('updateInProgress', 'true');
+            localStorage.setItem('pendingLoginState', currentLoginState || '');
+            
+            // 캐시 삭제
+            if ('caches' in window) {
+              try {
+                const cacheNames = await caches.keys();
+                await Promise.all(
+                  cacheNames.map(cacheName => caches.delete(cacheName))
+                );
+              } catch (error) {
+                console.warn('캐시 삭제 실패:', error);
+              }
+            }
+            
+            // Service Worker 업데이트
+            if ('serviceWorker' in navigator) {
+              try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                  await registration.update();
+                }
+              } catch (error) {
+                console.warn('Service Worker 업데이트 실패:', error);
+              }
+            }
+            
+            // 강제 로그아웃
+            handleLogout();
+            
+            // 페이지 새로고침으로 앱 재시작
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          }
         }
       } catch (error) {
         console.error('업데이트 확인 중 오류:', error);
@@ -1680,26 +1722,7 @@ function App() {
     // }
   }, [isAgentMode, isLoggedIn]);
 
-  // 업데이트 팝업 닫기 핸들러
-  const handleUpdatePopupClose = useCallback((hideToday = false) => {
-    setShowUpdatePopup(false);
-    
-    if (hideToday) {
-      // 오늘 하루 보지 않기 설정
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0); // 다음날 자정으로 설정
-      setHideUntilDate(tomorrow);
-      // console.log('오늘 하루 보지 않기 설정 완료:', tomorrow);
-    } else {
-      // 마지막 업데이트 버전을 현재 버전으로 설정
-      if (unreadUpdates.length > 0) {
-        const latestVersion = unreadUpdates[0].version;
-        setLastUpdateVersion(latestVersion);
-        // console.log('업데이트 확인 완료:', latestVersion);
-      }
-    }
-  }, [unreadUpdates]);
+
 
   // 업데이트 확인 핸들러
   const handleCheckUpdate = useCallback(async () => {
@@ -1707,13 +1730,57 @@ function App() {
       const hasNew = await hasNewUpdates();
       if (hasNew) {
         const updates = await getUnreadUpdates();
-        setUnreadUpdates(updates);
-        setShowUpdatePopup(true);
-        // console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
+        console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
+        
+        // 사용자에게 업데이트 알림
+        const shouldUpdate = window.confirm(
+          '업데이트 내용이 있습니다.\n\n' +
+          '업데이트를 적용하시겠습니까?\n\n' +
+          '확인을 누르면 앱이 재시작됩니다.'
+        );
+        
+        if (shouldUpdate) {
+          // 로그인 상태 저장 (재시작 후 복원용)
+          const currentLoginState = localStorage.getItem('loginState');
+          
+          // 업데이트 플래그 설정
+          localStorage.setItem('updateInProgress', 'true');
+          localStorage.setItem('pendingLoginState', currentLoginState || '');
+          
+          // 캐시 삭제
+          if ('caches' in window) {
+            try {
+              const cacheNames = await caches.keys();
+              await Promise.all(
+                cacheNames.map(cacheName => caches.delete(cacheName))
+              );
+            } catch (error) {
+              console.warn('캐시 삭제 실패:', error);
+            }
+          }
+          
+          // Service Worker 업데이트
+          if ('serviceWorker' in navigator) {
+            try {
+              const registration = await navigator.serviceWorker.getRegistration();
+              if (registration) {
+                await registration.update();
+              }
+            } catch (error) {
+              console.warn('Service Worker 업데이트 실패:', error);
+            }
+          }
+          
+          // 강제 로그아웃
+          handleLogout();
+          
+          // 페이지 새로고침으로 앱 재시작
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
       } else {
-        // 최신 버전인 경우 업데이트 진행 팝업을 표시하지 않고 바로 닫기
-        // console.log('업데이트 확인 - 최신 버전입니다');
-        // 최신 버전임을 알리는 간단한 알림만 표시
+        // 최신 버전인 경우 간단한 알림만 표시
         alert('현재 최신 버전을 사용하고 있습니다.');
       }
     } catch (error) {
@@ -1722,10 +1789,7 @@ function App() {
     }
   }, []);
 
-  // 업데이트 진행 팝업 닫기 핸들러
-  const handleUpdateProgressPopupClose = useCallback(() => {
-    setShowUpdateProgressPopup(false);
-  }, []);
+
 
   // 매장 재고 계산 함수 추가
   const getStoreInventory = useCallback((store) => {
@@ -2536,20 +2600,7 @@ function App() {
         </Box>
       </Container>
       
-      {/* 업데이트 팝업 */}
-      <UpdatePopup
-        open={showUpdatePopup}
-        onClose={handleUpdatePopupClose}
-        updates={unreadUpdates}
-        onMarkAsRead={handleUpdatePopupClose}
-      />
-      
-      {/* 업데이트 진행 팝업 */}
-      <UpdateProgressPopup
-        open={showUpdateProgressPopup}
-        onClose={handleUpdateProgressPopupClose}
-        isLatestVersion={false}
-      />
+
 
       {/* 알림 모달 */}
       <Dialog

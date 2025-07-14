@@ -2,6 +2,7 @@
 
 // 빌드 시점 기반 버전 체크
 const BUILD_VERSION_KEY = 'buildVersion';
+const BACKEND_VERSION_KEY = 'backendVersion';
 const LAST_CHECK_KEY = 'lastUpdateCheck';
 
 // 현재 빌드 버전 (Service Worker에서 가져오기)
@@ -33,12 +34,49 @@ const getCurrentBuildVersion = () => {
   });
 };
 
+// 백엔드 버전 정보 가져오기
+const getBackendVersion = async () => {
+  try {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/version`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      // 타임아웃 설정
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || data.buildTime || Date.now().toString();
+    } else {
+      // API가 없거나 오류인 경우 현재 시간 반환
+      return Date.now().toString();
+    }
+  } catch (error) {
+    console.warn('백엔드 버전 체크 실패:', error.message);
+    // 네트워크 오류 시 현재 시간 반환
+    return Date.now().toString();
+  }
+};
+
 // 저장된 빌드 버전 가져오기
 export const getStoredBuildVersion = () => {
   try {
     return localStorage.getItem(BUILD_VERSION_KEY) || '0';
   } catch (error) {
     console.error('저장된 빌드 버전 조회 실패:', error);
+    return '0';
+  }
+};
+
+// 저장된 백엔드 버전 가져오기
+export const getStoredBackendVersion = () => {
+  try {
+    return localStorage.getItem(BACKEND_VERSION_KEY) || '0';
+  } catch (error) {
+    console.error('저장된 백엔드 버전 조회 실패:', error);
     return '0';
   }
 };
@@ -52,24 +90,46 @@ export const setStoredBuildVersion = (version) => {
   }
 };
 
-// 새로운 배포가 있는지 확인
+// 백엔드 버전 저장
+export const setStoredBackendVersion = (version) => {
+  try {
+    localStorage.setItem(BACKEND_VERSION_KEY, version);
+  } catch (error) {
+    console.error('백엔드 버전 저장 실패:', error);
+  }
+};
+
+// 새로운 배포가 있는지 확인 (하이브리드 시스템)
 export const hasNewDeployment = async () => {
   try {
-    const currentVersion = await getCurrentBuildVersion();
-    const storedVersion = getStoredBuildVersion();
+    const currentFrontendVersion = await getCurrentBuildVersion();
+    const currentBackendVersion = await getBackendVersion();
+    const storedFrontendVersion = getStoredBuildVersion();
+    const storedBackendVersion = getStoredBackendVersion();
     
-    // console.log('배포 버전 체크:', { currentVersion, storedVersion });
+    // 프론트엔드 업데이트 체크
+    const hasFrontendUpdate = currentFrontendVersion !== storedFrontendVersion && storedFrontendVersion !== '0';
     
-    // 버전이 다르고, 저장된 버전이 '0'이 아닌 경우에만 새로운 배포로 간주
-    const hasNew = currentVersion !== storedVersion && storedVersion !== '0';
+    // 백엔드 업데이트 체크
+    const hasBackendUpdate = currentBackendVersion !== storedBackendVersion && storedBackendVersion !== '0';
     
-    if (hasNew) {
-      // console.log('새로운 배포 감지됨');
+    console.log('업데이트 체크:', {
+      frontend: { current: currentFrontendVersion, stored: storedFrontendVersion, hasUpdate: hasFrontendUpdate },
+      backend: { current: currentBackendVersion, stored: storedBackendVersion, hasUpdate: hasBackendUpdate }
+    });
+    
+    const hasUpdate = hasFrontendUpdate || hasBackendUpdate;
+    
+    if (hasUpdate) {
+      console.log('새로운 업데이트 감지됨:', {
+        frontend: hasFrontendUpdate ? '업데이트됨' : '변경없음',
+        backend: hasBackendUpdate ? '업데이트됨' : '변경없음'
+      });
     } else {
-      // console.log('새로운 배포 없음 또는 초기 로드');
+      console.log('새로운 업데이트 없음');
     }
     
-    return hasNew;
+    return hasUpdate;
   } catch (error) {
     console.error('배포 감지 중 오류:', error);
     return false;
@@ -79,21 +139,22 @@ export const hasNewDeployment = async () => {
 // 자동 로그아웃 실행
 export const performAutoLogout = async () => {
   try {
-    // console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+    console.log('새로운 배포 감지 - 자동 로그아웃 실행');
     
-    // 현재 빌드 버전 저장 (로그아웃 전에 저장)
-    const currentVersion = await getCurrentBuildVersion();
-    setStoredBuildVersion(currentVersion);
+    // 현재 버전들 저장 (로그아웃 전에 저장)
+    const currentFrontendVersion = await getCurrentBuildVersion();
+    const currentBackendVersion = await getBackendVersion();
+    
+    setStoredBuildVersion(currentFrontendVersion);
+    setStoredBackendVersion(currentBackendVersion);
     
     // 로그인 상태 삭제
     localStorage.removeItem('loginState');
     
     // 기타 관련 데이터 삭제 (업데이트 버전 정보는 보존)
     localStorage.removeItem('userIpInfo');
-    // localStorage.removeItem('lastUpdateVersion'); // 업데이트 버전 정보 보존
-    // localStorage.removeItem('hideUpdateUntilDate'); // 업데이트 숨김 설정 보존
     
-    // console.log('자동 로그아웃 완료 (업데이트 버전 정보 보존)');
+    console.log('자동 로그아웃 완료 (업데이트 버전 정보 보존)');
     return true;
   } catch (error) {
     console.error('자동 로그아웃 실패:', error);

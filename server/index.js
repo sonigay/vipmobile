@@ -807,6 +807,16 @@ app.get('/', (req, res) => {
   });
 });
 
+// 서버 버전 정보 엔드포인트
+app.get('/api/version', (req, res) => {
+  res.json({
+    version: process.env.npm_package_version || '1.0.0',
+    buildTime: Date.now().toString(),
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 캐시 상태 확인용 엔드포인트
 app.get('/api/cache-status', (req, res) => {
   res.json({
