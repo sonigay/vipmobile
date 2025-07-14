@@ -163,6 +163,48 @@
   min-height: 700px;
 }
 
+/* 모바일에서 맵 터치 영역 개선 */
+@media (max-width: 768px) {
+  .leaflet-container {
+    min-height: 500px;
+    touch-action: pan-x pan-y;
+  }
+  
+  /* 맵 컨트롤 영역 확대 */
+  .leaflet-control-zoom a {
+    width: 44px !important;
+    height: 44px !important;
+    line-height: 44px !important;
+    font-size: 18px !important;
+  }
+  
+  /* 맵 팝업 터치 영역 개선 */
+  .leaflet-popup-content {
+    min-width: 200px;
+    padding: 12px;
+  }
+  
+  .leaflet-popup-content h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  
+  .leaflet-popup-content p {
+    font-size: 16px;
+    margin: 8px 0;
+  }
+  
+  /* 스크롤과 맵 조작 구분 */
+  .map-container {
+    touch-action: pan-x pan-y;
+  }
+  
+  /* 맵 외부 영역은 스크롤 허용 */
+  .map-container:not(.leaflet-container) {
+    touch-action: auto;
+  }
+}
+
 .leaflet-popup-content {
   margin: 8px 12px;
   font-family: 'Roboto', sans-serif;

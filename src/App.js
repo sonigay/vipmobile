@@ -1682,6 +1682,11 @@ function App() {
     setCurrentView(view);
     // console.log(`재고 확인 뷰 변경: ${view}`);
     
+    // 뷰 변경 시 요청점 관련 상태 초기화
+    setRequestedStore(null);
+    setForceZoomToStore(null);
+    setSelectedStore(null);
+    
     // 로컬 스토리지에 현재 뷰 상태 저장
     const savedLoginState = localStorage.getItem('loginState');
     if (savedLoginState) {
@@ -2159,7 +2164,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Container maxWidth="xl" sx={{ 
-        height: '100vh', 
+        minHeight: '100vh', 
         py: 2,
         '@media (max-width: 768px)': {
           maxWidth: '100%',
@@ -2167,7 +2172,7 @@ function App() {
           py: 1
         }
       }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', gap: 2 }}>
           <Header 
             onCheckUpdate={handleCheckUpdate}
             inventoryUserName={inventoryUserName}
@@ -2201,10 +2206,12 @@ function App() {
                     // 담당개통확인 모드 - 지도를 위로, 테이블을 아래로
                     <>
                       <Box sx={{ 
-                        height: { xs: '40vh', sm: '50vh', md: '60vh' }, 
+                        height: { xs: '50vh', sm: '60vh', md: '70vh' }, 
                         mb: 2,
                         position: 'relative',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        borderRadius: 1,
+                        boxShadow: 2
                       }} className="activation-map-container">
                         <Map
                           userLocation={userLocation}
@@ -2232,7 +2239,8 @@ function App() {
                         borderRadius: 1, 
                         p: 2,
                         boxShadow: 1,
-                        height: { xs: '60vh', sm: '50vh', md: '40vh' },
+                        minHeight: { xs: '40vh', sm: '35vh', md: '30vh' },
+                        maxHeight: { xs: '50vh', sm: '45vh', md: '40vh' },
                         overflow: 'auto'
                       }} className="activation-table-container">
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
@@ -2520,7 +2528,14 @@ function App() {
                 />
               )}
               {currentView !== 'activation' && (
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ 
+                flex: 1,
+                minHeight: { xs: '60vh', sm: '70vh', md: '80vh' },
+                position: 'relative',
+                borderRadius: 1,
+                boxShadow: 2,
+                overflow: 'hidden'
+              }}>
                 <Map
                   userLocation={userLocation}
                   filteredStores={isAgentMode && currentView === 'assigned' && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}

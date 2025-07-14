@@ -15,7 +15,11 @@ L.Icon.Default.mergeOptions({
 const containerStyle = {
   width: '100%',
   height: '100%',
-  minHeight: '400px'
+  minHeight: '400px',
+  borderRadius: '4px',
+  '@media (max-width: 768px)': {
+    minHeight: '300px'
+  }
 };
 
 const mapContainerStyle = {
@@ -24,7 +28,9 @@ const mapContainerStyle = {
   display: 'flex',
   flexDirection: 'column',
   margin: 0,
-  padding: 0
+  padding: 0,
+  borderRadius: '4px',
+  overflow: 'hidden'
 };
 
 const defaultCenter = {
@@ -487,8 +493,11 @@ function Map({
       };
       
       safeMapOperation(() => {
-        // 선택된 매장으로 지도 이동 및 줌 레벨 조정 (더 확대)
-        map.setView([position.lat, position.lng], isAgentMode ? 16 : 15, {
+        // 현재 줌 레벨을 유지하면서 위치만 이동 (줌 레벨 강제 변경 방지)
+        const currentZoom = map.getZoom();
+        const targetZoom = Math.max(currentZoom, isAgentMode ? 12 : 14); // 최소 줌 레벨만 설정
+        
+        map.setView([position.lat, position.lng], targetZoom, {
           animate: true,
           duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
         });
