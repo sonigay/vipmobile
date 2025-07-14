@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
-import { Paper } from '@mui/material';
+import { Paper, Box, Button } from '@mui/material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -30,7 +30,8 @@ const mapContainerStyle = {
   margin: 0,
   padding: 0,
   borderRadius: '4px',
-  overflow: 'hidden'
+  overflow: 'hidden',
+  position: 'relative'
 };
 
 const defaultCenter = {
@@ -166,7 +167,9 @@ function Map({
   showActivationMarkers, // 개통실적 마커 표시 여부
   activationModelSearch, // 개통실적 모델 검색
   activationDateSearch, // 개통실적 날짜 검색
-  agentTarget // 담당자 정보 추가
+  agentTarget, // 담당자 정보 추가
+  isMapExpanded, // 맵 확대 상태
+  onMapExpandToggle // 맵 확대 토글 함수
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -174,6 +177,8 @@ function Map({
   const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
   const [mapZoom, setMapZoom] = useState(isAgentMode ? 9 : 12);
   const [mapKey, setMapKey] = useState(0);
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
   const initialLoadRef = useRef(true);
   const previousSelectedStoreRef = useRef(null);
   const mapRef = useRef(null);
@@ -458,6 +463,7 @@ function Map({
     // 지도가 완전히 로드될 때까지 대기
     setTimeout(() => {
       setIsMapReady(true);
+      setIsMapInitialized(true);
     }, 300); // 더 긴 대기 시간으로 조정
     
     // 사용자 인터랙션 이벤트 리스너 추가
@@ -594,8 +600,35 @@ function Map({
 
   return (
     <Paper sx={mapContainerStyle}>
+      {/* 확대/축소 토글 버튼 */}
+      <Box sx={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 1000,
+        backgroundColor: 'white',
+        borderRadius: 1,
+        boxShadow: 2,
+        p: 0.5
+      }}>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={onMapExpandToggle}
+          sx={{
+            minWidth: 'auto',
+            px: 1,
+            py: 0.5,
+            fontSize: '12px',
+            backgroundColor: 'white'
+          }}
+        >
+          {isMapExpanded ? '축소' : '확대'}
+        </Button>
+      </Box>
+      
       <MapContainer
-        key={`map-${isAgentMode ? 'agent' : 'store'}-${currentView || 'default'}-${mapKey}`}
+        key={`map-${isAgentMode ? 'agent' : 'store'}-${currentView || 'default'}-${currentView === 'activation' ? 'activation' : mapKey}`}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={mapZoom}
         style={containerStyle}

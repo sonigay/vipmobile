@@ -119,28 +119,28 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('AssignmentSettingsScreen: 데이터 로드 시작');
+        // console.log('AssignmentSettingsScreen: 데이터 로드 시작');
         
         // 담당자 데이터 로드
-        console.log('담당자 데이터 로드 중...');
+        // console.log('담당자 데이터 로드 중...');
         let agentDataLoaded = false;
         
         try {
           const agentResponse = await fetch(`${API_BASE_URL}/api/agents`);
-          console.log('담당자 API 응답 상태:', agentResponse.status);
-          console.log('담당자 API 응답 헤더:', agentResponse.headers.get('content-type'));
+          // console.log('담당자 API 응답 상태:', agentResponse.status);
+          // console.log('담당자 API 응답 헤더:', agentResponse.headers.get('content-type'));
           
           if (agentResponse.ok) {
             const contentType = agentResponse.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
               const agentData = await agentResponse.json();
-              console.log('담당자 데이터 로드 완료:', agentData.length, '명');
-              console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
+              // console.log('담당자 데이터 로드 완료:', agentData.length, '명');
+              // console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
               
               if (agentData && Array.isArray(agentData) && agentData.length > 0) {
                 setAgents(agentData);
                 agentDataLoaded = true;
-                console.log('✅ 실제 담당자 데이터 로드 성공');
+                // console.log('✅ 실제 담당자 데이터 로드 성공');
               } else {
                 console.warn('담당자 데이터가 비어있거나 유효하지 않음');
               }
@@ -150,52 +150,42 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               console.error('응답 내용:', responseText.substring(0, 200));
             }
           } else {
-            console.error('담당자 API 응답 실패:', agentResponse.status, agentResponse.statusText);
+            console.error('매장 API 응답 실패:', agentResponse.status, agentResponse.statusText);
             const responseText = await agentResponse.text();
             console.error('에러 응답 내용:', responseText.substring(0, 200));
           }
-        } catch (agentError) {
-          console.error('담당자 API 호출 실패:', agentError);
-          console.error('네트워크 에러 상세:', agentError.message);
+        } catch (apiError) {
+          console.error('API에서 데이터 가져오기 실패:', apiError);
+          console.error('네트워크 에러 상세:', apiError.message);
         }
         
-        // 실제 데이터 로드에 실패한 경우에만 샘플 데이터 사용
-        if (!agentDataLoaded) {
-          console.warn('⚠️ 실제 담당자 데이터 로드 실패, 샘플 데이터 사용');
-          const sampleAgents = [
-            { target: '김영업', contactId: 'kim001', office: '서울지사', department: '영업1팀' },
-            { target: '이매니저', contactId: 'lee002', office: '부산지사', department: '영업2팀' },
-            { target: '박대리', contactId: 'park003', office: '대구지사', department: '영업3팀' }
-          ];
-          setAgents(sampleAgents);
-        }
-
-        // 매장 데이터에서 사용 가능한 모델 추출
+        // 매장 데이터 로드
+        // console.log('매장 데이터 로드 중...');
         let storeData = null;
         let storeDataLoaded = false;
         
         if (data && Array.isArray(data)) {
-          console.log('Props로 받은 매장 데이터:', data.length, '개');
+          // console.log('Props로 받은 매장 데이터:', data.length, '개');
           storeData = data;
           storeDataLoaded = true;
-          console.log('✅ Props로 받은 매장 데이터 사용');
+          // console.log('✅ Props로 받은 매장 데이터 사용');
         } else {
-          console.log('Props로 받은 데이터가 없거나 배열이 아님, API에서 가져오기 시도');
+          // console.log('Props로 받은 데이터가 없거나 배열이 아님, API에서 가져오기 시도');
           // 데이터가 없으면 API에서 직접 가져오기
           try {
             const storeResponse = await fetch(`${API_BASE_URL}/api/stores`);
-            console.log('매장 API 응답 상태:', storeResponse.status);
-            console.log('매장 API 응답 헤더:', storeResponse.headers.get('content-type'));
+            // console.log('매장 API 응답 상태:', storeResponse.status);
+            // console.log('매장 API 응답 헤더:', storeResponse.headers.get('content-type'));
             
             if (storeResponse.ok) {
               const contentType = storeResponse.headers.get('content-type');
               if (contentType && contentType.includes('application/json')) {
                 const responseData = await storeResponse.json();
-                console.log('API에서 가져온 매장 데이터:', responseData.stores?.length || 0, '개');
+                // console.log('API에서 가져온 매장 데이터:', responseData.stores?.length || 0, '개');
                 if (responseData.stores && Array.isArray(responseData.stores)) {
                   storeData = responseData.stores;
                   storeDataLoaded = true;
-                  console.log('✅ API에서 매장 데이터 로드 성공');
+                  // console.log('✅ API에서 매장 데이터 로드 성공');
                 } else {
                   console.error('API 응답에 stores 배열이 없음:', responseData);
                 }
@@ -217,42 +207,30 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         
         // 모델 추출
         if (storeData && Array.isArray(storeData)) {
-          console.log('모델 추출 시작, 매장 수:', storeData.length);
+          // console.log('모델 추출 시작, 매장 수:', storeData.length);
           const models = extractAvailableModels(storeData);
-          console.log('추출된 모델 결과:', models);
-          console.log('사용 가능한 모델 수:', models.models.length);
-          console.log('사용 가능한 색상 수:', models.colors.length);
+          // console.log('추출된 모델 결과:', models);
+          // console.log('사용 가능한 모델 수:', models.models.length);
+          // console.log('사용 가능한 색상 수:', models.colors.length);
           setAvailableModels(models);
-          console.log('✅ 실제 모델 데이터 설정 완료');
+          // console.log('✅ 실제 모델 데이터 설정 완료');
         } else {
-          console.warn('⚠️ 매장 데이터가 없어 모델 추출 불가, 샘플 모델 사용');
-          // 샘플 모델 데이터 사용
-          const sampleModels = {
-            models: ['Galaxy S24', 'Galaxy A55', 'iPhone 15', 'iPhone 14'],
-            colors: ['블랙', '화이트', '블루', '그린', '레드'],
-            modelColors: new Map([
-              ['Galaxy S24', ['블랙', '화이트', '블루']],
-              ['Galaxy A55', ['블랙', '화이트', '그린']],
-              ['iPhone 15', ['블랙', '화이트', '레드']],
-              ['iPhone 14', ['블랙', '화이트', '블루']]
-            ])
-          };
-          setAvailableModels(sampleModels);
+          console.warn('⚠️ 매장 데이터가 없어 모델 추출 불가');
+          // 빈 모델 데이터 설정
+          setAvailableModels({
+            models: [],
+            colors: [],
+            modelColors: new Map()
+          });
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);
-        // 전체 에러 시에도 기본 데이터 설정
-        setAgents([
-          { target: '김영업', contactId: 'kim001', office: '서울지사', department: '영업1팀' },
-          { target: '이매니저', contactId: 'lee002', office: '부산지사', department: '영업2팀' }
-        ]);
+        // 에러 시 빈 데이터 설정
+        setAgents([]);
         setAvailableModels({
-          models: ['Galaxy S24', 'Galaxy A55'],
-          colors: ['블랙', '화이트'],
-          modelColors: new Map([
-            ['Galaxy S24', ['블랙', '화이트']],
-            ['Galaxy A55', ['블랙', '화이트']]
-          ])
+          models: [],
+          colors: [],
+          modelColors: new Map()
         });
       }
     };
@@ -349,10 +327,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     const defaultSettings = {
       assignmentSettings: {
         ratios: {
-          turnoverRate: 30,
+          turnoverRate: 25,
           storeCount: 25,
           remainingInventory: 25,
-          salesVolume: 20
+          salesVolume: 25
         },
         models: {},
         targets: {
@@ -455,10 +433,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 배정 미리보기
   const handlePreviewAssignment = async () => {
-    console.log('=== 배정 미리보기 시작 ===');
-    console.log('API_BASE_URL:', API_BASE_URL);
-    console.log('agents:', agents.length);
-    console.log('assignmentSettings:', JSON.stringify(assignmentSettings, null, 2));
+    // console.log('=== 배정 미리보기 시작 ===');
+    // console.log('API_BASE_URL:', API_BASE_URL);
+    // console.log('agents:', agents.length);
+    // console.log('assignmentSettings:', JSON.stringify(assignmentSettings, null, 2));
     
     setIsLoadingPreview(true);
     setProgress(0);
@@ -474,10 +452,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       }
       
       // 배정 대상 확인
-      console.log('배정 대상 확인 시작...');
+      // console.log('배정 대상 확인 시작...');
       const { eligibleAgents, selectedOffices, selectedDepartments, selectedAgentIds } = getSelectedTargets(agents, assignmentSettings);
-      console.log('선택된 배정 대상:', eligibleAgents.length, '명');
-      console.log('선택된 대상 상세:', eligibleAgents.map(a => ({ name: a.target, office: a.office, department: a.department })));
+      // console.log('선택된 배정 대상:', eligibleAgents.length, '명');
+      // console.log('선택된 대상 상세:', eligibleAgents.map(a => ({ name: a.target, office: a.office, department: a.department })));
       
       if (eligibleAgents.length === 0) {
         // 더 자세한 안내 메시지 생성
@@ -530,46 +508,46 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       }
       
       const storeData = await storeResponse.json();
-      console.log('매장 데이터 로드 완료:', storeData.stores?.length || 0, '개 매장');
-      console.log('매장 데이터 샘플:', storeData.stores?.slice(0, 3));
+      // console.log('매장 데이터 로드 완료:', storeData.stores?.length || 0, '개 매장');
+      // console.log('매장 데이터 샘플:', storeData.stores?.slice(0, 3));
       
       setProgress(30);
       setProgressMessage('개통실적 데이터를 로드하는 중...');
       
       // 새로운 배정 로직으로 계산
-      console.log('=== 배정 계산 시작 ===');
-      console.log('전달되는 파라미터:', {
-        agentsCount: agents.length,
-        settingsKeys: Object.keys(assignmentSettings),
-        storeDataKeys: Object.keys(storeData || {}),
-        storeDataLength: storeData?.stores?.length || 0
-      });
+      // console.log('=== 배정 계산 시작 ===');
+      // console.log('전달되는 파라미터:', {
+      //   agentsCount: agents.length,
+      //   settingsKeys: Object.keys(assignmentSettings),
+      //   storeDataKeys: Object.keys(storeData || {}),
+      //   storeDataLength: storeData?.stores?.length || 0
+      // });
       
       const preview = await calculateFullAssignment(agents, assignmentSettings, storeData);
-      console.log('=== 배정 계산 완료 ===');
-      console.log('배정 결과 구조:', {
-        agentsCount: Object.keys(preview.agents || {}).length,
-        officesCount: Object.keys(preview.offices || {}).length,
-        departmentsCount: Object.keys(preview.departments || {}).length,
-        modelsCount: Object.keys(preview.models || {}).length
-      });
-      console.log('배정 결과 상세:', JSON.stringify(preview, null, 2));
+      // console.log('=== 배정 계산 완료 ===');
+      // console.log('배정 결과 구조:', {
+      //   agentsCount: Object.keys(preview.agents || {}).length,
+      //   officesCount: Object.keys(preview.offices || {}).length,
+      //   departmentsCount: Object.keys(preview.departments || {}).length,
+      //   modelsCount: Object.keys(preview.models || {}).length
+      // });
+      // console.log('배정 결과 상세:', JSON.stringify(preview, null, 2));
       
       setProgress(90);
       setProgressMessage('결과를 정리하는 중...');
       
-      console.log('=== setPreviewData 호출 전 ===');
-      console.log('설정할 preview 데이터:', preview);
-      console.log('preview 데이터 구조:', {
-        agentsCount: Object.keys(preview.agents || {}).length,
-        officesCount: Object.keys(preview.offices || {}).length,
-        departmentsCount: Object.keys(preview.departments || {}).length,
-        modelsCount: Object.keys(preview.models || {}).length
-      });
+      // console.log('=== setPreviewData 호출 전 ===');
+      // console.log('설정할 preview 데이터:', preview);
+      // console.log('preview 데이터 구조:', {
+      //   agentsCount: Object.keys(preview.agents || {}).length,
+      //   officesCount: Object.keys(preview.offices || {}).length,
+      //   departmentsCount: Object.keys(preview.departments || {}).length,
+      //   modelsCount: Object.keys(preview.models || {}).length
+      // });
       
       setPreviewData(preview);
       
-      console.log('=== setPreviewData 호출 후 ===');
+      // console.log('=== setPreviewData 호출 후 ===');
       
       // 미리보기에서는 알림을 전송하지 않음 (실제 배정 확정 시에만 전송)
       
@@ -2018,28 +1996,28 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // previewData 상태 변경 추적
   useEffect(() => {
-    console.log('=== previewData 상태 변경 ===');
-    console.log('previewData:', previewData);
-    console.log('previewData 타입:', typeof previewData);
-    console.log('previewData가 null인가?', previewData === null);
-    console.log('previewData가 undefined인가?', previewData === undefined);
+    // console.log('=== previewData 상태 변경 ===');
+    // console.log('previewData:', previewData);
+    // console.log('previewData 타입:', typeof previewData);
+    // console.log('previewData가 null인가?', previewData === null);
+    // console.log('previewData가 undefined인가?', previewData === undefined);
     
     if (previewData) {
-      console.log('previewData 구조:', {
-        agentsCount: Object.keys(previewData.agents || {}).length,
-        officesCount: Object.keys(previewData.offices || {}).length,
-        departmentsCount: Object.keys(previewData.departments || {}).length,
-        modelsCount: Object.keys(previewData.models || {}).length
-      });
-      console.log('previewData 상세:', JSON.stringify(previewData, null, 2));
+      // console.log('previewData 구조:', {
+      //   agentsCount: Object.keys(previewData.agents || {}).length,
+      //   officesCount: Object.keys(previewData.offices || {}).length,
+      //   departmentsCount: Object.keys(previewData.departments || {}).length,
+      //   modelsCount: Object.keys(previewData.models || {}).length
+      // });
+      // console.log('previewData 상세:', JSON.stringify(previewData, null, 2));
     }
   }, [previewData]);
 
   // activeTab 상태 변경 추적
   useEffect(() => {
-    console.log('=== activeTab 상태 변경 ===');
-    console.log('현재 탭:', activeTab);
-    console.log('previewData 존재 여부:', !!previewData);
+    // console.log('=== activeTab 상태 변경 ===');
+    // console.log('현재 탭:', activeTab);
+    // console.log('previewData 존재 여부:', !!previewData);
   }, [activeTab, previewData]);
 
   return (

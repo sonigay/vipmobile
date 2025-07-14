@@ -132,6 +132,7 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [forceZoomToStore, setForceZoomToStore] = useState(null); // 강제 확대 상태 추가
   const [requestedStore, setRequestedStore] = useState(null); // 요청점검색으로 선택된 매장
+  const [isMapExpanded, setIsMapExpanded] = useState(false); // 맵 확대 상태
   // 관리자 모드 재고 확인 뷰 상태 추가
   const [currentView, setCurrentView] = useState('all'); // 'all' | 'assigned'
   // 현재 세션의 IP 및 위치 정보
@@ -978,34 +979,18 @@ function App() {
       // 전체재고확인에서는 3일 이내 출고재고 제외, 담당재고확인에서는 모든 재고 포함
       const includeShipped = isAgentMode && currentView === 'assigned' ? true : false;
       
-              // console.log('재고 데이터 요청 설정:', {
-              //   isAgentMode,
-              //   currentView,
-              //   includeShipped,
-              //   설명: includeShipped ? '담당재고확인 - 3일 이내 출고재고 포함' : '전체재고확인 - 3일 이내 출고재고 제외'
-              // });
-      
-      // 캐시 무효화를 위한 타임스탬프 추가
-      const timestamp = Date.now();
+      // 캐시를 효과적으로 사용하기 위해 타임스탬프 제거
       const [storesResponse, modelsResponse] = await Promise.all([
-        fetchData(includeShipped, timestamp),
+        fetchData(includeShipped),
         fetchModels()
       ]);
 
-      // console.log('매장 응답 전체:', storesResponse);
-      // console.log('모델 응답 전체:', modelsResponse);
-
       if (storesResponse.success && modelsResponse.success) {
-        // 데이터 구조 자세히 로깅
-        console.log('데이터 로딩 성공:', {
-          storesCount: storesResponse.data?.length || 0,
-          modelsCount: Object.keys(modelsResponse.data || {}).length,
-          firstStore: storesResponse.data?.[0] ? {
-            name: storesResponse.data[0].name,
-            hasInventory: !!storesResponse.data[0].inventory,
-            inventoryKeys: storesResponse.data[0].inventory ? Object.keys(storesResponse.data[0].inventory) : []
-          } : null
-        });
+        // 데이터 구조 자세히 로깅 제거
+        // console.log('데이터 로딩 성공:', {
+        //   storesCount: storesResponse.data?.length || 0,
+        //   modelsCount: Object.keys(modelsResponse.data || {}).length
+        // });
         
         const models = Object.keys(modelsResponse.data || {}).sort();
 
@@ -1352,6 +1337,7 @@ function App() {
       // 관리자 모드일 때 개통실적 데이터 로드
       loadActivationData();
     } else {
+      // 일반 매장 모드
       // console.log('로그인: 일반 매장 모드');
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1552,9 +1538,9 @@ function App() {
       });
     }
     
-    // 데이터 로드는 로그 전송 후 실행
-    loadData();
-  }, [loadData, loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
+    // 데이터 로드는 로그 전송 후 실행 (캐시 사용으로 인해 불필요한 호출 제거)
+    // loadData();
+  }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleColorSelect = useCallback((color) => {
     // console.log('선택된 색상 변경:', color);
@@ -1577,9 +1563,9 @@ function App() {
       });
     }
     
-    // 데이터 로드는 로그 전송 후 실행
-    loadData();
-  }, [loadData, loggedInStore, selectedModel, isAgentMode, agentTarget, ipInfo, deviceInfo]);
+    // 데이터 로드는 로그 전송 후 실행 (캐시 사용으로 인해 불필요한 호출 제거)
+    // loadData();
+  }, [loggedInStore, selectedModel, isAgentMode, agentTarget, ipInfo, deviceInfo]);
 
   const handleRadiusSelect = useCallback((radius) => {
     // console.log('선택된 반경 변경:', radius);
@@ -1699,15 +1685,15 @@ function App() {
       }
     }
     
-    // 관리자모드에서 뷰가 변경되면 데이터 다시 로드 (캐시 무효화)
-    if (isAgentMode && isLoggedIn) {
-      // console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
-      // 캐시 무효화를 위해 약간의 지연 후 데이터 로드
-      setTimeout(() => {
-        loadData();
-      }, 100);
-    }
-  }, [isAgentMode, isLoggedIn, loadData]);
+    // 관리자모드에서 뷰가 변경되면 데이터 다시 로드 (캐시 무효화 제거)
+    // if (isAgentMode && isLoggedIn) {
+    //   // console.log('관리자모드 뷰 변경으로 인한 데이터 재로드');
+    //   // 캐시 무효화를 위해 약간의 지연 후 데이터 로드
+    //   setTimeout(() => {
+    //     loadData();
+    //   }, 100);
+    // }
+  }, [isAgentMode, isLoggedIn]);
 
   // 업데이트 팝업 닫기 핸들러
   const handleUpdatePopupClose = useCallback((hideToday = false) => {
@@ -2182,7 +2168,7 @@ function App() {
             loggedInStore={loggedInStore}
             isAgentMode={isAgentMode}
             currentView={currentView}
-            onViewChange={setCurrentView}
+            onViewChange={handleViewChange}
             activationData={activationData}
             agentTarget={agentTarget}
             data={data}
@@ -2204,14 +2190,14 @@ function App() {
                 <>
                   {currentView === 'activation' ? (
                     // 담당개통확인 모드 - 지도를 위로, 테이블을 아래로
-                    <>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Box sx={{ 
-                        height: { xs: '50vh', sm: '60vh', md: '70vh' }, 
-                        mb: 2,
+                        height: isMapExpanded ? '85vh' : { xs: '50vh', sm: '60vh', md: '70vh' }, 
                         position: 'relative',
                         overflow: 'hidden',
                         borderRadius: 1,
-                        boxShadow: 2
+                        boxShadow: 2,
+                        transition: 'height 0.3s ease-in-out'
                       }} className="activation-map-container">
                         <Map
                           userLocation={userLocation}
@@ -2231,6 +2217,8 @@ function App() {
                           activationModelSearch={activationModelSearch}
                           activationDateSearch={activationDateSearch}
                           agentTarget={agentTarget}
+                          isMapExpanded={isMapExpanded}
+                          onMapExpandToggle={() => setIsMapExpanded(!isMapExpanded)}
                         />
                       </Box>
                       
@@ -2239,9 +2227,7 @@ function App() {
                         borderRadius: 1, 
                         p: 2,
                         boxShadow: 1,
-                        minHeight: { xs: '40vh', sm: '35vh', md: '30vh' },
-                        maxHeight: { xs: '50vh', sm: '45vh', md: '40vh' },
-                        overflow: 'auto'
+                        overflow: 'visible'
                       }} className="activation-table-container">
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -2482,7 +2468,7 @@ function App() {
                           </Box>
                         )}
                       </Box>
-                    </>
+                    </Box>
                   ) : (
                     // 기존 재고확인 모드
                 <>
@@ -2530,31 +2516,34 @@ function App() {
               {currentView !== 'activation' && (
               <Box sx={{ 
                 flex: 1,
-                minHeight: { xs: '60vh', sm: '70vh', md: '80vh' },
+                height: isMapExpanded ? '90vh' : { xs: '60vh', sm: '70vh', md: '80vh' },
                 position: 'relative',
                 borderRadius: 1,
                 boxShadow: 2,
-                overflow: 'hidden'
+                overflow: 'hidden',
+                transition: 'height 0.3s ease-in-out'
               }}>
-                <Map
-                  userLocation={userLocation}
-                  filteredStores={isAgentMode && currentView === 'assigned' && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
-                  selectedStore={selectedStore}
-                  requestedStore={requestedStore}
-                  onStoreSelect={handleStoreSelect}
-                  selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
-                  selectedModel={selectedModel}
-                  selectedColor={selectedColor}
-                  loggedInStoreId={loggedInStore?.id}
-                  isAgentMode={isAgentMode}
-                  currentView={currentView}
-                  forceZoomToStore={forceZoomToStore}
+                                  <Map
+                    userLocation={userLocation}
+                    filteredStores={isAgentMode && currentView === 'assigned' && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
+                    selectedStore={selectedStore}
+                    requestedStore={requestedStore}
+                    onStoreSelect={handleStoreSelect}
+                    selectedRadius={isAgentMode ? null : selectedRadius} // 관리자 모드일 때는 반경 표시 안함
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    loggedInStoreId={loggedInStore?.id}
+                    isAgentMode={isAgentMode}
+                    currentView={currentView}
+                    forceZoomToStore={forceZoomToStore}
                     activationData={activationData}
                     showActivationMarkers={currentView === 'activation'}
                     activationModelSearch={activationModelSearch}
                     activationDateSearch={activationDateSearch}
                     agentTarget={agentTarget}
-                />
+                    isMapExpanded={isMapExpanded}
+                    onMapExpandToggle={() => setIsMapExpanded(!isMapExpanded)}
+                  />
               </Box>
               )}
             </>

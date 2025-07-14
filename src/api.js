@@ -148,23 +148,20 @@ export async function fetchData(includeShipped = true, timestamp = null) {
   if (!timestamp) {
     const cachedData = clientCacheUtils.get(cacheKey);
     if (cachedData) {
-      console.log('캐시된 매장 데이터 사용');
+      // console.log('캐시된 매장 데이터 사용');
       return { success: true, data: cachedData };
     }
   }
   
   try {
-    console.log(`서버에서 매장 데이터 요청 중... (includeShipped: ${includeShipped})`);
+    // console.log(`서버에서 매장 데이터 요청 중... (includeShipped: ${includeShipped})`);
     const startTime = Date.now();
     
     const response = await fetch(`${API_URL}/api/stores?includeShipped=${includeShipped}`);
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
-    console.log(`매장 데이터 요청 완료: ${fetchTime}ms, 받은 매장 수: ${data.length}개`);
-    
-    console.log('\n=== 서버 응답 데이터 전체 구조 ===');
-    console.log('매장 데이터 예시:', data[0]);
+    // console.log(`매장 데이터 요청 완료: ${fetchTime}ms, 받은 매장 수: ${data.length}개`);
 
     // inventory 필드를 phoneData로 변환
     const processedData = data.map(store => {
@@ -191,8 +188,6 @@ export async function fetchData(includeShipped = true, timestamp = null) {
         });
       }
 
-
-
       // phoneCount 계산 (모든 모델의 수량 합계)
       const phoneCount = phoneData.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
@@ -204,35 +199,15 @@ export async function fetchData(includeShipped = true, timestamp = null) {
       };
     });
 
-    // 재고 현황 요약
-    console.log('\n=== 재고 현황 요약 ===');
-    const summary = processedData
-      .filter(store => store.phoneCount > 0)
-      .map(store => ({
-        매장명: store.name,
-        재고수량: store.phoneCount,
-        재고상세: store.phoneData.map(item => ({
-          모델명: item.F,
-          색상: item.G,
-          수량: item.quantity
-        }))
-      }));
-    
-    console.log(JSON.stringify(summary, null, 2));
-
     // 캐시에 저장
     clientCacheUtils.set(cacheKey, processedData);
     
     const totalTime = Date.now() - startTime;
-    console.log(`전체 처리 완료: ${totalTime}ms`);
+    // console.log(`전체 처리 완료: ${totalTime}ms`);
 
     return { success: true, data: processedData };
   } catch (error) {
     console.error('데이터 가져오기 오류:', error);
-    console.error('에러 상세:', {
-      메시지: error.message,
-      스택: error.stack
-    });
     return { success: false, error };
   }
 }
@@ -243,26 +218,26 @@ export async function fetchModels() {
   // 캐시에서 먼저 확인
   const cachedData = clientCacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log('캐시된 모델 데이터 사용');
+    // console.log('캐시된 모델 데이터 사용');
     return { success: true, data: cachedData };
   }
   
   try {
-    console.log('서버에서 모델 데이터 요청 중...');
+    // console.log('서버에서 모델 데이터 요청 중...');
     const startTime = Date.now();
     
     const response = await fetch(`${API_URL}/api/models`);
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
-    console.log(`모델 데이터 요청 완료: ${fetchTime}ms`);
-    console.log('서버로부터 받은 모델 데이터:', data);
+    // console.log(`모델 데이터 요청 완료: ${fetchTime}ms`);
+    // console.log('서버로부터 받은 모델 데이터:', data);
 
     // 캐시에 저장
     clientCacheUtils.set(cacheKey, data);
     
     const totalTime = Date.now() - startTime;
-    console.log(`전체 처리 완료: ${totalTime}ms`);
+    // console.log(`전체 처리 완료: ${totalTime}ms`);
 
     return { success: true, data };
   } catch (error) {
@@ -281,12 +256,12 @@ export const fetchAgentData = async () => {
   // 캐시에서 먼저 확인
   const cachedData = clientCacheUtils.get(cacheKey);
   if (cachedData) {
-    console.log('캐시된 대리점 데이터 사용');
+    // console.log('캐시된 대리점 데이터 사용');
     return cachedData;
   }
   
   try {
-    console.log('서버에서 대리점 데이터 요청 중...');
+    // console.log('서버에서 대리점 데이터 요청 중...');
     const startTime = Date.now();
     
     const response = await fetch(`${API_URL}/api/agents`);
@@ -299,13 +274,13 @@ export const fetchAgentData = async () => {
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
-    console.log(`대리점 데이터 요청 완료: ${fetchTime}ms`);
+    // console.log(`대리점 데이터 요청 완료: ${fetchTime}ms`);
     
     // 캐시에 저장
     clientCacheUtils.set(cacheKey, data);
     
     const totalTime = Date.now() - startTime;
-    console.log(`전체 처리 완료: ${totalTime}ms`);
+    // console.log(`전체 처리 완료: ${totalTime}ms`);
     
     return data;
   } catch (error) {
