@@ -722,8 +722,6 @@ function App() {
         if (hasNew) {
           // console.log('새로운 배포 감지 - 자동 로그아웃 실행');
           await performAutoLogout();
-          // 업데이트 진행 팝업 표시
-          setShowUpdateProgressPopup(true);
           return;
         }
         setLastUpdateCheck();
@@ -800,7 +798,6 @@ function App() {
         if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
                       // console.log('Service Worker에서 자동 로그아웃 요청 받음');
           performAutoLogout();
-          setShowUpdateProgressPopup(true);
         } else if (event.data && event.data.type === 'PLAY_NOTIFICATION_SOUND') {
                       // console.log('알림 사운드 재생 요청 받음:', event.data.soundUrl);
           try {
