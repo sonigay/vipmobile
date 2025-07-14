@@ -3140,30 +3140,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                               : 0;
                                             return sum + assignedQuantity;
                                           }, 0);
-                                          // 집계된 점수 정보 생성 (회전율, 거래처수, 잔여보유량, 판매량 등)
+                                          // 새로운 집계 데이터에서 점수 정보 가져오기
                                           let aggregateScores = {};
-                                          if (officeData.agents.length > 0) {
-                                            // 각 agent의 colorScores를 합산/평균 등으로 집계
-                                            const colorScoresList = officeData.agents.map(agent => {
-                                              const agentAssignments = previewData.agents[agent.contactId];
-                                              const modelAssignment = agentAssignments && agentAssignments[modelName];
-                                              return modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]
-                                                ? modelAssignment.colorScores[color.name].details
-                                                : null;
-                                            }).filter(Boolean);
-                                            // 평균값 계산 (단순 평균)
-                                            const keys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
-                                            keys.forEach(key => {
-                                              const values = colorScoresList.map(score => {
-                                                if (!score || !score[key]) return undefined;
-                                                if (typeof score[key] === 'object' && score[key] !== null && 'detail' in score[key]) return score[key].detail;
-                                                if (typeof score[key] === 'object' && score[key] !== null && 'value' in score[key]) return score[key].value;
-                                                return score[key];
-                                              }).filter(v => v !== undefined && v !== null);
-                                              if (values.length > 0) {
-                                                aggregateScores[key] = values.reduce((a, b) => a + b, 0) / values.length;
-                                              }
-                                            });
+                                          if (previewData.officesWithScores && previewData.officesWithScores[officeName]) {
+                                            const officeWithScores = previewData.officesWithScores[officeName];
+                                            if (officeWithScores.modelScores && officeWithScores.modelScores[modelName] && officeWithScores.modelScores[modelName][color.name]) {
+                                              const colorScores = officeWithScores.modelScores[modelName][color.name];
+                                              aggregateScores = colorScores.details || {};
+                                            }
                                           }
                                           return (
                                             <TableCell key={`${officeName}-${modelName}-${color.name}`} align="center" sx={{ backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100', fontWeight: officeTotalQuantity > 0 ? 'bold' : 'normal', color: officeTotalQuantity > 0 ? 'primary.main' : 'text.secondary', borderRight: '2px solid #ddd' }}>
@@ -3681,30 +3665,14 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                               : 0;
                                             return sum + assignedQuantity;
                                           }, 0);
-                                          // 집계된 점수 정보 생성 (회전율, 거래처수, 잔여보유량, 판매량 등)
+                                          // 새로운 집계 데이터에서 점수 정보 가져오기
                                           let aggregateScores = {};
-                                          if (deptData.agents.length > 0) {
-                                            // 각 agent의 colorScores를 합산/평균 등으로 집계
-                                            const colorScoresList = deptData.agents.map(agent => {
-                                              const agentAssignments = previewData.agents[agent.contactId];
-                                              const modelAssignment = agentAssignments && agentAssignments[modelName];
-                                              return modelAssignment && modelAssignment.colorScores && modelAssignment.colorScores[color.name]
-                                                ? modelAssignment.colorScores[color.name].details
-                                                : null;
-                                            }).filter(Boolean);
-                                            // 평균값 계산 (단순 평균)
-                                            const keys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
-                                            keys.forEach(key => {
-                                              const values = colorScoresList.map(score => {
-                                                if (!score || !score[key]) return undefined;
-                                                if (typeof score[key] === 'object' && score[key] !== null && 'detail' in score[key]) return score[key].detail;
-                                                if (typeof score[key] === 'object' && score[key] !== null && 'value' in score[key]) return score[key].value;
-                                                return score[key];
-                                              }).filter(v => v !== undefined && v !== null);
-                                              if (values.length > 0) {
-                                                aggregateScores[key] = values.reduce((a, b) => a + b, 0) / values.length;
-                                              }
-                                            });
+                                          if (previewData.departmentsWithScores && previewData.departmentsWithScores[deptName]) {
+                                            const deptWithScores = previewData.departmentsWithScores[deptName];
+                                            if (deptWithScores.modelScores && deptWithScores.modelScores[modelName] && deptWithScores.modelScores[modelName][color.name]) {
+                                              const colorScores = deptWithScores.modelScores[modelName][color.name];
+                                              aggregateScores = colorScores.details || {};
+                                            }
                                           }
                                           return (
                                             <TableCell key={`${deptName}-${modelName}-${color.name}`} align="center" sx={{ backgroundColor: colorIndex % 2 === 0 ? 'grey.50' : 'grey.100', fontWeight: deptTotalQuantity > 0 ? 'bold' : 'normal', color: deptTotalQuantity > 0 ? 'primary.main' : 'text.secondary', borderRight: '2px solid #ddd' }}>

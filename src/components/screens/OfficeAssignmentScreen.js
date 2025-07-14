@@ -85,9 +85,11 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
       try {
         const fullAssignment = await calculateFullAssignment(agents, assignmentSettings, data);
         
-        // 사무실별 통계 변환
+        // 사무실별 통계 변환 (새로운 집계 데이터 사용)
         const stats = {};
-        Object.entries(fullAssignment.offices || {}).forEach(([office, officeData]) => {
+        const officesData = fullAssignment.officesWithScores || fullAssignment.offices || {};
+        
+        Object.entries(officesData).forEach(([office, officeData]) => {
           stats[office] = {
             office: officeData.office,
             agentCount: officeData.agentCount,
@@ -96,18 +98,22 @@ function OfficeAssignmentScreen({ data, onBack, onLogout }) {
             models: {}
           };
           
-          // 모델별 배정량 계산
+          // 모델별 배정량 및 점수 계산
           Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
             const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
             const officeModelQuantity = Object.values(modelAssignments)
               .filter(assignment => assignment.office === office)
               .reduce((sum, assignment) => sum + assignment.quantity, 0);
             
+            // 새로운 집계 데이터에서 점수 정보 가져오기
+            const modelScores = officeData.modelScores?.[modelName] || {};
+            
             stats[office].models[modelName] = {
               name: modelName,
               colors: modelData.colors,
               totalQuantity: modelData.quantity,
-              assignedQuantity: officeModelQuantity
+              assignedQuantity: officeModelQuantity,
+              scores: modelScores // 점수 정보 추가
             };
           });
         });

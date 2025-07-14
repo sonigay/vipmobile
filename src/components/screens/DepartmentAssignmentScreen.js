@@ -86,9 +86,11 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
       try {
         const fullAssignment = await calculateFullAssignment(agents, assignmentSettings, data);
         
-        // 소속별 통계 변환
+        // 소속별 통계 변환 (새로운 집계 데이터 사용)
         const stats = {};
-        Object.entries(fullAssignment.departments || {}).forEach(([department, deptData]) => {
+        const departmentsData = fullAssignment.departmentsWithScores || fullAssignment.departments || {};
+        
+        Object.entries(departmentsData).forEach(([department, deptData]) => {
           stats[department] = {
             department: deptData.department,
             agentCount: deptData.agentCount,
@@ -97,18 +99,22 @@ function DepartmentAssignmentScreen({ data, onBack, onLogout }) {
             models: {}
           };
           
-          // 모델별 배정량 계산
+          // 모델별 배정량 및 점수 계산
           Object.entries(assignmentSettings.models || {}).forEach(([modelName, modelData]) => {
             const modelAssignments = fullAssignment.models[modelName]?.assignments || {};
             const deptModelQuantity = Object.values(modelAssignments)
               .filter(assignment => assignment.department === department)
               .reduce((sum, assignment) => sum + assignment.quantity, 0);
             
+            // 새로운 집계 데이터에서 점수 정보 가져오기
+            const modelScores = deptData.modelScores?.[modelName] || {};
+            
             stats[department].models[modelName] = {
               name: modelName,
               colors: modelData.colors,
               totalQuantity: modelData.quantity,
-              assignedQuantity: deptModelQuantity
+              assignedQuantity: deptModelQuantity,
+              scores: modelScores // 점수 정보 추가
             };
           });
         });

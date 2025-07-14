@@ -1192,6 +1192,190 @@ export const aggregateDepartmentAssignment = (assignments, eligibleAgents) => {
   return departmentStats;
 };
 
+// 사무실별 배정 수량 및 점수 집계 (개선된 버전)
+export const aggregateOfficeAssignmentWithScores = (assignments, eligibleAgents) => {
+  const officeStats = {};
+  
+  eligibleAgents.forEach(agent => {
+    if (!officeStats[agent.office]) {
+      officeStats[agent.office] = {
+        office: agent.office,
+        agentCount: 0,
+        totalQuantity: 0,
+        agents: [],
+        modelScores: {} // 모델별 점수 정보 추가
+      };
+    }
+    
+    officeStats[agent.office].agentCount++;
+    officeStats[agent.office].agents.push(agent);
+    
+    // 해당 영업사원의 배정량 추가 (모든 모델의 합계)
+    if (assignments[agent.contactId]) {
+      const agentTotalQuantity = Object.values(assignments[agent.contactId]).reduce((sum, assignment) => sum + assignment.quantity, 0);
+      officeStats[agent.office].totalQuantity += agentTotalQuantity;
+      
+      // 모델별 점수 정보 집계
+      Object.entries(assignments[agent.contactId]).forEach(([modelName, assignment]) => {
+        if (!officeStats[agent.office].modelScores[modelName]) {
+          officeStats[agent.office].modelScores[modelName] = {};
+        }
+        
+        // 색상별 점수 정보 집계
+        if (assignment.colorScores) {
+          Object.entries(assignment.colorScores).forEach(([colorName, colorScore]) => {
+            if (!officeStats[agent.office].modelScores[modelName][colorName]) {
+              officeStats[agent.office].modelScores[modelName][colorName] = {
+                scores: [],
+                averageScore: 0,
+                details: {}
+              };
+            }
+            
+            // 점수 정보 수집
+            officeStats[agent.office].modelScores[modelName][colorName].scores.push({
+              agentId: agent.contactId,
+              agentName: agent.target,
+              score: colorScore.averageScore,
+              details: colorScore.details
+            });
+          });
+        }
+      });
+    }
+  });
+  
+  // 각 모델/색상별 평균 점수 계산
+  Object.values(officeStats).forEach(office => {
+    Object.values(office.modelScores).forEach(modelScores => {
+      Object.values(modelScores).forEach(colorScores => {
+        if (colorScores.scores.length > 0) {
+          // 평균 점수 계산
+          colorScores.averageScore = colorScores.scores.reduce((sum, score) => sum + score.score, 0) / colorScores.scores.length;
+          
+          // 세부 점수 정보 집계 (평균값)
+          const detailKeys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+          detailKeys.forEach(key => {
+            const validDetails = colorScores.scores
+              .map(score => score.details[key])
+              .filter(detail => detail !== undefined && detail !== null);
+            
+            if (validDetails.length > 0) {
+              // 숫자 값 추출
+              const numericValues = validDetails.map(detail => {
+                if (typeof detail === 'number') return detail;
+                if (typeof detail === 'object' && detail !== null) {
+                  if ('detail' in detail) return detail.detail;
+                  if ('value' in detail) return detail.value;
+                }
+                return null;
+              }).filter(val => val !== null);
+              
+              if (numericValues.length > 0) {
+                colorScores.details[key] = numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
+              }
+            }
+          });
+        }
+      });
+    });
+  });
+  
+  return officeStats;
+};
+
+// 소속별 배정 수량 및 점수 집계 (개선된 버전)
+export const aggregateDepartmentAssignmentWithScores = (assignments, eligibleAgents) => {
+  const departmentStats = {};
+  
+  eligibleAgents.forEach(agent => {
+    if (!departmentStats[agent.department]) {
+      departmentStats[agent.department] = {
+        department: agent.department,
+        agentCount: 0,
+        totalQuantity: 0,
+        agents: [],
+        modelScores: {} // 모델별 점수 정보 추가
+      };
+    }
+    
+    departmentStats[agent.department].agentCount++;
+    departmentStats[agent.department].agents.push(agent);
+    
+    // 해당 영업사원의 배정량 추가 (모든 모델의 합계)
+    if (assignments[agent.contactId]) {
+      const agentTotalQuantity = Object.values(assignments[agent.contactId]).reduce((sum, assignment) => sum + assignment.quantity, 0);
+      departmentStats[agent.department].totalQuantity += agentTotalQuantity;
+      
+      // 모델별 점수 정보 집계
+      Object.entries(assignments[agent.contactId]).forEach(([modelName, assignment]) => {
+        if (!departmentStats[agent.department].modelScores[modelName]) {
+          departmentStats[agent.department].modelScores[modelName] = {};
+        }
+        
+        // 색상별 점수 정보 집계
+        if (assignment.colorScores) {
+          Object.entries(assignment.colorScores).forEach(([colorName, colorScore]) => {
+            if (!departmentStats[agent.department].modelScores[modelName][colorName]) {
+              departmentStats[agent.department].modelScores[modelName][colorName] = {
+                scores: [],
+                averageScore: 0,
+                details: {}
+              };
+            }
+            
+            // 점수 정보 수집
+            departmentStats[agent.department].modelScores[modelName][colorName].scores.push({
+              agentId: agent.contactId,
+              agentName: agent.target,
+              score: colorScore.averageScore,
+              details: colorScore.details
+            });
+          });
+        }
+      });
+    }
+  });
+  
+  // 각 모델/색상별 평균 점수 계산
+  Object.values(departmentStats).forEach(department => {
+    Object.values(department.modelScores).forEach(modelScores => {
+      Object.values(modelScores).forEach(colorScores => {
+        if (colorScores.scores.length > 0) {
+          // 평균 점수 계산
+          colorScores.averageScore = colorScores.scores.reduce((sum, score) => sum + score.score, 0) / colorScores.scores.length;
+          
+          // 세부 점수 정보 집계 (평균값)
+          const detailKeys = ['turnoverRate', 'storeCount', 'remainingInventory', 'salesVolume'];
+          detailKeys.forEach(key => {
+            const validDetails = colorScores.scores
+              .map(score => score.details[key])
+              .filter(detail => detail !== undefined && detail !== null);
+            
+            if (validDetails.length > 0) {
+              // 숫자 값 추출
+              const numericValues = validDetails.map(detail => {
+                if (typeof detail === 'number') return detail;
+                if (typeof detail === 'object' && detail !== null) {
+                  if ('detail' in detail) return detail.detail;
+                  if ('value' in detail) return detail.value;
+                }
+                return null;
+              }).filter(val => val !== null);
+              
+              if (numericValues.length > 0) {
+                colorScores.details[key] = numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
+              }
+            }
+          });
+        }
+      });
+    });
+  });
+  
+  return departmentStats;
+};
+
 // 전체 배정 계산 (최적화된 버전)
 export const calculateFullAssignment = async (agents, settings, storeData = null) => {
   try {
@@ -1293,6 +1477,10 @@ export const calculateFullAssignment = async (agents, settings, storeData = null
     // 소속별 집계
     // console.log('소속별 집계 시작...');
     results.departments = aggregateDepartmentAssignment(results.agents, filteredAgents);
+    
+    // 점수 정보가 포함된 집계 데이터 추가 (기존 데이터와 호환성을 위해 별도로 저장)
+    results.officesWithScores = aggregateOfficeAssignmentWithScores(results.agents, filteredAgents);
+    results.departmentsWithScores = aggregateDepartmentAssignmentWithScores(results.agents, filteredAgents);
     
     // console.log('=== calculateFullAssignment 완료 ===');
     // console.log('최종 결과 요약:', {
