@@ -819,7 +819,7 @@ function App() {
     }
   }, []);
 
-  // 업데이트 확인 및 팝업 표시 (앱 시작 시 한 번만 실행)
+  // 업데이트 확인 및 팝업 표시 (앱 시작 시 + 주기적 감지)
   useEffect(() => {
     // 로그인 상태와 관계없이 앱 시작 시 업데이트 체크
     const checkForUpdates = async () => {
@@ -860,6 +860,17 @@ function App() {
     setTimeout(() => {
       checkForUpdates();
     }, 1000);
+    
+    // 주기적 업데이트 감지 (5분마다)
+    const interval = setInterval(() => {
+      console.log('주기적 업데이트 감지 실행...');
+      checkForUpdates();
+    }, 5 * 60 * 1000); // 5분마다
+    
+    // 컴포넌트 언마운트 시 인터벌 정리
+    return () => {
+      clearInterval(interval);
+    };
   }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
 
   // 업데이트 완료 처리

@@ -60,6 +60,13 @@ function registerValidSW(swUrl, config) {
         };
       };
       
+      // 주기적으로 Service Worker 업데이트 확인 (1분마다)
+      setInterval(() => {
+        registration.update().catch(error => {
+          console.log('Service Worker 업데이트 확인 중 오류:', error);
+        });
+      }, 60 * 1000); // 1분마다
+      
       // Service Worker 메시지 리스너 추가
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'CACHE_CLEARED') {
