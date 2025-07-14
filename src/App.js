@@ -167,6 +167,23 @@ function App() {
   const [showUpdateProgress, setShowUpdateProgress] = useState(false);
   const [isUpdateInProgress, setIsUpdateInProgress] = useState(false);
   
+  // 맵 확대 토글 핸들러 (스크롤 자동 조정 포함)
+  const handleMapExpandToggle = () => {
+    setIsMapExpanded(!isMapExpanded);
+    
+    // 맵 확대 시 스크롤을 맵 위치로 자동 조정
+    setTimeout(() => {
+      const mapContainer = document.querySelector('.activation-map-container') || 
+                          document.querySelector('[style*="height"]');
+      if (mapContainer) {
+        mapContainer.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }
+    }, 100);
+  };
+  
   // 현재 사용자의 사용 가능한 모드 목록 가져오기
   const getCurrentUserAvailableModes = () => {
     if (!loggedInStore) return [];
@@ -2348,7 +2365,7 @@ function App() {
                           activationDateSearch={activationDateSearch}
                           agentTarget={agentTarget}
                           isMapExpanded={isMapExpanded}
-                          onMapExpandToggle={() => setIsMapExpanded(!isMapExpanded)}
+                          onMapExpandToggle={handleMapExpandToggle}
                         />
                       </Box>
                       
@@ -2672,7 +2689,7 @@ function App() {
                     activationDateSearch={activationDateSearch}
                     agentTarget={agentTarget}
                     isMapExpanded={isMapExpanded}
-                    onMapExpandToggle={() => setIsMapExpanded(!isMapExpanded)}
+                    onMapExpandToggle={handleMapExpandToggle}
                   />
                 </Box>
               )}

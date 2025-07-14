@@ -597,26 +597,41 @@ function Map({
     }
   }, [forceZoomToStore]);
 
-  // 지도 범위 계산
+  // 지도 범위 계산 (각 모드별 최적화)
   const mapBounds = useMemo(() => {
     if (!filteredStores.length && !userLocation) return null;
     
     const bounds = L.latLngBounds();
 
-    // 매장 위치 추가
+    // 매장 위치 추가 (재고가 있는 매장만)
     filteredStores.forEach(store => {
-      if (store.latitude && store.longitude) {
+      if (store.latitude && store.longitude && store.hasInventory) {
         bounds.extend([parseFloat(store.latitude), parseFloat(store.longitude)]);
       }
     });
     
-    // 사용자 위치 추가
-    if (userLocation) {
+    // 개통실적 마커가 있는 경우 해당 위치도 추가
+    if (showActivationMarkers && activationData) {
+      Object.entries(activationData).forEach(([storeName, data]) => {
+        const storeLocation = filteredStores.find(store => store.name === storeName);
+        if (storeLocation && storeLocation.latitude && storeLocation.longitude) {
+          bounds.extend([parseFloat(storeLocation.latitude), parseFloat(storeLocation.longitude)]);
+        }
+      });
+    }
+    
+    // 사용자 위치 추가 (일반 모드에서만)
+    if (userLocation && !isAgentMode) {
       bounds.extend([userLocation.lat, userLocation.lng]);
     }
     
+    // 경계가 유효한지 확인
+    if (bounds.isEmpty()) {
+      return null;
+    }
+    
     return bounds;
-  }, [filteredStores, userLocation]);
+  }, [filteredStores, userLocation, isAgentMode, showActivationMarkers, activationData]);
       
   // 초기 로드 시 지도 범위 설정 (각 모드별 최적화)
   useEffect(() => {
@@ -625,19 +640,22 @@ function Map({
         // 각 모드별 최대 줌 레벨 설정
         let maxZoom;
         if (isAgentMode) {
-          if (currentView === 'all') maxZoom = 10;        // 전체재고확인: 넓은 시야
-          else if (currentView === 'assigned') maxZoom = 11; // 담당재고확인: 중간 시야
-          else if (currentView === 'activation') maxZoom = 12; // 담당개통확인: 상세 시야
-          else maxZoom = 11;
+          if (currentView === 'all') maxZoom = 9;         // 전체재고확인: 매우 넓은 시야
+          else if (currentView === 'assigned') maxZoom = 10; // 담당재고확인: 넓은 시야
+          else if (currentView === 'activation') maxZoom = 11; // 담당개통확인: 중간 시야
+          else maxZoom = 10;
         } else {
-          maxZoom = 13; // 일반 매장 모드: 상세 시야
+          maxZoom = 12; // 일반 매장 모드: 중간 시야
         }
         
         map.fitBounds(mapBounds, {
           animate: true,
           duration: 1.5,
-          maxZoom: maxZoom // 최대 줌 레벨 제한
+          maxZoom: maxZoom, // 최대 줌 레벨 제한
+          padding: [20, 20] // 경계에 여백 추가
         });
+        
+        console.log(`지도 초기 뷰 설정: ${isAgentMode ? '관리자' : '일반'} 모드, ${currentView || '기본'} 뷰, 최대줌: ${maxZoom}`);
       });
       initialLoadRef.current = false;
     }
