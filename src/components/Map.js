@@ -212,10 +212,13 @@ function Map({
     const latPadding = (maxLat - minLat) * 0.1;
     const lngPadding = (maxLng - minLng) * 0.1;
     
-    return [
+    // Leaflet bounds 객체 생성
+    const bounds = L.latLngBounds([
       [minLat - latPadding, minLng - lngPadding],
       [maxLat + latPadding, maxLng + lngPadding]
-    ];
+    ]);
+    
+    return bounds;
   };
 
   // 각 모드별 초기 줌 레벨 설정 (마커 기반)
@@ -626,7 +629,7 @@ function Map({
     }
     
     // 경계가 유효한지 확인
-    if (bounds.isEmpty()) {
+    if (bounds && typeof bounds.isEmpty === 'function' && bounds.isEmpty()) {
       return null;
     }
     
