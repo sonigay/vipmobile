@@ -2563,15 +2563,17 @@ const connectedClients = new Map();
 app.get('/api/notifications/stream', (req, res) => {
   const { user_id } = req.query;
   
-  // SSE 헤더 설정 (CORS 개선)
+  // HTTP/2 호환성을 위한 SSE 헤더 설정
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Cache-Control': 'no-cache, no-store, must-revalidate, private',
     'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no', // Nginx 프록시에서 버퍼링 비활성화
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control, Content-Type',
+    'Access-Control-Allow-Headers': 'Cache-Control, Content-Type, Last-Event-ID',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Credentials': 'true'
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Expose-Headers': 'Last-Event-ID'
   });
   
   // 클라이언트 연결 저장
@@ -2586,8 +2588,33 @@ app.get('/api/notifications/stream', (req, res) => {
     console.log(`클라이언트 ${clientId} 연결 해제됨`);
   });
   
-  // 초기 연결 메시지
-  res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
+  req.on('error', (error) => {
+    console.error(`클라이언트 ${clientId} 연결 오류:`, error);
+    connectedClients.delete(clientId);
+  });
+  
+  // 초기 연결 메시지 (keep-alive 유지)
+  res.write(`data: ${JSON.stringify({ type: 'connected', clientId, timestamp: Date.now() })}\n\n`);
+  
+  // 주기적으로 연결 상태 확인 (30초마다)
+  const keepAliveInterval = setInterval(() => {
+    try {
+      if (connectedClients.has(clientId)) {
+        res.write(`data: ${JSON.stringify({ type: 'ping', timestamp: Date.now() })}\n\n`);
+      } else {
+        clearInterval(keepAliveInterval);
+      }
+    } catch (error) {
+      console.error(`클라이언트 ${clientId} keep-alive 오류:`, error);
+      connectedClients.delete(clientId);
+      clearInterval(keepAliveInterval);
+    }
+  }, 30000);
+  
+  // 연결 해제 시 인터벌 정리
+  req.on('close', () => {
+    clearInterval(keepAliveInterval);
+  });
 });
 
 // 모든 관리자모드 접속자에게 알림 전송하는 함수

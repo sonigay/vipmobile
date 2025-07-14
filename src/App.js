@@ -1610,7 +1610,42 @@ function App() {
   const handleRadiusSelect = useCallback((radius) => {
     // console.log('선택된 반경 변경:', radius);
     setSelectedRadius(radius);
-  }, []);
+    
+    // 일반 모드에서 반경 변경 시 맵을 사용자 위치로 이동
+    if (!isAgentMode && userLocation) {
+      // 맵 이동을 위한 상태 업데이트
+      setForceZoomToStore({
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+        zoom: getZoomLevelForRadius(radius)
+      });
+      
+      // 반경 변경 로그 전송
+      if (loggedInStore) {
+        logActivity({
+          userId: loggedInStore.id,
+          userType: 'store',
+          targetName: loggedInStore.name,
+          ipAddress: ipInfo?.ip || 'unknown',
+          location: ipInfo?.location || 'unknown',
+          deviceInfo: deviceInfo || 'unknown',
+          activity: 'radius_change',
+          radius: radius
+        });
+      }
+    }
+  }, [isAgentMode, userLocation, loggedInStore, ipInfo, deviceInfo]);
+
+  // 반경에 따른 적절한 줌 레벨 계산
+  const getZoomLevelForRadius = (radius) => {
+    if (radius <= 1000) return 15;      // 1km 이하: 매우 상세
+    if (radius <= 3000) return 14;      // 3km 이하: 상세
+    if (radius <= 5000) return 13;      // 5km 이하: 중간
+    if (radius <= 10000) return 12;     // 10km 이하: 넓은 지역
+    if (radius <= 20000) return 11;     // 20km 이하: 광역
+    if (radius <= 50000) return 10;     // 50km 이하: 대도시
+    return 9;                           // 50km 초과: 광역
+  };
 
   const handleStoreSelect = useCallback((store) => {
     // console.log('선택된 매장:', store);
@@ -1929,23 +1964,45 @@ function App() {
       
       const eventSource = new EventSource(`${process.env.REACT_APP_API_URL}/api/notifications/stream?user_id=${loggedInStore.id}`);
       
+      eventSource.onopen = () => {
+        console.log('SSE 연결 성공');
+      };
+      
       eventSource.onmessage = (event) => {
-        const notification = JSON.parse(event.data);
-        if (notification.type === 'assignment_completed') {
-          showNotificationToast(notification);
+        try {
+          const notification = JSON.parse(event.data);
+          
+          // ping 메시지는 무시
+          if (notification.type === 'ping') {
+            return;
+          }
+          
+          if (notification.type === 'assignment_completed') {
+            showNotificationToast(notification);
+          }
+        } catch (error) {
+          console.error('SSE 메시지 파싱 오류:', error);
         }
       };
 
       eventSource.onerror = (error) => {
         console.error('실시간 알림 연결 오류:', error);
-        // console.log('SSE 연결 상태:', eventSource.readyState);
+        
+        // 연결 상태 확인
+        if (eventSource.readyState === EventSource.CLOSED) {
+          console.log('SSE 연결이 종료됨');
+        } else if (eventSource.readyState === EventSource.CONNECTING) {
+          console.log('SSE 재연결 시도 중...');
+        }
+        
         // 연결이 끊어진 경우 5초 후 재연결 시도
         setTimeout(() => {
           if (eventSource.readyState === EventSource.CLOSED) {
-            // console.log('SSE 재연결 시도...');
+            console.log('SSE 재연결 시도...');
             // 재연결 로직은 useEffect의 의존성 배열에 의해 자동으로 처리됨
           }
         }, 5000);
+        
         eventSource.close();
       };
 

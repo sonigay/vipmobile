@@ -12,23 +12,26 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const containerStyle = {
+// 동적 스타일을 위한 함수들
+const getContainerStyle = (isExpanded) => ({
   width: '100%',
-  height: '100%',
-  borderRadius: '4px'
-};
+  height: isExpanded ? '85vh' : '100%',
+  borderRadius: '4px',
+  transition: 'height 0.3s ease-in-out'
+});
 
-const mapContainerStyle = {
+const getMapContainerStyle = (isExpanded) => ({
   width: '100%',
-  height: '100%',
+  height: isExpanded ? '85vh' : '100%',
   display: 'flex',
   flexDirection: 'column',
   margin: 0,
   padding: 0,
   borderRadius: '4px',
   overflow: 'hidden',
-  position: 'relative'
-};
+  position: 'relative',
+  transition: 'height 0.3s ease-in-out'
+});
 
 const defaultCenter = {
   lat: 37.5665,
@@ -41,7 +44,7 @@ function ForceZoomUpdater({ forceZoomToStore }) {
   
   useEffect(() => {
     if (forceZoomToStore && map) {
-      const { lat, lng } = forceZoomToStore;
+      const { lat, lng, zoom } = forceZoomToStore;
       
       const attemptZoom = (attemptCount = 0) => {
         try {
@@ -52,14 +55,14 @@ function ForceZoomUpdater({ forceZoomToStore }) {
             const panelSize = map._size || { x: container.offsetWidth, y: container.offsetHeight };
             
             if (panelSize.x > 0 && panelSize.y > 0) {
-              map.setView([lat, lng], 14, {
+              map.setView([lat, lng], zoom || 14, {
                 animate: true,
                 duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
               });
               return;
             } else if (container.offsetWidth > 0 && container.offsetHeight > 0) {
               // 컨테이너 크기로 대체
-              map.setView([lat, lng], 14, {
+              map.setView([lat, lng], zoom || 14, {
                 animate: true,
                 duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
               });
@@ -119,21 +122,16 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, currentView, forceZoomT
           
           if (panelSize.x > 0 && panelSize.y > 0 || container.offsetWidth > 0 && container.offsetHeight > 0) {
             if (bounds) {
+              const modeZoom = getModeZoom();
               map.fitBounds(bounds, {
                 animate: true,
-                duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+                duration: 1.5,
+                maxZoom: modeZoom // 최대 줌 레벨 제한
               });
-              const modeZoom = getModeZoom();
-              if (map.getZoom() > modeZoom) {
-                map.setZoom(modeZoom, {
-                  animate: true,
-                  duration: 1.5
-                });
-              }
             } else if (center) {
               map.setView([center.lat, center.lng], zoom || getModeZoom(), {
                 animate: true,
-                duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+                duration: 1.5
               });
             }
             return;
@@ -184,12 +182,48 @@ function Map({
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
   
-  // 각 모드별 초기 줌 레벨 설정
+  // 마커들의 경계를 계산하는 함수
+  const calculateBounds = (stores) => {
+    if (!stores || stores.length === 0) return null;
+    
+    const validStores = stores.filter(store => 
+      store.latitude && store.longitude && 
+      !isNaN(parseFloat(store.latitude)) && !isNaN(parseFloat(store.longitude))
+    );
+    
+    if (validStores.length === 0) return null;
+    
+    let minLat = parseFloat(validStores[0].latitude);
+    let maxLat = parseFloat(validStores[0].latitude);
+    let minLng = parseFloat(validStores[0].longitude);
+    let maxLng = parseFloat(validStores[0].longitude);
+    
+    validStores.forEach(store => {
+      const lat = parseFloat(store.latitude);
+      const lng = parseFloat(store.longitude);
+      
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+      minLng = Math.min(minLng, lng);
+      maxLng = Math.max(maxLng, lng);
+    });
+    
+    // 경계에 여백 추가 (10% 패딩)
+    const latPadding = (maxLat - minLat) * 0.1;
+    const lngPadding = (maxLng - minLng) * 0.1;
+    
+    return [
+      [minLat - latPadding, minLng - lngPadding],
+      [maxLat + latPadding, maxLng + lngPadding]
+    ];
+  };
+
+  // 각 모드별 초기 줌 레벨 설정 (마커 기반)
   const getInitialZoom = () => {
     if (isAgentMode) {
-      if (currentView === 'all') return 10;      // 전체재고확인
-      if (currentView === 'assigned') return 11; // 담당재고확인
-      if (currentView === 'activation') return 12; // 담당개통확인
+      if (currentView === 'all') return 10;      // 전체재고확인 (기본값)
+      if (currentView === 'assigned') return 11; // 담당재고확인 (기본값)
+      if (currentView === 'activation') return 12; // 담당개통확인 (기본값)
       return 10; // 기본값
     }
     return 12; // 일반 매장 모드
@@ -584,24 +618,30 @@ function Map({
     return bounds;
   }, [filteredStores, userLocation]);
       
-  // 초기 로드 시 지도 범위 설정
+  // 초기 로드 시 지도 범위 설정 (각 모드별 최적화)
   useEffect(() => {
     if (mapBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
       safeMapOperation(() => {
+        // 각 모드별 최대 줌 레벨 설정
+        let maxZoom;
+        if (isAgentMode) {
+          if (currentView === 'all') maxZoom = 10;        // 전체재고확인: 넓은 시야
+          else if (currentView === 'assigned') maxZoom = 11; // 담당재고확인: 중간 시야
+          else if (currentView === 'activation') maxZoom = 12; // 담당개통확인: 상세 시야
+          else maxZoom = 11;
+        } else {
+          maxZoom = 13; // 일반 매장 모드: 상세 시야
+        }
+        
         map.fitBounds(mapBounds, {
           animate: true,
-          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+          duration: 1.5,
+          maxZoom: maxZoom // 최대 줌 레벨 제한
         });
-        if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-          map.setZoom(isAgentMode ? 12 : 15, {
-            animate: true,
-            duration: 1.5
-          });
-        }
       });
       initialLoadRef.current = false;
     }
-  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode, forceZoomToStore]);
+  }, [map, mapBounds, userInteracted, safeMapOperation, isAgentMode, currentView, forceZoomToStore]);
 
   // 반경 변경 시 지도 범위 재설정
   useEffect(() => {
@@ -614,22 +654,20 @@ function Map({
       ]);
       
       safeMapOperation(() => {
+        // 일반 매장 모드에서 반경 변경 시 최대 줌 레벨 제한
+        const maxZoom = 13;
+        
         map.fitBounds(bounds, {
           animate: true,
-          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+          duration: 1.5,
+          maxZoom: maxZoom
         });
-        if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-          map.setZoom(isAgentMode ? 12 : 15, {
-            animate: true,
-            duration: 1.5
-          });
-        }
       });
     }
   }, [map, selectedRadius, userLocation, isAgentMode, userInteracted, safeMapOperation]);
 
   return (
-    <Paper sx={mapContainerStyle}>
+          <Paper sx={getMapContainerStyle(isMapExpanded)}>
       {/* 확대/축소 토글 버튼 */}
       <Box sx={{
         position: 'absolute',
@@ -661,7 +699,7 @@ function Map({
         key={`map-${isAgentMode ? 'agent' : 'store'}-${currentView || 'default'}-${currentView === 'activation' ? 'activation' : mapKey}`}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={mapZoom}
-        style={containerStyle}
+        style={getContainerStyle(isMapExpanded)}
         whenCreated={onMapLoad}
         zoomControl={true}
         attributionControl={false}
