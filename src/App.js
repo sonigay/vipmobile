@@ -1453,6 +1453,18 @@ function App() {
       case 'agent':
         // console.log('관리자 모드로 전환');
         setIsAgentMode(true);
+        // agentTarget 설정 (loggedInStore에서 추출)
+        const agentTarget = loggedInStore?.target || loggedInStore?.name || '';
+        console.log('모드 전환 - agentTarget 설정:', { 
+          loggedInStoreTarget: loggedInStore?.target, 
+          loggedInStoreName: loggedInStore?.name, 
+          finalTarget: agentTarget 
+        });
+        setAgentTarget(agentTarget);
+        // 관리자 모드일 때 개통실적 데이터 로드
+        setTimeout(() => {
+          loadActivationData();
+        }, 100);
         break;
       case 'inventory':
         // console.log('재고 모드로 전환');
