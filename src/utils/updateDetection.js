@@ -102,6 +102,14 @@ export const setStoredBackendVersion = (version) => {
 // 새로운 배포가 있는지 확인 (하이브리드 시스템)
 export const hasNewDeployment = async () => {
   try {
+    // Service Worker 업데이트 먼저 확인
+    const hasServiceWorkerUpdate = await checkServiceWorkerUpdate();
+    
+    if (hasServiceWorkerUpdate) {
+      console.log('Service Worker 업데이트 감지됨');
+      return true;
+    }
+    
     const currentFrontendVersion = await getCurrentBuildVersion();
     const currentBackendVersion = await getBackendVersion();
     const storedFrontendVersion = getStoredBuildVersion();
@@ -114,14 +122,16 @@ export const hasNewDeployment = async () => {
     const hasBackendUpdate = currentBackendVersion !== storedBackendVersion;
     
     console.log('업데이트 체크:', {
+      serviceWorker: hasServiceWorkerUpdate,
       frontend: { current: currentFrontendVersion, stored: storedFrontendVersion, hasUpdate: hasFrontendUpdate },
       backend: { current: currentBackendVersion, stored: storedBackendVersion, hasUpdate: hasBackendUpdate }
     });
     
-    const hasUpdate = hasFrontendUpdate || hasBackendUpdate;
+    const hasUpdate = hasServiceWorkerUpdate || hasFrontendUpdate || hasBackendUpdate;
     
     if (hasUpdate) {
       console.log('새로운 업데이트 감지됨:', {
+        serviceWorker: hasServiceWorkerUpdate ? '업데이트됨' : '변경없음',
         frontend: hasFrontendUpdate ? '업데이트됨' : '변경없음',
         backend: hasBackendUpdate ? '업데이트됨' : '변경없음'
       });
@@ -202,7 +212,12 @@ export const checkServiceWorkerUpdate = () => {
       registrations.forEach(registration => {
         if (registration.waiting) {
           hasUpdate = true;
-          // console.log('Service Worker 업데이트 대기 중');
+          console.log('Service Worker 업데이트 대기 중:', registration.waiting);
+        }
+        
+        // 업데이트 가능한 상태도 확인
+        if (registration.updateViaCache === 'none' && registration.active) {
+          console.log('Service Worker 업데이트 가능 상태');
         }
       });
       

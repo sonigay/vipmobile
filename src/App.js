@@ -878,11 +878,11 @@ function App() {
       checkForUpdates();
     }, 1000);
     
-    // 주기적 업데이트 감지 (5분마다)
+    // 주기적 업데이트 감지 (1분마다 - 더 자주 체크)
     const interval = setInterval(() => {
       console.log('주기적 업데이트 감지 실행...');
       checkForUpdates();
-    }, 5 * 60 * 1000); // 5분마다
+    }, 1 * 60 * 1000); // 1분마다
     
     // 컴포넌트 언마운트 시 인터벌 정리
     return () => {
