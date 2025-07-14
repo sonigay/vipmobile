@@ -752,13 +752,7 @@ function App() {
           setIsAgentMode(true);
           // agentTarget이 비어있으면 store.name에서 추출
           const agentTarget = parsedState.agentTarget || parsedState.store?.name || '';
-          console.log('로그인 상태 복원 - agentTarget 설정:', { 
-            parsedAgentTarget: parsedState.agentTarget, 
-            storeName: parsedState.store?.name, 
-            finalTarget: agentTarget,
-            parsedStateKeys: Object.keys(parsedState),
-            storeKeys: parsedState.store ? Object.keys(parsedState.store) : []
-          });
+
           setAgentTarget(agentTarget);
           setAgentQualification(parsedState.agentQualification || '');
           setAgentContactId(parsedState.agentContactId || '');
@@ -1301,12 +1295,7 @@ function App() {
       
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
       const agentTarget = store.target || store.name || '';
-      console.log('관리자 모드 agentTarget 설정:', { 
-        storeTarget: store.target, 
-        storeName: store.name, 
-        finalTarget: agentTarget,
-        storeKeys: Object.keys(store)
-      });
+
       setAgentTarget(agentTarget);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
@@ -1441,11 +1430,7 @@ function App() {
         setIsAgentMode(true);
         // agentTarget 설정 (loggedInStore에서 추출)
         const agentTarget = loggedInStore?.target || loggedInStore?.name || '';
-        console.log('모드 전환 - agentTarget 설정:', { 
-          loggedInStoreTarget: loggedInStore?.target, 
-          loggedInStoreName: loggedInStore?.name, 
-          finalTarget: agentTarget 
-        });
+
         setAgentTarget(agentTarget);
         // 관리자 모드일 때 개통실적 데이터 로드
         setTimeout(() => {
@@ -1993,12 +1978,12 @@ function App() {
           onModeChange={() => {
             // console.log('App.js PolicyMode onModeChange 호출됨');
             const currentModes = getCurrentUserAvailableModes();
-            console.log('getCurrentUserAvailableModes 결과:', currentModes);
+
             setAvailableModes(currentModes);
             // 현재 모드 비활성화
             setIsPolicyMode(false);
             setShowModeSelection(true);
-            console.log('PolicyMode 모드 선택 팝업 열기 완료');
+
           }}
           availableModes={availableModes}
         />
@@ -2516,7 +2501,7 @@ function App() {
               {currentView !== 'activation' && (
               <Box sx={{ 
                 flex: 1,
-                height: isMapExpanded ? '90vh' : { xs: '60vh', sm: '70vh', md: '80vh' },
+                height: isMapExpanded ? '90vh' : { xs: '50vh', sm: '60vh', md: '70vh' },
                 position: 'relative',
                 borderRadius: 1,
                 boxShadow: 2,

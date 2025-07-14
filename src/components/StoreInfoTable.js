@@ -63,27 +63,12 @@ function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentConta
   useEffect(() => {
     const loadAgentData = async () => {
       if (!selectedStore?.manager) {
-        console.log('담당자 정보가 없어 매칭 안함');
         return;
       }
       
       try {
         setLoading(true);
         const agents = await fetchAgentData();
-        
-        console.log('담당자 연락처 정보 로드됨:', agents.length);
-        
-        // 매칭 전에 모든 담당자 정보 확인 (디버깅)
-        console.log('모든 담당자 연락처 정보:');
-        agents.forEach((agent, index) => {
-          console.log(`담당자 #${index + 1}:`, {
-            담당자: agent.target,
-            담당자앞3글자: getPrefix(agent.target, 3),
-            자격: agent.qualification,
-            연락처: agent.contactId,
-            매칭여부: getPrefix(selectedStore.manager, 3) === getPrefix(agent.target, 3)
-          });
-        });
         
         // 정확히 앞 3글자만 비교하는 매칭 로직 (VLOOKUP 방식)
         const managerPrefix = getPrefix(selectedStore.manager, 3);
@@ -93,21 +78,12 @@ function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentConta
           if (!agent.target) return false;
           
           const targetPrefix = getPrefix(agent.target, 3);
-          const isExactMatch = targetPrefix === managerPrefix;
-          
-          if (isExactMatch) {
-            console.log(`매칭 성공: ${targetPrefix} === ${managerPrefix}`);
-            console.log(`- 담당자: ${selectedStore.manager} / 연락처 담당자: ${agent.target}`);
-          }
-          
-          return isExactMatch;
+          return targetPrefix === managerPrefix;
         });
         
         if (matched) {
-          console.log(`매칭된 담당자 연락처 발견: ${matched.target} (연락처: ${matched.contactId})`);
           setMatchedContact(matched.contactId);
         } else {
-          console.log(`매칭된 담당자 연락처 없음 - 담당자 앞 3글자(${managerPrefix})와 일치하는 담당자가 없음`);
           setMatchedContact(null);
         }
       } catch (error) {
@@ -121,7 +97,7 @@ function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentConta
   }, [selectedStore]);
 
   /**
-   * 전화 연결 함수 (로깅 추가)
+   * 전화 연결 함수
    */
   const handleCall = (phoneNumber) => {
     if (!phoneNumber) return;
@@ -133,8 +109,6 @@ function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentConta
     if (onCallButtonClick) {
       onCallButtonClick();
     }
-    
-    console.log(`전화 연결: ${phoneNumber}`);
   };
 
   /**
@@ -192,7 +166,6 @@ ${model} / ${color} 모델
 
     // 클립보드에 복사
     navigator.clipboard.writeText(message).then(() => {
-      console.log('카카오톡 메시지가 클립보드에 복사되었습니다:', message);
       alert('카카오톡 문구가 복사되었습니다!\n\n담당자에게 @태그는 직접 추가해주세요!');
     }).catch(err => {
       console.error('클립보드 복사 실패:', err);

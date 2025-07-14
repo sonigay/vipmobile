@@ -67,7 +67,6 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
   // 담당자의 거래처들 찾기 함수
   const getAgentStores = () => {
     if (!data || !data.stores || !agentTarget) {
-      console.log('Header - getAgentStores: 데이터 또는 담당자 정보 없음', { data: !!data, stores: data?.stores?.length, agentTarget });
       return [];
     }
     
@@ -78,14 +77,6 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
       if (!store.manager) return false;
       const managerPrefix = store.manager.toString().substring(0, 3);
       return managerPrefix === agentPrefix;
-    });
-    
-    console.log('Header - getAgentStores: 담당자 거래처 찾기 결과', {
-      agentTarget,
-      agentPrefix,
-      totalStores: data.stores.length,
-      agentStores: agentStores.map(store => ({ name: store.name, manager: store.manager })),
-      agentStoresCount: agentStores.length
     });
     
     return agentStores;
@@ -165,11 +156,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
       }
     });
     
-    console.log('Header - getAgentInventoryByCategory: 담당자 재고 계산 결과', {
-      agentTarget,
-      agentStoresCount: agentStores.length,
-      categories
-    });
+
     
     return categories;
   };
@@ -177,7 +164,6 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
   // 담당자의 거래처들의 당월 개통 데이터 계산 함수
   const getAgentActivationTotal = () => {
     if (!activationData || !agentTarget) {
-      console.log('Header - getAgentActivationTotal: 개통 데이터 또는 담당자 정보 없음', { activationData: !!activationData, agentTarget });
       return 0;
     }
     
@@ -198,13 +184,7 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
       }
     });
     
-    console.log('Header - getAgentActivationTotal: 담당자 개통 데이터 계산 결과', {
-      agentTarget,
-      agentStoresCount: agentStores.length,
-      agentStoreNames,
-      totalActivation,
-      matchedStores
-    });
+
     
     return totalActivation;
   };
@@ -416,11 +396,6 @@ function Header({ onCheckUpdate, inventoryUserName, isInventoryMode, currentUser
                   />
                   {(() => {
                     const categories = getAgentInventoryByCategory();
-                    console.log('Header - 재고 데이터 디버깅:', {
-                      loggedInStore: loggedInStore,
-                      inventory: loggedInStore?.inventory,
-                      categories: categories
-                    });
                     return (
                       <>
                         <Chip

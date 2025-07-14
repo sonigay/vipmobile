@@ -49,8 +49,8 @@ function ForceZoomUpdater({ forceZoomToStore }) {
       
       const attemptZoom = (attemptCount = 0) => {
         try {
-          // 지도가 완전히 로드되었는지 확인
-          if (map && map._loaded && map._container) {
+          // 지도가 완전히 로드되었는지 확인 (더 강력한 검사)
+          if (map && map._loaded && map._container && map._mapPane && map._leaflet_pos) {
             // 지도 패널 크기 확인 (컨테이너 크기로 대체 가능)
             const container = map._container;
             const panelSize = map._size || { x: container.offsetWidth, y: container.offsetHeight };
@@ -106,7 +106,7 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
     
     const attemptUpdate = (attemptCount = 0) => {
       try {
-        if (map && map._loaded && map._container) {
+        if (map && map._loaded && map._container && map._mapPane && map._leaflet_pos) {
           const container = map._container;
           const panelSize = map._size || { x: container.offsetWidth, y: container.offsetHeight };
           
@@ -459,11 +459,22 @@ function Map({
     setMap(mapInstance);
     mapRef.current = mapInstance; // ref 설정
     
-    // 지도가 완전히 로드될 때까지 대기
+    // 지도가 완전히 로드될 때까지 대기 (더 긴 대기 시간)
     setTimeout(() => {
-      setIsMapReady(true);
-      setIsMapInitialized(true);
-    }, 300); // 더 긴 대기 시간으로 조정
+      // 추가 안전 검사
+      if (mapInstance && mapInstance._loaded && mapInstance._mapPane) {
+        setIsMapReady(true);
+        setIsMapInitialized(true);
+      } else {
+        // 지도가 아직 준비되지 않았으면 다시 시도
+        setTimeout(() => {
+          if (mapInstance && mapInstance._loaded && mapInstance._mapPane) {
+            setIsMapReady(true);
+            setIsMapInitialized(true);
+          }
+        }, 500);
+      }
+    }, 500); // 더 긴 대기 시간으로 조정
     
     // 사용자 인터랙션 이벤트 리스너 추가
     mapInstance.on('dragstart', () => {
@@ -477,7 +488,7 @@ function Map({
 
   // 안전한 지도 조작 함수
   const safeMapOperation = useCallback((operation) => {
-    if (map && isMapReady && map._loaded && map._mapPane) {
+    if (map && isMapReady && map._loaded && map._mapPane && map._leaflet_pos) {
       try {
         operation();
       } catch (error) {
@@ -515,16 +526,16 @@ function Map({
 
   // 강제 확대 (검색 결과 선택 시) - 직접 지도 조작
   useEffect(() => {
-    if (forceZoomToStore && mapRef.current && mapRef.current._mapPane) {
+    if (forceZoomToStore && mapRef.current && mapRef.current._mapPane && mapRef.current._leaflet_pos) {
       const { lat, lng } = forceZoomToStore;
       
       try {
         const mapInstance = mapRef.current;
-        if (mapInstance._loaded && mapInstance._mapPane) {
-        mapInstance.setView([lat, lng], 14, {
-          animate: true,
-          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
-        });
+        if (mapInstance._loaded && mapInstance._mapPane && mapInstance._leaflet_pos) {
+          mapInstance.setView([lat, lng], 14, {
+            animate: true,
+            duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+          });
         }
       } catch (error) {
         console.error('강제 확대 직접 조작 오류:', error);
