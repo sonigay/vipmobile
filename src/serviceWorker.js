@@ -37,24 +37,14 @@ function registerValidSW(swUrl, config) {
         installingWorker.onstatechange = () => {
           if (installingWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
-              console.log('새로운 컨텐츠가 사용 가능합니다. 앱을 완전히 종료해주세요.');
+              console.log('새로운 컨텐츠가 사용 가능합니다.');
               
-              // 완전한 앱 종료 안내
+              // 메인 앱에 업데이트 알림 전송
               if (typeof window !== 'undefined') {
-                alert(
-                  '업데이트가 완료되었습니다.\n\n' +
-                  '앱을 완전히 종료하고 다시 실행해주세요.\n\n' +
-                  '이 창을 닫고 앱을 다시 열어주세요.'
-                );
-                
-                // 3초 후 자동으로 창 닫기 시도
-                setTimeout(() => {
-                  try {
-                    window.close();
-                  } catch (error) {
-                    console.log('자동 창 닫기 실패 - 사용자가 수동으로 닫아주세요');
-                  }
-                }, 3000);
+                // 자동 로그아웃 요청 메시지 전송
+                navigator.serviceWorker.controller.postMessage({
+                  type: 'AUTO_LOGOUT_REQUIRED'
+                });
               }
               
               if (config && config.onUpdate) {

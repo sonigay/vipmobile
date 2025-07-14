@@ -29,6 +29,7 @@ import ChartMode from './components/ChartMode';
 import PolicyMode from './components/PolicyMode';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
+import UpdateProgressScreen from './components/UpdateProgressScreen';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
 // 모바일 최적화 관련 import 제거 (재고 모드로 이동)
 // 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
@@ -161,6 +162,10 @@ function App() {
   const [availableModes, setAvailableModes] = useState([]);
   const [pendingLoginData, setPendingLoginData] = useState(null);
   const [modeSelectionRequired, setModeSelectionRequired] = useState(false);
+  
+  // 업데이트 관련 상태
+  const [showUpdateProgress, setShowUpdateProgress] = useState(false);
+  const [isUpdateInProgress, setIsUpdateInProgress] = useState(false);
   
   // 현재 사용자의 사용 가능한 모드 목록 가져오기
   const getCurrentUserAvailableModes = () => {
@@ -823,68 +828,27 @@ function App() {
         const hasNew = await hasNewDeployment();
         
         if (hasNew) {
-          // 업데이트가 있으면 즉시 강제 로그아웃 및 앱 재시작
+          // 업데이트가 있으면 사용자에게 알림
           console.log('새로운 업데이트 발견 - 하이브리드 시스템');
           
           // 사용자에게 업데이트 알림
           const shouldUpdate = window.confirm(
             '업데이트 내용이 있습니다.\n\n' +
-            '업데이트를 적용하시겠습니까?\n\n' +
-            '확인을 누르면 앱이 재시작됩니다.'
+            '업데이트를 진행하시겠습니까?\n\n' +
+            '확인을 누르면 앱이 업데이트를 진행합니다.'
           );
           
           if (shouldUpdate) {
+            // 업데이트 진행 상태 설정
+            setIsUpdateInProgress(true);
+            setShowUpdateProgress(true);
+            
             // 로그인 상태 저장 (재시작 후 복원용)
             const currentLoginState = localStorage.getItem('loginState');
+            localStorage.setItem('pendingLoginState', currentLoginState || '');
             
             // 업데이트 플래그 설정
             localStorage.setItem('updateInProgress', 'true');
-            localStorage.setItem('pendingLoginState', currentLoginState || '');
-            
-            // 캐시 삭제
-            if ('caches' in window) {
-              try {
-                const cacheNames = await caches.keys();
-                await Promise.all(
-                  cacheNames.map(cacheName => caches.delete(cacheName))
-                );
-              } catch (error) {
-                console.warn('캐시 삭제 실패:', error);
-              }
-            }
-            
-            // Service Worker 업데이트
-            if ('serviceWorker' in navigator) {
-              try {
-                const registration = await navigator.serviceWorker.getRegistration();
-                if (registration) {
-                  await registration.update();
-                }
-              } catch (error) {
-                console.warn('Service Worker 업데이트 실패:', error);
-              }
-            }
-            
-            // 강제 로그아웃
-            handleLogout();
-            
-            // 완전한 앱 종료 (카카오톡 스타일)
-            // 브라우저 탭을 닫거나 앱을 완전히 종료하도록 안내
-            alert(
-              '업데이트가 완료되었습니다.\n\n' +
-              '앱을 완전히 종료하고 다시 실행해주세요.\n\n' +
-              '이 창을 닫고 앱을 다시 열어주세요.'
-            );
-            
-            // 3초 후 자동으로 창 닫기 시도 (사용자가 허용한 경우에만)
-            setTimeout(() => {
-              try {
-                window.close();
-              } catch (error) {
-                // window.close()가 실패하면 사용자에게 수동으로 닫으라고 안내
-                console.log('자동 창 닫기 실패 - 사용자가 수동으로 닫아주세요');
-              }
-            }, 3000);
           }
         }
       } catch (error) {
@@ -897,6 +861,45 @@ function App() {
       checkForUpdates();
     }, 1000);
   }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
+
+  // 업데이트 완료 처리
+  const handleUpdateComplete = async () => {
+    try {
+      // 캐시 삭제
+      if ('caches' in window) {
+        try {
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => caches.delete(cacheName))
+          );
+        } catch (error) {
+          console.warn('캐시 삭제 실패:', error);
+        }
+      }
+      
+      // Service Worker 업데이트
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          if (registration) {
+            await registration.update();
+          }
+        } catch (error) {
+          console.warn('Service Worker 업데이트 실패:', error);
+        }
+      }
+      
+      // 강제 로그아웃
+      handleLogout();
+      
+      // 앱 완전 종료 및 재시작
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error('업데이트 완료 처리 중 오류:', error);
+    }
+  };
 
   // 담당자별 재고 필터링 함수 (useEffect보다 먼저 정의)
   const filterStoresByAgent = useCallback((stores, agentTarget) => {
@@ -2722,6 +2725,11 @@ function App() {
         isModeSwitch={false}
         userName={pendingLoginData?.target || '사용자'}
       />
+
+      {/* 업데이트 진행 화면 */}
+      {showUpdateProgress && (
+        <UpdateProgressScreen onUpdateComplete={handleUpdateComplete} />
+      )}
     </ThemeProvider>
   );
 }
