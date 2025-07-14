@@ -2523,7 +2523,7 @@ function App() {
               <Box sx={{ flex: 1 }}>
                 <Map
                   userLocation={userLocation}
-                  filteredStores={isAgentMode && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
+                  filteredStores={isAgentMode && currentView === 'assigned' && agentTarget ? filterStoresByAgent(data?.stores || [], agentTarget) : filteredStores}
                   selectedStore={selectedStore}
                   requestedStore={requestedStore}
                   onStoreSelect={handleStoreSelect}

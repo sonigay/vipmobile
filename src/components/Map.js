@@ -39,7 +39,6 @@ function ForceZoomUpdater({ forceZoomToStore }) {
   useEffect(() => {
     if (forceZoomToStore && map) {
       const { lat, lng } = forceZoomToStore;
-      console.log('ForceZoomUpdater 실행:', lat, lng, '지도 인스턴스:', map);
       
       const attemptZoom = (attemptCount = 0) => {
         try {
@@ -52,39 +51,36 @@ function ForceZoomUpdater({ forceZoomToStore }) {
             if (panelSize.x > 0 && panelSize.y > 0) {
               map.setView([lat, lng], 14, {
                 animate: true,
-                duration: 1
+                duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
               });
-              console.log('ForceZoomUpdater 확대 완료');
               return;
             } else if (container.offsetWidth > 0 && container.offsetHeight > 0) {
               // 컨테이너 크기로 대체
               map.setView([lat, lng], 14, {
                 animate: true,
-                duration: 1
+                duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
               });
-              console.log('ForceZoomUpdater 확대 완료 (컨테이너 크기 사용)');
               return;
             }
           }
           
-          // 재시도 로직 (최대 10회, 200ms 간격)
-          if (attemptCount < 10) {
-            console.log(`ForceZoomUpdater 재시도 ${attemptCount + 1}/10`);
-            setTimeout(() => attemptZoom(attemptCount + 1), 200);
+          // 재시도 로직 (최대 5회, 300ms 간격으로 늘림)
+          if (attemptCount < 5) {
+            setTimeout(() => attemptZoom(attemptCount + 1), 300);
           } else {
             console.warn('ForceZoomUpdater 최대 재시도 횟수 초과');
           }
         } catch (error) {
           console.error('ForceZoomUpdater 오류:', error);
           // 오류 발생 시에도 재시도
-          if (attemptCount < 10) {
-            setTimeout(() => attemptZoom(attemptCount + 1), 200);
+          if (attemptCount < 5) {
+            setTimeout(() => attemptZoom(attemptCount + 1), 300);
           }
         }
       };
       
       // 초기 시도
-      setTimeout(() => attemptZoom(), 100);
+      setTimeout(() => attemptZoom(), 200);
     }
   }, [forceZoomToStore, map]);
   
@@ -98,7 +94,6 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
   useEffect(() => {
     // 강제 확대가 진행 중이면 MapUpdater 비활성화 (지도 위치 유지)
     if (forceZoomToStore) {
-      console.log('MapUpdater 비활성화 - 강제 확대 상태 유지 중');
       return;
     }
     
@@ -110,27 +105,34 @@ function MapUpdater({ center, bounds, zoom, isAgentMode, forceZoomToStore }) {
           
           if (panelSize.x > 0 && panelSize.y > 0 || container.offsetWidth > 0 && container.offsetHeight > 0) {
             if (bounds) {
-              map.fitBounds(bounds);
+              map.fitBounds(bounds, {
+                animate: true,
+                duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+              });
               if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-                map.setZoom(isAgentMode ? 12 : 15);
+                map.setZoom(isAgentMode ? 12 : 15, {
+                  animate: true,
+                  duration: 1.5
+                });
               }
             } else if (center) {
-              map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12));
+              map.setView([center.lat, center.lng], zoom || (isAgentMode ? 9 : 12), {
+                animate: true,
+                duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+              });
             }
-            console.log('MapUpdater 업데이트 완료');
             return;
           }
         }
         
-        // 재시도 로직 (최대 5회, 300ms 간격)
-        if (attemptCount < 5) {
-          console.log(`MapUpdater 재시도 ${attemptCount + 1}/5`);
-          setTimeout(() => attemptUpdate(attemptCount + 1), 300);
+        // 재시도 로직 (최대 3회, 400ms 간격으로 늘림)
+        if (attemptCount < 3) {
+          setTimeout(() => attemptUpdate(attemptCount + 1), 400);
         }
       } catch (error) {
         console.error('MapUpdater 오류:', error);
-        if (attemptCount < 5) {
-          setTimeout(() => attemptUpdate(attemptCount + 1), 300);
+        if (attemptCount < 3) {
+          setTimeout(() => attemptUpdate(attemptCount + 1), 400);
         }
       }
     };
@@ -312,15 +314,7 @@ function Map({
       });
     });
 
-    // 디버깅 로그
-    if (hasSearchFilter && (result.within30 > 0 || result.within60 > 0 || result.over60 > 0)) {
-      console.log(`[${store.name}] 검색 필터 적용 결과:`, {
-        selectedModel,
-        selectedColor,
-        result,
-        hasSearchFilter
-      });
-    }
+
 
     return result;
   }, [selectedModel, selectedColor]);
@@ -452,15 +446,13 @@ function Map({
 
   // 지도 로드 핸들러
   const onMapLoad = useCallback((mapInstance) => {
-    console.log('지도 로드됨');
     setMap(mapInstance);
     mapRef.current = mapInstance; // ref 설정
     
     // 지도가 완전히 로드될 때까지 대기
     setTimeout(() => {
       setIsMapReady(true);
-      console.log('지도 준비 완료');
-    }, 200); // 더 긴 대기 시간
+    }, 300); // 더 긴 대기 시간으로 조정
     
     // 사용자 인터랙션 이벤트 리스너 추가
     mapInstance.on('dragstart', () => {
@@ -496,7 +488,10 @@ function Map({
       
       safeMapOperation(() => {
         // 선택된 매장으로 지도 이동 및 줌 레벨 조정 (더 확대)
-        map.setView([position.lat, position.lng], isAgentMode ? 16 : 15);
+        map.setView([position.lat, position.lng], isAgentMode ? 16 : 15, {
+          animate: true,
+          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+        });
       });
       
       // 선택한 매장 ID 저장
@@ -508,16 +503,14 @@ function Map({
   useEffect(() => {
     if (forceZoomToStore && mapRef.current && mapRef.current._mapPane) {
       const { lat, lng } = forceZoomToStore;
-      console.log('강제 확대 직접 조작:', lat, lng);
       
       try {
         const mapInstance = mapRef.current;
         if (mapInstance._loaded && mapInstance._mapPane) {
         mapInstance.setView([lat, lng], 14, {
           animate: true,
-          duration: 1
+          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
         });
-        console.log('강제 확대 직접 조작 완료');
         }
       } catch (error) {
         console.error('강제 확대 직접 조작 오류:', error);
@@ -550,9 +543,15 @@ function Map({
   useEffect(() => {
     if (mapBounds && (initialLoadRef.current || !userInteracted) && !forceZoomToStore) {
       safeMapOperation(() => {
-        map.fitBounds(mapBounds);
+        map.fitBounds(mapBounds, {
+          animate: true,
+          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+        });
         if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-          map.setZoom(isAgentMode ? 12 : 15);
+          map.setZoom(isAgentMode ? 12 : 15, {
+            animate: true,
+            duration: 1.5
+          });
         }
       });
       initialLoadRef.current = false;
@@ -570,9 +569,15 @@ function Map({
       ]);
       
       safeMapOperation(() => {
-        map.fitBounds(bounds);
+        map.fitBounds(bounds, {
+          animate: true,
+          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+        });
         if (map.getZoom() > (isAgentMode ? 12 : 15)) {
-          map.setZoom(isAgentMode ? 12 : 15);
+          map.setZoom(isAgentMode ? 12 : 15, {
+            animate: true,
+            duration: 1.5
+          });
         }
       });
     }
@@ -826,8 +831,7 @@ function Map({
               icon={activationIcon}
               eventHandlers={{
                 click: () => {
-                  // 개통실적 상세 정보 팝업 표시
-                  console.log('개통실적 마커 클릭:', storeName, data);
+                  // 개통실적 상세 정보 팝업 표시 (향후 구현 예정)
                 }
               }}
             >
