@@ -15,11 +15,7 @@ L.Icon.Default.mergeOptions({
 const containerStyle = {
   width: '100%',
   height: '100%',
-  minHeight: '400px',
-  borderRadius: '4px',
-  '@media (max-width: 768px)': {
-    minHeight: '300px'
-  }
+  borderRadius: '4px'
 };
 
 const mapContainerStyle = {
