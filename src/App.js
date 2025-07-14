@@ -751,6 +751,11 @@ function App() {
           setIsAgentMode(true);
           // agentTarget이 비어있으면 store.name에서 추출
           const agentTarget = parsedState.agentTarget || parsedState.store?.name || '';
+          console.log('로그인 상태 복원 - agentTarget 설정:', { 
+            parsedAgentTarget: parsedState.agentTarget, 
+            storeName: parsedState.store?.name, 
+            finalTarget: agentTarget 
+          });
           setAgentTarget(agentTarget);
           setAgentQualification(parsedState.agentQualification || '');
           setAgentContactId(parsedState.agentContactId || '');
@@ -990,10 +995,17 @@ function App() {
 
       if (storesResponse.success && modelsResponse.success) {
         // 데이터 구조 자세히 로깅
-        // console.log('모델 데이터 원본:', modelsResponse.data);
+        console.log('데이터 로딩 성공:', {
+          storesCount: storesResponse.data?.length || 0,
+          modelsCount: Object.keys(modelsResponse.data || {}).length,
+          firstStore: storesResponse.data?.[0] ? {
+            name: storesResponse.data[0].name,
+            hasInventory: !!storesResponse.data[0].inventory,
+            inventoryKeys: storesResponse.data[0].inventory ? Object.keys(storesResponse.data[0].inventory) : []
+          } : null
+        });
+        
         const models = Object.keys(modelsResponse.data || {}).sort();
-        // console.log('추출된 모델 목록:', models);
-        // console.log('모델별 색상 데이터:', modelsResponse.data);
 
         // 데이터 설정 전 최종 확인
         const finalData = {
@@ -1001,7 +1013,6 @@ function App() {
           models: models,
           colorsByModel: modelsResponse.data,
         };
-        // console.log('최종 설정될 데이터:', finalData);
 
         // 데이터 설정과 동시에 필터링된 매장 목록 초기화
         setData(finalData);
@@ -1300,7 +1311,11 @@ function App() {
       setIsInspectionMode(false);
       setIsChartMode(false);
       setIsPolicyMode(false);
-      setAgentTarget(store.target);
+      
+      // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
+      const agentTarget = store.target || store.name || '';
+      console.log('관리자 모드 agentTarget 설정:', { storeTarget: store.target, storeName: store.name, finalTarget: agentTarget });
+      setAgentTarget(agentTarget);
       setAgentQualification(store.qualification);
       setAgentContactId(store.contactId);
       
