@@ -848,25 +848,16 @@ function App() {
           // 업데이트가 있으면 사용자에게 알림
           console.log('새로운 업데이트 발견 - 하이브리드 시스템');
           
-          // 사용자에게 업데이트 알림
-          const shouldUpdate = window.confirm(
-            '업데이트 내용이 있습니다.\n\n' +
-            '업데이트를 진행하시겠습니까?\n\n' +
-            '확인을 누르면 앱이 업데이트를 진행합니다.'
-          );
+          // 업데이트 진행 상태 설정
+          setIsUpdateInProgress(true);
+          setShowUpdateProgress(true);
           
-          if (shouldUpdate) {
-            // 업데이트 진행 상태 설정
-            setIsUpdateInProgress(true);
-            setShowUpdateProgress(true);
-            
-            // 로그인 상태 저장 (재시작 후 복원용)
-            const currentLoginState = localStorage.getItem('loginState');
-            localStorage.setItem('pendingLoginState', currentLoginState || '');
-            
-            // 업데이트 플래그 설정
-            localStorage.setItem('updateInProgress', 'true');
-          }
+          // 로그인 상태 저장 (재시작 후 복원용)
+          const currentLoginState = localStorage.getItem('loginState');
+          localStorage.setItem('pendingLoginState', currentLoginState || '');
+          
+          // 업데이트 플래그 설정
+          localStorage.setItem('updateInProgress', 'true');
         }
       } catch (error) {
         console.error('업데이트 확인 중 오류:', error);

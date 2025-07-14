@@ -224,10 +224,10 @@ function Map({
   // 각 모드별 초기 줌 레벨 설정 (마커 기반)
   const getInitialZoom = () => {
     if (isAgentMode) {
-      if (currentView === 'all') return 10;      // 전체재고확인 (기본값)
-      if (currentView === 'assigned') return 11; // 담당재고확인 (기본값)
-      if (currentView === 'activation') return 12; // 담당개통확인 (기본값)
-      return 10; // 기본값
+      if (currentView === 'all') return 6;       // 전체재고확인: 대한민국 전체 (줌 레벨 낮춤)
+      if (currentView === 'assigned') return 9;  // 담당재고확인: 담당자 거래처 전체 (줌 레벨 낮춤)
+      if (currentView === 'activation') return 10; // 담당개통확인: 중간 시야
+      return 6; // 기본값: 전체재고확인과 동일
     }
     return 12; // 일반 매장 모드
   };
@@ -643,10 +643,10 @@ function Map({
         // 각 모드별 최대 줌 레벨 설정
         let maxZoom;
         if (isAgentMode) {
-          if (currentView === 'all') maxZoom = 9;         // 전체재고확인: 매우 넓은 시야
-          else if (currentView === 'assigned') maxZoom = 10; // 담당재고확인: 넓은 시야
+          if (currentView === 'all') maxZoom = 7;         // 전체재고확인: 대한민국 전체 (최대 줌 낮춤)
+          else if (currentView === 'assigned') maxZoom = 9; // 담당재고확인: 담당자 거래처 전체 (최대 줌 낮춤)
           else if (currentView === 'activation') maxZoom = 11; // 담당개통확인: 중간 시야
-          else maxZoom = 10;
+          else maxZoom = 7;
         } else {
           maxZoom = 12; // 일반 매장 모드: 중간 시야
         }
