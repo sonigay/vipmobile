@@ -330,16 +330,7 @@ function SalesByStoreScreen({ loggedInStore }) {
       });
     }
     
-    return {
-      filteredAgents,
-      filteredStores,
-      filteredAgentData: Object.fromEntries(
-        filteredAgents.map(agent => [agent, agentData[agent]])
-      ),
-      filteredStoreData: Object.fromEntries(
-        filteredStores.map(store => [store, storeData[store]])
-      )
-    };
+    return filteredAgents;
   };
 
   // 재고 현황 데이터 로드
@@ -850,6 +841,104 @@ function SalesByStoreScreen({ loggedInStore }) {
         </Alert>
       )}
 
+      {/* 고급 필터 */}
+      {showFilters && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              🔍 고급 필터
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="담당자명 검색"
+                  value={filters.agent}
+                  onChange={(e) => setFilters({ ...filters, agent: e.target.value })}
+                  placeholder="담당자명을 입력하세요"
+                  size="small"
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="대리점코드 검색"
+                  value={filters.storeCode}
+                  onChange={(e) => setFilters({ ...filters, storeCode: e.target.value })}
+                  placeholder="대리점코드를 입력하세요"
+                  size="small"
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  label="최소 완료율 (%)"
+                  type="number"
+                  value={filters.minCompletionRate}
+                  onChange={(e) => setFilters({ ...filters, minCompletionRate: e.target.value })}
+                  placeholder="0"
+                  size="small"
+                  inputProps={{ min: 0, max: 100 }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  label="최대 완료율 (%)"
+                  type="number"
+                  value={filters.maxCompletionRate}
+                  onChange={(e) => setFilters({ ...filters, maxCompletionRate: e.target.value })}
+                  placeholder="100"
+                  size="small"
+                  inputProps={{ min: 0, max: 100 }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  select
+                  label="상태"
+                  value={filters.status}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  size="small"
+                >
+                  <MenuItem value="">전체</MenuItem>
+                  <MenuItem value="completed">완료율 높음</MenuItem>
+                  <MenuItem value="pending">진행 중</MenuItem>
+                  <MenuItem value="no-data">데이터 없음</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+            
+            <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setFilters({
+                  agent: '',
+                  storeCode: '',
+                  status: '',
+                  minCompletionRate: '',
+                  maxCompletionRate: ''
+                })}
+              >
+                필터 초기화
+              </Button>
+              <Chip
+                label={`필터링된 담당자: ${getFilteredData().length}명`}
+                color="info"
+                size="small"
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 액션 버튼 */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Button
@@ -987,7 +1076,7 @@ function SalesByStoreScreen({ loggedInStore }) {
             </Typography>
             
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {agents.map((agent, index) => {
+              {getFilteredData().map((agent, index) => {
                 const agentData = data.byAgent[agent] || {};
                 const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
                 const isSelected = selectedAgent === index;
