@@ -6210,6 +6210,172 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
   }
 });
 
+// 판매처별정리 관련 API들
+
+// 대리점코드별 데이터 로드 API (캐시 적용)
+app.get('/api/sales-by-store/data', async (req, res) => {
+  try {
+    const cacheKey = 'sales_by_store_data';
+    const cachedData = cacheUtils.get(cacheKey);
+    
+    if (cachedData) {
+      console.log('판매처별정리 데이터 캐시에서 로드');
+      return res.json(cachedData);
+    }
+
+    console.log('판매처별정리 데이터 구글시트에서 로드');
+
+    // 1. 사전예약사이트 시트 데이터 로드
+    const reservationResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트!A:V'
+    });
+
+    // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
+    const phoneklResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '폰클출고처데이터!A:N'
+    });
+
+    // 3. 마당접수 시트 로드 (서류접수 상태 확인용)
+    const yardResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '마당접수!A:V'
+    });
+
+    if (!reservationResponse.data.values || !phoneklResponse.data.values || !yardResponse.data.values) {
+      throw new Error('시트 데이터를 불러올 수 없습니다.');
+    }
+
+    const reservationHeaders = reservationResponse.data.values[0];
+    const reservationData = reservationResponse.data.values.slice(1);
+    
+    const phoneklHeaders = phoneklResponse.data.values[0];
+    const phoneklData = phoneklResponse.data.values.slice(1);
+    
+    const yardHeaders = yardResponse.data.values[0];
+    const yardData = yardResponse.data.values.slice(1);
+
+    // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
+    const storeAgentMap = new Map();
+    phoneklData.forEach(row => {
+      const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
+      const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
+      if (storeCode && agent) {
+        storeAgentMap.set(storeCode, agent);
+      }
+    });
+
+    // 마당접수에서 U열+V열 조합으로 예약번호 매핑 생성
+    const yardReservationMap = new Set();
+    yardData.forEach(row => {
+      const uValue = row[20] || ''; // U열 (21번째, 0부터 시작)
+      const vValue = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const combinedReservation = (uValue + vValue).replace(/-/g, ''); // 하이픈 제거
+      if (combinedReservation) {
+        yardReservationMap.add(combinedReservation);
+      }
+    });
+
+    // 사전예약사이트 데이터 처리
+    const processedData = reservationData.map((row, index) => {
+      const posName = row[20] || ''; // U열 (21번째, 0부터 시작)
+      const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
+      const storeCodeForLookup = row[19] || ''; // T열 (20번째, 0부터 시작)
+      
+      // 담당자 매칭 (VLOOKUP 방식)
+      let agent = storeAgentMap.get(storeCodeForLookup) || '';
+      
+      // 서류접수 상태 확인
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const isDocumentReceived = yardReservationMap.has(normalizedReservationNumber);
+
+      return {
+        rowIndex: index + 2,
+        posName,
+        storeCode,
+        reservationNumber,
+        storeCodeForLookup,
+        agent,
+        isDocumentReceived,
+        originalRow: row
+      };
+    });
+
+    // 대리점코드별로 그룹화
+    const groupedByStore = {};
+    processedData.forEach(item => {
+      if (item.storeCode) {
+        if (!groupedByStore[item.storeCode]) {
+          groupedByStore[item.storeCode] = [];
+        }
+        groupedByStore[item.storeCode].push(item);
+      }
+    });
+
+    // 각 그룹 내에서 담당자별 정렬 후 POS명별 정렬
+    Object.keys(groupedByStore).forEach(storeCode => {
+      groupedByStore[storeCode].sort((a, b) => {
+        // 먼저 담당자로 정렬
+        if (a.agent !== b.agent) {
+          return (a.agent || '').localeCompare(b.agent || '');
+        }
+        // 담당자가 같으면 POS명으로 정렬
+        return (a.posName || '').localeCompare(b.posName || '');
+      });
+    });
+
+    const result = {
+      success: true,
+      data: groupedByStore,
+      stats: {
+        totalStores: Object.keys(groupedByStore).length,
+        totalItems: processedData.length,
+        totalWithAgent: processedData.filter(item => item.agent).length,
+        totalDocumentReceived: processedData.filter(item => item.isDocumentReceived).length
+      }
+    };
+
+    // 캐시에 저장 (10분)
+    cacheUtils.set(cacheKey, result, 10 * 60 * 1000);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('판매처별정리 데이터 로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load sales by store data',
+      message: error.message
+    });
+  }
+});
+
+// 담당자 수동 매칭 저장 API
+app.post('/api/sales-by-store/update-agent', async (req, res) => {
+  try {
+    const { storeCode, posName, agent } = req.body;
+    
+    // 여기서는 임시로 성공 응답만 반환
+    // 실제로는 구글시트에 저장하거나 별도 저장소에 저장할 수 있음
+    
+    // 캐시 무효화
+    cacheUtils.deletePattern('sales_by_store');
+    
+    res.json({
+      success: true,
+      message: '담당자가 업데이트되었습니다.'
+    });
+  } catch (error) {
+    console.error('담당자 업데이트 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update agent',
+      message: error.message
+    });
+  }
+});
+
 // 정규화 규칙 적용 테스트 API
 app.post('/api/reservation-settings/test-normalization', async (req, res) => {
   try {

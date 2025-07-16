@@ -13,9 +13,11 @@ import {
 import {
   Event as EventIcon,
   SwapHoriz as SwapHorizIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Store as StoreIcon
 } from '@mui/icons-material';
 import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
+import SalesByStoreScreen from './screens/SalesByStoreScreen';
 
 function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [currentTab, setCurrentTab] = useState(0);
@@ -62,6 +64,12 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
       case 1: // 사전예약정리 셋팅 탭
         return (
           <ReservationSettingsScreen 
+            loggedInStore={loggedInStore}
+          />
+        );
+      case 2: // 판매처별정리 탭
+        return (
+          <SalesByStoreScreen 
             loggedInStore={loggedInStore}
           />
         );
@@ -138,6 +146,17 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             <Tab 
               label="사전예약정리 셋팅" 
               icon={<SettingsIcon />} 
+              iconPosition="start"
+              sx={{ 
+                minHeight: 64,
+                '&.Mui-selected': {
+                  color: '#ff9a9e'
+                }
+              }}
+            />
+            <Tab 
+              label="판매처별정리" 
+              icon={<StoreIcon />} 
               iconPosition="start"
               sx={{ 
                 minHeight: 64,
