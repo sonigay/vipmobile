@@ -161,7 +161,11 @@ function SalesByStoreScreen({ loggedInStore }) {
     if (data.byAgent && Object.keys(data.byAgent).length > 0) {
       console.log('담당자별 데이터 구조:', data.byAgent);
       Object.entries(data.byAgent).forEach(([agent, agentData]) => {
-        console.log(`${agent} 담당자의 POS 목록:`, Object.keys(agentData));
+        const posNames = Object.keys(agentData);
+        const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+        const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+        console.log(`${agent} 담당자: ${posNames.length}개 POS, 총 ${totalItems}건, 접수 ${totalReceived}건`);
+        console.log(`  POS 목록:`, posNames);
       });
     }
   }, [data.byAgent]);
@@ -308,7 +312,7 @@ function SalesByStoreScreen({ loggedInStore }) {
         </Card>
       )}
 
-      {/* 담당자별 탭 - 컴팩트 버전 */}
+      {/* 담당자별 탭 */}
       {viewMode === 'agent' && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
@@ -316,45 +320,47 @@ function SalesByStoreScreen({ loggedInStore }) {
               담당자별 정리
             </Typography>
             
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <Tabs
+              value={selectedAgent}
+              onChange={(event, newValue) => setSelectedAgent(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 48,
+                  fontSize: '0.9rem',
+                  fontWeight: 500
+                }
+              }}
+            >
               {agents.map((agent, index) => {
                 const agentData = data.byAgent[agent] || {};
                 const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
-                const isSelected = index === selectedAgent;
                 
                 return (
-                  <Button
+                  <Tab
                     key={agent}
-                    variant={isSelected ? 'contained' : 'outlined'}
-                    size="small"
-                    onClick={() => setSelectedAgent(index)}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PersonIcon fontSize="small" />
+                        {agent}
+                        <Chip
+                          label={totalItems}
+                          size="small"
+                          color="primary"
+                          sx={{ fontSize: '0.7rem', height: 20 }}
+                        />
+                      </Box>
+                    }
                     sx={{
-                      minWidth: 'auto',
-                      px: 2,
-                      py: 1,
-                      fontSize: '0.8rem',
-                      backgroundColor: isSelected ? '#ff9a9e' : undefined,
-                      '&:hover': {
-                        backgroundColor: isSelected ? '#f48fb1' : undefined
+                      '&.Mui-selected': {
+                        color: '#ff9a9e'
                       }
                     }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <PersonIcon fontSize="small" />
-                      <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                        {agent}
-                      </Typography>
-                      <Chip
-                        label={totalItems}
-                        size="small"
-                        color={isSelected ? 'default' : 'primary'}
-                        sx={{ fontSize: '0.6rem', height: 16, minWidth: 20 }}
-                      />
-                    </Box>
-                  </Button>
+                  />
                 );
               })}
-            </Box>
+            </Tabs>
           </CardContent>
         </Card>
       )}

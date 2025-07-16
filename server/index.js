@@ -6277,6 +6277,9 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       }
     });
 
+    console.log('마당접수 예약번호 개수:', yardReservationMap.size);
+    console.log('마당접수 예약번호 샘플:', Array.from(yardReservationMap).slice(0, 5));
+
     // 사전예약사이트 데이터 처리
     const processedData = reservationData.map((row, index) => {
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
@@ -6291,6 +6294,11 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
       const isDocumentReceived = yardReservationMap.has(normalizedReservationNumber);
 
+      // 디버깅용 로그 (처음 10개만)
+      if (index < 10) {
+        console.log(`행 ${index + 2}: 예약번호=${reservationNumber}, 정규화=${normalizedReservationNumber}, 접수=${isDocumentReceived}`);
+      }
+
       return {
         rowIndex: index + 2,
         posName,
@@ -6302,6 +6310,9 @@ app.get('/api/sales-by-store/data', async (req, res) => {
         originalRow: row
       };
     });
+
+    console.log('총 처리된 데이터:', processedData.length);
+    console.log('서류접수된 데이터:', processedData.filter(item => item.isDocumentReceived).length);
 
     // 대리점코드별로 그룹화
     const groupedByStore = {};
@@ -6348,34 +6359,38 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 담당자별로 그룹화하고 POS명별로 서브 그룹화
     const groupedByAgent = {};
     
-    Object.keys(groupedByStore).forEach(storeCode => {
-      groupedByStore[storeCode].forEach(item => {
-        const agent = item.agent || '미배정';
-        const posName = item.posName || '미지정';
-        
-        if (!groupedByAgent[agent]) {
-          groupedByAgent[agent] = {};
-        }
-        
-        if (!groupedByAgent[agent][posName]) {
-          groupedByAgent[agent][posName] = {
-            received: 0,
-            notReceived: 0,
-            total: 0,
-            items: []
-          };
-        }
-        
-        // 서류접수 상태에 따라 카운팅
-        if (item.isDocumentReceived) {
-          groupedByAgent[agent][posName].received++;
-        } else {
-          groupedByAgent[agent][posName].notReceived++;
-        }
-        
-        groupedByAgent[agent][posName].total++;
-        groupedByAgent[agent][posName].items.push(item);
-      });
+    // 모든 데이터를 담당자별로 그룹화
+    processedData.forEach(item => {
+      const agent = item.agent || '미배정';
+      const posName = item.posName || '미지정';
+      
+      if (!groupedByAgent[agent]) {
+        groupedByAgent[agent] = {};
+      }
+      
+      if (!groupedByAgent[agent][posName]) {
+        groupedByAgent[agent][posName] = {
+          received: 0,
+          notReceived: 0,
+          total: 0,
+          items: []
+        };
+      }
+      
+      // 서류접수 상태에 따라 카운팅
+      if (item.isDocumentReceived) {
+        groupedByAgent[agent][posName].received++;
+      } else {
+        groupedByAgent[agent][posName].notReceived++;
+      }
+      
+      groupedByAgent[agent][posName].total++;
+      groupedByAgent[agent][posName].items.push(item);
+    });
+
+    // 디버깅용: 담당자별 POS 개수 확인
+    Object.entries(groupedByAgent).forEach(([agent, agentData]) => {
+      console.log(`${agent} 담당자: ${Object.keys(agentData).length}개 POS`);
     });
 
     const result = {
