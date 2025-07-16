@@ -3190,18 +3190,23 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const pValue = (row[15] || '').toString().trim(); // P열
       const qValue = (row[16] || '').toString().trim(); // Q열
       const rValue = (row[17] || '').toString().trim(); // R열
-      const reservationNumber = (row[0] || '').toString().trim(); // 예약번호
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       
       // 처음 몇 개 행의 데이터 확인
       if (index < 5) {
         console.log(`행 ${index + 1} 데이터: P="${pValue}", Q="${qValue}", R="${rValue}", 예약번호="${reservationNumber}"`);
       }
       
-      if (!pValue || !qValue || !rValue || !reservationNumber) {
+      if (!pValue || !qValue || !rValue) {
         if (index < 10) {
           console.log(`행 ${index + 1}: 필수 데이터 누락 - P:${!!pValue}, Q:${!!qValue}, R:${!!rValue}, 예약번호:${!!reservationNumber}`);
         }
         return;
+      }
+      
+      // 예약번호가 없어도 모델색상별 정리는 가능하도록 허용
+      if (!reservationNumber && index < 10) {
+        console.log(`행 ${index + 1}: 예약번호 없음 - 모델색상 정리만 진행`);
       }
       
       processedCount++;
@@ -3243,11 +3248,16 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       stats.total++;
       
       // 서류접수 여부 확인 (폰클개통데이터에서 예약번호 매칭)
-      const isReceived = phoneklValues.slice(1).some(phoneklRow => {
-        if (phoneklRow.length < 70) return false;
-        const phoneklReservationNumber = (phoneklRow[68] || '').toString().trim(); // BO열: 메모1
-        return phoneklReservationNumber === reservationNumber;
-      });
+      let isReceived = false;
+      
+      if (reservationNumber) {
+        // 예약번호가 있는 경우에만 매칭 시도
+        isReceived = phoneklValues.slice(1).some(phoneklRow => {
+          if (phoneklRow.length < 70) return false;
+          const phoneklReservationNumber = (phoneklRow[68] || '').toString().trim(); // BO열: 메모1
+          return phoneklReservationNumber === reservationNumber;
+        });
+      }
       
       if (isReceived) {
         stats.received++;
