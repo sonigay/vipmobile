@@ -870,16 +870,25 @@ function App() {
           // 업데이트가 있으면 사용자에게 알림
           console.log('새로운 업데이트 발견 - 하이브리드 시스템');
           
-          // 업데이트 진행 상태 설정
-          setIsUpdateInProgress(true);
-          setShowUpdateProgress(true);
+          // 사용자에게 업데이트 알림 (실행 중에도 즉시 알림)
+          const shouldUpdate = window.confirm(
+            '새로운 업데이트가 발견되었습니다.\n\n' +
+            '업데이트를 적용하시겠습니까?\n\n' +
+            '확인을 누르면 업데이트가 진행됩니다.'
+          );
           
-          // 로그인 상태 저장 (재시작 후 복원용)
-          const currentLoginState = localStorage.getItem('loginState');
-          localStorage.setItem('pendingLoginState', currentLoginState || '');
-          
-          // 업데이트 플래그 설정
-          localStorage.setItem('updateInProgress', 'true');
+          if (shouldUpdate) {
+            // 업데이트 진행 상태 설정
+            setIsUpdateInProgress(true);
+            setShowUpdateProgress(true);
+            
+            // 로그인 상태 저장 (재시작 후 복원용)
+            const currentLoginState = localStorage.getItem('loginState');
+            localStorage.setItem('pendingLoginState', currentLoginState || '');
+            
+            // 업데이트 플래그 설정
+            localStorage.setItem('updateInProgress', 'true');
+          }
         }
       } catch (error) {
         console.error('업데이트 확인 중 오류:', error);
@@ -891,11 +900,11 @@ function App() {
       checkForUpdates();
     }, 1000);
     
-    // 주기적 업데이트 감지 (1분마다 - 더 자주 체크)
+    // 주기적 업데이트 감지 (30초마다 - 더 자주 체크)
     const interval = setInterval(() => {
       console.log('주기적 업데이트 감지 실행...');
       checkForUpdates();
-    }, 1 * 60 * 1000); // 1분마다
+    }, 30 * 1000); // 30초마다
     
     // 컴포넌트 언마운트 시 인터벌 정리
     return () => {
@@ -903,9 +912,13 @@ function App() {
     };
   }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
 
-  // 업데이트 완료 처리
+  // 업데이트 완료 처리 (화면 깜빡임 개선)
   const handleUpdateComplete = async () => {
     try {
+      // 업데이트 진행 상태 해제
+      setIsUpdateInProgress(false);
+      setShowUpdateProgress(false);
+      
       // 캐시 삭제
       if ('caches' in window) {
         try {
@@ -930,13 +943,36 @@ function App() {
         }
       }
       
-      // 강제 로그아웃
-      handleLogout();
+      // 로그인 상태 정리 (깜빡임 방지를 위해 부드럽게 처리)
+      const currentLoginState = localStorage.getItem('loginState');
+      if (currentLoginState) {
+        // 로그인 상태를 임시로 보존
+        localStorage.setItem('tempLoginState', currentLoginState);
+      }
       
-      // 앱 완전 종료 및 재시작
+      // 업데이트 플래그 정리
+      localStorage.removeItem('updateInProgress');
+      
+      // 부드러운 로그아웃 처리
+      setIsLoggedIn(false);
+      setLoggedInStore(null);
+      setIsAgentMode(false);
+      setAgentTarget('');
+      setAgentQualification('');
+      setAgentContactId('');
+      setCurrentView('all');
+      
+      // 앱 완전 종료 및 재시작 (깜빡임 방지를 위해 지연)
       setTimeout(() => {
+        // 임시 로그인 상태 복원
+        const tempLoginState = localStorage.getItem('tempLoginState');
+        if (tempLoginState) {
+          localStorage.setItem('loginState', tempLoginState);
+          localStorage.removeItem('tempLoginState');
+        }
+        
         window.location.reload();
-      }, 1000);
+      }, 2000); // 2초 지연으로 깜빡임 방지
     } catch (error) {
       console.error('업데이트 완료 처리 중 오류:', error);
     }

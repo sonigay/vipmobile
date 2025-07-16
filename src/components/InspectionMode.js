@@ -69,6 +69,8 @@ import {
   updateModificationComplete,
   updateModificationNotes
 } from '../utils/inspectionUtils';
+import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+import UpdateProgressPopup from './UpdateProgressPopup';
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 상태 관리
@@ -77,6 +79,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc' - 기본값을 오름차순으로 설정
+  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
   
   // 필터 상태
   const [filters, setFilters] = useState({
@@ -98,6 +101,40 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   
   // 완료된 항목 추적 (해시화된 ID 사용)
   const [completedItems, setCompletedItems] = useState(new Set());
+  
+  // 새로운 배포 감지
+  useEffect(() => {
+    const checkForNewDeployment = async () => {
+      // 새로운 배포가 있는지 확인
+      if (shouldCheckForUpdates()) {
+        const hasNew = await hasNewDeployment();
+        if (hasNew) {
+          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+          await performAutoLogout();
+          // 업데이트 진행 팝업 표시
+          setShowUpdateProgressPopup(true);
+          return;
+        }
+        setLastUpdateCheck();
+      }
+    };
+
+    // 새로운 배포 체크
+    checkForNewDeployment();
+  }, []);
+
+  // Service Worker 메시지 리스너
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
+          console.log('Service Worker에서 자동 로그아웃 요청 받음');
+          performAutoLogout();
+          setShowUpdateProgressPopup(true);
+        }
+      });
+    }
+  }, []);
   
   // 완료 상태 로드
   const loadCompletionStatus = useCallback(async () => {
@@ -1286,6 +1323,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 업데이트 진행 팝업 */}
+      {showUpdateProgressPopup && <UpdateProgressPopup onClose={() => setShowUpdateProgressPopup(false)} />}
     </Box>
   );
 }

@@ -180,7 +180,7 @@ export const shouldCheckForUpdates = () => {
     
     const lastCheckTime = parseInt(lastCheck);
     const currentTime = Date.now();
-    const checkInterval = 5 * 60 * 1000; // 5분마다 체크
+    const checkInterval = 30 * 1000; // 30초마다 체크 (더 자주 체크)
     
     return (currentTime - lastCheckTime) > checkInterval;
   } catch (error) {

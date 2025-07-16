@@ -57,14 +57,28 @@ const UpdateProgressPopup = ({ open, onClose, onUpdate, isLatestVersion = false 
         });
       }
       
-      // 잠시 후 페이지 새로고침
+      // 부드러운 전환을 위해 지연 후 페이지 새로고침
       setTimeout(() => {
-        window.location.reload();
+        // 로그인 상태 임시 보존
+        const currentLoginState = localStorage.getItem('loginState');
+        if (currentLoginState) {
+          localStorage.setItem('tempLoginState', currentLoginState);
+        }
+        
+        // 업데이트 플래그 설정
+        localStorage.setItem('updateInProgress', 'true');
+        
+        // 부드러운 전환을 위해 fade out 효과
+        document.body.style.transition = 'opacity 0.5s ease-out';
+        document.body.style.opacity = '0';
+        
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
       }, 1000);
-      
     } catch (error) {
-      console.error('업데이트 중 오류 발생:', error);
-      setUpdateStep('업데이트 실패');
+      console.error('업데이트 처리 중 오류:', error);
+      setIsUpdating(false);
     }
   };
 

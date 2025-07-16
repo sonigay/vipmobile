@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -18,12 +18,49 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import * as XLSX from 'xlsx';
+import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+import UpdateProgressPopup from './UpdateProgressPopup';
 
 function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeChange, availableModes }) {
   const [excelData, setExcelData] = useState(null);
   const [originalFileName, setOriginalFileName] = useState(''); // 원본 파일명 저장
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
+  // 새로운 배포 감지
+  useEffect(() => {
+    const checkForNewDeployment = async () => {
+      // 새로운 배포가 있는지 확인
+      if (shouldCheckForUpdates()) {
+        const hasNew = await hasNewDeployment();
+        if (hasNew) {
+          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
+          await performAutoLogout();
+          // 업데이트 진행 팝업 표시
+          setShowUpdateProgressPopup(true);
+          return;
+        }
+        setLastUpdateCheck();
+      }
+    };
+
+    // 새로운 배포 체크
+    checkForNewDeployment();
+  }, []);
+
+  // Service Worker 메시지 리스너
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
+          console.log('Service Worker에서 자동 로그아웃 요청 받음');
+          performAutoLogout();
+          setShowUpdateProgressPopup(true);
+        }
+      });
+    }
+  }, []);
 
   // 엑셀 파일 업로드 처리
   const handleFileUpload = (event) => {
@@ -267,6 +304,7 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
           </Paper>
         )}
       </Box>
+      {showUpdateProgressPopup && <UpdateProgressPopup onClose={() => setShowUpdateProgressPopup(false)} />}
     </Container>
   );
 }
