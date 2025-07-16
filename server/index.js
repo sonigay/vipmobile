@@ -7584,23 +7584,24 @@ app.get('/api/inventory-analysis', async (req, res) => {
         const dataRows = inventoryResponse.data.values.slice(1);
         
         inventoryData = dataRows.map((row, index) => {
-          const fValue = row[5] || ''; // F열 (6번째, 0부터 시작)
-          const gValue = row[6] || ''; // G열 (7번째, 0부터 시작)
+          const fValue = row[5] || ''; // F열 (6번째, 0부터 시작) - 모델
+          const gValue = row[6] || ''; // G열 (7번째, 0부터 시작) - 색상
           const quantityValue = row[7] || '0'; // H열 (8번째, 0부터 시작) - 재고 수량
           
           // 수량을 숫자로 변환
           const quantity = parseInt(quantityValue) || 0;
           
-          // 정규화 규칙 적용
+          // 폰클재고데이터의 F열, G열을 그대로 사용하여 정규화 규칙과 매칭
           let normalizedModel = '';
           for (const rule of normalizationRules) {
             const ruleParts = rule.phonekl.split(' | ');
             if (ruleParts.length >= 2) {
-              const ruleF = ruleParts[0];
-              const ruleG = ruleParts[1];
+              const ruleF = ruleParts[0]; // 정규화 규칙의 F열 값
+              const ruleG = ruleParts[1]; // 정규화 규칙의 G열 값
               
-              const fMatch = !ruleF || fValue.includes(ruleF) || ruleF.includes(fValue);
-              const gMatch = !ruleG || gValue.includes(ruleG) || ruleG.includes(gValue);
+              // F열, G열이 정확히 일치하는지 확인
+              const fMatch = fValue.trim() === ruleF.trim();
+              const gMatch = gValue.trim() === ruleG.trim();
               
               if (fMatch && gMatch) {
                 normalizedModel = rule.normalizedModel;
@@ -7641,6 +7642,22 @@ app.get('/api/inventory-analysis', async (req, res) => {
         수량: item.quantity
       }))
     );
+    
+    // 정규화되지 않은 모델들의 통계
+    const unnormalizedModels = new Set();
+    inventoryData.filter(item => !item.normalizedModel).forEach(item => {
+      unnormalizedModels.add(`${item.originalF} | ${item.originalG}`);
+    });
+    console.log('정규화되지 않은 모델 조합 개수:', unnormalizedModels.size);
+    console.log('정규화되지 않은 모델 조합 샘플:', Array.from(unnormalizedModels).slice(0, 10));
+    
+    // 정규화된 모델들의 통계
+    const normalizedModels = new Set();
+    inventoryData.filter(item => item.normalizedModel).forEach(item => {
+      normalizedModels.add(`${item.originalF} | ${item.originalG} -> ${item.normalizedModel}`);
+    });
+    console.log('정규화된 모델 조합 개수:', normalizedModels.size);
+    console.log('정규화된 모델 조합 샘플:', Array.from(normalizedModels).slice(0, 10));
     
     // 정규화된 모델별로 재고 수량 집계
     const inventoryByModel = {};
