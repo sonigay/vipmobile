@@ -7280,6 +7280,196 @@ app.get('/api/sales-by-store/data', async (req, res) => {
   }
 });
 
+// 담당자별 고객 리스트 API
+app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, res) => {
+  try {
+    const { agentName } = req.params;
+    
+    // 1. 사전예약사이트 데이터 로드
+    const reservationResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트!A:Z'
+    });
+
+    // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
+    const phoneklResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '폰클출고처데이터!A:N'
+    });
+
+    if (!reservationResponse.data.values || !phoneklResponse.data.values) {
+      throw new Error('시트 데이터를 불러올 수 없습니다.');
+    }
+
+    const reservationHeaders = reservationResponse.data.values[0];
+    const reservationData = reservationResponse.data.values.slice(1);
+    
+    const phoneklHeaders = phoneklResponse.data.values[0];
+    const phoneklData = phoneklResponse.data.values.slice(1);
+
+    // 담당자 이름 정규화 함수
+    const normalizeAgentName = (agentName) => {
+      if (!agentName) return '';
+      return agentName.replace(/\([^)]*\)/g, '').trim();
+    };
+
+    // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
+    const storeAgentMap = new Map();
+    
+    phoneklData.forEach(row => {
+      const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
+      const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
+      if (storeCode && agent) {
+        const normalizedAgent = normalizeAgentName(agent);
+        storeAgentMap.set(storeCode, normalizedAgent);
+      }
+    });
+
+    // 해당 담당자의 고객 리스트 필터링
+    const customerList = reservationData
+      .map((row, index) => {
+        const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
+        const customerName = row[9] || ''; // J열 (10번째, 0부터 시작)
+        const reservationDateTime = row[10] || ''; // K열 (11번째, 0부터 시작)
+        const receivedDateTime = row[11] || ''; // L열 (12번째, 0부터 시작)
+        const model = row[15] || ''; // P열 (16번째, 0부터 시작)
+        const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
+        const type = row[17] || ''; // R열 (18번째, 0부터 시작)
+        const storeCodeForLookup = row[21] || ''; // V열 (22번째, 0부터 시작)
+        const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
+        const reservationMemo = row[12] || ''; // M열 (13번째, 0부터 시작)
+        const receivedMemo = row[13] || ''; // N열 (14번째, 0부터 시작)
+        
+        // 담당자 매칭
+        const agent = storeAgentMap.get(storeCodeForLookup) || '';
+        
+        return {
+          reservationNumber,
+          customerName,
+          reservationDateTime,
+          receivedDateTime,
+          model,
+          color,
+          type,
+          storeCode: storeCodeForLookup,
+          posName,
+          reservationMemo,
+          receivedMemo,
+          agent,
+          rowIndex: index + 2
+        };
+      })
+      .filter(item => normalizeAgentName(item.agent) === agentName);
+
+    res.json({
+      success: true,
+      data: customerList,
+      stats: {
+        totalCustomers: customerList.length,
+        agentName: agentName
+      }
+    });
+  } catch (error) {
+    console.error('담당자별 고객 리스트 로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load customer list by agent',
+      message: error.message
+    });
+  }
+});
+
+// 담당자별 모델/색상 데이터 API
+app.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, res) => {
+  try {
+    const { agentName } = req.params;
+    
+    // 1. 사전예약사이트 데이터 로드
+    const reservationResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트!A:Z'
+    });
+
+    // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
+    const phoneklResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '폰클출고처데이터!A:N'
+    });
+
+    if (!reservationResponse.data.values || !phoneklResponse.data.values) {
+      throw new Error('시트 데이터를 불러올 수 없습니다.');
+    }
+
+    const reservationHeaders = reservationResponse.data.values[0];
+    const reservationData = reservationResponse.data.values.slice(1);
+    
+    const phoneklHeaders = phoneklResponse.data.values[0];
+    const phoneklData = phoneklResponse.data.values.slice(1);
+
+    // 담당자 이름 정규화 함수
+    const normalizeAgentName = (agentName) => {
+      if (!agentName) return '';
+      return agentName.replace(/\([^)]*\)/g, '').trim();
+    };
+
+    // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
+    const storeAgentMap = new Map();
+    
+    phoneklData.forEach(row => {
+      const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
+      const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
+      if (storeCode && agent) {
+        const normalizedAgent = normalizeAgentName(agent);
+        storeAgentMap.set(storeCode, normalizedAgent);
+      }
+    });
+
+    // 해당 담당자의 모델/색상 데이터 필터링
+    const modelColorData = reservationData
+      .map((row, index) => {
+        const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
+        const customerName = row[9] || ''; // J열 (10번째, 0부터 시작)
+        const model = row[15] || ''; // P열 (16번째, 0부터 시작)
+        const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
+        const type = row[17] || ''; // R열 (18번째, 0부터 시작)
+        const storeCodeForLookup = row[21] || ''; // V열 (22번째, 0부터 시작)
+        const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
+        
+        // 담당자 매칭
+        const agent = storeAgentMap.get(storeCodeForLookup) || '';
+        
+        return {
+          reservationNumber,
+          customerName,
+          model,
+          color,
+          type,
+          storeCode: storeCodeForLookup,
+          posName,
+          agent,
+          rowIndex: index + 2
+        };
+      })
+      .filter(item => normalizeAgentName(item.agent) === agentName);
+
+    res.json({
+      success: true,
+      data: modelColorData,
+      stats: {
+        totalItems: modelColorData.length,
+        agentName: agentName
+      }
+    });
+  } catch (error) {
+    console.error('담당자별 모델/색상 데이터 로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load model-color data by agent',
+      message: error.message
+    });
+  }
+});
+
 // 담당자 수동 매칭 저장 API
 app.post('/api/sales-by-store/update-agent', async (req, res) => {
   try {

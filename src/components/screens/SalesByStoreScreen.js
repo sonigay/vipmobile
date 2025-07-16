@@ -26,7 +26,8 @@ import {
   IconButton,
   Tooltip,
   Grid,
-  Skeleton
+  Skeleton,
+  MenuItem
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -42,7 +43,8 @@ import {
   Download as DownloadIcon,
   BarChart as BarChartIcon,
   PieChart as PieChartIcon,
-  TrendingUp as TrendingUpIcon
+  TrendingUp as TrendingUpIcon,
+  FilterList as FilterIcon
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -59,6 +61,7 @@ import {
   LineChart,
   Line
 } from 'recharts';
+import AgentDetailScreen from './AgentDetailScreen';
 
 function SalesByStoreScreen({ loggedInStore }) {
   const [data, setData] = useState({ byStore: {}, byAgent: {} });
@@ -84,6 +87,15 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [showCharts, setShowCharts] = useState(false);
   const [inventoryData, setInventoryData] = useState({});
   const [loadingInventory, setLoadingInventory] = useState(false);
+  const [filters, setFilters] = useState({
+    agent: '',
+    storeCode: '',
+    status: '',
+    minCompletionRate: '',
+    maxCompletionRate: ''
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedAgentDetail, setSelectedAgentDetail] = useState(null);
 
   // 차트 데이터 준비 함수들
   const prepareAgentPerformanceData = () => {
@@ -151,6 +163,183 @@ function SalesByStoreScreen({ loggedInStore }) {
       })
       .sort((a, b) => b.완료율 - a.완료율)
       .slice(0, 10); // 상위 10명만 표시
+  };
+
+  // 담당자별 성과 엑셀 다운로드
+  const downloadAgentPerformanceExcel = async () => {
+    setDownloadingExcel(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const XLSX = await import('xlsx');
+      
+      // 담당자별 성과 데이터 준비
+      const agentData = data.byAgent || {};
+      const excelData = Object.entries(agentData).map(([agent, agentData]) => {
+        const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+        const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+        const completionRate = totalItems > 0 ? Math.round((totalReceived / totalItems) * 100) : 0;
+        
+        return {
+          '담당자': agent,
+          '총건수': totalItems,
+          '서류접수': totalReceived,
+          '서류미접수': totalItems - totalReceived,
+          '완료율(%)': completionRate,
+          'POS개수': Object.keys(agentData).length
+        };
+      }).sort((a, b) => b['총건수'] - a['총건수']);
+
+      // 워크북 생성
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // 열 너비 설정
+      const columnWidths = [
+        { wch: 20 },  // 담당자
+        { wch: 12 },  // 총건수
+        { wch: 12 },  // 서류접수
+        { wch: 12 },  // 서류미접수
+        { wch: 12 },  // 완료율
+        { wch: 12 }   // POS개수
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // 워크시트를 워크북에 추가
+      XLSX.utils.book_append_sheet(workbook, worksheet, '담당자별성과');
+
+      // 파일 다운로드
+      const fileName = `담당자별성과_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      setMessage({ type: 'success', text: '담당자별 성과 엑셀 파일이 다운로드되었습니다.' });
+    } catch (error) {
+      console.error('엑셀 다운로드 오류:', error);
+      setMessage({ type: 'error', text: '엑셀 다운로드에 실패했습니다.' });
+    } finally {
+      setDownloadingExcel(false);
+    }
+  };
+
+  // 재고 현황 엑셀 다운로드
+  const downloadInventoryExcel = async () => {
+    if (Object.keys(inventoryData).length === 0) {
+      setMessage({ type: 'warning', text: '다운로드할 재고 현황 데이터가 없습니다.' });
+      return;
+    }
+
+    setDownloadingExcel(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const XLSX = await import('xlsx');
+      
+      // 재고 현황 데이터 준비
+      const excelData = Object.entries(inventoryData)
+        .sort((a, b) => b[1].remainingStock - a[1].remainingStock)
+        .map(([model, data]) => ({
+          '정규화된 모델': model,
+          '보유재고': data.inventory,
+          '사전예약': data.reservations,
+          '예상잔여재고': data.remainingStock,
+          '상태': data.status
+        }));
+
+      // 워크북 생성
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // 열 너비 설정
+      const columnWidths = [
+        { wch: 30 },  // 정규화된 모델
+        { wch: 12 },  // 보유재고
+        { wch: 12 },  // 사전예약
+        { wch: 15 },  // 예상잔여재고
+        { wch: 12 }   // 상태
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // 워크시트를 워크북에 추가
+      XLSX.utils.book_append_sheet(workbook, worksheet, '재고현황');
+
+      // 파일 다운로드
+      const fileName = `재고현황_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      setMessage({ type: 'success', text: '재고 현황 엑셀 파일이 다운로드되었습니다.' });
+    } catch (error) {
+      console.error('엑셀 다운로드 오류:', error);
+      setMessage({ type: 'error', text: '엑셀 다운로드에 실패했습니다.' });
+    } finally {
+      setDownloadingExcel(false);
+    }
+  };
+
+  // 필터링된 데이터 계산
+  const getFilteredData = () => {
+    const agentData = data.byAgent || {};
+    const storeData = data.byStore || {};
+    
+    let filteredAgents = Object.keys(agentData);
+    let filteredStores = Object.keys(storeData);
+    
+    // 담당자 필터
+    if (filters.agent) {
+      filteredAgents = filteredAgents.filter(agent => 
+        agent.toLowerCase().includes(filters.agent.toLowerCase())
+      );
+    }
+    
+    // 대리점코드 필터
+    if (filters.storeCode) {
+      filteredStores = filteredStores.filter(store => 
+        store.toLowerCase().includes(filters.storeCode.toLowerCase())
+      );
+    }
+    
+    // 완료율 필터
+    if (filters.minCompletionRate || filters.maxCompletionRate) {
+      filteredAgents = filteredAgents.filter(agent => {
+        const agentData = data.byAgent[agent] || {};
+        const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+        const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+        const completionRate = totalItems > 0 ? Math.round((totalReceived / totalItems) * 100) : 0;
+        
+        const minRate = filters.minCompletionRate ? parseInt(filters.minCompletionRate) : 0;
+        const maxRate = filters.maxCompletionRate ? parseInt(filters.maxCompletionRate) : 100;
+        
+        return completionRate >= minRate && completionRate <= maxRate;
+      });
+    }
+    
+    // 상태 필터 (서류접수 상태)
+    if (filters.status) {
+      filteredAgents = filteredAgents.filter(agent => {
+        const agentData = data.byAgent[agent] || {};
+        const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+        const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+        
+        if (filters.status === 'completed') {
+          return totalReceived === totalItems && totalItems > 0;
+        } else if (filters.status === 'pending') {
+          return totalReceived < totalItems;
+        } else if (filters.status === 'no-data') {
+          return totalItems === 0;
+        }
+        return true;
+      });
+    }
+    
+    return {
+      filteredAgents,
+      filteredStores,
+      filteredAgentData: Object.fromEntries(
+        filteredAgents.map(agent => [agent, agentData[agent]])
+      ),
+      filteredStoreData: Object.fromEntries(
+        filteredStores.map(store => [store, storeData[store]])
+      )
+    };
   };
 
   // 재고 현황 데이터 로드
@@ -295,6 +484,14 @@ function SalesByStoreScreen({ loggedInStore }) {
     setEditDialogOpen(false);
     setEditingAgent(null);
     setEditAgentValue('');
+  };
+
+  const handleAgentClick = (agentName) => {
+    setSelectedAgentDetail(agentName);
+  };
+
+  const handleBackFromAgentDetail = () => {
+    setSelectedAgentDetail(null);
   };
 
   // 정규화 상태 확인
@@ -627,6 +824,17 @@ function SalesByStoreScreen({ loggedInStore }) {
   const currentAgentName = agents[selectedAgent];
   const currentAgentData = data.byAgent[currentAgentName] || {};
 
+  // 담당자 상세 화면이 선택된 경우
+  if (selectedAgentDetail) {
+    return (
+      <AgentDetailScreen
+        agentName={selectedAgentDetail}
+        onBack={handleBackFromAgentDetail}
+        loggedInStore={loggedInStore}
+      />
+    );
+  }
+
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
       <Typography variant="h4" component="h1" sx={{ mb: 3, fontWeight: 'bold', color: '#ff9a9e' }}>
@@ -694,6 +902,24 @@ function SalesByStoreScreen({ loggedInStore }) {
           sx={{ backgroundColor: showCharts ? '#ff9a9e' : undefined }}
         >
           {showCharts ? '차트 숨기기' : '차트 보기'}
+        </Button>
+        
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={downloadAgentPerformanceExcel}
+          disabled={downloadingExcel || Object.keys(data.byAgent || {}).length === 0}
+        >
+          {downloadingExcel ? <CircularProgress size={20} /> : '담당자별 성과 다운로드'}
+        </Button>
+        
+        <Button
+          variant={showFilters ? 'contained' : 'outlined'}
+          startIcon={<FilterIcon />}
+          onClick={() => setShowFilters(!showFilters)}
+          sx={{ backgroundColor: showFilters ? '#ff9a9e' : undefined }}
+        >
+          {showFilters ? '필터 숨기기' : '고급 필터'}
         </Button>
       </Box>
 
@@ -771,6 +997,7 @@ function SalesByStoreScreen({ loggedInStore }) {
                     size="small"
                     startIcon={<PersonIcon />}
                     onClick={() => setSelectedAgent(index)}
+                    onDoubleClick={() => handleAgentClick(agent)}
                     sx={{
                       backgroundColor: isSelected ? '#ff9a9e' : undefined,
                       color: isSelected ? 'white' : undefined,
@@ -780,8 +1007,10 @@ function SalesByStoreScreen({ loggedInStore }) {
                       minWidth: 'auto',
                       px: 2,
                       py: 1,
-                      fontSize: '0.8rem'
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
                     }}
+                    title="더블클릭하여 담당자 상세 정보 보기"
                   >
                     {agent}
                     <Chip
@@ -1250,9 +1479,24 @@ function SalesByStoreScreen({ loggedInStore }) {
             {/* 재고 현황 테이블 */}
             {Object.keys(inventoryData).length > 0 && (
               <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                  📦 재고 현황 분석
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+                    📦 재고 현황 분석
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<DownloadIcon />}
+                    onClick={downloadInventoryExcel}
+                    disabled={downloadingExcel}
+                    size="small"
+                    sx={{ 
+                      backgroundColor: '#ff9a9e',
+                      '&:hover': { backgroundColor: '#ff8a8e' }
+                    }}
+                  >
+                    {downloadingExcel ? <CircularProgress size={16} /> : '재고 현황 다운로드'}
+                  </Button>
+                </Box>
                 
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
