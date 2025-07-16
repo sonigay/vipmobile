@@ -491,7 +491,9 @@ function SalesByStoreScreen({ loggedInStore }) {
   };
 
   const handleBackFromAgentDetail = () => {
+    console.log('handleBackFromAgentDetail 호출됨');
     setSelectedAgentDetail(null);
+    console.log('selectedAgentDetail 상태가 null로 설정됨');
   };
 
   // 정규화 상태 확인

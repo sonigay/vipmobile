@@ -218,7 +218,14 @@ function AgentDetailScreen({ agentName, onBack, loggedInStore }) {
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
-        <Button variant="contained" onClick={onBack}>
+        <Button variant="contained" onClick={() => {
+          console.log('AgentDetailScreen 에러 상태에서 뒤로가기 버튼 클릭됨');
+          if (onBack) {
+            onBack();
+          } else {
+            console.error('onBack 함수가 정의되지 않음');
+          }
+        }}>
           뒤로가기
         </Button>
       </Container>
@@ -237,7 +244,15 @@ function AgentDetailScreen({ agentName, onBack, loggedInStore }) {
         <Button
           variant="outlined"
           startIcon={<ArrowBackIcon />}
-          onClick={onBack}
+          onClick={() => {
+            console.log('AgentDetailScreen 뒤로가기 버튼 클릭됨');
+            console.log('onBack 함수:', onBack);
+            if (onBack) {
+              onBack();
+            } else {
+              console.error('onBack 함수가 정의되지 않음');
+            }
+          }}
           sx={{ mr: 2 }}
         >
           뒤로가기
