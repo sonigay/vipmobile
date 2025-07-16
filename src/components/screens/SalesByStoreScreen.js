@@ -39,8 +39,26 @@ import {
   Store as StoreIcon,
   ColorLens as ColorLensIcon,
   Close as CloseIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  BarChart as BarChartIcon,
+  PieChart as PieChartIcon,
+  TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line
+} from 'recharts';
 
 function SalesByStoreScreen({ loggedInStore }) {
   const [data, setData] = useState({ byStore: {}, byAgent: {} });
@@ -63,6 +81,75 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [loadingCustomerList, setLoadingCustomerList] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState({ type: '', value: '' });
   const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
+
+  // 차트 데이터 준비 함수들
+  const prepareAgentPerformanceData = () => {
+    const agentData = data.byAgent || {};
+    return Object.entries(agentData)
+      .map(([agent, agentData]) => {
+        const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+        const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+        const completionRate = totalItems > 0 ? Math.round((totalReceived / totalItems) * 100) : 0;
+        
+        return {
+          name: agent,
+          총건수: totalItems,
+          접수완료: totalReceived,
+          미접수: totalItems - totalReceived,
+          완료율: completionRate
+        };
+      })
+      .sort((a, b) => b.총건수 - a.총건수)
+      .slice(0, 10); // 상위 10명만 표시
+  };
+
+  const prepareDocumentStatusData = () => {
+    const agentData = data.byAgent || {};
+    const totalReceived = Object.values(agentData).reduce((sum, agentData) => 
+      sum + Object.values(agentData).reduce((agentSum, posData) => agentSum + posData.received, 0), 0
+    );
+    const totalNotReceived = Object.values(agentData).reduce((sum, agentData) => 
+      sum + Object.values(agentData).reduce((agentSum, posData) => agentSum + posData.notReceived, 0), 0
+    );
+    
+    return [
+      { name: '서류접수 완료', value: totalReceived, fill: '#4caf50' },
+      { name: '서류접수 대기', value: totalNotReceived, fill: '#ff9800' }
+    ];
+  };
+
+  const prepareStoreDistributionData = () => {
+    const storeData = data.byStore || {};
+    return Object.entries(storeData)
+      .map(([storeCode, storeData]) => {
+        const totalItems = Object.values(storeData).reduce((sum, agentData) => sum + agentData.total, 0);
+        return {
+          name: storeCode,
+          총건수: totalItems
+        };
+      })
+      .sort((a, b) => b.총건수 - a.총건수)
+      .slice(0, 8); // 상위 8개 대리점만 표시
+  };
+
+  const prepareCompletionTrendData = () => {
+    const agentData = data.byAgent || {};
+    return Object.entries(agentData)
+      .map(([agent, agentData]) => {
+        const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+        const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+        const completionRate = totalItems > 0 ? Math.round((totalReceived / totalItems) * 100) : 0;
+        
+        return {
+          name: agent,
+          완료율: completionRate,
+          총건수: totalItems
+        };
+      })
+      .sort((a, b) => b.완료율 - a.완료율)
+      .slice(0, 10); // 상위 10명만 표시
+  };
 
   // 데이터 로드
   const loadData = async () => {
@@ -568,6 +655,15 @@ function SalesByStoreScreen({ loggedInStore }) {
           sx={{ backgroundColor: viewMode === 'modelColor' ? '#ff9a9e' : undefined }}
         >
           모델색상별 정리
+        </Button>
+        
+        <Button
+          variant={showCharts ? 'contained' : 'outlined'}
+          startIcon={<BarChartIcon />}
+          onClick={() => setShowCharts(!showCharts)}
+          sx={{ backgroundColor: showCharts ? '#ff9a9e' : undefined }}
+        >
+          {showCharts ? '차트 숨기기' : '차트 보기'}
         </Button>
       </Box>
 
@@ -1247,6 +1343,112 @@ function SalesByStoreScreen({ loggedInStore }) {
                 </Table>
               </TableContainer>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 차트 섹션 */}
+      {showCharts && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, color: '#ff9a9e', fontWeight: 'bold' }}>
+              📊 데이터 시각화
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* 담당자별 성과 차트 */}
+              <Grid item xs={12} lg={6}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e' }}>
+                      담당자별 성과 (상위 10명)
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={prepareAgentPerformanceData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Bar dataKey="접수완료" fill="#4caf50" />
+                        <Bar dataKey="미접수" fill="#ff9800" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* 서류접수 현황 파이 차트 */}
+              <Grid item xs={12} lg={6}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e' }}>
+                      서류접수 현황
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={prepareDocumentStatusData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {prepareDocumentStatusData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* 대리점별 분포 차트 */}
+              <Grid item xs={12} lg={6}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e' }}>
+                      대리점별 분포 (상위 8개)
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={prepareStoreDistributionData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Bar dataKey="총건수" fill="#2196f3" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* 완료율 트렌드 차트 */}
+              <Grid item xs={12} lg={6}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e' }}>
+                      담당자별 완료율 (상위 10명)
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={prepareCompletionTrendData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="완료율" stroke="#ff9a9e" strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
           </CardContent>
         </Card>
       )}
