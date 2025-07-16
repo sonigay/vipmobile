@@ -3223,21 +3223,21 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       matchedCount++;
       console.log(`정규화된 모델 매칭: ${originalKey} -> ${normalizedModel}`);
       
-      // 모델과 색상 분리 (정규화된 모델명에서 색상 추출)
-      const modelColorMatch = normalizedModel.match(/^(.+?)\s+([가-힣a-zA-Z0-9\s]+)$/);
-      if (!modelColorMatch) return;
+      // 모델과 색상 분리 (정규화된 모델명에서 모델명만 추출)
+      // "Z Fold7 512G 블루 쉐도우 SM-F966N_512G 블루 쉐도우" -> "Z Fold7 512G 블루 쉐도우"
+      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
+      if (!modelMatch) return;
       
-      const model = modelColorMatch[1].trim();
-      const color = modelColorMatch[2].trim();
+      const model = modelMatch[1].trim();
+      const color = ''; // 색상은 모델명에 포함되어 있으므로 별도 추출하지 않음
       
-      if (!model || !color) return;
+      if (!model) return;
       
-      const key = `${model}|${color}`;
+      const key = model; // 모델명만으로 키 생성
       
       if (!modelColorStats.has(key)) {
         modelColorStats.set(key, {
           model,
-          color,
           total: 0,
           received: 0,
           notReceived: 0
@@ -3289,6 +3289,272 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to load model-color data',
+      message: error.message
+    });
+  }
+});
+
+// POS별 모델색상 데이터 API
+app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) => {
+  try {
+    const { posName } = req.params;
+    console.log(`POS별 모델색상 데이터 요청: ${posName}`);
+    
+    // 1. 정규화된 데이터 가져오기
+    const normalizedResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/reservation-settings/normalized-data`);
+    if (!normalizedResponse.ok) {
+      throw new Error('정규화된 데이터를 가져올 수 없습니다.');
+    }
+    const normalizedData = await normalizedResponse.json();
+    
+    if (!normalizedData.success) {
+      throw new Error('정규화된 데이터 조회 실패');
+    }
+    
+    // 2. 사전예약사이트 데이터 가져오기
+    const reservationSiteValues = await getSheetValues('사전예약사이트');
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 3. 폰클개통데이터 가져오기
+    const phoneklValues = await getSheetValues('폰클개통데이터');
+    if (!phoneklValues || phoneklValues.length < 2) {
+      throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+    }
+    
+    // 4. 마당접수 데이터 가져오기
+    const yardValues = await getSheetValues('마당접수');
+    if (!yardValues || yardValues.length < 2) {
+      throw new Error('마당접수 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 5. 정규화 규칙 매핑 생성
+    const normalizationRules = normalizedData.normalizationRules || [];
+    const ruleMap = new Map();
+    
+    normalizationRules.forEach(rule => {
+      const key = rule.reservationSite.replace(/\s+/g, '');
+      ruleMap.set(key, rule.normalizedModel);
+    });
+    
+    // 6. 사전예약사이트 데이터 처리 (POS별 필터링)
+    const reservationSiteRows = reservationSiteValues.slice(1);
+    const customerList = [];
+    
+    reservationSiteRows.forEach((row, index) => {
+      if (row.length < 30) return;
+      
+      const pValue = (row[15] || '').toString().trim(); // P열
+      const qValue = (row[16] || '').toString().trim(); // Q열
+      const rValue = (row[17] || '').toString().trim(); // R열
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
+      const posName = (row[22] || '').toString().trim(); // W열: POS명
+      const type = (row[31] || '').toString().trim(); // AF열: 유형
+      const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
+      const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
+      
+      if (!pValue || !qValue || !rValue || !reservationNumber || !customerName) return;
+      
+      // POS명 필터링
+      if (posName !== req.params.posName) return;
+      
+      // 정규화된 모델명 찾기
+      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
+      const normalizedModel = ruleMap.get(originalKey);
+      
+      if (!normalizedModel) return;
+      
+      // 모델명 추출
+      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
+      if (!modelMatch) return;
+      
+      const model = modelMatch[1].trim();
+      
+      // 서류접수 정보 찾기
+      let receivedDateTime = '';
+      let receivedMemo = '';
+      
+      const yardRow = yardValues.slice(1).find(yardRow => {
+        if (yardRow.length < 25) return false;
+        const yardReservationNumber = (yardRow[0] || '').toString().trim(); // A열: 예약번호
+        return yardReservationNumber === reservationNumber;
+      });
+      
+      if (yardRow) {
+        receivedDateTime = (yardRow[11] || '').toString().trim(); // L열: 접수일시
+        receivedMemo = (yardRow[20] || '').toString().trim(); // U열: 접수메모
+      }
+      
+      customerList.push({
+        customerName,
+        reservationNumber,
+        reservationDateTime,
+        receivedDateTime,
+        model,
+        type,
+        storeCode,
+        posName,
+        reservationMemo,
+        receivedMemo,
+        receiver
+      });
+    });
+    
+    // 7. 예약일시로 오름차순 정렬
+    customerList.sort((a, b) => {
+      const dateA = new Date(a.reservationDateTime);
+      const dateB = new Date(b.reservationDateTime);
+      return dateA - dateB;
+    });
+    
+    console.log(`POS별 고객 리스트 생성 완료: ${customerList.length}개 고객`);
+    
+    res.json({
+      success: true,
+      data: customerList,
+      total: customerList.length,
+      posName: posName
+    });
+    
+  } catch (error) {
+    console.error('POS별 모델색상 데이터 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load POS-specific data',
+      message: error.message
+    });
+  }
+});
+
+// 모델별 고객 리스트 API
+app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => {
+  try {
+    const { model } = req.params;
+    console.log(`모델별 고객 리스트 요청: ${model}`);
+    
+    // 1. 정규화된 데이터 가져오기
+    const normalizedResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/reservation-settings/normalized-data`);
+    if (!normalizedResponse.ok) {
+      throw new Error('정규화된 데이터를 가져올 수 없습니다.');
+    }
+    const normalizedData = await normalizedResponse.json();
+    
+    if (!normalizedData.success) {
+      throw new Error('정규화된 데이터 조회 실패');
+    }
+    
+    // 2. 사전예약사이트 데이터 가져오기
+    const reservationSiteValues = await getSheetValues('사전예약사이트');
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 3. 마당접수 데이터 가져오기
+    const yardValues = await getSheetValues('마당접수');
+    if (!yardValues || yardValues.length < 2) {
+      throw new Error('마당접수 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 4. 정규화 규칙 매핑 생성
+    const normalizationRules = normalizedData.normalizationRules || [];
+    const ruleMap = new Map();
+    
+    normalizationRules.forEach(rule => {
+      const key = rule.reservationSite.replace(/\s+/g, '');
+      ruleMap.set(key, rule.normalizedModel);
+    });
+    
+    // 5. 사전예약사이트 데이터 처리 (모델별 필터링)
+    const reservationSiteRows = reservationSiteValues.slice(1);
+    const customerList = [];
+    
+    reservationSiteRows.forEach((row, index) => {
+      if (row.length < 30) return;
+      
+      const pValue = (row[15] || '').toString().trim(); // P열
+      const qValue = (row[16] || '').toString().trim(); // Q열
+      const rValue = (row[17] || '').toString().trim(); // R열
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
+      const posName = (row[22] || '').toString().trim(); // W열: POS명
+      const type = (row[31] || '').toString().trim(); // AF열: 유형
+      const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
+      const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
+      
+      if (!pValue || !qValue || !rValue || !reservationNumber || !customerName) return;
+      
+      // 정규화된 모델명 찾기
+      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
+      const normalizedModel = ruleMap.get(originalKey);
+      
+      if (!normalizedModel) return;
+      
+      // 모델명 추출
+      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
+      if (!modelMatch) return;
+      
+      const extractedModel = modelMatch[1].trim();
+      
+      // 모델 필터링
+      if (extractedModel !== model) return;
+      
+      // 서류접수 정보 찾기
+      let receivedDateTime = '';
+      let receivedMemo = '';
+      
+      const yardRow = yardValues.slice(1).find(yardRow => {
+        if (yardRow.length < 25) return false;
+        const yardReservationNumber = (yardRow[0] || '').toString().trim(); // A열: 예약번호
+        return yardReservationNumber === reservationNumber;
+      });
+      
+      if (yardRow) {
+        receivedDateTime = (yardRow[11] || '').toString().trim(); // L열: 접수일시
+        receivedMemo = (yardRow[20] || '').toString().trim(); // U열: 접수메모
+      }
+      
+      customerList.push({
+        customerName,
+        reservationNumber,
+        reservationDateTime,
+        receivedDateTime,
+        model: extractedModel,
+        type,
+        storeCode,
+        posName,
+        reservationMemo,
+        receivedMemo,
+        receiver
+      });
+    });
+    
+    // 6. 예약일시로 오름차순 정렬
+    customerList.sort((a, b) => {
+      const dateA = new Date(a.reservationDateTime);
+      const dateB = new Date(b.reservationDateTime);
+      return dateA - dateB;
+    });
+    
+    console.log(`모델별 고객 리스트 생성 완료: ${customerList.length}개 고객`);
+    
+    res.json({
+      success: true,
+      data: customerList,
+      total: customerList.length,
+      model: model
+    });
+    
+  } catch (error) {
+    console.error('모델별 고객 리스트 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load model-specific customer data',
       message: error.message
     });
   }
