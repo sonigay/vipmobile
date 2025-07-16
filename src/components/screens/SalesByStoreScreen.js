@@ -36,7 +36,8 @@ import {
   Warning as WarningIcon,
   Person as PersonIcon,
   Store as StoreIcon,
-  ColorLens as ColorLensIcon
+  ColorLens as ColorLensIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 
 function SalesByStoreScreen({ loggedInStore }) {
@@ -56,6 +57,9 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [normalizationStatus, setNormalizationStatus] = useState(null);
   const [modelColorData, setModelColorData] = useState([]);
   const [loadingModelColor, setLoadingModelColor] = useState(false);
+  const [customerListData, setCustomerListData] = useState([]);
+  const [loadingCustomerList, setLoadingCustomerList] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState({ type: '', value: '' });
 
   // 데이터 로드
   const loadData = async () => {
@@ -169,6 +173,64 @@ function SalesByStoreScreen({ loggedInStore }) {
     } catch (error) {
       console.error('정규화 상태 확인 오류:', error);
       setNormalizationStatus(false);
+    }
+  };
+
+  // POS별 고객 리스트 로드
+  const loadCustomerListByPos = async (posName) => {
+    setLoadingCustomerList(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/model-color/by-pos/${encodeURIComponent(posName)}`);
+      
+      if (!response.ok) {
+        throw new Error('POS별 고객 리스트를 불러올 수 없습니다.');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setCustomerListData(result.data);
+        setSelectedFilter({ type: 'pos', value: posName });
+        setMessage({ type: 'success', text: `${posName} 고객 리스트 로드 완료: ${result.data.length}명` });
+      } else {
+        throw new Error(result.message || 'POS별 고객 리스트 로드에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('POS별 고객 리스트 로드 오류:', error);
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoadingCustomerList(false);
+    }
+  };
+
+  // 모델별 고객 리스트 로드
+  const loadCustomerListByModel = async (model) => {
+    setLoadingCustomerList(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/customers/by-model/${encodeURIComponent(model)}`);
+      
+      if (!response.ok) {
+        throw new Error('모델별 고객 리스트를 불러올 수 없습니다.');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setCustomerListData(result.data);
+        setSelectedFilter({ type: 'model', value: model });
+        setMessage({ type: 'success', text: `${model} 고객 리스트 로드 완료: ${result.data.length}명` });
+      } else {
+        throw new Error(result.message || '모델별 고객 리스트 로드에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('모델별 고객 리스트 로드 오류:', error);
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoadingCustomerList(false);
     }
   };
 
@@ -635,12 +697,7 @@ function SalesByStoreScreen({ loggedInStore }) {
                             }
                           }}
                           onClick={() => {
-                            setViewMode('modelColor');
-                            // POS별 모델색상 데이터를 로드하거나 필터링
-                            setMessage({ 
-                              type: 'info', 
-                              text: `${posName}의 모델색상별 정리를 준비 중입니다.` 
-                            });
+                            loadCustomerListByPos(posName);
                           }}
                         />
                       </TableCell>
@@ -821,7 +878,14 @@ function SalesByStoreScreen({ loggedInStore }) {
                             color="primary"
                             size="small"
                             icon={<ColorLensIcon />}
-                            sx={{ fontSize: '0.8rem' }}
+                            sx={{ 
+                              fontSize: '0.8rem',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                backgroundColor: '#ff8a8e'
+                              }
+                            }}
+                            onClick={() => loadCustomerListByModel(item.model)}
                           />
                         </TableCell>
                         <TableCell>
@@ -862,6 +926,120 @@ function SalesByStoreScreen({ loggedInStore }) {
               <Alert severity="info">
                 모델색상별 데이터가 없습니다. 새로고침 버튼을 클릭하여 데이터를 로드해주세요.
               </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 고객 리스트 테이블 */}
+      {customerListData.length > 0 && (
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+                {selectedFilter.type === 'pos' ? `${selectedFilter.value} 고객 리스트` : `${selectedFilter.value} 고객 리스트`}
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<CloseIcon />}
+                onClick={() => {
+                  setCustomerListData([]);
+                  setSelectedFilter({ type: '', value: '' });
+                }}
+                size="small"
+              >
+                닫기
+              </Button>
+            </Box>
+            
+            {loadingCustomerList ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell width="120px">고객명</TableCell>
+                      <TableCell width="100px">예약번호</TableCell>
+                      <TableCell width="120px">예약일시</TableCell>
+                      <TableCell width="120px">접수일시</TableCell>
+                      <TableCell width="150px">모델&색상</TableCell>
+                      <TableCell width="80px">유형</TableCell>
+                      <TableCell width="100px">대리점</TableCell>
+                      <TableCell width="100px">POS명</TableCell>
+                      <TableCell width="120px">예약메모</TableCell>
+                      <TableCell width="120px">접수메모</TableCell>
+                      <TableCell width="80px">접수자</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {customerListData.map((customer, index) => (
+                      <TableRow key={customer.reservationNumber} hover>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {customer.customerName}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.reservationNumber}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.reservationDateTime}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.receivedDateTime || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={customer.model}
+                            color="primary"
+                            size="small"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.type || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.storeCode || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.posName || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.reservationMemo || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.receivedMemo || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.receiver || '-'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </CardContent>
         </Card>
