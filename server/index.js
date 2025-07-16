@@ -7599,9 +7599,13 @@ app.get('/api/inventory-analysis', async (req, res) => {
               const ruleF = ruleParts[0]; // 정규화 규칙의 F열 값
               const ruleG = ruleParts[1]; // 정규화 규칙의 G열 값
               
-              // F열, G열이 정확히 일치하는지 확인
-              const fMatch = fValue.trim() === ruleF.trim();
-              const gMatch = gValue.trim() === ruleG.trim();
+              // 더 유연한 매칭: 부분 문자열 포함 또는 정확한 일치
+              const fMatch = !ruleF || fValue.trim() === ruleF.trim() || 
+                           fValue.trim().includes(ruleF.trim()) || 
+                           ruleF.trim().includes(fValue.trim());
+              const gMatch = !ruleG || gValue.trim() === ruleG.trim() || 
+                           gValue.trim().includes(ruleG.trim()) || 
+                           ruleG.trim().includes(gValue.trim());
               
               if (fMatch && gMatch) {
                 normalizedModel = rule.normalizedModel;
@@ -7642,6 +7646,22 @@ app.get('/api/inventory-analysis', async (req, res) => {
         수량: item.quantity
       }))
     );
+    
+    // 정규화 규칙과 실제 데이터 비교 디버깅
+    console.log('=== 정규화 규칙 vs 실제 데이터 비교 ===');
+    const sampleUnnormalized = inventoryData.filter(item => !item.normalizedModel).slice(0, 3);
+    sampleUnnormalized.forEach((item, index) => {
+      console.log(`샘플 ${index + 1}: F="${item.originalF}", G="${item.originalG}"`);
+      console.log('매칭 시도한 규칙들:');
+      normalizationRules.slice(0, 3).forEach((rule, ruleIndex) => {
+        const ruleParts = rule.phonekl.split(' | ');
+        if (ruleParts.length >= 2) {
+          const ruleF = ruleParts[0];
+          const ruleG = ruleParts[1];
+          console.log(`  규칙 ${ruleIndex + 1}: F="${ruleF}", G="${ruleG}"`);
+        }
+      });
+    });
     
     // 정규화되지 않은 모델들의 통계
     const unnormalizedModels = new Set();
