@@ -192,14 +192,24 @@ function App() {
   
   // 현재 사용자의 사용 가능한 모드 목록 가져오기
   const getCurrentUserAvailableModes = () => {
-    if (!loggedInStore) return [];
-    
-    if (loggedInStore.modePermissions) {
-      return Object.entries(loggedInStore.modePermissions)
-        .filter(([mode, hasPermission]) => hasPermission)
-        .map(([mode]) => mode);
+    if (!loggedInStore) {
+      console.log('getCurrentUserAvailableModes: loggedInStore가 없음');
+      return [];
     }
     
+    console.log('getCurrentUserAvailableModes: loggedInStore =', loggedInStore);
+    console.log('getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
+    
+    if (loggedInStore.modePermissions) {
+      const availableModes = Object.entries(loggedInStore.modePermissions)
+        .filter(([mode, hasPermission]) => hasPermission)
+        .map(([mode]) => mode);
+      
+      console.log('getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
+      return availableModes;
+    }
+    
+    console.log('getCurrentUserAvailableModes: modePermissions가 없음');
     return [];
   };
   
@@ -1222,6 +1232,9 @@ function App() {
   }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget]);
 
   const handleLogin = (store) => {
+    console.log('handleLogin 호출됨:', store);
+    console.log('store.modePermissions:', store.modePermissions);
+    
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
@@ -1231,7 +1244,7 @@ function App() {
         .filter(([mode, hasPermission]) => hasPermission)
         .map(([mode]) => mode);
       
-      // console.log('다중 권한 확인:', availableModes);
+      console.log('다중 권한 확인:', availableModes);
       
       if (availableModes.length > 1) {
         // 다중 권한이 있는 경우 모드 선택 팝업 표시
@@ -1692,7 +1705,7 @@ function App() {
     // console.log('선택된 모델 변경:', model);
     setSelectedModel(model);
     setSelectedColor('');  // 색상 선택 초기화
-    setFilteredStores([]); // 검색 결과 초기화
+    // setFilteredStores([]); // 검색 결과 초기화 제거 - 마커가 사라지는 문제 해결
     
     // 모델 검색 로그 전송
     if (loggedInStore) {
@@ -1716,7 +1729,7 @@ function App() {
   const handleColorSelect = useCallback((color) => {
     // console.log('선택된 색상 변경:', color);
     setSelectedColor(color);
-    setFilteredStores([]); // 검색 결과 초기화
+    // setFilteredStores([]); // 검색 결과 초기화 제거 - 마커가 사라지는 문제 해결
     
     // 색상 검색 로그 전송
     if (loggedInStore && selectedModel) {
