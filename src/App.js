@@ -2056,9 +2056,11 @@ function App() {
   const playNotificationSound = useCallback(() => {
     try {
       const audio = new Audio('/sounds/notification.mp3');
-      audio.play();
+      audio.play().catch(error => {
+        console.warn('알림음 재생 실패:', error);
+      });
     } catch (error) {
-      console.error('알림음 재생 실패:', error);
+      console.warn('알림음 생성 실패:', error);
     }
   }, []);
 

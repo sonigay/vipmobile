@@ -356,12 +356,12 @@ class NotificationManager {
   // 알림 사운드 재생
   playNotificationSound() {
     try {
-      const audio = new Audio('/notification.mp3');
+      const audio = new Audio('/sounds/notification.mp3');
       audio.play().catch(error => {
-        // console.log('알림 사운드 재생 실패:', error);
+        console.warn('알림 사운드 재생 실패:', error);
       });
     } catch (error) {
-      // console.log('알림 사운드 생성 실패:', error);
+      console.warn('알림 사운드 생성 실패:', error);
     }
   }
 
