@@ -7745,18 +7745,29 @@ app.get('/api/inventory-analysis', async (req, res) => {
       
       console.log(`정규화된 모델 "${normalizedModel}" -> F="${extractedF}", G="${extractedG}"`);
       
-      // 추출된 F열, G열 값으로 폰클재고데이터에서 수량 찾기
+      // 해당 F, G 조합의 총 행 수 확인
+      const matchingRows = inventoryData.filter(item => item.originalF === extractedF && item.originalG === extractedG);
+      console.log(`  매칭된 행 수: ${matchingRows.length}, 총 수량: ${matchingRows.reduce((sum, item) => sum + item.quantity, 0)}`);
+      
+      // 추출된 F열, G열 값으로 폰클재고데이터에서 수량 찾기 (중복 제거)
       let totalQuantity = 0;
+      const processedItems = new Set(); // 중복 제거를 위한 Set
+      
       inventoryData.forEach(item => {
         if (item.originalF === extractedF && item.originalG === extractedG) {
-          totalQuantity += item.quantity;
-          if (item.quantity > 0) {
-            quantityDebug.push({
-              model: normalizedModel,
-              originalF: item.originalF,
-              originalG: item.originalG,
-              quantity: item.quantity
-            });
+          // 중복 제거: 같은 F, G, 수량 조합은 한 번만 계산
+          const itemKey = `${item.originalF}|${item.originalG}|${item.quantity}`;
+          if (!processedItems.has(itemKey)) {
+            processedItems.add(itemKey);
+            totalQuantity += item.quantity;
+            if (item.quantity > 0) {
+              quantityDebug.push({
+                model: normalizedModel,
+                originalF: item.originalF,
+                originalG: item.originalG,
+                quantity: item.quantity
+              });
+            }
           }
         }
       });
