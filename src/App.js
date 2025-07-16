@@ -1822,7 +1822,7 @@ function App() {
 
   // 검색된 매장으로 지도 이동
   const handleSearchResultSelect = useCallback((store) => {
-    // console.log('검색 결과 선택:', store);
+    console.log('검색 결과 선택:', store);
     setSelectedStore(store);
     setRequestedStore(store); // 요청점검색으로 선택된 매장 저장
     setSearchQuery('');
@@ -1833,16 +1833,16 @@ function App() {
       const lat = parseFloat(store.latitude);
       const lng = parseFloat(store.longitude);
       
-      // console.log('지도 이동 좌표:', lat, lng);
+      console.log('지도 이동 좌표:', lat, lng);
       
       // 먼저 userLocation 변경
       setUserLocation({ lat, lng });
       
-      // 강제 확대 실행 (지연 시간을 늘림)
+      // 강제 확대 실행 (지연 시간을 더 늘림)
       setTimeout(() => {
-        // console.log('강제 확대 상태 설정');
+        console.log('강제 확대 상태 설정');
         setForceZoomToStore({ lat, lng });
-      }, 300); // 100ms에서 300ms로 증가
+      }, 800); // 300ms에서 800ms로 증가
     }
   }, []);
 
