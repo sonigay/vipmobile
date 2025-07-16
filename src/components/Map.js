@@ -48,68 +48,65 @@ function ForceZoomUpdater({ forceZoomToStore }) {
       
       const attemptZoom = (attemptCount = 0) => {
         try {
-          // 지도 상태 확인 (더 포괄적인 검사)
+          // 지도 상태 확인 (간소화된 검사)
           const isMapReady = map && 
             map._loaded && 
             map._container && 
-            map._mapPane && 
-            map._leaflet_pos &&
-            map.getSize &&
             map.setView;
           
           if (isMapReady) {
-            // 지도 크기 확인
-            const mapSize = map.getSize();
-            const containerSize = map._container ? {
-              x: map._container.offsetWidth,
-              y: map._container.offsetHeight
-            } : { x: 0, y: 0 };
+            console.log('지도 확대 실행:', { lat, lng, zoom: zoom || 14 });
             
-            // 지도가 실제로 렌더링되었는지 확인
-            if ((mapSize && mapSize.x > 0 && mapSize.y > 0) || 
-                (containerSize.x > 0 && containerSize.y > 0)) {
-              
-              console.log('지도 확대 실행:', { lat, lng, zoom: zoom || 14 });
-              
-              map.setView([lat, lng], zoom || 14, {
-                animate: true,
-                duration: 1.5
-              });
-              return;
-            }
+            // 즉시 확대 실행 (애니메이션 없이)
+            map.setView([lat, lng], zoom || 14, {
+              animate: false,
+              duration: 0
+            });
+            
+            // 확대 후 애니메이션으로 부드럽게 이동
+            setTimeout(() => {
+              if (map && map.setView) {
+                map.setView([lat, lng], zoom || 14, {
+                  animate: true,
+                  duration: 1.0
+                });
+              }
+            }, 100);
+            
+            return;
           }
           
-          // 재시도 로직 (최대 15회, 800ms 간격으로 늘림)
-          if (attemptCount < 15) {
-            console.log(`지도 확대 재시도 ${attemptCount + 1}/15`);
-            setTimeout(() => attemptZoom(attemptCount + 1), 800);
+          // 재시도 로직 (최대 5회, 200ms 간격으로 단축)
+          if (attemptCount < 5) {
+            console.log(`지도 확대 재시도 ${attemptCount + 1}/5`);
+            setTimeout(() => attemptZoom(attemptCount + 1), 200);
           } else {
-            console.warn('ForceZoomUpdater 최대 재시도 횟수 초과 - 지도가 아직 로드되지 않았습니다.');
+            console.warn('ForceZoomUpdater 최대 재시도 횟수 초과 - 강제 실행');
             
-            // 마지막 시도로 강제 실행
+            // 강제 실행 (지도 상태와 관계없이)
             try {
               if (map && map.setView) {
-                console.log('마지막 시도로 강제 확대 실행');
+                console.log('강제 확대 실행');
                 map.setView([lat, lng], zoom || 14, {
-                  animate: false, // 애니메이션 없이 즉시 실행
+                  animate: false,
                   duration: 0
                 });
               }
             } catch (finalError) {
-              console.error('마지막 확대 시도도 실패:', finalError);
+              console.error('강제 확대 실행 실패:', finalError);
             }
           }
         } catch (error) {
           console.error('ForceZoomUpdater 오류:', error);
           // 오류 발생 시에도 재시도
-          if (attemptCount < 15) {
-            setTimeout(() => attemptZoom(attemptCount + 1), 800);
+          if (attemptCount < 5) {
+            setTimeout(() => attemptZoom(attemptCount + 1), 200);
           }
         }
       };
       
-      // 초기 시도 (지연 시간을 더 늘림)
-      setTimeout(() => attemptZoom(), 1000);
+      // 초기 시도 (지연 시간 단축)
+      setTimeout(() => attemptZoom(), 300);
     }
   }, [forceZoomToStore, map]);
   

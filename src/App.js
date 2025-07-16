@@ -1838,11 +1838,11 @@ function App() {
       // 먼저 userLocation 변경
       setUserLocation({ lat, lng });
       
-      // 강제 확대 실행 (지연 시간을 더 늘림)
+      // 강제 확대 실행 (지연 시간 단축)
       setTimeout(() => {
         console.log('강제 확대 상태 설정');
         setForceZoomToStore({ lat, lng });
-      }, 800); // 300ms에서 800ms로 증가
+      }, 200); // 800ms에서 200ms로 단축
     }
   }, []);
 
