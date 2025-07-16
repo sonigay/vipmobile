@@ -5862,19 +5862,34 @@ app.post('/api/reservation-settings/save', async (req, res) => {
   try {
     const { selectedValues, matchingResult } = req.body;
     
+    // 더 읽기 쉬운 형식으로 데이터 정리
+    const reservationSiteText = [
+      selectedValues.reservationSite.p,
+      selectedValues.reservationSite.q,
+      selectedValues.reservationSite.r
+    ].filter(v => v).join(' | ');
+    
+    const phoneklText = [
+      selectedValues.phonekl.f,
+      selectedValues.phonekl.g
+    ].filter(v => v).join(' | ');
+    
     // 정규화작업 시트에 저장
     const saveData = [
       [
         new Date().toISOString(), // 저장일시
-        JSON.stringify(selectedValues), // 선택된 값들
-        JSON.stringify(matchingResult), // 매칭 결과
+        reservationSiteText || '선택된 값 없음', // 사전예약사이트 선택값
+        phoneklText || '선택된 값 없음', // 폰클 선택값
+        matchingResult.normalizedModel || '정규화된 값 없음', // 정규화된 모델명
+        matchingResult.matchingStatus || '매칭 상태 없음', // 매칭 상태
+        matchingResult.isMatched ? '완료' : '미완료', // 완료 여부
         '사전예약 모델명 정규화' // 비고
       ]
     ];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: '정규화작업!A:D',
+      range: '정규화작업!A:G',
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: saveData
@@ -5883,13 +5898,61 @@ app.post('/api/reservation-settings/save', async (req, res) => {
 
     res.json({
       success: true,
-      message: '설정이 성공적으로 저장되었습니다.'
+      message: '정규화 설정이 성공적으로 저장되었습니다.'
     });
   } catch (error) {
     console.error('사전예약 설정 저장 오류:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to save reservation settings',
+      message: error.message
+    });
+  }
+});
+
+// 저장된 정규화 목록 불러오기 API
+app.get('/api/reservation-settings/list', async (req, res) => {
+  try {
+    // 정규화작업 시트에서 모든 정규화 기록 불러오기
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정규화작업!A:G'
+      });
+      
+      if (response.data.values && response.data.values.length > 1) {
+        // 헤더 제거하고 데이터 정리
+        const normalizationList = response.data.values.slice(1).map((row, index) => ({
+          id: index + 1,
+          timestamp: row[0] || '',
+          reservationSite: row[1] || '',
+          phonekl: row[2] || '',
+          normalizedModel: row[3] || '',
+          matchingStatus: row[4] || '',
+          isCompleted: row[5] === '완료',
+          note: row[6] || ''
+        }));
+        
+        res.json({
+          success: true,
+          normalizationList: normalizationList.reverse() // 최신 항목이 위로 오도록
+        });
+        return;
+      }
+    } catch (error) {
+      console.log('정규화작업 시트 로드 실패:', error.message);
+    }
+
+    // 저장된 데이터가 없는 경우 빈 배열 반환
+    res.json({
+      success: true,
+      normalizationList: []
+    });
+  } catch (error) {
+    console.error('정규화 목록 불러오기 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load normalization list',
       message: error.message
     });
   }
@@ -5902,7 +5965,7 @@ app.get('/api/reservation-settings/load', async (req, res) => {
     try {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정규화작업!A:D'
+        range: '정규화작업!A:G'
       });
       
       if (response.data.values && response.data.values.length > 1) {
@@ -5910,8 +5973,27 @@ app.get('/api/reservation-settings/load', async (req, res) => {
         const latestRow = response.data.values[response.data.values.length - 1];
         
         if (latestRow.length >= 3) {
-          const selectedValues = JSON.parse(latestRow[1] || '{}');
-          const matchingResult = JSON.parse(latestRow[2] || '{}');
+          // 텍스트 형태의 데이터를 다시 객체로 변환
+          const reservationSiteParts = (latestRow[1] || '').split(' | ');
+          const phoneklParts = (latestRow[2] || '').split(' | ');
+          
+          const selectedValues = {
+            reservationSite: {
+              p: reservationSiteParts[0] || '',
+              q: reservationSiteParts[1] || '',
+              r: reservationSiteParts[2] || ''
+            },
+            phonekl: {
+              f: phoneklParts[0] || '',
+              g: phoneklParts[1] || ''
+            }
+          };
+          
+          const matchingResult = {
+            normalizedModel: latestRow[3] || '',
+            matchingStatus: latestRow[4] || '',
+            isMatched: latestRow[5] === '완료'
+          };
           
           res.json({
             success: true,
@@ -5943,6 +6025,274 @@ app.get('/api/reservation-settings/load', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to load reservation settings',
+      message: error.message
+    });
+  }
+});
+
+// 정규화된 데이터 조회 API
+app.get('/api/reservation-settings/normalized-data', async (req, res) => {
+  try {
+    // 1. 정규화 규칙들을 불러오기
+    let normalizationRules = [];
+    try {
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정규화작업!A:G'
+      });
+      
+      if (rulesResponse.data.values && rulesResponse.data.values.length > 1) {
+        // 헤더 제거하고 완료된 규칙만 필터링
+        normalizationRules = rulesResponse.data.values.slice(1)
+          .filter(row => row.length >= 6 && row[5] === '완료')
+          .map(row => ({
+            reservationSite: row[1] || '',
+            phonekl: row[2] || '',
+            normalizedModel: row[3] || '',
+            note: row[6] || ''
+          }));
+      }
+    } catch (error) {
+      console.log('정규화 규칙 로드 실패:', error.message);
+    }
+
+    // 2. 사전예약사이트 시트의 원본 데이터 읽기
+    let reservationSiteOriginalData = [];
+    try {
+      const reservationResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트!A:Z' // 전체 데이터 읽기
+      });
+      
+      if (reservationResponse.data.values && reservationResponse.data.values.length > 1) {
+        const headers = reservationResponse.data.values[0];
+        const dataRows = reservationResponse.data.values.slice(1);
+        
+        reservationSiteOriginalData = dataRows.map((row, index) => {
+          const rowData = {};
+          headers.forEach((header, colIndex) => {
+            rowData[header] = row[colIndex] || '';
+          });
+          
+          // P, Q, R열 값 추출
+          const pValue = row[15] || ''; // P열 (16번째, 0부터 시작)
+          const qValue = row[16] || ''; // Q열 (17번째, 0부터 시작)
+          const rValue = row[17] || ''; // R열 (18번째, 0부터 시작)
+          
+          // 정규화 규칙 적용
+          let normalizedModel = '';
+          let appliedRule = null;
+          
+          for (const rule of normalizationRules) {
+            const ruleParts = rule.reservationSite.split(' | ');
+            if (ruleParts.length >= 3) {
+              const ruleP = ruleParts[0];
+              const ruleQ = ruleParts[1];
+              const ruleR = ruleParts[2];
+              
+              // 정확한 매칭 또는 부분 매칭 확인
+              const pMatch = !ruleP || pValue.includes(ruleP) || ruleP.includes(pValue);
+              const qMatch = !ruleQ || qValue.includes(ruleQ) || ruleQ.includes(qValue);
+              const rMatch = !ruleR || rValue.includes(ruleR) || ruleR.includes(rValue);
+              
+              if (pMatch && qMatch && rMatch) {
+                normalizedModel = rule.normalizedModel;
+                appliedRule = rule;
+                break;
+              }
+            }
+          }
+          
+          return {
+            ...rowData,
+            originalP: pValue,
+            originalQ: qValue,
+            originalR: rValue,
+            normalizedModel: normalizedModel,
+            appliedRule: appliedRule,
+            rowIndex: index + 2 // 실제 행 번호 (헤더 제외)
+          };
+        });
+      }
+    } catch (error) {
+      console.log('사전예약사이트 시트 로드 실패:', error.message);
+    }
+
+    // 3. 폰클재고데이터 시트의 원본 데이터 읽기
+    let phoneklOriginalData = [];
+    try {
+      const phoneklResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '폰클재고데이터!A:Z' // 전체 데이터 읽기
+      });
+      
+      if (phoneklResponse.data.values && phoneklResponse.data.values.length > 1) {
+        const headers = phoneklResponse.data.values[0];
+        const dataRows = phoneklResponse.data.values.slice(1);
+        
+        phoneklOriginalData = dataRows.map((row, index) => {
+          const rowData = {};
+          headers.forEach((header, colIndex) => {
+            rowData[header] = row[colIndex] || '';
+          });
+          
+          // F, G열 값 추출
+          const fValue = row[5] || ''; // F열 (6번째, 0부터 시작)
+          const gValue = row[6] || ''; // G열 (7번째, 0부터 시작)
+          
+          // 정규화 규칙 적용
+          let normalizedModel = '';
+          let appliedRule = null;
+          
+          for (const rule of normalizationRules) {
+            const ruleParts = rule.phonekl.split(' | ');
+            if (ruleParts.length >= 2) {
+              const ruleF = ruleParts[0];
+              const ruleG = ruleParts[1];
+              
+              // 정확한 매칭 또는 부분 매칭 확인
+              const fMatch = !ruleF || fValue.includes(ruleF) || ruleF.includes(fValue);
+              const gMatch = !ruleG || gValue.includes(ruleG) || ruleG.includes(gValue);
+              
+              if (fMatch && gMatch) {
+                normalizedModel = rule.normalizedModel;
+                appliedRule = rule;
+                break;
+              }
+            }
+          }
+          
+          return {
+            ...rowData,
+            originalF: fValue,
+            originalG: gValue,
+            normalizedModel: normalizedModel,
+            appliedRule: appliedRule,
+            rowIndex: index + 2 // 실제 행 번호 (헤더 제외)
+          };
+        });
+      }
+    } catch (error) {
+      console.log('폰클재고데이터 시트 로드 실패:', error.message);
+    }
+
+    // 4. 통계 정보 계산
+    const stats = {
+      totalRules: normalizationRules.length,
+      reservationSiteTotal: reservationSiteOriginalData.length,
+      reservationSiteNormalized: reservationSiteOriginalData.filter(item => item.normalizedModel).length,
+      phoneklTotal: phoneklOriginalData.length,
+      phoneklNormalized: phoneklOriginalData.filter(item => item.normalizedModel).length
+    };
+
+    res.json({
+      success: true,
+      normalizationRules: normalizationRules,
+      reservationSiteData: reservationSiteOriginalData,
+      phoneklData: phoneklOriginalData,
+      stats: stats
+    });
+  } catch (error) {
+    console.error('정규화된 데이터 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load normalized data',
+      message: error.message
+    });
+  }
+});
+
+// 정규화 규칙 적용 테스트 API
+app.post('/api/reservation-settings/test-normalization', async (req, res) => {
+  try {
+    const { testData, dataType } = req.body; // dataType: 'reservationSite' 또는 'phonekl'
+    
+    // 정규화 규칙들을 불러오기
+    let normalizationRules = [];
+    try {
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정규화작업!A:G'
+      });
+      
+      if (rulesResponse.data.values && rulesResponse.data.values.length > 1) {
+        normalizationRules = rulesResponse.data.values.slice(1)
+          .filter(row => row.length >= 6 && row[5] === '완료')
+          .map(row => ({
+            reservationSite: row[1] || '',
+            phonekl: row[2] || '',
+            normalizedModel: row[3] || '',
+            note: row[6] || ''
+          }));
+      }
+    } catch (error) {
+      console.log('정규화 규칙 로드 실패:', error.message);
+    }
+
+    // 테스트 데이터에 정규화 규칙 적용
+    const testResults = testData.map(item => {
+      let normalizedModel = '';
+      let appliedRule = null;
+      
+      if (dataType === 'reservationSite') {
+        const { p, q, r } = item;
+        
+        for (const rule of normalizationRules) {
+          const ruleParts = rule.reservationSite.split(' | ');
+          if (ruleParts.length >= 3) {
+            const ruleP = ruleParts[0];
+            const ruleQ = ruleParts[1];
+            const ruleR = ruleParts[2];
+            
+            const pMatch = !ruleP || p.includes(ruleP) || ruleP.includes(p);
+            const qMatch = !ruleQ || q.includes(ruleQ) || ruleQ.includes(q);
+            const rMatch = !ruleR || r.includes(ruleR) || ruleR.includes(r);
+            
+            if (pMatch && qMatch && rMatch) {
+              normalizedModel = rule.normalizedModel;
+              appliedRule = rule;
+              break;
+            }
+          }
+        }
+      } else if (dataType === 'phonekl') {
+        const { f, g } = item;
+        
+        for (const rule of normalizationRules) {
+          const ruleParts = rule.phonekl.split(' | ');
+          if (ruleParts.length >= 2) {
+            const ruleF = ruleParts[0];
+            const ruleG = ruleParts[1];
+            
+            const fMatch = !ruleF || f.includes(ruleF) || ruleF.includes(f);
+            const gMatch = !ruleG || g.includes(ruleG) || ruleG.includes(g);
+            
+            if (fMatch && gMatch) {
+              normalizedModel = rule.normalizedModel;
+              appliedRule = rule;
+              break;
+            }
+          }
+        }
+      }
+      
+      return {
+        ...item,
+        normalizedModel,
+        appliedRule
+      };
+    });
+
+    res.json({
+      success: true,
+      testResults,
+      appliedRules: normalizationRules
+    });
+  } catch (error) {
+    console.error('정규화 테스트 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to test normalization',
       message: error.message
     });
   }

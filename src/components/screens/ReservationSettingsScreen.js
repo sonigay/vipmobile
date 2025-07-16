@@ -16,14 +16,28 @@ import {
   Divider,
   Alert,
   CircularProgress,
-  Chip
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Collapse,
+  Autocomplete
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Refresh as RefreshIcon,
   Clear as ClearIcon,
   CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  List as ListIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 function ReservationSettingsScreen({ loggedInStore }) {
@@ -45,31 +59,30 @@ function ReservationSettingsScreen({ loggedInStore }) {
     gColumn: []
   });
 
-  // 선택된 값들
-  const [selectedValues, setSelectedValues] = useState({
-    reservationSite: {
-      p: '',
-      q: '',
-      r: ''
-    },
-    phonekl: {
-      f: '',
-      g: ''
+  // 정규화 항목들 (여러 개 추가 가능)
+  const [normalizationItems, setNormalizationItems] = useState([
+    {
+      id: 1,
+      reservationSite: { p: '', q: '', r: '' },
+      phonekl: { f: '', g: '' },
+      normalizedModel: '',
+      matchingStatus: '',
+      isMatched: false
     }
-  });
+  ]);
 
-  // 매칭 결과
-  const [matchingResult, setMatchingResult] = useState({
-    normalizedModel: '',
-    matchingStatus: '',
-    isMatched: false
-  });
+  // 저장된 정규화 목록
+  const [savedNormalizationList, setSavedNormalizationList] = useState([]);
+  const [showSavedList, setShowSavedList] = useState(false);
 
-  // 검색어
-  const [searchTerms, setSearchTerms] = useState({
-    reservationSite: { p: '', q: '', r: '' },
-    phonekl: { f: '', g: '' }
+  // 정규화된 데이터
+  const [normalizedData, setNormalizedData] = useState({
+    reservationSiteData: [],
+    phoneklData: [],
+    stats: {}
   });
+  const [showNormalizedData, setShowNormalizedData] = useState(false);
+  const [loadingNormalizedData, setLoadingNormalizedData] = useState(false);
 
   // 데이터 로드
   const loadData = async () => {
@@ -94,43 +107,130 @@ function ReservationSettingsScreen({ loggedInStore }) {
     }
   };
 
-  // 저장된 설정 불러오기
-  const loadSavedSettings = async () => {
+  // 저장된 정규화 목록 불러오기
+  const loadSavedNormalizationList = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/load`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/list`);
       if (response.ok) {
         const data = await response.json();
-        setSelectedValues(data.selectedValues);
-        setMatchingResult(data.matchingResult);
-        setMessage({ type: 'success', text: '저장된 설정을 불러왔습니다.' });
+        setSavedNormalizationList(data.normalizationList);
       }
     } catch (error) {
-      console.error('설정 불러오기 오류:', error);
+      console.error('정규화 목록 불러오기 오류:', error);
     }
   };
 
-  // 설정 저장
-  const saveSettings = async () => {
+  // 정규화된 데이터 불러오기
+  const loadNormalizedData = async () => {
+    setLoadingNormalizedData(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/normalized-data`);
+      if (response.ok) {
+        const data = await response.json();
+        setNormalizedData(data);
+        setMessage({ type: 'success', text: '정규화된 데이터를 성공적으로 불러왔습니다.' });
+      } else {
+        throw new Error('정규화된 데이터 로드 실패');
+      }
+    } catch (error) {
+      console.error('정규화된 데이터 불러오기 오류:', error);
+      setMessage({ type: 'error', text: '정규화된 데이터 로드 중 오류가 발생했습니다.' });
+    } finally {
+      setLoadingNormalizedData(false);
+    }
+  };
+
+  // 정규화 항목 추가
+  const addNormalizationItem = () => {
+    const newId = Math.max(...normalizationItems.map(item => item.id), 0) + 1;
+    setNormalizationItems(prev => [...prev, {
+      id: newId,
+      reservationSite: { p: '', q: '', r: '' },
+      phonekl: { f: '', g: '' },
+      normalizedModel: '',
+      matchingStatus: '',
+      isMatched: false
+    }]);
+  };
+
+  // 정규화 항목 삭제
+  const removeNormalizationItem = (id) => {
+    if (normalizationItems.length > 1) {
+      setNormalizationItems(prev => prev.filter(item => item.id !== id));
+    }
+  };
+
+  // 정규화 항목 업데이트
+  const updateNormalizationItem = (id, field, value) => {
+    setNormalizationItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const updatedItem = { ...item };
+        
+        if (field.startsWith('reservationSite.')) {
+          const subField = field.split('.')[1];
+          updatedItem.reservationSite = { ...updatedItem.reservationSite, [subField]: value };
+        } else if (field.startsWith('phonekl.')) {
+          const subField = field.split('.')[1];
+          updatedItem.phonekl = { ...updatedItem.phonekl, [subField]: value };
+        } else {
+          updatedItem[field] = value;
+        }
+        
+        // 매칭 결과 업데이트
+        const hasReservationData = updatedItem.reservationSite.p || updatedItem.reservationSite.q || updatedItem.reservationSite.r;
+        const hasPhoneklData = updatedItem.phonekl.f || updatedItem.phonekl.g;
+        
+        if (hasReservationData && hasPhoneklData) {
+          updatedItem.normalizedModel = `${updatedItem.reservationSite.p || ''} ${updatedItem.reservationSite.q || ''} ${updatedItem.reservationSite.r || ''}`.trim();
+          updatedItem.matchingStatus = '매칭 완료';
+          updatedItem.isMatched = true;
+        } else {
+          updatedItem.normalizedModel = '';
+          updatedItem.matchingStatus = '데이터 부족';
+          updatedItem.isMatched = false;
+        }
+        
+        return updatedItem;
+      }
+      return item;
+    }));
+  };
+
+  // 모든 정규화 항목 저장
+  const saveAllNormalizationItems = async () => {
     setSaving(true);
     setMessage({ type: '', text: '' });
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          selectedValues,
-          matchingResult
-        })
-      });
-      
-      if (response.ok) {
-        setMessage({ type: 'success', text: '설정이 성공적으로 저장되었습니다.' });
-      } else {
-        throw new Error('저장 실패');
+      // 각 항목을 개별적으로 저장
+      for (const item of normalizationItems) {
+        if (item.isMatched) { // 매칭된 항목만 저장
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/save`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              selectedValues: {
+                reservationSite: item.reservationSite,
+                phonekl: item.phonekl
+              },
+              matchingResult: {
+                normalizedModel: item.normalizedModel,
+                matchingStatus: item.matchingStatus,
+                isMatched: item.isMatched
+              }
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error('저장 실패');
+          }
+        }
       }
+      
+      setMessage({ type: 'success', text: '정규화 설정이 성공적으로 저장되었습니다.' });
+      await loadSavedNormalizationList();
     } catch (error) {
       console.error('저장 오류:', error);
       setMessage({ type: 'error', text: '저장 중 오류가 발생했습니다.' });
@@ -141,72 +241,37 @@ function ReservationSettingsScreen({ loggedInStore }) {
 
   // 초기화
   const resetSettings = () => {
-    setSelectedValues({
-      reservationSite: { p: '', q: '', r: '' },
-      phonekl: { f: '', g: '' }
-    });
-    setMatchingResult({
-      normalizedModel: '',
-      matchingStatus: '',
-      isMatched: false
-    });
-    setSearchTerms({
-      reservationSite: { p: '', q: '', r: '' },
-      phonekl: { f: '', g: '' }
-    });
+    setNormalizationItems([
+      {
+        id: 1,
+        reservationSite: { p: '', q: '', r: '' },
+        phonekl: { f: '', g: '' },
+        normalizedModel: '',
+        matchingStatus: '',
+        isMatched: false
+      }
+    ]);
     setMessage({ type: 'info', text: '설정이 초기화되었습니다.' });
   };
 
-  // 매칭 실행
-  const runMatching = () => {
-    const { reservationSite, phonekl } = selectedValues;
-    
-    // 간단한 매칭 로직 (실제로는 더 복잡한 로직이 필요)
-    const hasReservationData = reservationSite.p || reservationSite.q || reservationSite.r;
-    const hasPhoneklData = phonekl.f || phonekl.g;
-    
-    if (hasReservationData && hasPhoneklData) {
-      const normalizedModel = `${reservationSite.p || ''} ${reservationSite.q || ''} ${reservationSite.r || ''}`.trim();
-      setMatchingResult({
-        normalizedModel,
-        matchingStatus: '매칭 완료',
-        isMatched: true
-      });
-      setMessage({ type: 'success', text: '매칭이 완료되었습니다.' });
-    } else {
-      setMatchingResult({
-        normalizedModel: '',
-        matchingStatus: '데이터 부족',
-        isMatched: false
-      });
-      setMessage({ type: 'warning', text: '매칭을 위해 더 많은 데이터가 필요합니다.' });
+  // 날짜 포맷팅
+  const formatDate = (timestamp) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString('ko-KR');
+    } catch (error) {
+      return timestamp;
     }
-  };
-
-  // 필터링된 옵션 생성
-  const getFilteredOptions = (data, searchTerm) => {
-    if (!searchTerm) return data;
-    return data.filter(item => 
-      item.toLowerCase().includes(searchTerm.toLowerCase())
-    );
   };
 
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadData();
-    loadSavedSettings();
+    loadSavedNormalizationList();
   }, []);
 
-  // 선택된 값이 변경될 때마다 매칭 실행
-  useEffect(() => {
-    if (Object.values(selectedValues.reservationSite).some(v => v) || 
-        Object.values(selectedValues.phonekl).some(v => v)) {
-      runMatching();
-    }
-  }, [selectedValues]);
-
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Container maxWidth="xl" sx={{ py: 3 }}>
       <Typography variant="h4" component="h1" sx={{ mb: 3, fontWeight: 'bold', color: '#ff9a9e' }}>
         사전예약정리 셋팅
       </Typography>
@@ -219,15 +284,15 @@ function ReservationSettingsScreen({ loggedInStore }) {
       )}
 
       {/* 액션 버튼들 */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Button
           variant="contained"
           startIcon={<SaveIcon />}
-          onClick={saveSettings}
+          onClick={saveAllNormalizationItems}
           disabled={saving}
           sx={{ backgroundColor: '#ff9a9e', '&:hover': { backgroundColor: '#f48fb1' } }}
         >
-          {saving ? <CircularProgress size={20} /> : '저장'}
+          {saving ? <CircularProgress size={20} /> : '정규화 저장'}
         </Button>
         <Button
           variant="outlined"
@@ -245,208 +310,396 @@ function ReservationSettingsScreen({ loggedInStore }) {
         >
           초기화
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={<ListIcon />}
+          onClick={() => {
+            setShowSavedList(!showSavedList);
+            if (!showSavedList) {
+              loadSavedNormalizationList();
+            }
+          }}
+          color="info"
+        >
+          {showSavedList ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          저장된 정규화 목록 ({savedNormalizationList.length})
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<ListIcon />}
+          onClick={() => {
+            setShowNormalizedData(!showNormalizedData);
+            if (!showNormalizedData) {
+              loadNormalizedData();
+            }
+          }}
+          color="secondary"
+          disabled={loadingNormalizedData}
+        >
+          {loadingNormalizedData ? <CircularProgress size={20} /> : (showNormalizedData ? <ExpandLessIcon /> : <ExpandMoreIcon />)}
+          정규화된 데이터 조회
+        </Button>
       </Box>
 
-      <Grid container spacing={3}>
-        {/* 사전예약사이트 모델명형식 */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                사전예약사이트 모델명형식
-              </Typography>
-              
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  label="P열 검색"
-                  value={searchTerms.reservationSite.p}
-                  onChange={(e) => setSearchTerms(prev => ({
-                    ...prev,
-                    reservationSite: { ...prev.reservationSite, p: e.target.value }
-                  }))}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
-                <FormControl fullWidth size="small">
-                  <InputLabel>P열 선택</InputLabel>
-                  <Select
-                    value={selectedValues.reservationSite.p}
-                    onChange={(e) => setSelectedValues(prev => ({
-                      ...prev,
-                      reservationSite: { ...prev.reservationSite, p: e.target.value }
-                    }))}
-                    label="P열 선택"
-                  >
-                    {getFilteredOptions(reservationSiteData.pColumn, searchTerms.reservationSite.p).map((item, index) => (
-                      <MenuItem key={index} value={item}>{item}</MenuItem>
+      {/* 저장된 정규화 목록 */}
+      <Collapse in={showSavedList}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              저장된 정규화 목록
+            </Typography>
+            
+            {savedNormalizationList.length > 0 ? (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>저장일시</TableCell>
+                      <TableCell>사전예약사이트</TableCell>
+                      <TableCell>폰클</TableCell>
+                      <TableCell>정규화된 모델명</TableCell>
+                      <TableCell>상태</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {savedNormalizationList.map((item, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{formatDate(item.timestamp)}</TableCell>
+                        <TableCell>{item.reservationSite}</TableCell>
+                        <TableCell>{item.phonekl}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={item.normalizedModel}
+                            color={item.isCompleted ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={item.isCompleted ? '완료' : '미완료'}
+                            color={item.isCompleted ? 'success' : 'warning'}
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </Select>
-                </FormControl>
-              </Box>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Alert severity="info">
+                저장된 정규화 기록이 없습니다.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </Collapse>
 
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Q열 검색"
-                  value={searchTerms.reservationSite.q}
-                  onChange={(e) => setSearchTerms(prev => ({
-                    ...prev,
-                    reservationSite: { ...prev.reservationSite, q: e.target.value }
-                  }))}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
-                <FormControl fullWidth size="small">
-                  <InputLabel>Q열 선택</InputLabel>
-                  <Select
-                    value={selectedValues.reservationSite.q}
-                    onChange={(e) => setSelectedValues(prev => ({
-                      ...prev,
-                      reservationSite: { ...prev.reservationSite, q: e.target.value }
-                    }))}
-                    label="Q열 선택"
-                  >
-                    {getFilteredOptions(reservationSiteData.qColumn, searchTerms.reservationSite.q).map((item, index) => (
-                      <MenuItem key={index} value={item}>{item}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  label="R열 검색"
-                  value={searchTerms.reservationSite.r}
-                  onChange={(e) => setSearchTerms(prev => ({
-                    ...prev,
-                    reservationSite: { ...prev.reservationSite, r: e.target.value }
-                  }))}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
-                <FormControl fullWidth size="small">
-                  <InputLabel>R열 선택</InputLabel>
-                  <Select
-                    value={selectedValues.reservationSite.r}
-                    onChange={(e) => setSelectedValues(prev => ({
-                      ...prev,
-                      reservationSite: { ...prev.reservationSite, r: e.target.value }
-                    }))}
-                    label="R열 선택"
-                  >
-                    {getFilteredOptions(reservationSiteData.rColumn, searchTerms.reservationSite.r).map((item, index) => (
-                      <MenuItem key={index} value={item}>{item}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* 폰클 모델명형식 */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                폰클 모델명형식
-              </Typography>
-              
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  label="F열 검색"
-                  value={searchTerms.phonekl.f}
-                  onChange={(e) => setSearchTerms(prev => ({
-                    ...prev,
-                    phonekl: { ...prev.phonekl, f: e.target.value }
-                  }))}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
-                <FormControl fullWidth size="small">
-                  <InputLabel>F열 선택</InputLabel>
-                  <Select
-                    value={selectedValues.phonekl.f}
-                    onChange={(e) => setSelectedValues(prev => ({
-                      ...prev,
-                      phonekl: { ...prev.phonekl, f: e.target.value }
-                    }))}
-                    label="F열 선택"
-                  >
-                    {getFilteredOptions(phoneklData.fColumn, searchTerms.phonekl.f).map((item, index) => (
-                      <MenuItem key={index} value={item}>{item}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  label="G열 검색"
-                  value={searchTerms.phonekl.g}
-                  onChange={(e) => setSearchTerms(prev => ({
-                    ...prev,
-                    phonekl: { ...prev.phonekl, g: e.target.value }
-                  }))}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
-                <FormControl fullWidth size="small">
-                  <InputLabel>G열 선택</InputLabel>
-                  <Select
-                    value={selectedValues.phonekl.g}
-                    onChange={(e) => setSelectedValues(prev => ({
-                      ...prev,
-                      phonekl: { ...prev.phonekl, g: e.target.value }
-                    }))}
-                    label="G열 선택"
-                  >
-                    {getFilteredOptions(phoneklData.gColumn, searchTerms.phonekl.g).map((item, index) => (
-                      <MenuItem key={index} value={item}>{item}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* 매칭 결과 */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                매칭 결과
-              </Typography>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                  정규화된 모델명:
+      {/* 정규화된 데이터 조회 */}
+      <Collapse in={showNormalizedData}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              정규화된 데이터 조회
+            </Typography>
+            
+            {/* 통계 정보 */}
+            {normalizedData.stats && Object.keys(normalizedData.stats).length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  정규화 통계
                 </Typography>
-                <Chip
-                  label={matchingResult.normalizedModel || '선택된 값이 없습니다'}
-                  color={matchingResult.isMatched ? 'success' : 'default'}
-                  icon={matchingResult.isMatched ? <CheckCircleIcon /> : <WarningIcon />}
-                />
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <Chip
+                      label={`총 규칙: ${normalizedData.stats.totalRules || 0}`}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Chip
+                      label={`사전예약사이트: ${normalizedData.stats.reservationSiteNormalized || 0}/${normalizedData.stats.reservationSiteTotal || 0}`}
+                      color="success"
+                      variant="outlined"
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Chip
+                      label={`폰클: ${normalizedData.stats.phoneklNormalized || 0}/${normalizedData.stats.phoneklTotal || 0}`}
+                      color="info"
+                      variant="outlined"
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Chip
+                      label={`전체 정규화율: ${normalizedData.stats.reservationSiteTotal + normalizedData.stats.phoneklTotal > 0 ? 
+                        Math.round(((normalizedData.stats.reservationSiteNormalized + normalizedData.stats.phoneklNormalized) / 
+                        (normalizedData.stats.reservationSiteTotal + normalizedData.stats.phoneklTotal)) * 100) : 0}%`}
+                      color="secondary"
+                      variant="outlined"
+                    />
+                  </Grid>
+                </Grid>
               </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                  매칭 상태:
+            )}
+
+            {/* 사전예약사이트 정규화된 데이터 */}
+            {normalizedData.reservationSiteData && normalizedData.reservationSiteData.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  사전예약사이트 정규화된 데이터 (최대 10개 표시)
                 </Typography>
-                <Chip
-                  label={matchingResult.matchingStatus || '대기 중'}
-                  color={matchingResult.isMatched ? 'success' : 'warning'}
-                />
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>행 번호</TableCell>
+                        <TableCell>원본 P열</TableCell>
+                        <TableCell>원본 Q열</TableCell>
+                        <TableCell>원본 R열</TableCell>
+                        <TableCell>정규화된 모델명</TableCell>
+                        <TableCell>적용된 규칙</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {normalizedData.reservationSiteData.slice(0, 10).map((item, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell>{item.rowIndex}</TableCell>
+                          <TableCell>{item.originalP}</TableCell>
+                          <TableCell>{item.originalQ}</TableCell>
+                          <TableCell>{item.originalR}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.normalizedModel || '미정규화'}
+                              color={item.normalizedModel ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {item.appliedRule ? (
+                              <Chip
+                                label={item.appliedRule.normalizedModel}
+                                color="primary"
+                                size="small"
+                                variant="outlined"
+                              />
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                규칙 없음
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {normalizedData.reservationSiteData.length > 10 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    총 {normalizedData.reservationSiteData.length}개 중 10개만 표시됩니다.
+                  </Typography>
+                )}
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+            )}
+
+            {/* 폰클 정규화된 데이터 */}
+            {normalizedData.phoneklData && normalizedData.phoneklData.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  폰클 정규화된 데이터 (최대 10개 표시)
+                </Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>행 번호</TableCell>
+                        <TableCell>원본 F열</TableCell>
+                        <TableCell>원본 G열</TableCell>
+                        <TableCell>정규화된 모델명</TableCell>
+                        <TableCell>적용된 규칙</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {normalizedData.phoneklData.slice(0, 10).map((item, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell>{item.rowIndex}</TableCell>
+                          <TableCell>{item.originalF}</TableCell>
+                          <TableCell>{item.originalG}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.normalizedModel || '미정규화'}
+                              color={item.normalizedModel ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {item.appliedRule ? (
+                              <Chip
+                                label={item.appliedRule.normalizedModel}
+                                color="primary"
+                                size="small"
+                                variant="outlined"
+                              />
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                규칙 없음
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {normalizedData.phoneklData.length > 10 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    총 {normalizedData.phoneklData.length}개 중 10개만 표시됩니다.
+                  </Typography>
+                )}
+              </Box>
+            )}
+
+            {(!normalizedData.reservationSiteData || normalizedData.reservationSiteData.length === 0) && 
+             (!normalizedData.phoneklData || normalizedData.phoneklData.length === 0) && (
+              <Alert severity="info">
+                정규화된 데이터가 없습니다. 먼저 정규화 규칙을 설정하고 저장해주세요.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </Collapse>
+
+      {/* 정규화 설정 테이블 */}
+      <Card>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+              정규화 설정
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={addNormalizationItem}
+              size="small"
+            >
+              항목 추가
+            </Button>
+          </Box>
+          
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell width="50px">삭제</TableCell>
+                  <TableCell width="200px">사전예약사이트</TableCell>
+                  <TableCell width="200px">폰클</TableCell>
+                  <TableCell>매칭 결과</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell></TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>P열</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>Q열</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>R열</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>F열</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>G열</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption" sx={{ fontWeight: 'bold' }}>정규화된 값</Typography>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {normalizationItems.map((item) => (
+                  <TableRow key={item.id} hover>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        onClick={() => removeNormalizationItem(item.id)}
+                        disabled={normalizationItems.length === 1}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                        <Autocomplete
+                          size="small"
+                          options={reservationSiteData.pColumn || []}
+                          value={item.reservationSite.p}
+                          onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.p', newValue || '')}
+                          renderInput={(params) => <TextField {...params} placeholder="P열 선택" />}
+                          freeSolo
+                        />
+                        <Autocomplete
+                          size="small"
+                          options={reservationSiteData.qColumn || []}
+                          value={item.reservationSite.q}
+                          onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.q', newValue || '')}
+                          renderInput={(params) => <TextField {...params} placeholder="Q열 선택" />}
+                          freeSolo
+                        />
+                        <Autocomplete
+                          size="small"
+                          options={reservationSiteData.rColumn || []}
+                          value={item.reservationSite.r}
+                          onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.r', newValue || '')}
+                          renderInput={(params) => <TextField {...params} placeholder="R열 선택" />}
+                          freeSolo
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                        <Autocomplete
+                          size="small"
+                          options={phoneklData.fColumn || []}
+                          value={item.phonekl.f}
+                          onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.f', newValue || '')}
+                          renderInput={(params) => <TextField {...params} placeholder="F열 선택" />}
+                          freeSolo
+                        />
+                        <Autocomplete
+                          size="small"
+                          options={phoneklData.gColumn || []}
+                          value={item.phonekl.g}
+                          onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.g', newValue || '')}
+                          renderInput={(params) => <TextField {...params} placeholder="G열 선택" />}
+                          freeSolo
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Chip
+                          label={item.normalizedModel || '정규화된 값 없음'}
+                          color={item.isMatched ? 'success' : 'default'}
+                          icon={item.isMatched ? <CheckCircleIcon /> : <WarningIcon />}
+                          size="small"
+                        />
+                        <Chip
+                          label={item.matchingStatus || '대기 중'}
+                          color={item.isMatched ? 'success' : 'warning'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
     </Container>
   );
 }
