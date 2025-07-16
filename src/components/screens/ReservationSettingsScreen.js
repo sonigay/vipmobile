@@ -659,50 +659,55 @@ function ReservationSettingsScreen({ loggedInStore }) {
                       </IconButton>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         <Autocomplete
                           size="small"
                           options={reservationSiteData.pColumn || []}
                           value={item.reservationSite.p}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.p', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="P열 선택" />}
+                          renderInput={(params) => <TextField {...params} placeholder="P" size="small" sx={{ width: '80px' }} />}
                           freeSolo
+                          sx={{ width: '80px' }}
                         />
                         <Autocomplete
                           size="small"
                           options={reservationSiteData.qColumn || []}
                           value={item.reservationSite.q}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.q', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="Q열 선택" />}
+                          renderInput={(params) => <TextField {...params} placeholder="Q" size="small" sx={{ width: '80px' }} />}
                           freeSolo
+                          sx={{ width: '80px' }}
                         />
                         <Autocomplete
                           size="small"
                           options={reservationSiteData.rColumn || []}
                           value={item.reservationSite.r}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.r', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="R열 선택" />}
+                          renderInput={(params) => <TextField {...params} placeholder="R" size="small" sx={{ width: '80px' }} />}
                           freeSolo
+                          sx={{ width: '80px' }}
                         />
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         <Autocomplete
                           size="small"
                           options={phoneklData.fColumn || []}
                           value={item.phonekl.f}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.f', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="F열 선택" />}
+                          renderInput={(params) => <TextField {...params} placeholder="F" size="small" sx={{ width: '80px' }} />}
                           freeSolo
+                          sx={{ width: '80px' }}
                         />
                         <Autocomplete
                           size="small"
                           options={phoneklData.gColumn || []}
                           value={item.phonekl.g}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.g', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="G열 선택" />}
+                          renderInput={(params) => <TextField {...params} placeholder="G" size="small" sx={{ width: '80px' }} />}
                           freeSolo
+                          sx={{ width: '80px' }}
                         />
                       </Box>
                     </TableCell>
