@@ -7751,26 +7751,25 @@ app.get('/api/inventory-analysis', async (req, res) => {
       
       // 추출된 F열, G열 값으로 폰클재고데이터에서 수량 찾기 (중복 제거)
       let totalQuantity = 0;
-      const processedItems = new Set(); // 중복 제거를 위한 Set
+      const uniqueQuantities = new Set(); // 고유한 수량만 저장
       
       inventoryData.forEach(item => {
-        if (item.originalF === extractedF && item.originalG === extractedG) {
-          // 중복 제거: 같은 F, G, 수량 조합은 한 번만 계산
-          const itemKey = `${item.originalF}|${item.originalG}|${item.quantity}`;
-          if (!processedItems.has(itemKey)) {
-            processedItems.add(itemKey);
+        if (item.originalF === extractedF && item.originalG === extractedG && item.quantity > 0) {
+          // 고유한 수량만 합산 (같은 수량은 한 번만)
+          if (!uniqueQuantities.has(item.quantity)) {
+            uniqueQuantities.add(item.quantity);
             totalQuantity += item.quantity;
-            if (item.quantity > 0) {
-              quantityDebug.push({
-                model: normalizedModel,
-                originalF: item.originalF,
-                originalG: item.originalG,
-                quantity: item.quantity
-              });
-            }
+            quantityDebug.push({
+              model: normalizedModel,
+              originalF: item.originalF,
+              originalG: item.originalG,
+              quantity: item.quantity
+            });
           }
         }
       });
+      
+      console.log(`  고유한 수량 개수: ${uniqueQuantities.size}, 수량들: ${Array.from(uniqueQuantities).join(', ')}`);
       
       inventoryByModel[normalizedModel] = totalQuantity;
     });
