@@ -35,21 +35,25 @@ import {
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Person as PersonIcon,
-  Store as StoreIcon
+  Store as StoreIcon,
+  ColorLens as ColorLensIcon
 } from '@mui/icons-material';
 
 function SalesByStoreScreen({ loggedInStore }) {
   const [data, setData] = useState({ byStore: {}, byAgent: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState('store'); // 'store' 또는 'agent'
+  const [viewMode, setViewMode] = useState('store'); // 'store', 'agent', 'modelColor'
   const [selectedStore, setSelectedStore] = useState(0);
   const [selectedAgent, setSelectedAgent] = useState(0);
+  const [selectedPos, setSelectedPos] = useState(0);
+  const [selectedModelColor, setSelectedModelColor] = useState(0);
   const [editingAgent, setEditingAgent] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editAgentValue, setEditAgentValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [normalizationStatus, setNormalizationStatus] = useState(null);
 
   // 데이터 로드
   const loadData = async () => {
@@ -151,9 +155,24 @@ function SalesByStoreScreen({ loggedInStore }) {
     setEditAgentValue('');
   };
 
+  // 정규화 상태 확인
+  const checkNormalizationStatus = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/normalized-data`);
+      if (response.ok) {
+        const result = await response.json();
+        setNormalizationStatus(result.success);
+      }
+    } catch (error) {
+      console.error('정규화 상태 확인 오류:', error);
+      setNormalizationStatus(false);
+    }
+  };
+
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadData();
+    checkNormalizationStatus();
   }, []);
 
   // 디버깅용: 데이터 구조 확인
@@ -256,6 +275,24 @@ function SalesByStoreScreen({ loggedInStore }) {
           sx={{ backgroundColor: viewMode === 'agent' ? '#ff9a9e' : undefined }}
         >
           담당자별 정리
+        </Button>
+        
+        <Button
+          variant={viewMode === 'modelColor' ? 'contained' : 'outlined'}
+          startIcon={<ColorLensIcon />}
+          onClick={() => {
+            if (normalizationStatus) {
+              setViewMode('modelColor');
+            } else {
+              setMessage({ 
+                type: 'warning', 
+                text: '모델색상별정리를 사용하려면 먼저 사전예약정리 셋팅에서 모델 정규화작업을 완료해주세요.' 
+              });
+            }
+          }}
+          sx={{ backgroundColor: viewMode === 'modelColor' ? '#ff9a9e' : undefined }}
+        >
+          모델색상별 정리
         </Button>
       </Box>
 
@@ -378,6 +415,7 @@ function SalesByStoreScreen({ loggedInStore }) {
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell width="60px" align="center">랭크</TableCell>
                     <TableCell width="200px">담당자</TableCell>
                     <TableCell width="120px" align="center">서류접수</TableCell>
                     <TableCell width="120px" align="center">서류미접수</TableCell>
@@ -385,8 +423,28 @@ function SalesByStoreScreen({ loggedInStore }) {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {Object.entries(currentStoreData).map(([agent, agentData]) => (
+                  {Object.entries(currentStoreData)
+                    .map(([agent, agentData]) => ({
+                      agent,
+                      agentData,
+                      total: agentData.total
+                    }))
+                    .sort((a, b) => b.total - a.total) // 합계 내림차순 정렬
+                    .map(({ agent, agentData }, index) => (
                     <TableRow key={agent} hover>
+                      <TableCell align="center">
+                        <Chip
+                          label={index + 1}
+                          size="small"
+                          color={index < 3 ? 'primary' : 'default'}
+                          sx={{ 
+                            fontSize: '0.7rem', 
+                            fontWeight: 'bold',
+                            backgroundColor: index < 3 ? '#ff9a9e' : undefined,
+                            color: index < 3 ? 'white' : undefined
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Chip
@@ -394,7 +452,20 @@ function SalesByStoreScreen({ loggedInStore }) {
                             color="primary"
                             size="small"
                             icon={<PersonIcon />}
-                            sx={{ fontSize: '0.8rem' }}
+                            sx={{ 
+                              fontSize: '0.8rem',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                backgroundColor: '#ff8a8e'
+                              }
+                            }}
+                            onClick={() => {
+                              setViewMode('agent');
+                              const agentIndex = agents.findIndex(a => a === agent);
+                              if (agentIndex !== -1) {
+                                setSelectedAgent(agentIndex);
+                              }
+                            }}
                           />
                         </Box>
                       </TableCell>
@@ -477,6 +548,7 @@ function SalesByStoreScreen({ loggedInStore }) {
               <Table size="small">
                 <TableHead>
                   <TableRow>
+                    <TableCell width="60px" align="center">랭크</TableCell>
                     <TableCell width="200px">POS명</TableCell>
                     <TableCell width="120px" align="center">서류접수</TableCell>
                     <TableCell width="120px" align="center">서류미접수</TableCell>
@@ -484,12 +556,50 @@ function SalesByStoreScreen({ loggedInStore }) {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {Object.entries(currentAgentData).map(([posName, posData]) => (
+                  {Object.entries(currentAgentData)
+                    .map(([posName, posData]) => ({
+                      posName,
+                      posData,
+                      total: posData.total
+                    }))
+                    .sort((a, b) => b.total - a.total) // 합계 내림차순 정렬
+                    .map(({ posName, posData }, index) => (
                     <TableRow key={posName} hover>
+                      <TableCell align="center">
+                        <Chip
+                          label={index + 1}
+                          size="small"
+                          color={index < 3 ? 'primary' : 'default'}
+                          sx={{ 
+                            fontSize: '0.7rem', 
+                            fontWeight: 'bold',
+                            backgroundColor: index < 3 ? '#ff9a9e' : undefined,
+                            color: index < 3 ? 'white' : undefined
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {posName || '-'}
-                        </Typography>
+                        <Chip
+                          label={posName || '-'}
+                          color="primary"
+                          size="small"
+                          icon={<StoreIcon />}
+                          sx={{ 
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              backgroundColor: '#ff8a8e'
+                            }
+                          }}
+                          onClick={() => {
+                            setViewMode('modelColor');
+                            // POS별 모델색상 데이터를 로드하거나 필터링
+                            setMessage({ 
+                              type: 'info', 
+                              text: `${posName}의 모델색상별 정리를 준비 중입니다.` 
+                            });
+                          }}
+                        />
                       </TableCell>
                       <TableCell align="center">
                         <Chip
@@ -554,6 +664,148 @@ function SalesByStoreScreen({ loggedInStore }) {
                 </Grid>
               </Grid>
             </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 모델색상별 정리 탭 */}
+      {viewMode === 'modelColor' && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              모델색상별 정리
+            </Typography>
+            
+            {normalizationStatus ? (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<ColorLensIcon />}
+                  onClick={() => setSelectedModelColor(0)}
+                  sx={{
+                    backgroundColor: selectedModelColor === 0 ? '#ff9a9e' : undefined,
+                    color: selectedModelColor === 0 ? 'white' : undefined,
+                    '&:hover': {
+                      backgroundColor: selectedModelColor === 0 ? '#ff8a8e' : undefined
+                    }
+                  }}
+                >
+                  전체 모델
+                </Button>
+                {/* 여기에 모델별 버튼들이 추가될 예정 */}
+              </Box>
+            ) : (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                모델색상별정리를 사용하려면 먼저 사전예약정리 셋팅에서 모델 정규화작업을 완료해주세요.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 모델색상별 데이터 테이블 */}
+      {viewMode === 'modelColor' && normalizationStatus && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              모델색상별 서류접수 현황
+            </Typography>
+            
+            <Alert severity="info" sx={{ mb: 2 }}>
+              모델색상별 정리 기능은 정규화작업이 완료된 후 사용할 수 있습니다.
+            </Alert>
+            
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell width="60px" align="center">랭크</TableCell>
+                    <TableCell width="200px">모델</TableCell>
+                    <TableCell width="150px">색상</TableCell>
+                    <TableCell width="120px" align="center">서류접수</TableCell>
+                    <TableCell width="120px" align="center">서류미접수</TableCell>
+                    <TableCell width="100px" align="center">합계</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {/* 정규화작업이 완료되면 실제 데이터가 여기에 표시됩니다 */}
+                  {/* 예시 구조:
+                  {modelColorData
+                    .map(({ model, color, received, notReceived, total }) => ({
+                      model,
+                      color,
+                      received,
+                      notReceived,
+                      total
+                    }))
+                    .sort((a, b) => b.total - a.total) // 합계 내림차순 정렬
+                    .map(({ model, color, received, notReceived, total }, index) => (
+                    <TableRow key={`${model}-${color}`} hover>
+                      <TableCell align="center">
+                        <Chip
+                          label={index + 1}
+                          size="small"
+                          color={index < 3 ? 'primary' : 'default'}
+                          sx={{ 
+                            fontSize: '0.7rem', 
+                            fontWeight: 'bold',
+                            backgroundColor: index < 3 ? '#ff9a9e' : undefined,
+                            color: index < 3 ? 'white' : undefined
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={model}
+                          color="primary"
+                          size="small"
+                          icon={<ColorLensIcon />}
+                          sx={{ fontSize: '0.8rem' }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {color}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={received}
+                          color="success"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={notReceived}
+                          color="warning"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={total}
+                          color="primary"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40, fontWeight: 'bold' }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                  */}
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        정규화작업이 완료되면 모델색상별 데이터가 표시됩니다.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
           </CardContent>
         </Card>
       )}
