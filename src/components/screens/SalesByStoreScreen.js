@@ -25,7 +25,8 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
-  Grid
+  Grid,
+  Skeleton
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -849,8 +850,7 @@ function SalesByStoreScreen({ loggedInStore }) {
                   <TableHead>
                     <TableRow>
                       <TableCell width="60px" align="center">랭크</TableCell>
-                      <TableCell width="200px">모델</TableCell>
-                      <TableCell width="150px">색상</TableCell>
+                      <TableCell width="350px">모델색상</TableCell>
                       <TableCell width="120px" align="center">서류접수</TableCell>
                       <TableCell width="120px" align="center">서류미접수</TableCell>
                       <TableCell width="100px" align="center">합계</TableCell>
@@ -887,11 +887,6 @@ function SalesByStoreScreen({ loggedInStore }) {
                             }}
                             onClick={() => loadCustomerListByModel(item.model)}
                           />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {item.color}
-                          </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Chip
@@ -953,8 +948,15 @@ function SalesByStoreScreen({ loggedInStore }) {
             </Box>
             
             {loadingCustomerList ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
+              <Box sx={{ py: 2 }}>
+                <Skeleton variant="rectangular" height={40} sx={{ mb: 1 }} />
+                <Skeleton variant="rectangular" height={40} sx={{ mb: 1 }} />
+                <Skeleton variant="rectangular" height={40} sx={{ mb: 1 }} />
+                <Skeleton variant="rectangular" height={40} sx={{ mb: 1 }} />
+                <Skeleton variant="rectangular" height={40} sx={{ mb: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
               </Box>
             ) : (
               <TableContainer component={Paper} variant="outlined">
