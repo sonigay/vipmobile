@@ -3182,14 +3182,27 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     let matchedCount = 0;
     
     reservationSiteRows.forEach((row, index) => {
-      if (row.length < 20) return; // 최소 컬럼 수 확인
+      if (row.length < 20) {
+        console.log(`행 ${index + 1}: 컬럼 수 부족 (${row.length})`);
+        return; // 최소 컬럼 수 확인
+      }
       
       const pValue = (row[15] || '').toString().trim(); // P열
       const qValue = (row[16] || '').toString().trim(); // Q열
       const rValue = (row[17] || '').toString().trim(); // R열
       const reservationNumber = (row[0] || '').toString().trim(); // 예약번호
       
-      if (!pValue || !qValue || !rValue || !reservationNumber) return;
+      // 처음 몇 개 행의 데이터 확인
+      if (index < 5) {
+        console.log(`행 ${index + 1} 데이터: P="${pValue}", Q="${qValue}", R="${rValue}", 예약번호="${reservationNumber}"`);
+      }
+      
+      if (!pValue || !qValue || !rValue || !reservationNumber) {
+        if (index < 10) {
+          console.log(`행 ${index + 1}: 필수 데이터 누락 - P:${!!pValue}, Q:${!!qValue}, R:${!!rValue}, 예약번호:${!!reservationNumber}`);
+        }
+        return;
+      }
       
       processedCount++;
       
