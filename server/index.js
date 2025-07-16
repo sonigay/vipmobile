@@ -6326,11 +6326,47 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       });
     });
 
+    // 담당자별로 그룹화하고 POS명별로 서브 그룹화
+    const groupedByAgent = {};
+    
+    Object.keys(groupedByStore).forEach(storeCode => {
+      groupedByStore[storeCode].forEach(item => {
+        const agent = item.agent || '미배정';
+        
+        if (!groupedByAgent[agent]) {
+          groupedByAgent[agent] = {};
+        }
+        
+        if (!groupedByAgent[agent][item.posName]) {
+          groupedByAgent[agent][item.posName] = {
+            received: 0,
+            notReceived: 0,
+            total: 0,
+            items: []
+          };
+        }
+        
+        // 서류접수 상태에 따라 카운팅
+        if (item.isDocumentReceived) {
+          groupedByAgent[agent][item.posName].received++;
+        } else {
+          groupedByAgent[agent][item.posName].notReceived++;
+        }
+        
+        groupedByAgent[agent][item.posName].total++;
+        groupedByAgent[agent][item.posName].items.push(item);
+      });
+    });
+
     const result = {
       success: true,
-      data: groupedByStore,
+      data: {
+        byStore: groupedByStore,
+        byAgent: groupedByAgent
+      },
       stats: {
         totalStores: Object.keys(groupedByStore).length,
+        totalAgents: Object.keys(groupedByAgent).length,
         totalItems: processedData.length,
         totalWithAgent: processedData.filter(item => item.agent).length,
         totalDocumentReceived: processedData.filter(item => item.isDocumentReceived).length

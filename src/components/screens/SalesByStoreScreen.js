@@ -39,10 +39,12 @@ import {
 } from '@mui/icons-material';
 
 function SalesByStoreScreen({ loggedInStore }) {
-  const [data, setData] = useState({});
+  const [data, setData] = useState({ byStore: {}, byAgent: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('store'); // 'store' 또는 'agent'
   const [selectedStore, setSelectedStore] = useState(0);
+  const [selectedAgent, setSelectedAgent] = useState(0);
   const [editingAgent, setEditingAgent] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editAgentValue, setEditAgentValue] = useState('');
@@ -79,11 +81,10 @@ function SalesByStoreScreen({ loggedInStore }) {
     }
   };
 
-  // 담당자 수정 다이얼로그 열기
+  // 담당자 수정 다이얼로그 열기 (현재는 비활성화)
   const handleEditAgent = (item) => {
-    setEditingAgent(item);
-    setEditAgentValue(item.agent || '');
-    setEditDialogOpen(true);
+    // 새로운 데이터 구조에서는 개별 항목 편집이 어려우므로 임시로 비활성화
+    setMessage({ type: 'info', text: '담당자 수정 기능은 현재 개발 중입니다.' });
   };
 
   // 담당자 수정 저장
@@ -155,8 +156,9 @@ function SalesByStoreScreen({ loggedInStore }) {
     loadData();
   }, []);
 
-  // 대리점코드 목록
-  const storeCodes = Object.keys(data);
+  // 데이터 목록
+  const storeCodes = Object.keys(data.byStore);
+  const agents = Object.keys(data.byAgent);
 
   if (loading) {
     return (
@@ -185,7 +187,7 @@ function SalesByStoreScreen({ loggedInStore }) {
     );
   }
 
-  if (storeCodes.length === 0) {
+  if (storeCodes.length === 0 && agents.length === 0) {
     return (
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Alert severity="info">
@@ -195,8 +197,10 @@ function SalesByStoreScreen({ loggedInStore }) {
     );
   }
 
-  const selectedStoreCode = storeCodes[selectedStore];
-  const selectedStoreData = data[selectedStoreCode] || [];
+  const currentStoreCode = storeCodes[selectedStore];
+  const currentStoreData = data.byStore[currentStoreCode] || [];
+  const currentAgentName = agents[selectedAgent];
+  const currentAgentData = data.byAgent[currentAgentName] || {};
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -212,7 +216,7 @@ function SalesByStoreScreen({ loggedInStore }) {
       )}
 
       {/* 액션 버튼 */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
@@ -221,166 +225,332 @@ function SalesByStoreScreen({ loggedInStore }) {
         >
           {loading ? <CircularProgress size={20} /> : '새로고침'}
         </Button>
+        
+        <Button
+          variant={viewMode === 'store' ? 'contained' : 'outlined'}
+          startIcon={<StoreIcon />}
+          onClick={() => setViewMode('store')}
+          sx={{ backgroundColor: viewMode === 'store' ? '#ff9a9e' : undefined }}
+        >
+          대리점코드별 정리
+        </Button>
+        
+        <Button
+          variant={viewMode === 'agent' ? 'contained' : 'outlined'}
+          startIcon={<PersonIcon />}
+          onClick={() => setViewMode('agent')}
+          sx={{ backgroundColor: viewMode === 'agent' ? '#ff9a9e' : undefined }}
+        >
+          담당자별 정리
+        </Button>
       </Box>
 
       {/* 대리점코드별 탭 */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-            대리점코드별 정리
-          </Typography>
-          
-          <Tabs
-            value={selectedStore}
-            onChange={(event, newValue) => setSelectedStore(newValue)}
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{
-              '& .MuiTab-root': {
-                minHeight: 48,
-                fontSize: '0.9rem',
-                fontWeight: 500
-              }
-            }}
-          >
-            {storeCodes.map((storeCode, index) => (
-              <Tab
-                key={storeCode}
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <StoreIcon fontSize="small" />
-                    {storeCode}
-                    <Chip
-                      label={data[storeCode]?.length || 0}
-                      size="small"
-                      color="primary"
-                      sx={{ fontSize: '0.7rem', height: 20 }}
-                    />
-                  </Box>
+      {viewMode === 'store' && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              대리점코드별 정리
+            </Typography>
+            
+            <Tabs
+              value={selectedStore}
+              onChange={(event, newValue) => setSelectedStore(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 48,
+                  fontSize: '0.9rem',
+                  fontWeight: 500
                 }
-                sx={{
-                  '&.Mui-selected': {
-                    color: '#ff9a9e'
-                  }
-                }}
-              />
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* 선택된 대리점의 데이터 테이블 */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-            {selectedStoreCode} - POS별 정리
-          </Typography>
-          
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell width="60px">행번호</TableCell>
-                  <TableCell width="200px">POS명</TableCell>
-                  <TableCell width="150px">담당자</TableCell>
-                  <TableCell width="120px">서류접수</TableCell>
-                  <TableCell>예약번호</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {selectedStoreData.map((item, index) => (
-                  <TableRow key={index} hover>
-                    <TableCell>{item.rowIndex}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {item.posName || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {item.agent ? (
-                          <Chip
-                            label={item.agent}
-                            color="primary"
-                            size="small"
-                            icon={<PersonIcon />}
-                            sx={{ fontSize: '0.8rem' }}
-                          />
-                        ) : (
-                          <Chip
-                            label="미배정"
-                            color="default"
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.8rem' }}
-                          />
-                        )}
-                        <Tooltip title="담당자 수정">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEditAgent(item)}
-                            sx={{ p: 0.5 }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
+              }}
+            >
+              {storeCodes.map((storeCode, index) => (
+                <Tab
+                  key={storeCode}
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <StoreIcon fontSize="small" />
+                      {storeCode}
                       <Chip
-                        label={item.isDocumentReceived ? '접수완료' : '미접수'}
-                        color={item.isDocumentReceived ? 'success' : 'warning'}
-                        icon={item.isDocumentReceived ? <CheckCircleIcon /> : <WarningIcon />}
+                        label={data.byStore[storeCode]?.length || 0}
                         size="small"
-                        sx={{ fontSize: '0.8rem' }}
+                        color="primary"
+                        sx={{ fontSize: '0.7rem', height: 20 }}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {item.reservationNumber || '-'}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                    </Box>
+                  }
+                  sx={{
+                    '&.Mui-selected': {
+                      color: '#ff9a9e'
+                    }
+                  }}
+                />
+              ))}
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
 
-          {/* 통계 정보 */}
-          <Box sx={{ mt: 3 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={6} md={3}>
-                <Chip
-                  label={`총 ${selectedStoreData.length}건`}
-                  color="primary"
-                  variant="outlined"
-                />
+      {/* 담당자별 탭 */}
+      {viewMode === 'agent' && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              담당자별 정리
+            </Typography>
+            
+            <Tabs
+              value={selectedAgent}
+              onChange={(event, newValue) => setSelectedAgent(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 48,
+                  fontSize: '0.9rem',
+                  fontWeight: 500
+                }
+              }}
+            >
+              {agents.map((agent, index) => {
+                const agentData = data.byAgent[agent] || {};
+                const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+                
+                return (
+                  <Tab
+                    key={agent}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PersonIcon fontSize="small" />
+                        {agent}
+                        <Chip
+                          label={totalItems}
+                          size="small"
+                          color="primary"
+                          sx={{ fontSize: '0.7rem', height: 20 }}
+                        />
+                      </Box>
+                    }
+                    sx={{
+                      '&.Mui-selected': {
+                        color: '#ff9a9e'
+                      }
+                    }}
+                  />
+                );
+              })}
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 대리점코드별 데이터 테이블 */}
+      {viewMode === 'store' && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              {currentStoreCode} - POS별 정리
+            </Typography>
+            
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell width="200px">POS명</TableCell>
+                    <TableCell width="150px">담당자</TableCell>
+                    <TableCell width="120px">서류접수</TableCell>
+                    <TableCell>예약번호</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {currentStoreData.map((item, index) => (
+                    <TableRow key={index} hover>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {item.posName || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {item.agent ? (
+                            <Chip
+                              label={item.agent}
+                              color="primary"
+                              size="small"
+                              icon={<PersonIcon />}
+                              sx={{ fontSize: '0.8rem' }}
+                            />
+                          ) : (
+                            <Chip
+                              label="미배정"
+                              color="default"
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: '0.8rem' }}
+                            />
+                          )}
+                          <Tooltip title="담당자 수정">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEditAgent(item)}
+                              sx={{ p: 0.5 }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={item.isDocumentReceived ? '접수완료' : '미접수'}
+                          color={item.isDocumentReceived ? 'success' : 'warning'}
+                          icon={item.isDocumentReceived ? <CheckCircleIcon /> : <WarningIcon />}
+                          size="small"
+                          sx={{ fontSize: '0.8rem' }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {item.reservationNumber || '-'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* 통계 정보 */}
+            <Box sx={{ mt: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`총 ${currentStoreData.length}건`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`담당자 배정: ${currentStoreData.filter(item => item.agent).length}건`}
+                    color="info"
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`서류접수: ${currentStoreData.filter(item => item.isDocumentReceived).length}건`}
+                    color="success"
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`미접수: ${currentStoreData.filter(item => !item.isDocumentReceived).length}건`}
+                    color="warning"
+                    variant="outlined"
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={6} md={3}>
-                <Chip
-                  label={`담당자 배정: ${selectedStoreData.filter(item => item.agent).length}건`}
-                  color="info"
-                  variant="outlined"
-                />
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 담당자별 데이터 테이블 */}
+      {viewMode === 'agent' && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              {currentAgentName} - POS별 정리
+            </Typography>
+            
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell width="200px">POS명</TableCell>
+                    <TableCell width="120px" align="center">서류접수</TableCell>
+                    <TableCell width="120px" align="center">서류미접수</TableCell>
+                    <TableCell width="100px" align="center">합계</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {Object.entries(currentAgentData).map(([posName, posData]) => (
+                    <TableRow key={posName} hover>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {posName || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={posData.received}
+                          color="success"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={posData.notReceived}
+                          color="warning"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={posData.total}
+                          color="primary"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40, fontWeight: 'bold' }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* 통계 정보 */}
+            <Box sx={{ mt: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`총 POS: ${Object.keys(currentAgentData).length}개`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`총 건수: ${Object.values(currentAgentData).reduce((sum, posData) => sum + posData.total, 0)}건`}
+                    color="info"
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`서류접수: ${Object.values(currentAgentData).reduce((sum, posData) => sum + posData.received, 0)}건`}
+                    color="success"
+                    variant="outlined"
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Chip
+                    label={`미접수: ${Object.values(currentAgentData).reduce((sum, posData) => sum + posData.notReceived, 0)}건`}
+                    color="warning"
+                    variant="outlined"
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={6} md={3}>
-                <Chip
-                  label={`서류접수: ${selectedStoreData.filter(item => item.isDocumentReceived).length}건`}
-                  color="success"
-                  variant="outlined"
-                />
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Chip
-                  label={`미접수: ${selectedStoreData.filter(item => !item.isDocumentReceived).length}건`}
-                  color="warning"
-                  variant="outlined"
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        </CardContent>
-      </Card>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 담당자 수정 다이얼로그 */}
       <Dialog open={editDialogOpen} onClose={handleCancelEdit} maxWidth="sm" fullWidth>
