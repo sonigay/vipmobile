@@ -6279,10 +6279,10 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 
     // 사전예약사이트 데이터 처리
     const processedData = reservationData.map((row, index) => {
-      const posName = row[20] || ''; // U열 (21번째, 0부터 시작)
+      const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
-      const storeCodeForLookup = row[19] || ''; // T열 (20번째, 0부터 시작)
+      const storeCodeForLookup = row[21] || ''; // V열 (22번째, 0부터 시작)
       
       // 담당자 매칭 (VLOOKUP 방식)
       let agent = storeAgentMap.get(storeCodeForLookup) || '';
