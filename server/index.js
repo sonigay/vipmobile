@@ -7586,10 +7586,21 @@ app.get('/api/inventory-analysis', async (req, res) => {
         inventoryData = dataRows.map((row, index) => {
           const fValue = row[5] || ''; // F열 (6번째, 0부터 시작) - 모델
           const gValue = row[6] || ''; // G열 (7번째, 0부터 시작) - 색상
-          const quantityValue = row[7] || '0'; // H열 (8번째, 0부터 시작) - 재고 수량
           
-          // 수량을 숫자로 변환
-          const quantity = parseInt(quantityValue) || 0;
+          // 여러 열에서 수량 확인 (H, I, J, K, L열)
+          const quantityH = parseInt(row[7] || '0') || 0; // H열
+          const quantityI = parseInt(row[8] || '0') || 0; // I열
+          const quantityJ = parseInt(row[9] || '0') || 0; // J열
+          const quantityK = parseInt(row[10] || '0') || 0; // K열
+          const quantityL = parseInt(row[11] || '0') || 0; // L열
+          
+          // 첫 번째로 0이 아닌 수량을 사용
+          const quantity = quantityH || quantityI || quantityJ || quantityK || quantityL;
+          
+          // 디버깅: 처음 5개 행의 모든 열 값 확인
+          if (index < 5) {
+            console.log(`행 ${index + 2}: F="${fValue}", G="${gValue}", H=${quantityH}, I=${quantityI}, J=${quantityJ}, K=${quantityK}, L=${quantityL}, 최종수량=${quantity}`);
+          }
           
           // 폰클재고데이터의 F열, G열을 그대로 사용하여 정규화 규칙과 매칭
           let normalizedModel = '';
@@ -7636,6 +7647,16 @@ app.get('/api/inventory-analysis', async (req, res) => {
     } catch (error) {
       console.log('폰클재고데이터 시트 로드 실패:', error.message);
     }
+    
+    // 폰클재고데이터 수량 통계
+    const totalQuantity = inventoryData.reduce((sum, item) => sum + item.quantity, 0);
+    const itemsWithQuantity = inventoryData.filter(item => item.quantity > 0).length;
+    console.log('폰클재고데이터 수량 통계:', {
+      총수량: totalQuantity,
+      수량있는항목수: itemsWithQuantity,
+      전체항목수: inventoryData.length,
+      평균수량: inventoryData.length > 0 ? (totalQuantity / inventoryData.length).toFixed(2) : 0
+    });
 
     // 4. 재고 현황 분석
     const inventoryAnalysis = {};
@@ -7693,23 +7714,54 @@ app.get('/api/inventory-analysis', async (req, res) => {
     const inventoryByModel = {};
     const quantityDebug = [];
     
-    inventoryData.forEach(item => {
-      if (item.normalizedModel) {
-        if (!inventoryByModel[item.normalizedModel]) {
-          inventoryByModel[item.normalizedModel] = 0;
-        }
-        inventoryByModel[item.normalizedModel] += item.quantity;
-        
-        // 디버깅: 수량이 있는 항목들 기록
-        if (item.quantity > 0) {
-          quantityDebug.push({
-            model: item.normalizedModel,
-            originalF: item.originalF,
-            originalG: item.originalG,
-            quantity: item.quantity
-          });
+    // 정규화된 모델명에서 F열, G열 값 추출하여 재고 수량 찾기
+    const uniqueNormalizedModels = new Set();
+    inventoryData.filter(item => item.normalizedModel).forEach(item => {
+      uniqueNormalizedModels.add(item.normalizedModel);
+    });
+    
+    uniqueNormalizedModels.forEach(normalizedModel => {
+      // 정규화된 모델명에서 F열, G열 값 추출
+      // 예: "Z Fold7 512G 실버 쉐도우 SM-F966N_512G 실버 쉐도우" -> F="SM-F966N_512G", G="실버 쉐도우"
+      const modelParts = normalizedModel.split(' ');
+      let extractedF = '';
+      let extractedG = '';
+      
+      // 마지막 부분에서 F열 값 추출 (SM-으로 시작하는 부분)
+      for (let i = modelParts.length - 1; i >= 0; i--) {
+        if (modelParts[i].startsWith('SM-')) {
+          extractedF = modelParts[i];
+          // F열 값 앞의 색상 부분을 G열 값으로 추출
+          if (i > 0) {
+            extractedG = modelParts[i - 1];
+            // 색상이 두 단어일 수 있음 (예: "실버 쉐도우")
+            if (i > 1 && !modelParts[i - 2].startsWith('SM-') && !modelParts[i - 2].includes('G')) {
+              extractedG = modelParts[i - 2] + ' ' + modelParts[i - 1];
+            }
+          }
+          break;
         }
       }
+      
+      console.log(`정규화된 모델 "${normalizedModel}" -> F="${extractedF}", G="${extractedG}"`);
+      
+      // 추출된 F열, G열 값으로 폰클재고데이터에서 수량 찾기
+      let totalQuantity = 0;
+      inventoryData.forEach(item => {
+        if (item.originalF === extractedF && item.originalG === extractedG) {
+          totalQuantity += item.quantity;
+          if (item.quantity > 0) {
+            quantityDebug.push({
+              model: normalizedModel,
+              originalF: item.originalF,
+              originalG: item.originalG,
+              quantity: item.quantity
+            });
+          }
+        }
+      });
+      
+      inventoryByModel[normalizedModel] = totalQuantity;
     });
     
     console.log('수량이 있는 정규화된 재고 항목들:', quantityDebug.slice(0, 10));
