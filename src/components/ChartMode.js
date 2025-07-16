@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   AppBar,
@@ -10,15 +10,38 @@ import {
   Tabs,
   Tab,
   Card,
-  CardContent
+  CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Alert,
+  CircularProgress,
+  Chip,
+  Grid,
+  IconButton,
+  Collapse
 } from '@mui/material';
 import {
   BarChart as BarChartIcon,
   SwapHoriz as SwapHorizIcon,
   AccountBalance as AccountBalanceIcon,
   Image as ImageIcon,
-  TableChart as TableChartIcon
+  TableChart as TableChartIcon,
+  CloudUpload as CloudUploadIcon,
+  Close as CloseIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
+import { createWorker } from 'tesseract.js';
 
 function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = useState(0);
@@ -138,6 +161,213 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
 // 채권장표 탭 컴포넌트
 function BondChartTab() {
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [processedData, setProcessedData] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showDataDialog, setShowDataDialog] = useState(false);
+  const [editingData, setEditingData] = useState(null);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const fileInputRef = useRef(null);
+
+  // 이미지 업로드 처리
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+      setMessage({ type: 'error', text: '이미지 파일만 업로드 가능합니다.' });
+      return;
+    }
+
+    const newImages = imageFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      file,
+      name: file.name,
+      preview: URL.createObjectURL(file),
+      status: 'pending' // pending, processing, completed, error
+    }));
+
+    setUploadedImages(prev => [...prev, ...newImages]);
+    setMessage({ type: 'success', text: `${imageFiles.length}개의 이미지가 업로드되었습니다.` });
+  };
+
+  // OCR 처리
+  const processImageWithOCR = async (imageData) => {
+    try {
+      const worker = await createWorker('kor+eng');
+      const { data: { text } } = await worker.recognize(imageData.file);
+      await worker.terminate();
+      
+      return text;
+    } catch (error) {
+      console.error('OCR 처리 오류:', error);
+      throw new Error('OCR 처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 텍스트에서 채권 데이터 파싱
+  const parseBondData = (text) => {
+    const data = {
+      date: new Date().toISOString().split('T')[0],
+      terminalBonds: [],
+      inventoryBonds: [],
+      collateralBonds: [],
+      totalAmount: 0,
+      notes: ''
+    };
+
+    // 날짜 추출 (YYYY-MM-DD, YYYY/MM/DD, MM/DD 등)
+    const datePatterns = [
+      /(\d{4})[-/](\d{1,2})[-/](\d{1,2})/g,
+      /(\d{1,2})[-/](\d{1,2})/g
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        data.date = match[0];
+        break;
+      }
+    }
+
+    // 단말기채권 추출
+    const terminalPattern = /단말기[^\d]*(\d+)[^\d]*(\d{1,3}(?:,\d{3})*)/g;
+    let match;
+    while ((match = terminalPattern.exec(text)) !== null) {
+      data.terminalBonds.push({
+        terminal: match[1],
+        amount: parseInt(match[2].replace(/,/g, ''))
+      });
+    }
+
+    // 재고초과채권 추출
+    const inventoryPattern = /재고[^\d]*(\d+)[^\d]*(\d{1,3}(?:,\d{3})*)/g;
+    while ((match = inventoryPattern.exec(text)) !== null) {
+      data.inventoryBonds.push({
+        quantity: parseInt(match[1]),
+        amount: parseInt(match[2].replace(/,/g, ''))
+      });
+    }
+
+    // 담보초과채권 추출
+    const collateralPattern = /담보[^\d]*(\d{1,3}(?:,\d{3})*)/g;
+    while ((match = collateralPattern.exec(text)) !== null) {
+      data.collateralBonds.push({
+        amount: parseInt(match[1].replace(/,/g, ''))
+      });
+    }
+
+    // 총액 계산
+    const allAmounts = [
+      ...data.terminalBonds.map(b => b.amount),
+      ...data.inventoryBonds.map(b => b.amount),
+      ...data.collateralBonds.map(b => b.amount)
+    ];
+    data.totalAmount = allAmounts.reduce((sum, amount) => sum + amount, 0);
+
+    return data;
+  };
+
+  // 이미지 처리 시작
+  const startProcessing = async () => {
+    if (uploadedImages.length === 0) {
+      setMessage({ type: 'warning', text: '처리할 이미지가 없습니다.' });
+      return;
+    }
+
+    setIsProcessing(true);
+    setMessage({ type: 'info', text: '이미지 처리 중입니다...' });
+
+    try {
+      const results = [];
+      
+      for (const image of uploadedImages) {
+        // 이미지 상태 업데이트
+        setUploadedImages(prev => 
+          prev.map(img => 
+            img.id === image.id 
+              ? { ...img, status: 'processing' }
+              : img
+          )
+        );
+
+        try {
+          // OCR 처리
+          const ocrText = await processImageWithOCR(image);
+          
+          // 데이터 파싱
+          const parsedData = parseBondData(ocrText);
+          
+          results.push({
+            id: image.id,
+            imageName: image.name,
+            ocrText,
+            parsedData,
+            status: 'completed'
+          });
+
+          // 이미지 상태 업데이트
+          setUploadedImages(prev => 
+            prev.map(img => 
+              img.id === image.id 
+                ? { ...img, status: 'completed' }
+                : img
+            )
+          );
+
+        } catch (error) {
+          console.error(`이미지 ${image.name} 처리 오류:`, error);
+          
+          setUploadedImages(prev => 
+            prev.map(img => 
+              img.id === image.id 
+                ? { ...img, status: 'error' }
+                : img
+            )
+          );
+        }
+      }
+
+      setProcessedData(results);
+      setMessage({ type: 'success', text: '이미지 처리가 완료되었습니다.' });
+      
+    } catch (error) {
+      console.error('처리 오류:', error);
+      setMessage({ type: 'error', text: '이미지 처리 중 오류가 발생했습니다.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 데이터 편집
+  const handleEditData = (data) => {
+    setEditingData(data);
+    setShowDataDialog(true);
+  };
+
+  // 데이터 저장
+  const handleSaveData = () => {
+    if (!editingData) return;
+
+    setProcessedData(prev => 
+      prev.map(item => 
+        item.id === editingData.id 
+          ? { ...item, parsedData: editingData.parsedData }
+          : item
+      )
+    );
+
+    setShowDataDialog(false);
+    setEditingData(null);
+    setMessage({ type: 'success', text: '데이터가 저장되었습니다.' });
+  };
+
+  // 이미지 삭제
+  const handleDeleteImage = (imageId) => {
+    setUploadedImages(prev => prev.filter(img => img.id !== imageId));
+    setProcessedData(prev => prev.filter(data => data.id !== imageId));
+  };
+
   return (
     <Box>
       <Typography variant="h4" component="h1" sx={{ mb: 3, fontWeight: 'bold', color: '#f5576c' }}>
@@ -148,63 +378,186 @@ function BondChartTab() {
         이미지 업로드를 통한 채권 데이터 수집 및 관리
       </Typography>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: 4 }}>
+      {/* 메시지 표시 */}
+      {message.text && (
+        <Alert severity={message.type} sx={{ mb: 3 }} onClose={() => setMessage({ type: '', text: '' })}>
+          {message.text}
+        </Alert>
+      )}
+
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* 이미지 업로드 카드 */}
-        <Card elevation={3} sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <ImageIcon sx={{ fontSize: 32, color: '#f5576c', mr: 2 }} />
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                이미지 업로드
+        <Grid item xs={12} md={6}>
+          <Card elevation={3} sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <ImageIcon sx={{ fontSize: 32, color: '#f5576c', mr: 2 }} />
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                  이미지 업로드
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                채권 관련 이미지를 업로드하여 OCR로 데이터를 추출합니다.
               </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              채권 관련 이미지를 업로드하여 OCR로 데이터를 추출합니다.
-            </Typography>
-            <Button
-              variant="contained"
-              fullWidth
-              sx={{
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #e085e8 0%, #e04a5f 100%)'
-                }
-              }}
-            >
-              이미지 선택
-            </Button>
-          </CardContent>
-        </Card>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: 'none' }}
+              />
+              
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<CloudUploadIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                sx={{
+                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #e085e8 0%, #e04a5f 100%)'
+                  }
+                }}
+              >
+                이미지 선택
+              </Button>
+
+              {/* 업로드된 이미지 목록 */}
+              {uploadedImages.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    업로드된 이미지 ({uploadedImages.length})
+                  </Typography>
+                  {uploadedImages.map((image) => (
+                    <Box key={image.id} sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      p: 1, 
+                      mb: 1, 
+                      border: '1px solid #ddd',
+                      borderRadius: 1,
+                      backgroundColor: '#f9f9f9'
+                    }}>
+                      <img 
+                        src={image.preview} 
+                        alt={image.name}
+                        style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, marginRight: 8 }}
+                      />
+                      <Typography variant="body2" sx={{ flex: 1, fontSize: '0.8rem' }}>
+                        {image.name}
+                      </Typography>
+                      <Chip 
+                        label={image.status === 'pending' ? '대기' : 
+                               image.status === 'processing' ? '처리중' :
+                               image.status === 'completed' ? '완료' : '오류'}
+                        color={image.status === 'completed' ? 'success' : 
+                               image.status === 'error' ? 'error' : 'default'}
+                        size="small"
+                        sx={{ mr: 1 }}
+                      />
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDeleteImage(image.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    onClick={startProcessing}
+                    disabled={isProcessing || uploadedImages.length === 0}
+                    startIcon={isProcessing ? <CircularProgress size={16} /> : null}
+                    sx={{ mt: 2 }}
+                  >
+                    {isProcessing ? '처리 중...' : 'OCR 처리 시작'}
+                  </Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
 
         {/* 데이터 관리 카드 */}
-        <Card elevation={3} sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <TableChartIcon sx={{ fontSize: 32, color: '#f5576c', mr: 2 }} />
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                데이터 관리
+        <Grid item xs={12} md={6}>
+          <Card elevation={3} sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <TableChartIcon sx={{ fontSize: 32, color: '#f5576c', mr: 2 }} />
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                  데이터 관리
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                추출된 데이터를 확인하고 편집할 수 있습니다.
               </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              추출된 데이터를 확인하고 편집할 수 있습니다.
-            </Typography>
-            <Button
-              variant="outlined"
-              fullWidth
-              sx={{
-                borderColor: '#f5576c',
-                color: '#f5576c',
-                '&:hover': {
-                  borderColor: '#e04a5f',
-                  backgroundColor: 'rgba(245, 87, 108, 0.04)'
-                }
-              }}
-            >
-              데이터 보기
-            </Button>
-          </CardContent>
-        </Card>
-      </Box>
+              
+              {processedData.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    처리된 데이터 ({processedData.length})
+                  </Typography>
+                  {processedData.map((data) => (
+                    <Box key={data.id} sx={{ 
+                      p: 2, 
+                      mb: 1, 
+                      border: '1px solid #ddd',
+                      borderRadius: 1,
+                      backgroundColor: '#f9f9f9'
+                    }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {data.imageName}
+                        </Typography>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleEditData(data)}
+                          color="primary"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        총액: {data.parsedData.totalAmount?.toLocaleString()}원
+                      </Typography>
+                    </Box>
+                  ))}
+                  
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    onClick={() => setShowDataDialog(true)}
+                    sx={{ mt: 2 }}
+                  >
+                    전체 데이터 보기
+                  </Button>
+                </Box>
+              ) : (
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  disabled
+                  sx={{
+                    borderColor: '#f5576c',
+                    color: '#f5576c',
+                    '&:hover': {
+                      borderColor: '#e04a5f',
+                      backgroundColor: 'rgba(245, 87, 108, 0.04)'
+                    }
+                  }}
+                >
+                  데이터 없음
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* 기능 설명 */}
       <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -212,8 +565,8 @@ function BondChartTab() {
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
             주요 기능
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-            <Box>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                 📸 이미지 OCR
               </Typography>
@@ -222,8 +575,8 @@ function BondChartTab() {
                 • 무료 OCR 기술로 텍스트 자동 추출<br/>
                 • 다중 이미지 동시 처리 지원
               </Typography>
-            </Box>
-            <Box>
+            </Grid>
+            <Grid item xs={12} md={6}>
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                 📊 자동 표 생성
               </Typography>
@@ -232,10 +585,145 @@ function BondChartTab() {
                 • 일자별 데이터 그룹핑 및 관리<br/>
                 • 통계 및 분석 기능 제공
               </Typography>
-            </Box>
-          </Box>
+            </Grid>
+          </Grid>
         </CardContent>
       </Card>
+
+      {/* 데이터 편집 다이얼로그 */}
+      <Dialog 
+        open={showDataDialog} 
+        onClose={() => setShowDataDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">데이터 편집</Typography>
+            <IconButton onClick={() => setShowDataDialog(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {editingData && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                {editingData.imageName}
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="날짜"
+                    value={editingData.parsedData.date || ''}
+                    onChange={(e) => setEditingData(prev => ({
+                      ...prev,
+                      parsedData: { ...prev.parsedData, date: e.target.value }
+                    }))}
+                    fullWidth
+                    sx={{ mb: 2 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="총액"
+                    value={editingData.parsedData.totalAmount?.toLocaleString() || ''}
+                    fullWidth
+                    sx={{ mb: 2 }}
+                    InputProps={{ readOnly: true }}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* 단말기채권 */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                단말기채권
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>단말기</TableCell>
+                      <TableCell>금액</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {editingData.parsedData.terminalBonds?.map((bond, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{bond.terminal}</TableCell>
+                        <TableCell>{bond.amount?.toLocaleString()}원</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* 재고초과채권 */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                재고초과채권
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>수량</TableCell>
+                      <TableCell>금액</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {editingData.parsedData.inventoryBonds?.map((bond, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{bond.quantity}</TableCell>
+                        <TableCell>{bond.amount?.toLocaleString()}원</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* 담보초과채권 */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                담보초과채권
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>금액</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {editingData.parsedData.collateralBonds?.map((bond, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{bond.amount?.toLocaleString()}원</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              <TextField
+                label="메모"
+                value={editingData.parsedData.notes || ''}
+                onChange={(e) => setEditingData(prev => ({
+                  ...prev,
+                  parsedData: { ...prev.parsedData, notes: e.target.value }
+                }))}
+                fullWidth
+                multiline
+                rows={3}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDataDialog(false)}>취소</Button>
+          <Button onClick={handleSaveData} variant="contained" startIcon={<SaveIcon />}>
+            저장
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
