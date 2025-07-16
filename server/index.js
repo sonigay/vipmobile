@@ -6314,31 +6314,18 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       }
     });
 
-    // 각 그룹 내에서 담당자별 정렬 후 POS명별 정렬
-    Object.keys(groupedByStore).forEach(storeCode => {
-      groupedByStore[storeCode].sort((a, b) => {
-        // 먼저 담당자로 정렬
-        if (a.agent !== b.agent) {
-          return (a.agent || '').localeCompare(b.agent || '');
-        }
-        // 담당자가 같으면 POS명으로 정렬
-        return (a.posName || '').localeCompare(b.posName || '');
-      });
-    });
-
-    // 담당자별로 그룹화하고 POS명별로 서브 그룹화
-    const groupedByAgent = {};
+    // 대리점코드별로 담당자별 그룹화 및 카운팅
+    const groupedByStoreWithAgent = {};
     
     Object.keys(groupedByStore).forEach(storeCode => {
-      groupedByStore[storeCode].forEach(item => {
+      const storeData = groupedByStore[storeCode];
+      groupedByStoreWithAgent[storeCode] = {};
+      
+      storeData.forEach(item => {
         const agent = item.agent || '미배정';
         
-        if (!groupedByAgent[agent]) {
-          groupedByAgent[agent] = {};
-        }
-        
-        if (!groupedByAgent[agent][item.posName]) {
-          groupedByAgent[agent][item.posName] = {
+        if (!groupedByStoreWithAgent[storeCode][agent]) {
+          groupedByStoreWithAgent[storeCode][agent] = {
             received: 0,
             notReceived: 0,
             total: 0,
@@ -6348,20 +6335,53 @@ app.get('/api/sales-by-store/data', async (req, res) => {
         
         // 서류접수 상태에 따라 카운팅
         if (item.isDocumentReceived) {
-          groupedByAgent[agent][item.posName].received++;
+          groupedByStoreWithAgent[storeCode][agent].received++;
         } else {
-          groupedByAgent[agent][item.posName].notReceived++;
+          groupedByStoreWithAgent[storeCode][agent].notReceived++;
         }
         
-        groupedByAgent[agent][item.posName].total++;
-        groupedByAgent[agent][item.posName].items.push(item);
+        groupedByStoreWithAgent[storeCode][agent].total++;
+        groupedByStoreWithAgent[storeCode][agent].items.push(item);
+      });
+    });
+
+    // 담당자별로 그룹화하고 POS명별로 서브 그룹화
+    const groupedByAgent = {};
+    
+    Object.keys(groupedByStore).forEach(storeCode => {
+      groupedByStore[storeCode].forEach(item => {
+        const agent = item.agent || '미배정';
+        const posName = item.posName || '미지정';
+        
+        if (!groupedByAgent[agent]) {
+          groupedByAgent[agent] = {};
+        }
+        
+        if (!groupedByAgent[agent][posName]) {
+          groupedByAgent[agent][posName] = {
+            received: 0,
+            notReceived: 0,
+            total: 0,
+            items: []
+          };
+        }
+        
+        // 서류접수 상태에 따라 카운팅
+        if (item.isDocumentReceived) {
+          groupedByAgent[agent][posName].received++;
+        } else {
+          groupedByAgent[agent][posName].notReceived++;
+        }
+        
+        groupedByAgent[agent][posName].total++;
+        groupedByAgent[agent][posName].items.push(item);
       });
     });
 
     const result = {
       success: true,
       data: {
-        byStore: groupedByStore,
+        byStore: groupedByStoreWithAgent,
         byAgent: groupedByAgent
       },
       stats: {

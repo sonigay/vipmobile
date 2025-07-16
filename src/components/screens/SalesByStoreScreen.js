@@ -156,6 +156,16 @@ function SalesByStoreScreen({ loggedInStore }) {
     loadData();
   }, []);
 
+  // 디버깅용: 데이터 구조 확인
+  useEffect(() => {
+    if (data.byAgent && Object.keys(data.byAgent).length > 0) {
+      console.log('담당자별 데이터 구조:', data.byAgent);
+      Object.entries(data.byAgent).forEach(([agent, agentData]) => {
+        console.log(`${agent} 담당자의 POS 목록:`, Object.keys(agentData));
+      });
+    }
+  }, [data.byAgent]);
+
   // 데이터 목록
   const storeCodes = Object.keys(data.byStore);
   const agents = Object.keys(data.byAgent);
@@ -266,65 +276,17 @@ function SalesByStoreScreen({ loggedInStore }) {
                 }
               }}
             >
-              {storeCodes.map((storeCode, index) => (
-                <Tab
-                  key={storeCode}
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <StoreIcon fontSize="small" />
-                      {storeCode}
-                      <Chip
-                        label={data.byStore[storeCode]?.length || 0}
-                        size="small"
-                        color="primary"
-                        sx={{ fontSize: '0.7rem', height: 20 }}
-                      />
-                    </Box>
-                  }
-                  sx={{
-                    '&.Mui-selected': {
-                      color: '#ff9a9e'
-                    }
-                  }}
-                />
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 담당자별 탭 */}
-      {viewMode === 'agent' && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-              담당자별 정리
-            </Typography>
-            
-            <Tabs
-              value={selectedAgent}
-              onChange={(event, newValue) => setSelectedAgent(newValue)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{
-                '& .MuiTab-root': {
-                  minHeight: 48,
-                  fontSize: '0.9rem',
-                  fontWeight: 500
-                }
-              }}
-            >
-              {agents.map((agent, index) => {
-                const agentData = data.byAgent[agent] || {};
-                const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+              {storeCodes.map((storeCode, index) => {
+                const storeData = data.byStore[storeCode] || {};
+                const totalItems = Object.values(storeData).reduce((sum, agentData) => sum + agentData.total, 0);
                 
                 return (
                   <Tab
-                    key={agent}
+                    key={storeCode}
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PersonIcon fontSize="small" />
-                        {agent}
+                        <StoreIcon fontSize="small" />
+                        {storeCode}
                         <Chip
                           label={totalItems}
                           size="small"
@@ -346,75 +308,112 @@ function SalesByStoreScreen({ loggedInStore }) {
         </Card>
       )}
 
+      {/* 담당자별 탭 - 컴팩트 버전 */}
+      {viewMode === 'agent' && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              담당자별 정리
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {agents.map((agent, index) => {
+                const agentData = data.byAgent[agent] || {};
+                const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+                const isSelected = index === selectedAgent;
+                
+                return (
+                  <Button
+                    key={agent}
+                    variant={isSelected ? 'contained' : 'outlined'}
+                    size="small"
+                    onClick={() => setSelectedAgent(index)}
+                    sx={{
+                      minWidth: 'auto',
+                      px: 2,
+                      py: 1,
+                      fontSize: '0.8rem',
+                      backgroundColor: isSelected ? '#ff9a9e' : undefined,
+                      '&:hover': {
+                        backgroundColor: isSelected ? '#f48fb1' : undefined
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <PersonIcon fontSize="small" />
+                      <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                        {agent}
+                      </Typography>
+                      <Chip
+                        label={totalItems}
+                        size="small"
+                        color={isSelected ? 'default' : 'primary'}
+                        sx={{ fontSize: '0.6rem', height: 16, minWidth: 20 }}
+                      />
+                    </Box>
+                  </Button>
+                );
+              })}
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 대리점코드별 데이터 테이블 */}
       {viewMode === 'store' && (
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-              {currentStoreCode} - POS별 정리
+              {currentStoreCode} - 담당자별 정리
             </Typography>
             
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell width="200px">POS명</TableCell>
-                    <TableCell width="150px">담당자</TableCell>
-                    <TableCell width="120px">서류접수</TableCell>
-                    <TableCell>예약번호</TableCell>
+                    <TableCell width="200px">담당자</TableCell>
+                    <TableCell width="120px" align="center">서류접수</TableCell>
+                    <TableCell width="120px" align="center">서류미접수</TableCell>
+                    <TableCell width="100px" align="center">합계</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {currentStoreData.map((item, index) => (
-                    <TableRow key={index} hover>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {item.posName || '-'}
-                        </Typography>
-                      </TableCell>
+                  {Object.entries(currentStoreData).map(([agent, agentData]) => (
+                    <TableRow key={agent} hover>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {item.agent ? (
-                            <Chip
-                              label={item.agent}
-                              color="primary"
-                              size="small"
-                              icon={<PersonIcon />}
-                              sx={{ fontSize: '0.8rem' }}
-                            />
-                          ) : (
-                            <Chip
-                              label="미배정"
-                              color="default"
-                              size="small"
-                              variant="outlined"
-                              sx={{ fontSize: '0.8rem' }}
-                            />
-                          )}
-                          <Tooltip title="담당자 수정">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEditAgent(item)}
-                              sx={{ p: 0.5 }}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Chip
+                            label={agent}
+                            color="primary"
+                            size="small"
+                            icon={<PersonIcon />}
+                            sx={{ fontSize: '0.8rem' }}
+                          />
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell align="center">
                         <Chip
-                          label={item.isDocumentReceived ? '접수완료' : '미접수'}
-                          color={item.isDocumentReceived ? 'success' : 'warning'}
-                          icon={item.isDocumentReceived ? <CheckCircleIcon /> : <WarningIcon />}
+                          label={agentData.received}
+                          color="success"
                           size="small"
-                          sx={{ fontSize: '0.8rem' }}
+                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {item.reservationNumber || '-'}
-                        </Typography>
+                      <TableCell align="center">
+                        <Chip
+                          label={agentData.notReceived}
+                          color="warning"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={agentData.total}
+                          color="primary"
+                          size="small"
+                          sx={{ fontSize: '0.8rem', minWidth: 40, fontWeight: 'bold' }}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -427,28 +426,28 @@ function SalesByStoreScreen({ loggedInStore }) {
               <Grid container spacing={2}>
                 <Grid item xs={6} md={3}>
                   <Chip
-                    label={`총 ${currentStoreData.length}건`}
+                    label={`총 담당자: ${Object.keys(currentStoreData).length}명`}
                     color="primary"
                     variant="outlined"
                   />
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Chip
-                    label={`담당자 배정: ${currentStoreData.filter(item => item.agent).length}건`}
+                    label={`총 건수: ${Object.values(currentStoreData).reduce((sum, agentData) => sum + agentData.total, 0)}건`}
                     color="info"
                     variant="outlined"
                   />
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Chip
-                    label={`서류접수: ${currentStoreData.filter(item => item.isDocumentReceived).length}건`}
+                    label={`서류접수: ${Object.values(currentStoreData).reduce((sum, agentData) => sum + agentData.received, 0)}건`}
                     color="success"
                     variant="outlined"
                   />
                 </Grid>
                 <Grid item xs={6} md={3}>
                   <Chip
-                    label={`미접수: ${currentStoreData.filter(item => !item.isDocumentReceived).length}건`}
+                    label={`미접수: ${Object.values(currentStoreData).reduce((sum, agentData) => sum + agentData.notReceived, 0)}건`}
                     color="warning"
                     variant="outlined"
                   />
