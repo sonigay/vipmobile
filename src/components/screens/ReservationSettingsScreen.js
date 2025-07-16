@@ -37,7 +37,8 @@ import {
   ExpandLess as ExpandLessIcon,
   List as ListIcon,
   Add as AddIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 
 function ReservationSettingsScreen({ loggedInStore }) {
