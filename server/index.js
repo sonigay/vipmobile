@@ -7239,6 +7239,16 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
       const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
       console.log(`${agent} 담당자: ${Object.keys(agentData).length}개 POS, 총 ${totalItems}건, 접수 ${totalReceived}건`);
+      
+      // POS명 상세 로그 (처음 10개만)
+      const posNames = Object.keys(agentData);
+      console.log(`  POS명 목록: ${posNames.slice(0, 10).join(', ')}${posNames.length > 10 ? `... (총 ${posNames.length}개)` : ''}`);
+      
+      // 서류접수 상세 로그
+      posNames.slice(0, 5).forEach(posName => {
+        const posData = agentData[posName];
+        console.log(`    ${posName}: 접수 ${posData.received}, 미접수 ${posData.notReceived}, 총 ${posData.total}`);
+      });
     });
 
     const result = {

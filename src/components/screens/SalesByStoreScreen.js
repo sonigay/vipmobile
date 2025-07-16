@@ -80,6 +80,22 @@ function SalesByStoreScreen({ loggedInStore }) {
       
       if (result.success) {
         setData(result.data);
+        
+        // 디버깅 로그 추가
+        console.log('판매처별정리 데이터 로드 완료:', {
+          byStore: Object.keys(result.data.byStore || {}).length,
+          byAgent: Object.keys(result.data.byAgent || {}).length
+        });
+        
+        // 담당자별 데이터 상세 로그
+        Object.entries(result.data.byAgent || {}).forEach(([agent, agentData]) => {
+          const posNames = Object.keys(agentData);
+          const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+          const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+          console.log(`클라이언트 ${agent}: ${posNames.length}개 POS, 총 ${totalItems}건, 접수 ${totalReceived}건`);
+          console.log(`  POS명: ${posNames.slice(0, 10).join(', ')}${posNames.length > 10 ? `... (총 ${posNames.length}개)` : ''}`);
+        });
+        
         if (Object.keys(result.data).length > 0) {
           setSelectedStore(0);
         }
@@ -800,8 +816,15 @@ function SalesByStoreScreen({ loggedInStore }) {
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-              {currentAgentName} - POS별 정리
+              {currentAgentName} - POS별 정리 (총 {Object.keys(currentAgentData).length}개 POS)
             </Typography>
+            
+            {/* 디버깅 정보 */}
+            <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                디버깅: {currentAgentName} 담당자의 POS 데이터 - 총 {Object.keys(currentAgentData).length}개 POS
+              </Typography>
+            </Box>
             
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
