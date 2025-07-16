@@ -3197,16 +3197,11 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
         console.log(`행 ${index + 1} 데이터: P="${pValue}", Q="${qValue}", R="${rValue}", 예약번호="${reservationNumber}"`);
       }
       
-      if (!pValue || !qValue || !rValue) {
+      if (!pValue || !qValue || !rValue || !reservationNumber) {
         if (index < 10) {
           console.log(`행 ${index + 1}: 필수 데이터 누락 - P:${!!pValue}, Q:${!!qValue}, R:${!!rValue}, 예약번호:${!!reservationNumber}`);
         }
         return;
-      }
-      
-      // 예약번호가 없어도 모델색상별 정리는 가능하도록 허용
-      if (!reservationNumber && index < 10) {
-        console.log(`행 ${index + 1}: 예약번호 없음 - 모델색상 정리만 진행`);
       }
       
       processedCount++;
@@ -3248,16 +3243,11 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       stats.total++;
       
       // 서류접수 여부 확인 (폰클개통데이터에서 예약번호 매칭)
-      let isReceived = false;
-      
-      if (reservationNumber) {
-        // 예약번호가 있는 경우에만 매칭 시도
-        isReceived = phoneklValues.slice(1).some(phoneklRow => {
-          if (phoneklRow.length < 70) return false;
-          const phoneklReservationNumber = (phoneklRow[68] || '').toString().trim(); // BO열: 메모1
-          return phoneklReservationNumber === reservationNumber;
-        });
-      }
+      const isReceived = phoneklValues.slice(1).some(phoneklRow => {
+        if (phoneklRow.length < 70) return false;
+        const phoneklReservationNumber = (phoneklRow[68] || '').toString().trim(); // BO열: 메모1
+        return phoneklReservationNumber === reservationNumber;
+      });
       
       if (isReceived) {
         stats.received++;
