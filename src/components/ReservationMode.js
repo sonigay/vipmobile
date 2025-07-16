@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   AppBar,
@@ -6,17 +6,68 @@ import {
   Typography,
   Button,
   Container,
-  Paper
+  Paper,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Event as EventIcon,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
+import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 
 function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
+  const [currentTab, setCurrentTab] = useState(0);
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
   const handleBackToMain = () => {
     // 메인 화면으로 돌아가기 (모드 선택 팝업 표시)
     window.location.reload();
+  };
+
+  // 탭 내용 렌더링
+  const renderTabContent = () => {
+    switch (currentTab) {
+      case 0: // 메인 탭
+        return (
+          <Container maxWidth="lg" sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 4, 
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+                color: 'white',
+                borderRadius: 3
+              }}
+            >
+              <EventIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
+              <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                사전예약 모드
+              </Typography>
+              <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+                준비 중입니다
+              </Typography>
+              <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
+                사전예약 및 일정 관리 기능이 개발 중입니다.<br />
+                빠른 시일 내에 서비스를 제공하겠습니다.
+              </Typography>
+            </Paper>
+          </Container>
+        );
+      case 1: // 사전예약정리 셋팅 탭
+        return (
+          <ReservationSettingsScreen 
+            loggedInStore={loggedInStore}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -58,31 +109,51 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
           </Button>
         </Toolbar>
       </AppBar>
+
+      {/* 탭 네비게이션 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
+        <Container maxWidth="lg">
+          <Tabs 
+            value={currentTab} 
+            onChange={handleTabChange}
+            sx={{
+              '& .MuiTab-root': {
+                minHeight: 64,
+                fontSize: '1rem',
+                fontWeight: 500
+              }
+            }}
+          >
+            <Tab 
+              label="메인" 
+              icon={<EventIcon />} 
+              iconPosition="start"
+              sx={{ 
+                minHeight: 64,
+                '&.Mui-selected': {
+                  color: '#ff9a9e'
+                }
+              }}
+            />
+            <Tab 
+              label="사전예약정리 셋팅" 
+              icon={<SettingsIcon />} 
+              iconPosition="start"
+              sx={{ 
+                minHeight: 64,
+                '&.Mui-selected': {
+                  color: '#ff9a9e'
+                }
+              }}
+            />
+          </Tabs>
+        </Container>
+      </Box>
       
-      <Container maxWidth="lg" sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 4, 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-            color: 'white',
-            borderRadius: 3
-          }}
-        >
-          <EventIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
-          <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
-            사전예약 모드
-          </Typography>
-          <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
-            준비 중입니다
-          </Typography>
-          <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
-            사전예약 및 일정 관리 기능이 개발 중입니다.<br />
-            빠른 시일 내에 서비스를 제공하겠습니다.
-          </Typography>
-        </Paper>
-      </Container>
+      {/* 탭 내용 */}
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        {renderTabContent()}
+      </Box>
     </Box>
   );
 }

@@ -5779,3 +5779,171 @@ app.get('/api/inspection/completion-status', async (req, res) => {
 
 // 서버 시작 코드는 1866번째 줄에 이미 존재합니다.
 // 중복된 서버 시작 코드 제거 
+
+// 사전예약 설정 관련 API
+
+// 사전예약 설정 데이터 로드 API
+app.get('/api/reservation-settings/data', async (req, res) => {
+  try {
+    // 사전예약사이트 시트에서 P, Q, R열 데이터 로드
+    let reservationSiteData = { pColumn: [], qColumn: [], rColumn: [] };
+    try {
+      const reservationResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트!P:R'
+      });
+      
+      if (reservationResponse.data.values && reservationResponse.data.values.length > 1) {
+        const rows = reservationResponse.data.values.slice(1); // 헤더 제거
+        const pValues = new Set();
+        const qValues = new Set();
+        const rValues = new Set();
+        
+        rows.forEach(row => {
+          if (row.length > 0 && row[0]) pValues.add(row[0].toString().trim());
+          if (row.length > 1 && row[1]) qValues.add(row[1].toString().trim());
+          if (row.length > 2 && row[2]) rValues.add(row[2].toString().trim());
+        });
+        
+        reservationSiteData = {
+          pColumn: Array.from(pValues).filter(v => v).sort(),
+          qColumn: Array.from(qValues).filter(v => v).sort(),
+          rColumn: Array.from(rValues).filter(v => v).sort()
+        };
+      }
+    } catch (error) {
+      console.log('사전예약사이트 시트 로드 실패:', error.message);
+    }
+
+    // 폰클재고데이터 시트에서 F, G열 데이터 로드
+    let phoneklData = { fColumn: [], gColumn: [] };
+    try {
+      const phoneklResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '폰클재고데이터!F:G'
+      });
+      
+      if (phoneklResponse.data.values && phoneklResponse.data.values.length > 1) {
+        const rows = phoneklResponse.data.values.slice(1); // 헤더 제거
+        const fValues = new Set();
+        const gValues = new Set();
+        
+        rows.forEach(row => {
+          if (row.length > 0 && row[0]) fValues.add(row[0].toString().trim());
+          if (row.length > 1 && row[1]) gValues.add(row[1].toString().trim());
+        });
+        
+        phoneklData = {
+          fColumn: Array.from(fValues).filter(v => v).sort(),
+          gColumn: Array.from(gValues).filter(v => v).sort()
+        };
+      }
+    } catch (error) {
+      console.log('폰클재고데이터 시트 로드 실패:', error.message);
+    }
+
+    res.json({
+      success: true,
+      reservationSite: reservationSiteData,
+      phonekl: phoneklData
+    });
+  } catch (error) {
+    console.error('사전예약 설정 데이터 로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load reservation settings data',
+      message: error.message
+    });
+  }
+});
+
+// 사전예약 설정 저장 API
+app.post('/api/reservation-settings/save', async (req, res) => {
+  try {
+    const { selectedValues, matchingResult } = req.body;
+    
+    // 정규화작업 시트에 저장
+    const saveData = [
+      [
+        new Date().toISOString(), // 저장일시
+        JSON.stringify(selectedValues), // 선택된 값들
+        JSON.stringify(matchingResult), // 매칭 결과
+        '사전예약 모델명 정규화' // 비고
+      ]
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '정규화작업!A:D',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: saveData
+      }
+    });
+
+    res.json({
+      success: true,
+      message: '설정이 성공적으로 저장되었습니다.'
+    });
+  } catch (error) {
+    console.error('사전예약 설정 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save reservation settings',
+      message: error.message
+    });
+  }
+});
+
+// 사전예약 설정 불러오기 API
+app.get('/api/reservation-settings/load', async (req, res) => {
+  try {
+    // 정규화작업 시트에서 최신 설정 불러오기
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정규화작업!A:D'
+      });
+      
+      if (response.data.values && response.data.values.length > 1) {
+        // 최신 설정 (마지막 행) 불러오기
+        const latestRow = response.data.values[response.data.values.length - 1];
+        
+        if (latestRow.length >= 3) {
+          const selectedValues = JSON.parse(latestRow[1] || '{}');
+          const matchingResult = JSON.parse(latestRow[2] || '{}');
+          
+          res.json({
+            success: true,
+            selectedValues,
+            matchingResult
+          });
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('정규화작업 시트 로드 실패:', error.message);
+    }
+
+    // 저장된 설정이 없는 경우 기본값 반환
+    res.json({
+      success: true,
+      selectedValues: {
+        reservationSite: { p: '', q: '', r: '' },
+        phonekl: { f: '', g: '' }
+      },
+      matchingResult: {
+        normalizedModel: '',
+        matchingStatus: '',
+        isMatched: false
+      }
+    });
+  } catch (error) {
+    console.error('사전예약 설정 불러오기 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load reservation settings',
+      message: error.message
+    });
+  }
+});
