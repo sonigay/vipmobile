@@ -6256,15 +6256,34 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     const yardHeaders = yardResponse.data.values[0];
     const yardData = yardResponse.data.values.slice(1);
 
+    // 담당자 이름 정규화 함수 (괄호 안 부서 정보 제거)
+    const normalizeAgentName = (agentName) => {
+      if (!agentName) return '';
+      // 괄호와 그 안의 내용 제거 (예: 홍기현(별도) -> 홍기현)
+      return agentName.replace(/\([^)]*\)/g, '').trim();
+    };
+
     // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
     const storeAgentMap = new Map();
+    const agentNormalizationMap = new Map(); // 정규화된 이름 -> 원본 이름 매핑
+    
     phoneklData.forEach(row => {
       const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
       const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
       if (storeCode && agent) {
-        storeAgentMap.set(storeCode, agent);
+        const normalizedAgent = normalizeAgentName(agent);
+        
+        // 정규화된 이름으로 매핑 저장
+        storeAgentMap.set(storeCode, normalizedAgent);
+        
+        // 정규화된 이름 -> 원본 이름 매핑 저장 (첫 번째 발견된 원본 이름 사용)
+        if (!agentNormalizationMap.has(normalizedAgent)) {
+          agentNormalizationMap.set(normalizedAgent, agent);
+        }
       }
     });
+
+    console.log('담당자 정규화 매핑:', Object.fromEntries(agentNormalizationMap));
 
     // 마당접수에서 예약번호 추출 (정규표현식 사용)
     const yardReservationMap = new Set();
@@ -6297,7 +6316,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
       const storeCodeForLookup = row[21] || ''; // V열 (22번째, 0부터 시작)
       
-      // 담당자 매칭 (VLOOKUP 방식)
+      // 담당자 매칭 (VLOOKUP 방식) - 정규화된 이름 사용
       let agent = storeAgentMap.get(storeCodeForLookup) || '';
       
       // 서류접수 상태 확인
@@ -6388,7 +6407,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 담당자별로 그룹화하고 POS명별로 서브 그룹화
     const groupedByAgent = {};
     
-    // 모든 데이터를 담당자별로 그룹화
+    // 모든 데이터를 담당자별로 그룹화 (정규화된 이름 사용)
     processedData.forEach(item => {
       const agent = item.agent || '미배정';
       const posName = item.posName || '미지정';
@@ -6419,7 +6438,9 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 
     // 디버깅용: 담당자별 POS 개수 확인
     Object.entries(groupedByAgent).forEach(([agent, agentData]) => {
-      console.log(`${agent} 담당자: ${Object.keys(agentData).length}개 POS`);
+      const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+      const totalReceived = Object.values(agentData).reduce((sum, posData) => sum + posData.received, 0);
+      console.log(`${agent} 담당자: ${Object.keys(agentData).length}개 POS, 총 ${totalItems}건, 접수 ${totalReceived}건`);
     });
 
     const result = {
