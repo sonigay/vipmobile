@@ -6268,12 +6268,16 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 
     // 마당접수에서 U열+V열 조합으로 예약번호 매핑 생성
     const yardReservationMap = new Set();
-    yardData.forEach(row => {
+    yardData.forEach((row, index) => {
       const uValue = row[20] || ''; // U열 (21번째, 0부터 시작)
       const vValue = row[21] || ''; // V열 (22번째, 0부터 시작)
       const combinedReservation = (uValue + vValue).replace(/-/g, ''); // 하이픈 제거
       if (combinedReservation) {
         yardReservationMap.add(combinedReservation);
+        // 처음 5개만 디버깅 로그
+        if (index < 5) {
+          console.log(`마당접수 행 ${index + 2}: U=${uValue}, V=${vValue}, 조합=${combinedReservation}`);
+        }
       }
     });
 
@@ -6296,12 +6300,13 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 
       // 디버깅용 로그 (처음 10개만)
       if (index < 10) {
-        console.log(`행 ${index + 2}: 예약번호=${reservationNumber}, 정규화=${normalizedReservationNumber}, 접수=${isDocumentReceived}`);
+        console.log(`사전예약 행 ${index + 2}: 예약번호=${reservationNumber}, 정규화=${normalizedReservationNumber}, 접수=${isDocumentReceived}, 담당자=${agent}`);
       }
 
       return {
         rowIndex: index + 2,
         posName,
+        storeName: posName, // 클라이언트 호환성
         storeCode,
         reservationNumber,
         storeCodeForLookup,
@@ -6313,6 +6318,24 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 
     console.log('총 처리된 데이터:', processedData.length);
     console.log('서류접수된 데이터:', processedData.filter(item => item.isDocumentReceived).length);
+    
+    // 서류접수 매칭 상세 분석
+    const receivedItems = processedData.filter(item => item.isDocumentReceived);
+    const notReceivedItems = processedData.filter(item => !item.isDocumentReceived);
+    
+    console.log('서류접수된 항목 샘플:', receivedItems.slice(0, 3).map(item => ({
+      예약번호: item.reservationNumber,
+      정규화: item.reservationNumber.replace(/-/g, ''),
+      담당자: item.agent,
+      POS명: item.posName
+    })));
+    
+    console.log('서류미접수 항목 샘플:', notReceivedItems.slice(0, 3).map(item => ({
+      예약번호: item.reservationNumber,
+      정규화: item.reservationNumber.replace(/-/g, ''),
+      담당자: item.agent,
+      POS명: item.posName
+    })));
 
     // 대리점코드별로 그룹화
     const groupedByStore = {};
