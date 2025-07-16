@@ -3162,14 +3162,24 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     const normalizationRules = normalizedData.normalizationRules || [];
     const ruleMap = new Map();
     
+    console.log(`정규화 규칙 수: ${normalizationRules.length}`);
+    
     normalizationRules.forEach(rule => {
       const key = `${rule.reservationSite}|${rule.phonekl}`;
       ruleMap.set(key, rule.normalizedModel);
+      console.log(`정규화 규칙 추가: ${key} -> ${rule.normalizedModel}`);
     });
+    
+    console.log(`정규화 규칙 매핑 완료: ${ruleMap.size}개 규칙`);
     
     // 5. 사전예약사이트 데이터 처리
     const reservationSiteRows = reservationSiteValues.slice(1); // 헤더 제거
     const modelColorStats = new Map(); // 모델색상별 통계
+    
+    console.log(`사전예약사이트 데이터 행 수: ${reservationSiteRows.length}`);
+    
+    let processedCount = 0;
+    let matchedCount = 0;
     
     reservationSiteRows.forEach((row, index) => {
       if (row.length < 20) return; // 최소 컬럼 수 확인
@@ -3181,11 +3191,19 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       
       if (!pValue || !qValue || !rValue || !reservationNumber) return;
       
+      processedCount++;
+      
       // 정규화된 모델명 찾기
       const originalKey = `${pValue}|${qValue}|${rValue}`;
       const normalizedModel = ruleMap.get(originalKey);
       
-      if (!normalizedModel) return; // 정규화되지 않은 모델은 제외
+      if (!normalizedModel) {
+        console.log(`정규화되지 않은 모델: ${originalKey}`);
+        return; // 정규화되지 않은 모델은 제외
+      }
+      
+      matchedCount++;
+      console.log(`정규화된 모델 매칭: ${originalKey} -> ${normalizedModel}`);
       
       // 모델과 색상 분리 (정규화된 모델명에서 색상 추출)
       const modelColorMatch = normalizedModel.match(/^(.+?)\s+([가-힣a-zA-Z0-9\s]+)$/);
@@ -3234,6 +3252,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       }));
     
     console.log(`모델색상별 정리 데이터 생성 완료: ${result.length}개 모델색상 조합`);
+    console.log(`처리된 데이터: ${processedCount}개, 매칭된 데이터: ${matchedCount}개`);
+    console.log(`모델색상 통계: ${modelColorStats.size}개 조합`);
     
     res.json({
       success: true,
