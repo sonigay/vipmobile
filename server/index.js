@@ -7625,6 +7625,23 @@ app.get('/api/inventory-analysis', async (req, res) => {
     // 4. 재고 현황 분석
     const inventoryAnalysis = {};
     
+    // 디버깅: 정규화 규칙 로그
+    console.log('=== 재고 현황 분석 디버깅 ===');
+    console.log('정규화 규칙 개수:', normalizationRules.length);
+    console.log('정규화 규칙 샘플:', normalizationRules.slice(0, 3));
+    
+    // 디버깅: 폰클재고데이터 정규화 결과
+    console.log('폰클재고데이터 총 개수:', inventoryData.length);
+    const normalizedInventoryCount = inventoryData.filter(item => item.normalizedModel).length;
+    console.log('정규화된 재고 데이터 개수:', normalizedInventoryCount);
+    console.log('정규화되지 않은 재고 데이터 샘플:', 
+      inventoryData.filter(item => !item.normalizedModel).slice(0, 5).map(item => ({
+        F: item.originalF,
+        G: item.originalG,
+        수량: item.quantity
+      }))
+    );
+    
     // 정규화된 모델별로 재고 수량 집계
     const inventoryByModel = {};
     inventoryData.forEach(item => {
@@ -7635,6 +7652,9 @@ app.get('/api/inventory-analysis', async (req, res) => {
         inventoryByModel[item.normalizedModel] += item.quantity;
       }
     });
+    
+    console.log('재고 모델별 집계 결과:', Object.keys(inventoryByModel).length, '개 모델');
+    console.log('재고 모델별 집계 샘플:', Object.entries(inventoryByModel).slice(0, 5));
     
     // 정규화된 모델별로 사전예약 건수 집계
     const reservationByModel = {};
