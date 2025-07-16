@@ -7593,23 +7593,33 @@ app.get('/api/inventory-analysis', async (req, res) => {
           
           // 폰클재고데이터의 F열, G열을 그대로 사용하여 정규화 규칙과 매칭
           let normalizedModel = '';
-          for (const rule of normalizationRules) {
-            const ruleParts = rule.phonekl.split(' | ');
-            if (ruleParts.length >= 2) {
-              const ruleF = ruleParts[0]; // 정규화 규칙의 F열 값
-              const ruleG = ruleParts[1]; // 정규화 규칙의 G열 값
-              
-              // 더 유연한 매칭: 부분 문자열 포함 또는 정확한 일치
-              const fMatch = !ruleF || fValue.trim() === ruleF.trim() || 
-                           fValue.trim().includes(ruleF.trim()) || 
-                           ruleF.trim().includes(fValue.trim());
-              const gMatch = !ruleG || gValue.trim() === ruleG.trim() || 
-                           gValue.trim().includes(ruleG.trim()) || 
-                           ruleG.trim().includes(gValue.trim());
-              
-              if (fMatch && gMatch) {
-                normalizedModel = rule.normalizedModel;
-                break;
+          
+          // 빈 값이나 헤더 행은 정규화하지 않음
+          if (!fValue.trim() || !gValue.trim() || 
+              fValue.trim() === '모델명' || gValue.trim() === '색상') {
+            normalizedModel = '';
+          } else {
+            for (const rule of normalizationRules) {
+              const ruleParts = rule.phonekl.split(' | ');
+              if (ruleParts.length >= 2) {
+                const ruleF = ruleParts[0]; // 정규화 규칙의 F열 값
+                const ruleG = ruleParts[1]; // 정규화 규칙의 G열 값
+                
+                // 빈 규칙 값은 매칭하지 않음
+                if (!ruleF.trim() || !ruleG.trim()) continue;
+                
+                // 더 유연한 매칭: 부분 문자열 포함 또는 정확한 일치
+                const fMatch = fValue.trim() === ruleF.trim() || 
+                             fValue.trim().includes(ruleF.trim()) || 
+                             ruleF.trim().includes(fValue.trim());
+                const gMatch = gValue.trim() === ruleG.trim() || 
+                             gValue.trim().includes(ruleG.trim()) || 
+                             ruleG.trim().includes(gValue.trim());
+                
+                if (fMatch && gMatch) {
+                  normalizedModel = rule.normalizedModel;
+                  break;
+                }
               }
             }
           }
@@ -7681,13 +7691,33 @@ app.get('/api/inventory-analysis', async (req, res) => {
     
     // 정규화된 모델별로 재고 수량 집계
     const inventoryByModel = {};
+    const quantityDebug = [];
+    
     inventoryData.forEach(item => {
       if (item.normalizedModel) {
         if (!inventoryByModel[item.normalizedModel]) {
           inventoryByModel[item.normalizedModel] = 0;
         }
         inventoryByModel[item.normalizedModel] += item.quantity;
+        
+        // 디버깅: 수량이 있는 항목들 기록
+        if (item.quantity > 0) {
+          quantityDebug.push({
+            model: item.normalizedModel,
+            originalF: item.originalF,
+            originalG: item.originalG,
+            quantity: item.quantity
+          });
+        }
       }
+    });
+    
+    console.log('수량이 있는 정규화된 재고 항목들:', quantityDebug.slice(0, 10));
+    console.log('전체 재고 수량 분포:', {
+      총항목수: inventoryData.length,
+      정규화된항목수: inventoryData.filter(item => item.normalizedModel).length,
+      수량있는항목수: inventoryData.filter(item => item.quantity > 0).length,
+      정규화되고수량있는항목수: inventoryData.filter(item => item.normalizedModel && item.quantity > 0).length
     });
     
     console.log('재고 모델별 집계 결과:', Object.keys(inventoryByModel).length, '개 모델');
