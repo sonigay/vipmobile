@@ -38,7 +38,8 @@ import {
   Person as PersonIcon,
   Store as StoreIcon,
   ColorLens as ColorLensIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 
 function SalesByStoreScreen({ loggedInStore }) {
@@ -61,6 +62,7 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [customerListData, setCustomerListData] = useState([]);
   const [loadingCustomerList, setLoadingCustomerList] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState({ type: '', value: '' });
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
 
   // 데이터 로드
   const loadData = async () => {
@@ -232,6 +234,157 @@ function SalesByStoreScreen({ loggedInStore }) {
       setMessage({ type: 'error', text: error.message });
     } finally {
       setLoadingCustomerList(false);
+    }
+  };
+
+  // 고객리스트 엑셀 다운로드 함수
+  const downloadCustomerListExcel = async () => {
+    if (customerListData.length === 0) {
+      setMessage({ type: 'warning', text: '다운로드할 데이터가 없습니다.' });
+      return;
+    }
+
+    setDownloadingExcel(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // XLSX 라이브러리 동적 import
+      const XLSX = await import('xlsx');
+      
+      // 헤더 정의
+      const headers = [
+        '고객명',
+        '예약번호',
+        '예약일시',
+        '접수일시',
+        '모델&색상',
+        '유형',
+        '대리점',
+        'POS명',
+        '예약메모',
+        '접수메모',
+        '접수자'
+      ];
+
+      // 데이터 준비
+      const excelData = customerListData.map(customer => [
+        customer.customerName || '',
+        customer.reservationNumber || '',
+        customer.reservationDateTime || '',
+        customer.receivedDateTime || '',
+        customer.model || '',
+        customer.type || '',
+        customer.storeCode || '',
+        customer.posName || '',
+        customer.reservationMemo || '',
+        customer.receivedMemo || '',
+        customer.receiver || ''
+      ]);
+
+      // 워크북 생성
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...excelData]);
+
+      // 컬럼 너비 설정
+      const colWidths = [
+        { wch: 15 }, // 고객명
+        { wch: 12 }, // 예약번호
+        { wch: 15 }, // 예약일시
+        { wch: 15 }, // 접수일시
+        { wch: 25 }, // 모델&색상
+        { wch: 10 }, // 유형
+        { wch: 12 }, // 대리점
+        { wch: 15 }, // POS명
+        { wch: 20 }, // 예약메모
+        { wch: 20 }, // 접수메모
+        { wch: 10 }  // 접수자
+      ];
+      ws['!cols'] = colWidths;
+
+      // 워크시트를 워크북에 추가
+      const sheetName = selectedFilter.type === 'pos' 
+        ? `${selectedFilter.value}_고객리스트`
+        : `${selectedFilter.value}_고객리스트`;
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+      // 파일명 생성
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const fileName = `${selectedFilter.value}_고객리스트_${timestamp}.xlsx`;
+
+      // 엑셀 파일 다운로드
+      XLSX.writeFile(wb, fileName);
+
+      setMessage({ type: 'success', text: `엑셀 파일 다운로드 완료: ${fileName}` });
+    } catch (error) {
+      console.error('엑셀 다운로드 오류:', error);
+      setMessage({ type: 'error', text: '엑셀 파일 다운로드에 실패했습니다.' });
+    } finally {
+      setDownloadingExcel(false);
+    }
+  };
+
+  // 모델색상별 정리 엑셀 다운로드 함수
+  const downloadModelColorExcel = async () => {
+    if (modelColorData.length === 0) {
+      setMessage({ type: 'warning', text: '다운로드할 데이터가 없습니다.' });
+      return;
+    }
+
+    setDownloadingExcel(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // XLSX 라이브러리 동적 import
+      const XLSX = await import('xlsx');
+      
+      // 헤더 정의
+      const headers = [
+        '랭크',
+        '모델색상',
+        '서류접수',
+        '서류미접수',
+        '합계'
+      ];
+
+      // 데이터 준비
+      const excelData = modelColorData.map(item => [
+        item.rank || '',
+        item.model || '',
+        item.received || 0,
+        item.notReceived || 0,
+        item.total || 0
+      ]);
+
+      // 워크북 생성
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...excelData]);
+
+      // 컬럼 너비 설정
+      const colWidths = [
+        { wch: 8 },  // 랭크
+        { wch: 35 }, // 모델색상
+        { wch: 12 }, // 서류접수
+        { wch: 12 }, // 서류미접수
+        { wch: 10 }  // 합계
+      ];
+      ws['!cols'] = colWidths;
+
+      // 워크시트를 워크북에 추가
+      XLSX.utils.book_append_sheet(wb, ws, '모델색상별_정리');
+
+      // 파일명 생성
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const fileName = `모델색상별_정리_${timestamp}.xlsx`;
+
+      // 엑셀 파일 다운로드
+      XLSX.writeFile(wb, fileName);
+
+      setMessage({ type: 'success', text: `엑셀 파일 다운로드 완료: ${fileName}` });
+    } catch (error) {
+      console.error('엑셀 다운로드 오류:', error);
+      setMessage({ type: 'error', text: '엑셀 파일 다운로드에 실패했습니다.' });
+    } finally {
+      setDownloadingExcel(false);
     }
   };
 
@@ -803,6 +956,19 @@ function SalesByStoreScreen({ loggedInStore }) {
                 >
                   {loadingModelColor ? <CircularProgress size={16} /> : '데이터 로드'}
                 </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<DownloadIcon />}
+                  onClick={downloadModelColorExcel}
+                  disabled={downloadingExcel || modelColorData.length === 0}
+                  sx={{ 
+                    backgroundColor: '#ff9a9e',
+                    '&:hover': { backgroundColor: '#ff8a8e' }
+                  }}
+                >
+                  {downloadingExcel ? <CircularProgress size={16} /> : '엑셀 다운로드'}
+                </Button>
                 {modelColorData.length > 0 && (
                   <Chip
                     label={`${modelColorData.length}개 모델색상 조합`}
@@ -934,17 +1100,32 @@ function SalesByStoreScreen({ loggedInStore }) {
               <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
                 {selectedFilter.type === 'pos' ? `${selectedFilter.value} 고객 리스트` : `${selectedFilter.value} 고객 리스트`}
               </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<CloseIcon />}
-                onClick={() => {
-                  setCustomerListData([]);
-                  setSelectedFilter({ type: '', value: '' });
-                }}
-                size="small"
-              >
-                닫기
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<DownloadIcon />}
+                  onClick={downloadCustomerListExcel}
+                  disabled={downloadingExcel || customerListData.length === 0}
+                  size="small"
+                  sx={{ 
+                    backgroundColor: '#ff9a9e',
+                    '&:hover': { backgroundColor: '#ff8a8e' }
+                  }}
+                >
+                  {downloadingExcel ? <CircularProgress size={16} /> : '엑셀 다운로드'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<CloseIcon />}
+                  onClick={() => {
+                    setCustomerListData([]);
+                    setSelectedFilter({ type: '', value: '' });
+                  }}
+                  size="small"
+                >
+                  닫기
+                </Button>
+              </Box>
             </Box>
             
             {loadingCustomerList ? (
