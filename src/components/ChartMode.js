@@ -89,22 +89,32 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const handleTabChange = (event, newValue) => {
+    // 채권장표 탭(0번)에 접근할 때 권한 체크
+    if (newValue === 0 && !loggedInStore?.modePermissions?.bondChart) {
+      alert('채권장표 메뉴에 대한 권한이 없습니다.');
+      return;
+    }
     setActiveTab(newValue);
   };
 
-  // 탭 구성
+  // 탭 구성 (권한에 따라 조건부 렌더링)
   const tabs = [
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab />
+      component: <BondChartTab />,
+      hasPermission: loggedInStore?.modePermissions?.bondChart
     },
     {
       label: '준비 중',
       icon: <BarChartIcon />,
-      component: <ComingSoonTab />
+      component: <ComingSoonTab />,
+      hasPermission: true // 준비 중 탭은 모든 사용자에게 표시
     }
   ];
+
+  // 권한이 있는 탭만 필터링
+  const availableTabs = tabs.filter(tab => tab.hasPermission);
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -171,7 +181,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               }
             }}
           >
-            {tabs.map((tab, index) => (
+            {availableTabs.map((tab, index) => (
               <Tab
                 key={index}
                 label={tab.label}
@@ -190,7 +200,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       {/* 탭 컨텐츠 */}
       <Container maxWidth="lg" sx={{ flex: 1, py: 3, overflow: 'auto' }}>
-        {tabs[activeTab].component}
+        {availableTabs[activeTab].component}
       </Container>
 
       {/* 업데이트 진행 팝업 */}

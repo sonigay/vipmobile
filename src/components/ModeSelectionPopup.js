@@ -84,14 +84,14 @@ const ModeSelectionPopup = ({
     },
     chart: {
       title: '장표 모드',
-      description: '장표 및 차트 생성 시스템',
-      icon: <BarChartIcon sx={{ fontSize: 40, color: '#e91e63' }} />,
-      color: '#e91e63',
+      description: '채권장표 및 기타 장표 기능 (권한에 따라 메뉴 제한)',
+      icon: <BarChartIcon sx={{ fontSize: 40, color: '#ff9800' }} />,
+      color: '#ff9800',
       features: [
-        '차트 및 그래프 생성',
-        '데이터 시각화',
-        '장표 템플릿 관리',
-        '보고서 자동 생성'
+        '채권장표 OCR 처리',
+        '이미지 업로드 및 분석',
+        '데이터 편집 및 저장',
+        '권한별 메뉴 접근 제어'
       ]
     },
     policy: {
