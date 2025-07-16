@@ -70,23 +70,23 @@ function ForceZoomUpdater({ forceZoomToStore }) {
             }
           }
           
-          // 재시도 로직 (최대 5회, 300ms 간격으로 늘림)
-          if (attemptCount < 5) {
-            setTimeout(() => attemptZoom(attemptCount + 1), 300);
+          // 재시도 로직 (최대 10회, 500ms 간격으로 늘림)
+          if (attemptCount < 10) {
+            setTimeout(() => attemptZoom(attemptCount + 1), 500);
           } else {
-            console.warn('ForceZoomUpdater 최대 재시도 횟수 초과');
+            console.warn('ForceZoomUpdater 최대 재시도 횟수 초과 - 지도가 아직 로드되지 않았습니다.');
           }
         } catch (error) {
           console.error('ForceZoomUpdater 오류:', error);
           // 오류 발생 시에도 재시도
-          if (attemptCount < 5) {
-            setTimeout(() => attemptZoom(attemptCount + 1), 300);
+          if (attemptCount < 10) {
+            setTimeout(() => attemptZoom(attemptCount + 1), 500);
           }
         }
       };
       
-      // 초기 시도
-      setTimeout(() => attemptZoom(), 200);
+      // 초기 시도 (지연 시간을 늘림)
+      setTimeout(() => attemptZoom(), 500);
     }
   }, [forceZoomToStore, map]);
   
