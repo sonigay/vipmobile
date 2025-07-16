@@ -2292,6 +2292,9 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // Git 커밋 히스토리를 구글시트에 자동 입력
           // console.log('Git 커밋 히스토리를 구글시트에 자동 입력합니다...');
     await updateGoogleSheetWithGitHistory();
+    
+    // 푸시 구독 정보 초기화
+    await initializePushSubscriptions();
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
   }
@@ -2663,26 +2666,25 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
       secondRow: agentData?.[1]
     });
     
-    if (agentData && agentData.length > 1) {
-      // 헤더 제외하고 데이터 파싱 (대리점아이디관리 시트 구조)
-      agents = agentData.slice(1).map((row, index) => {
+    if (agentData && agentData.length > 3) {
+      // 헤더 제거 (3행까지가 헤더이므로 4행부터 시작)
+      agents = agentData.slice(3).map((row, index) => {
         const agent = {
-          target: row[0], // 담당자명
-          contactId: row[1], // 연락처 ID (전화번호)
-          role: row[2], // 역할 (영업사원, 스탭, 이사 등)
-          office: row[3], // 사무실
-          department: row[4] // 부서
+          target: row[0], // A열: 담당자명
+          qualification: row[1], // B열: 자격
+          contactId: row[2], // C열: 연락처(아이디)
+          office: row[3], // D열: 사무실
+          department: row[4], // E열: 소속
+          pushSubscription: row[14] ? JSON.parse(row[14]) : null // O열: 푸시 구독 정보
         };
         
-        // contactId가 전화번호 형식인지 확인하고, 아니면 role과 교체
-        if (agent.contactId && !agent.contactId.match(/^\d{10,11}$/)) {
-          // contactId가 전화번호가 아니면 role과 교체
-          const temp = agent.contactId;
-          agent.contactId = agent.role;
-          agent.role = temp;
-        }
-        
-        console.log(`담당자 데이터 파싱 ${index + 1}:`, agent);
+        console.log(`담당자 데이터 파싱 ${index + 1}:`, {
+          target: agent.target,
+          contactId: agent.contactId,
+          office: agent.office,
+          department: agent.department,
+          hasPushSubscription: !!agent.pushSubscription
+        });
         return agent;
       }).filter(agent => agent.target && agent.contactId);
       
@@ -2727,8 +2729,12 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
         console.log(`SSE 알림 전송 완료: 클라이언트 ${clientId} (${client.user_id})`);
         sseSentCount++;
         
-        // 푸시 알림도 함께 전송
-        sendPushNotificationToUser(client.user_id, notification);
+        // 푸시 알림도 함께 전송 (시트에서 로드한 구독 정보 사용)
+        const targetAgent = agents.find(agent => agent.contactId === client.user_id);
+        const subscription = targetAgent?.pushSubscription || pushSubscriptions.get(client.user_id);
+        if (subscription) {
+          sendPushNotificationToUser(client.user_id, notification, subscription);
+        }
       } else {
         console.log(`클라이언트 ${clientId} (${client.user_id})는 배정 대상자가 아님`);
       }
@@ -2744,8 +2750,14 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
     // 현재 온라인 상태가 아닌 사용자에게만 푸시 알림 전송
     const isOnline = Array.from(connectedClients.values()).some(client => client.user_id === agent.contactId);
     if (!isOnline) {
-      sendPushNotificationToUser(agent.contactId, notification);
-      pushSentCount++;
+      // 시트에서 로드한 구독 정보가 있으면 사용, 없으면 메모리에서 찾기
+      const subscription = agent.pushSubscription || pushSubscriptions.get(agent.contactId);
+      if (subscription) {
+        sendPushNotificationToUser(agent.contactId, notification, subscription);
+        pushSentCount++;
+      } else {
+        console.log(`사용자 ${agent.contactId}의 푸시 구독 정보를 찾을 수 없습니다.`);
+      }
     }
   });
   
@@ -2757,15 +2769,20 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
 }
 
 // 푸시 알림 전송 함수
-async function sendPushNotificationToUser(userId, notification) {
+async function sendPushNotificationToUser(userId, notification, subscription = null) {
   try {
+    // 구독 정보가 전달되지 않으면 메모리에서 찾기
+    if (!subscription) {
+      subscription = pushSubscriptions.get(userId);
+    }
+    
     console.log(`푸시 알림 전송 시도: ${userId}`, {
-      hasSubscription: pushSubscriptions.has(userId),
+      hasSubscription: !!subscription,
+      subscriptionSource: subscription ? (subscription === pushSubscriptions.get(userId) ? 'memory' : 'sheet') : 'none',
       notificationTitle: notification.title,
       notificationMessage: notification.message
     });
     
-    const subscription = pushSubscriptions.get(userId);
     if (!subscription) {
       console.log(`사용자 ${userId}의 푸시 구독이 없습니다.`);
       return;
@@ -2852,6 +2869,112 @@ function isTargetAgent(userId, targetOffices, targetDepartments, targetAgents, a
   return isTarget;
 }
 
+// 푸시 구독 정보를 Google Sheets에 저장하는 함수
+async function savePushSubscriptionToSheet(userId, subscription) {
+  try {
+    console.log(`푸시 구독 정보를 시트에 저장 중: ${userId}`);
+    
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    if (!agentValues || agentValues.length < 4) {
+      throw new Error('대리점아이디관리 시트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 헤더 제거 (3행까지가 헤더이므로 4행부터 시작)
+    const agentRows = agentValues.slice(3);
+    
+    // 사용자 ID로 해당 행 찾기 (C열: 연락처(아이디))
+    const userRowIndex = agentRows.findIndex(row => row[2] === userId);
+    
+    if (userRowIndex === -1) {
+      console.log(`사용자 ${userId}를 대리점아이디관리 시트에서 찾을 수 없습니다.`);
+      return false;
+    }
+    
+    // 실제 시트 행 번호 (헤더 3행 + 0부터 시작하는 인덱스 + 1)
+    const actualRowNumber = 4 + userRowIndex;
+    
+    // 구독 정보를 JSON 문자열로 변환 (null인 경우 빈 문자열)
+    const subscriptionJson = subscription ? JSON.stringify(subscription) : '';
+    
+    // Google Sheets API를 사용하여 O열에 구독 정보 저장
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${AGENT_SHEET_NAME}!O${actualRowNumber}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[subscriptionJson]]
+      }
+    });
+    
+    console.log(`푸시 구독 정보 저장 완료: ${userId} (행 ${actualRowNumber})`);
+    return true;
+    
+  } catch (error) {
+    console.error(`푸시 구독 정보 저장 실패 (${userId}):`, error);
+    return false;
+  }
+}
+
+// Google Sheets에서 푸시 구독 정보를 로드하는 함수
+async function loadPushSubscriptionsFromSheet() {
+  try {
+    console.log('Google Sheets에서 푸시 구독 정보 로드 중...');
+    
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    if (!agentValues || agentValues.length < 4) {
+      console.warn('대리점아이디관리 시트 데이터를 가져올 수 없습니다.');
+      return new Map();
+    }
+    
+    // 헤더 제거 (3행까지가 헤더이므로 4행부터 시작)
+    const agentRows = agentValues.slice(3);
+    
+    const subscriptions = new Map();
+    
+    agentRows.forEach((row, index) => {
+      const userId = row[2]; // C열: 연락처(아이디)
+      const subscriptionJson = row[14]; // O열: 푸시 구독 정보
+      
+      if (userId && subscriptionJson) {
+        try {
+          const subscription = JSON.parse(subscriptionJson);
+          subscriptions.set(userId, subscription);
+          console.log(`푸시 구독 정보 로드: ${userId}`);
+        } catch (error) {
+          console.error(`푸시 구독 정보 파싱 실패 (${userId}):`, error);
+        }
+      }
+    });
+    
+    console.log(`푸시 구독 정보 로드 완료: ${subscriptions.size}개`);
+    return subscriptions;
+    
+  } catch (error) {
+    console.error('푸시 구독 정보 로드 실패:', error);
+    return new Map();
+  }
+}
+
+// 서버 시작 시 푸시 구독 정보 로드
+async function initializePushSubscriptions() {
+  try {
+    console.log('서버 시작 시 푸시 구독 정보 초기화 중...');
+    const subscriptions = await loadPushSubscriptionsFromSheet();
+    
+    // 기존 메모리 기반 구독 정보를 시트에서 로드한 정보로 교체
+    pushSubscriptions.clear();
+    subscriptions.forEach((subscription, userId) => {
+      pushSubscriptions.set(userId, subscription);
+    });
+    
+    console.log(`푸시 구독 정보 초기화 완료: ${pushSubscriptions.size}개`);
+  } catch (error) {
+    console.error('푸시 구독 정보 초기화 실패:', error);
+  }
+}
+
 // 푸시 알림 관련 API
 app.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ 
@@ -2878,17 +3001,25 @@ app.post('/api/push/subscribe', async (req, res) => {
       });
     }
     
-    // 구독 정보 저장
+    // 메모리와 Google Sheets 모두에 구독 정보 저장
     pushSubscriptions.set(userId, subscription);
+    
+    // Google Sheets에 저장 시도
+    const sheetSaveResult = await savePushSubscriptionToSheet(userId, subscription);
+    
     console.log(`푸시 구독 등록 완료: ${userId}`, {
       totalSubscriptions: pushSubscriptions.size,
+      sheetSaveResult,
       subscription: {
         endpoint: subscription.endpoint,
         keys: subscription.keys ? Object.keys(subscription.keys) : []
       }
     });
     
-    res.json({ success: true });
+    res.json({ 
+      success: true, 
+      sheetSaved: sheetSaveResult 
+    });
   } catch (error) {
     console.error('푸시 구독 등록 오류:', error);
     res.status(500).json({ success: false, error: '구독 등록 실패' });
@@ -2907,11 +3038,20 @@ app.post('/api/push/unsubscribe', async (req, res) => {
       });
     }
     
-    // 구독 정보 삭제
+    // 메모리에서 구독 정보 삭제
     pushSubscriptions.delete(userId);
-    console.log(`푸시 구독 해제: ${userId}`);
     
-    res.json({ success: true });
+    // Google Sheets에서도 구독 정보 삭제 (빈 문자열로 업데이트)
+    const sheetDeleteResult = await savePushSubscriptionToSheet(userId, null);
+    
+    console.log(`푸시 구독 해제: ${userId}`, {
+      sheetDeleteResult
+    });
+    
+    res.json({ 
+      success: true, 
+      sheetDeleted: sheetDeleteResult 
+    });
   } catch (error) {
     console.error('푸시 구독 해제 오류:', error);
     res.status(500).json({ success: false, error: '구독 해제 실패' });
@@ -2930,7 +3070,26 @@ app.post('/api/push/send', async (req, res) => {
       });
     }
     
-    const subscription = pushSubscriptions.get(userId);
+    // 먼저 메모리에서 구독 정보 찾기
+    let subscription = pushSubscriptions.get(userId);
+    
+    // 메모리에 없으면 시트에서 로드
+    if (!subscription) {
+      try {
+        const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+        if (agentValues && agentValues.length > 3) {
+          const agentRows = agentValues.slice(3);
+          const userRow = agentRows.find(row => row[2] === userId);
+          if (userRow && userRow[14]) {
+            subscription = JSON.parse(userRow[14]);
+            console.log(`시트에서 구독 정보 로드: ${userId}`);
+          }
+        }
+      } catch (error) {
+        console.error('시트에서 구독 정보 로드 실패:', error);
+      }
+    }
+    
     if (!subscription) {
       return res.status(404).json({ 
         success: false, 
@@ -2962,10 +3121,61 @@ app.post('/api/push/send', async (req, res) => {
     if (error.statusCode === 410) {
       const { userId } = req.body;
       pushSubscriptions.delete(userId);
+      // 시트에서도 삭제
+      await savePushSubscriptionToSheet(userId, null);
       console.log(`만료된 구독 삭제: ${userId}`);
     }
     
     res.status(500).json({ success: false, error: '푸시 알림 전송 실패' });
+  }
+});
+
+// 푸시 구독 정보 관리 API
+app.get('/api/push/subscriptions', async (req, res) => {
+  try {
+    // 메모리와 시트의 모든 구독 정보 수집
+    const allSubscriptions = new Map(pushSubscriptions);
+    
+    // 시트에서 추가 구독 정보 로드
+    try {
+      const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+      if (agentValues && agentValues.length > 3) {
+        const agentRows = agentValues.slice(3);
+        agentRows.forEach(row => {
+          const userId = row[2]; // C열: 연락처(아이디)
+          const subscriptionJson = row[14]; // O열: 푸시 구독 정보
+          
+          if (userId && subscriptionJson && !allSubscriptions.has(userId)) {
+            try {
+              const subscription = JSON.parse(subscriptionJson);
+              allSubscriptions.set(userId, subscription);
+            } catch (error) {
+              console.error(`구독 정보 파싱 실패 (${userId}):`, error);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('시트에서 구독 정보 로드 실패:', error);
+    }
+    
+    const subscriptions = Array.from(allSubscriptions.entries()).map(([userId, subscription]) => ({
+      userId,
+      endpoint: subscription.endpoint,
+      hasKeys: !!subscription.keys,
+      source: pushSubscriptions.has(userId) ? 'memory' : 'sheet'
+    }));
+    
+    res.json({
+      success: true,
+      subscriptions,
+      totalCount: subscriptions.length,
+      memoryCount: pushSubscriptions.size,
+      sheetCount: subscriptions.length - pushSubscriptions.size
+    });
+  } catch (error) {
+    console.error('푸시 구독 정보 조회 오류:', error);
+    res.status(500).json({ success: false, error: '구독 정보 조회 실패' });
   }
 });
 
@@ -2997,7 +3207,33 @@ app.post('/api/push/send-all', async (req, res) => {
     const results = [];
     const expiredSubscriptions = [];
     
-    for (const [userId, subscription] of pushSubscriptions.entries()) {
+    // 메모리와 시트의 모든 구독 정보 수집
+    const allSubscriptions = new Map(pushSubscriptions);
+    
+    // 시트에서 추가 구독 정보 로드
+    try {
+      const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+      if (agentValues && agentValues.length > 3) {
+        const agentRows = agentValues.slice(3);
+        agentRows.forEach(row => {
+          const userId = row[2]; // C열: 연락처(아이디)
+          const subscriptionJson = row[14]; // O열: 푸시 구독 정보
+          
+          if (userId && subscriptionJson && !allSubscriptions.has(userId)) {
+            try {
+              const subscription = JSON.parse(subscriptionJson);
+              allSubscriptions.set(userId, subscription);
+            } catch (error) {
+              console.error(`구독 정보 파싱 실패 (${userId}):`, error);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('시트에서 구독 정보 로드 실패:', error);
+    }
+    
+    for (const [userId, subscription] of allSubscriptions.entries()) {
       try {
         await webpush.sendNotification(subscription, payload);
         results.push({ userId, success: true });
@@ -3016,13 +3252,15 @@ app.post('/api/push/send-all', async (req, res) => {
     // 만료된 구독 삭제
     expiredSubscriptions.forEach(userId => {
       pushSubscriptions.delete(userId);
+      savePushSubscriptionToSheet(userId, null);
       console.log(`만료된 구독 삭제: ${userId}`);
     });
     
     res.json({ 
       success: true, 
       results,
-      expiredCount: expiredSubscriptions.length
+      expiredCount: expiredSubscriptions.length,
+      totalSent: allSubscriptions.size
     });
   } catch (error) {
     console.error('푸시 알림 전송 오류:', error);

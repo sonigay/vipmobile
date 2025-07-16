@@ -244,41 +244,56 @@ export async function sendTestPushNotification(userId) {
 // 푸시 알림 디버깅 정보 출력
 export async function debugPushNotificationStatus() {
   try {
-    // console.log('=== 푸시 알림 디버깅 정보 ===');
+    console.log('=== 푸시 알림 디버깅 정보 ===');
     
     // 1. 브라우저 지원 확인
-    // console.log('1. 브라우저 지원 확인:');
-    // console.log('- Service Worker 지원:', 'serviceWorker' in navigator);
-    // console.log('- Push Manager 지원:', 'PushManager' in window);
-    // console.log('- Notification 지원:', 'Notification' in window);
+    console.log('1. 브라우저 지원 확인:');
+    console.log('- Service Worker 지원:', 'serviceWorker' in navigator);
+    console.log('- Push Manager 지원:', 'PushManager' in window);
+    console.log('- Notification 지원:', 'Notification' in window);
     
     // 2. 권한 상태 확인
-    // console.log('2. 권한 상태:');
-    // console.log('- Notification 권한:', Notification.permission);
+    console.log('2. 권한 상태:');
+    console.log('- Notification 권한:', Notification.permission);
     
     // 3. Service Worker 상태 확인
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.ready;
-      // console.log('3. Service Worker 상태:');
-      // console.log('- 등록됨:', !!registration);
-      // console.log('- 활성 상태:', registration.active ? '활성' : '비활성');
+      console.log('3. Service Worker 상태:');
+      console.log('- 등록됨:', !!registration);
+      console.log('- 활성 상태:', registration.active ? '활성' : '비활성');
       
       // 4. 구독 상태 확인
       const subscription = await registration.pushManager.getSubscription();
-      // console.log('4. 푸시 구독 상태:');
-      // console.log('- 구독됨:', !!subscription);
-      // if (subscription) {
-      //   console.log('- 구독 정보:', {
-      //     endpoint: subscription.endpoint,
-      //     keys: subscription.keys ? Object.keys(subscription.keys) : 'none'
-      //   });
-      // }
+      console.log('4. 푸시 구독 상태:');
+      console.log('- 구독됨:', !!subscription);
+      if (subscription) {
+        console.log('- 구독 정보:', {
+          endpoint: subscription.endpoint,
+          keys: subscription.keys ? Object.keys(subscription.keys) : 'none'
+        });
+      }
     }
     
     // 5. API URL 확인
-    // console.log('5. API URL:', API_URL);
+    console.log('5. API URL:', API_URL);
     
-    // console.log('=== 디버깅 정보 완료 ===');
+    // 6. 서버 구독 정보 확인
+    try {
+      const response = await fetch(`${API_URL}/api/push/subscriptions`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('6. 서버 구독 정보:');
+        console.log('- 총 구독 수:', data.totalCount);
+        console.log('- 메모리 구독 수:', data.memoryCount);
+        console.log('- 시트 구독 수:', data.sheetCount);
+        console.log('- 구독 목록:', data.subscriptions);
+      }
+    } catch (error) {
+      console.error('서버 구독 정보 조회 실패:', error);
+    }
+    
+    console.log('=== 디버깅 정보 완료 ===');
     
   } catch (error) {
     console.error('푸시 알림 디버깅 실패:', error);
