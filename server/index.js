@@ -7749,29 +7749,16 @@ app.get('/api/inventory-analysis', async (req, res) => {
       const matchingRows = inventoryData.filter(item => item.originalF === extractedF && item.originalG === extractedG);
       console.log(`  매칭된 행 수: ${matchingRows.length}, 총 수량: ${matchingRows.reduce((sum, item) => sum + item.quantity, 0)}`);
       
-      // 추출된 F열, G열 값으로 폰클재고데이터에서 수량 찾기 (중복 제거)
-      let totalQuantity = 0;
-      const uniqueQuantities = new Set(); // 고유한 수량만 저장
+      // 추출된 F열, G열 값으로 폰클재고데이터에서 해당 조합의 개수 세기
+      const matchingItems = inventoryData.filter(item => 
+        item.originalF === extractedF && item.originalG === extractedG
+      );
       
-      inventoryData.forEach(item => {
-        if (item.originalF === extractedF && item.originalG === extractedG && item.quantity > 0) {
-          // 고유한 수량만 합산 (같은 수량은 한 번만)
-          if (!uniqueQuantities.has(item.quantity)) {
-            uniqueQuantities.add(item.quantity);
-            totalQuantity += item.quantity;
-            quantityDebug.push({
-              model: normalizedModel,
-              originalF: item.originalF,
-              originalG: item.originalG,
-              quantity: item.quantity
-            });
-          }
-        }
-      });
+      const totalCount = matchingItems.length; // 해당 조합의 총 개수
       
-      console.log(`  고유한 수량 개수: ${uniqueQuantities.size}, 수량들: ${Array.from(uniqueQuantities).join(', ')}`);
+      console.log(`  ${extractedF} | ${extractedG} 조합 개수: ${totalCount}개`);
       
-      inventoryByModel[normalizedModel] = totalQuantity;
+              inventoryByModel[normalizedModel] = totalCount;
     });
     
     console.log('수량이 있는 정규화된 재고 항목들:', quantityDebug.slice(0, 10));
