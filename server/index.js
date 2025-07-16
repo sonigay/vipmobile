@@ -6266,19 +6266,25 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       }
     });
 
-    // 마당접수에서 U열+V열 조합으로 예약번호 매핑 생성
+    // 마당접수에서 예약번호 추출 (정규표현식 사용)
     const yardReservationMap = new Set();
     yardData.forEach((row, index) => {
       const uValue = row[20] || ''; // U열 (21번째, 0부터 시작)
       const vValue = row[21] || ''; // V열 (22번째, 0부터 시작)
-      const combinedReservation = (uValue + vValue).replace(/-/g, ''); // 하이픈 제거
-      if (combinedReservation) {
-        yardReservationMap.add(combinedReservation);
+      
+      // 예약번호 패턴 찾기 (예: PK590797, XJ766583 등)
+      const reservationPattern = /[A-Z]{2}\d{6}/g;
+      const uMatches = uValue.match(reservationPattern) || [];
+      const vMatches = vValue.match(reservationPattern) || [];
+      
+      // 모든 예약번호를 Set에 추가
+      [...uMatches, ...vMatches].forEach(match => {
+        yardReservationMap.add(match);
         // 처음 5개만 디버깅 로그
         if (index < 5) {
-          console.log(`마당접수 행 ${index + 2}: U=${uValue}, V=${vValue}, 조합=${combinedReservation}`);
+          console.log(`마당접수 행 ${index + 2}: U=${uValue}, V=${vValue}, 추출된예약번호=${match}`);
         }
-      }
+      });
     });
 
     console.log('마당접수 예약번호 개수:', yardReservationMap.size);

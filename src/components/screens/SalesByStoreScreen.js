@@ -320,47 +320,48 @@ function SalesByStoreScreen({ loggedInStore }) {
               담당자별 정리
             </Typography>
             
-            <Tabs
-              value={selectedAgent}
-              onChange={(event, newValue) => setSelectedAgent(newValue)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{
-                '& .MuiTab-root': {
-                  minHeight: 48,
-                  fontSize: '0.9rem',
-                  fontWeight: 500
-                }
-              }}
-            >
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {agents.map((agent, index) => {
                 const agentData = data.byAgent[agent] || {};
                 const totalItems = Object.values(agentData).reduce((sum, posData) => sum + posData.total, 0);
+                const isSelected = selectedAgent === index;
                 
                 return (
-                  <Tab
+                  <Button
                     key={agent}
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PersonIcon fontSize="small" />
-                        {agent}
-                        <Chip
-                          label={totalItems}
-                          size="small"
-                          color="primary"
-                          sx={{ fontSize: '0.7rem', height: 20 }}
-                        />
-                      </Box>
-                    }
+                    variant={isSelected ? 'contained' : 'outlined'}
+                    size="small"
+                    startIcon={<PersonIcon />}
+                    onClick={() => setSelectedAgent(index)}
                     sx={{
-                      '&.Mui-selected': {
-                        color: '#ff9a9e'
-                      }
+                      backgroundColor: isSelected ? '#ff9a9e' : undefined,
+                      color: isSelected ? 'white' : undefined,
+                      '&:hover': {
+                        backgroundColor: isSelected ? '#ff8a8e' : undefined
+                      },
+                      minWidth: 'auto',
+                      px: 2,
+                      py: 1,
+                      fontSize: '0.8rem'
                     }}
-                  />
+                  >
+                    {agent}
+                    <Chip
+                      label={totalItems}
+                      size="small"
+                      color={isSelected ? 'default' : 'primary'}
+                      sx={{ 
+                        fontSize: '0.6rem', 
+                        height: 16, 
+                        ml: 1,
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : undefined,
+                        color: isSelected ? 'white' : undefined
+                      }}
+                    />
+                  </Button>
                 );
               })}
-            </Tabs>
+            </Box>
           </CardContent>
         </Card>
       )}
