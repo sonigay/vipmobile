@@ -216,7 +216,11 @@ function ReservationSettingsScreen({ loggedInStore }) {
         console.log(`항목 ${item.id} 매칭 상태:`, item.isMatched);
         console.log(`항목 ${item.id} 데이터:`, item.reservationSite, item.phonekl);
         
-        if (item.isMatched) { // 매칭된 항목만 저장
+        // 데이터가 입력된 항목은 모두 저장 (매칭 여부와 관계없이)
+        const hasReservationData = item.reservationSite.p || item.reservationSite.q || item.reservationSite.r;
+        const hasPhoneklData = item.phonekl.f || item.phonekl.g;
+        
+        if (hasReservationData || hasPhoneklData) {
           console.log(`항목 ${item.id} 저장 시도...`);
           
           const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/save`, {
@@ -246,7 +250,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
           console.log(`항목 ${item.id} 저장 성공`);
           savedCount++;
         } else {
-          console.log(`항목 ${item.id} 매칭되지 않아 저장 건너뜀`);
+          console.log(`항목 ${item.id} 데이터가 없어 저장 건너뜀`);
           skippedCount++;
         }
       }
@@ -256,7 +260,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
       if (savedCount > 0) {
         setMessage({ type: 'success', text: `${savedCount}개의 정규화 설정이 성공적으로 저장되었습니다.` });
       } else {
-        setMessage({ type: 'warning', text: '저장할 매칭된 항목이 없습니다. 데이터를 입력해주세요.' });
+        setMessage({ type: 'warning', text: '저장할 데이터가 없습니다. 사전예약사이트 또는 폰클 데이터를 입력해주세요.' });
       }
       
       await loadSavedNormalizationList();
@@ -659,55 +663,55 @@ function ReservationSettingsScreen({ loggedInStore }) {
                       </IconButton>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                         <Autocomplete
                           size="small"
                           options={reservationSiteData.pColumn || []}
                           value={item.reservationSite.p}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.p', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="P" size="small" sx={{ width: '80px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="P열" size="small" sx={{ width: '120px' }} />}
                           freeSolo
-                          sx={{ width: '80px' }}
+                          sx={{ width: '120px' }}
                         />
                         <Autocomplete
                           size="small"
                           options={reservationSiteData.qColumn || []}
                           value={item.reservationSite.q}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.q', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="Q" size="small" sx={{ width: '80px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="Q열" size="small" sx={{ width: '120px' }} />}
                           freeSolo
-                          sx={{ width: '80px' }}
+                          sx={{ width: '120px' }}
                         />
                         <Autocomplete
                           size="small"
                           options={reservationSiteData.rColumn || []}
                           value={item.reservationSite.r}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.r', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="R" size="small" sx={{ width: '80px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="R열" size="small" sx={{ width: '120px' }} />}
                           freeSolo
-                          sx={{ width: '80px' }}
+                          sx={{ width: '120px' }}
                         />
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                         <Autocomplete
                           size="small"
                           options={phoneklData.fColumn || []}
                           value={item.phonekl.f}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.f', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="F" size="small" sx={{ width: '80px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="F열" size="small" sx={{ width: '120px' }} />}
                           freeSolo
-                          sx={{ width: '80px' }}
+                          sx={{ width: '120px' }}
                         />
                         <Autocomplete
                           size="small"
                           options={phoneklData.gColumn || []}
                           value={item.phonekl.g}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.g', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="G" size="small" sx={{ width: '80px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="G열" size="small" sx={{ width: '120px' }} />}
                           freeSolo
-                          sx={{ width: '80px' }}
+                          sx={{ width: '120px' }}
                         />
                       </Box>
                     </TableCell>
