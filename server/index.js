@@ -3169,6 +3169,7 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const key = `${rule.reservationSite}|${rule.phonekl}`.replace(/\s+/g, '');
       ruleMap.set(key, rule.normalizedModel);
       console.log(`정규화 규칙 추가: ${key} -> ${rule.normalizedModel}`);
+      console.log(`  원본 데이터: reservationSite="${rule.reservationSite}", phonekl="${rule.phonekl}"`);
     });
     
     console.log(`정규화 규칙 매핑 완료: ${ruleMap.size}개 규칙`);
@@ -3212,7 +3213,10 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const normalizedModel = ruleMap.get(originalKey);
       
       if (!normalizedModel) {
-        console.log(`정규화되지 않은 모델: ${originalKey}`);
+        if (index < 5) {
+          console.log(`정규화되지 않은 모델: ${originalKey}`);
+          console.log(`  원본 값: P="${pValue}", Q="${qValue}", R="${rValue}"`);
+        }
         return; // 정규화되지 않은 모델은 제외
       }
       
