@@ -3165,8 +3165,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     console.log(`정규화 규칙 수: ${normalizationRules.length}`);
     
     normalizationRules.forEach(rule => {
-      // 공백을 제거하여 키 생성
-      const key = `${rule.reservationSite}|${rule.phonekl}`.replace(/\s+/g, '');
+      // reservationSite 부분만 사용하여 키 생성 (P|Q|R 형식)
+      const key = rule.reservationSite.replace(/\s+/g, '');
       ruleMap.set(key, rule.normalizedModel);
       console.log(`정규화 규칙 추가: ${key} -> ${rule.normalizedModel}`);
       console.log(`  원본 데이터: reservationSite="${rule.reservationSite}", phonekl="${rule.phonekl}"`);
