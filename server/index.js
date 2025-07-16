@@ -6228,7 +6228,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 1. 사전예약사이트 시트 데이터 로드
     const reservationResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:V'
+      range: '사전예약사이트!A:Z'
     });
 
     // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
@@ -6280,7 +6280,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 사전예약사이트 데이터 처리
     const processedData = reservationData.map((row, index) => {
       const posName = row[20] || ''; // U열 (21번째, 0부터 시작)
-      const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
       const storeCodeForLookup = row[19] || ''; // T열 (20번째, 0부터 시작)
       
