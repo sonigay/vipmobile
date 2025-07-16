@@ -7305,6 +7305,209 @@ app.post('/api/sales-by-store/update-agent', async (req, res) => {
   }
 });
 
+// 재고 현황 분석 API
+app.get('/api/inventory-analysis', async (req, res) => {
+  try {
+    // 1. 정규화 규칙 로드
+    let normalizationRules = [];
+    try {
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정규화작업!A:G'
+      });
+      
+      if (rulesResponse.data.values && rulesResponse.data.values.length > 1) {
+        normalizationRules = rulesResponse.data.values.slice(1)
+          .filter(row => row.length >= 6 && row[5] === '완료')
+          .map(row => ({
+            reservationSite: row[1] || '',
+            phonekl: row[2] || '',
+            normalizedModel: row[3] || '',
+            note: row[6] || ''
+          }));
+      }
+    } catch (error) {
+      console.log('정규화 규칙 로드 실패:', error.message);
+    }
+
+    // 2. 사전예약사이트 데이터 로드
+    let reservationData = [];
+    try {
+      const reservationResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트!A:Z'
+      });
+      
+      if (reservationResponse.data.values && reservationResponse.data.values.length > 1) {
+        const headers = reservationResponse.data.values[0];
+        const dataRows = reservationResponse.data.values.slice(1);
+        
+        reservationData = dataRows.map((row, index) => {
+          const pValue = row[15] || ''; // P열 (16번째, 0부터 시작)
+          const qValue = row[16] || ''; // Q열 (17번째, 0부터 시작)
+          const rValue = row[17] || ''; // R열 (18번째, 0부터 시작)
+          
+          // 정규화 규칙 적용
+          let normalizedModel = '';
+          for (const rule of normalizationRules) {
+            const ruleParts = rule.reservationSite.split(' | ');
+            if (ruleParts.length >= 3) {
+              const ruleP = ruleParts[0];
+              const ruleQ = ruleParts[1];
+              const ruleR = ruleParts[2];
+              
+              const pMatch = !ruleP || pValue.includes(ruleP) || ruleP.includes(pValue);
+              const qMatch = !ruleQ || qValue.includes(ruleQ) || ruleQ.includes(qValue);
+              const rMatch = !ruleR || rValue.includes(ruleR) || ruleR.includes(rValue);
+              
+              if (pMatch && qMatch && rMatch) {
+                normalizedModel = rule.normalizedModel;
+                break;
+              }
+            }
+          }
+          
+          return {
+            reservationNumber: row[8] || '', // I열 (9번째, 0부터 시작)
+            originalP: pValue,
+            originalQ: qValue,
+            originalR: rValue,
+            normalizedModel: normalizedModel,
+            rowIndex: index + 2
+          };
+        });
+      }
+    } catch (error) {
+      console.log('사전예약사이트 시트 로드 실패:', error.message);
+    }
+
+    // 3. 폰클재고데이터 로드 (재고 수량 포함)
+    let inventoryData = [];
+    try {
+      const inventoryResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '폰클재고데이터!A:Z'
+      });
+      
+      if (inventoryResponse.data.values && inventoryResponse.data.values.length > 1) {
+        const headers = inventoryResponse.data.values[0];
+        const dataRows = inventoryResponse.data.values.slice(1);
+        
+        inventoryData = dataRows.map((row, index) => {
+          const fValue = row[5] || ''; // F열 (6번째, 0부터 시작)
+          const gValue = row[6] || ''; // G열 (7번째, 0부터 시작)
+          const quantityValue = row[7] || '0'; // H열 (8번째, 0부터 시작) - 재고 수량
+          
+          // 수량을 숫자로 변환
+          const quantity = parseInt(quantityValue) || 0;
+          
+          // 정규화 규칙 적용
+          let normalizedModel = '';
+          for (const rule of normalizationRules) {
+            const ruleParts = rule.phonekl.split(' | ');
+            if (ruleParts.length >= 2) {
+              const ruleF = ruleParts[0];
+              const ruleG = ruleParts[1];
+              
+              const fMatch = !ruleF || fValue.includes(ruleF) || ruleF.includes(fValue);
+              const gMatch = !ruleG || gValue.includes(ruleG) || ruleG.includes(gValue);
+              
+              if (fMatch && gMatch) {
+                normalizedModel = rule.normalizedModel;
+                break;
+              }
+            }
+          }
+          
+          return {
+            originalF: fValue,
+            originalG: gValue,
+            normalizedModel: normalizedModel,
+            quantity: quantity,
+            rowIndex: index + 2
+          };
+        });
+      }
+    } catch (error) {
+      console.log('폰클재고데이터 시트 로드 실패:', error.message);
+    }
+
+    // 4. 재고 현황 분석
+    const inventoryAnalysis = {};
+    
+    // 정규화된 모델별로 재고 수량 집계
+    const inventoryByModel = {};
+    inventoryData.forEach(item => {
+      if (item.normalizedModel) {
+        if (!inventoryByModel[item.normalizedModel]) {
+          inventoryByModel[item.normalizedModel] = 0;
+        }
+        inventoryByModel[item.normalizedModel] += item.quantity;
+      }
+    });
+    
+    // 정규화된 모델별로 사전예약 건수 집계
+    const reservationByModel = {};
+    reservationData.forEach(item => {
+      if (item.normalizedModel) {
+        if (!reservationByModel[item.normalizedModel]) {
+          reservationByModel[item.normalizedModel] = 0;
+        }
+        reservationByModel[item.normalizedModel]++;
+      }
+    });
+    
+    // 재고 현황 분석 결과 생성
+    const allModels = new Set([
+      ...Object.keys(inventoryByModel),
+      ...Object.keys(reservationByModel)
+    ]);
+    
+    allModels.forEach(model => {
+      const inventory = inventoryByModel[model] || 0;
+      const reservations = reservationByModel[model] || 0;
+      const remainingStock = inventory - reservations;
+      
+      inventoryAnalysis[model] = {
+        inventory: inventory,
+        reservations: reservations,
+        remainingStock: remainingStock,
+        status: remainingStock > 0 ? '충분' : remainingStock === 0 ? '부족' : '초과예약'
+      };
+    });
+
+    // 5. 통계 정보
+    const totalInventory = Object.values(inventoryByModel).reduce((sum, qty) => sum + qty, 0);
+    const totalReservations = Object.values(reservationByModel).reduce((sum, count) => sum + count, 0);
+    const totalRemainingStock = Object.values(inventoryAnalysis).reduce((sum, item) => sum + item.remainingStock, 0);
+    
+    const stats = {
+      totalModels: allModels.size,
+      totalInventory: totalInventory,
+      totalReservations: totalReservations,
+      totalRemainingStock: totalRemainingStock,
+      modelsWithSufficientStock: Object.values(inventoryAnalysis).filter(item => item.status === '충분').length,
+      modelsWithInsufficientStock: Object.values(inventoryAnalysis).filter(item => item.status === '부족').length,
+      modelsWithOverReservation: Object.values(inventoryAnalysis).filter(item => item.status === '초과예약').length
+    };
+
+    res.json({
+      success: true,
+      inventoryAnalysis: inventoryAnalysis,
+      stats: stats,
+      inventoryByModel: inventoryByModel,
+      reservationByModel: reservationByModel
+    });
+  } catch (error) {
+    console.error('재고 현황 분석 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to analyze inventory',
+      message: error.message
+    });
+  }
+});
+
 // 정규화 규칙 적용 테스트 API
 app.post('/api/reservation-settings/test-normalization', async (req, res) => {
   try {

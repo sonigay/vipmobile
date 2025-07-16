@@ -50,7 +50,15 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
     pendingReservations: 0,
     totalAgents: 0,
     totalStores: 0,
-    recentActivity: []
+    recentActivity: [],
+    inventoryStats: {
+      totalInventory: 0,
+      totalReservations: 0,
+      totalRemainingStock: 0,
+      modelsWithSufficientStock: 0,
+      modelsWithInsufficientStock: 0,
+      modelsWithOverReservation: 0
+    }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -114,6 +122,28 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
         const totalAgents = stats?.totalAgents || 0;
         const totalStores = stats?.totalStores || 0;
         
+        // 재고 현황 데이터 로드
+        let inventoryStats = {
+          totalInventory: 0,
+          totalReservations: 0,
+          totalRemainingStock: 0,
+          modelsWithSufficientStock: 0,
+          modelsWithInsufficientStock: 0,
+          modelsWithOverReservation: 0
+        };
+        
+        try {
+          const inventoryResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/inventory-analysis`);
+          if (inventoryResponse.ok) {
+            const inventoryResult = await inventoryResponse.json();
+            if (inventoryResult.success) {
+              inventoryStats = inventoryResult.stats;
+            }
+          }
+        } catch (error) {
+          console.error('재고 현황 데이터 로드 실패:', error);
+        }
+        
         // 최근 활동 데이터 (임시)
         const recentActivity = [
           { type: 'reservation', message: '새로운 사전예약이 등록되었습니다.', time: '5분 전' },
@@ -127,7 +157,8 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
           pendingReservations,
           totalAgents,
           totalStores,
-          recentActivity
+          recentActivity,
+          inventoryStats
         });
       } else {
         throw new Error(result.message || '데이터 로드에 실패했습니다.');
@@ -259,6 +290,98 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                         </Typography>
                       </Box>
                       <PeopleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* 재고 현황 카드 */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+                  📦 재고 현황
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.inventoryStats.totalInventory.toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          총 재고 수량
+                        </Typography>
+                      </Box>
+                      <StoreIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.inventoryStats.totalReservations.toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          사전예약 건수
+                        </Typography>
+                      </Box>
+                      <EventIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.inventoryStats.totalRemainingStock.toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          예상 잔여재고
+                        </Typography>
+                      </Box>
+                      <TrendingUpIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.inventoryStats.modelsWithInsufficientStock}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          재고 부족 모델
+                        </Typography>
+                      </Box>
+                      <WarningIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
                   </CardContent>
                 </Card>

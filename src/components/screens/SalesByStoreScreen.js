@@ -82,6 +82,8 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [selectedFilter, setSelectedFilter] = useState({ type: '', value: '' });
   const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
+  const [inventoryData, setInventoryData] = useState({});
+  const [loadingInventory, setLoadingInventory] = useState(false);
 
   // 차트 데이터 준비 함수들
   const prepareAgentPerformanceData = () => {
@@ -149,6 +151,34 @@ function SalesByStoreScreen({ loggedInStore }) {
       })
       .sort((a, b) => b.완료율 - a.완료율)
       .slice(0, 10); // 상위 10명만 표시
+  };
+
+  // 재고 현황 데이터 로드
+  const loadInventoryData = async () => {
+    setLoadingInventory(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inventory-analysis`);
+      
+      if (!response.ok) {
+        throw new Error('재고 현황 데이터를 불러올 수 없습니다.');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setInventoryData(result.inventoryAnalysis);
+        setMessage({ type: 'success', text: `재고 현황 로드 완료: ${Object.keys(result.inventoryAnalysis).length}개 모델` });
+      } else {
+        throw new Error(result.message || '재고 현황 데이터 로드에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('재고 현황 데이터 로드 오류:', error);
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoadingInventory(false);
+    }
   };
 
   // 데이터 로드
@@ -1076,6 +1106,15 @@ function SalesByStoreScreen({ loggedInStore }) {
                   {loadingModelColor ? <CircularProgress size={16} /> : '데이터 로드'}
                 </Button>
                 <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<StoreIcon />}
+                  onClick={loadInventoryData}
+                  disabled={loadingInventory}
+                >
+                  {loadingInventory ? <CircularProgress size={16} /> : '재고 현황'}
+                </Button>
+                <Button
                   variant="contained"
                   size="small"
                   startIcon={<DownloadIcon />}
@@ -1206,6 +1245,108 @@ function SalesByStoreScreen({ loggedInStore }) {
               <Alert severity="info">
                 모델색상별 데이터가 없습니다. 새로고침 버튼을 클릭하여 데이터를 로드해주세요.
               </Alert>
+            )}
+
+            {/* 재고 현황 테이블 */}
+            {Object.keys(inventoryData).length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+                  📦 재고 현황 분석
+                </Typography>
+                
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell width="200px">정규화된 모델</TableCell>
+                        <TableCell width="100px" align="center">보유재고</TableCell>
+                        <TableCell width="100px" align="center">사전예약</TableCell>
+                        <TableCell width="120px" align="center">예상잔여재고</TableCell>
+                        <TableCell width="100px" align="center">상태</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(inventoryData)
+                        .sort((a, b) => b[1].remainingStock - a[1].remainingStock) // 잔여재고 내림차순 정렬
+                        .map(([model, data]) => (
+                        <TableRow key={model} hover>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {model}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={data.inventory}
+                              color="primary"
+                              size="small"
+                              sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={data.reservations}
+                              color="secondary"
+                              size="small"
+                              sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={data.remainingStock}
+                              color={data.status === '충분' ? 'success' : data.status === '부족' ? 'warning' : 'error'}
+                              size="small"
+                              sx={{ fontSize: '0.8rem', minWidth: 40, fontWeight: 'bold' }}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={data.status}
+                              color={data.status === '충분' ? 'success' : data.status === '부족' ? 'warning' : 'error'}
+                              size="small"
+                              sx={{ fontSize: '0.7rem' }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                {/* 재고 현황 통계 */}
+                <Box sx={{ mt: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} md={3}>
+                      <Chip
+                        label={`총 모델: ${Object.keys(inventoryData).length}개`}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Chip
+                        label={`재고 충분: ${Object.values(inventoryData).filter(item => item.status === '충분').length}개`}
+                        color="success"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Chip
+                        label={`재고 부족: ${Object.values(inventoryData).filter(item => item.status === '부족').length}개`}
+                        color="warning"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Chip
+                        label={`초과예약: ${Object.values(inventoryData).filter(item => item.status === '초과예약').length}개`}
+                        color="error"
+                        variant="outlined"
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Box>
             )}
           </CardContent>
         </Card>
