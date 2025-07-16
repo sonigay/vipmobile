@@ -27,6 +27,8 @@ import ModeSelectionPopup from './components/ModeSelectionPopup';
 import InspectionMode from './components/InspectionMode';
 import ChartMode from './components/ChartMode';
 import PolicyMode from './components/PolicyMode';
+import MeetingMode from './components/MeetingMode';
+import ReservationMode from './components/ReservationMode';
 import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
 import UpdateProgressScreen from './components/UpdateProgressScreen';
@@ -35,8 +37,8 @@ import UpdateProgressScreen from './components/UpdateProgressScreen';
 // 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
 import './mobile.css';
 import PersonIcon from '@mui/icons-material/Person';
-import NotificationsIcon from '@mui/icons-material/Notifications';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { 
   Table, 
   TableBody, 
@@ -124,6 +126,10 @@ function App() {
   const [isChartMode, setIsChartMode] = useState(false);
   // 정책모드 관련 상태 추가
   const [isPolicyMode, setIsPolicyMode] = useState(false);
+  // 회의모드 관련 상태 추가
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
+  // 사전예약모드 관련 상태 추가
+  const [isReservationMode, setIsReservationMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -783,6 +789,12 @@ function App() {
           setTimeout(() => {
             loadActivationData();
           }, 100);
+        } else if (parsedState.isMeeting) {
+          // 회의모드 상태 복원
+          setIsMeetingMode(true);
+        } else if (parsedState.isReservation) {
+          // 사전예약모드 상태 복원
+          setIsReservationMode(true);
         } else if (parsedState.isInventory) {
           // 재고모드 상태 복원
           setIsInventoryMode(true);
@@ -1237,8 +1249,58 @@ function App() {
 
   // 실제 로그인 처리 함수
   const processLogin = (store) => {
+    // 회의모드인지 확인
+    if (store.isMeeting) {
+      // console.log('로그인: 회의모드');
+      setIsMeetingMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsReservationMode(false);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isMeeting: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isReservation: false,
+        store: store
+      }));
+    }
+    // 사전예약모드인지 확인
+    else if (store.isReservation) {
+      // console.log('로그인: 사전예약모드');
+      setIsReservationMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isReservation: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        store: store
+      }));
+    }
     // 검수모드인지 확인
-    if (store.isInspection) {
+    else if (store.isInspection) {
       // console.log('로그인: 검수모드');
       setIsInspectionMode(true);
       setIsAgentMode(false);
@@ -1246,6 +1308,8 @@ function App() {
       setIsSettlementMode(false);
       setIsChartMode(false);
       setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1255,6 +1319,8 @@ function App() {
         isSettlement: false,
         isChart: false,
         isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
         store: store
       }));
     }
@@ -1267,6 +1333,8 @@ function App() {
       setIsSettlementMode(false);
       setIsInspectionMode(false);
       setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1276,6 +1344,8 @@ function App() {
         isSettlement: false,
         isInspection: false,
         isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
         store: store
       }));
     }
@@ -1288,6 +1358,8 @@ function App() {
       setIsSettlementMode(false);
       setIsInspectionMode(false);
       setIsChartMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1297,6 +1369,8 @@ function App() {
         isSettlement: false,
         isInspection: false,
         isChart: false,
+        isMeeting: false,
+        isReservation: false,
         store: store
       }));
     }
@@ -1309,6 +1383,8 @@ function App() {
       setIsInspectionMode(false);
       setIsChartMode(false);
       setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       
       setSettlementUserName(store.manager || '정산관리자');
               // console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
@@ -1321,6 +1397,8 @@ function App() {
         isInspection: false,
         isChart: false,
         isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
         store: store,
         settlementUserName: store.manager || '정산관리자'
       }));
@@ -1334,6 +1412,8 @@ function App() {
       setIsInspectionMode(false);
       setIsChartMode(false);
       setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       
       setInventoryUserName(store.manager || '재고관리자');
               // console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
@@ -1353,6 +1433,8 @@ function App() {
         isInspection: false,
         isChart: false,
         isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
         store: store,
         inventoryUserName: store.manager || '재고관리자'
       }));
@@ -1366,6 +1448,8 @@ function App() {
       setIsInspectionMode(false);
       setIsChartMode(false);
       setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
       const agentTarget = store.target || store.name || '';
@@ -1390,6 +1474,8 @@ function App() {
         isInspection: false,
         isChart: false,
         isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
         store: store,
         agentTarget: store.target,
         agentQualification: store.qualification,
@@ -1408,6 +1494,8 @@ function App() {
       setIsInspectionMode(false);
       setIsChartMode(false);
       setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -1424,6 +1512,8 @@ function App() {
         isInspection: false,
         isChart: false,
         isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
         store: store
       }));
     }
@@ -1443,6 +1533,8 @@ function App() {
     modifiedStore.isInspection = false;
     modifiedStore.isChart = false;
     modifiedStore.isPolicy = false;
+    modifiedStore.isMeeting = false;
+    modifiedStore.isReservation = false;
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1463,6 +1555,12 @@ function App() {
         break;
       case 'policy':
         modifiedStore.isPolicy = true;
+        break;
+      case 'meeting':
+        modifiedStore.isMeeting = true;
+        break;
+      case 'reservation':
+        modifiedStore.isReservation = true;
         break;
       default:
         break;
@@ -1496,6 +1594,8 @@ function App() {
     setIsInspectionMode(false);
     setIsChartMode(false);
     setIsPolicyMode(false);
+    setIsMeetingMode(false);
+    setIsReservationMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1530,6 +1630,14 @@ function App() {
       case 'policy':
         // console.log('정책 모드로 전환');
         setIsPolicyMode(true);
+        break;
+      case 'meeting':
+        // console.log('회의 모드로 전환');
+        setIsMeetingMode(true);
+        break;
+      case 'reservation':
+        // console.log('사전예약 모드로 전환');
+        setIsReservationMode(true);
         break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
@@ -1569,6 +1677,10 @@ function App() {
     setIsChartMode(false);
     // 정책모드 상태 초기화
     setIsPolicyMode(false);
+    // 회의모드 상태 초기화
+    setIsMeetingMode(false);
+    // 사전예약모드 상태 초기화
+    setIsReservationMode(false);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -2137,6 +2249,54 @@ function App() {
             setIsPolicyMode(false);
             setShowModeSelection(true);
 
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 회의모드일 때는 별도 화면 렌더링
+  if (isMeetingMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <MeetingMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            // console.log('App.js MeetingMode onModeChange 호출됨');
+            const currentModes = getCurrentUserAvailableModes();
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsMeetingMode(false);
+            setShowModeSelection(true);
+            // console.log('MeetingMode 모드 선택 팝업 열기 완료');
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 사전예약모드일 때는 별도 화면 렌더링
+  if (isReservationMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ReservationMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            // console.log('App.js ReservationMode onModeChange 호출됨');
+            const currentModes = getCurrentUserAvailableModes();
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsReservationMode(false);
+            setShowModeSelection(true);
+            // console.log('ReservationMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />

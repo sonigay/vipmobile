@@ -19,6 +19,8 @@ import {
   Assignment as AssignmentIcon,
   BarChart as BarChartIcon,
   Policy as PolicyIcon,
+  MeetingRoom as MeetingRoomIcon,
+  Event as EventIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 
@@ -102,6 +104,30 @@ const ModeSelectionPopup = ({
         '규정 업데이트',
         '정책 공지사항',
         '정책 이력 추적'
+      ]
+    },
+    meeting: {
+      title: '회의 모드',
+      description: '회의 및 일정 관리 시스템',
+      icon: <MeetingRoomIcon sx={{ fontSize: 40, color: '#667eea' }} />,
+      color: '#667eea',
+      features: [
+        '회의 일정 관리',
+        '회의실 예약',
+        '참석자 관리',
+        '회의록 작성'
+      ]
+    },
+    reservation: {
+      title: '사전예약 모드',
+      description: '사전예약 및 일정 관리 시스템',
+      icon: <EventIcon sx={{ fontSize: 40, color: '#ff9a9e' }} />,
+      color: '#ff9a9e',
+      features: [
+        '사전예약 관리',
+        '일정 조율',
+        '알림 시스템',
+        '예약 현황 확인'
       ]
     }
   };
