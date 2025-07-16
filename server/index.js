@@ -3165,7 +3165,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     console.log(`정규화 규칙 수: ${normalizationRules.length}`);
     
     normalizationRules.forEach(rule => {
-      const key = `${rule.reservationSite}|${rule.phonekl}`;
+      // 공백을 제거하여 키 생성
+      const key = `${rule.reservationSite}|${rule.phonekl}`.replace(/\s+/g, '');
       ruleMap.set(key, rule.normalizedModel);
       console.log(`정규화 규칙 추가: ${key} -> ${rule.normalizedModel}`);
     });
@@ -3206,8 +3207,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       
       processedCount++;
       
-      // 정규화된 모델명 찾기
-      const originalKey = `${pValue}|${qValue}|${rValue}`;
+      // 정규화된 모델명 찾기 (공백 제거)
+      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
       const normalizedModel = ruleMap.get(originalKey);
       
       if (!normalizedModel) {
