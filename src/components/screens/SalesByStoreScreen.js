@@ -161,7 +161,8 @@ function SalesByStoreScreen({ loggedInStore }) {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/normalized-data`);
       if (response.ok) {
         const result = await response.json();
-        setNormalizationStatus(result.success);
+        // 사전예약사이트의 모든 모델이 정규화되면 완료로 간주
+        setNormalizationStatus(result.success && result.stats?.isCompleted);
       }
     } catch (error) {
       console.error('정규화 상태 확인 오류:', error);

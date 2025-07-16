@@ -663,10 +663,15 @@ function ReservationSettingsScreen({ loggedInStore }) {
                   </Grid>
                   <Grid item xs={6} md={3}>
                     <Chip
-                      label={`전체 정규화율: ${normalizedData.stats.reservationSiteTotal + normalizedData.stats.phoneklTotal > 0 ? 
-                        Math.round(((normalizedData.stats.reservationSiteNormalized + normalizedData.stats.phoneklNormalized) / 
-                        (normalizedData.stats.reservationSiteTotal + normalizedData.stats.phoneklTotal)) * 100) : 0}%`}
-                      color="secondary"
+                      label={`사전예약사이트 완료율: ${normalizedData.stats.completionRate || 0}%`}
+                      color={normalizedData.stats.isCompleted ? 'success' : 'secondary'}
+                      variant="outlined"
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Chip
+                      label={`정규화 상태: ${normalizedData.stats.isCompleted ? '완료' : '진행중'}`}
+                      color={normalizedData.stats.isCompleted ? 'success' : 'warning'}
                       variant="outlined"
                     />
                   </Grid>

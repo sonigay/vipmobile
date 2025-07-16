@@ -6184,13 +6184,36 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
       console.log('폰클재고데이터 시트 로드 실패:', error.message);
     }
 
-    // 4. 통계 정보 계산
+    // 4. 통계 정보 계산 - 사전예약사이트 기준으로 완료율 계산
+    const uniqueReservationModels = new Set();
+    const uniqueNormalizedModels = new Set();
+    
+    // 사전예약사이트의 고유 모델 조합 추출 (P+Q+R)
+    reservationSiteOriginalData.forEach(item => {
+      const modelKey = `${item.originalP}|${item.originalQ}|${item.originalR}`.trim();
+      if (modelKey && modelKey !== '||') {
+        uniqueReservationModels.add(modelKey);
+      }
+    });
+    
+    // 정규화된 고유 모델 추출
+    reservationSiteOriginalData.forEach(item => {
+      if (item.normalizedModel) {
+        uniqueNormalizedModels.add(item.normalizedModel);
+      }
+    });
+    
     const stats = {
       totalRules: normalizationRules.length,
-      reservationSiteTotal: reservationSiteOriginalData.length,
-      reservationSiteNormalized: reservationSiteOriginalData.filter(item => item.normalizedModel).length,
+      reservationSiteTotal: uniqueReservationModels.size,
+      reservationSiteNormalized: uniqueNormalizedModels.size,
       phoneklTotal: phoneklOriginalData.length,
-      phoneklNormalized: phoneklOriginalData.filter(item => item.normalizedModel).length
+      phoneklNormalized: phoneklOriginalData.filter(item => item.normalizedModel).length,
+      // 사전예약사이트 기준 완료율 (100% 완료 시 정규화작업 완료로 간주)
+      completionRate: uniqueReservationModels.size > 0 
+        ? Math.round((uniqueNormalizedModels.size / uniqueReservationModels.size) * 100) 
+        : 0,
+      isCompleted: uniqueReservationModels.size > 0 && uniqueNormalizedModels.size >= uniqueReservationModels.size
     };
 
     res.json({
