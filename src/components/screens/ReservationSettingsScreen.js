@@ -176,12 +176,16 @@ function ReservationSettingsScreen({ loggedInStore }) {
           updatedItem[field] = value;
         }
         
-        // 매칭 결과 업데이트
+        // 매칭 결과 업데이트 - 조건 완화
         const hasReservationData = updatedItem.reservationSite.p || updatedItem.reservationSite.q || updatedItem.reservationSite.r;
         const hasPhoneklData = updatedItem.phonekl.f || updatedItem.phonekl.g;
         
-        if (hasReservationData && hasPhoneklData) {
-          updatedItem.normalizedModel = `${updatedItem.reservationSite.p || ''} ${updatedItem.reservationSite.q || ''} ${updatedItem.reservationSite.r || ''}`.trim();
+        // 하나라도 데이터가 있으면 매칭 완료로 처리
+        if (hasReservationData || hasPhoneklData) {
+          const reservationText = `${updatedItem.reservationSite.p || ''} ${updatedItem.reservationSite.q || ''} ${updatedItem.reservationSite.r || ''}`.trim();
+          const phoneklText = `${updatedItem.phonekl.f || ''} ${updatedItem.phonekl.g || ''}`.trim();
+          
+          updatedItem.normalizedModel = `${reservationText} ${phoneklText}`.trim();
           updatedItem.matchingStatus = '매칭 완료';
           updatedItem.isMatched = true;
         } else {
@@ -202,9 +206,19 @@ function ReservationSettingsScreen({ loggedInStore }) {
     setMessage({ type: '', text: '' });
     
     try {
+      console.log('저장할 항목들:', normalizationItems);
+      
+      let savedCount = 0;
+      let skippedCount = 0;
+      
       // 각 항목을 개별적으로 저장
       for (const item of normalizationItems) {
+        console.log(`항목 ${item.id} 매칭 상태:`, item.isMatched);
+        console.log(`항목 ${item.id} 데이터:`, item.reservationSite, item.phonekl);
+        
         if (item.isMatched) { // 매칭된 항목만 저장
+          console.log(`항목 ${item.id} 저장 시도...`);
+          
           const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/save`, {
             method: 'POST',
             headers: {
@@ -224,16 +238,31 @@ function ReservationSettingsScreen({ loggedInStore }) {
           });
           
           if (!response.ok) {
-            throw new Error('저장 실패');
+            const errorText = await response.text();
+            console.error(`항목 ${item.id} 저장 실패:`, errorText);
+            throw new Error(`저장 실패: ${errorText}`);
           }
+          
+          console.log(`항목 ${item.id} 저장 성공`);
+          savedCount++;
+        } else {
+          console.log(`항목 ${item.id} 매칭되지 않아 저장 건너뜀`);
+          skippedCount++;
         }
       }
       
-      setMessage({ type: 'success', text: '정규화 설정이 성공적으로 저장되었습니다.' });
+      console.log(`저장 완료: ${savedCount}개 저장, ${skippedCount}개 건너뜀`);
+      
+      if (savedCount > 0) {
+        setMessage({ type: 'success', text: `${savedCount}개의 정규화 설정이 성공적으로 저장되었습니다.` });
+      } else {
+        setMessage({ type: 'warning', text: '저장할 매칭된 항목이 없습니다. 데이터를 입력해주세요.' });
+      }
+      
       await loadSavedNormalizationList();
     } catch (error) {
       console.error('저장 오류:', error);
-      setMessage({ type: 'error', text: '저장 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: `저장 중 오류가 발생했습니다: ${error.message}` });
     } finally {
       setSaving(false);
     }
@@ -594,7 +623,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                   <TableCell width="50px">삭제</TableCell>
                   <TableCell width="200px">사전예약사이트</TableCell>
                   <TableCell width="200px">폰클</TableCell>
-                  <TableCell>매칭 결과</TableCell>
+                  <TableCell width="150px">매칭 결과</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell></TableCell>
@@ -612,7 +641,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption" sx={{ fontWeight: 'bold' }}>정규화된 값</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.7rem' }}>정규화된 값</Typography>
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -678,19 +707,21 @@ function ReservationSettingsScreen({ loggedInStore }) {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Chip
                           label={item.normalizedModel || '정규화된 값 없음'}
                           color={item.isMatched ? 'success' : 'default'}
                           icon={item.isMatched ? <CheckCircleIcon /> : <WarningIcon />}
                           size="small"
+                          sx={{ fontSize: '0.7rem', height: '20px' }}
                         />
-                        <Chip
-                          label={item.matchingStatus || '대기 중'}
-                          color={item.isMatched ? 'success' : 'warning'}
-                          size="small"
-                          variant="outlined"
-                        />
+                        <Typography 
+                          variant="caption" 
+                          color={item.isMatched ? 'success.main' : 'warning.main'}
+                          sx={{ fontSize: '0.65rem', fontWeight: 'bold' }}
+                        >
+                          {item.matchingStatus || '대기 중'}
+                        </Typography>
                       </Box>
                     </TableCell>
                   </TableRow>

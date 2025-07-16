@@ -5862,6 +5862,8 @@ app.post('/api/reservation-settings/save', async (req, res) => {
   try {
     const { selectedValues, matchingResult } = req.body;
     
+    console.log('저장 요청 받음:', { selectedValues, matchingResult });
+    
     // 더 읽기 쉬운 형식으로 데이터 정리
     const reservationSiteText = [
       selectedValues.reservationSite.p,
@@ -5873,6 +5875,8 @@ app.post('/api/reservation-settings/save', async (req, res) => {
       selectedValues.phonekl.f,
       selectedValues.phonekl.g
     ].filter(v => v).join(' | ');
+    
+    console.log('정리된 데이터:', { reservationSiteText, phoneklText });
     
     // 정규화작업 시트에 저장
     const saveData = [
@@ -5887,6 +5891,8 @@ app.post('/api/reservation-settings/save', async (req, res) => {
       ]
     ];
 
+    console.log('Google Sheets에 저장할 데이터:', saveData);
+
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: '정규화작업!A:G',
@@ -5895,6 +5901,8 @@ app.post('/api/reservation-settings/save', async (req, res) => {
         values: saveData
       }
     });
+
+    console.log('Google Sheets 저장 완료');
 
     res.json({
       success: true,
