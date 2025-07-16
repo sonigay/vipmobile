@@ -3130,6 +3130,132 @@ app.post('/api/push/send', async (req, res) => {
   }
 });
 
+// 모델색상별 정리 데이터 API
+app.get('/api/reservation-sales/model-color', async (req, res) => {
+  try {
+    console.log('모델색상별 정리 데이터 요청');
+    
+    // 1. 정규화된 데이터 가져오기
+    const normalizedResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/reservation-settings/normalized-data`);
+    if (!normalizedResponse.ok) {
+      throw new Error('정규화된 데이터를 가져올 수 없습니다.');
+    }
+    const normalizedData = await normalizedResponse.json();
+    
+    if (!normalizedData.success) {
+      throw new Error('정규화된 데이터 조회 실패');
+    }
+    
+    // 2. 사전예약사이트 데이터 가져오기
+    const reservationSiteValues = await getSheetValues('사전예약사이트');
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 3. 폰클개통데이터 가져오기
+    const phoneklValues = await getSheetValues('폰클개통데이터');
+    if (!phoneklValues || phoneklValues.length < 2) {
+      throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+    }
+    
+    // 4. 정규화 규칙 매핑 생성
+    const normalizationRules = normalizedData.normalizationRules || [];
+    const ruleMap = new Map();
+    
+    normalizationRules.forEach(rule => {
+      const key = `${rule.reservationSite}|${rule.phonekl}`;
+      ruleMap.set(key, rule.normalizedModel);
+    });
+    
+    // 5. 사전예약사이트 데이터 처리
+    const reservationSiteRows = reservationSiteValues.slice(1); // 헤더 제거
+    const modelColorStats = new Map(); // 모델색상별 통계
+    
+    reservationSiteRows.forEach((row, index) => {
+      if (row.length < 20) return; // 최소 컬럼 수 확인
+      
+      const pValue = (row[15] || '').toString().trim(); // P열
+      const qValue = (row[16] || '').toString().trim(); // Q열
+      const rValue = (row[17] || '').toString().trim(); // R열
+      const reservationNumber = (row[0] || '').toString().trim(); // 예약번호
+      
+      if (!pValue || !qValue || !rValue || !reservationNumber) return;
+      
+      // 정규화된 모델명 찾기
+      const originalKey = `${pValue}|${qValue}|${rValue}`;
+      const normalizedModel = ruleMap.get(originalKey);
+      
+      if (!normalizedModel) return; // 정규화되지 않은 모델은 제외
+      
+      // 모델과 색상 분리 (정규화된 모델명에서 색상 추출)
+      const modelColorMatch = normalizedModel.match(/^(.+?)\s+([가-힣a-zA-Z0-9\s]+)$/);
+      if (!modelColorMatch) return;
+      
+      const model = modelColorMatch[1].trim();
+      const color = modelColorMatch[2].trim();
+      
+      if (!model || !color) return;
+      
+      const key = `${model}|${color}`;
+      
+      if (!modelColorStats.has(key)) {
+        modelColorStats.set(key, {
+          model,
+          color,
+          total: 0,
+          received: 0,
+          notReceived: 0
+        });
+      }
+      
+      const stats = modelColorStats.get(key);
+      stats.total++;
+      
+      // 서류접수 여부 확인 (폰클개통데이터에서 예약번호 매칭)
+      const isReceived = phoneklValues.slice(1).some(phoneklRow => {
+        if (phoneklRow.length < 70) return false;
+        const phoneklReservationNumber = (phoneklRow[68] || '').toString().trim(); // BO열: 메모1
+        return phoneklReservationNumber === reservationNumber;
+      });
+      
+      if (isReceived) {
+        stats.received++;
+      } else {
+        stats.notReceived++;
+      }
+    });
+    
+    // 6. 결과 정렬 및 반환
+    const result = Array.from(modelColorStats.values())
+      .sort((a, b) => b.total - a.total) // 총 수량 내림차순 정렬
+      .map((item, index) => ({
+        ...item,
+        rank: index + 1
+      }));
+    
+    console.log(`모델색상별 정리 데이터 생성 완료: ${result.length}개 모델색상 조합`);
+    
+    res.json({
+      success: true,
+      data: result,
+      total: result.length,
+      stats: {
+        totalItems: result.reduce((sum, item) => sum + item.total, 0),
+        totalReceived: result.reduce((sum, item) => sum + item.received, 0),
+        totalNotReceived: result.reduce((sum, item) => sum + item.notReceived, 0)
+      }
+    });
+    
+  } catch (error) {
+    console.error('모델색상별 정리 데이터 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load model-color data',
+      message: error.message
+    });
+  }
+});
+
 // 푸시 구독 정보 관리 API
 app.get('/api/push/subscriptions', async (req, res) => {
   try {

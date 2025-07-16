@@ -54,6 +54,8 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [normalizationStatus, setNormalizationStatus] = useState(null);
+  const [modelColorData, setModelColorData] = useState([]);
+  const [loadingModelColor, setLoadingModelColor] = useState(false);
 
   // 데이터 로드
   const loadData = async () => {
@@ -170,11 +172,51 @@ function SalesByStoreScreen({ loggedInStore }) {
     }
   };
 
+  // 모델색상별 데이터 로드
+  const loadModelColorData = async () => {
+    if (!normalizationStatus) {
+      setMessage({ type: 'warning', text: '정규화작업이 완료되지 않았습니다.' });
+      return;
+    }
+
+    setLoadingModelColor(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/model-color`);
+      
+      if (!response.ok) {
+        throw new Error('모델색상별 데이터를 불러올 수 없습니다.');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setModelColorData(result.data);
+        setMessage({ type: 'success', text: `모델색상별 데이터 로드 완료: ${result.data.length}개 조합` });
+      } else {
+        throw new Error(result.message || '모델색상별 데이터 로드에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('모델색상별 데이터 로드 오류:', error);
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoadingModelColor(false);
+    }
+  };
+
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadData();
     checkNormalizationStatus();
   }, []);
+
+  // 모델색상별 탭 선택 시 데이터 로드
+  useEffect(() => {
+    if (viewMode === 'modelColor' && normalizationStatus && modelColorData.length === 0) {
+      loadModelColorData();
+    }
+  }, [viewMode, normalizationStatus]);
 
   // 디버깅용: 데이터 구조 확인
   useEffect(() => {
@@ -678,7 +720,7 @@ function SalesByStoreScreen({ loggedInStore }) {
             </Typography>
             
             {normalizationStatus ? (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                 <Button
                   variant="outlined"
                   size="small"
@@ -694,7 +736,23 @@ function SalesByStoreScreen({ loggedInStore }) {
                 >
                   전체 모델
                 </Button>
-                {/* 여기에 모델별 버튼들이 추가될 예정 */}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={loadModelColorData}
+                  disabled={loadingModelColor}
+                >
+                  {loadingModelColor ? <CircularProgress size={16} /> : '데이터 로드'}
+                </Button>
+                {modelColorData.length > 0 && (
+                  <Chip
+                    label={`${modelColorData.length}개 모델색상 조합`}
+                    color="success"
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
               </Box>
             ) : (
               <Alert severity="warning" sx={{ mb: 2 }}>
@@ -709,104 +767,102 @@ function SalesByStoreScreen({ loggedInStore }) {
       {viewMode === 'modelColor' && normalizationStatus && (
         <Card>
           <CardContent>
-            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-              모델색상별 서류접수 현황
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+                모델색상별 서류접수 현황
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={loadModelColorData}
+                disabled={loadingModelColor}
+                size="small"
+              >
+                {loadingModelColor ? <CircularProgress size={16} /> : '새로고침'}
+              </Button>
+            </Box>
             
-            <Alert severity="info" sx={{ mb: 2 }}>
-              모델색상별 정리 기능은 정규화작업이 완료된 후 사용할 수 있습니다.
-            </Alert>
-            
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell width="60px" align="center">랭크</TableCell>
-                    <TableCell width="200px">모델</TableCell>
-                    <TableCell width="150px">색상</TableCell>
-                    <TableCell width="120px" align="center">서류접수</TableCell>
-                    <TableCell width="120px" align="center">서류미접수</TableCell>
-                    <TableCell width="100px" align="center">합계</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {/* 정규화작업이 완료되면 실제 데이터가 여기에 표시됩니다 */}
-                  {/* 예시 구조:
-                  {modelColorData
-                    .map(({ model, color, received, notReceived, total }) => ({
-                      model,
-                      color,
-                      received,
-                      notReceived,
-                      total
-                    }))
-                    .sort((a, b) => b.total - a.total) // 합계 내림차순 정렬
-                    .map(({ model, color, received, notReceived, total }, index) => (
-                    <TableRow key={`${model}-${color}`} hover>
-                      <TableCell align="center">
-                        <Chip
-                          label={index + 1}
-                          size="small"
-                          color={index < 3 ? 'primary' : 'default'}
-                          sx={{ 
-                            fontSize: '0.7rem', 
-                            fontWeight: 'bold',
-                            backgroundColor: index < 3 ? '#ff9a9e' : undefined,
-                            color: index < 3 ? 'white' : undefined
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={model}
-                          color="primary"
-                          size="small"
-                          icon={<ColorLensIcon />}
-                          sx={{ fontSize: '0.8rem' }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {color}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={received}
-                          color="success"
-                          size="small"
-                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={notReceived}
-                          color="warning"
-                          size="small"
-                          sx={{ fontSize: '0.8rem', minWidth: 40 }}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={total}
-                          color="primary"
-                          size="small"
-                          sx={{ fontSize: '0.8rem', minWidth: 40, fontWeight: 'bold' }}
-                        />
-                      </TableCell>
+            {loadingModelColor ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : modelColorData.length > 0 ? (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell width="60px" align="center">랭크</TableCell>
+                      <TableCell width="200px">모델</TableCell>
+                      <TableCell width="150px">색상</TableCell>
+                      <TableCell width="120px" align="center">서류접수</TableCell>
+                      <TableCell width="120px" align="center">서류미접수</TableCell>
+                      <TableCell width="100px" align="center">합계</TableCell>
                     </TableRow>
-                  ))
-                  */}
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <Typography variant="body2" color="text.secondary">
-                        정규화작업이 완료되면 모델색상별 데이터가 표시됩니다.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {modelColorData.map((item) => (
+                      <TableRow key={`${item.model}-${item.color}`} hover>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.rank}
+                            size="small"
+                            color={item.rank <= 3 ? 'primary' : 'default'}
+                            sx={{ 
+                              fontSize: '0.7rem', 
+                              fontWeight: 'bold',
+                              backgroundColor: item.rank <= 3 ? '#ff9a9e' : undefined,
+                              color: item.rank <= 3 ? 'white' : undefined
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={item.model}
+                            color="primary"
+                            size="small"
+                            icon={<ColorLensIcon />}
+                            sx={{ fontSize: '0.8rem' }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {item.color}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.received}
+                            color="success"
+                            size="small"
+                            sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.notReceived}
+                            color="warning"
+                            size="small"
+                            sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.total}
+                            color="primary"
+                            size="small"
+                            sx={{ fontSize: '0.8rem', minWidth: 40, fontWeight: 'bold' }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Alert severity="info">
+                모델색상별 데이터가 없습니다. 새로고침 버튼을 클릭하여 데이터를 로드해주세요.
+              </Alert>
+            )}
           </CardContent>
         </Card>
       )}
