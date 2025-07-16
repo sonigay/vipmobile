@@ -83,6 +83,12 @@ function ReservationSettingsScreen({ loggedInStore }) {
   });
   const [showNormalizedData, setShowNormalizedData] = useState(false);
   const [loadingNormalizedData, setLoadingNormalizedData] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualInput, setManualInput] = useState({
+    reservationSite: { p: '', q: '', r: '' },
+    phonekl: { f: '', g: '' },
+    normalizedModel: ''
+  });
 
   // 데이터 로드
   const loadData = async () => {
@@ -287,6 +293,59 @@ function ReservationSettingsScreen({ loggedInStore }) {
     setMessage({ type: 'info', text: '설정이 초기화되었습니다.' });
   };
 
+  // 수기 입력 저장
+  const saveManualInput = async () => {
+    if (!manualInput.normalizedModel.trim()) {
+      setMessage({ type: 'warning', text: '정규화된 모델명을 입력해주세요.' });
+      return;
+    }
+
+    setSaving(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          selectedValues: {
+            reservationSite: manualInput.reservationSite,
+            phonekl: manualInput.phonekl
+          },
+          matchingResult: {
+            normalizedModel: manualInput.normalizedModel,
+            matchingStatus: '수기 입력',
+            isMatched: true
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`저장 실패: ${errorText}`);
+      }
+
+      setMessage({ type: 'success', text: '수기 입력이 성공적으로 저장되었습니다.' });
+      
+      // 입력 필드 초기화
+      setManualInput({
+        reservationSite: { p: '', q: '', r: '' },
+        phonekl: { f: '', g: '' },
+        normalizedModel: ''
+      });
+      
+      // 저장된 목록 새로고침
+      await loadSavedNormalizationList();
+    } catch (error) {
+      console.error('수기 입력 저장 오류:', error);
+      setMessage({ type: 'error', text: `저장 중 오류가 발생했습니다: ${error.message}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // 날짜 포맷팅
   const formatDate = (timestamp) => {
     try {
@@ -372,6 +431,15 @@ function ReservationSettingsScreen({ loggedInStore }) {
           {loadingNormalizedData ? <CircularProgress size={20} /> : (showNormalizedData ? <ExpandLessIcon /> : <ExpandMoreIcon />)}
           정규화된 데이터 조회
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={<EditIcon />}
+          onClick={() => setShowManualInput(!showManualInput)}
+          color="warning"
+        >
+          {showManualInput ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          수기 입력
+        </Button>
       </Box>
 
       {/* 저장된 정규화 목록 */}
@@ -424,6 +492,134 @@ function ReservationSettingsScreen({ loggedInStore }) {
                 저장된 정규화 기록이 없습니다.
               </Alert>
             )}
+          </CardContent>
+        </Card>
+      </Collapse>
+
+      {/* 수기 입력 */}
+      <Collapse in={showManualInput}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+              수기 입력 (폰클재고데이터에 없는 모델용)
+            </Typography>
+            
+            <Alert severity="info" sx={{ mb: 2 }}>
+              사전예약사이트에 있는 모델이 폰클재고데이터에 없어서 매칭이 안 되는 경우, 수기로 입력하여 정규화작업을 완료할 수 있습니다.
+            </Alert>
+            
+            <Grid container spacing={2}>
+              {/* 사전예약사이트 입력 */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  사전예약사이트 데이터
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="P열 (모델명)"
+                  value={manualInput.reservationSite.p}
+                  onChange={(e) => setManualInput(prev => ({
+                    ...prev,
+                    reservationSite: { ...prev.reservationSite, p: e.target.value }
+                  }))}
+                  size="small"
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  label="Q열 (색상)"
+                  value={manualInput.reservationSite.q}
+                  onChange={(e) => setManualInput(prev => ({
+                    ...prev,
+                    reservationSite: { ...prev.reservationSite, q: e.target.value }
+                  }))}
+                  size="small"
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  label="R열 (용량)"
+                  value={manualInput.reservationSite.r}
+                  onChange={(e) => setManualInput(prev => ({
+                    ...prev,
+                    reservationSite: { ...prev.reservationSite, r: e.target.value }
+                  }))}
+                  size="small"
+                />
+              </Grid>
+              
+              {/* 폰클 입력 */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  폰클 데이터 (선택사항)
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="F열 (모델명)"
+                  value={manualInput.phonekl.f}
+                  onChange={(e) => setManualInput(prev => ({
+                    ...prev,
+                    phonekl: { ...prev.phonekl, f: e.target.value }
+                  }))}
+                  size="small"
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  label="G열 (색상)"
+                  value={manualInput.phonekl.g}
+                  onChange={(e) => setManualInput(prev => ({
+                    ...prev,
+                    phonekl: { ...prev.phonekl, g: e.target.value }
+                  }))}
+                  size="small"
+                />
+              </Grid>
+              
+              {/* 정규화된 모델명 입력 */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  정규화된 모델명 *
+                </Typography>
+                <TextField
+                  fullWidth
+                  label="정규화된 모델명을 입력하세요"
+                  value={manualInput.normalizedModel}
+                  onChange={(e) => setManualInput(prev => ({
+                    ...prev,
+                    normalizedModel: e.target.value
+                  }))}
+                  placeholder="예: iPhone 15 Pro Max 256GB 블랙타이타늄"
+                  required
+                  sx={{ mb: 2 }}
+                />
+              </Grid>
+              
+              {/* 저장 버튼 */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={saveManualInput}
+                    disabled={saving || !manualInput.normalizedModel.trim()}
+                    sx={{ backgroundColor: '#ff9a9e', '&:hover': { backgroundColor: '#f48fb1' } }}
+                  >
+                    {saving ? <CircularProgress size={20} /> : '수기 입력 저장'}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setManualInput({
+                      reservationSite: { p: '', q: '', r: '' },
+                      phonekl: { f: '', g: '' },
+                      normalizedModel: ''
+                    })}
+                  >
+                    초기화
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
           </CardContent>
         </Card>
       </Collapse>
