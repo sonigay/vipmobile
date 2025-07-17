@@ -119,6 +119,55 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
 
+  // 담당자 데이터 분석하여 계층 구조 생성
+  const getHierarchicalStructure = useMemo(() => {
+    const structure = {
+      offices: {},
+      departments: {},
+      agents: {}
+    };
+
+    // 유효한 담당자만 필터링
+    const validAgents = agents.filter(agent => 
+      agent.office && agent.office.trim() !== '' && 
+      agent.department && agent.department.trim() !== ''
+    );
+
+    validAgents.forEach(agent => {
+      const office = agent.office.trim();
+      const department = agent.department.trim();
+      const agentId = agent.contactId;
+
+      // 사무실별 구조
+      if (!structure.offices[office]) {
+        structure.offices[office] = {
+          departments: new Set(),
+          agents: new Set()
+        };
+      }
+      structure.offices[office].departments.add(department);
+      structure.offices[office].agents.add(agentId);
+
+      // 소속별 구조
+      if (!structure.departments[department]) {
+        structure.departments[department] = {
+          office: office,
+          agents: new Set()
+        };
+      }
+      structure.departments[department].agents.add(agentId);
+
+      // 영업사원별 구조
+      structure.agents[agentId] = {
+        name: agent.target,
+        office: office,
+        department: department
+      };
+    });
+
+    return structure;
+  }, [agents]);
+
   // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
     const loadData = async () => {
@@ -532,15 +581,54 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   // 계층적 대상자 변경 처리
   const handleHierarchicalTargetChange = (type, target, checked) => {
     setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      
+      if (type === 'offices') {
+        // 사무실 선택/해제 시 해당 소속과 영업사원도 함께 처리
+        newTargets.offices[target] = checked;
+        
+        if (getHierarchicalStructure.offices[target]) {
+          const officeData = getHierarchicalStructure.offices[target];
+          
+          // 해당 사무실의 소속들 처리
+          officeData.departments.forEach(dept => {
+            if (newTargets.departments[dept] !== undefined) {
+              newTargets.departments[dept] = checked;
+            }
+          });
+          
+          // 해당 사무실의 영업사원들 처리
+          officeData.agents.forEach(agentId => {
+            if (newTargets.agents[agentId] !== undefined) {
+              newTargets.agents[agentId] = checked;
+            }
+          });
+        }
+      } else if (type === 'departments') {
+        // 소속 선택/해제 시 해당 영업사원도 함께 처리
+        newTargets.departments[target] = checked;
+        
+        if (getHierarchicalStructure.departments[target]) {
+          const deptData = getHierarchicalStructure.departments[target];
+          
+          // 해당 소속의 영업사원들 처리
+          deptData.agents.forEach(agentId => {
+            if (newTargets.agents[agentId] !== undefined) {
+              newTargets.agents[agentId] = checked;
+            }
+          });
+        }
+      } else if (type === 'agents') {
+        // 영업사원 개별 선택/해제
+        newTargets.agents[target] = checked;
+      } else if (type === 'stores') {
+        // 매장 개별 선택/해제
+        newTargets.stores[target] = checked;
+      }
+
       const newSettings = {
         ...prev,
-        targets: {
-          ...prev.targets,
-          [type]: {
-            ...prev.targets[type],
-            [target]: checked
-          }
-        }
+        targets: newTargets
       };
       
       // 즉시 저장
@@ -557,23 +645,60 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 계층적 전체 선택/해제
   const handleHierarchicalSelectAll = (type, checked) => {
-    const targets = type === 'offices' ? 
-      [...new Set(agents.map(agent => agent.office))] :
-      type === 'departments' ? 
-      [...new Set(agents.map(agent => agent.department))] :
-      type === 'stores' ? 
-      stores.map(store => store.id) :
-      agents.map(agent => agent.contactId);
-    
     setAssignmentSettings(prev => {
       const newTargets = { ...prev.targets };
-      newTargets[type] = {};
-      targets.forEach(target => {
-        if (target) { // null이나 undefined가 아닌 경우만
-          newTargets[type][target] = checked;
-        }
-      });
       
+      if (type === 'offices') {
+        // 사무실 전체 선택/해제
+        Object.keys(newTargets.offices).forEach(office => {
+          newTargets.offices[office] = checked;
+          
+          if (getHierarchicalStructure.offices[office]) {
+            const officeData = getHierarchicalStructure.offices[office];
+            
+            // 해당 사무실의 소속들 처리
+            officeData.departments.forEach(dept => {
+              if (newTargets.departments[dept] !== undefined) {
+                newTargets.departments[dept] = checked;
+              }
+            });
+            
+            // 해당 사무실의 영업사원들 처리
+            officeData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = checked;
+              }
+            });
+          }
+        });
+      } else if (type === 'departments') {
+        // 소속 전체 선택/해제
+        Object.keys(newTargets.departments).forEach(dept => {
+          newTargets.departments[dept] = checked;
+          
+          if (getHierarchicalStructure.departments[dept]) {
+            const deptData = getHierarchicalStructure.departments[dept];
+            
+            // 해당 소속의 영업사원들 처리
+            deptData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = checked;
+              }
+            });
+          }
+        });
+      } else if (type === 'agents') {
+        // 영업사원 전체 선택/해제
+        Object.keys(newTargets.agents).forEach(agentId => {
+          newTargets.agents[agentId] = checked;
+        });
+      } else if (type === 'stores') {
+        // 매장 전체 선택/해제
+        stores.forEach(store => {
+          newTargets.stores[store.id] = checked;
+        });
+      }
+
       const newSettings = {
         ...prev,
         targets: newTargets
@@ -595,12 +720,59 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   const handleHierarchicalReset = (type) => {
     if (window.confirm(`${type === 'offices' ? '사무실' : type === 'departments' ? '소속' : type === 'stores' ? '매장' : '담당자'} 선택을 초기화하시겠습니까?`)) {
       setAssignmentSettings(prev => {
+        const newTargets = { ...prev.targets };
+        
+        if (type === 'offices') {
+          // 사무실 전체 해제 시 모든 하위 항목도 해제
+          Object.keys(newTargets.offices).forEach(office => {
+            newTargets.offices[office] = false;
+            
+            if (getHierarchicalStructure.offices[office]) {
+              const officeData = getHierarchicalStructure.offices[office];
+              
+              officeData.departments.forEach(dept => {
+                if (newTargets.departments[dept] !== undefined) {
+                  newTargets.departments[dept] = false;
+                }
+              });
+              
+              officeData.agents.forEach(agentId => {
+                if (newTargets.agents[agentId] !== undefined) {
+                  newTargets.agents[agentId] = false;
+                }
+              });
+            }
+          });
+        } else if (type === 'departments') {
+          // 소속 전체 해제 시 해당 영업사원들도 해제
+          Object.keys(newTargets.departments).forEach(dept => {
+            newTargets.departments[dept] = false;
+            
+            if (getHierarchicalStructure.departments[dept]) {
+              const deptData = getHierarchicalStructure.departments[dept];
+              
+              deptData.agents.forEach(agentId => {
+                if (newTargets.agents[agentId] !== undefined) {
+                  newTargets.agents[agentId] = false;
+                }
+              });
+            }
+          });
+        } else if (type === 'agents') {
+          // 영업사원 전체 해제
+          Object.keys(newTargets.agents).forEach(agentId => {
+            newTargets.agents[agentId] = false;
+          });
+        } else if (type === 'stores') {
+          // 매장 전체 해제
+          Object.keys(newTargets.stores).forEach(storeId => {
+            newTargets.stores[storeId] = false;
+          });
+        }
+
         const newSettings = {
           ...prev,
-          targets: {
-            ...prev.targets,
-            [type]: {}
-          }
+          targets: newTargets
         };
         
         // 즉시 저장
