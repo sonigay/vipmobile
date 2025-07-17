@@ -7904,6 +7904,13 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
 
     console.log(`전체 고객리스트 생성 완료: ${customerList.length}개 고객`);
 
+    // 사이트예약(예약일시) 기준으로 오름차순 정렬
+    customerList.sort((a, b) => {
+      const dateA = new Date(a.reservationDateTime);
+      const dateB = new Date(b.reservationDateTime);
+      return dateA - dateB;
+    });
+
     const result = {
       success: true,
       data: customerList,
