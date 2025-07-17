@@ -83,6 +83,7 @@ if (!API_BASE_URL) {
 
 function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [agents, setAgents] = useState([]);
+  const [stores, setStores] = useState([]);
   const [assignmentSettings, setAssignmentSettings] = useState({
     priorities: {
       onSaleReceipt: 1,    // 온세일접수 1순위
@@ -126,6 +127,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         
         // 담당자 데이터 로드
         console.log('담당자 데이터 로드 중...');
+        console.log('API_BASE_URL:', API_BASE_URL);
         let agentDataLoaded = false;
         
         try {
@@ -139,13 +141,28 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
               const agentData = await agentResponse.json();
               console.log('담당자 데이터 로드 완료:', agentData.length, '명');
               console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
+              console.log('담당자 데이터 구조 확인:', agentData.length > 0 ? Object.keys(agentData[0]) : '빈 데이터');
               
               if (agentData && Array.isArray(agentData) && agentData.length > 0) {
                 setAgents(agentData);
                 agentDataLoaded = true;
                 console.log('✅ 실제 담당자 데이터 로드 성공');
+                
+                // 담당자 데이터 상세 로그
+                console.log('담당자 데이터 상세:');
+                agentData.slice(0, 5).forEach((agent, index) => {
+                  console.log(`  ${index + 1}번째 담당자:`, {
+                    target: agent.target,
+                    contactId: agent.contactId,
+                    office: agent.office,
+                    department: agent.department,
+                    store: agent.store
+                  });
+                });
               } else {
                 console.warn('담당자 데이터가 비어있거나 유효하지 않음');
+                console.warn('agentData 타입:', typeof agentData);
+                console.warn('agentData 길이:', agentData?.length);
               }
             } else {
               console.error('담당자 API가 JSON이 아닌 응답을 반환:', contentType);
@@ -153,7 +170,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
               console.error('응답 내용:', responseText.substring(0, 200));
             }
           } else {
-            console.error('매장 API 응답 실패:', agentResponse.status, agentResponse.statusText);
+            console.error('담당자 API 응답 실패:', agentResponse.status, agentResponse.statusText);
             const responseText = await agentResponse.text();
             console.error('에러 응답 내용:', responseText.substring(0, 200));
           }
@@ -170,6 +187,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         if (data && Array.isArray(data)) {
           console.log('Props로 받은 매장 데이터:', data.length, '개');
           storeData = data;
+          setStores(data);
           storeDataLoaded = true;
           console.log('✅ Props로 받은 매장 데이터 사용');
         } else {
@@ -187,6 +205,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                 console.log('API에서 가져온 매장 데이터:', responseData.stores?.length || 0, '개');
                 if (responseData.stores && Array.isArray(responseData.stores)) {
                   storeData = responseData.stores;
+                  setStores(responseData.stores);
                   storeDataLoaded = true;
                   console.log('✅ API에서 매장 데이터 로드 성공');
                 } else {
@@ -543,7 +562,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       type === 'departments' ? 
       [...new Set(agents.map(agent => agent.department))] :
       type === 'stores' ? 
-      [...new Set(agents.map(agent => agent.store))] :
+      stores.map(store => store.id) :
       agents.map(agent => agent.contactId);
     
     setAssignmentSettings(prev => {
@@ -970,12 +989,12 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                         
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                          {[...new Set(agents.map(agent => agent.store))].filter(store => store).map(store => (
+                          {stores.map(store => (
                             <Chip
-                              key={store}
-                              label={store}
-                              color={assignmentSettings.targets.stores?.[store] ? 'primary' : 'default'}
-                              onClick={() => handleHierarchicalTargetChange('stores', store, !assignmentSettings.targets.stores?.[store])}
+                              key={store.id}
+                              label={store.name}
+                              color={assignmentSettings.targets.stores?.[store.id] ? 'primary' : 'default'}
+                              onClick={() => handleHierarchicalTargetChange('stores', store.id, !assignmentSettings.targets.stores?.[store.id])}
                               sx={{ cursor: 'pointer' }}
                             />
                           ))}
@@ -1013,7 +1032,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                           {agents.map(agent => (
                             <Chip
                               key={agent.contactId}
-                              label={agent.name}
+                              label={agent.target || agent.contactId}
                               color={assignmentSettings.targets.agents[agent.contactId] ? 'primary' : 'default'}
                               onClick={() => handleHierarchicalTargetChange('agents', agent.contactId, !assignmentSettings.targets.agents[agent.contactId])}
                               sx={{ cursor: 'pointer' }}
