@@ -1043,44 +1043,210 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
               </Box>
             </Box>
 
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>담당자</TableCell>
-                    <TableCell>모델</TableCell>
-                    <TableCell>색상</TableCell>
-                    <TableCell align="center">수량</TableCell>
-                    <TableCell align="center">우선순위</TableCell>
-                    <TableCell>접수시간</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {previewData.assignments.map((assignment, index) => (
-                    <TableRow key={index} hover>
-                      <TableCell>{assignment.agent}</TableCell>
-                      <TableCell>{assignment.model}</TableCell>
-                      <TableCell>{assignment.color}</TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={assignment.quantity}
-                          color="primary"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={assignment.priority}
-                          color={assignment.priority === 1 ? 'primary' : assignment.priority === 2 ? 'secondary' : 'warning'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{assignment.receiptTime}</TableCell>
+            {/* 미리보기 서브탭 */}
+            <Tabs value={previewSubTab} onChange={(e, newValue) => setPreviewSubTab(newValue)} sx={{ mb: 2 }}>
+              <Tab label="상세 배정" />
+              <Tab label="POS별 합산" />
+              <Tab label="담당자별 합산" />
+              <Tab label="소속별 합산" />
+              <Tab label="사무실별 합산" />
+            </Tabs>
+
+            {/* 상세 배정 탭 */}
+            {previewSubTab === 0 && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>담당자</TableCell>
+                      <TableCell>모델</TableCell>
+                      <TableCell>색상</TableCell>
+                      <TableCell align="center">수량</TableCell>
+                      <TableCell align="center">우선순위</TableCell>
+                      <TableCell>접수시간</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {previewData.assignments.map((assignment, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{assignment.agent}</TableCell>
+                        <TableCell>{assignment.model}</TableCell>
+                        <TableCell>{assignment.color}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={assignment.quantity}
+                            color="primary"
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={assignment.priority}
+                            color={assignment.priority === 1 ? 'primary' : assignment.priority === 2 ? 'secondary' : 'warning'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>{assignment.receiptTime}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* POS별 합산 탭 */}
+            {previewSubTab === 1 && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>POS명</TableCell>
+                      <TableCell>모델</TableCell>
+                      <TableCell>색상</TableCell>
+                      <TableCell align="center">총 수량</TableCell>
+                      <TableCell align="center">담당자 수</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {generatePOSSummary(previewData.assignments, agents).map((pos, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{pos.posName}</TableCell>
+                        <TableCell>{pos.model}</TableCell>
+                        <TableCell>{pos.color}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={pos.totalQuantity}
+                            color="primary"
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={pos.agentCount}
+                            color="secondary"
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* 담당자별 합산 탭 */}
+            {previewSubTab === 2 && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>담당자</TableCell>
+                      <TableCell>POS명</TableCell>
+                      <TableCell>모델</TableCell>
+                      <TableCell>색상</TableCell>
+                      <TableCell align="center">총 수량</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {generateAgentSummary(previewData.assignments, agents).map((agent, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{agent.agentName}</TableCell>
+                        <TableCell>{agent.posName}</TableCell>
+                        <TableCell>{agent.model}</TableCell>
+                        <TableCell>{agent.color}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={agent.totalQuantity}
+                            color="primary"
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* 소속별 합산 탭 */}
+            {previewSubTab === 3 && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>소속</TableCell>
+                      <TableCell>모델</TableCell>
+                      <TableCell>색상</TableCell>
+                      <TableCell align="center">총 수량</TableCell>
+                      <TableCell align="center">담당자 수</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {generateDepartmentSummary(previewData.assignments, agents).map((dept, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{dept.department}</TableCell>
+                        <TableCell>{dept.model}</TableCell>
+                        <TableCell>{dept.color}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={dept.totalQuantity}
+                            color="primary"
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={dept.agentCount}
+                            color="secondary"
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* 사무실별 합산 탭 */}
+            {previewSubTab === 4 && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>사무실</TableCell>
+                      <TableCell>모델</TableCell>
+                      <TableCell>색상</TableCell>
+                      <TableCell align="center">총 수량</TableCell>
+                      <TableCell align="center">담당자 수</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {generateOfficeSummary(previewData.assignments, agents).map((office, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{office.office}</TableCell>
+                        <TableCell>{office.model}</TableCell>
+                        <TableCell>{office.color}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={office.totalQuantity}
+                            color="primary"
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={office.agentCount}
+                            color="secondary"
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
           </Box>
         )}
 
@@ -1229,6 +1395,118 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       </Dialog>
     </Box>
   );
+
+  // POS별 합산 계산
+  const generatePOSSummary = (assignments, agents) => {
+    const posMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent && agent.store) {
+        const key = `${agent.store}_${assignment.model}_${assignment.color}`;
+        if (!posMap.has(key)) {
+          posMap.set(key, {
+            posName: agent.store,
+            model: assignment.model,
+            color: assignment.color,
+            totalQuantity: 0,
+            agentCount: 0,
+            agents: new Set()
+          });
+        }
+        
+        const posData = posMap.get(key);
+        posData.totalQuantity += assignment.quantity;
+        posData.agents.add(assignment.agent);
+        posData.agentCount = posData.agents.size;
+      }
+    });
+    
+    return Array.from(posMap.values()).sort((a, b) => a.posName.localeCompare(b.posName));
+  };
+
+  // 담당자별 합산 계산
+  const generateAgentSummary = (assignments, agents) => {
+    const agentMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent) {
+        const key = `${assignment.agent}_${assignment.model}_${assignment.color}`;
+        if (!agentMap.has(key)) {
+          agentMap.set(key, {
+            agentName: assignment.agent,
+            posName: agent.store || '-',
+            model: assignment.model,
+            color: assignment.color,
+            totalQuantity: 0
+          });
+        }
+        
+        agentMap.get(key).totalQuantity += assignment.quantity;
+      }
+    });
+    
+    return Array.from(agentMap.values()).sort((a, b) => a.agentName.localeCompare(b.agentName));
+  };
+
+  // 소속별 합산 계산
+  const generateDepartmentSummary = (assignments, agents) => {
+    const deptMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent && agent.department) {
+        const key = `${agent.department}_${assignment.model}_${assignment.color}`;
+        if (!deptMap.has(key)) {
+          deptMap.set(key, {
+            department: agent.department,
+            model: assignment.model,
+            color: assignment.color,
+            totalQuantity: 0,
+            agentCount: 0,
+            agents: new Set()
+          });
+        }
+        
+        const deptData = deptMap.get(key);
+        deptData.totalQuantity += assignment.quantity;
+        deptData.agents.add(assignment.agent);
+        deptData.agentCount = deptData.agents.size;
+      }
+    });
+    
+    return Array.from(deptMap.values()).sort((a, b) => a.department.localeCompare(b.department));
+  };
+
+  // 사무실별 합산 계산
+  const generateOfficeSummary = (assignments, agents) => {
+    const officeMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent && agent.office) {
+        const key = `${agent.office}_${assignment.model}_${assignment.color}`;
+        if (!officeMap.has(key)) {
+          officeMap.set(key, {
+            office: agent.office,
+            model: assignment.model,
+            color: assignment.color,
+            totalQuantity: 0,
+            agentCount: 0,
+            agents: new Set()
+          });
+        }
+        
+        const officeData = officeMap.get(key);
+        officeData.totalQuantity += assignment.quantity;
+        officeData.agents.add(assignment.agent);
+        officeData.agentCount = officeData.agents.size;
+      }
+    });
+    
+    return Array.from(officeMap.values()).sort((a, b) => a.office.localeCompare(b.office));
+  };
 }
 
 export default ReservationAssignmentSettingsScreen; 
