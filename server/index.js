@@ -3200,7 +3200,9 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       if (yardRow.length >= 25) {
         const reservationNumber = (yardRow[0] || '').toString().trim();
         if (reservationNumber) {
-          yardIndex.set(reservationNumber, true);
+          // 하이픈 제거하여 정규화된 예약번호로 저장
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          yardIndex.set(normalizedReservationNumber, true);
         }
       }
     });
@@ -3281,17 +3283,19 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       stats.total++;
       
       // 서류접수 여부 확인 (인덱스 활용으로 빠른 검색)
-      const isReceived = yardIndex.has(reservationNumber);
+      // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const isReceived = yardIndex.has(normalizedReservationNumber);
       
       if (isReceived) {
         stats.received++;
         if (index < 5) {
-          console.log(`서류접수 확인됨: ${reservationNumber} -> ${model}`);
+          console.log(`서류접수 확인됨: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
         }
       } else {
         stats.notReceived++;
         if (index < 5) {
-          console.log(`서류미접수: ${reservationNumber} -> ${model}`);
+          console.log(`서류미접수: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
         }
       }
     });
@@ -3403,7 +3407,9 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       if (yardRow.length >= 25) {
         const reservationNumber = (yardRow[0] || '').toString().trim();
         if (reservationNumber) {
-          yardIndex.set(reservationNumber, {
+          // 하이픈 제거하여 정규화된 예약번호로 저장
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          yardIndex.set(normalizedReservationNumber, {
             receivedDateTime: (yardRow[11] || '').toString().trim(),
             receivedMemo: (yardRow[20] || '').toString().trim()
           });
@@ -3453,7 +3459,9 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       const model = modelMatch[1].trim();
       
       // 서류접수 정보 찾기 (인덱스 활용으로 빠른 검색)
-      const yardData = yardIndex.get(reservationNumber) || {};
+      // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const yardData = yardIndex.get(normalizedReservationNumber) || {};
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
       
@@ -3567,7 +3575,9 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       if (yardRow.length >= 25) {
         const reservationNumber = (yardRow[0] || '').toString().trim();
         if (reservationNumber) {
-          yardIndex.set(reservationNumber, {
+          // 하이픈 제거하여 정규화된 예약번호로 저장
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          yardIndex.set(normalizedReservationNumber, {
             receivedDateTime: (yardRow[11] || '').toString().trim(),
             receivedMemo: (yardRow[20] || '').toString().trim()
           });
@@ -3614,7 +3624,9 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       if (extractedModel !== model) return;
       
       // 서류접수 정보 찾기 (인덱스 활용으로 빠른 검색)
-      const yardData = yardIndex.get(reservationNumber) || {};
+      // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const yardData = yardIndex.get(normalizedReservationNumber) || {};
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
       
@@ -4527,8 +4539,6 @@ app.get('/api/inspection-data', async (req, res) => {
     });
   }
 });
-
-// 기존 COLUMN_MAPPINGS와 compareRows 함수는 제거됨 (compareDynamicColumns로 통합)
 
 // 해시화된 ID를 원본 키로 변환하는 함수
 function findOriginalKeyFromHash(hashId, differences) {
