@@ -3651,7 +3651,7 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
           // 하이픈 제거하여 정규화된 예약번호로 저장
           const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
           const receivedDateTime = (yardRow[11] || '').toString().trim();
-          const receivedMemo = (yardRow[20] || '').toString().trim();
+          const receivedMemo = (yardRow[21] || '').toString().trim();
           
           yardIndex.set(normalizedReservationNumber, {
             receivedDateTime,
