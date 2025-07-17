@@ -823,7 +823,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                             }}
                           />
                           <Chip
-                            label={`${modelData.name} ${modelData.color}`}
+                            label={`${modelData.name} ${modelData.capacity} ${modelData.color}`}
                             color="primary"
                             size="small"
                           />
@@ -1070,20 +1070,21 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
               <TableContainer component={Paper} variant="outlined">
                 <Table>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>담당자</TableCell>
-                      <TableCell>모델</TableCell>
-                      <TableCell>색상</TableCell>
-                      <TableCell align="center">수량</TableCell>
-                      <TableCell align="center">우선순위</TableCell>
-                      <TableCell>접수시간</TableCell>
-                    </TableRow>
+                                          <TableRow>
+                        <TableCell>담당자</TableCell>
+                        <TableCell>모델/용량</TableCell>
+                        <TableCell>색상</TableCell>
+                        <TableCell align="center">수량</TableCell>
+                        <TableCell align="center">우선순위</TableCell>
+                        <TableCell>출처</TableCell>
+                        <TableCell>접수시간</TableCell>
+                      </TableRow>
                   </TableHead>
                   <TableBody>
                     {previewData.assignments.map((assignment, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{assignment.agent}</TableCell>
-                        <TableCell>{assignment.model}</TableCell>
+                        <TableCell>{assignment.model} {assignment.capacity}</TableCell>
                         <TableCell>{assignment.color}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -1094,9 +1095,17 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={assignment.priority}
-                            color={assignment.priority === 1 ? 'primary' : assignment.priority === 2 ? 'secondary' : 'warning'}
+                            label={assignment.priority === 1 ? '온세일' : assignment.priority === 2 ? '마당접수' : '사전예약'}
+                            color={assignment.priority === 1 ? 'error' : assignment.priority === 2 ? 'warning' : 'info'}
                             size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={assignment.source === 'onSale' ? '온세일' : assignment.source === 'yard' ? '마당접수' : '사전예약'}
+                            color={assignment.source === 'onSale' ? 'error' : assignment.source === 'yard' ? 'warning' : 'info'}
+                            size="small"
+                            variant="outlined"
                           />
                         </TableCell>
                         <TableCell>{assignment.receiptTime}</TableCell>
@@ -1114,7 +1123,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                   <TableHead>
                     <TableRow>
                       <TableCell>POS명</TableCell>
-                      <TableCell>모델</TableCell>
+                      <TableCell>모델/용량</TableCell>
                       <TableCell>색상</TableCell>
                       <TableCell align="center">총 수량</TableCell>
                       <TableCell align="center">담당자 수</TableCell>
@@ -1124,7 +1133,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                     {generatePOSSummary(previewData.assignments, agents).map((pos, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{pos.posName}</TableCell>
-                        <TableCell>{pos.model}</TableCell>
+                        <TableCell>{pos.model} {pos.capacity}</TableCell>
                         <TableCell>{pos.color}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -1155,7 +1164,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                     <TableRow>
                       <TableCell>담당자</TableCell>
                       <TableCell>POS명</TableCell>
-                      <TableCell>모델</TableCell>
+                      <TableCell>모델/용량</TableCell>
                       <TableCell>색상</TableCell>
                       <TableCell align="center">총 수량</TableCell>
                     </TableRow>
@@ -1165,7 +1174,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <TableRow key={index} hover>
                         <TableCell>{agent.agentName}</TableCell>
                         <TableCell>{agent.posName}</TableCell>
-                        <TableCell>{agent.model}</TableCell>
+                        <TableCell>{agent.model} {agent.capacity}</TableCell>
                         <TableCell>{agent.color}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -1188,7 +1197,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                   <TableHead>
                     <TableRow>
                       <TableCell>소속</TableCell>
-                      <TableCell>모델</TableCell>
+                      <TableCell>모델/용량</TableCell>
                       <TableCell>색상</TableCell>
                       <TableCell align="center">총 수량</TableCell>
                       <TableCell align="center">담당자 수</TableCell>
@@ -1198,7 +1207,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                     {generateDepartmentSummary(previewData.assignments, agents).map((dept, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{dept.department}</TableCell>
-                        <TableCell>{dept.model}</TableCell>
+                        <TableCell>{dept.model} {dept.capacity}</TableCell>
                         <TableCell>{dept.color}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -1228,7 +1237,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                   <TableHead>
                     <TableRow>
                       <TableCell>사무실</TableCell>
-                      <TableCell>모델</TableCell>
+                      <TableCell>모델/용량</TableCell>
                       <TableCell>색상</TableCell>
                       <TableCell align="center">총 수량</TableCell>
                       <TableCell align="center">담당자 수</TableCell>
@@ -1238,7 +1247,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                     {generateOfficeSummary(previewData.assignments, agents).map((office, index) => (
                       <TableRow key={index} hover>
                         <TableCell>{office.office}</TableCell>
-                        <TableCell>{office.model}</TableCell>
+                        <TableCell>{office.model} {office.capacity}</TableCell>
                         <TableCell>{office.color}</TableCell>
                         <TableCell align="center">
                           <Chip
@@ -1334,8 +1343,9 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
               size="small"
               onClick={() => {
                 setSelectedModel('');
+                setSelectedCapacity('');
                 setSelectedColor('');
-                setNewModel({ name: '', color: '', quantity: 1 });
+                setNewModel({ name: '', capacity: '', color: '', quantity: 0, bulkQuantities: {} });
               }}
             >
               초기화
@@ -1595,11 +1605,12 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     assignments.forEach(assignment => {
       const agent = agents.find(a => a.name === assignment.agent);
       if (agent && agent.store) {
-        const key = `${agent.store}_${assignment.model}_${assignment.color}`;
+        const key = `${agent.store}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
         if (!posMap.has(key)) {
           posMap.set(key, {
             posName: agent.store,
             model: assignment.model,
+            capacity: assignment.capacity,
             color: assignment.color,
             totalQuantity: 0,
             agentCount: 0,
@@ -1624,12 +1635,13 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     assignments.forEach(assignment => {
       const agent = agents.find(a => a.name === assignment.agent);
       if (agent) {
-        const key = `${assignment.agent}_${assignment.model}_${assignment.color}`;
+        const key = `${assignment.agent}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
         if (!agentMap.has(key)) {
           agentMap.set(key, {
             agentName: assignment.agent,
             posName: agent.store || '-',
             model: assignment.model,
+            capacity: assignment.capacity,
             color: assignment.color,
             totalQuantity: 0
           });
@@ -1649,11 +1661,12 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     assignments.forEach(assignment => {
       const agent = agents.find(a => a.name === assignment.agent);
       if (agent && agent.department) {
-        const key = `${agent.department}_${assignment.model}_${assignment.color}`;
+        const key = `${agent.department}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
         if (!deptMap.has(key)) {
           deptMap.set(key, {
             department: agent.department,
             model: assignment.model,
+            capacity: assignment.capacity,
             color: assignment.color,
             totalQuantity: 0,
             agentCount: 0,
@@ -1678,11 +1691,12 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     assignments.forEach(assignment => {
       const agent = agents.find(a => a.name === assignment.agent);
       if (agent && agent.office) {
-        const key = `${agent.office}_${assignment.model}_${assignment.color}`;
+        const key = `${agent.office}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
         if (!officeMap.has(key)) {
           officeMap.set(key, {
             office: agent.office,
             model: assignment.model,
+            capacity: assignment.capacity,
             color: assignment.color,
             totalQuantity: 0,
             agentCount: 0,

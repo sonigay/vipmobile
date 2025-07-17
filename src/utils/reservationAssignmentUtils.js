@@ -131,96 +131,59 @@ const parseReceiptTime = (timeString) => {
   }
 };
 
-// 사전예약 데이터에서 사용 가능한 모델과 색상 추출 (정규화된 데이터 사용)
+// 사전예약 데이터에서 사용 가능한 모델과 색상 추출 (새로운 API 사용)
 export const extractAvailableModels = async () => {
   try {
-    console.log('정규화된 사전예약 데이터에서 모델 추출 시작');
+    console.log('사전예약사이트 모델 데이터 추출 시작');
     
-    // 정규화된 사전예약 데이터 가져오기
+    // 새로운 API 사용
     const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-    const normalizedResponse = await fetch(`${API_BASE_URL}/api/reservation-settings/normalized-data`);
+    const response = await fetch(`${API_BASE_URL}/api/reservation-settings/model-data`);
     
-    if (!normalizedResponse.ok) {
-      throw new Error('정규화된 데이터를 가져올 수 없습니다.');
+    if (!response.ok) {
+      throw new Error('사전예약사이트 모델 데이터를 가져올 수 없습니다.');
     }
     
-    const normalizedData = await normalizedResponse.json();
+    const data = await response.json();
     
-    if (!normalizedData.success || !normalizedData.reservationSiteData) {
-      throw new Error('정규화된 데이터가 올바르지 않습니다.');
+    if (!data.success) {
+      throw new Error('사전예약사이트 모델 데이터가 올바르지 않습니다.');
     }
     
-    const models = new Set();
-    const capacities = new Set();
-    const colors = new Set();
-    const modelCapacityColors = new Map(); // 모델별 사용 가능한 용량-색상 조합
+    console.log('사전예약사이트 모델 데이터 로드 완료:', data.stats);
     
-    // 정규화된 사전예약사이트 데이터에서 모델, 용량, 색상 추출
-    normalizedData.reservationSiteData.forEach(item => {
-      if (item.normalizedModel) {
-        // 정규화된 모델명 사용
-        const model = item.normalizedModel.trim();
-        
-        if (model) {
-          models.add(model);
-          
-          // 원본 용량 정보 사용 (Q열)
-          const capacity = item.originalQ ? item.originalQ.trim() : '';
-          if (capacity) {
-            capacities.add(capacity);
-          }
-          
-          // 원본 색상 정보 사용 (R열)
-          const color = item.originalR ? item.originalR.trim() : '';
-          if (color) {
-            colors.add(color);
-          }
-          
-          // 모델별 용량-색상 조합 저장
-          if (!modelCapacityColors.has(model)) {
-            modelCapacityColors.set(model, new Map());
-          }
-          
-          if (capacity && color) {
-            if (!modelCapacityColors.get(model).has(capacity)) {
-              modelCapacityColors.get(model).set(capacity, new Set());
-            }
-            modelCapacityColors.get(model).get(capacity).add(color);
-          }
-        }
-      }
-    });
+    // Map 객체를 다시 생성 (JSON 직렬화/역직렬화로 인한 손실 복구)
+    const modelCapacityColors = new Map();
+    
+    if (data.modelCapacityColors) {
+      Object.entries(data.modelCapacityColors).forEach(([model, capacityMap]) => {
+        const capacityColorsMap = new Map();
+        Object.entries(capacityMap).forEach(([capacity, colors]) => {
+          capacityColorsMap.set(capacity, colors);
+        });
+        modelCapacityColors.set(model, capacityColorsMap);
+      });
+    }
     
     const result = {
-      models: Array.from(models).sort(),
-      capacities: Array.from(capacities).sort(),
-      colors: Array.from(colors).sort(),
-      modelCapacityColors: new Map(
-        Array.from(modelCapacityColors.entries()).map(([model, capacityMap]) => [
-          model,
-          new Map(
-            Array.from(capacityMap.entries()).map(([capacity, colorSet]) => [
-              capacity,
-              Array.from(colorSet).sort()
-            ])
-          )
-        ])
-      )
+      models: data.models || [],
+      capacities: data.capacities || [],
+      colors: data.colors || [],
+      modelCapacityColors: modelCapacityColors
     };
     
-    console.log('정규화된 사전예약 모델 추출 결과:', {
+    console.log('사전예약 모델 데이터 추출 완료:', {
       modelsCount: result.models.length,
       capacitiesCount: result.capacities.length,
       colorsCount: result.colors.length,
-      modelCapacityColorsCount: result.modelCapacityColors.size,
-      sampleModels: result.models.slice(0, 5),
-      sampleCapacities: result.capacities.slice(0, 5),
-      sampleColors: result.colors.slice(0, 5)
+      modelCapacityColorsSize: result.modelCapacityColors.size
     });
     
     return result;
+    
   } catch (error) {
-    console.error('정규화된 사전예약 모델 추출 실패:', error);
+    console.error('사전예약 모델 데이터 추출 실패:', error);
+    // 에러 시 빈 데이터 반환
     return {
       models: [],
       capacities: [],
@@ -257,6 +220,7 @@ export const calculateReservationAssignment = async (
       .map(([key, model]) => ({
         key,
         name: model.name,
+        capacity: model.capacity,
         color: model.color,
         quantity: model.quantity
       }));
@@ -272,7 +236,11 @@ export const calculateReservationAssignment = async (
     
     // 1순위: 온세일접수 (고객명만으로 매칭)
     const filteredOnSale = reservationData.onSale.filter(item => 
-      selectedModels.some(model => model.name === item.model && model.color === item.color)
+      selectedModels.some(model => 
+        model.name === item.model && 
+        model.capacity === item.capacity && 
+        model.color === item.color
+      )
     );
     console.log('필터링된 온세일 데이터:', filteredOnSale.length, '건');
     
@@ -286,7 +254,11 @@ export const calculateReservationAssignment = async (
     
     // 2순위: 마당접수 (고객명만으로 매칭, 온세일에서 이미 처리된 고객은 제외)
     const filteredYard = reservationData.yard.filter(item => 
-      selectedModels.some(model => model.name === item.model && model.color === item.color)
+      selectedModels.some(model => 
+        model.name === item.model && 
+        model.capacity === item.capacity && 
+        model.color === item.color
+      )
     );
     console.log('필터링된 마당접수 데이터:', filteredYard.length, '건');
     
@@ -300,7 +272,11 @@ export const calculateReservationAssignment = async (
     
     // 3순위: 사전예약사이트 (고객명만으로 매칭, 온세일/마당접수에서 이미 처리된 고객은 제외)
     const filteredSite = reservationData.site.filter(item => 
-      selectedModels.some(model => model.name === item.model && model.color === item.color)
+      selectedModels.some(model => 
+        model.name === item.model && 
+        model.capacity === item.capacity && 
+        model.color === item.color
+      )
     );
     console.log('필터링된 사전예약사이트 데이터:', filteredSite.length, '건');
     
@@ -383,7 +359,9 @@ export const calculateReservationAssignment = async (
     allItems.forEach((item, index) => {
       // 해당 모델의 최대 수량 확인
       const modelConfig = selectedModels.find(model => 
-        model.name === item.model && model.color === item.color
+        model.name === item.model && 
+        model.capacity === item.capacity && 
+        model.color === item.color
       );
       
       if (!modelConfig) return;
@@ -391,6 +369,7 @@ export const calculateReservationAssignment = async (
       // 현재까지 배정된 수량 확인
       const currentAssigned = assignments.filter(assignment => 
         assignment.model === item.model && 
+        assignment.capacity === item.capacity &&
         assignment.color === item.color
       ).reduce((sum, assignment) => sum + assignment.quantity, 0);
       
@@ -409,6 +388,7 @@ export const calculateReservationAssignment = async (
       const assignment = {
         agent: selectedAgent.agent,
         model: item.model,
+        capacity: item.capacity,
         color: item.color,
         quantity: 1,
         priority: item.priority,
@@ -453,10 +433,13 @@ export const calculateReservationAssignment = async (
         })),
         byModel: selectedModels.map(model => ({
           model: model.name,
+          capacity: model.capacity,
           color: model.color,
           requested: model.quantity,
           assigned: assignments.filter(a => 
-            a.model === model.name && a.color === model.color
+            a.model === model.name && 
+            a.capacity === model.capacity &&
+            a.color === model.color
           ).reduce((sum, a) => sum + a.quantity, 0)
         }))
       },
