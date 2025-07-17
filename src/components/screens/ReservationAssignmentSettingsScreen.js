@@ -67,9 +67,9 @@ import {
   Close as CloseIcon,
   PriorityHigh as PriorityHighIcon
 } from '@mui/icons-material';
-import { calculateReservationAssignment, clearReservationAssignmentCache, getSelectedReservationTargets } from '../../utils/reservationAssignmentUtils';
+import { calculateReservationAssignment, clearReservationAssignmentCache, getSelectedReservationTargets, extractAvailableModels } from '../../utils/reservationAssignmentUtils';
 import AssignmentVisualization from '../AssignmentVisualization';
-import { extractAvailableModels, getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
+import { getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
 import { addAssignmentCompletedNotification, addSettingsChangedNotification } from '../../utils/notificationUtils';
 import { saveAssignmentHistory, createHistoryItem } from '../../utils/assignmentHistory';
 

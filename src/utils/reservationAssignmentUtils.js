@@ -131,6 +131,85 @@ const parseReceiptTime = (timeString) => {
   }
 };
 
+// 사전예약 데이터에서 사용 가능한 모델과 색상 추출
+export const extractAvailableModels = async () => {
+  try {
+    console.log('사전예약 데이터에서 모델 추출 시작');
+    
+    // 사전예약 데이터 가져오기
+    const reservationData = await fetchReservationData();
+    
+    const models = new Set();
+    const colors = new Set();
+    const modelColors = new Map(); // 모델별 사용 가능한 색상
+    
+    // 온세일 데이터에서 모델 추출
+    reservationData.onSale.forEach(item => {
+      if (item.model && item.color) {
+        models.add(item.model);
+        colors.add(item.color);
+        
+        if (!modelColors.has(item.model)) {
+          modelColors.set(item.model, new Set());
+        }
+        modelColors.get(item.model).add(item.color);
+      }
+    });
+    
+    // 마당접수 데이터에서 모델 추출
+    reservationData.yard.forEach(item => {
+      if (item.model && item.color) {
+        models.add(item.model);
+        colors.add(item.color);
+        
+        if (!modelColors.has(item.model)) {
+          modelColors.set(item.model, new Set());
+        }
+        modelColors.get(item.model).add(item.color);
+      }
+    });
+    
+    // 사전예약사이트 데이터에서 모델 추출
+    reservationData.site.forEach(item => {
+      if (item.model && item.color) {
+        models.add(item.model);
+        colors.add(item.color);
+        
+        if (!modelColors.has(item.model)) {
+          modelColors.set(item.model, new Set());
+        }
+        modelColors.get(item.model).add(item.color);
+      }
+    });
+    
+    const result = {
+      models: Array.from(models).sort(),
+      colors: Array.from(colors).sort(),
+      modelColors: new Map(
+        Array.from(modelColors.entries()).map(([model, colorSet]) => [
+          model, 
+          Array.from(colorSet).sort()
+        ])
+      )
+    };
+    
+    console.log('사전예약 모델 추출 결과:', {
+      modelsCount: result.models.length,
+      colorsCount: result.colors.length,
+      modelColorsCount: result.modelColors.size
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('사전예약 모델 추출 실패:', error);
+    return {
+      models: [],
+      colors: [],
+      modelColors: new Map()
+    };
+  }
+};
+
 // 우선순위 기반 배정 계산
 export const calculateReservationAssignment = async (
   settings,

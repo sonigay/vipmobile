@@ -3527,30 +3527,17 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
     console.log(`POS "${posName}" 필터링 결과: ${filteredRows.length}개 행 (전체 ${reservationSiteRows.length}개 중)`);
     
     filteredRows.forEach((row, index) => {
-      const pValue = (row[15] || '').toString().trim(); // P열
-      const qValue = (row[16] || '').toString().trim(); // Q열
-      const rValue = (row[17] || '').toString().trim(); // R열
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const customerName = (row[7] || '').toString().trim(); // H열: 고객명
       const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const model = (row[15] || '').toString().trim(); // P열: 모델
+      const color = (row[16] || '').toString().trim(); // Q열: 색상
+      const type = (row[17] || '').toString().trim(); // R열: 유형
       const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
-      const type = (row[31] || '').toString().trim(); // AF열: 유형
       const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
       const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
       
-      if (!pValue || !qValue || !rValue || !reservationNumber || !customerName) return;
-      
-      // 정규화된 모델명 찾기
-      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
-      const normalizedModel = ruleMap.get(originalKey);
-      
-      if (!normalizedModel) return;
-      
-      // 모델명 추출
-      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
-      if (!modelMatch) return;
-      
-      const model = modelMatch[1].trim();
+      if (!reservationNumber || !customerName || !model || !color) return;
       
       // 서류접수 정보 찾기 (인덱스 활용으로 빠른 검색)
       // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
@@ -3575,6 +3562,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
         reservationDateTime,
         receivedDateTime,
         model,
+        color,
         type,
         storeCode,
         posName,
@@ -3717,34 +3705,21 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     reservationSiteRows.forEach((row, index) => {
       if (row.length < 30) return;
       
-      const pValue = (row[15] || '').toString().trim(); // P열
-      const qValue = (row[16] || '').toString().trim(); // Q열
-      const rValue = (row[17] || '').toString().trim(); // R열
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const customerName = (row[7] || '').toString().trim(); // H열: 고객명
       const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const model = (row[15] || '').toString().trim(); // P열: 모델
+      const color = (row[16] || '').toString().trim(); // Q열: 색상
+      const type = (row[17] || '').toString().trim(); // R열: 유형
       const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
       const posName = (row[22] || '').toString().trim(); // W열: POS명
-      const type = (row[31] || '').toString().trim(); // AF열: 유형
       const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
       const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
       
-      if (!pValue || !qValue || !rValue || !reservationNumber || !customerName) return;
-      
-      // 정규화된 모델명 찾기
-      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
-      const normalizedModel = ruleMap.get(originalKey);
-      
-      if (!normalizedModel) return;
-      
-      // 모델명 추출
-      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
-      if (!modelMatch) return;
-      
-      const extractedModel = modelMatch[1].trim();
+      if (!reservationNumber || !customerName || !model || !color) return;
       
       // 모델 필터링
-      if (extractedModel !== model) return;
+      if (model !== req.params.model) return;
       
       // 서류접수 정보 찾기 (인덱스 활용으로 빠른 검색)
       // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
@@ -3768,7 +3743,8 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         reservationNumber,
         reservationDateTime,
         receivedDateTime,
-        model: extractedModel,
+        model,
+        color,
         type,
         storeCode,
         posName,
@@ -7560,32 +7536,19 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
     reservationSiteRows.forEach((row, index) => {
       if (row.length < 30) return;
       
-      const pValue = (row[15] || '').toString().trim(); // P열
-      const qValue = (row[16] || '').toString().trim(); // Q열
-      const rValue = (row[17] || '').toString().trim(); // R열
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const customerName = (row[7] || '').toString().trim(); // H열: 고객명
       const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const model = (row[15] || '').toString().trim(); // P열: 모델
+      const color = (row[16] || '').toString().trim(); // Q열: 색상
+      const type = (row[17] || '').toString().trim(); // R열: 유형
       const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
       const posName = (row[22] || '').toString().trim(); // W열: POS명
-      const type = (row[31] || '').toString().trim(); // AF열: 유형
       const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
       const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
       const storeCodeForLookup = (row[21] || '').toString().trim(); // V열: 대리점코드(조회용)
       
-      if (!pValue || !qValue || !rValue || !reservationNumber || !customerName) return;
-      
-      // 정규화된 모델명 찾기
-      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
-      const normalizedModel = ruleMap.get(originalKey);
-      
-      if (!normalizedModel) return;
-      
-      // 모델명 추출
-      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
-      if (!modelMatch) return;
-      
-      const model = modelMatch[1].trim();
+      if (!reservationNumber || !customerName || !model || !color) return;
       
       // 담당자 매칭 (VLOOKUP 방식) - 정규화된 이름 사용
       const agent = storeAgentMap.get(storeCodeForLookup) || '';
@@ -7617,6 +7580,7 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
         reservationDateTime,
         receivedDateTime,
         model,
+        color,
         type,
         storeCode,
         posName,
@@ -7799,6 +7763,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       return number.toString().replace(/[-\s]/g, '').trim();
     };
 
+
+
     // 마당접수 데이터 인덱싱 (예약번호 기준)
     const yardIndex = new Map();
     let yardIndexCount = 0;
@@ -7867,12 +7833,14 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const reservationMemo = row[34] || ''; // AI열 (35번째, 0부터 시작)
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
+      const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
 
       // 처음 5개 고객의 사이트메모 디버깅 로그
       if (index < 5) {
         console.log(`전체고객리스트 사이트메모 디버깅: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
         console.log(`  AI열 원본값: "${row[34]}"`);
         console.log(`  사이트메모: "${reservationMemo}"`);
+        console.log(`  Z열 접수자: "${receiver}"`);
         console.log(`  행 길이: ${row.length}`);
       }
 
@@ -7897,7 +7865,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         yardReceivedDate: yardInfo.receivedDate || '',
         yardReceivedMemo: yardInfo.receivedMemo || '',
         onSaleReceivedDate,
-        receiver: yardInfo.receiver || '',
+        receiver: receiver, // 사전예약사이트 Z열에서 가져온 접수자
         rowIndex: index + 2
       };
     });
