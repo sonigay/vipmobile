@@ -3196,18 +3196,33 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     
     // 5. 마당접수 데이터 인덱싱 (예약번호별 빠른 검색을 위해)
     const yardIndex = new Map();
-    yardValues.slice(1).forEach(yardRow => {
+    let yardIndexCount = 0;
+    yardValues.slice(1).forEach((yardRow, index) => {
       if (yardRow.length >= 25) {
         const reservationNumber = (yardRow[0] || '').toString().trim();
         if (reservationNumber) {
           // 하이픈 제거하여 정규화된 예약번호로 저장
           const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-          yardIndex.set(normalizedReservationNumber, true);
+          const receivedDateTime = (yardRow[11] || '').toString().trim();
+          const receivedMemo = (yardRow[20] || '').toString().trim();
+          
+          yardIndex.set(normalizedReservationNumber, {
+            receivedDateTime,
+            receivedMemo
+          });
+          yardIndexCount++;
+          
+          // 처음 5개 마당접수 데이터 로그
+          if (index < 5) {
+            console.log(`마당접수 인덱싱: 원본="${reservationNumber}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
+          }
         }
       }
     });
     
-    console.log(`마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호`);
+    console.log(`마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호 (총 ${yardIndexCount}개 처리)`);
+    console.log(`마당접수 예약번호 샘플:`, Array.from(yardIndex.keys()).slice(0, 5));
     
     // 6. 사전예약사이트 데이터 처리
     const reservationSiteRows = reservationSiteValues.slice(1); // 헤더 제거
@@ -3261,12 +3276,27 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       // 모델과 색상 분리 (정규화된 모델명에서 모델명만 추출)
       // "Z Fold7 512G 블루 쉐도우 SM-F966N_512G 블루 쉐도우" -> "Z Fold7 512G 블루 쉐도우"
       const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
-      if (!modelMatch) return;
+      if (!modelMatch) {
+        if (index < 5) {
+          console.log(`모델명 추출 실패: 정규화된모델="${normalizedModel}"`);
+          console.log(`  정규표현식 매칭 실패: ${normalizedModel}`);
+        }
+        return;
+      }
       
       const model = modelMatch[1].trim();
       const color = ''; // 색상은 모델명에 포함되어 있으므로 별도 추출하지 않음
       
-      if (!model) return;
+      if (!model) {
+        if (index < 5) {
+          console.log(`모델명이 비어있음: 정규화된모델="${normalizedModel}"`);
+        }
+        return;
+      }
+      
+      if (index < 5) {
+        console.log(`모델명 추출 성공: 정규화된모델="${normalizedModel}" -> 모델명="${model}"`);
+      }
       
       const key = model; // 모델명만으로 키 생성
       
@@ -3287,15 +3317,20 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
       const isReceived = yardIndex.has(normalizedReservationNumber);
       
+      if (index < 5) {
+        console.log(`서류접수 매칭 시도: 예약번호="${reservationNumber}" -> 정규화="${normalizedReservationNumber}" -> 매칭결과=${isReceived}`);
+        console.log(`  마당접수 인덱스에 존재: ${yardIndex.has(normalizedReservationNumber)}`);
+      }
+      
       if (isReceived) {
         stats.received++;
         if (index < 5) {
-          console.log(`서류접수 확인됨: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
+          console.log(`✅ 서류접수 확인됨: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
         }
       } else {
         stats.notReceived++;
         if (index < 5) {
-          console.log(`서류미접수: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
+          console.log(`❌ 서류미접수: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
         }
       }
     });
@@ -3403,21 +3438,33 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
     
     // 4. 마당접수 데이터 인덱싱 (예약번호별 빠른 검색을 위해)
     const yardIndex = new Map();
-    yardValues.slice(1).forEach(yardRow => {
+    let yardIndexCount = 0;
+    yardValues.slice(1).forEach((yardRow, index) => {
       if (yardRow.length >= 25) {
         const reservationNumber = (yardRow[0] || '').toString().trim();
         if (reservationNumber) {
           // 하이픈 제거하여 정규화된 예약번호로 저장
           const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          const receivedDateTime = (yardRow[11] || '').toString().trim();
+          const receivedMemo = (yardRow[20] || '').toString().trim();
+          
           yardIndex.set(normalizedReservationNumber, {
-            receivedDateTime: (yardRow[11] || '').toString().trim(),
-            receivedMemo: (yardRow[20] || '').toString().trim()
+            receivedDateTime,
+            receivedMemo
           });
+          yardIndexCount++;
+          
+          // 처음 5개 마당접수 데이터 로그
+          if (index < 5) {
+            console.log(`POS별 마당접수 인덱싱: 원본="${reservationNumber}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
+          }
         }
       }
     });
     
-    console.log(`마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호`);
+    console.log(`POS별 마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호 (총 ${yardIndexCount}개 처리)`);
+    console.log(`POS별 마당접수 예약번호 샘플:`, Array.from(yardIndex.keys()).slice(0, 5));
     
     // 5. 사전예약사이트 데이터 처리 (POS별 필터링, 최적화)
     const reservationSiteRows = reservationSiteValues.slice(1);
@@ -3464,6 +3511,16 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       const yardData = yardIndex.get(normalizedReservationNumber) || {};
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
+      
+      // 처음 5개 고객의 접수정보 디버깅 로그
+      if (index < 5) {
+        console.log(`POS별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
+        console.log(`  정규화된 예약번호: "${normalizedReservationNumber}"`);
+        console.log(`  마당접수 인덱스 존재: ${yardIndex.has(normalizedReservationNumber)}`);
+        console.log(`  접수일시: "${receivedDateTime}"`);
+        console.log(`  접수메모: "${receivedMemo}"`);
+        console.log(`  모델명: "${model}"`);
+      }
       
       customerList.push({
         customerName,
@@ -3571,21 +3628,33 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     
     // 4. 마당접수 데이터 인덱싱 (예약번호별 빠른 검색을 위해)
     const yardIndex = new Map();
-    yardValues.slice(1).forEach(yardRow => {
+    let yardIndexCount = 0;
+    yardValues.slice(1).forEach((yardRow, index) => {
       if (yardRow.length >= 25) {
         const reservationNumber = (yardRow[0] || '').toString().trim();
         if (reservationNumber) {
           // 하이픈 제거하여 정규화된 예약번호로 저장
           const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          const receivedDateTime = (yardRow[11] || '').toString().trim();
+          const receivedMemo = (yardRow[20] || '').toString().trim();
+          
           yardIndex.set(normalizedReservationNumber, {
-            receivedDateTime: (yardRow[11] || '').toString().trim(),
-            receivedMemo: (yardRow[20] || '').toString().trim()
+            receivedDateTime,
+            receivedMemo
           });
+          yardIndexCount++;
+          
+          // 처음 5개 마당접수 데이터 로그
+          if (index < 5) {
+            console.log(`모델별 마당접수 인덱싱: 원본="${reservationNumber}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
+          }
         }
       }
     });
     
-    console.log(`마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호`);
+    console.log(`모델별 마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호 (총 ${yardIndexCount}개 처리)`);
+    console.log(`모델별 마당접수 예약번호 샘플:`, Array.from(yardIndex.keys()).slice(0, 5));
     
     // 5. 사전예약사이트 데이터 처리 (모델별 필터링, 최적화)
     const reservationSiteRows = reservationSiteValues.slice(1);
@@ -3629,6 +3698,16 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       const yardData = yardIndex.get(normalizedReservationNumber) || {};
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
+      
+      // 처음 5개 고객의 접수정보 디버깅 로그
+      if (index < 5) {
+        console.log(`모델별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
+        console.log(`  정규화된 예약번호: "${normalizedReservationNumber}"`);
+        console.log(`  마당접수 인덱스 존재: ${yardIndex.has(normalizedReservationNumber)}`);
+        console.log(`  접수일시: "${receivedDateTime}"`);
+        console.log(`  접수메모: "${receivedMemo}"`);
+        console.log(`  모델명: "${extractedModel}"`);
+      }
       
       customerList.push({
         customerName,
