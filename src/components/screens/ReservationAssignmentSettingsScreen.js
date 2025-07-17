@@ -100,9 +100,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   
   const [editingAgent, setEditingAgent] = useState(null);
   const [showModelDialog, setShowModelDialog] = useState(false);
-  const [newModel, setNewModel] = useState({ name: '', color: '', quantity: 0, bulkQuantities: {} });
-  const [availableModels, setAvailableModels] = useState({ models: [], colors: [], modelColors: new Map() });
+  const [newModel, setNewModel] = useState({ name: '', capacity: '', color: '', quantity: 0, bulkQuantities: {} });
+  const [availableModels, setAvailableModels] = useState({ models: [], capacities: [], colors: [], modelCapacityColors: new Map() });
   const [selectedModel, setSelectedModel] = useState('');
+  const [selectedCapacity, setSelectedCapacity] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -220,8 +221,9 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           // 에러 시 빈 데이터 설정
           setAvailableModels({
             models: [],
+            capacities: [],
             colors: [],
-            modelColors: new Map()
+            modelCapacityColors: new Map()
           });
         }
         
@@ -435,14 +437,15 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 모델 추가
   const handleAddModel = () => {
-    if (selectedModel && selectedColor) {
-      const modelKey = `${selectedModel}|${selectedColor}`;
+    if (selectedModel && selectedCapacity && selectedColor) {
+      const modelKey = `${selectedModel}|${selectedCapacity}|${selectedColor}`;
       setAssignmentSettings(prev => ({
         ...prev,
         models: {
           ...prev.models,
           [modelKey]: {
             name: selectedModel,
+            capacity: selectedCapacity,
             color: selectedColor,
             enabled: true,
             quantity: newModel.quantity,
@@ -451,8 +454,9 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         }
       }));
       
-      setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
+      setNewModel({ name: '', capacity: '', color: '', quantity: 0, bulkQuantities: {} });
       setSelectedModel('');
+      setSelectedCapacity('');
       setSelectedColor('');
       setShowModelDialog(false);
       console.log('✅ 모델 추가 완료:', modelKey);
@@ -1340,8 +1344,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            {/* 모델 검색 및 선택 */}
-            <Grid item xs={12} md={6}>
+            {/* 모델 선택 */}
+            <Grid item xs={12} md={4}>
               <Typography variant="subtitle1" gutterBottom>
                 📱 모델 선택
               </Typography>
@@ -1349,8 +1353,9 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                 value={selectedModel}
                 onChange={(event, newValue) => {
                   setSelectedModel(newValue || '');
+                  setSelectedCapacity('');
                   setSelectedColor('');
-                  setNewModel(prev => ({ ...prev, name: newValue || '', color: '' }));
+                  setNewModel(prev => ({ ...prev, name: newValue || '', capacity: '', color: '' }));
                 }}
                 options={availableModels.models.sort()}
                 getOptionLabel={(option) => option || ''}
@@ -1376,7 +1381,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <span>{option}</span>
                       <Chip 
                         size="small" 
-                        label={getColorsForModel(availableModels.modelColors, option).length} 
+                        label={availableModels.modelCapacityColors.get(option)?.size || 0} 
                         color="primary" 
                         variant="outlined"
                       />
@@ -1391,30 +1396,89 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                 clearOnBlur
                 handleHomeEndKeys
               />
-              
-              {/* 모델별 색상 개수 요약 */}
-              {!selectedModel && (
-                <Box mt={2}>
+            </Grid>
+
+            {/* 용량 선택 */}
+            <Grid item xs={12} md={4}>
+              <Typography variant="subtitle1" gutterBottom>
+                💾 용량 선택
+              </Typography>
+              {selectedModel ? (
+                <Autocomplete
+                  value={selectedCapacity}
+                  onChange={(event, newValue) => {
+                    setSelectedCapacity(newValue || '');
+                    setSelectedColor('');
+                    setNewModel(prev => ({ ...prev, capacity: newValue || '', color: '' }));
+                  }}
+                  options={Array.from(availableModels.modelCapacityColors.get(selectedModel)?.keys() || []).sort()}
+                  getOptionLabel={(option) => option || ''}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="용량"
+                      placeholder="용량을 입력하거나 선택하세요"
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            <InputAdornment position="start">💾</InputAdornment>
+                            {params.InputProps.startAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                        <span>{option}</span>
+                        <Chip 
+                          size="small" 
+                          label={availableModels.modelCapacityColors.get(selectedModel)?.get(option)?.length || 0} 
+                          color="secondary" 
+                          variant="outlined"
+                        />
+                      </Box>
+                    </Box>
+                  )}
+                  noOptionsText="사용 가능한 용량이 없습니다. 모델을 먼저 선택해주세요."
+                  loading={!availableModels.modelCapacityColors.get(selectedModel)}
+                  loadingText="용량 데이터 로딩 중..."
+                  freeSolo
+                  selectOnFocus
+                  clearOnBlur
+                  handleHomeEndKeys
+                />
+              ) : (
+                <Box 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  height="56px"
+                  border="1px dashed #ccc"
+                  borderRadius="4px"
+                >
                   <Typography variant="body2" color="text.secondary">
-                    총 {availableModels.models.length}개 모델, {availableModels.colors.length}개 색상
+                    모델을 먼저 선택해주세요
                   </Typography>
                 </Box>
               )}
             </Grid>
 
             {/* 색상 선택 */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={4}>
               <Typography variant="subtitle1" gutterBottom>
                 🎨 색상 선택
               </Typography>
-              {selectedModel ? (
+              {selectedModel && selectedCapacity ? (
                 <Autocomplete
                   value={selectedColor}
                   onChange={(event, newValue) => {
                     setSelectedColor(newValue || '');
                     setNewModel(prev => ({ ...prev, color: newValue || '' }));
                   }}
-                  options={getColorsForModel(availableModels.modelColors, selectedModel).sort()}
+                  options={availableModels.modelCapacityColors.get(selectedModel)?.get(selectedCapacity)?.sort() || []}
                   getOptionLabel={(option) => option || ''}
                   renderInput={(params) => (
                     <TextField
@@ -1439,14 +1503,14 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         <Chip 
                           size="small" 
                           label="사전예약" 
-                          color="secondary" 
+                          color="success" 
                           variant="outlined"
                         />
                       </Box>
                     </Box>
                   )}
-                  noOptionsText="사용 가능한 색상이 없습니다. 모델을 먼저 선택해주세요."
-                  loading={getColorsForModel(availableModels.modelColors, selectedModel).length === 0}
+                  noOptionsText="사용 가능한 색상이 없습니다. 모델과 용량을 먼저 선택해주세요."
+                  loading={!availableModels.modelCapacityColors.get(selectedModel)?.get(selectedCapacity)}
                   loadingText="색상 데이터 로딩 중..."
                   freeSolo
                   selectOnFocus
@@ -1463,7 +1527,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                   borderRadius="4px"
                 >
                   <Typography variant="body2" color="text.secondary">
-                    모델을 먼저 선택해주세요
+                    {!selectedModel ? '모델을 먼저 선택해주세요' : '용량을 먼저 선택해주세요'}
                   </Typography>
                 </Box>
               )}

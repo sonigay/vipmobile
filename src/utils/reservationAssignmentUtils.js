@@ -151,10 +151,11 @@ export const extractAvailableModels = async () => {
     }
     
     const models = new Set();
+    const capacities = new Set();
     const colors = new Set();
-    const modelColors = new Map(); // 모델별 사용 가능한 색상
+    const modelCapacityColors = new Map(); // 모델별 사용 가능한 용량-색상 조합
     
-    // 정규화된 사전예약사이트 데이터에서 모델과 색상 추출
+    // 정규화된 사전예약사이트 데이터에서 모델, 용량, 색상 추출
     normalizedData.reservationSiteData.forEach(item => {
       if (item.normalizedModel) {
         // 정규화된 모델명 사용
@@ -162,17 +163,29 @@ export const extractAvailableModels = async () => {
         
         if (model) {
           models.add(model);
-          if (!modelColors.has(model)) {
-            modelColors.set(model, new Set());
+          
+          // 원본 용량 정보 사용 (Q열)
+          const capacity = item.originalQ ? item.originalQ.trim() : '';
+          if (capacity) {
+            capacities.add(capacity);
           }
           
           // 원본 색상 정보 사용 (R열)
-          if (item.originalR) {
-            const color = item.originalR.trim();
-            if (color) {
-              colors.add(color);
-              modelColors.get(model).add(color);
+          const color = item.originalR ? item.originalR.trim() : '';
+          if (color) {
+            colors.add(color);
+          }
+          
+          // 모델별 용량-색상 조합 저장
+          if (!modelCapacityColors.has(model)) {
+            modelCapacityColors.set(model, new Map());
+          }
+          
+          if (capacity && color) {
+            if (!modelCapacityColors.get(model).has(capacity)) {
+              modelCapacityColors.get(model).set(capacity, new Set());
             }
+            modelCapacityColors.get(model).get(capacity).add(color);
           }
         }
       }
@@ -180,20 +193,28 @@ export const extractAvailableModels = async () => {
     
     const result = {
       models: Array.from(models).sort(),
+      capacities: Array.from(capacities).sort(),
       colors: Array.from(colors).sort(),
-      modelColors: new Map(
-        Array.from(modelColors.entries()).map(([model, colorSet]) => [
-          model, 
-          Array.from(colorSet).sort()
+      modelCapacityColors: new Map(
+        Array.from(modelCapacityColors.entries()).map(([model, capacityMap]) => [
+          model,
+          new Map(
+            Array.from(capacityMap.entries()).map(([capacity, colorSet]) => [
+              capacity,
+              Array.from(colorSet).sort()
+            ])
+          )
         ])
       )
     };
     
     console.log('정규화된 사전예약 모델 추출 결과:', {
       modelsCount: result.models.length,
+      capacitiesCount: result.capacities.length,
       colorsCount: result.colors.length,
-      modelColorsCount: result.modelColors.size,
+      modelCapacityColorsCount: result.modelCapacityColors.size,
       sampleModels: result.models.slice(0, 5),
+      sampleCapacities: result.capacities.slice(0, 5),
       sampleColors: result.colors.slice(0, 5)
     });
     
@@ -202,8 +223,9 @@ export const extractAvailableModels = async () => {
     console.error('정규화된 사전예약 모델 추출 실패:', error);
     return {
       models: [],
+      capacities: [],
       colors: [],
-      modelColors: new Map()
+      modelCapacityColors: new Map()
     };
   }
 };
