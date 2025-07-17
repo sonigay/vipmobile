@@ -197,7 +197,7 @@ function AllCustomerListScreen({ loggedInStore }) {
           전체고객리스트
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          전체 고객 정보를 확인하고 검색할 수 있습니다
+          전체 고객 정보를 확인하고 검색할 수 있습니다 (모델/용량/색상)
         </Typography>
       </Box>
 
@@ -207,7 +207,7 @@ function AllCustomerListScreen({ loggedInStore }) {
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* 검색창 */}
             <TextField
-              placeholder="고객명, 예약번호, 모델명, 대리점 등으로 검색..."
+              placeholder="고객명, 예약번호, 모델/용량/색상, 대리점 등으로 검색..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               sx={{ flexGrow: 1, minWidth: 300 }}
@@ -280,7 +280,7 @@ function AllCustomerListScreen({ loggedInStore }) {
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-            고객 리스트 ({filteredCustomerList.length}명)
+            고객 리스트 ({filteredCustomerList.length}명) - 모델/용량/색상
           </Typography>
           
           {loading ? (
