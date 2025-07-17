@@ -40,7 +40,9 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Autocomplete,
+  InputAdornment
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -208,12 +210,19 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         // 사용 가능한 모델 로드
         console.log('사용 가능한 모델 로드 중...');
         try {
+          // 사전예약 데이터에서 모델 추출
           const modelData = await extractAvailableModels();
           console.log('사용 가능한 모델 데이터:', modelData);
           setAvailableModels(modelData);
           console.log('✅ 사용 가능한 모델 데이터 로드 성공');
         } catch (modelError) {
           console.error('모델 데이터 로드 실패:', modelError);
+          // 에러 시 빈 데이터 설정
+          setAvailableModels({
+            models: [],
+            colors: [],
+            modelColors: new Map()
+          });
         }
         
         // 저장된 설정 로드
@@ -1313,48 +1322,167 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       </Box>
 
       {/* 모델 추가 다이얼로그 */}
-      <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>모델 추가</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <FormControl fullWidth>
-              <InputLabel>모델 선택</InputLabel>
-              <Select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                label="모델 선택"
-              >
-                {availableModels.models.map((model) => (
-                  <MenuItem key={model} value={model}>
-                    {model}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            
-            <FormControl fullWidth>
-              <InputLabel>색상 선택</InputLabel>
-              <Select
-                value={selectedColor}
-                onChange={(e) => setSelectedColor(e.target.value)}
-                label="색상 선택"
-              >
-                {availableModels.colors.map((color) => (
-                  <MenuItem key={color} value={color}>
-                    {color}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            
-            <TextField
-              label="수량"
-              type="number"
-              value={newModel.quantity}
-              onChange={(e) => setNewModel(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
-              fullWidth
-            />
+      <Dialog open={showModelDialog} onClose={() => setShowModelDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">📱 모델 추가</Typography>
+            <Button
+              size="small"
+              onClick={() => {
+                setSelectedModel('');
+                setSelectedColor('');
+                setNewModel({ name: '', color: '', quantity: 1 });
+              }}
+            >
+              초기화
+            </Button>
           </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {/* 모델 검색 및 선택 */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" gutterBottom>
+                📱 모델 선택
+              </Typography>
+              <Autocomplete
+                value={selectedModel}
+                onChange={(event, newValue) => {
+                  setSelectedModel(newValue || '');
+                  setSelectedColor('');
+                  setNewModel(prev => ({ ...prev, name: newValue || '', color: '' }));
+                }}
+                options={availableModels.models.sort()}
+                getOptionLabel={(option) => option || ''}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="모델명"
+                    placeholder="모델명을 입력하거나 선택하세요"
+                    InputProps={{
+                      ...params.InputProps,
+                      startAdornment: (
+                        <>
+                          <InputAdornment position="start">📱</InputAdornment>
+                          {params.InputProps.startAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                      <span>{option}</span>
+                      <Chip 
+                        size="small" 
+                        label={getColorsForModel(availableModels.modelColors, option).length} 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                    </Box>
+                  </Box>
+                )}
+                noOptionsText="사용 가능한 모델이 없습니다. 사전예약 데이터를 확인해주세요."
+                loading={availableModels.models.length === 0}
+                loadingText="모델 데이터 로딩 중..."
+                freeSolo
+                selectOnFocus
+                clearOnBlur
+                handleHomeEndKeys
+              />
+              
+              {/* 모델별 색상 개수 요약 */}
+              {!selectedModel && (
+                <Box mt={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    총 {availableModels.models.length}개 모델, {availableModels.colors.length}개 색상
+                  </Typography>
+                </Box>
+              )}
+            </Grid>
+
+            {/* 색상 선택 */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" gutterBottom>
+                🎨 색상 선택
+              </Typography>
+              {selectedModel ? (
+                <Autocomplete
+                  value={selectedColor}
+                  onChange={(event, newValue) => {
+                    setSelectedColor(newValue || '');
+                    setNewModel(prev => ({ ...prev, color: newValue || '' }));
+                  }}
+                  options={getColorsForModel(availableModels.modelColors, selectedModel).sort()}
+                  getOptionLabel={(option) => option || ''}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="색상"
+                      placeholder="색상을 입력하거나 선택하세요"
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            <InputAdornment position="start">🎨</InputAdornment>
+                            {params.InputProps.startAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                        <span>{option}</span>
+                        <Chip 
+                          size="small" 
+                          label="사전예약" 
+                          color="secondary" 
+                          variant="outlined"
+                        />
+                      </Box>
+                    </Box>
+                  )}
+                  noOptionsText="사용 가능한 색상이 없습니다. 모델을 먼저 선택해주세요."
+                  loading={getColorsForModel(availableModels.modelColors, selectedModel).length === 0}
+                  loadingText="색상 데이터 로딩 중..."
+                  freeSolo
+                  selectOnFocus
+                  clearOnBlur
+                  handleHomeEndKeys
+                />
+              ) : (
+                <Box 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center" 
+                  height="56px"
+                  border="1px dashed #ccc"
+                  borderRadius="4px"
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    모델을 먼저 선택해주세요
+                  </Typography>
+                </Box>
+              )}
+            </Grid>
+
+            {/* 수량 입력 */}
+            <Grid item xs={12}>
+              <TextField
+                label="수량"
+                type="number"
+                value={newModel.quantity}
+                onChange={(e) => setNewModel(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                fullWidth
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">📦</InputAdornment>,
+                }}
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowModelDialog(false)}>취소</Button>
