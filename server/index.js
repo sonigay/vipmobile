@@ -3645,14 +3645,20 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     const yardIndex = new Map();
     let yardIndexCount = 0;
     yardValues.slice(1).forEach((yardRow, index) => {
-      if (yardRow.length >= 25) {
-        const reservationNumber = (yardRow[0] || '').toString().trim();
-        if (reservationNumber) {
-          // 하이픈 제거하여 정규화된 예약번호로 저장
-          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-          const receivedDateTime = (yardRow[11] || '').toString().trim();
-          const receivedMemo = (yardRow[21] || '').toString().trim();
-          
+      if (yardRow.length >= 22) { // V열까지 필요하므로 최소 22개 컬럼
+        const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
+        const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
+        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        
+        // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
+        const reservationPattern = /[A-Z]{2}\d{6}/g;
+        const uMatches = uValue.match(reservationPattern) || [];
+        const vMatches = vValue.match(reservationPattern) || [];
+        
+        // 모든 예약번호를 인덱스에 추가 (이미 하이픈이 없는 형태)
+        [...uMatches, ...vMatches].forEach(match => {
+          const normalizedReservationNumber = match;
           yardIndex.set(normalizedReservationNumber, {
             receivedDateTime,
             receivedMemo
@@ -3661,10 +3667,11 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
           
           // 처음 5개 마당접수 데이터 로그
           if (index < 5) {
-            console.log(`모델별 마당접수 인덱싱: 원본="${reservationNumber}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`모델별 마당접수 인덱싱: 원본="${match}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  U열: "${uValue}", V열: "${vValue}"`);
             console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
           }
-        }
+        });
       }
     });
     
