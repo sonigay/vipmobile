@@ -40,32 +40,45 @@ const cacheUtils = {
   }
 };
 
-// 선택된 대상자 가져오기
+// 선택된 대상자 가져오기 (매장별 우선 배정)
 export const getSelectedReservationTargets = (targets, agents) => {
   const selectedAgents = new Set();
   
-  // 사무실별 선택
-  Object.entries(targets.offices).forEach(([office, selected]) => {
+  // 1순위: 매장별 선택 (가장 우선)
+  Object.entries(targets.stores || {}).forEach(([store, selected]) => {
     if (selected) {
-      agents.filter(agent => agent.office === office).forEach(agent => {
+      agents.filter(agent => agent.store === store).forEach(agent => {
         selectedAgents.add(agent.name);
       });
     }
   });
   
-  // 소속별 선택
-  Object.entries(targets.departments).forEach(([department, selected]) => {
-    if (selected) {
-      agents.filter(agent => agent.department === department).forEach(agent => {
-        selectedAgents.add(agent.name);
-      });
-    }
-  });
-  
-  // 담당자별 선택
-  Object.entries(targets.agents).forEach(([agentName, selected]) => {
-    if (selected) {
+  // 2순위: 담당자별 선택 (매장별에서 선택되지 않은 담당자들)
+  Object.entries(targets.agents || {}).forEach(([agentName, selected]) => {
+    if (selected && !selectedAgents.has(agentName)) {
       selectedAgents.add(agentName);
+    }
+  });
+  
+  // 3순위: 소속별 선택 (매장별/담당자별에서 선택되지 않은 담당자들)
+  Object.entries(targets.departments || {}).forEach(([department, selected]) => {
+    if (selected) {
+      agents.filter(agent => 
+        agent.department === department && !selectedAgents.has(agent.name)
+      ).forEach(agent => {
+        selectedAgents.add(agent.name);
+      });
+    }
+  });
+  
+  // 4순위: 사무실별 선택 (매장별/담당자별/소속별에서 선택되지 않은 담당자들)
+  Object.entries(targets.offices || {}).forEach(([office, selected]) => {
+    if (selected) {
+      agents.filter(agent => 
+        agent.office === office && !selectedAgents.has(agent.name)
+      ).forEach(agent => {
+        selectedAgents.add(agent.name);
+      });
     }
   });
   
@@ -202,15 +215,33 @@ export const calculateReservationAssignment = async (
     
     console.log('최종 매칭된 고객 수:', customerStoreMap.size, '명');
     
-    // 우선순위별로 정렬된 데이터 생성
+    // 우선순위별로 정렬된 데이터 생성 (사전예약사이트 사이트예약시간 오름차순 우선)
     const sortedData = {
       onSale: Array.from(customerStoreMap.values())
         .filter(item => item.priority === 1)
-        .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime)),
+        .sort((a, b) => {
+          // 온세일접수는 사전예약사이트의 사이트예약시간으로 정렬
+          const siteA = reservationData.site.find(site => 
+            site.customerName === a.customerName && site.storeCode === a.storeCode
+          );
+          const siteB = reservationData.site.find(site => 
+            site.customerName === b.customerName && site.storeCode === b.storeCode
+          );
+          return parseReceiptTime(siteA?.receiptTime || a.receiptTime) - parseReceiptTime(siteB?.receiptTime || b.receiptTime);
+        }),
       
       yard: Array.from(customerStoreMap.values())
         .filter(item => item.priority === 2)
-        .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime)),
+        .sort((a, b) => {
+          // 마당접수도 사전예약사이트의 사이트예약시간으로 정렬
+          const siteA = reservationData.site.find(site => 
+            site.customerName === a.customerName && site.storeCode === a.storeCode
+          );
+          const siteB = reservationData.site.find(site => 
+            site.customerName === b.customerName && site.storeCode === b.storeCode
+          );
+          return parseReceiptTime(siteA?.receiptTime || a.receiptTime) - parseReceiptTime(siteB?.receiptTime || b.receiptTime);
+        }),
       
       site: Array.from(customerStoreMap.values())
         .filter(item => item.priority === 3)

@@ -89,9 +89,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     },
     models: {},
     targets: {
-      offices: {},
+      stores: {},
+      agents: {},
       departments: {},
-      agents: {}
+      offices: {}
     }
   });
   
@@ -277,9 +278,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       },
       models: {},
       targets: {
-        offices: {},
+        stores: {},
+        agents: {},
         departments: {},
-        agents: {}
+        offices: {}
       }
     };
     setAssignmentSettings(defaultSettings);
@@ -835,36 +837,37 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
               <Card>
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                    👥 대상자 설정
+                    👥 대상
                   </Typography>
 
                   <Tabs value={previewSubTab} onChange={(e, newValue) => setPreviewSubTab(newValue)}>
-                    <Tab label="사무실별" />
-                    <Tab label="소속별" />
+                    <Tab label="매장별" />
                     <Tab label="담당자별" />
+                    <Tab label="소속별" />
+                    <Tab label="사무실별" />
                   </Tabs>
 
                   <Box sx={{ mt: 2 }}>
                     {previewSubTab === 0 && (
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                          <Typography variant="subtitle1">사무실별 선택</Typography>
+                          <Typography variant="subtitle1">매장별 선택</Typography>
                           <Box sx={{ display: 'flex', gap: 1 }}>
                             <Button
                               size="small"
-                              onClick={() => handleHierarchicalSelectAll('offices', true)}
+                              onClick={() => handleHierarchicalSelectAll('stores', true)}
                             >
                               전체 선택
                             </Button>
                             <Button
                               size="small"
-                              onClick={() => handleHierarchicalSelectAll('offices', false)}
+                              onClick={() => handleHierarchicalSelectAll('stores', false)}
                             >
                               전체 해제
                             </Button>
                             <Button
                               size="small"
-                              onClick={() => handleHierarchicalReset('offices')}
+                              onClick={() => handleHierarchicalReset('stores')}
                             >
                               초기화
                             </Button>
@@ -872,12 +875,12 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                         
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                          {[...new Set(agents.map(agent => agent.office))].map(office => (
+                          {[...new Set(agents.map(agent => agent.store))].filter(store => store).map(store => (
                             <Chip
-                              key={office}
-                              label={office}
-                              color={assignmentSettings.targets.offices[office] ? 'primary' : 'default'}
-                              onClick={() => handleHierarchicalTargetChange('offices', office, !assignmentSettings.targets.offices[office])}
+                              key={store}
+                              label={store}
+                              color={assignmentSettings.targets.stores?.[store] ? 'primary' : 'default'}
+                              onClick={() => handleHierarchicalTargetChange('stores', store, !assignmentSettings.targets.stores?.[store])}
                               sx={{ cursor: 'pointer' }}
                             />
                           ))}
@@ -886,6 +889,46 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                     )}
 
                     {previewSubTab === 1 && (
+                      <Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle1">담당자별 선택</Typography>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              size="small"
+                              onClick={() => handleHierarchicalSelectAll('agents', true)}
+                            >
+                              전체 선택
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={() => handleHierarchicalSelectAll('agents', false)}
+                            >
+                              전체 해제
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={() => handleHierarchicalReset('agents')}
+                            >
+                              초기화
+                            </Button>
+                          </Box>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {agents.map(agent => (
+                            <Chip
+                              key={agent.name}
+                              label={agent.name}
+                              color={assignmentSettings.targets.agents[agent.name] ? 'primary' : 'default'}
+                              onClick={() => handleHierarchicalTargetChange('agents', agent.name, !assignmentSettings.targets.agents[agent.name])}
+                              sx={{ cursor: 'pointer' }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {previewSubTab === 2 && (
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">소속별 선택</Typography>
@@ -925,26 +968,26 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                       </Box>
                     )}
 
-                    {previewSubTab === 2 && (
+                    {previewSubTab === 3 && (
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                          <Typography variant="subtitle1">담당자별 선택</Typography>
+                          <Typography variant="subtitle1">사무실별 선택</Typography>
                           <Box sx={{ display: 'flex', gap: 1 }}>
                             <Button
                               size="small"
-                              onClick={() => handleHierarchicalSelectAll('agents', true)}
+                              onClick={() => handleHierarchicalSelectAll('offices', true)}
                             >
                               전체 선택
                             </Button>
                             <Button
                               size="small"
-                              onClick={() => handleHierarchicalSelectAll('agents', false)}
+                              onClick={() => handleHierarchicalSelectAll('offices', false)}
                             >
                               전체 해제
                             </Button>
                             <Button
                               size="small"
-                              onClick={() => handleHierarchicalReset('agents')}
+                              onClick={() => handleHierarchicalReset('offices')}
                             >
                               초기화
                             </Button>
@@ -952,12 +995,12 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                         
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                          {agents.map(agent => (
+                          {[...new Set(agents.map(agent => agent.office))].map(office => (
                             <Chip
-                              key={agent.name}
-                              label={agent.name}
-                              color={assignmentSettings.targets.agents[agent.name] ? 'primary' : 'default'}
-                              onClick={() => handleHierarchicalTargetChange('agents', agent.name, !assignmentSettings.targets.agents[agent.name])}
+                              key={office}
+                              label={office}
+                              color={assignmentSettings.targets.offices[office] ? 'primary' : 'default'}
+                              onClick={() => handleHierarchicalTargetChange('offices', office, !assignmentSettings.targets.offices[office])}
                               sx={{ cursor: 'pointer' }}
                             />
                           ))}
