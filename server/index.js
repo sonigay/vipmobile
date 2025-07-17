@@ -3185,7 +3185,7 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     console.log(`정규화 규칙 수: ${normalizationRules.length}`);
     
     normalizationRules.forEach(rule => {
-      // reservationSite 부분만 사용하여 키 생성 (P|Q|R 형식)
+      // reservationSite 부분만 사용하여 키 생성 (P|Q|R 형식) - 공백 제거
       const key = rule.reservationSite.replace(/\s+/g, '');
       ruleMap.set(key, rule.normalizedModel);
       console.log(`정규화 규칙 추가: ${key} -> ${rule.normalizedModel}`);
@@ -3198,14 +3198,20 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     const yardIndex = new Map();
     let yardIndexCount = 0;
     yardValues.slice(1).forEach((yardRow, index) => {
-      if (yardRow.length >= 25) {
-        const reservationNumber = (yardRow[0] || '').toString().trim();
-        if (reservationNumber) {
-          // 하이픈 제거하여 정규화된 예약번호로 저장
-          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-          const receivedDateTime = (yardRow[11] || '').toString().trim();
-          const receivedMemo = (yardRow[20] || '').toString().trim();
-          
+      if (yardRow.length >= 22) { // V열까지 필요하므로 최소 22개 컬럼
+        const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
+        const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
+        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        
+        // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
+        const reservationPattern = /[A-Z]{2}\d{6}/g;
+        const uMatches = uValue.match(reservationPattern) || [];
+        const vMatches = vValue.match(reservationPattern) || [];
+        
+        // 모든 예약번호를 인덱스에 추가 (이미 하이픈이 없는 형태)
+        [...uMatches, ...vMatches].forEach(match => {
+          const normalizedReservationNumber = match;
           yardIndex.set(normalizedReservationNumber, {
             receivedDateTime,
             receivedMemo
@@ -3214,10 +3220,11 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
           
           // 처음 5개 마당접수 데이터 로그
           if (index < 5) {
-            console.log(`마당접수 인덱싱: 원본="${reservationNumber}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`마당접수 인덱싱: 원본="${match}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  U열: "${uValue}", V열: "${vValue}"`);
             console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
           }
-        }
+        });
       }
     });
     
@@ -3315,7 +3322,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       // 서류접수 여부 확인 (인덱스 활용으로 빠른 검색)
       // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-      const isReceived = yardIndex.has(normalizedReservationNumber);
+      const yardData = yardIndex.get(normalizedReservationNumber);
+      const isReceived = !!yardData;
       
       if (index < 5) {
         console.log(`서류접수 매칭 시도: 예약번호="${reservationNumber}" -> 정규화="${normalizedReservationNumber}" -> 매칭결과=${isReceived}`);
@@ -3440,14 +3448,20 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
     const yardIndex = new Map();
     let yardIndexCount = 0;
     yardValues.slice(1).forEach((yardRow, index) => {
-      if (yardRow.length >= 25) {
-        const reservationNumber = (yardRow[0] || '').toString().trim();
-        if (reservationNumber) {
-          // 하이픈 제거하여 정규화된 예약번호로 저장
-          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-          const receivedDateTime = (yardRow[11] || '').toString().trim();
-          const receivedMemo = (yardRow[20] || '').toString().trim();
-          
+      if (yardRow.length >= 22) { // V열까지 필요하므로 최소 22개 컬럼
+        const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
+        const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
+        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        
+        // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
+        const reservationPattern = /[A-Z]{2}\d{6}/g;
+        const uMatches = uValue.match(reservationPattern) || [];
+        const vMatches = vValue.match(reservationPattern) || [];
+        
+        // 모든 예약번호를 인덱스에 추가 (이미 하이픈이 없는 형태)
+        [...uMatches, ...vMatches].forEach(match => {
+          const normalizedReservationNumber = match;
           yardIndex.set(normalizedReservationNumber, {
             receivedDateTime,
             receivedMemo
@@ -3456,10 +3470,11 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
           
           // 처음 5개 마당접수 데이터 로그
           if (index < 5) {
-            console.log(`POS별 마당접수 인덱싱: 원본="${reservationNumber}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`POS별 마당접수 인덱싱: 원본="${match}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  U열: "${uValue}", V열: "${vValue}"`);
             console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
           }
-        }
+        });
       }
     });
     
@@ -6962,10 +6977,18 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
               const ruleQ = ruleParts[1];
               const ruleR = ruleParts[2];
               
-              // 정확한 매칭 또는 부분 매칭 확인
-              const pMatch = !ruleP || pValue.includes(ruleP) || ruleP.includes(pValue);
-              const qMatch = !ruleQ || qValue.includes(ruleQ) || ruleQ.includes(qValue);
-              const rMatch = !ruleR || rValue.includes(ruleR) || ruleR.includes(rValue);
+              // 공백 제거하여 정확한 매칭 확인
+              const normalizedPValue = pValue.replace(/\s+/g, '');
+              const normalizedQValue = qValue.replace(/\s+/g, '');
+              const normalizedRValue = rValue.replace(/\s+/g, '');
+              const normalizedRuleP = ruleP.replace(/\s+/g, '');
+              const normalizedRuleQ = ruleQ.replace(/\s+/g, '');
+              const normalizedRuleR = ruleR.replace(/\s+/g, '');
+              
+              // 정확한 매칭 확인
+              const pMatch = !normalizedRuleP || normalizedPValue === normalizedRuleP;
+              const qMatch = !normalizedRuleQ || normalizedQValue === normalizedRuleQ;
+              const rMatch = !normalizedRuleR || normalizedRValue === normalizedRuleR;
               
               if (pMatch && qMatch && rMatch) {
                 normalizedModel = rule.normalizedModel;
@@ -7022,9 +7045,15 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
               const ruleF = ruleParts[0];
               const ruleG = ruleParts[1];
               
-              // 정확한 매칭 또는 부분 매칭 확인
-              const fMatch = !ruleF || fValue.includes(ruleF) || ruleF.includes(fValue);
-              const gMatch = !ruleG || gValue.includes(ruleG) || ruleG.includes(gValue);
+              // 공백 제거하여 정확한 매칭 확인
+              const normalizedFValue = fValue.replace(/\s+/g, '');
+              const normalizedGValue = gValue.replace(/\s+/g, '');
+              const normalizedRuleF = ruleF.replace(/\s+/g, '');
+              const normalizedRuleG = ruleG.replace(/\s+/g, '');
+              
+              // 정확한 매칭 확인
+              const fMatch = !normalizedRuleF || normalizedFValue === normalizedRuleF;
+              const gMatch = !normalizedRuleG || normalizedGValue === normalizedRuleG;
               
               if (fMatch && gMatch) {
                 normalizedModel = rule.normalizedModel;
@@ -7052,9 +7081,9 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
     const uniqueReservationModels = new Set();
     const uniqueNormalizedModels = new Set();
     
-    // 사전예약사이트의 고유 모델 조합 추출 (P+Q+R)
+    // 사전예약사이트의 고유 모델 조합 추출 (P+Q+R) - 공백 제거
     reservationSiteOriginalData.forEach(item => {
-      const modelKey = `${item.originalP}|${item.originalQ}|${item.originalR}`.trim();
+      const modelKey = `${item.originalP}|${item.originalQ}|${item.originalR}`.replace(/\s+/g, '');
       if (modelKey && modelKey !== '||') {
         uniqueReservationModels.add(modelKey);
       }
