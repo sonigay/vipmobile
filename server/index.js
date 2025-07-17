@@ -8003,7 +8003,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
           const pValue = row[15] || ''; // P열 (16번째, 0부터 시작)
           const qValue = row[16] || ''; // Q열 (17번째, 0부터 시작)
           const rValue = row[17] || ''; // R열 (18번째, 0부터 시작)
-          const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작) - 대리점코드
+          const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작) - 대리점코드
           
           // 정규화 규칙 적용
           let normalizedModel = '';
