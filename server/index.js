@@ -7830,8 +7830,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const model = row[15] || ''; // P열 (16번째, 0부터 시작)
       const capacity = row[16] || ''; // Q열 (17번째, 0부터 시작) - 용량
       const color = row[17] || ''; // R열 (18번째, 0부터 시작) - 색상
-      const type = row.length > 32 ? (row[32] || '') : ''; // AF열 (32번째, 0부터 시작) - 유형
-      const reservationMemo = row.length > 35 ? (row[35] || '') : ''; // AI열 (35번째, 0부터 시작) - 사이트메모
+      const type = row.length > 31 ? (row[31] || '') : ''; // AF열 (32번째, 0부터 시작) - 유형
+      const reservationMemo = row.length > 34 ? (row[34] || '') : ''; // AI열 (35번째, 0부터 시작) - 사이트메모
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
@@ -7854,8 +7854,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         console.log(`  P열(16번째, index 15): 모델 = "${row[15]}"`);
         console.log(`  Q열(17번째, index 16): 색상 = "${row[16]}"`);
         console.log(`  R열(18번째, index 17): 용량 = "${row[17]}"`);
-        console.log(`  AF열(32번째, index 32): 유형 = "${row.length > 32 ? row[32] : '컬럼 없음'}"`);
-        console.log(`  AI열(35번째, index 35): 사이트메모 = "${row.length > 35 ? row[35] : '컬럼 없음'}"`);
+        console.log(`  AF열(32번째, index 31): 유형 = "${row.length > 31 ? row[31] : '컬럼 없음'}"`);
+        console.log(`  AI열(35번째, index 34): 사이트메모 = "${row.length > 34 ? row[34] : '컬럼 없음'}"`);
         console.log(`  Z열(26번째, index 25): 접수자 = "${row[25]}"`);
         console.log(`--- 처리된 값 ---`);
         console.log(`  모델: "${model}"`);
