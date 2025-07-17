@@ -1083,7 +1083,13 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">매장별 선택</Typography>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Chip
+                              label={`선택됨: ${Object.values(assignmentSettings.targets.stores || {}).filter(Boolean).length}/${stores.length}`}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
                             <Button
                               size="small"
                               onClick={() => handleHierarchicalSelectAll('stores', true)}
@@ -1105,18 +1111,30 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Box>
                         </Box>
                         
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
                           {stores.map(store => (
-                            <Chip
-                              key={store.id}
-                              label={store.name}
-                              color={assignmentSettings.targets.stores?.[store.id] ? 'primary' : 'default'}
-                              onClick={() => handleHierarchicalTargetChange('stores', store.id, !assignmentSettings.targets.stores?.[store.id])}
-                              sx={{ cursor: 'pointer' }}
-                            />
+                            <Box key={store.id} sx={{ display: 'flex', alignItems: 'center', mb: 1, p: 1, borderRadius: 1, '&:hover': { backgroundColor: '#f5f5f5' } }}>
+                              <Checkbox
+                                checked={assignmentSettings.targets.stores?.[store.id] || false}
+                                onChange={(e) => handleHierarchicalTargetChange('stores', store.id, e.target.checked)}
+                                size="small"
+                                sx={{ mr: 1 }}
+                              />
+                              <Typography variant="body2" sx={{ flex: 1 }}>
+                                {store.name}
+                              </Typography>
+                              {assignmentSettings.targets.stores?.[store.id] && (
+                                <Chip
+                                  label="선택됨"
+                                  size="small"
+                                  color="primary"
+                                  sx={{ fontSize: '0.7rem', height: 20 }}
+                                />
+                              )}
+                            </Box>
                           ))}
                           {stores.length === 0 && (
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
                               매장 데이터를 불러오는 중...
                             </Typography>
                           )}
@@ -1128,7 +1146,13 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                       <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="subtitle1">담당자별 선택</Typography>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Chip
+                              label={`선택됨: ${Object.values(assignmentSettings.targets.agents || {}).filter(Boolean).length}/${agents.length}`}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
                             <Button
                               size="small"
                               onClick={() => handleHierarchicalSelectAll('agents', true)}
@@ -1150,15 +1174,32 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                           </Box>
                         </Box>
                         
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
                           {agents.map(agent => (
-                            <Chip
-                              key={agent.contactId}
-                              label={agent.target || agent.contactId}
-                              color={assignmentSettings.targets.agents[agent.contactId] ? 'primary' : 'default'}
-                              onClick={() => handleHierarchicalTargetChange('agents', agent.contactId, !assignmentSettings.targets.agents[agent.contactId])}
-                              sx={{ cursor: 'pointer' }}
-                            />
+                            <Box key={agent.contactId} sx={{ display: 'flex', alignItems: 'center', mb: 1, p: 1, borderRadius: 1, '&:hover': { backgroundColor: '#f5f5f5' } }}>
+                              <Checkbox
+                                checked={assignmentSettings.targets.agents[agent.contactId] || false}
+                                onChange={(e) => handleHierarchicalTargetChange('agents', agent.contactId, e.target.checked)}
+                                size="small"
+                                sx={{ mr: 1 }}
+                              />
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2">
+                                  {agent.target || agent.contactId}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {agent.office} • {agent.department}
+                                </Typography>
+                              </Box>
+                              {assignmentSettings.targets.agents[agent.contactId] && (
+                                <Chip
+                                  label="선택됨"
+                                  size="small"
+                                  color="primary"
+                                  sx={{ fontSize: '0.7rem', height: 20 }}
+                                />
+                              )}
+                            </Box>
                           ))}
                         </Box>
                       </Box>

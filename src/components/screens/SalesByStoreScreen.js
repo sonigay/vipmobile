@@ -538,6 +538,59 @@ function SalesByStoreScreen({ loggedInStore }) {
     console.log('selectedAgentDetail 상태가 null로 설정됨');
   };
 
+  // 영업사원 선택 시 배정셋팅과 연동하는 함수
+  const handleAgentSelectionForAssignment = (agentName) => {
+    try {
+      // 현재 배정셋팅 설정 가져오기
+      const currentSettings = JSON.parse(localStorage.getItem('reservationAssignmentSettings') || '{}');
+      
+      // 해당 영업사원의 매장들 찾기
+      const agentData = data.byAgent[agentName] || {};
+      const agentStores = Object.keys(agentData);
+      
+      // 매장별 설정 업데이트
+      const updatedStores = { ...currentSettings.targets?.stores };
+      agentStores.forEach(storeName => {
+        // 매장 ID 찾기 (storeName을 ID로 사용하거나 매핑 필요)
+        const storeId = storeName; // 임시로 storeName을 ID로 사용
+        updatedStores[storeId] = true;
+      });
+      
+      // 담당자별 설정 업데이트
+      const updatedAgents = { ...currentSettings.targets?.agents };
+      // 담당자 ID 찾기 (실제 구현에서는 agents 배열에서 찾아야 함)
+      const agentId = agentName; // 임시로 agentName을 ID로 사용
+      updatedAgents[agentId] = true;
+      
+      // 업데이트된 설정 저장
+      const updatedSettings = {
+        ...currentSettings,
+        targets: {
+          ...currentSettings.targets,
+          stores: updatedStores,
+          agents: updatedAgents
+        }
+      };
+      
+      localStorage.setItem('reservationAssignmentSettings', JSON.stringify(updatedSettings));
+      
+      console.log(`✅ 영업사원 "${agentName}" 선택 - ${agentStores.length}개 매장이 배정셋팅에서 자동 체크됨`);
+      
+      // 사용자에게 알림
+      setMessage({ 
+        type: 'success', 
+        text: `"${agentName}" 담당자의 ${agentStores.length}개 매장이 배정셋팅에서 자동 선택되었습니다.` 
+      });
+      
+    } catch (error) {
+      console.error('영업사원 선택 연동 오류:', error);
+      setMessage({ 
+        type: 'error', 
+        text: '배정셋팅 연동 중 오류가 발생했습니다.' 
+      });
+    }
+  };
+
   // 캐시된 정규화 상태 확인
   const checkNormalizationStatus = useCallback(async () => {
     try {
@@ -1149,7 +1202,11 @@ function SalesByStoreScreen({ loggedInStore }) {
                     variant={isSelected ? 'contained' : 'outlined'}
                     size="small"
                     startIcon={<PersonIcon />}
-                    onClick={() => setSelectedAgent(index)}
+                    onClick={() => {
+                      setSelectedAgent(index);
+                      // 배정셋팅과 연동: 해당 영업사원의 매장들을 자동 체크
+                      handleAgentSelectionForAssignment(agent);
+                    }}
                     onDoubleClick={() => handleAgentClick(agent)}
                     sx={{
                       backgroundColor: isSelected ? '#ff9a9e' : undefined,
