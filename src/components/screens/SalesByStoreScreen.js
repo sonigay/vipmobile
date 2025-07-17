@@ -87,6 +87,8 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [showCharts, setShowCharts] = useState(false);
   const [inventoryData, setInventoryData] = useState({});
   const [loadingInventory, setLoadingInventory] = useState(false);
+  const [inventoryTab, setInventoryTab] = useState(0); // 0: 전체, 1: 306891, 2: 314942, 3: 315835
+  const [inventoryDataByStore, setInventoryDataByStore] = useState({});
   const [filters, setFilters] = useState({
     agent: '',
     storeCode: '',
@@ -333,13 +335,17 @@ function SalesByStoreScreen({ loggedInStore }) {
     return filteredAgents;
   };
 
-  // 재고 현황 데이터 로드
-  const loadInventoryData = async () => {
+  // 재고 현황 데이터 로드 (대리점별)
+  const loadInventoryData = async (storeCode = null) => {
     setLoadingInventory(true);
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inventory-analysis`);
+      const url = storeCode 
+        ? `${process.env.REACT_APP_API_URL}/api/inventory-analysis?storeCode=${storeCode}`
+        : `${process.env.REACT_APP_API_URL}/api/inventory-analysis`;
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error('재고 현황 데이터를 불러올 수 없습니다.');
@@ -348,7 +354,16 @@ function SalesByStoreScreen({ loggedInStore }) {
       const result = await response.json();
       
       if (result.success) {
-        setInventoryData(result.inventoryAnalysis);
+        if (storeCode) {
+          // 특정 대리점 데이터 저장
+          setInventoryDataByStore(prev => ({
+            ...prev,
+            [storeCode]: result.inventoryAnalysis
+          }));
+        } else {
+          // 전체 데이터 저장
+          setInventoryData(result.inventoryAnalysis);
+        }
         setMessage({ type: 'success', text: `재고 현황 로드 완료: ${Object.keys(result.inventoryAnalysis).length}개 모델` });
       } else {
         throw new Error(result.message || '재고 현황 데이터 로드에 실패했습니다.');
@@ -359,6 +374,32 @@ function SalesByStoreScreen({ loggedInStore }) {
     } finally {
       setLoadingInventory(false);
     }
+  };
+
+  // 대리점별 재고 데이터 로드
+  const loadInventoryDataByStore = async () => {
+    // 전체 데이터 로드
+    await loadInventoryData();
+    
+    // 각 대리점별 데이터 로드
+    const storeCodes = ['306891', '314942', '315835'];
+    for (const code of storeCodes) {
+      await loadInventoryData(code);
+    }
+  };
+
+  // 현재 탭에 따른 재고 데이터 반환
+  const getCurrentInventoryData = () => {
+    const storeCodes = ['306891', '314942', '315835'];
+    const currentStoreCode = storeCodes[inventoryTab - 1];
+    
+    if (inventoryTab === 0) {
+      return inventoryData;
+    } else if (currentStoreCode && inventoryDataByStore[currentStoreCode]) {
+      return inventoryDataByStore[currentStoreCode];
+    }
+    
+    return {};
   };
 
   // 데이터 로드
@@ -751,6 +792,7 @@ function SalesByStoreScreen({ loggedInStore }) {
   useEffect(() => {
     loadData();
     checkNormalizationStatus();
+    loadInventoryDataByStore(); // 대리점별 재고 데이터 로드
   }, []);
 
   // 모델색상별 탭 선택 시 데이터 로드
@@ -759,6 +801,16 @@ function SalesByStoreScreen({ loggedInStore }) {
       loadModelColorData();
     }
   }, [viewMode, normalizationStatus]);
+
+  // 재고 탭 변경 시 해당 대리점 데이터 로드
+  useEffect(() => {
+    const storeCodes = ['306891', '314942', '315835'];
+    const currentStoreCode = storeCodes[inventoryTab - 1];
+    
+    if (inventoryTab > 0 && currentStoreCode && !inventoryDataByStore[currentStoreCode]) {
+      loadInventoryData(currentStoreCode);
+    }
+  }, [inventoryTab]);
 
   // 디버깅용: 데이터 구조 확인
   useEffect(() => {
@@ -1623,7 +1675,7 @@ function SalesByStoreScreen({ loggedInStore }) {
             )}
 
             {/* 재고 현황 테이블 */}
-            {Object.keys(inventoryData).length > 0 && (
+            {Object.keys(getCurrentInventoryData()).length > 0 && (
               <Box sx={{ mt: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
@@ -1643,6 +1695,54 @@ function SalesByStoreScreen({ loggedInStore }) {
                     {downloadingExcel ? <CircularProgress size={16} /> : '재고 현황 다운로드'}
                   </Button>
                 </Box>
+
+                {/* 대리점별 탭 */}
+                <Box sx={{ mb: 2 }}>
+                  <Tabs 
+                    value={inventoryTab} 
+                    onChange={(event, newValue) => setInventoryTab(newValue)}
+                    sx={{
+                      '& .MuiTab-root': {
+                        minHeight: 48,
+                        fontSize: '0.9rem',
+                        fontWeight: 500
+                      }
+                    }}
+                  >
+                    <Tab 
+                      label="전체" 
+                      sx={{ 
+                        '&.Mui-selected': {
+                          color: '#ff9a9e'
+                        }
+                      }}
+                    />
+                    <Tab 
+                      label="306891 (경수)" 
+                      sx={{ 
+                        '&.Mui-selected': {
+                          color: '#ff9a9e'
+                        }
+                      }}
+                    />
+                    <Tab 
+                      label="314942 (군산)" 
+                      sx={{ 
+                        '&.Mui-selected': {
+                          color: '#ff9a9e'
+                        }
+                      }}
+                    />
+                    <Tab 
+                      label="315835 (인천)" 
+                      sx={{ 
+                        '&.Mui-selected': {
+                          color: '#ff9a9e'
+                        }
+                      }}
+                    />
+                  </Tabs>
+                </Box>
                 
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
@@ -1656,7 +1756,7 @@ function SalesByStoreScreen({ loggedInStore }) {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {Object.entries(inventoryData)
+                      {Object.entries(getCurrentInventoryData())
                         .sort((a, b) => b[1].remainingStock - a[1].remainingStock) // 잔여재고 내림차순 정렬
                         .map(([model, data]) => (
                         <TableRow key={model} hover>
@@ -1708,28 +1808,28 @@ function SalesByStoreScreen({ loggedInStore }) {
                   <Grid container spacing={2}>
                     <Grid item xs={6} md={3}>
                       <Chip
-                        label={`총 모델: ${Object.keys(inventoryData).length}개`}
+                        label={`총 모델: ${Object.keys(getCurrentInventoryData()).length}개`}
                         color="primary"
                         variant="outlined"
                       />
                     </Grid>
                     <Grid item xs={6} md={3}>
                       <Chip
-                        label={`재고 충분: ${Object.values(inventoryData).filter(item => item.status === '충분').length}개`}
+                        label={`재고 충분: ${Object.values(getCurrentInventoryData()).filter(item => item.status === '충분').length}개`}
                         color="success"
                         variant="outlined"
                       />
                     </Grid>
                     <Grid item xs={6} md={3}>
                       <Chip
-                        label={`재고 부족: ${Object.values(inventoryData).filter(item => item.status === '부족').length}개`}
+                        label={`재고 부족: ${Object.values(getCurrentInventoryData()).filter(item => item.status === '부족').length}개`}
                         color="warning"
                         variant="outlined"
                       />
                     </Grid>
                     <Grid item xs={6} md={3}>
                       <Chip
-                        label={`초과예약: ${Object.values(inventoryData).filter(item => item.status === '초과예약').length}개`}
+                        label={`초과예약: ${Object.values(getCurrentInventoryData()).filter(item => item.status === '초과예약').length}개`}
                         color="error"
                         variant="outlined"
                       />

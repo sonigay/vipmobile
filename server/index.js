@@ -7929,10 +7929,43 @@ app.post('/api/sales-by-store/update-agent', async (req, res) => {
   }
 });
 
-// 재고 현황 분석 API
+// 재고 현황 분석 API (대리점별 분리)
 app.get('/api/inventory-analysis', async (req, res) => {
+  const { storeCode } = req.query; // 대리점 코드 필터링 (선택사항)
+  
   try {
-    // 1. 정규화 규칙 로드
+    // 1. 대리점 코드 매핑 정보 로드
+    let storeCodeMapping = {};
+    try {
+      const mappingResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '폰클재고데이터!K:K'
+      });
+      
+      if (mappingResponse.data.values && mappingResponse.data.values.length > 1) {
+        // K열에서 대리점명과 코드 매핑 정보 추출
+        const mappingData = mappingResponse.data.values.slice(1);
+        mappingData.forEach((row, index) => {
+          const storeName = row[0] || '';
+          if (storeName) {
+            // 매핑 규칙 적용
+            if (storeName.includes('LG사업자폰(경수)')) {
+              storeCodeMapping['306891'] = storeName;
+            } else if (storeName.includes('LG사업자폰(군산)')) {
+              storeCodeMapping['314942'] = storeName;
+            } else if (storeName.includes('LG사업자폰(인천)')) {
+              storeCodeMapping['315835'] = storeName;
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.log('대리점 코드 매핑 로드 실패:', error.message);
+    }
+
+        console.log('대리점 코드 매핑:', storeCodeMapping);
+
+    // 2. 정규화 규칙 로드
     let normalizationRules = [];
     try {
       const rulesResponse = await sheets.spreadsheets.values.get({
@@ -7954,7 +7987,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
       console.log('정규화 규칙 로드 실패:', error.message);
     }
 
-    // 2. 사전예약사이트 데이터 로드
+    // 2. 사전예약사이트 데이터 로드 (대리점별 필터링)
     let reservationData = [];
     try {
       const reservationResponse = await sheets.spreadsheets.values.get({
@@ -7970,6 +8003,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
           const pValue = row[15] || ''; // P열 (16번째, 0부터 시작)
           const qValue = row[16] || ''; // Q열 (17번째, 0부터 시작)
           const rValue = row[17] || ''; // R열 (18번째, 0부터 시작)
+          const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작) - 대리점코드
           
           // 정규화 규칙 적용
           let normalizedModel = '';
@@ -7997,15 +8031,22 @@ app.get('/api/inventory-analysis', async (req, res) => {
             originalQ: qValue,
             originalR: rValue,
             normalizedModel: normalizedModel,
+            storeCode: storeCode,
             rowIndex: index + 2
           };
         });
+        
+        // 대리점 코드별 필터링 적용
+        if (storeCode) {
+          reservationData = reservationData.filter(item => item.storeCode === storeCode);
+          console.log(`사전예약 대리점 코드 ${storeCode} 필터링 적용: ${reservationData.length}개 항목`);
+        }
       }
     } catch (error) {
       console.log('사전예약사이트 시트 로드 실패:', error.message);
     }
 
-    // 3. 폰클재고데이터 로드 (재고 수량 포함)
+    // 3. 폰클재고데이터 로드 (재고 수량 포함, 대리점별 필터링)
     let inventoryData = [];
     try {
       const inventoryResponse = await sheets.spreadsheets.values.get({
@@ -8020,6 +8061,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
         inventoryData = dataRows.map((row, index) => {
           const fValue = row[5] || ''; // F열 (6번째, 0부터 시작) - 모델
           const gValue = row[6] || ''; // G열 (7번째, 0부터 시작) - 색상
+          const storeName = row[10] || ''; // K열 (11번째, 0부터 시작) - 대리점명
           
           // 여러 열에서 수량 확인 (H, I, J, K, L열)
           const quantityH = parseInt(row[7] || '0') || 0; // H열
@@ -8031,9 +8073,19 @@ app.get('/api/inventory-analysis', async (req, res) => {
           // 첫 번째로 0이 아닌 수량을 사용
           const quantity = quantityH || quantityI || quantityJ || quantityK || quantityL;
           
+          // 대리점 코드 결정
+          let storeCode = '';
+          if (storeName.includes('LG사업자폰(경수)')) {
+            storeCode = '306891';
+          } else if (storeName.includes('LG사업자폰(군산)')) {
+            storeCode = '314942';
+          } else if (storeName.includes('LG사업자폰(인천)')) {
+            storeCode = '315835';
+          }
+          
           // 디버깅: 처음 5개 행의 모든 열 값 확인
           if (index < 5) {
-            console.log(`행 ${index + 2}: F="${fValue}", G="${gValue}", H=${quantityH}, I=${quantityI}, J=${quantityJ}, K=${quantityK}, L=${quantityL}, 최종수량=${quantity}`);
+            console.log(`행 ${index + 2}: F="${fValue}", G="${gValue}", 대리점="${storeName}", 코드="${storeCode}", H=${quantityH}, I=${quantityI}, J=${quantityJ}, K=${quantityK}, L=${quantityL}, 최종수량=${quantity}`);
           }
           
           // 폰클재고데이터의 F열, G열을 그대로 사용하여 정규화 규칙과 매칭
@@ -8074,9 +8126,17 @@ app.get('/api/inventory-analysis', async (req, res) => {
             originalG: gValue,
             normalizedModel: normalizedModel,
             quantity: quantity,
+            storeName: storeName,
+            storeCode: storeCode,
             rowIndex: index + 2
           };
         });
+        
+        // 대리점 코드별 필터링 적용
+        if (storeCode) {
+          inventoryData = inventoryData.filter(item => item.storeCode === storeCode);
+          console.log(`대리점 코드 ${storeCode} 필터링 적용: ${inventoryData.length}개 항목`);
+        }
       }
     } catch (error) {
       console.log('폰클재고데이터 시트 로드 실패:', error.message);
@@ -8256,7 +8316,9 @@ app.get('/api/inventory-analysis', async (req, res) => {
       inventoryAnalysis: inventoryAnalysis,
       stats: stats,
       inventoryByModel: inventoryByModel,
-      reservationByModel: reservationByModel
+      reservationByModel: reservationByModel,
+      storeCode: storeCode || 'all',
+      storeCodeMapping: storeCodeMapping
     });
   } catch (error) {
     console.error('재고 현황 분석 오류:', error);
