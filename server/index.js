@@ -3758,8 +3758,8 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         console.log(`모델별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
         console.log(`  정규화된 예약번호: "${normalizedReservationNumber}"`);
         console.log(`  마당접수 인덱스 존재: ${yardIndex.has(normalizedReservationNumber)}`);
-        console.log(`  접수일시: "${receivedDateTime}"`);
-        console.log(`  접수메모: "${receivedMemo}"`);
+        console.log(`  마당접수일: "${receivedDateTime}"`);
+        console.log(`  마당메모: "${receivedMemo}"`);
         console.log(`  모델명: "${extractedModel}"`);
       }
       
@@ -7605,8 +7605,8 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
         console.log(`담당자별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
         console.log(`  정규화된 예약번호: "${normalizedReservationNumber}"`);
         console.log(`  마당접수 인덱스 존재: ${yardIndex.has(normalizedReservationNumber)}`);
-        console.log(`  접수일시: "${receivedDateTime}"`);
-        console.log(`  접수메모: "${receivedMemo}"`);
+        console.log(`  마당접수일: "${receivedDateTime}"`);
+        console.log(`  마당메모: "${receivedMemo}"`);
         console.log(`  모델명: "${model}"`);
         console.log(`  담당자: "${agent}"`);
       }
@@ -7803,20 +7803,36 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     const yardIndex = new Map();
     let yardIndexCount = 0;
     
-    yardData.forEach(row => {
-      const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
-      const receivedDate = row[11] || ''; // L열 (12번째, 0부터 시작)
-      const receivedMemo = row[21] || ''; // V열 (22번째, 0부터 시작)
-      const receiver = row[24] || ''; // Y열 (25번째, 0부터 시작)
-      
-      if (reservationNumber) {
-        const normalizedReservationNumber = normalizeReservationNumber(reservationNumber);
-        yardIndex.set(normalizedReservationNumber, {
-          receivedDate,
-          receivedMemo,
-          receiver
+    yardData.forEach((row, index) => {
+      if (row.length >= 22) { // V열까지 필요하므로 최소 22개 컬럼
+        const uValue = (row[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
+        const vValue = (row[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedDate = (row[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
+        const receivedMemo = (row[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receiver = (row[24] || '').toString().trim(); // Y열 (25번째, 0부터 시작)
+        
+        // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
+        const reservationPattern = /[A-Z]{2}\d{6}/g;
+        const uMatches = uValue.match(reservationPattern) || [];
+        const vMatches = vValue.match(reservationPattern) || [];
+        
+        // 모든 예약번호를 인덱스에 추가 (이미 하이픈이 없는 형태)
+        [...uMatches, ...vMatches].forEach(match => {
+          const normalizedReservationNumber = match;
+          yardIndex.set(normalizedReservationNumber, {
+            receivedDate,
+            receivedMemo,
+            receiver
+          });
+          yardIndexCount++;
+          
+          // 처음 5개 마당접수 데이터 로그
+          if (index < 5) {
+            console.log(`전체고객리스트 마당접수 인덱싱: 원본="${match}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  U열: "${uValue}", V열: "${vValue}"`);
+            console.log(`  접수일시: "${receivedDate}", 접수메모: "${receivedMemo}"`);
+          }
         });
-        yardIndexCount++;
       }
     });
 
