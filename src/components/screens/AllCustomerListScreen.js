@@ -117,7 +117,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         '사이트예약',
         '마당접수일',
         '온세일접수일',
-        '모델&용량&색상',
+        '모델/용량/색상',
         '유형',
         '대리점',
         'POS명',
@@ -155,7 +155,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         { wch: 15 },  // 사이트예약
         { wch: 15 },  // 마당접수일
         { wch: 15 },  // 온세일접수일
-        { wch: 25 },  // 모델&용량&색상
+        { wch: 25 },  // 모델/용량/색상
         { wch: 10 },  // 유형
         { wch: 12 },  // 대리점
         { wch: 15 },  // POS명
@@ -298,7 +298,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                     <TableCell width="120px">사이트예약</TableCell>
                     <TableCell width="120px">마당접수일</TableCell>
                     <TableCell width="120px">온세일접수일</TableCell>
-                    <TableCell width="150px">모델&용량&색상</TableCell>
+                    <TableCell width="150px">모델/용량/색상</TableCell>
                     <TableCell width="80px">유형</TableCell>
                     <TableCell width="100px">대리점</TableCell>
                     <TableCell width="100px">POS명</TableCell>

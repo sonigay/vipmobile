@@ -7836,19 +7836,30 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
 
-      // 모델&용량&색상 조합
-      const modelCapacityColor = [model, capacity, color].filter(Boolean).join('&');
+      // 모델/용량/색상 조합
+      const modelCapacityColor = [model, capacity, color].filter(Boolean).join('/');
 
-      // 처음 5개 고객의 사이트메모 디버깅 로그
+      // 처음 5개 고객의 상세 디버깅 로그
       if (index < 5) {
-        console.log(`전체고객리스트 사이트메모 디버깅: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
-        console.log(`  AI열 원본값: "${row[34]}"`);
+        console.log(`=== 전체고객리스트 디버깅 ${index + 1}번째 고객 ===`);
+        console.log(`고객명: "${customerName}", 예약번호: "${reservationNumber}"`);
+        console.log(`행 길이: ${row.length}`);
+        console.log(`--- 컬럼 값 확인 ---`);
+        console.log(`  P열(16번째, index 15): 모델 = "${row[15]}"`);
+        console.log(`  Q열(17번째, index 16): 색상 = "${row[16]}"`);
+        console.log(`  R열(18번째, index 17): 용량 = "${row[17]}"`);
+        console.log(`  AF열(32번째, index 31): 유형 = "${row[31]}"`);
+        console.log(`  AI열(35번째, index 34): 사이트메모 = "${row[34]}"`);
+        console.log(`  Z열(26번째, index 25): 접수자 = "${row[25]}"`);
+        console.log(`--- 처리된 값 ---`);
+        console.log(`  모델: "${model}"`);
+        console.log(`  색상: "${color}"`);
+        console.log(`  용량: "${capacity}"`);
+        console.log(`  유형: "${type}"`);
         console.log(`  사이트메모: "${reservationMemo}"`);
-        console.log(`  AF열 유형: "${row[31]}"`);
-        console.log(`  Z열 접수자: "${receiver}"`);
-        console.log(`  P열 모델: "${model}", Q열 색상: "${color}", R열 용량: "${capacity}"`);
-        console.log(`  모델&용량&색상: "${modelCapacityColor}"`);
-        console.log(`  행 길이: ${row.length}`);
+        console.log(`  접수자: "${receiver}"`);
+        console.log(`  모델/용량/색상: "${modelCapacityColor}"`);
+        console.log(`=== 디버깅 끝 ===`);
       }
 
       // 마당접수 정보 매칭
