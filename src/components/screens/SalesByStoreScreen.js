@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -62,6 +62,14 @@ import {
   Line
 } from 'recharts';
 import AgentDetailScreen from './AgentDetailScreen';
+import { 
+  getCachedModelColorData, 
+  getCachedNormalizationStatus,
+  getCachedCustomerListByPos,
+  getCachedCustomerListByModel,
+  clearModelColorCache,
+  getModelColorCacheStats
+} from '../../utils/modelColorCache';
 
 function SalesByStoreScreen({ loggedInStore }) {
   const [data, setData] = useState({ byStore: {}, byAgent: {} });
@@ -98,6 +106,8 @@ function SalesByStoreScreen({ loggedInStore }) {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedAgentDetail, setSelectedAgentDetail] = useState(null);
+  const [showCacheStatsDialog, setShowCacheStatsDialog] = useState(false);
+  const [cacheStats, setCacheStats] = useState(null);
 
   // 차트 데이터 준비 함수들
   const prepareAgentPerformanceData = () => {
@@ -528,34 +538,28 @@ function SalesByStoreScreen({ loggedInStore }) {
     console.log('selectedAgentDetail 상태가 null로 설정됨');
   };
 
-  // 정규화 상태 확인
-  const checkNormalizationStatus = async () => {
+  // 캐시된 정규화 상태 확인
+  const checkNormalizationStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-settings/normalized-data`);
-      if (response.ok) {
-        const result = await response.json();
-        // 사전예약사이트의 모든 모델이 정규화되면 완료로 간주
-        setNormalizationStatus(result.success && result.stats?.isCompleted);
+      const result = await getCachedNormalizationStatus(process.env.REACT_APP_API_URL);
+      setNormalizationStatus(result.isNormalized);
+      
+      if (!result.isNormalized) {
+        setMessage({ type: 'warning', text: '모델 정규화작업이 필요합니다.' });
       }
     } catch (error) {
       console.error('정규화 상태 확인 오류:', error);
       setNormalizationStatus(false);
     }
-  };
+  }, []);
 
-  // POS별 고객 리스트 로드
-  const loadCustomerListByPos = async (posName) => {
+  // 캐시된 POS별 고객 리스트 로드
+  const loadCustomerListByPos = useCallback(async (posName) => {
     setLoadingCustomerList(true);
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/model-color/by-pos/${encodeURIComponent(posName)}`);
-      
-      if (!response.ok) {
-        throw new Error('POS별 고객 리스트를 불러올 수 없습니다.');
-      }
-      
-      const result = await response.json();
+      const result = await getCachedCustomerListByPos(process.env.REACT_APP_API_URL, posName);
       
       if (result.success) {
         setCustomerListData(result.data);
@@ -570,21 +574,15 @@ function SalesByStoreScreen({ loggedInStore }) {
     } finally {
       setLoadingCustomerList(false);
     }
-  };
+  }, []);
 
-  // 모델별 고객 리스트 로드
-  const loadCustomerListByModel = async (model) => {
+  // 캐시된 모델별 고객 리스트 로드
+  const loadCustomerListByModel = useCallback(async (model) => {
     setLoadingCustomerList(true);
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/customers/by-model/${encodeURIComponent(model)}`);
-      
-      if (!response.ok) {
-        throw new Error('모델별 고객 리스트를 불러올 수 없습니다.');
-      }
-      
-      const result = await response.json();
+      const result = await getCachedCustomerListByModel(process.env.REACT_APP_API_URL, model);
       
       if (result.success) {
         setCustomerListData(result.data);
@@ -599,7 +597,22 @@ function SalesByStoreScreen({ loggedInStore }) {
     } finally {
       setLoadingCustomerList(false);
     }
-  };
+  }, []);
+
+  // 캐시 클리어
+  const handleClearCache = useCallback(() => {
+    if (window.confirm('모델색상별 정리 캐시를 클리어하시겠습니까?')) {
+      clearModelColorCache();
+      setMessage({ type: 'success', text: '모델색상별 정리 캐시가 클리어되었습니다.' });
+    }
+  }, []);
+
+  // 캐시 통계 보기
+  const handleShowCacheStats = useCallback(() => {
+    const stats = getModelColorCacheStats();
+    setCacheStats(stats);
+    setShowCacheStatsDialog(true);
+  }, []);
 
   // 고객리스트 엑셀 다운로드 함수
   const downloadCustomerListExcel = async () => {
@@ -755,8 +768,8 @@ function SalesByStoreScreen({ loggedInStore }) {
     }
   };
 
-  // 모델색상별 데이터 로드
-  const loadModelColorData = async () => {
+  // 캐시된 모델색상별 데이터 로드
+  const loadModelColorData = useCallback(async () => {
     if (!normalizationStatus) {
       setMessage({ type: 'warning', text: '정규화작업이 완료되지 않았습니다.' });
       return;
@@ -766,13 +779,7 @@ function SalesByStoreScreen({ loggedInStore }) {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/model-color`);
-      
-      if (!response.ok) {
-        throw new Error('모델색상별 데이터를 불러올 수 없습니다.');
-      }
-      
-      const result = await response.json();
+      const result = await getCachedModelColorData(process.env.REACT_APP_API_URL);
       
       if (result.success) {
         setModelColorData(result.data);
@@ -786,7 +793,7 @@ function SalesByStoreScreen({ loggedInStore }) {
     } finally {
       setLoadingModelColor(false);
     }
-  };
+  }, [normalizationStatus]);
 
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
@@ -795,12 +802,12 @@ function SalesByStoreScreen({ loggedInStore }) {
     loadInventoryDataByStore(); // 대리점별 재고 데이터 로드
   }, []);
 
-  // 모델색상별 탭 선택 시 데이터 로드
+  // 캐시된 모델색상별 탭 선택 시 데이터 로드
   useEffect(() => {
     if (viewMode === 'modelColor' && normalizationStatus && modelColorData.length === 0) {
       loadModelColorData();
     }
-  }, [viewMode, normalizationStatus]);
+  }, [viewMode, normalizationStatus, modelColorData.length, loadModelColorData]);
 
   // 재고 탭 변경 시 해당 대리점 데이터 로드
   useEffect(() => {
@@ -1483,6 +1490,22 @@ function SalesByStoreScreen({ loggedInStore }) {
                 <Button
                   variant="outlined"
                   size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={handleClearCache}
+                >
+                  캐시 클리어
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<BarChartIcon />}
+                  onClick={handleShowCacheStats}
+                >
+                  캐시 통계
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
                   startIcon={<StoreIcon />}
                   onClick={loadInventoryData}
                   disabled={loadingInventory}
@@ -2122,6 +2145,66 @@ function SalesByStoreScreen({ loggedInStore }) {
           >
             {saving ? '저장 중...' : '저장'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 캐시 통계 다이얼로그 */}
+      <Dialog open={showCacheStatsDialog} onClose={() => setShowCacheStatsDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <BarChartIcon color="primary" />
+            모델색상별 정리 캐시 통계
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {cacheStats && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body1">캐시 항목 수:</Typography>
+                <Chip 
+                  label={`${cacheStats.size} / ${cacheStats.maxSize}`} 
+                  color={cacheStats.size > cacheStats.maxSize * 0.8 ? 'warning' : 'primary'}
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body1">사용률:</Typography>
+                <Typography variant="body1" color="primary">
+                  {Math.round((cacheStats.size / cacheStats.maxSize) * 100)}%
+                </Typography>
+              </Box>
+              
+              <Divider />
+              
+              <Typography variant="subtitle2" gutterBottom>
+                캐시된 데이터 타입:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {cacheStats.keys.map((key, index) => {
+                  const type = key.split(':')[0];
+                  return (
+                    <Chip
+                      key={index}
+                      label={type}
+                      size="small"
+                      variant="outlined"
+                      color="secondary"
+                    />
+                  );
+                })}
+              </Box>
+              
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  모델색상별 정리 캐시는 성능 향상을 위해 자주 사용되는 데이터를 메모리에 저장합니다.
+                  캐시가 가득 차면 가장 오래된 항목이 자동으로 제거됩니다.
+                </Typography>
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCacheStatsDialog(false)}>닫기</Button>
         </DialogActions>
       </Dialog>
     </Container>
