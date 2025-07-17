@@ -8521,14 +8521,11 @@ app.get('/api/reservation-data/yard-receipt', async (req, res) => {
         // 고객명 (B열)
         const customerName = row[1] ? row[1].toString().trim() : '';
         
-        // 대리점코드 (C열)
-        const storeCode = row[2] ? row[2].toString().trim() : '';
+        // 모델명 (C열)
+        const model = row[2] ? row[2].toString().trim() : '';
         
-        // 모델명 (D열)
-        const model = row[3] ? row[3].toString().trim() : '';
-        
-        // 색상 (E열)
-        const color = row[4] ? row[4].toString().trim() : '';
+        // 색상 (D열)
+        const color = row[3] ? row[3].toString().trim() : '';
         
         // 접수시간 (L열)
         const receiptTime = row[11] ? row[11].toString().trim() : '';
@@ -8538,7 +8535,6 @@ app.get('/api/reservation-data/yard-receipt', async (req, res) => {
           return {
             reservationNumber,
             customerName,
-            storeCode,
             model,
             color,
             receiptTime,

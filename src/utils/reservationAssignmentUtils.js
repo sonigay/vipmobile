@@ -171,45 +171,45 @@ export const calculateReservationAssignment = async (
     console.log('마당접수 데이터:', reservationData.yard.length, '건');
     console.log('사전예약사이트 데이터:', reservationData.site.length, '건');
     
-    // 1순위: 온세일접수 (고객명 + 대리점코드 매칭)
+    // 1순위: 온세일접수 (고객명만으로 매칭)
     const filteredOnSale = reservationData.onSale.filter(item => 
       selectedModels.some(model => model.name === item.model && model.color === item.color)
     );
     console.log('필터링된 온세일 데이터:', filteredOnSale.length, '건');
     
     filteredOnSale.forEach(item => {
-      const key = `${item.customerName}_${item.storeCode}`;
+      const key = `${item.customerName}`;
       if (!customerStoreMap.has(key)) {
         customerStoreMap.set(key, { ...item, priority: 1, source: 'onSale' });
-        console.log(`온세일 매칭: ${item.customerName} (${item.storeCode}) -> ${item.model} ${item.color}`);
+        console.log(`온세일 매칭: ${item.customerName} -> ${item.model} ${item.color}`);
       }
     });
     
-    // 2순위: 마당접수 (고객명 + 대리점코드 매칭, 온세일에서 이미 처리된 고객은 제외)
+    // 2순위: 마당접수 (고객명만으로 매칭, 온세일에서 이미 처리된 고객은 제외)
     const filteredYard = reservationData.yard.filter(item => 
       selectedModels.some(model => model.name === item.model && model.color === item.color)
     );
     console.log('필터링된 마당접수 데이터:', filteredYard.length, '건');
     
     filteredYard.forEach(item => {
-      const key = `${item.customerName}_${item.storeCode}`;
+      const key = `${item.customerName}`;
       if (!customerStoreMap.has(key)) {
         customerStoreMap.set(key, { ...item, priority: 2, source: 'yard' });
-        console.log(`마당접수 매칭: ${item.customerName} (${item.storeCode}) -> ${item.model} ${item.color}`);
+        console.log(`마당접수 매칭: ${item.customerName} -> ${item.model} ${item.color}`);
       }
     });
     
-    // 3순위: 사전예약사이트 (고객명 + 대리점코드 매칭, 온세일/마당접수에서 이미 처리된 고객은 제외)
+    // 3순위: 사전예약사이트 (고객명만으로 매칭, 온세일/마당접수에서 이미 처리된 고객은 제외)
     const filteredSite = reservationData.site.filter(item => 
       selectedModels.some(model => model.name === item.model && model.color === item.color)
     );
     console.log('필터링된 사전예약사이트 데이터:', filteredSite.length, '건');
     
     filteredSite.forEach(item => {
-      const key = `${item.customerName}_${item.storeCode}`;
+      const key = `${item.customerName}`;
       if (!customerStoreMap.has(key)) {
         customerStoreMap.set(key, { ...item, priority: 3, source: 'site' });
-        console.log(`사전예약사이트 매칭: ${item.customerName} (${item.storeCode}) -> ${item.model} ${item.color}`);
+        console.log(`사전예약사이트 매칭: ${item.customerName} -> ${item.model} ${item.color}`);
       }
     });
     
@@ -222,10 +222,10 @@ export const calculateReservationAssignment = async (
         .sort((a, b) => {
           // 온세일접수는 사전예약사이트의 사이트예약시간으로 정렬
           const siteA = reservationData.site.find(site => 
-            site.customerName === a.customerName && site.storeCode === a.storeCode
+            site.customerName === a.customerName
           );
           const siteB = reservationData.site.find(site => 
-            site.customerName === b.customerName && site.storeCode === b.storeCode
+            site.customerName === b.customerName
           );
           return parseReceiptTime(siteA?.receiptTime || a.receiptTime) - parseReceiptTime(siteB?.receiptTime || b.receiptTime);
         }),
@@ -235,10 +235,10 @@ export const calculateReservationAssignment = async (
         .sort((a, b) => {
           // 마당접수도 사전예약사이트의 사이트예약시간으로 정렬
           const siteA = reservationData.site.find(site => 
-            site.customerName === a.customerName && site.storeCode === a.storeCode
+            site.customerName === a.customerName
           );
           const siteB = reservationData.site.find(site => 
-            site.customerName === b.customerName && site.storeCode === b.storeCode
+            site.customerName === b.customerName
           );
           return parseReceiptTime(siteA?.receiptTime || a.receiptTime) - parseReceiptTime(siteB?.receiptTime || b.receiptTime);
         }),
