@@ -7914,6 +7914,12 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     const cachedData = cacheUtils.get(cacheKey);
     if (cachedData) {
       console.log('캐시된 전체 고객리스트 반환');
+      // 캐시 정보 업데이트
+      cachedData.stats.cacheInfo = {
+        cached: true,
+        timestamp: new Date().toISOString(),
+        ttl: 300
+      };
       return res.json(cachedData);
     }
 
@@ -8099,7 +8105,12 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       stats: {
         totalCustomers: customerList.length,
         totalYardReceived: customerList.filter(c => c.yardReceivedDate).length,
-        totalOnSaleReceived: customerList.filter(c => c.onSaleReceivedDate).length
+        totalOnSaleReceived: customerList.filter(c => c.onSaleReceivedDate).length,
+        cacheInfo: {
+          cached: false,
+          timestamp: new Date().toISOString(),
+          ttl: 300
+        }
       }
     };
 

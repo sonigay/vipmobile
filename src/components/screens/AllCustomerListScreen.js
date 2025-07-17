@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Container,
@@ -19,14 +19,22 @@ import {
   CircularProgress,
   InputAdornment,
   IconButton,
-  Tooltip
+  Tooltip,
+  Badge
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Cached as CachedIcon
 } from '@mui/icons-material';
+import { 
+  getCachedAllCustomerList, 
+  getCachedSearchResults, 
+  clearAllCustomerCache, 
+  getAllCustomerCacheStats 
+} from '../../utils/allCustomerCache';
 
 function AllCustomerListScreen({ loggedInStore }) {
   const [customerList, setCustomerList] = useState([]);
@@ -35,20 +43,15 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [cacheStats, setCacheStats] = useState(null);
 
-  // 전체 고객리스트 로드
-  const loadAllCustomerList = async () => {
+  // 전체 고객리스트 로드 (캐시 적용)
+  const loadAllCustomerList = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/all-customers`);
-      
-      if (!response.ok) {
-        throw new Error('전체 고객 리스트를 불러올 수 없습니다.');
-      }
-      
-      const result = await response.json();
+      const result = await getCachedAllCustomerList(process.env.REACT_APP_API_URL);
       
       if (result.success) {
         setCustomerList(result.data);
@@ -62,10 +65,10 @@ function AllCustomerListScreen({ loggedInStore }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // 검색 기능
-  const handleSearch = (query) => {
+  // 검색 기능 (캐시 적용)
+  const handleSearch = useCallback((query) => {
     setSearchQuery(query);
     
     if (!query.trim()) {
@@ -73,30 +76,31 @@ function AllCustomerListScreen({ loggedInStore }) {
       return;
     }
 
-    const filtered = customerList.filter(customer => {
-      const searchLower = query.toLowerCase();
-      return (
-        (customer.customerName && customer.customerName.toLowerCase().includes(searchLower)) ||
-        (customer.reservationNumber && customer.reservationNumber.toLowerCase().includes(searchLower)) ||
-        (customer.modelCapacityColor && customer.modelCapacityColor.toLowerCase().includes(searchLower)) ||
-        (customer.storeCode && customer.storeCode.toLowerCase().includes(searchLower)) ||
-        (customer.posName && customer.posName.toLowerCase().includes(searchLower)) ||
-        (customer.reservationMemo && customer.reservationMemo.toLowerCase().includes(searchLower)) ||
-        (customer.yardReceivedMemo && customer.yardReceivedMemo.toLowerCase().includes(searchLower))
-      );
-    });
-
+    // 캐시된 검색 결과 사용
+    const filtered = getCachedSearchResults(query, customerList);
     setFilteredCustomerList(filtered);
-  };
+  }, [customerList]);
 
   // 검색 초기화
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery('');
     setFilteredCustomerList(customerList);
-  };
+  }, [customerList]);
+
+  // 캐시 새로고침
+  const refreshCache = useCallback(async () => {
+    clearAllCustomerCache();
+    await loadAllCustomerList();
+  }, [loadAllCustomerList]);
+
+  // 캐시 통계 업데이트
+  const updateCacheStats = useCallback(() => {
+    const stats = getAllCustomerCacheStats();
+    setCacheStats(stats);
+  }, []);
 
   // 엑셀 다운로드
-  const downloadExcel = async () => {
+  const downloadExcel = useCallback(async () => {
     if (filteredCustomerList.length === 0) {
       setError('다운로드할 데이터가 없습니다.');
       return;
@@ -182,23 +186,80 @@ function AllCustomerListScreen({ loggedInStore }) {
     } finally {
       setDownloadingExcel(false);
     }
-  };
+  }, [filteredCustomerList]);
 
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadAllCustomerList();
-  }, []);
+  }, [loadAllCustomerList]);
+
+  // 캐시 통계 주기적 업데이트
+  useEffect(() => {
+    updateCacheStats();
+    const interval = setInterval(updateCacheStats, 10000); // 10초마다 업데이트
+    return () => clearInterval(interval);
+  }, [updateCacheStats]);
+
+  // 메모이제이션된 통계 정보
+  const statsInfo = useMemo(() => {
+    if (!cacheStats) return null;
+    
+    return {
+      totalCustomers: customerList.length,
+      filteredCustomers: filteredCustomerList.length,
+      cacheSize: cacheStats.size,
+      maxCacheSize: cacheStats.maxSize,
+      cacheHitRate: cacheStats.size > 0 ? '활성' : '비활성'
+    };
+  }, [cacheStats, customerList.length, filteredCustomerList.length]);
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
       {/* 헤더 */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: '#ff9a9e', mb: 1 }}>
-          전체고객리스트
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: '#ff9a9e' }}>
+            전체고객리스트
+          </Typography>
+          
+          {/* 캐시 상태 표시 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {statsInfo && (
+              <Chip
+                icon={<CachedIcon />}
+                label={`캐시: ${statsInfo.cacheHitRate} (${statsInfo.cacheSize}/${statsInfo.maxCacheSize})`}
+                color={statsInfo.cacheSize > 0 ? 'success' : 'default'}
+                size="small"
+              />
+            )}
+            <Tooltip title="캐시 새로고침">
+              <IconButton onClick={refreshCache} disabled={loading} size="small">
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+        
         <Typography variant="body1" color="text.secondary">
           전체 고객 정보를 확인하고 검색할 수 있습니다 (모델/용량/색상)
         </Typography>
+        
+        {/* 통계 정보 */}
+        {statsInfo && (
+          <Box sx={{ mt: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Chip 
+              label={`전체: ${statsInfo.totalCustomers}명`} 
+              variant="outlined" 
+              size="small" 
+            />
+            <Chip 
+              label={`검색결과: ${statsInfo.filteredCustomers}명`} 
+              variant="outlined" 
+              size="small" 
+              color={statsInfo.filteredCustomers !== statsInfo.totalCustomers ? 'primary' : 'default'}
+            />
+          </Box>
+        )}
       </Box>
 
       {/* 검색 및 액션 버튼 */}
