@@ -8207,3 +8207,192 @@ app.post('/api/reservation-settings/test-normalization', async (req, res) => {
     });
   }
 });
+
+// 사전예약 데이터 API 엔드포인트들
+app.get('/api/reservation-data/on-sale-receipt', async (req, res) => {
+  try {
+    console.log('온세일접수 데이터 요청');
+    
+    // 온세일접수 시트에서 데이터 가져오기
+    const sheetName = '온세일접수';
+    const values = await getSheetValues(sheetName);
+    
+    if (!values || values.length === 0) {
+      console.log('온세일접수 데이터가 없습니다.');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제거하고 데이터 처리
+    const headers = values[0];
+    const dataRows = values.slice(1);
+    
+    const processedData = dataRows
+      .filter(row => row.length > 0 && row.some(cell => cell && cell.toString().trim() !== ''))
+      .map((row, index) => {
+        // 예약번호 (A열)
+        const reservationNumber = row[0] ? row[0].toString().replace(/-/g, '') : '';
+        
+        // 고객명 (B열)
+        const customerName = row[1] ? row[1].toString().trim() : '';
+        
+        // 모델명 (C열)
+        const model = row[2] ? row[2].toString().trim() : '';
+        
+        // 색상 (D열)
+        const color = row[3] ? row[3].toString().trim() : '';
+        
+        // 접수시간 (E열)
+        const receiptTime = row[4] ? row[4].toString().trim() : '';
+        
+        // 유효한 데이터만 반환
+        if (reservationNumber && customerName && model && color) {
+          return {
+            reservationNumber,
+            customerName,
+            model,
+            color,
+            receiptTime,
+            source: 'onSale'
+          };
+        }
+        return null;
+      })
+      .filter(item => item !== null);
+    
+    console.log(`온세일접수 데이터 처리 완료: ${processedData.length}건`);
+    
+    res.json({ success: true, data: processedData });
+    
+  } catch (error) {
+    console.error('온세일접수 데이터 가져오기 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/reservation-data/yard-receipt', async (req, res) => {
+  try {
+    console.log('마당접수 데이터 요청');
+    
+    // 마당접수 시트에서 데이터 가져오기
+    const sheetName = '마당접수';
+    const values = await getSheetValues(sheetName);
+    
+    if (!values || values.length === 0) {
+      console.log('마당접수 데이터가 없습니다.');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제거하고 데이터 처리
+    const headers = values[0];
+    const dataRows = values.slice(1);
+    
+    const processedData = dataRows
+      .filter(row => row.length > 0 && row.some(cell => cell && cell.toString().trim() !== ''))
+      .map((row, index) => {
+        // 예약번호 (U, V열에서 추출)
+        let reservationNumber = '';
+        if (row[20]) { // U열
+          const match = row[20].toString().match(/[A-Z]{2}\d+/);
+          if (match) reservationNumber = match[0];
+        }
+        if (!reservationNumber && row[21]) { // V열
+          const match = row[21].toString().match(/[A-Z]{2}\d+/);
+          if (match) reservationNumber = match[0];
+        }
+        
+        // 고객명 (B열)
+        const customerName = row[1] ? row[1].toString().trim() : '';
+        
+        // 모델명 (C열)
+        const model = row[2] ? row[2].toString().trim() : '';
+        
+        // 색상 (D열)
+        const color = row[3] ? row[3].toString().trim() : '';
+        
+        // 접수시간 (L열)
+        const receiptTime = row[11] ? row[11].toString().trim() : '';
+        
+        // 유효한 데이터만 반환
+        if (reservationNumber && customerName && model && color) {
+          return {
+            reservationNumber,
+            customerName,
+            model,
+            color,
+            receiptTime,
+            source: 'yard'
+          };
+        }
+        return null;
+      })
+      .filter(item => item !== null);
+    
+    console.log(`마당접수 데이터 처리 완료: ${processedData.length}건`);
+    
+    res.json({ success: true, data: processedData });
+    
+  } catch (error) {
+    console.error('마당접수 데이터 가져오기 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/reservation-data/reservation-site', async (req, res) => {
+  try {
+    console.log('사전예약사이트 데이터 요청');
+    
+    // 사전예약사이트 시트에서 데이터 가져오기
+    const sheetName = '사전예약사이트';
+    const values = await getSheetValues(sheetName);
+    
+    if (!values || values.length === 0) {
+      console.log('사전예약사이트 데이터가 없습니다.');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제거하고 데이터 처리
+    const headers = values[0];
+    const dataRows = values.slice(1);
+    
+    const processedData = dataRows
+      .filter(row => row.length > 0 && row.some(cell => cell && cell.toString().trim() !== ''))
+      .map((row, index) => {
+        // 예약번호 (A열)
+        const reservationNumber = row[0] ? row[0].toString().replace(/-/g, '') : '';
+        
+        // 고객명 (B열)
+        const customerName = row[1] ? row[1].toString().trim() : '';
+        
+        // 모델명 (C열)
+        const model = row[2] ? row[2].toString().trim() : '';
+        
+        // 색상 (D열)
+        const color = row[3] ? row[3].toString().trim() : '';
+        
+        // 접수시간 (E열)
+        const receiptTime = row[4] ? row[4].toString().trim() : '';
+        
+        // 유효한 데이터만 반환
+        if (reservationNumber && customerName && model && color) {
+          return {
+            reservationNumber,
+            customerName,
+            model,
+            color,
+            receiptTime,
+            source: 'site'
+          };
+        }
+        return null;
+      })
+      .filter(item => item !== null);
+    
+    console.log(`사전예약사이트 데이터 처리 완료: ${processedData.length}건`);
+    
+    res.json({ success: true, data: processedData });
+    
+  } catch (error) {
+    console.error('사전예약사이트 데이터 가져오기 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});

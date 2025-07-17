@@ -34,10 +34,12 @@ import {
   Schedule as ScheduleIcon,
   People as PeopleIcon,
   Business as BusinessIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  PriorityHigh as PriorityHighIcon
 } from '@mui/icons-material';
 import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 import SalesByStoreScreen from './screens/SalesByStoreScreen';
+import ReservationAssignmentSettingsScreen from './screens/ReservationAssignmentSettingsScreen';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
 import UpdateProgressPopup from './UpdateProgressPopup';
 
@@ -415,6 +417,14 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                       </Button>
                       <Button
                         variant="outlined"
+                        startIcon={<PriorityHighIcon />}
+                        onClick={() => setCurrentTab(3)}
+                        sx={{ justifyContent: 'flex-start', py: 1.5 }}
+                      >
+                        배정셋팅
+                      </Button>
+                      <Button
+                        variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={loadDashboardData}
                         disabled={loading}
@@ -512,6 +522,14 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             loggedInStore={loggedInStore}
           />
         );
+      case 3: // 배정셋팅 탭
+        return (
+          <ReservationAssignmentSettingsScreen 
+            data={[]} // 매장 데이터는 필요에 따라 전달
+            onBack={() => setCurrentTab(0)}
+            onLogout={onLogout}
+          />
+        );
       default:
         return null;
     }
@@ -596,6 +614,17 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             <Tab 
               label="판매처별정리" 
               icon={<StoreIcon />} 
+              iconPosition="start"
+              sx={{ 
+                minHeight: 64,
+                '&.Mui-selected': {
+                  color: '#ff9a9e'
+                }
+              }}
+            />
+            <Tab 
+              label="배정셋팅" 
+              icon={<PriorityHighIcon />} 
               iconPosition="start"
               sx={{ 
                 minHeight: 64,
