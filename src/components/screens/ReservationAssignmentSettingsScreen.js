@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   AppBar,
@@ -72,6 +72,15 @@ import AssignmentVisualization from '../AssignmentVisualization';
 import { getColorsForModel, getModelInventorySummary } from '../../utils/modelUtils';
 import { addAssignmentCompletedNotification, addSettingsChangedNotification } from '../../utils/notificationUtils';
 import { saveAssignmentHistory, createHistoryItem } from '../../utils/assignmentHistory';
+import { 
+  getCachedHierarchicalStructure, 
+  getCachedAvailableModels, 
+  getCachedAgents, 
+  getCachedStores,
+  getCachedAssignmentCalculation,
+  clearReservationCache,
+  getCacheStats
+} from '../../utils/reservationAssignmentCache';
 
 // API 기본 URL 설정
 const API_BASE_URL = process.env.REACT_APP_API_URL;
@@ -118,238 +127,69 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [expandedLogicDetails, setExpandedLogicDetails] = useState({}); // 로직 세부사항 접기/펼치기 상태 (기본값: 모두 닫힘)
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
+  const [showCacheStatsDialog, setShowCacheStatsDialog] = useState(false);
+  const [cacheStats, setCacheStats] = useState(null);
 
-  // 담당자 데이터 분석하여 계층 구조 생성
-  const getHierarchicalStructure = useMemo(() => {
-    const structure = {
-      offices: {},
-      departments: {},
-      agents: {},
-      stores: {}
+  // 캐시된 계층 구조 생성
+  const [hierarchicalStructure, setHierarchicalStructure] = useState({
+    offices: {},
+    departments: {},
+    agents: {},
+    stores: {}
+  });
+
+  // 계층 구조 캐시 로드
+  useEffect(() => {
+    const loadHierarchicalStructure = async () => {
+      if (agents.length > 0) {
+        try {
+          const structure = await getCachedHierarchicalStructure(agents, data);
+          setHierarchicalStructure(structure);
+        } catch (error) {
+          console.error('계층 구조 캐시 로드 실패:', error);
+        }
+      }
     };
 
-    // 유효한 담당자만 필터링
-    const validAgents = agents.filter(agent => 
-      agent.office && agent.office.trim() !== '' && 
-      agent.department && agent.department.trim() !== ''
-    );
-
-    validAgents.forEach(agent => {
-      const office = agent.office.trim();
-      const department = agent.department.trim();
-      const agentId = agent.contactId;
-
-      // 사무실별 구조
-      if (!structure.offices[office]) {
-        structure.offices[office] = {
-          departments: new Set(),
-          agents: new Set(),
-          stores: new Set()
-        };
-      }
-      structure.offices[office].departments.add(department);
-      structure.offices[office].agents.add(agentId);
-
-      // 소속별 구조
-      if (!structure.departments[department]) {
-        structure.departments[department] = {
-          office: office,
-          agents: new Set(),
-          stores: new Set()
-        };
-      }
-      structure.departments[department].agents.add(agentId);
-
-      // 영업사원별 구조
-      structure.agents[agentId] = {
-        name: agent.target,
-        office: office,
-        department: department,
-        stores: new Set()
-      };
-    });
-
-    // 매장별 구조 (담당자별 정리 데이터에서 가져오기)
-    if (data && data.byAgent) {
-      Object.entries(data.byAgent).forEach(([agentName, agentData]) => {
-        // 담당자 ID 찾기
-        const agent = validAgents.find(a => a.target === agentName);
-        if (agent) {
-          const agentId = agent.contactId;
-          
-          // 해당 담당자의 매장들 추가
-          Object.keys(agentData).forEach(posName => {
-            // 매장별 구조에 추가
-            if (!structure.stores[posName]) {
-              structure.stores[posName] = {
-                agents: new Set()
-              };
-            }
-            structure.stores[posName].agents.add(agentId);
-            
-            // 담당자별 구조에 매장 추가
-            if (structure.agents[agentId]) {
-              structure.agents[agentId].stores.add(posName);
-            }
-            
-            // 소속별 구조에 매장 추가
-            const department = agent.department;
-            if (structure.departments[department]) {
-              structure.departments[department].stores.add(posName);
-            }
-            
-            // 사무실별 구조에 매장 추가
-            const office = agent.office;
-            if (structure.offices[office]) {
-              structure.offices[office].stores.add(posName);
-            }
-          });
-        }
-      });
-    }
-
-    return structure;
+    loadHierarchicalStructure();
   }, [agents, data]);
 
-  // 담당자 데이터 및 사용 가능한 모델 로드
+  // 캐시된 데이터 로드
   useEffect(() => {
-    const loadData = async () => {
+    const loadCachedData = async () => {
       try {
-        console.log('ReservationAssignmentSettingsScreen: 데이터 로드 시작');
+        console.log('🔄 캐시된 데이터 로드 시작');
         
-        // 담당자 데이터 로드
-        console.log('담당자 데이터 로드 중...');
-        console.log('API_BASE_URL:', API_BASE_URL);
-        let agentDataLoaded = false;
-        
+        // 담당자 데이터 캐시 로드
+        console.log('담당자 데이터 캐시 로드 중...');
         try {
-          const agentResponse = await fetch(`${API_BASE_URL}/api/agents`);
-          console.log('담당자 API 응답 상태:', agentResponse.status);
-          console.log('담당자 API 응답 헤더:', agentResponse.headers.get('content-type'));
-          
-          if (agentResponse.ok) {
-            const contentType = agentResponse.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              const agentData = await agentResponse.json();
-              console.log('담당자 데이터 로드 완료:', agentData.length, '명');
-              console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
-              console.log('담당자 데이터 구조 확인:', agentData.length > 0 ? Object.keys(agentData[0]) : '빈 데이터');
-              
-              if (agentData && Array.isArray(agentData) && agentData.length > 0) {
-                setAgents(agentData);
-                agentDataLoaded = true;
-                console.log('✅ 실제 담당자 데이터 로드 성공');
-                
-                // 담당자 데이터 상세 로그
-                console.log('담당자 데이터 상세:');
-                agentData.slice(0, 5).forEach((agent, index) => {
-                  console.log(`  ${index + 1}번째 담당자:`, {
-                    target: agent.target,
-                    contactId: agent.contactId,
-                    office: agent.office,
-                    department: agent.department,
-                    store: agent.store
-                  });
-                });
-              } else {
-                console.warn('담당자 데이터가 비어있거나 유효하지 않음');
-                console.warn('agentData 타입:', typeof agentData);
-                console.warn('agentData 길이:', agentData?.length);
-              }
-            } else {
-              console.error('담당자 API가 JSON이 아닌 응답을 반환:', contentType);
-              const responseText = await agentResponse.text();
-              console.error('응답 내용:', responseText.substring(0, 200));
-            }
-          } else {
-            console.error('담당자 API 응답 실패:', agentResponse.status, agentResponse.statusText);
-            const responseText = await agentResponse.text();
-            console.error('에러 응답 내용:', responseText.substring(0, 200));
-          }
-        } catch (apiError) {
-          console.error('API에서 데이터 가져오기 실패:', apiError);
-          console.error('네트워크 에러 상세:', apiError.message);
+          const agentData = await getCachedAgents(API_BASE_URL);
+          console.log('✅ 캐시된 담당자 데이터 로드 완료:', agentData.length, '명');
+          setAgents(agentData);
+        } catch (agentError) {
+          console.error('담당자 데이터 캐시 로드 실패:', agentError);
+          setAgents([]);
         }
         
-        // 매장 데이터 로드 (담당자별 정리 데이터에서 추출)
-        console.log('매장 데이터 로드 중...');
-        let storeData = null;
-        let storeDataLoaded = false;
-        
-        if (data && data.byAgent) {
-          // 담당자별 정리 데이터에서 매장 목록 추출
-          const storeSet = new Set();
-          Object.values(data.byAgent).forEach(agentData => {
-            Object.keys(agentData).forEach(posName => {
-              if (posName && posName !== '미지정') {
-                storeSet.add(posName);
-              }
-            });
-          });
-          
-          const storeList = Array.from(storeSet).map(storeName => ({
-            id: storeName,
-            name: storeName
-          }));
-          
-          console.log('담당자별 정리에서 추출한 매장 데이터:', storeList.length, '개');
-          setStores(storeList);
-          storeDataLoaded = true;
-          console.log('✅ 담당자별 정리에서 매장 데이터 추출 완료');
-        } else if (data && Array.isArray(data)) {
-          console.log('Props로 받은 매장 데이터:', data.length, '개');
-          storeData = data;
-          setStores(data);
-          storeDataLoaded = true;
-          console.log('✅ Props로 받은 매장 데이터 사용');
-        } else {
-          console.log('Props로 받은 데이터가 없거나 배열이 아님, API에서 가져오기 시도');
-          // 데이터가 없으면 API에서 직접 가져오기
-          try {
-            const storeResponse = await fetch(`${API_BASE_URL}/api/stores`);
-            console.log('매장 API 응답 상태:', storeResponse.status);
-            console.log('매장 API 응답 헤더:', storeResponse.headers.get('content-type'));
-            
-            if (storeResponse.ok) {
-              const contentType = storeResponse.headers.get('content-type');
-              if (contentType && contentType.includes('application/json')) {
-                const responseData = await storeResponse.json();
-                console.log('API에서 가져온 매장 데이터:', responseData.stores?.length || 0, '개');
-                if (responseData.stores && Array.isArray(responseData.stores)) {
-                  storeData = responseData.stores;
-                  setStores(responseData.stores);
-                  storeDataLoaded = true;
-                  console.log('✅ API에서 매장 데이터 로드 성공');
-                } else {
-                  console.error('API 응답에 stores 배열이 없음:', responseData);
-                }
-              } else {
-                console.error('매장 API가 JSON이 아닌 응답을 반환:', contentType);
-                const responseText = await storeResponse.text();
-                console.error('응답 내용:', responseText.substring(0, 200));
-              }
-            } else {
-              console.error('매장 API 응답 실패:', storeResponse.status, storeResponse.statusText);
-              const responseText = await storeResponse.text();
-              console.error('에러 응답 내용:', responseText.substring(0, 200));
-            }
-          } catch (apiError) {
-            console.error('API에서 매장 데이터 가져오기 실패:', apiError);
-            console.error('네트워크 에러 상세:', apiError.message);
-          }
+        // 매장 데이터 캐시 로드
+        console.log('매장 데이터 캐시 로드 중...');
+        try {
+          const storeData = await getCachedStores(data, API_BASE_URL);
+          console.log('✅ 캐시된 매장 데이터 로드 완료:', storeData.length, '개');
+          setStores(storeData);
+        } catch (storeError) {
+          console.error('매장 데이터 캐시 로드 실패:', storeError);
+          setStores([]);
         }
         
-        // 사용 가능한 모델 로드
-        console.log('사용 가능한 모델 로드 중...');
+        // 사용 가능한 모델 캐시 로드
+        console.log('사용 가능한 모델 캐시 로드 중...');
         try {
-          // 사전예약 데이터에서 모델 추출
-          const modelData = await extractAvailableModels();
-          console.log('사용 가능한 모델 데이터:', modelData);
+          const modelData = await getCachedAvailableModels();
+          console.log('✅ 캐시된 모델 데이터 로드 완료');
           setAvailableModels(modelData);
-          console.log('✅ 사용 가능한 모델 데이터 로드 성공');
         } catch (modelError) {
-          console.error('모델 데이터 로드 실패:', modelError);
-          // 에러 시 빈 데이터 설정
+          console.error('모델 데이터 캐시 로드 실패:', modelError);
           setAvailableModels({
             models: [],
             capacities: [],
@@ -365,20 +205,17 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           console.log('✅ 저장된 설정 로드 성공');
         } catch (settingsError) {
           console.error('설정 로드 실패:', settingsError);
-          console.log('기본 설정으로 초기화');
           setDefaultSettings();
         }
         
-        console.log('✅ 모든 데이터 로드 완료');
-        console.log('담당자 데이터 로드 상태:', agentDataLoaded);
-        console.log('매장 데이터 로드 상태:', storeDataLoaded);
+        console.log('✅ 모든 캐시된 데이터 로드 완료');
         
       } catch (error) {
-        console.error('데이터 로드 중 오류 발생:', error);
+        console.error('캐시된 데이터 로드 중 오류 발생:', error);
       }
     };
     
-    loadData();
+    loadCachedData();
   }, [data]);
 
   // 설정이 변경될 때마다 자동 저장
@@ -417,8 +254,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []); // 빈 의존성 배열로 변경
 
-  // 설정 저장
-  const saveSettings = () => {
+  // 메모이제이션된 설정 저장
+  const saveSettings = useCallback(() => {
     try {
       localStorage.setItem('reservationAssignmentSettings', JSON.stringify(assignmentSettings));
       console.log('✅ 사전예약 배정 설정 저장 완료');
@@ -426,10 +263,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     } catch (error) {
       console.error('설정 저장 실패:', error);
     }
-  };
+  }, [assignmentSettings]);
 
-  // 설정 로드
-  const loadSettings = async () => {
+  // 메모이제이션된 설정 로드
+  const loadSettings = useCallback(async () => {
     try {
       const savedSettings = localStorage.getItem('reservationAssignmentSettings');
       if (savedSettings) {
@@ -444,10 +281,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       console.error('설정 로드 실패:', error);
       setDefaultSettings();
     }
-  };
+  }, []);
 
-  // 기본 설정 설정
-  const setDefaultSettings = () => {
+  // 메모이제이션된 기본 설정 설정
+  const setDefaultSettings = useCallback(() => {
     const defaultSettings = {
       priorities: {
         onSaleReceipt: 1,    // 온세일접수 1순위
@@ -464,7 +301,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     };
     setAssignmentSettings(defaultSettings);
     console.log('✅ 기본 사전예약 배정 설정 적용');
-  };
+  }, []);
 
   // 모든 설정 초기화
   const handleResetAllSettings = () => {
@@ -476,14 +313,14 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     }
   };
 
-  // 미리보기 배정 실행
-  const handlePreviewAssignment = async () => {
+  // 캐시된 미리보기 배정 실행
+  const handlePreviewAssignment = useCallback(async () => {
     setIsLoadingPreview(true);
     setProgress(0);
     setProgressMessage('사전예약 배정 미리보기 준비 중...');
     
     try {
-      console.log('사전예약 배정 미리보기 시작');
+      console.log('🔄 캐시된 사전예약 배정 미리보기 시작');
       
       // 선택된 대상자 확인
       const selectedTargets = getSelectedReservationTargets(assignmentSettings.targets, agents);
@@ -509,12 +346,14 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgress(20);
       setProgressMessage('사전예약 데이터 수집 중...');
       
-      // 사전예약 배정 계산
-      const result = await calculateReservationAssignment(
+      // 캐시된 사전예약 배정 계산
+      const result = await getCachedAssignmentCalculation(
         assignmentSettings,
         selectedTargets,
-        setProgress,
-        setProgressMessage
+        (progress, message) => {
+          setProgress(progress);
+          setProgressMessage(message);
+        }
       );
       
       setProgress(100);
@@ -523,7 +362,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       if (result.success) {
         setPreviewData(result.data);
         setActiveTab(1); // 미리보기 탭으로 이동
-        console.log('✅ 사전예약 배정 미리보기 완료');
+        console.log('✅ 캐시된 사전예약 배정 미리보기 완료');
         addSettingsChangedNotification('사전예약 배정 미리보기가 완료되었습니다.');
       } else {
         setErrorDetails(result.error || '사전예약 배정 미리보기 중 오류가 발생했습니다.');
@@ -531,7 +370,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       }
       
     } catch (error) {
-      console.error('사전예약 배정 미리보기 실패:', error);
+      console.error('캐시된 사전예약 배정 미리보기 실패:', error);
       setErrorDetails(`사전예약 배정 미리보기 실패: ${error.message}`);
       setShowErrorDialog(true);
     } finally {
@@ -539,16 +378,23 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       setProgress(0);
       setProgressMessage('');
     }
-  };
+  }, [assignmentSettings, agents]);
 
   // 캐시 클리어
-  const handleClearCache = () => {
+  const handleClearCache = useCallback(() => {
     if (window.confirm('사전예약 배정 캐시를 클리어하시겠습니까?')) {
-      clearReservationAssignmentCache();
+      clearReservationCache();
       console.log('✅ 사전예약 배정 캐시 클리어 완료');
       addSettingsChangedNotification('사전예약 배정 캐시가 클리어되었습니다.');
     }
-  };
+  }, []);
+
+  // 캐시 통계 보기
+  const handleShowCacheStats = useCallback(() => {
+    const stats = getCacheStats();
+    setCacheStats(stats);
+    setShowCacheStatsDialog(true);
+  }, []);
 
   // 담당자 편집 관련 함수들
   const handleAgentEdit = (agent) => {
@@ -641,8 +487,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     }
   };
 
-  // 계층적 대상자 변경 처리
-  const handleHierarchicalTargetChange = (type, target, checked) => {
+  // 캐시된 계층적 대상자 변경 처리
+  const handleHierarchicalTargetChange = useCallback((type, target, checked) => {
     setAssignmentSettings(prev => {
       const newTargets = { ...prev.targets };
       
@@ -650,8 +496,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         // 사무실 선택/해제 시 해당 소속과 영업사원도 함께 처리
         newTargets.offices[target] = checked;
         
-        if (getHierarchicalStructure.offices[target]) {
-          const officeData = getHierarchicalStructure.offices[target];
+        if (hierarchicalStructure.offices[target]) {
+          const officeData = hierarchicalStructure.offices[target];
           
           // 해당 사무실의 소속들 처리
           officeData.departments.forEach(dept => {
@@ -671,8 +517,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         // 소속 선택/해제 시 해당 영업사원도 함께 처리
         newTargets.departments[target] = checked;
         
-        if (getHierarchicalStructure.departments[target]) {
-          const deptData = getHierarchicalStructure.departments[target];
+        if (hierarchicalStructure.departments[target]) {
+          const deptData = hierarchicalStructure.departments[target];
           
           // 해당 소속의 영업사원들 처리
           deptData.agents.forEach(agentId => {
@@ -689,8 +535,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         newTargets.stores[target] = checked;
         
         // 해당 매장의 담당자들도 함께 처리
-        if (getHierarchicalStructure.stores[target]) {
-          const storeData = getHierarchicalStructure.stores[target];
+        if (hierarchicalStructure.stores[target]) {
+          const storeData = hierarchicalStructure.stores[target];
           
           // 해당 매장의 담당자들 처리
           storeData.agents.forEach(agentId => {
@@ -716,10 +562,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       return newSettings;
     });
-  };
+  }, [hierarchicalStructure]);
 
-  // 계층적 전체 선택/해제
-  const handleHierarchicalSelectAll = (type, checked) => {
+  // 캐시된 계층적 전체 선택/해제
+  const handleHierarchicalSelectAll = useCallback((type, checked) => {
     setAssignmentSettings(prev => {
       const newTargets = { ...prev.targets };
       
@@ -728,8 +574,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         Object.keys(newTargets.offices).forEach(office => {
           newTargets.offices[office] = checked;
           
-          if (getHierarchicalStructure.offices[office]) {
-            const officeData = getHierarchicalStructure.offices[office];
+          if (hierarchicalStructure.offices[office]) {
+            const officeData = hierarchicalStructure.offices[office];
             
             // 해당 사무실의 소속들 처리
             officeData.departments.forEach(dept => {
@@ -751,8 +597,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         Object.keys(newTargets.departments).forEach(dept => {
           newTargets.departments[dept] = checked;
           
-          if (getHierarchicalStructure.departments[dept]) {
-            const deptData = getHierarchicalStructure.departments[dept];
+          if (hierarchicalStructure.departments[dept]) {
+            const deptData = hierarchicalStructure.departments[dept];
             
             // 해당 소속의 영업사원들 처리
             deptData.agents.forEach(agentId => {
@@ -773,8 +619,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           newTargets.stores[storeName] = checked;
           
           // 해당 매장의 담당자들도 함께 처리
-          if (getHierarchicalStructure.stores[storeName]) {
-            const storeData = getHierarchicalStructure.stores[storeName];
+          if (hierarchicalStructure.stores[storeName]) {
+            const storeData = hierarchicalStructure.stores[storeName];
             
             storeData.agents.forEach(agentId => {
               if (newTargets.agents[agentId] !== undefined) {
@@ -800,10 +646,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       
       return newSettings;
     });
-  };
+  }, [hierarchicalStructure]);
 
-  // 계층적 초기화
-  const handleHierarchicalReset = (type) => {
+  // 캐시된 계층적 초기화
+  const handleHierarchicalReset = useCallback((type) => {
     if (window.confirm(`${type === 'offices' ? '사무실' : type === 'departments' ? '소속' : type === 'stores' ? '매장' : '담당자'} 선택을 초기화하시겠습니까?`)) {
       setAssignmentSettings(prev => {
         const newTargets = { ...prev.targets };
@@ -813,8 +659,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           Object.keys(newTargets.offices).forEach(office => {
             newTargets.offices[office] = false;
             
-            if (getHierarchicalStructure.offices[office]) {
-              const officeData = getHierarchicalStructure.offices[office];
+            if (hierarchicalStructure.offices[office]) {
+              const officeData = hierarchicalStructure.offices[office];
               
               officeData.departments.forEach(dept => {
                 if (newTargets.departments[dept] !== undefined) {
@@ -834,8 +680,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           Object.keys(newTargets.departments).forEach(dept => {
             newTargets.departments[dept] = false;
             
-            if (getHierarchicalStructure.departments[dept]) {
-              const deptData = getHierarchicalStructure.departments[dept];
+            if (hierarchicalStructure.departments[dept]) {
+              const deptData = hierarchicalStructure.departments[dept];
               
               deptData.agents.forEach(agentId => {
                 if (newTargets.agents[agentId] !== undefined) {
@@ -855,8 +701,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
             newTargets.stores[storeName] = false;
             
             // 해당 매장의 담당자들도 함께 해제
-            if (getHierarchicalStructure.stores[storeName]) {
-              const storeData = getHierarchicalStructure.stores[storeName];
+            if (hierarchicalStructure.stores[storeName]) {
+              const storeData = hierarchicalStructure.stores[storeName];
               
               storeData.agents.forEach(agentId => {
                 if (newTargets.agents[agentId] !== undefined) {
@@ -883,7 +729,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         return newSettings;
       });
     }
-  };
+  }, [hierarchicalStructure]);
 
   // 배정 확인 및 실행
   const handleConfirmAssignment = async () => {
@@ -930,29 +776,31 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     }
   };
 
-  // 점수 표시 컴포넌트
-  const ScoreDisplay = ({ scores, modelName, colorName }) => {
-    if (!scores) return null;
-    
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-          {modelName} {colorName}
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          {Object.entries(scores).map(([key, value]) => (
-            <Chip
-              key={key}
-              label={`${key}: ${value}`}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.6rem', height: 20 }}
-            />
-          ))}
+  // 메모이제이션된 점수 표시 컴포넌트
+  const ScoreDisplay = useMemo(() => {
+    return React.memo(({ scores, modelName, colorName }) => {
+      if (!scores) return null;
+      
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+            {modelName} {colorName}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {Object.entries(scores).map(([key, value]) => (
+              <Chip
+                key={key}
+                label={`${key}: ${value}`}
+                size="small"
+                variant="outlined"
+                sx={{ fontSize: '0.6rem', height: 20 }}
+              />
+            ))}
+          </Box>
         </Box>
-      </Box>
-    );
-  };
+      );
+    });
+  }, []);
 
   // 인쇄 처리
   const handlePrint = (type) => {
@@ -1683,6 +1531,13 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
             >
               캐시 클리어
             </Button>
+            <Button
+              variant="outlined"
+              startIcon={<InfoIcon />}
+              onClick={handleShowCacheStats}
+            >
+              캐시 통계
+            </Button>
           </Box>
           
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1970,11 +1825,71 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           <Button onClick={() => setShowSharedSettingsDialog(false)}>닫기</Button>
         </DialogActions>
       </Dialog>
+
+      {/* 캐시 통계 다이얼로그 */}
+      <Dialog open={showCacheStatsDialog} onClose={() => setShowCacheStatsDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <InfoIcon color="primary" />
+            캐시 통계
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {cacheStats && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body1">캐시 항목 수:</Typography>
+                <Chip 
+                  label={`${cacheStats.size} / ${cacheStats.maxSize}`} 
+                  color={cacheStats.size > cacheStats.maxSize * 0.8 ? 'warning' : 'primary'}
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body1">사용률:</Typography>
+                <Typography variant="body1" color="primary">
+                  {Math.round((cacheStats.size / cacheStats.maxSize) * 100)}%
+                </Typography>
+              </Box>
+              
+              <Divider />
+              
+              <Typography variant="subtitle2" gutterBottom>
+                캐시된 데이터 타입:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {cacheStats.keys.map((key, index) => {
+                  const type = key.split(':')[0];
+                  return (
+                    <Chip
+                      key={index}
+                      label={type}
+                      size="small"
+                      variant="outlined"
+                      color="secondary"
+                    />
+                  );
+                })}
+              </Box>
+              
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  캐시는 성능 향상을 위해 자주 사용되는 데이터를 메모리에 저장합니다.
+                  캐시가 가득 차면 가장 오래된 항목이 자동으로 제거됩니다.
+                </Typography>
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCacheStatsDialog(false)}>닫기</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 
-  // POS별 합산 계산
-  const generatePOSSummary = (assignments, agents) => {
+  // 메모이제이션된 POS별 합산 계산
+  const generatePOSSummary = useCallback((assignments, agents) => {
     const posMap = new Map();
     
     assignments.forEach(assignment => {
@@ -2001,10 +1916,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     });
     
     return Array.from(posMap.values()).sort((a, b) => a.posName.localeCompare(b.posName));
-  };
+  }, []);
 
-  // 담당자별 합산 계산
-  const generateAgentSummary = (assignments, agents) => {
+  // 메모이제이션된 담당자별 합산 계산
+  const generateAgentSummary = useCallback((assignments, agents) => {
     const agentMap = new Map();
     
     assignments.forEach(assignment => {
@@ -2027,10 +1942,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     });
     
     return Array.from(agentMap.values()).sort((a, b) => a.agentName.localeCompare(b.agentName));
-  };
+  }, []);
 
-  // 소속별 합산 계산
-  const generateDepartmentSummary = (assignments, agents) => {
+  // 메모이제이션된 소속별 합산 계산
+  const generateDepartmentSummary = useCallback((assignments, agents) => {
     const deptMap = new Map();
     
     assignments.forEach(assignment => {
@@ -2057,10 +1972,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     });
     
     return Array.from(deptMap.values()).sort((a, b) => a.department.localeCompare(b.department));
-  };
+  }, []);
 
-  // 사무실별 합산 계산
-  const generateOfficeSummary = (assignments, agents) => {
+  // 메모이제이션된 사무실별 합산 계산
+  const generateOfficeSummary = useCallback((assignments, agents) => {
     const officeMap = new Map();
     
     assignments.forEach(assignment => {
@@ -2087,7 +2002,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     });
     
     return Array.from(officeMap.values()).sort((a, b) => a.office.localeCompare(b.office));
-  };
+  }, []);
 }
 
 export default ReservationAssignmentSettingsScreen; 
