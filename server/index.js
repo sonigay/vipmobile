@@ -3586,14 +3586,14 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
         customerName,
         reservationNumber,
         reservationDateTime,
-        receivedDateTime,
+        yardReceivedDate: receivedDateTime,
+        onSaleReceivedDate,
         modelCapacityColor, // 모델&용량&색상으로 변경
         type,
         storeCode,
         posName,
         reservationMemo,
-        receivedMemo,
-        onSaleReceivedDate,
+        yardReceivedMemo: receivedMemo,
         receiver
       });
     });
@@ -3664,10 +3664,11 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       cacheUtils.set(normalizedCacheKey, normalizedData, 600);
     }
     
-    // 2. 병렬로 시트 데이터 가져오기
-    const [reservationSiteValues, yardValues] = await Promise.all([
+    // 2. 병렬로 시트 데이터 가져오기 (온세일 포함)
+    const [reservationSiteValues, yardValues, onSaleValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
-      getSheetValues('마당접수')
+      getSheetValues('마당접수'),
+      getSheetValues('온세일')
     ]);
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
@@ -3677,6 +3678,20 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     if (!yardValues || yardValues.length < 2) {
       throw new Error('마당접수 데이터를 가져올 수 없습니다.');
     }
+    
+    // 온세일 데이터 인덱싱 (고객명 + 대리점코드 기준)
+    const onSaleIndex = new Map();
+    let onSaleIndexCount = 0;
+    onSaleValues.slice(1).forEach(row => {
+      const customerName = row[2] || '';
+      const storeCode = row[12] || '';
+      const receivedDate = row[5] || '';
+      if (customerName && storeCode) {
+        const key = `${customerName}_${storeCode}`;
+        onSaleIndex.set(key, receivedDate);
+        onSaleIndexCount++;
+      }
+    });
     
     // 3. 정규화 규칙 매핑 생성
     const normalizationRules = normalizedData.normalizationRules || [];
@@ -3755,6 +3770,10 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
       
+      // 온세일 접수일
+      const onSaleKey = `${customerName}_${storeCode}`;
+      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      
       // 처음 5개 고객의 접수정보 디버깅 로그
       if (index < 5) {
         console.log(`모델별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
@@ -3762,6 +3781,7 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         console.log(`  마당접수 인덱스 존재: ${yardIndex.has(normalizedReservationNumber)}`);
         console.log(`  마당접수일: "${receivedDateTime}"`);
         console.log(`  마당메모: "${receivedMemo}"`);
+        console.log(`  온세일접수일: "${onSaleReceivedDate}"`);
         console.log(`  모델명: "${model}"`);
       }
       
@@ -3772,13 +3792,14 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         customerName,
         reservationNumber,
         reservationDateTime,
-        receivedDateTime,
+        yardReceivedDate: receivedDateTime,
+        onSaleReceivedDate,
         modelCapacityColor, // 모델&용량&색상으로 변경
         type,
         storeCode,
         posName,
         reservationMemo,
-        receivedMemo,
+        yardReceivedMemo: receivedMemo,
         receiver
       });
     });
@@ -7583,11 +7604,11 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
       cacheUtils.set(normalizedCacheKey, normalizedData, 600);
     }
     
-    // 2. 병렬로 시트 데이터 가져오기
-    const [reservationSiteValues, yardValues, phoneklValues] = await Promise.all([
+    // 2. 병렬로 시트 데이터 가져오기 (온세일 포함)
+    const [reservationSiteValues, yardValues, onSaleValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
       getSheetValues('마당접수'),
-      getSheetValues('폰클출고처데이터')
+      getSheetValues('온세일')
     ]);
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
@@ -7598,8 +7619,8 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
       throw new Error('마당접수 데이터를 가져올 수 없습니다.');
     }
     
-    if (!phoneklValues || phoneklValues.length < 2) {
-      throw new Error('폰클출고처데이터를 가져올 수 없습니다.');
+    if (!onSaleValues || onSaleValues.length < 2) {
+      throw new Error('온세일 데이터를 가져올 수 없습니다.');
     }
     
     // 3. 정규화 규칙 매핑 생성
@@ -7618,9 +7639,9 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
       return agentName.replace(/\([^)]*\)/g, '').trim();
     };
     
-    phoneklValues.slice(1).forEach(row => {
-      const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
-      const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
+    onSaleValues.slice(1).forEach(row => {
+      const storeCode = row[12] || ''; // L열 (13번째, 0부터 시작)
+      const agent = row[2] || ''; // C열 (3번째, 0부터 시작)
       if (storeCode && agent) {
         const normalizedAgent = normalizeAgentName(agent);
         storeAgentMap.set(storeCode, normalizedAgent);
@@ -7675,15 +7696,16 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
       const customerName = (row[7] || '').toString().trim(); // H열: 고객명
       const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
       const model = (row[15] || '').toString().trim(); // P열: 모델
-      const color = (row[16] || '').toString().trim(); // Q열: 색상
-      const type = (row[17] || '').toString().trim(); // R열: 유형
+      const capacity = (row[16] || '').toString().trim(); // Q열: 용량
+      const color = (row[17] || '').toString().trim(); // R열: 색상
+      const type = (row[18] || '').toString().trim(); // S열: 유형
       const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
       const posName = (row[22] || '').toString().trim(); // W열: POS명
       const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
       const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
       const storeCodeForLookup = (row[21] || '').toString().trim(); // V열: 대리점코드(조회용)
       
-      if (!reservationNumber || !customerName || !model || !color) return;
+      if (!reservationNumber || !customerName || !model || !capacity || !color) return;
       
       // 담당자 매칭 (VLOOKUP 방식) - 정규화된 이름 사용
       const agent = storeAgentMap.get(storeCodeForLookup) || '';
@@ -7709,20 +7731,27 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
         console.log(`  담당자: "${agent}"`);
       }
       
+      // 온세일 접수일 찾기
+      const onSaleKey = `${customerName}_${storeCode}`;
+      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      
+      // 모델/용량/색상 조합
+      const modelCapacityColor = [model, capacity, color].filter(Boolean).join('/');
+      
       customerList.push({
         customerName,
         reservationNumber,
         reservationDateTime,
         receivedDateTime,
-        model,
-        color,
+        modelCapacityColor,
         type,
         storeCode,
         posName,
         reservationMemo,
         receivedMemo,
         receiver,
-        agent
+        agent,
+        onSaleReceivedDate
       });
     });
     

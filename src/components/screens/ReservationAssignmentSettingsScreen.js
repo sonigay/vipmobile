@@ -250,6 +250,42 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     loadData();
   }, [data]);
 
+  // 설정이 변경될 때마다 자동 저장
+  useEffect(() => {
+    // 초기 로드 시에는 저장하지 않음 (loadSettings에서 이미 로드됨)
+    const isInitialLoad = localStorage.getItem('reservationAssignmentSettings') === null;
+    if (!isInitialLoad) {
+      saveSettings();
+    }
+  }, [assignmentSettings]);
+
+  // 키보드 단축키 처리 - 의존성 배열에서 assignmentSettings 제거
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 's':
+            event.preventDefault();
+            saveSettings();
+            break;
+          case 'p':
+            event.preventDefault();
+            handlePreviewAssignment();
+            break;
+          case 'r':
+            event.preventDefault();
+            handleResetAllSettings();
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []); // 빈 의존성 배열로 변경
+
   // 설정 저장
   const saveSettings = () => {
     try {
@@ -383,33 +419,6 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     }
   };
 
-  // 키보드 단축키 처리
-  useEffect(() => {
-    const handleKeyPress = (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        switch (event.key) {
-          case 's':
-            event.preventDefault();
-            saveSettings();
-            break;
-          case 'p':
-            event.preventDefault();
-            handlePreviewAssignment();
-            break;
-          case 'r':
-            event.preventDefault();
-            handleResetAllSettings();
-            break;
-          default:
-            break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [assignmentSettings]);
-
   // 담당자 편집 관련 함수들
   const handleAgentEdit = (agent) => {
     setEditingAgent({ ...agent });
@@ -439,20 +448,32 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
   const handleAddModel = () => {
     if (selectedModel && selectedCapacity && selectedColor) {
       const modelKey = `${selectedModel}|${selectedCapacity}|${selectedColor}`;
-      setAssignmentSettings(prev => ({
-        ...prev,
-        models: {
-          ...prev.models,
-          [modelKey]: {
-            name: selectedModel,
-            capacity: selectedCapacity,
-            color: selectedColor,
-            enabled: true,
-            quantity: newModel.quantity,
-            bulkQuantities: { ...newModel.bulkQuantities }
+      setAssignmentSettings(prev => {
+        const newSettings = {
+          ...prev,
+          models: {
+            ...prev.models,
+            [modelKey]: {
+              name: selectedModel,
+              capacity: selectedCapacity,
+              color: selectedColor,
+              enabled: true,
+              quantity: newModel.quantity,
+              bulkQuantities: { ...newModel.bulkQuantities }
+            }
           }
+        };
+        
+        // 즉시 저장
+        try {
+          localStorage.setItem('reservationAssignmentSettings', JSON.stringify(newSettings));
+          console.log('✅ 모델 추가 후 즉시 저장 완료');
+        } catch (error) {
+          console.error('모델 추가 후 저장 실패:', error);
         }
-      }));
+        
+        return newSettings;
+      });
       
       setNewModel({ name: '', capacity: '', color: '', quantity: 0, bulkQuantities: {} });
       setSelectedModel('');
@@ -469,10 +490,21 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       setAssignmentSettings(prev => {
         const newModels = { ...prev.models };
         delete newModels[modelKey];
-        return {
+        
+        const newSettings = {
           ...prev,
           models: newModels
         };
+        
+        // 즉시 저장
+        try {
+          localStorage.setItem('reservationAssignmentSettings', JSON.stringify(newSettings));
+          console.log('✅ 모델 삭제 후 즉시 저장 완료');
+        } catch (error) {
+          console.error('모델 삭제 후 저장 실패:', error);
+        }
+        
+        return newSettings;
       });
       console.log('✅ 모델 삭제 완료:', modelKey);
     }
@@ -480,16 +512,28 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   // 계층적 대상자 변경 처리
   const handleHierarchicalTargetChange = (type, target, checked) => {
-    setAssignmentSettings(prev => ({
-      ...prev,
-      targets: {
-        ...prev.targets,
-        [type]: {
-          ...prev.targets[type],
-          [target]: checked
+    setAssignmentSettings(prev => {
+      const newSettings = {
+        ...prev,
+        targets: {
+          ...prev.targets,
+          [type]: {
+            ...prev.targets[type],
+            [target]: checked
+          }
         }
+      };
+      
+      // 즉시 저장
+      try {
+        localStorage.setItem('reservationAssignmentSettings', JSON.stringify(newSettings));
+        console.log('✅ 대상자 선택 변경 후 즉시 저장 완료');
+      } catch (error) {
+        console.error('대상자 선택 변경 후 저장 실패:', error);
       }
-    }));
+      
+      return newSettings;
+    });
   };
 
   // 계층적 전체 선택/해제
@@ -498,32 +542,58 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       [...new Set(agents.map(agent => agent.office))] :
       type === 'departments' ? 
       [...new Set(agents.map(agent => agent.department))] :
-      agents.map(agent => agent.name);
+      type === 'stores' ? 
+      [...new Set(agents.map(agent => agent.store))] :
+      agents.map(agent => agent.contactId);
     
-    const newTargets = {};
-    targets.forEach(target => {
-      newTargets[target] = checked;
-    });
-    
-    setAssignmentSettings(prev => ({
-      ...prev,
-      targets: {
-        ...prev.targets,
-        [type]: newTargets
+    setAssignmentSettings(prev => {
+      const newTargets = { ...prev.targets };
+      newTargets[type] = {};
+      targets.forEach(target => {
+        if (target) { // null이나 undefined가 아닌 경우만
+          newTargets[type][target] = checked;
+        }
+      });
+      
+      const newSettings = {
+        ...prev,
+        targets: newTargets
+      };
+      
+      // 즉시 저장
+      try {
+        localStorage.setItem('reservationAssignmentSettings', JSON.stringify(newSettings));
+        console.log('✅ 전체 선택/해제 후 즉시 저장 완료');
+      } catch (error) {
+        console.error('전체 선택/해제 후 저장 실패:', error);
       }
-    }));
+      
+      return newSettings;
+    });
   };
 
   // 계층적 초기화
   const handleHierarchicalReset = (type) => {
-    if (window.confirm(`${type === 'offices' ? '사무실' : type === 'departments' ? '소속' : '담당자'} 선택을 초기화하시겠습니까?`)) {
-      setAssignmentSettings(prev => ({
-        ...prev,
-        targets: {
-          ...prev.targets,
-          [type]: {}
+    if (window.confirm(`${type === 'offices' ? '사무실' : type === 'departments' ? '소속' : type === 'stores' ? '매장' : '담당자'} 선택을 초기화하시겠습니까?`)) {
+      setAssignmentSettings(prev => {
+        const newSettings = {
+          ...prev,
+          targets: {
+            ...prev.targets,
+            [type]: {}
+          }
+        };
+        
+        // 즉시 저장
+        try {
+          localStorage.setItem('reservationAssignmentSettings', JSON.stringify(newSettings));
+          console.log('✅ 초기화 후 즉시 저장 완료');
+        } catch (error) {
+          console.error('초기화 후 저장 실패:', error);
         }
-      }));
+        
+        return newSettings;
+      });
     }
   };
 
@@ -810,16 +880,28 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                           <Checkbox
                             checked={modelData.enabled}
                             onChange={(e) => {
-                              setAssignmentSettings(prev => ({
-                                ...prev,
-                                models: {
-                                  ...prev.models,
-                                  [modelKey]: {
-                                    ...prev.models[modelKey],
-                                    enabled: e.target.checked
+                              setAssignmentSettings(prev => {
+                                const newSettings = {
+                                  ...prev,
+                                  models: {
+                                    ...prev.models,
+                                    [modelKey]: {
+                                      ...prev.models[modelKey],
+                                      enabled: e.target.checked
+                                    }
                                   }
+                                };
+                                
+                                // 즉시 저장
+                                try {
+                                  localStorage.setItem('reservationAssignmentSettings', JSON.stringify(newSettings));
+                                  console.log('✅ 모델 활성화/비활성화 후 즉시 저장 완료');
+                                } catch (error) {
+                                  console.error('모델 활성화/비활성화 후 저장 실패:', error);
                                 }
-                              }));
+                                
+                                return newSettings;
+                              });
                             }}
                           />
                           <Chip
@@ -930,10 +1012,10 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                           {agents.map(agent => (
                             <Chip
-                              key={agent.name}
+                              key={agent.contactId}
                               label={agent.name}
-                              color={assignmentSettings.targets.agents[agent.name] ? 'primary' : 'default'}
-                              onClick={() => handleHierarchicalTargetChange('agents', agent.name, !assignmentSettings.targets.agents[agent.name])}
+                              color={assignmentSettings.targets.agents[agent.contactId] ? 'primary' : 'default'}
+                              onClick={() => handleHierarchicalTargetChange('agents', agent.contactId, !assignmentSettings.targets.agents[agent.contactId])}
                               sx={{ cursor: 'pointer' }}
                             />
                           ))}
@@ -968,7 +1050,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                         
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                          {[...new Set(agents.map(agent => agent.department))].map(department => (
+                          {[...new Set(agents.map(agent => agent.department))].filter(department => department).map(department => (
                             <Chip
                               key={department}
                               label={department}
@@ -1008,7 +1090,7 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                         
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                          {[...new Set(agents.map(agent => agent.office))].map(office => (
+                          {[...new Set(agents.map(agent => agent.office))].filter(office => office).map(office => (
                             <Chip
                               key={office}
                               label={office}

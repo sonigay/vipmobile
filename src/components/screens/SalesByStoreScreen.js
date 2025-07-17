@@ -1938,7 +1938,7 @@ function SalesByStoreScreen({ loggedInStore }) {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={customer.model}
+                            label={customer.modelCapacityColor || '-'}
                             color="primary"
                             size="small"
                             sx={{ fontSize: '0.7rem' }}
