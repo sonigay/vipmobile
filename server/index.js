@@ -7409,39 +7409,73 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, res) => {
   try {
     const { agentName } = req.params;
+    console.log(`담당자별 고객 리스트 요청: ${agentName}`);
     
-    // 1. 사전예약사이트 데이터 로드
-    const reservationResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:Z'
-    });
-
-    // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
-    const phoneklResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '폰클출고처데이터!A:N'
-    });
-
-    if (!reservationResponse.data.values || !phoneklResponse.data.values) {
-      throw new Error('시트 데이터를 불러올 수 없습니다.');
+    // 캐시 키 생성
+    const cacheKey = `agent_customer_list_${agentName}`;
+    
+    // 캐시에서 먼저 확인 (5분 TTL)
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      console.log(`캐시된 담당자별 고객 리스트 반환: ${agentName}`);
+      return res.json(cachedData);
     }
-
-    const reservationHeaders = reservationResponse.data.values[0];
-    const reservationData = reservationResponse.data.values.slice(1);
     
-    const phoneklHeaders = phoneklResponse.data.values[0];
-    const phoneklData = phoneklResponse.data.values.slice(1);
-
-    // 담당자 이름 정규화 함수
+    // 1. 정규화된 데이터 가져오기 (캐시 활용)
+    const normalizedCacheKey = 'normalized_data_cache';
+    let normalizedData = cacheUtils.get(normalizedCacheKey);
+    
+    if (!normalizedData) {
+      const normalizedResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/reservation-settings/normalized-data`);
+      if (!normalizedResponse.ok) {
+        throw new Error('정규화된 데이터를 가져올 수 없습니다.');
+      }
+      normalizedData = await normalizedResponse.json();
+      
+      if (!normalizedData.success) {
+        throw new Error('정규화된 데이터 조회 실패');
+      }
+      
+      // 정규화 데이터 캐싱 (10분 TTL)
+      cacheUtils.set(normalizedCacheKey, normalizedData, 600);
+    }
+    
+    // 2. 병렬로 시트 데이터 가져오기
+    const [reservationSiteValues, yardValues, phoneklValues] = await Promise.all([
+      getSheetValues('사전예약사이트'),
+      getSheetValues('마당접수'),
+      getSheetValues('폰클출고처데이터')
+    ]);
+    
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!yardValues || yardValues.length < 2) {
+      throw new Error('마당접수 데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!phoneklValues || phoneklValues.length < 2) {
+      throw new Error('폰클출고처데이터를 가져올 수 없습니다.');
+    }
+    
+    // 3. 정규화 규칙 매핑 생성
+    const normalizationRules = normalizedData.normalizationRules || [];
+    const ruleMap = new Map();
+    
+    normalizationRules.forEach(rule => {
+      const key = rule.reservationSite.replace(/\s+/g, '');
+      ruleMap.set(key, rule.normalizedModel);
+    });
+    
+    // 4. 담당자 매핑 생성
+    const storeAgentMap = new Map();
     const normalizeAgentName = (agentName) => {
       if (!agentName) return '';
       return agentName.replace(/\([^)]*\)/g, '').trim();
     };
-
-    // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
-    const storeAgentMap = new Map();
     
-    phoneklData.forEach(row => {
+    phoneklValues.slice(1).forEach(row => {
       const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
       const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
       if (storeCode && agent) {
@@ -7449,53 +7483,141 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
         storeAgentMap.set(storeCode, normalizedAgent);
       }
     });
-
-    // 해당 담당자의 고객 리스트 필터링
-    const customerList = reservationData
-      .map((row, index) => {
-        const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
-        const customerName = row[9] || ''; // J열 (10번째, 0부터 시작)
-        const reservationDateTime = row[10] || ''; // K열 (11번째, 0부터 시작)
-        const receivedDateTime = row[11] || ''; // L열 (12번째, 0부터 시작)
-        const model = row[15] || ''; // P열 (16번째, 0부터 시작)
-        const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
-        const type = row[17] || ''; // R열 (18번째, 0부터 시작)
-        const storeCodeForLookup = row[21] || ''; // V열 (22번째, 0부터 시작)
-        const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
-        const reservationMemo = row[12] || ''; // M열 (13번째, 0부터 시작)
-        const receivedMemo = row[13] || ''; // N열 (14번째, 0부터 시작)
+    
+    // 5. 마당접수 데이터 인덱싱 (예약번호별 빠른 검색을 위해)
+    const yardIndex = new Map();
+    let yardIndexCount = 0;
+    yardValues.slice(1).forEach((yardRow, index) => {
+      if (yardRow.length >= 22) { // V열까지 필요하므로 최소 22개 컬럼
+        const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
+        const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
+        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
         
-        // 담당자 매칭
-        const agent = storeAgentMap.get(storeCodeForLookup) || '';
+        // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
+        const reservationPattern = /[A-Z]{2}\d{6}/g;
+        const uMatches = uValue.match(reservationPattern) || [];
+        const vMatches = vValue.match(reservationPattern) || [];
         
-        return {
-          reservationNumber,
-          customerName,
-          reservationDateTime,
-          receivedDateTime,
-          model,
-          color,
-          type,
-          storeCode: storeCodeForLookup,
-          posName,
-          reservationMemo,
-          receivedMemo,
-          agent,
-          rowIndex: index + 2
-        };
-      })
-      .filter(item => normalizeAgentName(item.agent) === agentName);
-
-    res.json({
-      success: true,
-      data: customerList,
-      stats: {
-        totalCustomers: customerList.length,
-        agentName: agentName
+        // 모든 예약번호를 인덱스에 추가 (이미 하이픈이 없는 형태)
+        [...uMatches, ...vMatches].forEach(match => {
+          const normalizedReservationNumber = match;
+          yardIndex.set(normalizedReservationNumber, {
+            receivedDateTime,
+            receivedMemo
+          });
+          yardIndexCount++;
+          
+          // 처음 5개 마당접수 데이터 로그
+          if (index < 5) {
+            console.log(`담당자별 마당접수 인덱싱: 원본="${match}" -> 정규화="${normalizedReservationNumber}"`);
+            console.log(`  U열: "${uValue}", V열: "${vValue}"`);
+            console.log(`  접수일시: "${receivedDateTime}", 접수메모: "${receivedMemo}"`);
+          }
+        });
       }
     });
+    
+    console.log(`담당자별 마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호 (총 ${yardIndexCount}개 처리)`);
+    console.log(`담당자별 마당접수 예약번호 샘플:`, Array.from(yardIndex.keys()).slice(0, 5));
+    
+    // 6. 사전예약사이트 데이터 처리 (담당자별 필터링)
+    const reservationSiteRows = reservationSiteValues.slice(1);
+    const customerList = [];
+    
+    reservationSiteRows.forEach((row, index) => {
+      if (row.length < 30) return;
+      
+      const pValue = (row[15] || '').toString().trim(); // P열
+      const qValue = (row[16] || '').toString().trim(); // Q열
+      const rValue = (row[17] || '').toString().trim(); // R열
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
+      const posName = (row[22] || '').toString().trim(); // W열: POS명
+      const type = (row[31] || '').toString().trim(); // AF열: 유형
+      const reservationMemo = (row[34] || '').toString().trim(); // AI열: 예약메모
+      const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
+      const storeCodeForLookup = (row[21] || '').toString().trim(); // V열: 대리점코드(조회용)
+      
+      if (!pValue || !qValue || !rValue || !reservationNumber || !customerName) return;
+      
+      // 정규화된 모델명 찾기
+      const originalKey = `${pValue}|${qValue}|${rValue}`.replace(/\s+/g, '');
+      const normalizedModel = ruleMap.get(originalKey);
+      
+      if (!normalizedModel) return;
+      
+      // 모델명 추출
+      const modelMatch = normalizedModel.match(/^(.+?)\s+SM-[A-Z0-9_]+/);
+      if (!modelMatch) return;
+      
+      const model = modelMatch[1].trim();
+      
+      // 담당자 매칭 (VLOOKUP 방식) - 정규화된 이름 사용
+      const agent = storeAgentMap.get(storeCodeForLookup) || '';
+      
+      // 담당자 필터링
+      if (normalizeAgentName(agent) !== agentName) return;
+      
+      // 서류접수 정보 찾기 (인덱스 활용으로 빠른 검색)
+      // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const yardData = yardIndex.get(normalizedReservationNumber) || {};
+      const receivedDateTime = yardData.receivedDateTime || '';
+      const receivedMemo = yardData.receivedMemo || '';
+      
+      // 처음 5개 고객의 접수정보 디버깅 로그
+      if (index < 5) {
+        console.log(`담당자별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
+        console.log(`  정규화된 예약번호: "${normalizedReservationNumber}"`);
+        console.log(`  마당접수 인덱스 존재: ${yardIndex.has(normalizedReservationNumber)}`);
+        console.log(`  접수일시: "${receivedDateTime}"`);
+        console.log(`  접수메모: "${receivedMemo}"`);
+        console.log(`  모델명: "${model}"`);
+        console.log(`  담당자: "${agent}"`);
+      }
+      
+      customerList.push({
+        customerName,
+        reservationNumber,
+        reservationDateTime,
+        receivedDateTime,
+        model,
+        type,
+        storeCode,
+        posName,
+        reservationMemo,
+        receivedMemo,
+        receiver,
+        agent
+      });
+    });
+    
+    // 7. 예약일시로 오름차순 정렬
+    customerList.sort((a, b) => {
+      const dateA = new Date(a.reservationDateTime);
+      const dateB = new Date(b.reservationDateTime);
+      return dateA - dateB;
+    });
+    
+    console.log(`담당자별 고객 리스트 생성 완료: ${customerList.length}개 고객`);
+    
+    const result = {
+      success: true,
+      data: customerList,
+      total: customerList.length,
+      agentName: agentName
+    };
+    
+    // 결과 캐싱 (5분 TTL)
+    cacheUtils.set(cacheKey, result, 300);
+    
+    res.json(result);
+    
   } catch (error) {
-    console.error('담당자별 고객 리스트 로드 오류:', error);
+    console.error('담당자별 고객 리스트 조회 오류:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to load customer list by agent',
