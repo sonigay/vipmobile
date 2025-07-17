@@ -151,28 +151,70 @@ export const calculateReservationAssignment = async (
     
     console.log('선택된 모델:', selectedModels);
     
-    // 각 우선순위별로 데이터 정렬 (접수시간 우선)
+    // 고객명 + 대리점코드 기준으로 중복 제거 및 우선순위 적용
+    const customerStoreMap = new Map(); // 고객명_대리점코드 -> 최고우선순위 아이템
+    
+    console.log('온세일 데이터:', reservationData.onSale.length, '건');
+    console.log('마당접수 데이터:', reservationData.yard.length, '건');
+    console.log('사전예약사이트 데이터:', reservationData.site.length, '건');
+    
+    // 1순위: 온세일접수 (고객명 + 대리점코드 매칭)
+    const filteredOnSale = reservationData.onSale.filter(item => 
+      selectedModels.some(model => model.name === item.model && model.color === item.color)
+    );
+    console.log('필터링된 온세일 데이터:', filteredOnSale.length, '건');
+    
+    filteredOnSale.forEach(item => {
+      const key = `${item.customerName}_${item.storeCode}`;
+      if (!customerStoreMap.has(key)) {
+        customerStoreMap.set(key, { ...item, priority: 1, source: 'onSale' });
+        console.log(`온세일 매칭: ${item.customerName} (${item.storeCode}) -> ${item.model} ${item.color}`);
+      }
+    });
+    
+    // 2순위: 마당접수 (고객명 + 대리점코드 매칭, 온세일에서 이미 처리된 고객은 제외)
+    const filteredYard = reservationData.yard.filter(item => 
+      selectedModels.some(model => model.name === item.model && model.color === item.color)
+    );
+    console.log('필터링된 마당접수 데이터:', filteredYard.length, '건');
+    
+    filteredYard.forEach(item => {
+      const key = `${item.customerName}_${item.storeCode}`;
+      if (!customerStoreMap.has(key)) {
+        customerStoreMap.set(key, { ...item, priority: 2, source: 'yard' });
+        console.log(`마당접수 매칭: ${item.customerName} (${item.storeCode}) -> ${item.model} ${item.color}`);
+      }
+    });
+    
+    // 3순위: 사전예약사이트 (고객명 + 대리점코드 매칭, 온세일/마당접수에서 이미 처리된 고객은 제외)
+    const filteredSite = reservationData.site.filter(item => 
+      selectedModels.some(model => model.name === item.model && model.color === item.color)
+    );
+    console.log('필터링된 사전예약사이트 데이터:', filteredSite.length, '건');
+    
+    filteredSite.forEach(item => {
+      const key = `${item.customerName}_${item.storeCode}`;
+      if (!customerStoreMap.has(key)) {
+        customerStoreMap.set(key, { ...item, priority: 3, source: 'site' });
+        console.log(`사전예약사이트 매칭: ${item.customerName} (${item.storeCode}) -> ${item.model} ${item.color}`);
+      }
+    });
+    
+    console.log('최종 매칭된 고객 수:', customerStoreMap.size, '명');
+    
+    // 우선순위별로 정렬된 데이터 생성
     const sortedData = {
-      onSale: reservationData.onSale
-        .filter(item => selectedModels.some(model => 
-          model.name === item.model && model.color === item.color
-        ))
-        .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime))
-        .map(item => ({ ...item, priority: 1, source: 'onSale' })),
+      onSale: Array.from(customerStoreMap.values())
+        .filter(item => item.priority === 1)
+        .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime)),
       
-      yard: reservationData.yard
-        .filter(item => selectedModels.some(model => 
-          model.name === item.model && model.color === item.color
-        ))
-        .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime))
-        .map(item => ({ ...item, priority: 2, source: 'yard' })),
+      yard: Array.from(customerStoreMap.values())
+        .filter(item => item.priority === 2)
+        .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime)),
       
-      site: reservationData.site
-        .filter(item => selectedModels.some(model => 
-          model.name === item.model && model.color === item.color
-        ))
+      site: Array.from(customerStoreMap.values())
+        .filter(item => item.priority === 3)
         .sort((a, b) => parseReceiptTime(a.receiptTime) - parseReceiptTime(b.receiptTime))
-        .map(item => ({ ...item, priority: 3, source: 'site' }))
     };
     
     setProgress(50);

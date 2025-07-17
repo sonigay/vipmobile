@@ -8431,12 +8431,12 @@ app.get('/api/reservation-data/on-sale-receipt', async (req, res) => {
   try {
     console.log('온세일접수 데이터 요청');
     
-    // 온세일접수 시트에서 데이터 가져오기
-    const sheetName = '온세일접수';
+    // 온세일 시트에서 데이터 가져오기 (고객명 + 대리점코드 매칭용)
+    const sheetName = '온세일';
     const values = await getSheetValues(sheetName);
     
     if (!values || values.length === 0) {
-      console.log('온세일접수 데이터가 없습니다.');
+      console.log('온세일 데이터가 없습니다.');
       return res.json({ success: true, data: [] });
     }
     
@@ -8447,26 +8447,26 @@ app.get('/api/reservation-data/on-sale-receipt', async (req, res) => {
     const processedData = dataRows
       .filter(row => row.length > 0 && row.some(cell => cell && cell.toString().trim() !== ''))
       .map((row, index) => {
-        // 예약번호 (A열)
-        const reservationNumber = row[0] ? row[0].toString().replace(/-/g, '') : '';
+        // 고객명 (C열)
+        const customerName = row[2] ? row[2].toString().trim() : '';
         
-        // 고객명 (B열)
-        const customerName = row[1] ? row[1].toString().trim() : '';
+        // 가입대리점코드 (M열)
+        const storeCode = row[12] ? row[12].toString().trim() : '';
         
-        // 모델명 (C열)
-        const model = row[2] ? row[2].toString().trim() : '';
+        // 모델명 (D열)
+        const model = row[3] ? row[3].toString().trim() : '';
         
-        // 색상 (D열)
-        const color = row[3] ? row[3].toString().trim() : '';
+        // 색상 (E열)
+        const color = row[4] ? row[4].toString().trim() : '';
         
-        // 접수시간 (E열)
-        const receiptTime = row[4] ? row[4].toString().trim() : '';
+        // 접수시간 (F열)
+        const receiptTime = row[5] ? row[5].toString().trim() : '';
         
         // 유효한 데이터만 반환
-        if (reservationNumber && customerName && model && color) {
+        if (customerName && storeCode && model && color) {
           return {
-            reservationNumber,
             customerName,
+            storeCode,
             model,
             color,
             receiptTime,
@@ -8477,12 +8477,12 @@ app.get('/api/reservation-data/on-sale-receipt', async (req, res) => {
       })
       .filter(item => item !== null);
     
-    console.log(`온세일접수 데이터 처리 완료: ${processedData.length}건`);
+    console.log(`온세일 데이터 처리 완료: ${processedData.length}건`);
     
     res.json({ success: true, data: processedData });
     
   } catch (error) {
-    console.error('온세일접수 데이터 가져오기 실패:', error);
+    console.error('온세일 데이터 가져오기 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -8521,11 +8521,14 @@ app.get('/api/reservation-data/yard-receipt', async (req, res) => {
         // 고객명 (B열)
         const customerName = row[1] ? row[1].toString().trim() : '';
         
-        // 모델명 (C열)
-        const model = row[2] ? row[2].toString().trim() : '';
+        // 대리점코드 (C열)
+        const storeCode = row[2] ? row[2].toString().trim() : '';
         
-        // 색상 (D열)
-        const color = row[3] ? row[3].toString().trim() : '';
+        // 모델명 (D열)
+        const model = row[3] ? row[3].toString().trim() : '';
+        
+        // 색상 (E열)
+        const color = row[4] ? row[4].toString().trim() : '';
         
         // 접수시간 (L열)
         const receiptTime = row[11] ? row[11].toString().trim() : '';
@@ -8535,6 +8538,7 @@ app.get('/api/reservation-data/yard-receipt', async (req, res) => {
           return {
             reservationNumber,
             customerName,
+            storeCode,
             model,
             color,
             receiptTime,
@@ -8575,27 +8579,33 @@ app.get('/api/reservation-data/reservation-site', async (req, res) => {
     const processedData = dataRows
       .filter(row => row.length > 0 && row.some(cell => cell && cell.toString().trim() !== ''))
       .map((row, index) => {
-        // 예약번호 (A열)
-        const reservationNumber = row[0] ? row[0].toString().replace(/-/g, '') : '';
+        // 예약번호 (I열)
+        const reservationNumber = row[8] ? row[8].toString().replace(/-/g, '') : '';
         
-        // 고객명 (B열)
-        const customerName = row[1] ? row[1].toString().trim() : '';
+        // 고객명 (H열)
+        const customerName = row[7] ? row[7].toString().trim() : '';
         
-        // 모델명 (C열)
-        const model = row[2] ? row[2].toString().trim() : '';
+        // 대리점코드 (X열)
+        const storeCode = row[23] ? row[23].toString().trim() : '';
         
-        // 색상 (D열)
-        const color = row[3] ? row[3].toString().trim() : '';
+        // 모델명 (P, Q, R열 조합)
+        const pValue = row[15] ? row[15].toString().trim() : '';
+        const qValue = row[16] ? row[16].toString().trim() : '';
+        const rValue = row[17] ? row[17].toString().trim() : '';
         
-        // 접수시간 (E열)
-        const receiptTime = row[4] ? row[4].toString().trim() : '';
+        // 색상 (Q열)
+        const color = qValue;
+        
+        // 접수시간 (O열)
+        const receiptTime = row[14] ? row[14].toString().trim() : '';
         
         // 유효한 데이터만 반환
-        if (reservationNumber && customerName && model && color) {
+        if (reservationNumber && customerName && pValue && qValue && rValue) {
           return {
             reservationNumber,
             customerName,
-            model,
+            storeCode,
+            model: `${pValue} ${qValue} ${rValue}`.trim(),
             color,
             receiptTime,
             source: 'site'
