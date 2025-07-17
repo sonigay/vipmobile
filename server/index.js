@@ -7749,6 +7749,161 @@ app.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, re
   }
 });
 
+// 전체 고객리스트 API
+app.get('/api/reservation-sales/all-customers', async (req, res) => {
+  try {
+    console.log('전체 고객리스트 요청');
+    
+    // 캐시 확인
+    const cacheKey = 'all_customer_list';
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      console.log('캐시된 전체 고객리스트 반환');
+      return res.json(cachedData);
+    }
+
+    // 1. 사전예약사이트 데이터 로드
+    const reservationResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트!A:Z'
+    });
+
+    // 2. 마당접수 데이터 로드
+    const yardResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '마당접수!A:Z'
+    });
+
+    // 3. 온세일 데이터 로드
+    const onSaleResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일!A:Z'
+    });
+
+    if (!reservationResponse.data.values || !yardResponse.data.values || !onSaleResponse.data.values) {
+      throw new Error('시트 데이터를 불러올 수 없습니다.');
+    }
+
+    const reservationHeaders = reservationResponse.data.values[0];
+    const reservationData = reservationResponse.data.values.slice(1);
+    
+    const yardHeaders = yardResponse.data.values[0];
+    const yardData = yardResponse.data.values.slice(1);
+    
+    const onSaleHeaders = onSaleResponse.data.values[0];
+    const onSaleData = onSaleResponse.data.values.slice(1);
+
+    // 예약번호 정규화 함수
+    const normalizeReservationNumber = (number) => {
+      if (!number) return '';
+      return number.toString().replace(/[-\s]/g, '').trim();
+    };
+
+    // 마당접수 데이터 인덱싱 (예약번호 기준)
+    const yardIndex = new Map();
+    let yardIndexCount = 0;
+    
+    yardData.forEach(row => {
+      const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
+      const receivedDate = row[9] || ''; // J열 (10번째, 0부터 시작)
+      const receivedMemo = row[10] || ''; // K열 (11번째, 0부터 시작)
+      const receiver = row[11] || ''; // L열 (12번째, 0부터 시작)
+      
+      if (reservationNumber) {
+        const normalizedReservationNumber = normalizeReservationNumber(reservationNumber);
+        yardIndex.set(normalizedReservationNumber, {
+          receivedDate,
+          receivedMemo,
+          receiver
+        });
+        yardIndexCount++;
+      }
+    });
+
+    console.log(`마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호 (총 ${yardIndexCount}개 처리)`);
+
+    // 온세일 데이터 인덱싱 (고객명 + 대리점코드 기준)
+    const onSaleIndex = new Map();
+    let onSaleIndexCount = 0;
+    
+    onSaleData.forEach(row => {
+      const customerName = row[1] || ''; // B열 (2번째, 0부터 시작)
+      const storeCode = row[2] || ''; // C열 (3번째, 0부터 시작)
+      const receivedDate = row[3] || ''; // D열 (4번째, 0부터 시작)
+      
+      if (customerName && storeCode) {
+        const key = `${customerName}_${storeCode}`;
+        onSaleIndex.set(key, receivedDate);
+        onSaleIndexCount++;
+      }
+    });
+
+    console.log(`온세일 데이터 인덱싱 완료: ${onSaleIndex.size}개 고객-대리점 조합 (총 ${onSaleIndexCount}개 처리)`);
+
+    // 전체 고객리스트 생성
+    const customerList = reservationData.map((row, index) => {
+      const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
+      const customerName = row[9] || ''; // J열 (10번째, 0부터 시작)
+      const reservationDateTime = row[10] || ''; // K열 (11번째, 0부터 시작)
+      const model = row[15] || ''; // P열 (16번째, 0부터 시작)
+      const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
+      const type = row[17] || ''; // R열 (18번째, 0부터 시작)
+      const reservationMemo = row[18] || ''; // S열 (19번째, 0부터 시작)
+      const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
+
+      // 마당접수 정보 매칭
+      const normalizedReservationNumber = normalizeReservationNumber(reservationNumber);
+      const yardInfo = yardIndex.get(normalizedReservationNumber) || {};
+      
+      // 온세일접수 정보 매칭
+      const onSaleKey = `${customerName}_${storeCode}`;
+      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+
+      return {
+        reservationNumber,
+        customerName,
+        reservationDateTime,
+        model,
+        color,
+        type,
+        reservationMemo,
+        storeCode,
+        posName,
+        yardReceivedDate: yardInfo.receivedDate || '',
+        yardReceivedMemo: yardInfo.receivedMemo || '',
+        onSaleReceivedDate,
+        receiver: yardInfo.receiver || '',
+        rowIndex: index + 2
+      };
+    });
+
+    console.log(`전체 고객리스트 생성 완료: ${customerList.length}개 고객`);
+
+    const result = {
+      success: true,
+      data: customerList,
+      stats: {
+        totalCustomers: customerList.length,
+        totalYardReceived: customerList.filter(c => c.yardReceivedDate).length,
+        totalOnSaleReceived: customerList.filter(c => c.onSaleReceivedDate).length
+      }
+    };
+
+    // 캐시 저장 (5분)
+    cacheUtils.set(cacheKey, result, 300);
+
+    res.json(result);
+  } catch (error) {
+    console.error('전체 고객리스트 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load all customer list',
+      message: error.message
+    });
+  }
+});
+
 // 담당자 수동 매칭 저장 API
 app.post('/api/sales-by-store/update-agent', async (req, res) => {
   try {

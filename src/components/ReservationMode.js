@@ -40,6 +40,7 @@ import {
 import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 import SalesByStoreScreen from './screens/SalesByStoreScreen';
 import ReservationAssignmentSettingsScreen from './screens/ReservationAssignmentSettingsScreen';
+import AllCustomerListScreen from './screens/AllCustomerListScreen';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
 import UpdateProgressPopup from './UpdateProgressPopup';
 
@@ -530,6 +531,12 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             onLogout={onLogout}
           />
         );
+      case 4: // 전체고객리스트 탭
+        return (
+          <AllCustomerListScreen 
+            loggedInStore={loggedInStore}
+          />
+        );
       default:
         return null;
     }
@@ -625,6 +632,17 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             <Tab 
               label="배정셋팅" 
               icon={<PriorityHighIcon />} 
+              iconPosition="start"
+              sx={{ 
+                minHeight: 64,
+                '&.Mui-selected': {
+                  color: '#ff9a9e'
+                }
+              }}
+            />
+            <Tab 
+              label="전체고객리스트" 
+              icon={<PeopleIcon />} 
               iconPosition="start"
               sx={{ 
                 minHeight: 64,
