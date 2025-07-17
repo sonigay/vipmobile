@@ -7729,13 +7729,13 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     // 1. 사전예약사이트 데이터 로드
     const reservationResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:Z'
+      range: '사전예약사이트!A:AI'
     });
 
     // 2. 마당접수 데이터 로드
     const yardResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '마당접수!A:Z'
+      range: '마당접수!A:AI'
     });
 
     // 3. 온세일 데이터 로드
@@ -7828,8 +7828,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const customerName = row[7] || ''; // H열 (8번째, 0부터 시작)
       const reservationDateTime = row[14] || ''; // O열 (15번째, 0부터 시작)
       const model = row[15] || ''; // P열 (16번째, 0부터 시작)
-      const capacity = row[16] || ''; // Q열 (17번째, 0부터 시작) - 용량 (실제로는 용량이 들어있음)
-      const color = row[17] || ''; // R열 (18번째, 0부터 시작) - 색상 (실제로는 색상이 들어있음)
+      const capacity = row[16] || ''; // Q열 (17번째, 0부터 시작) - 용량
+      const color = row[17] || ''; // R열 (18번째, 0부터 시작) - 색상
       const type = row.length > 32 ? (row[32] || '') : ''; // AF열 (32번째, 0부터 시작) - 유형
       const reservationMemo = row.length > 35 ? (row[35] || '') : ''; // AI열 (35번째, 0부터 시작) - 사이트메모
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)

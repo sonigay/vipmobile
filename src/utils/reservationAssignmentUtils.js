@@ -131,54 +131,50 @@ const parseReceiptTime = (timeString) => {
   }
 };
 
-// 사전예약 데이터에서 사용 가능한 모델과 색상 추출
+// 사전예약 데이터에서 사용 가능한 모델과 색상 추출 (정규화된 데이터 사용)
 export const extractAvailableModels = async () => {
   try {
-    console.log('사전예약 데이터에서 모델 추출 시작');
+    console.log('정규화된 사전예약 데이터에서 모델 추출 시작');
     
-    // 사전예약 데이터 가져오기
-    const reservationData = await fetchReservationData();
+    // 정규화된 사전예약 데이터 가져오기
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+    const normalizedResponse = await fetch(`${API_BASE_URL}/api/reservation-settings/normalized-data`);
+    
+    if (!normalizedResponse.ok) {
+      throw new Error('정규화된 데이터를 가져올 수 없습니다.');
+    }
+    
+    const normalizedData = await normalizedResponse.json();
+    
+    if (!normalizedData.success || !normalizedData.reservationSiteData) {
+      throw new Error('정규화된 데이터가 올바르지 않습니다.');
+    }
     
     const models = new Set();
     const colors = new Set();
     const modelColors = new Map(); // 모델별 사용 가능한 색상
     
-    // 온세일 데이터에서 모델 추출
-    reservationData.onSale.forEach(item => {
-      if (item.model && item.color) {
-        models.add(item.model);
-        colors.add(item.color);
+    // 정규화된 사전예약사이트 데이터에서 모델과 색상 추출
+    normalizedData.reservationSiteData.forEach(item => {
+      if (item.normalizedModel) {
+        // 정규화된 모델명 사용
+        const model = item.normalizedModel.trim();
         
-        if (!modelColors.has(item.model)) {
-          modelColors.set(item.model, new Set());
+        if (model) {
+          models.add(model);
+          if (!modelColors.has(model)) {
+            modelColors.set(model, new Set());
+          }
+          
+          // 원본 색상 정보 사용 (R열)
+          if (item.originalR) {
+            const color = item.originalR.trim();
+            if (color) {
+              colors.add(color);
+              modelColors.get(model).add(color);
+            }
+          }
         }
-        modelColors.get(item.model).add(item.color);
-      }
-    });
-    
-    // 마당접수 데이터에서 모델 추출
-    reservationData.yard.forEach(item => {
-      if (item.model && item.color) {
-        models.add(item.model);
-        colors.add(item.color);
-        
-        if (!modelColors.has(item.model)) {
-          modelColors.set(item.model, new Set());
-        }
-        modelColors.get(item.model).add(item.color);
-      }
-    });
-    
-    // 사전예약사이트 데이터에서 모델 추출
-    reservationData.site.forEach(item => {
-      if (item.model && item.color) {
-        models.add(item.model);
-        colors.add(item.color);
-        
-        if (!modelColors.has(item.model)) {
-          modelColors.set(item.model, new Set());
-        }
-        modelColors.get(item.model).add(item.color);
       }
     });
     
@@ -193,15 +189,17 @@ export const extractAvailableModels = async () => {
       )
     };
     
-    console.log('사전예약 모델 추출 결과:', {
+    console.log('정규화된 사전예약 모델 추출 결과:', {
       modelsCount: result.models.length,
       colorsCount: result.colors.length,
-      modelColorsCount: result.modelColors.size
+      modelColorsCount: result.modelColors.size,
+      sampleModels: result.models.slice(0, 5),
+      sampleColors: result.colors.slice(0, 5)
     });
     
     return result;
   } catch (error) {
-    console.error('사전예약 모델 추출 실패:', error);
+    console.error('정규화된 사전예약 모델 추출 실패:', error);
     return {
       models: [],
       colors: [],
