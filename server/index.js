@@ -7805,9 +7805,9 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     
     yardData.forEach(row => {
       const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
-      const receivedDate = row[9] || ''; // J열 (10번째, 0부터 시작)
-      const receivedMemo = row[10] || ''; // K열 (11번째, 0부터 시작)
-      const receiver = row[11] || ''; // L열 (12번째, 0부터 시작)
+      const receivedDate = row[11] || ''; // L열 (12번째, 0부터 시작)
+      const receivedMemo = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const receiver = row[24] || ''; // Y열 (25번째, 0부터 시작)
       
       if (reservationNumber) {
         const normalizedReservationNumber = normalizeReservationNumber(reservationNumber);
@@ -7827,9 +7827,9 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     let onSaleIndexCount = 0;
     
     onSaleData.forEach(row => {
-      const customerName = row[1] || ''; // B열 (2번째, 0부터 시작)
-      const storeCode = row[2] || ''; // C열 (3번째, 0부터 시작)
-      const receivedDate = row[3] || ''; // D열 (4번째, 0부터 시작)
+      const customerName = row[2] || ''; // C열 (3번째, 0부터 시작)
+      const storeCode = row[12] || ''; // M열 (13번째, 0부터 시작)
+      const receivedDate = row[5] || ''; // F열 (6번째, 0부터 시작)
       
       if (customerName && storeCode) {
         const key = `${customerName}_${storeCode}`;
@@ -7843,13 +7843,13 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     // 전체 고객리스트 생성
     const customerList = reservationData.map((row, index) => {
       const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
-      const customerName = row[9] || ''; // J열 (10번째, 0부터 시작)
-      const reservationDateTime = row[10] || ''; // K열 (11번째, 0부터 시작)
+      const customerName = row[7] || ''; // H열 (8번째, 0부터 시작)
+      const reservationDateTime = row[14] || ''; // O열 (15번째, 0부터 시작)
       const model = row[15] || ''; // P열 (16번째, 0부터 시작)
       const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
       const type = row[17] || ''; // R열 (18번째, 0부터 시작)
-      const reservationMemo = row[18] || ''; // S열 (19번째, 0부터 시작)
-      const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const reservationMemo = row[34] || ''; // AI열 (35번째, 0부터 시작)
+      const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
 
       // 마당접수 정보 매칭
