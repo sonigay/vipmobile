@@ -7868,6 +7868,14 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
 
+      // 처음 5개 고객의 사이트메모 디버깅 로그
+      if (index < 5) {
+        console.log(`전체고객리스트 사이트메모 디버깅: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
+        console.log(`  AI열 원본값: "${row[34]}"`);
+        console.log(`  사이트메모: "${reservationMemo}"`);
+        console.log(`  행 길이: ${row.length}`);
+      }
+
       // 마당접수 정보 매칭
       const normalizedReservationNumber = normalizeReservationNumber(reservationNumber);
       const yardInfo = yardIndex.get(normalizedReservationNumber) || {};
