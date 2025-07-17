@@ -3775,11 +3775,18 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       
       if (!reservationNumber || !customerName || !model || !capacity || !color) return;
       
-      // 모델 필터링 (디버깅 로그 추가)
-      if (model !== req.params.model) {
+      // 모델 필터링 (모델+용량+색상 조합으로 정확히 비교)
+      // 요청된 모델명을 모델/용량/색상으로 분해
+      const requestedParts = req.params.model.split(' ');
+      const requestedModel = requestedParts.slice(0, 2).join(' '); // "Z Flip7"
+      const requestedCapacity = requestedParts[2]; // "512G"
+      const requestedColor = requestedParts.slice(3).join(' '); // "제트블랙"
+      
+      // 데이터의 모델/용량/색상과 비교
+      if (model !== requestedModel || capacity !== requestedCapacity || color !== requestedColor) {
         // 처음 10개만 로그 출력
         if (index < 10) {
-          console.log(`모델 불일치: 데이터="${model}" vs 요청="${req.params.model}"`);
+          console.log(`모델 불일치: 데이터="${model} ${capacity} ${color}" vs 요청="${requestedModel} ${requestedCapacity} ${requestedColor}"`);
         }
         return;
       }
