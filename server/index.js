@@ -3250,10 +3250,11 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const qValue = (row[16] || '').toString().trim(); // Q열
       const rValue = (row[17] || '').toString().trim(); // R열
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const type = (row[31] || '').toString().trim(); // AF열: 유형
       
       // 처음 몇 개 행의 데이터 확인
       if (index < 5) {
-        console.log(`행 ${index + 1} 데이터: P="${pValue}", Q="${qValue}", R="${rValue}", 예약번호="${reservationNumber}"`);
+        console.log(`행 ${index + 1} 데이터: P="${pValue}", Q="${qValue}", R="${rValue}", 예약번호="${reservationNumber}", 유형="${type}"`);
       }
       
       if (!pValue || !qValue || !rValue || !reservationNumber) {
@@ -3305,14 +3306,36 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
         console.log(`모델명 추출 성공: 정규화된모델="${normalizedModel}" -> 모델명="${model}"`);
       }
       
+      // 유형 분류 함수
+      const classifyType = (typeValue) => {
+        if (!typeValue) return '기타';
+        const typeStr = typeValue.toString().trim();
+        if (typeStr.includes('신규가입')) return '신규';
+        if (typeStr.includes('번호이동')) return 'MNP';
+        if (typeStr.includes('기기변경')) return '기변';
+        return '기타';
+      };
+      
+      const classifiedType = classifyType(type);
+      
       const key = model; // 모델명만으로 키 생성
       
       if (!modelColorStats.has(key)) {
         modelColorStats.set(key, {
           model,
           total: 0,
-          received: 0,
-          notReceived: 0
+          received: {
+            신규: 0,
+            MNP: 0,
+            기변: 0,
+            기타: 0
+          },
+          notReceived: {
+            신규: 0,
+            MNP: 0,
+            기변: 0,
+            기타: 0
+          }
         });
       }
       
@@ -3331,14 +3354,14 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       }
       
       if (isReceived) {
-        stats.received++;
+        stats.received[classifiedType]++;
         if (index < 5) {
-          console.log(`✅ 서류접수 확인됨: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
+          console.log(`✅ 서류접수 확인됨: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model} (${classifiedType})`);
         }
       } else {
-        stats.notReceived++;
+        stats.notReceived[classifiedType]++;
         if (index < 5) {
-          console.log(`❌ 서류미접수: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model}`);
+          console.log(`❌ 서류미접수: ${reservationNumber} (정규화: ${normalizedReservationNumber}) -> ${model} (${classifiedType})`);
         }
       }
     });
@@ -3346,10 +3369,18 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     // 7. 결과 정렬 및 반환
     const result = Array.from(modelColorStats.values())
       .sort((a, b) => b.total - a.total) // 총 수량 내림차순 정렬
-      .map((item, index) => ({
-        ...item,
-        rank: index + 1
-      }));
+      .map((item, index) => {
+        // 유형별 합계 계산
+        const receivedTotal = item.received.신규 + item.received.MNP + item.received.기변 + item.received.기타;
+        const notReceivedTotal = item.notReceived.신규 + item.notReceived.MNP + item.notReceived.기변 + item.notReceived.기타;
+        
+        return {
+          ...item,
+          rank: index + 1,
+          receivedTotal,
+          notReceivedTotal
+        };
+      });
     
     console.log(`모델색상별 정리 데이터 생성 완료: ${result.length}개 모델색상 조합`);
     console.log(`처리된 데이터: ${processedCount}개, 매칭된 데이터: ${matchedCount}개`);
@@ -3361,8 +3392,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       total: result.length,
       stats: {
         totalItems: result.reduce((sum, item) => sum + item.total, 0),
-        totalReceived: result.reduce((sum, item) => sum + item.received, 0),
-        totalNotReceived: result.reduce((sum, item) => sum + item.notReceived, 0)
+        totalReceived: result.reduce((sum, item) => sum + item.receivedTotal, 0),
+        totalNotReceived: result.reduce((sum, item) => sum + item.notReceivedTotal, 0)
       }
     };
     

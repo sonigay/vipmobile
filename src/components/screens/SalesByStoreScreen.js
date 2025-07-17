@@ -1495,8 +1495,26 @@ function SalesByStoreScreen({ loggedInStore }) {
                     <TableRow>
                       <TableCell width="60px" align="center">랭크</TableCell>
                       <TableCell width="350px">모델색상</TableCell>
-                      <TableCell width="120px" align="center">서류접수</TableCell>
-                      <TableCell width="120px" align="center">서류미접수</TableCell>
+                      <TableCell width="200px" align="center" colSpan={3}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>서류접수</Typography>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                            <Chip label="신규" size="small" sx={{ fontSize: '0.6rem', height: 20 }} />
+                            <Chip label="MNP" size="small" sx={{ fontSize: '0.6rem', height: 20 }} />
+                            <Chip label="기변" size="small" sx={{ fontSize: '0.6rem', height: 20 }} />
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell width="200px" align="center" colSpan={3}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>서류미접수</Typography>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                            <Chip label="신규" size="small" sx={{ fontSize: '0.6rem', height: 20 }} />
+                            <Chip label="MNP" size="small" sx={{ fontSize: '0.6rem', height: 20 }} />
+                            <Chip label="기변" size="small" sx={{ fontSize: '0.6rem', height: 20 }} />
+                          </Box>
+                        </Box>
+                      </TableCell>
                       <TableCell width="100px" align="center">합계</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1532,20 +1550,54 @@ function SalesByStoreScreen({ loggedInStore }) {
                             onClick={() => loadCustomerListByModel(item.model)}
                           />
                         </TableCell>
+                        {/* 서류접수 - 유형별 */}
                         <TableCell align="center">
                           <Chip
-                            label={item.received}
+                            label={item.received?.신규 || 0}
                             color="success"
                             size="small"
-                            sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                            sx={{ fontSize: '0.7rem', minWidth: 30 }}
                           />
                         </TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={item.notReceived}
+                            label={item.received?.MNP || 0}
+                            color="success"
+                            size="small"
+                            sx={{ fontSize: '0.7rem', minWidth: 30 }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.received?.기변 || 0}
+                            color="success"
+                            size="small"
+                            sx={{ fontSize: '0.7rem', minWidth: 30 }}
+                          />
+                        </TableCell>
+                        {/* 서류미접수 - 유형별 */}
+                        <TableCell align="center">
+                          <Chip
+                            label={item.notReceived?.신규 || 0}
                             color="warning"
                             size="small"
-                            sx={{ fontSize: '0.8rem', minWidth: 40 }}
+                            sx={{ fontSize: '0.7rem', minWidth: 30 }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.notReceived?.MNP || 0}
+                            color="warning"
+                            size="small"
+                            sx={{ fontSize: '0.7rem', minWidth: 30 }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={item.notReceived?.기변 || 0}
+                            color="warning"
+                            size="small"
+                            sx={{ fontSize: '0.7rem', minWidth: 30 }}
                           />
                         </TableCell>
                         <TableCell align="center">
