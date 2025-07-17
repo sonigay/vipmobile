@@ -124,7 +124,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     const structure = {
       offices: {},
       departments: {},
-      agents: {}
+      agents: {},
+      stores: {}
     };
 
     // 유효한 담당자만 필터링
@@ -142,7 +143,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       if (!structure.offices[office]) {
         structure.offices[office] = {
           departments: new Set(),
-          agents: new Set()
+          agents: new Set(),
+          stores: new Set()
         };
       }
       structure.offices[office].departments.add(department);
@@ -152,7 +154,8 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       if (!structure.departments[department]) {
         structure.departments[department] = {
           office: office,
-          agents: new Set()
+          agents: new Set(),
+          stores: new Set()
         };
       }
       structure.departments[department].agents.add(agentId);
@@ -161,12 +164,52 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       structure.agents[agentId] = {
         name: agent.target,
         office: office,
-        department: department
+        department: department,
+        stores: new Set()
       };
     });
 
+    // 매장별 구조 (담당자별 정리 데이터에서 가져오기)
+    if (data && data.byAgent) {
+      Object.entries(data.byAgent).forEach(([agentName, agentData]) => {
+        // 담당자 ID 찾기
+        const agent = validAgents.find(a => a.target === agentName);
+        if (agent) {
+          const agentId = agent.contactId;
+          
+          // 해당 담당자의 매장들 추가
+          Object.keys(agentData).forEach(posName => {
+            // 매장별 구조에 추가
+            if (!structure.stores[posName]) {
+              structure.stores[posName] = {
+                agents: new Set()
+              };
+            }
+            structure.stores[posName].agents.add(agentId);
+            
+            // 담당자별 구조에 매장 추가
+            if (structure.agents[agentId]) {
+              structure.agents[agentId].stores.add(posName);
+            }
+            
+            // 소속별 구조에 매장 추가
+            const department = agent.department;
+            if (structure.departments[department]) {
+              structure.departments[department].stores.add(posName);
+            }
+            
+            // 사무실별 구조에 매장 추가
+            const office = agent.office;
+            if (structure.offices[office]) {
+              structure.offices[office].stores.add(posName);
+            }
+          });
+        }
+      });
+    }
+
     return structure;
-  }, [agents]);
+  }, [agents, data]);
 
   // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
@@ -228,12 +271,32 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           console.error('네트워크 에러 상세:', apiError.message);
         }
         
-        // 매장 데이터 로드
+        // 매장 데이터 로드 (담당자별 정리 데이터에서 추출)
         console.log('매장 데이터 로드 중...');
         let storeData = null;
         let storeDataLoaded = false;
         
-        if (data && Array.isArray(data)) {
+        if (data && data.byAgent) {
+          // 담당자별 정리 데이터에서 매장 목록 추출
+          const storeSet = new Set();
+          Object.values(data.byAgent).forEach(agentData => {
+            Object.keys(agentData).forEach(posName => {
+              if (posName && posName !== '미지정') {
+                storeSet.add(posName);
+              }
+            });
+          });
+          
+          const storeList = Array.from(storeSet).map(storeName => ({
+            id: storeName,
+            name: storeName
+          }));
+          
+          console.log('담당자별 정리에서 추출한 매장 데이터:', storeList.length, '개');
+          setStores(storeList);
+          storeDataLoaded = true;
+          console.log('✅ 담당자별 정리에서 매장 데이터 추출 완료');
+        } else if (data && Array.isArray(data)) {
           console.log('Props로 받은 매장 데이터:', data.length, '개');
           storeData = data;
           setStores(data);
@@ -624,6 +687,18 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       } else if (type === 'stores') {
         // 매장 개별 선택/해제
         newTargets.stores[target] = checked;
+        
+        // 해당 매장의 담당자들도 함께 처리
+        if (getHierarchicalStructure.stores[target]) {
+          const storeData = getHierarchicalStructure.stores[target];
+          
+          // 해당 매장의 담당자들 처리
+          storeData.agents.forEach(agentId => {
+            if (newTargets.agents[agentId] !== undefined) {
+              newTargets.agents[agentId] = checked;
+            }
+          });
+        }
       }
 
       const newSettings = {
@@ -694,8 +769,19 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
         });
       } else if (type === 'stores') {
         // 매장 전체 선택/해제
-        stores.forEach(store => {
-          newTargets.stores[store.id] = checked;
+        Object.keys(newTargets.stores).forEach(storeName => {
+          newTargets.stores[storeName] = checked;
+          
+          // 해당 매장의 담당자들도 함께 처리
+          if (getHierarchicalStructure.stores[storeName]) {
+            const storeData = getHierarchicalStructure.stores[storeName];
+            
+            storeData.agents.forEach(agentId => {
+              if (newTargets.agents[agentId] !== undefined) {
+                newTargets.agents[agentId] = checked;
+              }
+            });
+          }
         });
       }
 
@@ -765,8 +851,19 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
           });
         } else if (type === 'stores') {
           // 매장 전체 해제
-          Object.keys(newTargets.stores).forEach(storeId => {
-            newTargets.stores[storeId] = false;
+          Object.keys(newTargets.stores).forEach(storeName => {
+            newTargets.stores[storeName] = false;
+            
+            // 해당 매장의 담당자들도 함께 해제
+            if (getHierarchicalStructure.stores[storeName]) {
+              const storeData = getHierarchicalStructure.stores[storeName];
+              
+              storeData.agents.forEach(agentId => {
+                if (newTargets.agents[agentId] !== undefined) {
+                  newTargets.agents[agentId] = false;
+                }
+              });
+            }
           });
         }
 
@@ -1170,6 +1267,11 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
                               sx={{ cursor: 'pointer' }}
                             />
                           ))}
+                          {stores.length === 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              매장 데이터를 불러오는 중...
+                            </Typography>
+                          )}
                         </Box>
                       </Box>
                     )}
