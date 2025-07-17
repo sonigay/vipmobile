@@ -3743,6 +3743,21 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     const reservationSiteRows = reservationSiteValues.slice(1);
     const customerList = [];
     
+    // 디버깅: 요청된 모델명과 실제 데이터의 모델명 비교
+    console.log(`모델별 고객리스트 필터링: 요청된 모델명="${req.params.model}"`);
+    
+    // 실제 데이터에서 사용되는 모델명들 수집 (처음 20개)
+    const actualModels = new Set();
+    reservationSiteRows.slice(0, 20).forEach((row, index) => {
+      if (row.length >= 16) {
+        const actualModel = (row[15] || '').toString().trim(); // P열: 모델
+        if (actualModel) {
+          actualModels.add(actualModel);
+        }
+      }
+    });
+    console.log(`실제 데이터의 모델명 샘플 (처음 20개):`, Array.from(actualModels));
+    
     reservationSiteRows.forEach((row, index) => {
       if (row.length < 30) return;
       
@@ -3760,8 +3775,14 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       
       if (!reservationNumber || !customerName || !model || !capacity || !color) return;
       
-      // 모델 필터링
-      if (model !== req.params.model) return;
+      // 모델 필터링 (디버깅 로그 추가)
+      if (model !== req.params.model) {
+        // 처음 10개만 로그 출력
+        if (index < 10) {
+          console.log(`모델 불일치: 데이터="${model}" vs 요청="${req.params.model}"`);
+        }
+        return;
+      }
       
       // 서류접수 정보 찾기 (인덱스 활용으로 빠른 검색)
       // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
