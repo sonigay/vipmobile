@@ -7829,8 +7829,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const reservationDateTime = row[14] || ''; // O열 (15번째, 0부터 시작)
       const model = row[15] || ''; // P열 (16번째, 0부터 시작)
       const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
-      const type = row[17] || ''; // R열 (18번째, 0부터 시작)
-      const reservationMemo = row[34] || ''; // AI열 (35번째, 0부터 시작)
+      const type = row[31] || ''; // AF열 (32번째, 0부터 시작) - 유형
+      const reservationMemo = row[34] || ''; // AI열 (35번째, 0부터 시작) - 사이트메모
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
@@ -7840,6 +7840,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         console.log(`전체고객리스트 사이트메모 디버깅: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
         console.log(`  AI열 원본값: "${row[34]}"`);
         console.log(`  사이트메모: "${reservationMemo}"`);
+        console.log(`  AF열 유형: "${row[31]}"`);
         console.log(`  Z열 접수자: "${receiver}"`);
         console.log(`  행 길이: ${row.length}`);
       }
