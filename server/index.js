@@ -7829,11 +7829,15 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const reservationDateTime = row[14] || ''; // O열 (15번째, 0부터 시작)
       const model = row[15] || ''; // P열 (16번째, 0부터 시작)
       const color = row[16] || ''; // Q열 (17번째, 0부터 시작)
+      const capacity = row[17] || ''; // R열 (18번째, 0부터 시작) - 용량
       const type = row[31] || ''; // AF열 (32번째, 0부터 시작) - 유형
       const reservationMemo = row[34] || ''; // AI열 (35번째, 0부터 시작) - 사이트메모
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
+
+      // 모델&용량&색상 조합
+      const modelCapacityColor = [model, capacity, color].filter(Boolean).join('&');
 
       // 처음 5개 고객의 사이트메모 디버깅 로그
       if (index < 5) {
@@ -7842,6 +7846,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         console.log(`  사이트메모: "${reservationMemo}"`);
         console.log(`  AF열 유형: "${row[31]}"`);
         console.log(`  Z열 접수자: "${receiver}"`);
+        console.log(`  P열 모델: "${model}", Q열 색상: "${color}", R열 용량: "${capacity}"`);
+        console.log(`  모델&용량&색상: "${modelCapacityColor}"`);
         console.log(`  행 길이: ${row.length}`);
       }
 
@@ -7857,8 +7863,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         reservationNumber,
         customerName,
         reservationDateTime,
-        model,
-        color,
+        modelCapacityColor, // 모델&용량&색상으로 변경
         type,
         reservationMemo,
         storeCode,

@@ -78,8 +78,7 @@ function AllCustomerListScreen({ loggedInStore }) {
       return (
         (customer.customerName && customer.customerName.toLowerCase().includes(searchLower)) ||
         (customer.reservationNumber && customer.reservationNumber.toLowerCase().includes(searchLower)) ||
-        (customer.model && customer.model.toLowerCase().includes(searchLower)) ||
-        (customer.color && customer.color.toLowerCase().includes(searchLower)) ||
+        (customer.modelCapacityColor && customer.modelCapacityColor.toLowerCase().includes(searchLower)) ||
         (customer.storeCode && customer.storeCode.toLowerCase().includes(searchLower)) ||
         (customer.posName && customer.posName.toLowerCase().includes(searchLower)) ||
         (customer.reservationMemo && customer.reservationMemo.toLowerCase().includes(searchLower)) ||
@@ -118,8 +117,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         '사이트예약',
         '마당접수일',
         '온세일접수일',
-        '모델',
-        '색상',
+        '모델&용량&색상',
         '유형',
         '대리점',
         'POS명',
@@ -136,8 +134,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         customer.reservationDateTime || '',
         customer.yardReceivedDate || '',
         customer.onSaleReceivedDate || '',
-        customer.model || '',
-        customer.color || '',
+        customer.modelCapacityColor || '',
         customer.type || '',
         customer.storeCode || '',
         customer.posName || '',
@@ -158,8 +155,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         { wch: 15 },  // 사이트예약
         { wch: 15 },  // 마당접수일
         { wch: 15 },  // 온세일접수일
-        { wch: 20 },  // 모델
-        { wch: 15 },  // 색상
+        { wch: 25 },  // 모델&용량&색상
         { wch: 10 },  // 유형
         { wch: 12 },  // 대리점
         { wch: 15 },  // POS명
@@ -302,7 +298,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                     <TableCell width="120px">사이트예약</TableCell>
                     <TableCell width="120px">마당접수일</TableCell>
                     <TableCell width="120px">온세일접수일</TableCell>
-                    <TableCell width="150px">모델&색상</TableCell>
+                    <TableCell width="150px">모델&용량&색상</TableCell>
                     <TableCell width="80px">유형</TableCell>
                     <TableCell width="100px">대리점</TableCell>
                     <TableCell width="100px">POS명</TableCell>
@@ -346,7 +342,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={`${customer.model || '-'} / ${customer.color || '-'}`}
+                          label={customer.modelCapacityColor || '-'}
                           color="primary"
                           size="small"
                           sx={{ fontSize: '0.7rem' }}
