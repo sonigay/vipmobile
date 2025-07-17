@@ -164,13 +164,14 @@ function AgentDetailScreen({ agentName, onBack, loggedInStore }) {
           '순번': index + 1,
           '예약번호': customer.reservationNumber || '',
           '고객명': customer.customerName || '',
-          '예약일시': customer.reservationDateTime || '',
-          '접수일시': customer.receivedDateTime || '',
+          '사이트예약': customer.reservationDateTime || '',
+          '마당접수일': customer.yardReceivedDate || '',
+          '온세일접수일': customer.onSaleReceivedDate || '',
           '모델': customer.model || '',
           '색상': customer.color || '',
           'POS명': customer.posName || '',
-          '예약메모': customer.reservationMemo || '',
-          '접수메모': customer.receivedMemo || ''
+          '사이트메모': customer.reservationMemo || '',
+          '마당메모': customer.yardReceivedMemo || ''
         }));
         
         const customerWorksheet = XLSX.utils.json_to_sheet(customerData);
@@ -515,12 +516,13 @@ function AgentDetailScreen({ agentName, onBack, loggedInStore }) {
                       <TableCell width="80px">순번</TableCell>
                       <TableCell width="120px">예약번호</TableCell>
                       <TableCell width="100px">고객명</TableCell>
-                      <TableCell width="120px">예약일시</TableCell>
-                      <TableCell width="120px">접수일시</TableCell>
+                      <TableCell width="120px">사이트예약</TableCell>
+                      <TableCell width="120px">마당접수일</TableCell>
+                      <TableCell width="120px">온세일접수일</TableCell>
                       <TableCell width="150px">모델&색상</TableCell>
                       <TableCell width="100px">POS명</TableCell>
-                      <TableCell width="200px">예약메모</TableCell>
-                      <TableCell width="200px">접수메모</TableCell>
+                      <TableCell width="200px">사이트메모</TableCell>
+                      <TableCell width="200px">마당메모</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -544,7 +546,12 @@ function AgentDetailScreen({ agentName, onBack, loggedInStore }) {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            {customer.receivedDateTime || '-'}
+                            {customer.yardReceivedDate || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.onSaleReceivedDate || '-'}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -567,7 +574,7 @@ function AgentDetailScreen({ agentName, onBack, loggedInStore }) {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            {customer.receivedMemo || '-'}
+                            {customer.yardReceivedMemo || '-'}
                           </Typography>
                         </TableCell>
                       </TableRow>

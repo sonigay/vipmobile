@@ -3448,10 +3448,11 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
     }
     
     // 2. 병렬로 모든 시트 데이터 가져오기
-    const [reservationSiteValues, phoneklValues, yardValues] = await Promise.all([
+    const [reservationSiteValues, phoneklValues, yardValues, onSaleValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
       getSheetValues('폰클개통데이터'),
-      getSheetValues('마당접수')
+      getSheetValues('마당접수'),
+      getSheetValues('온세일')
     ]);
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {

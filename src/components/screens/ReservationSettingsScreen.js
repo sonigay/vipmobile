@@ -528,7 +528,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                 />
                 <TextField
                   fullWidth
-                  label="Q열 (색상)"
+                  label="Q열 (용량)"
                   value={manualInput.reservationSite.q}
                   onChange={(e) => setManualInput(prev => ({
                     ...prev,
@@ -539,7 +539,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                 />
                 <TextField
                   fullWidth
-                  label="R열 (용량)"
+                  label="R열 (색상)"
                   value={manualInput.reservationSite.r}
                   onChange={(e) => setManualInput(prev => ({
                     ...prev,
@@ -556,7 +556,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                 </Typography>
                 <TextField
                   fullWidth
-                  label="F열 (모델명)"
+                  label="F열 (모델명&용량)"
                   value={manualInput.phonekl.f}
                   onChange={(e) => setManualInput(prev => ({
                     ...prev,
@@ -835,15 +835,15 @@ function ReservationSettingsScreen({ loggedInStore }) {
                   <TableCell></TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>P열</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>Q열</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>R열</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>P열(모델명)</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>Q열(용량)</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>R열(색상)</Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>F열</Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>G열</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>F열(모델명&용량)</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>G열(색상)</Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -871,7 +871,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={reservationSiteData.pColumn || []}
                           value={item.reservationSite.p}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.p', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="P열" size="small" sx={{ width: '120px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="P열(모델명)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
                         />
@@ -880,7 +880,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={reservationSiteData.qColumn || []}
                           value={item.reservationSite.q}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.q', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="Q열" size="small" sx={{ width: '120px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="Q열(용량)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
                         />
@@ -889,7 +889,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={reservationSiteData.rColumn || []}
                           value={item.reservationSite.r}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.r', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="R열" size="small" sx={{ width: '120px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="R열(색상)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
                         />
@@ -902,7 +902,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={phoneklData.fColumn || []}
                           value={item.phonekl.f}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.f', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="F열" size="small" sx={{ width: '120px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="F열(모델명&용량)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
                         />
@@ -911,7 +911,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={phoneklData.gColumn || []}
                           value={item.phonekl.g}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.g', newValue || '')}
-                          renderInput={(params) => <TextField {...params} placeholder="G열" size="small" sx={{ width: '120px' }} />}
+                          renderInput={(params) => <TextField {...params} placeholder="G열(색상)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
                         />

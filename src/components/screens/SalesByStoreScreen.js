@@ -578,14 +578,15 @@ function SalesByStoreScreen({ loggedInStore }) {
       const headers = [
         '고객명',
         '예약번호',
-        '예약일시',
-        '접수일시',
+        '사이트예약',
+        '마당접수일',
+        '온세일접수일',
         '모델&색상',
         '유형',
         '대리점',
         'POS명',
-        '예약메모',
-        '접수메모',
+        '사이트메모',
+        '마당메모',
         '접수자'
       ];
 
@@ -594,13 +595,14 @@ function SalesByStoreScreen({ loggedInStore }) {
         customer.customerName || '',
         customer.reservationNumber || '',
         customer.reservationDateTime || '',
-        customer.receivedDateTime || '',
+        customer.yardReceivedDate || '',
+        customer.onSaleReceivedDate || '',
         customer.model || '',
         customer.type || '',
         customer.storeCode || '',
         customer.posName || '',
         customer.reservationMemo || '',
-        customer.receivedMemo || '',
+        customer.yardReceivedMemo || '',
         customer.receiver || ''
       ]);
 
@@ -612,14 +614,15 @@ function SalesByStoreScreen({ loggedInStore }) {
       const colWidths = [
         { wch: 15 }, // 고객명
         { wch: 12 }, // 예약번호
-        { wch: 15 }, // 예약일시
-        { wch: 15 }, // 접수일시
+        { wch: 15 }, // 사이트예약
+        { wch: 15 }, // 마당접수일
+        { wch: 15 }, // 온세일접수일
         { wch: 25 }, // 모델&색상
         { wch: 10 }, // 유형
         { wch: 12 }, // 대리점
         { wch: 15 }, // POS명
-        { wch: 20 }, // 예약메모
-        { wch: 20 }, // 접수메모
+        { wch: 20 }, // 사이트메모
+        { wch: 20 }, // 마당메모
         { wch: 10 }  // 접수자
       ];
       ws['!cols'] = colWidths;
@@ -1793,14 +1796,15 @@ function SalesByStoreScreen({ loggedInStore }) {
                     <TableRow>
                       <TableCell width="120px">고객명</TableCell>
                       <TableCell width="100px">예약번호</TableCell>
-                      <TableCell width="120px">예약일시</TableCell>
-                      <TableCell width="120px">접수일시</TableCell>
+                      <TableCell width="120px">사이트예약</TableCell>
+                      <TableCell width="120px">마당접수일</TableCell>
+                      <TableCell width="120px">온세일접수일</TableCell>
                       <TableCell width="150px">모델&색상</TableCell>
                       <TableCell width="80px">유형</TableCell>
                       <TableCell width="100px">대리점</TableCell>
                       <TableCell width="100px">POS명</TableCell>
-                      <TableCell width="120px">예약메모</TableCell>
-                      <TableCell width="120px">접수메모</TableCell>
+                      <TableCell width="120px">사이트메모</TableCell>
+                      <TableCell width="120px">마당메모</TableCell>
                       <TableCell width="80px">접수자</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1824,7 +1828,12 @@ function SalesByStoreScreen({ loggedInStore }) {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            {customer.receivedDateTime || '-'}
+                            {customer.yardReceivedDate || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                            {customer.onSaleReceivedDate || '-'}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -1857,7 +1866,7 @@ function SalesByStoreScreen({ loggedInStore }) {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            {customer.receivedMemo || '-'}
+                            {customer.yardReceivedMemo || '-'}
                           </Typography>
                         </TableCell>
                         <TableCell>
