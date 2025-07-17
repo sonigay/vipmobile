@@ -6789,22 +6789,21 @@ app.get('/api/reservation-settings/model-data', async (req, res) => {
       }
     });
     
+    // Map 객체를 일반 객체로 변환하여 JSON 직렬화 가능하게 만들기
+    const modelCapacityColorsObj = {};
+    Array.from(modelCapacityColors.entries()).forEach(([model, capacityMap]) => {
+      modelCapacityColorsObj[model] = {};
+      Array.from(capacityMap.entries()).forEach(([capacity, colorSet]) => {
+        modelCapacityColorsObj[model][capacity] = Array.from(colorSet).sort();
+      });
+    });
+
     const result = {
       success: true,
       models: Array.from(models).sort(),
       capacities: Array.from(capacities).sort(),
       colors: Array.from(colors).sort(),
-      modelCapacityColors: new Map(
-        Array.from(modelCapacityColors.entries()).map(([model, capacityMap]) => [
-          model,
-          new Map(
-            Array.from(capacityMap.entries()).map(([capacity, colorSet]) => [
-              capacity,
-              Array.from(colorSet).sort()
-            ])
-          )
-        ])
-      ),
+      modelCapacityColors: modelCapacityColorsObj,
       stats: {
         totalModels: models.size,
         totalCapacities: capacities.size,

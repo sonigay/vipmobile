@@ -152,7 +152,7 @@ export const extractAvailableModels = async () => {
     
     console.log('사전예약사이트 모델 데이터 로드 완료:', data.stats);
     
-    // Map 객체를 다시 생성 (JSON 직렬화/역직렬화로 인한 손실 복구)
+    // 일반 객체를 Map 객체로 변환
     const modelCapacityColors = new Map();
     
     if (data.modelCapacityColors) {
