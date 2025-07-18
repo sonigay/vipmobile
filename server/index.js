@@ -2204,6 +2204,284 @@ async function checkAndUpdateAddresses() {
   }
 }
 
+// 재고배정 상태 계산 API
+app.get('/api/inventory/assignment-status', async (req, res) => {
+  try {
+    console.log('재고배정 상태 계산 요청');
+    
+    // 캐시 키 생성
+    const cacheKey = 'inventory_assignment_status';
+    
+    // 캐시에서 먼저 확인 (30분 TTL)
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      console.log('캐시된 재고배정 상태 반환');
+      return res.json(cachedData);
+    }
+    
+    // 1. 필요한 시트 데이터 병렬로 가져오기
+    const [reservationSiteValues, phoneklInventoryValues, phoneklStoreValues, phoneklActivationValues, normalizationValues] = await Promise.all([
+      getSheetValues('사전예약사이트'),
+      getSheetValues('폰클재고데이터'),
+      getSheetValues('폰클출고처데이터'),
+      getSheetValues('폰클개통데이터'),
+      getSheetValues('정규화작업')
+    ]);
+    
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!phoneklInventoryValues || phoneklInventoryValues.length < 2) {
+      throw new Error('폰클재고데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!phoneklStoreValues || phoneklStoreValues.length < 2) {
+      throw new Error('폰클출고처데이터를 가져올 수 없습니다.');
+    }
+    
+    // 2. 정규화 규칙 로드
+    const normalizationRules = new Map();
+    if (normalizationValues && normalizationValues.length > 1) {
+      normalizationValues.slice(1).forEach(row => {
+        if (row.length >= 3) {
+          const reservationSite = (row[0] || '').toString().trim();
+          const phoneklModel = (row[1] || '').toString().trim();
+          const phoneklColor = (row[2] || '').toString().trim();
+          
+          if (reservationSite && phoneklModel && phoneklColor) {
+            const key = `${reservationSite}`;
+            normalizationRules.set(key, { phoneklModel, phoneklColor });
+          }
+        }
+      });
+    }
+    
+    console.log(`정규화 규칙 로드 완료: ${normalizationRules.size}개`);
+    
+    // 3. 폰클출고처데이터에서 POS코드 매핑 생성
+    const storePosCodeMapping = new Map();
+    phoneklStoreValues.slice(1).forEach(row => {
+      if (row.length >= 8) {
+        const storeName = (row[6] || '').toString().trim(); // G열: 출고처명
+        const posCode = (row[7] || '').toString().trim(); // H열: POS코드
+        
+        if (storeName && posCode) {
+          storePosCodeMapping.set(storeName, posCode);
+        }
+      }
+    });
+    
+    console.log(`폰클출고처 POS코드 매핑 로드 완료: ${storePosCodeMapping.size}개`);
+    
+    // 4. 폰클재고데이터에서 사용 가능한 재고 정보 생성
+    const availableInventory = new Map(); // key: "모델명_색상_POS코드", value: [일련번호들]
+    const serialNumberToStore = new Map(); // key: 일련번호, value: 출고처명
+    
+    phoneklInventoryValues.slice(1).forEach(row => {
+      if (row.length >= 15) {
+        const serialNumber = (row[3] || '').toString().trim(); // D열: 일련번호
+        const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
+        const color = (row[6] || '').toString().trim(); // G열: 색상
+        const storeName = (row[13] || '').toString().trim(); // N열: 출고처
+        
+        if (serialNumber && modelCapacity && color && storeName) {
+          const posCode = storePosCodeMapping.get(storeName);
+          if (posCode) {
+            const key = `${modelCapacity}_${color}_${posCode}`;
+            
+            if (!availableInventory.has(key)) {
+              availableInventory.set(key, []);
+            }
+            availableInventory.get(key).push(serialNumber);
+            
+            serialNumberToStore.set(serialNumber, storeName);
+          }
+        }
+      }
+    });
+    
+    console.log(`폰클재고데이터 처리 완료: ${availableInventory.size}개 모델/색상/POS 조합`);
+    
+    // 5. 폰클개통데이터에서 개통 완료된 일련번호 수집
+    const activatedSerialNumbers = new Set();
+    if (phoneklActivationValues && phoneklActivationValues.length > 1) {
+      phoneklActivationValues.slice(1).forEach(row => {
+        if (row.length >= 16) {
+          const serialNumber = (row[15] || '').toString().trim(); // P열: 일련번호
+          const storeName = (row[6] || '').toString().trim(); // G열: 출고처
+          
+          if (serialNumber && storeName) {
+            activatedSerialNumbers.add(serialNumber);
+          }
+        }
+      });
+    }
+    
+    console.log(`폰클개통데이터 처리 완료: ${activatedSerialNumbers.size}개 개통완료`);
+    
+    // 6. 사전예약사이트 데이터 처리 및 배정 상태 계산
+    const reservationSiteRows = reservationSiteValues.slice(1);
+    const assignmentResults = [];
+    
+    // 이미 배정된 일련번호 추적
+    const assignedSerialNumbers = new Set();
+    
+    reservationSiteRows.forEach((row, index) => {
+      if (row.length < 35) return;
+      
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      const reservationDateTime = (row[14] || '').toString().trim(); // O열: 예약일시
+      const model = (row[15] || '').toString().trim(); // P열: 모델
+      const capacity = (row[16] || '').toString().trim(); // Q열: 용량
+      const color = (row[17] || '').toString().trim(); // R열: 색상
+      const posCode = (row[21] || '').toString().trim(); // V열: POS코드
+      const yardReceivedDate = (row[11] || '').toString().trim(); // L열: 마당접수일 (임시)
+      const onSaleReceivedDate = (row[12] || '').toString().trim(); // M열: 온세일접수일 (임시)
+      const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+      
+      if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) return;
+      
+      // 정규화된 모델명 생성
+      const reservationSiteModel = `${model} ${capacity} ${color}`.trim();
+      const normalizedRule = normalizationRules.get(reservationSiteModel);
+      
+      if (!normalizedRule) {
+        console.log(`정규화 규칙 없음: ${reservationSiteModel}`);
+        return;
+      }
+      
+      const phoneklModel = normalizedRule.phoneklModel;
+      const phoneklColor = normalizedRule.phoneklColor;
+      
+      // 재고 키 생성
+      const inventoryKey = `${phoneklModel}_${phoneklColor}_${posCode}`;
+      
+      // 배정 상태 계산
+      let assignmentStatus = '미배정';
+      let activationStatus = '미개통';
+      let assignedSerial = '';
+      let waitingOrder = 0;
+      
+      // 이미 배정된 일련번호가 있는 경우
+      if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
+        assignedSerial = assignedSerialNumber;
+        assignmentStatus = '배정완료';
+        
+        // 개통 상태 확인
+        if (activatedSerialNumbers.has(assignedSerialNumber)) {
+          activationStatus = '개통완료';
+        }
+      } else {
+        // 새로운 배정이 필요한 경우
+        const availableSerials = availableInventory.get(inventoryKey) || [];
+        const unassignedSerials = availableSerials.filter(serial => !assignedSerialNumbers.has(serial));
+        
+        if (unassignedSerials.length > 0) {
+          // 배정 가능한 재고가 있음
+          assignedSerial = unassignedSerials[0];
+          assignmentStatus = '배정완료';
+          assignedSerialNumbers.add(assignedSerial);
+          
+          // 개통 상태 확인
+          if (activatedSerialNumbers.has(assignedSerial)) {
+            activationStatus = '개통완료';
+          }
+        } else {
+          // 배정 대기 중 - 순번 계산
+          const allCustomersForModel = reservationSiteRows.filter(r => {
+            if (r.length < 35) return false;
+            const rModel = (r[15] || '').toString().trim();
+            const rCapacity = (r[16] || '').toString().trim();
+            const rColor = (r[17] || '').toString().trim();
+            const rPosCode = (r[21] || '').toString().trim();
+            return `${rModel} ${rCapacity} ${rColor}`.trim() === reservationSiteModel && rPosCode === posCode;
+          });
+          
+          // 우선순위별로 정렬 (온세일접수일 → 마당접수일 → 일반)
+          allCustomersForModel.sort((a, b) => {
+            const aOnSale = (a[12] || '').toString().trim();
+            const bOnSale = (b[12] || '').toString().trim();
+            const aYard = (a[11] || '').toString().trim();
+            const bYard = (b[11] || '').toString().trim();
+            const aDateTime = (a[14] || '').toString().trim();
+            const bDateTime = (b[14] || '').toString().trim();
+            
+            // 온세일접수일 우선
+            if (aOnSale && !bOnSale) return -1;
+            if (!aOnSale && bOnSale) return 1;
+            if (aOnSale && bOnSale) {
+              return new Date(aOnSale) - new Date(bOnSale);
+            }
+            
+            // 마당접수일 차선
+            if (aYard && !bYard) return -1;
+            if (!aYard && bYard) return 1;
+            if (aYard && bYard) {
+              return new Date(aYard) - new Date(bYard);
+            }
+            
+            // 사전예약일시
+            return new Date(aDateTime) - new Date(bDateTime);
+          });
+          
+          // 현재 고객의 순번 찾기
+          const currentIndex = allCustomersForModel.findIndex(r => 
+            (r[8] || '').toString().trim() === reservationNumber
+          );
+          
+          if (currentIndex !== -1) {
+            waitingOrder = currentIndex + 1;
+            assignmentStatus = `미배정(${waitingOrder}번째)`;
+          }
+        }
+      }
+      
+      assignmentResults.push({
+        reservationNumber,
+        customerName,
+        reservationDateTime,
+        model: reservationSiteModel,
+        posCode,
+        yardReceivedDate,
+        onSaleReceivedDate,
+        assignmentStatus,
+        activationStatus,
+        assignedSerialNumber: assignedSerial,
+        waitingOrder
+      });
+    });
+    
+    console.log(`재고배정 상태 계산 완료: ${assignmentResults.length}개 고객`);
+    
+    const result = {
+      success: true,
+      data: assignmentResults,
+      total: assignmentResults.length,
+      stats: {
+        assigned: assignmentResults.filter(r => r.assignmentStatus === '배정완료').length,
+        unassigned: assignmentResults.filter(r => r.assignmentStatus.startsWith('미배정')).length,
+        activated: assignmentResults.filter(r => r.activationStatus === '개통완료').length,
+        notActivated: assignmentResults.filter(r => r.activationStatus === '미개통').length
+      }
+    };
+    
+    // 결과 캐싱 (30분 TTL)
+    cacheUtils.set(cacheKey, result, 30 * 60);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('재고배정 상태 계산 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to calculate inventory assignment status',
+      message: error.message
+    });
+  }
+});
+
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
@@ -8705,7 +8983,10 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         yardReceivedMemo: yardInfo.receivedMemo || '',
         onSaleReceivedDate,
         receiver: receiver, // 사전예약사이트 Z열에서 가져온 접수자
-        rowIndex: index + 2
+        rowIndex: index + 2,
+        // 재고배정 상태는 별도 API에서 가져올 예정
+        assignmentStatus: '로딩중...',
+        activationStatus: '로딩중...'
       };
     });
 
