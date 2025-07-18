@@ -20,14 +20,20 @@ import {
   InputAdornment,
   IconButton,
   Tooltip,
-  Badge
+  Badge,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Divider
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
   Clear as ClearIcon,
-  Cached as CachedIcon
+  Cached as CachedIcon,
+  FilterList as FilterIcon
 } from '@mui/icons-material';
 import { 
   getCachedAllCustomerList, 
@@ -46,6 +52,8 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [cacheStats, setCacheStats] = useState(null);
   const [assignmentStatus, setAssignmentStatus] = useState({});
   const [loadingAssignment, setLoadingAssignment] = useState(false);
+  const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'assigned', 'unassigned'
+  const [activationFilter, setActivationFilter] = useState('all'); // 'all', 'activated', 'notActivated'
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -69,25 +77,64 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
   }, []);
 
+  // 필터링 및 검색 적용
+  const applyFilters = useCallback(() => {
+    let filtered = customerList;
+
+    // 검색 필터 적용
+    if (searchQuery.trim()) {
+      filtered = getCachedSearchResults(searchQuery, filtered);
+    }
+
+    // 재고배정 상태 필터 적용
+    if (assignmentFilter !== 'all') {
+      filtered = filtered.filter(customer => {
+        const status = assignmentStatus[customer.reservationNumber];
+        if (!status) return false;
+        
+        if (assignmentFilter === 'assigned') {
+          return status.assignmentStatus === '배정완료';
+        } else if (assignmentFilter === 'unassigned') {
+          return status.assignmentStatus.startsWith('미배정');
+        }
+        return true;
+      });
+    }
+
+    // 개통완료 상태 필터 적용
+    if (activationFilter !== 'all') {
+      filtered = filtered.filter(customer => {
+        const status = assignmentStatus[customer.reservationNumber];
+        if (!status) return false;
+        
+        if (activationFilter === 'activated') {
+          return status.activationStatus === '개통완료';
+        } else if (activationFilter === 'notActivated') {
+          return status.activationStatus === '미개통';
+        }
+        return true;
+      });
+    }
+
+    setFilteredCustomerList(filtered);
+  }, [customerList, searchQuery, assignmentFilter, activationFilter, assignmentStatus]);
+
   // 검색 기능 (캐시 적용)
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
-    
-    if (!query.trim()) {
-      setFilteredCustomerList(customerList);
-      return;
-    }
-
-    // 캐시된 검색 결과 사용
-    const filtered = getCachedSearchResults(query, customerList);
-    setFilteredCustomerList(filtered);
-  }, [customerList]);
+  }, []);
 
   // 검색 초기화
   const clearSearch = useCallback(() => {
     setSearchQuery('');
-    setFilteredCustomerList(customerList);
-  }, [customerList]);
+  }, []);
+
+  // 모든 필터 초기화
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery('');
+    setAssignmentFilter('all');
+    setActivationFilter('all');
+  }, []);
 
   // 캐시 새로고침
   const refreshCache = useCallback(async () => {
@@ -234,6 +281,11 @@ function AllCustomerListScreen({ loggedInStore }) {
     loadAssignmentStatus();
   }, [loadAllCustomerList, loadAssignmentStatus]);
 
+  // 필터 변경 시 적용
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
   // 캐시 통계 주기적 업데이트
   useEffect(() => {
     updateCacheStats();
@@ -378,8 +430,58 @@ function AllCustomerListScreen({ loggedInStore }) {
             </Button>
           </Box>
 
+          {/* 필터 UI */}
+          <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FilterIcon sx={{ color: 'text.secondary' }} />
+              <Typography variant="body2" color="text.secondary">
+                필터:
+              </Typography>
+            </Box>
+            
+            {/* 재고배정 상태 필터 */}
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>재고배정</InputLabel>
+              <Select
+                value={assignmentFilter}
+                label="재고배정"
+                onChange={(e) => setAssignmentFilter(e.target.value)}
+              >
+                <MenuItem value="all">전체</MenuItem>
+                <MenuItem value="assigned">배정완료</MenuItem>
+                <MenuItem value="unassigned">미배정</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 개통완료 상태 필터 */}
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>개통완료</InputLabel>
+              <Select
+                value={activationFilter}
+                label="개통완료"
+                onChange={(e) => setActivationFilter(e.target.value)}
+              >
+                <MenuItem value="all">전체</MenuItem>
+                <MenuItem value="activated">개통완료</MenuItem>
+                <MenuItem value="notActivated">미개통</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* 필터 초기화 버튼 */}
+            {(assignmentFilter !== 'all' || activationFilter !== 'all' || searchQuery) && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={clearAllFilters}
+                startIcon={<ClearIcon />}
+              >
+                필터 초기화
+              </Button>
+            )}
+          </Box>
+
           {/* 검색 결과 정보 */}
-          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Typography variant="body2" color="text.secondary">
               총 {customerList.length}명의 고객 중 {filteredCustomerList.length}명 표시
             </Typography>
@@ -389,6 +491,22 @@ function AllCustomerListScreen({ loggedInStore }) {
                 size="small"
                 onDelete={clearSearch}
                 color="primary"
+              />
+            )}
+            {assignmentFilter !== 'all' && (
+              <Chip
+                label={`재고배정: ${assignmentFilter === 'assigned' ? '배정완료' : '미배정'}`}
+                size="small"
+                color="success"
+                variant="outlined"
+              />
+            )}
+            {activationFilter !== 'all' && (
+              <Chip
+                label={`개통완료: ${activationFilter === 'activated' ? '개통완료' : '미개통'}`}
+                size="small"
+                color="info"
+                variant="outlined"
               />
             )}
           </Box>
