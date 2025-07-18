@@ -44,6 +44,8 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [cacheStats, setCacheStats] = useState(null);
+  const [assignmentStatus, setAssignmentStatus] = useState({});
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -91,7 +93,36 @@ function AllCustomerListScreen({ loggedInStore }) {
   const refreshCache = useCallback(async () => {
     clearAllCustomerCache();
     await loadAllCustomerList();
-  }, [loadAllCustomerList]);
+    await loadAssignmentStatus();
+  }, [loadAllCustomerList, loadAssignmentStatus]);
+
+  // 재고배정 상태 로드
+  const loadAssignmentStatus = useCallback(async () => {
+    setLoadingAssignment(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 예약번호를 키로 하는 맵 생성
+          const statusMap = {};
+          result.data.forEach(item => {
+            statusMap[item.reservationNumber] = {
+              assignmentStatus: item.assignmentStatus,
+              activationStatus: item.activationStatus,
+              assignedSerialNumber: item.assignedSerialNumber,
+              waitingOrder: item.waitingOrder
+            };
+          });
+          setAssignmentStatus(statusMap);
+        }
+      }
+    } catch (error) {
+      console.error('재고배정 상태 로드 오류:', error);
+    } finally {
+      setLoadingAssignment(false);
+    }
+  }, []);
 
   // 캐시 통계 업데이트
   const updateCacheStats = useCallback(() => {
@@ -125,27 +156,34 @@ function AllCustomerListScreen({ loggedInStore }) {
         '유형',
         '대리점',
         'POS명',
+        '재고배정',
+        '개통완료',
         '사이트메모',
         '마당메모',
         '접수자'
       ];
 
       // 데이터 준비
-      const excelData = filteredCustomerList.map((customer, index) => [
-        index + 1,
-        customer.customerName || '',
-        customer.reservationNumber || '',
-        customer.reservationDateTime || '',
-        customer.yardReceivedDate || '',
-        customer.onSaleReceivedDate || '',
-        customer.modelCapacityColor || '',
-        customer.type || '',
-        customer.storeCode || '',
-        customer.posName || '',
-        customer.reservationMemo || '',
-        customer.yardReceivedMemo || '',
-        customer.receiver || ''
-      ]);
+      const excelData = filteredCustomerList.map((customer, index) => {
+        const status = assignmentStatus[customer.reservationNumber];
+        return [
+          index + 1,
+          customer.customerName || '',
+          customer.reservationNumber || '',
+          customer.reservationDateTime || '',
+          customer.yardReceivedDate || '',
+          customer.onSaleReceivedDate || '',
+          customer.modelCapacityColor || '',
+          customer.type || '',
+          customer.storeCode || '',
+          customer.posName || '',
+          status?.assignmentStatus || '로딩중...',
+          status?.activationStatus || '로딩중...',
+          customer.reservationMemo || '',
+          customer.yardReceivedMemo || '',
+          customer.receiver || ''
+        ];
+      });
 
       // 워크북 생성
       const wb = XLSX.utils.book_new();
@@ -163,6 +201,8 @@ function AllCustomerListScreen({ loggedInStore }) {
         { wch: 10 },  // 유형
         { wch: 12 },  // 대리점
         { wch: 15 },  // POS명
+        { wch: 12 },  // 재고배정
+        { wch: 12 },  // 개통완료
         { wch: 20 },  // 사이트메모
         { wch: 20 },  // 마당메모
         { wch: 10 }   // 접수자
@@ -191,7 +231,8 @@ function AllCustomerListScreen({ loggedInStore }) {
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadAllCustomerList();
-  }, [loadAllCustomerList]);
+    loadAssignmentStatus();
+  }, [loadAllCustomerList, loadAssignmentStatus]);
 
   // 캐시 통계 주기적 업데이트
   useEffect(() => {
@@ -204,14 +245,26 @@ function AllCustomerListScreen({ loggedInStore }) {
   const statsInfo = useMemo(() => {
     if (!cacheStats) return null;
     
+    // 재고배정 상태 통계 계산
+    const assignmentStats = Object.values(assignmentStatus).reduce((acc, status) => {
+      if (status.assignmentStatus === '배정완료') acc.assigned++;
+      else if (status.assignmentStatus.startsWith('미배정')) acc.unassigned++;
+      
+      if (status.activationStatus === '개통완료') acc.activated++;
+      else if (status.activationStatus === '미개통') acc.notActivated++;
+      
+      return acc;
+    }, { assigned: 0, unassigned: 0, activated: 0, notActivated: 0 });
+    
     return {
       totalCustomers: customerList.length,
       filteredCustomers: filteredCustomerList.length,
       cacheSize: cacheStats.size,
       maxCacheSize: cacheStats.maxSize,
-      cacheHitRate: cacheStats.size > 0 ? '활성' : '비활성'
+      cacheHitRate: cacheStats.size > 0 ? '활성' : '비활성',
+      assignmentStats
     };
-  }, [cacheStats, customerList.length, filteredCustomerList.length]);
+  }, [cacheStats, customerList.length, filteredCustomerList.length, assignmentStatus]);
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -257,6 +310,18 @@ function AllCustomerListScreen({ loggedInStore }) {
               variant="outlined" 
               size="small" 
               color={statsInfo.filteredCustomers !== statsInfo.totalCustomers ? 'primary' : 'default'}
+            />
+            <Chip 
+              label={`재고배정: ${statsInfo.assignmentStats.assigned}완료/${statsInfo.assignmentStats.unassigned}미배정`} 
+              variant="outlined" 
+              size="small" 
+              color="success"
+            />
+            <Chip 
+              label={`개통완료: ${statsInfo.assignmentStats.activated}완료/${statsInfo.assignmentStats.notActivated}미개통`} 
+              variant="outlined" 
+              size="small" 
+              color="info"
             />
           </Box>
         )}
@@ -363,6 +428,8 @@ function AllCustomerListScreen({ loggedInStore }) {
                     <TableCell width="80px">유형</TableCell>
                     <TableCell width="100px">대리점</TableCell>
                     <TableCell width="100px">POS명</TableCell>
+                    <TableCell width="100px" align="center">재고배정</TableCell>
+                    <TableCell width="100px" align="center">개통완료</TableCell>
                     <TableCell width="200px">사이트메모</TableCell>
                     <TableCell width="200px">마당메모</TableCell>
                     <TableCell width="80px">접수자</TableCell>
@@ -423,6 +490,59 @@ function AllCustomerListScreen({ loggedInStore }) {
                         <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
                           {customer.posName || '-'}
                         </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        {loadingAssignment ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          (() => {
+                            const status = assignmentStatus[customer.reservationNumber];
+                            if (!status) return '-';
+                            
+                            const isAssigned = status.assignmentStatus === '배정완료';
+                            const isWaiting = status.assignmentStatus.startsWith('미배정');
+                            
+                            return (
+                              <Chip
+                                label={status.assignmentStatus}
+                                size="small"
+                                color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
+                                sx={{
+                                  fontSize: '0.7rem',
+                                  backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
+                                  color: isAssigned || isWaiting ? 'white' : 'black',
+                                  fontWeight: 'bold'
+                                }}
+                              />
+                            );
+                          })()
+                        )}
+                      </TableCell>
+                      <TableCell align="center">
+                        {loadingAssignment ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          (() => {
+                            const status = assignmentStatus[customer.reservationNumber];
+                            if (!status) return '-';
+                            
+                            const isActivated = status.activationStatus === '개통완료';
+                            
+                            return (
+                              <Chip
+                                label={status.activationStatus}
+                                size="small"
+                                color={isActivated ? 'success' : 'default'}
+                                sx={{
+                                  fontSize: '0.7rem',
+                                  backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
+                                  color: isActivated ? 'white' : 'black',
+                                  fontWeight: 'bold'
+                                }}
+                              />
+                            );
+                          })()
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
