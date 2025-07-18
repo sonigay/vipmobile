@@ -8913,6 +8913,57 @@ app.get('/api/inventory-analysis', async (req, res) => {
   }
 });
 
+// 정규화 상태 확인 API
+app.get('/api/reservation-settings/normalization-status', async (req, res) => {
+  try {
+    console.log('정규화 상태 확인 요청');
+    
+    // 정규화 규칙들을 불러오기
+    let normalizationRules = [];
+    try {
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정규화작업!A:G'
+      });
+      
+      if (rulesResponse.data.values && rulesResponse.data.values.length > 1) {
+        normalizationRules = rulesResponse.data.values.slice(1)
+          .filter(row => row.length >= 6 && row[5] === '완료')
+          .map(row => ({
+            reservationSite: row[1] || '',
+            phonekl: row[2] || '',
+            normalizedModel: row[3] || '',
+            note: row[6] || ''
+          }));
+      }
+    } catch (error) {
+      console.log('정규화 규칙 로드 실패:', error.message);
+    }
+
+    // 정규화 상태 판단
+    const isNormalized = normalizationRules.length > 0;
+    const totalRules = normalizationRules.length;
+    const completedRules = normalizationRules.filter(rule => rule.normalizedModel).length;
+
+    console.log(`정규화 상태 확인 완료: ${isNormalized ? '완료' : '미완료'} (총 ${totalRules}개 규칙, 완료 ${completedRules}개)`);
+
+    res.json({
+      success: true,
+      isNormalized,
+      totalRules,
+      completedRules,
+      rules: normalizationRules
+    });
+  } catch (error) {
+    console.error('정규화 상태 확인 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check normalization status',
+      message: error.message
+    });
+  }
+});
+
 // 정규화 규칙 적용 테스트 API
 app.post('/api/reservation-settings/test-normalization', async (req, res) => {
   try {
