@@ -3749,8 +3749,8 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     const { model } = req.params;
     console.log(`모델별 고객 리스트 요청: ${model}`);
     
-    // 캐시 키 생성
-    const cacheKey = `model_customer_list_${model}`;
+    // 캐시 키 생성 (POS 매핑 포함)
+    const cacheKey = `model_customer_list_with_pos_mapping_${model}`;
     
     // 캐시에서 먼저 확인 (5분 TTL)
     const cachedData = cacheUtils.get(cacheKey);
@@ -3826,6 +3826,25 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         }
       });
       console.log(`모델별 고객리스트: POS코드 매핑 ${posCodeMapping.size}개, POS명 매핑 ${posNameMapping.size}개, 접수자별 매핑 ${posNameMappingWithReceiver.size}개 로드`);
+      
+      // 매핑 테이블 내용 디버깅 (처음 5개만)
+      console.log('모델별 POS명 매핑 테이블 내용:');
+      let count = 0;
+      for (const [original, mapped] of posNameMapping.entries()) {
+        if (count < 5) {
+          console.log(`  "${original}" -> "${mapped}"`);
+          count++;
+        }
+      }
+      
+      console.log('모델별 접수자별 POS명 매핑 테이블 내용:');
+      count = 0;
+      for (const [key, mapped] of posNameMappingWithReceiver.entries()) {
+        if (count < 5) {
+          console.log(`  "${key}" -> "${mapped}"`);
+          count++;
+        }
+      }
     }
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
