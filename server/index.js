@@ -7401,7 +7401,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     try {
       posCodeMappingResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: 'POS코드변경설정!A:D'
+        range: 'POS코드변경설정!A:H'
       });
       console.log('POS코드변경설정 시트 로드 성공');
     } catch (error) {
@@ -7432,33 +7432,59 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     const posCodeMapping = new Map();
     const posCodeMappingWithReceiver = new Map(); // 접수자별 매핑
     
+    // POS명 매핑 테이블 생성 (접수자별 매핑 지원)
+    const posNameMapping = new Map();
+    const posNameMappingWithReceiver = new Map(); // 접수자별 매핑
+    
     if (posCodeMappingData && posCodeMappingData.length > 0) {
       posCodeMappingData.forEach((row, index) => {
+        // POS코드 매핑 처리
         const originalCode = row[0] || ''; // A열: 원본 POS코드
-        const receiver = row[1] || '';     // B열: 접수자명 (선택사항)
+        const receiverCode = row[1] || ''; // B열: 접수자명 (POS코드용)
         const mappedCode = row[2] || '';   // C열: 변경될 POS코드
-        const description = row[3] || '';  // D열: 설명
+        const descriptionCode = row[3] || ''; // D열: 설명 (POS코드용)
         
         if (originalCode && mappedCode) {
-          if (receiver) {
+          if (receiverCode) {
             // 접수자별 매핑
-            const key = `${originalCode}_${receiver}`;
+            const key = `${originalCode}_${receiverCode}`;
             posCodeMappingWithReceiver.set(key, mappedCode);
-            console.log(`접수자별 매핑 ${index + 2}: ${key} -> ${mappedCode} (${description})`);
+            console.log(`POS코드 접수자별 매핑 ${index + 2}: ${key} -> ${mappedCode} (${descriptionCode})`);
           } else {
             // 일반 매핑
             posCodeMapping.set(originalCode, mappedCode);
-            console.log(`일반 매핑 ${index + 2}: ${originalCode} -> ${mappedCode} (${description})`);
+            console.log(`POS코드 일반 매핑 ${index + 2}: ${originalCode} -> ${mappedCode} (${descriptionCode})`);
+          }
+        }
+        
+        // POS명 매핑 처리
+        const originalName = row[4] || ''; // E열: 원본 POS명
+        const receiverName = row[5] || ''; // F열: 접수자명 (POS명용)
+        const mappedName = row[6] || '';   // G열: 변경될 POS명
+        const descriptionName = row[7] || ''; // H열: 설명 (POS명용)
+        
+        if (originalName && mappedName) {
+          if (receiverName) {
+            // 접수자별 매핑
+            const key = `${originalName}_${receiverName}`;
+            posNameMappingWithReceiver.set(key, mappedName);
+            console.log(`POS명 접수자별 매핑 ${index + 2}: ${key} -> ${mappedName} (${descriptionName})`);
+          } else {
+            // 일반 매핑
+            posNameMapping.set(originalName, mappedName);
+            console.log(`POS명 일반 매핑 ${index + 2}: ${originalName} -> ${mappedName} (${descriptionName})`);
           }
         }
       });
 
-      console.log('POS코드 매핑 테이블 생성 완료:', {
-        일반매핑: posCodeMapping.size,
-        접수자별매핑: posCodeMappingWithReceiver.size
+      console.log('매핑 테이블 생성 완료:', {
+        POS코드_일반매핑: posCodeMapping.size,
+        POS코드_접수자별매핑: posCodeMappingWithReceiver.size,
+        POS명_일반매핑: posNameMapping.size,
+        POS명_접수자별매핑: posNameMappingWithReceiver.size
       });
     } else {
-      console.log('POS코드 매핑 테이블: 매핑 데이터 없음 (원본 POS코드 그대로 사용)');
+      console.log('매핑 테이블: 매핑 데이터 없음 (원본 값 그대로 사용)');
     }
 
     // 담당자 이름 정규화 함수 (괄호 안 부서 정보 제거)
@@ -7583,10 +7609,22 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       
       if (posCodeMappingWithReceiver.has(receiverKey)) {
         mappedStoreCode = posCodeMappingWithReceiver.get(receiverKey);
-        console.log(`접수자별 매핑 적용: ${storeCodeForLookup}(${receiver}) -> ${mappedStoreCode}`);
+        console.log(`POS코드 접수자별 매핑 적용: ${storeCodeForLookup}(${receiver}) -> ${mappedStoreCode}`);
       } else if (posCodeMapping.has(storeCodeForLookup)) {
         mappedStoreCode = posCodeMapping.get(storeCodeForLookup);
-        console.log(`일반 매핑 적용: ${storeCodeForLookup} -> ${mappedStoreCode}`);
+        console.log(`POS코드 일반 매핑 적용: ${storeCodeForLookup} -> ${mappedStoreCode}`);
+      }
+      
+      // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
+      let mappedPosName = posName;
+      const posNameReceiverKey = `${posName}_${receiver}`;
+      
+      if (posNameMappingWithReceiver.has(posNameReceiverKey)) {
+        mappedPosName = posNameMappingWithReceiver.get(posNameReceiverKey);
+        console.log(`POS명 접수자별 매핑 적용: ${posName}(${receiver}) -> ${mappedPosName}`);
+      } else if (posNameMapping.has(posName)) {
+        mappedPosName = posNameMapping.get(posName);
+        console.log(`POS명 일반 매핑 적용: ${posName} -> ${mappedPosName}`);
       }
       
       // 담당자 매칭 (매핑된 POS코드 사용)
@@ -7607,8 +7645,8 @@ app.get('/api/sales-by-store/data', async (req, res) => {
 
       return {
         rowIndex: index + 2,
-        posName,
-        storeName: posName, // 클라이언트 호환성
+        posName: mappedPosName, // 매핑된 POS명 사용
+        storeName: mappedPosName, // 클라이언트 호환성
         storeCode,
         reservationNumber,
         storeCodeForLookup,
@@ -8373,7 +8411,7 @@ app.get('/api/pos-code-mappings', async (req, res) => {
     // POS코드변경설정 시트에서 데이터 로드
     const posCodeMappingResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'POS코드변경설정!A:D'
+      range: 'POS코드변경설정!A:H'
     });
 
     if (!posCodeMappingResponse.data.values) {
@@ -8389,10 +8427,14 @@ app.get('/api/pos-code-mappings', async (req, res) => {
     const mappings = posCodeMappingData.map((row, index) => ({
       id: index + 1,
       originalCode: row[0] || '', // A열: 원본 POS코드
-      receiver: row[1] || '',     // B열: 접수자명 (선택사항)
+      receiverCode: row[1] || '', // B열: 접수자명 (POS코드용)
       mappedCode: row[2] || '',   // C열: 변경될 POS코드
-      description: row[3] || ''   // D열: 설명
-    })).filter(mapping => mapping.originalCode && mapping.mappedCode); // 빈 데이터 제거
+      descriptionCode: row[3] || '', // D열: 설명 (POS코드용)
+      originalName: row[4] || '', // E열: 원본 POS명
+      receiverName: row[5] || '', // F열: 접수자명 (POS명용)
+      mappedName: row[6] || '',   // G열: 변경될 POS명
+      descriptionName: row[7] || '' // H열: 설명 (POS명용)
+    })).filter(mapping => (mapping.originalCode && mapping.mappedCode) || (mapping.originalName && mapping.mappedName)); // 빈 데이터 제거
 
     console.log(`POS코드변경설정 로드 완료: ${mappings.length}개 매핑`);
 
@@ -8423,25 +8465,27 @@ app.post('/api/pos-code-mappings', async (req, res) => {
 
     // 시트에 저장할 데이터 준비 (헤더 포함)
     const sheetData = [
-      ['원본 POS코드', '접수자명', '변경될 POS코드', '설명'] // 헤더
+      ['원본 POS코드', '접수자명', '변경될 POS코드', '설명', '원본 POS명', '접수자명', '변경될 POS명', '설명'] // 헤더
     ];
 
     // 매핑 데이터 추가
     mappings.forEach(mapping => {
-      if (mapping.originalCode && mapping.mappedCode) {
-        sheetData.push([
-          mapping.originalCode,
-          mapping.receiver || '',
-          mapping.mappedCode,
-          mapping.description || ''
-        ]);
-      }
+      sheetData.push([
+        mapping.originalCode || '',
+        mapping.receiverCode || '',
+        mapping.mappedCode || '',
+        mapping.descriptionCode || '',
+        mapping.originalName || '',
+        mapping.receiverName || '',
+        mapping.mappedName || '',
+        mapping.descriptionName || ''
+      ]);
     });
 
     // Google Sheets에 저장
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'POS코드변경설정!A:D',
+      range: 'POS코드변경설정!A:H',
       valueInputOption: 'RAW',
       resource: {
         values: sheetData

@@ -203,9 +203,13 @@ function ReservationSettingsScreen({ loggedInStore }) {
     setPosCodeMappings(prev => [...prev, {
       id: Date.now(),
       originalCode: '',
-      receiver: '',
+      receiverCode: '',
       mappedCode: '',
-      description: ''
+      descriptionCode: '',
+      originalName: '',
+      receiverName: '',
+      mappedName: '',
+      descriptionName: ''
     }]);
   };
 
@@ -940,10 +944,14 @@ function ReservationSettingsScreen({ loggedInStore }) {
                     <TableHead>
                       <TableRow>
                         <TableCell width="60px" align="center">순번</TableCell>
-                        <TableCell width="150px">원본 POS코드</TableCell>
-                        <TableCell width="120px">접수자명 (선택)</TableCell>
-                        <TableCell width="150px">변경될 POS코드</TableCell>
-                        <TableCell width="200px">설명</TableCell>
+                        <TableCell width="120px">원본 POS코드</TableCell>
+                        <TableCell width="100px">접수자명</TableCell>
+                        <TableCell width="120px">변경될 POS코드</TableCell>
+                        <TableCell width="150px">설명</TableCell>
+                        <TableCell width="120px">원본 POS명</TableCell>
+                        <TableCell width="100px">접수자명</TableCell>
+                        <TableCell width="120px">변경될 POS명</TableCell>
+                        <TableCell width="150px">설명</TableCell>
                         <TableCell width="80px" align="center">작업</TableCell>
                       </TableRow>
                     </TableHead>
@@ -958,6 +966,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                               sx={{ fontSize: '0.7rem', fontWeight: 'bold' }}
                             />
                           </TableCell>
+                          {/* POS코드 변환 */}
                           <TableCell>
                             <TextField
                               fullWidth
@@ -971,8 +980,8 @@ function ReservationSettingsScreen({ loggedInStore }) {
                             <TextField
                               fullWidth
                               size="small"
-                              value={mapping.receiver}
-                              onChange={(e) => updatePosCodeMapping(mapping.id, 'receiver', e.target.value)}
+                              value={mapping.receiverCode}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'receiverCode', e.target.value)}
                               placeholder="예: 홍길동"
                             />
                           </TableCell>
@@ -989,9 +998,46 @@ function ReservationSettingsScreen({ loggedInStore }) {
                             <TextField
                               fullWidth
                               size="small"
-                              value={mapping.description}
-                              onChange={(e) => updatePosCodeMapping(mapping.id, 'description', e.target.value)}
+                              value={mapping.descriptionCode}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'descriptionCode', e.target.value)}
                               placeholder="예: 경수대리점 POS코드 매핑"
+                            />
+                          </TableCell>
+                          {/* POS명 변환 */}
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.originalName}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'originalName', e.target.value)}
+                              placeholder="예: LG사업자폰"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.receiverName}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'receiverName', e.target.value)}
+                              placeholder="예: 홍길동"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.mappedName}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'mappedName', e.target.value)}
+                              placeholder="예: LG사업자폰(경수)"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.descriptionName}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'descriptionName', e.target.value)}
+                              placeholder="예: 경수대리점 POS명 매핑"
                             />
                           </TableCell>
                           <TableCell align="center">
@@ -1033,9 +1079,11 @@ function ReservationSettingsScreen({ loggedInStore }) {
               <Alert severity="info" sx={{ mt: 2 }}>
                 <Typography variant="body2">
                   <strong>사용법:</strong><br/>
-                  1. <strong>일반 매핑:</strong> 접수자명을 비워두면 모든 접수자에 적용됩니다.<br/>
-                  2. <strong>접수자별 매핑:</strong> 접수자명을 입력하면 해당 접수자에게만 적용됩니다.<br/>
-                  3. <strong>우선순위:</strong> 접수자별 매핑이 일반 매핑보다 우선 적용됩니다.
+                  1. <strong>POS코드 변환:</strong> 사전예약사이트의 POS코드를 폰클출고처데이터의 매장코드로 변환합니다.<br/>
+                  2. <strong>POS명 변환:</strong> 사전예약사이트의 POS명을 폰클출고처데이터의 매장명으로 변환합니다.<br/>
+                  3. <strong>일반 매핑:</strong> 접수자명을 비워두면 모든 접수자에 적용됩니다.<br/>
+                  4. <strong>접수자별 매핑:</strong> 접수자명을 입력하면 해당 접수자에게만 적용됩니다.<br/>
+                  5. <strong>우선순위:</strong> 접수자별 매핑이 일반 매핑보다 우선 적용됩니다.
                 </Typography>
               </Alert>
             </Box>
