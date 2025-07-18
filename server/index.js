@@ -2257,13 +2257,8 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       });
     }
     
-    // 정규화 규칙 디버깅
-    console.log('🔍 정규화 규칙 디버깅:');
-    console.log(`  - 총 규칙 수: ${normalizationRules.size}개`);
-    console.log('  - 정규화 규칙 목록:');
-    normalizationRules.forEach((value, key) => {
-      console.log(`    "${key}" -> "${value.phoneklModel} ${value.phoneklColor}"`);
-    });
+      // 정규화 규칙 로드 완료
+  console.log(`정규화 규칙 로드 완료: ${normalizationRules.size}개`);
     
     console.log(`정규화 규칙 로드 완료: ${normalizationRules.size}개`);
     
@@ -2355,18 +2350,9 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       const reservationSiteModel = `${model} ${capacity} ${color}`.trim();
       const normalizedRule = normalizationRules.get(reservationSiteModel);
       
-      // 처음 10개만 디버깅 로그 출력
-      if (index < 10) {
-        console.log(`🔍 정규화 시도 ${index + 1}: "${reservationSiteModel}"`);
-        console.log(`  - 모델: "${model}"`);
-        console.log(`  - 용량: "${capacity}"`);
-        console.log(`  - 색상: "${color}"`);
-        console.log(`  - 조합: "${reservationSiteModel}"`);
-        console.log(`  - 매칭 결과: ${normalizedRule ? '성공' : '실패'}`);
-      }
+      
       
       if (!normalizedRule) {
-        console.log(`❌ 정규화 규칙 없음: ${reservationSiteModel}`);
         return;
       }
       
