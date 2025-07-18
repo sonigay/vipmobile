@@ -2245,13 +2245,14 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     if (normalizationValues && normalizationValues.length > 1) {
       normalizationValues.slice(1).forEach(row => {
         if (row.length >= 3) {
-          const reservationSite = (row[0] || '').toString().trim();
-          const phoneklModel = (row[1] || '').toString().trim();
-          const phoneklColor = (row[2] || '').toString().trim();
+          const reservationSite = (row[0] || '').toString().trim(); // B열: 사전예약사이트
+          const phoneklModel = (row[1] || '').toString().trim(); // C열: 폰클
+          const phoneklColor = (row[2] || '').toString().trim(); // D열: 색상
           
           if (reservationSite && phoneklModel && phoneklColor) {
             const key = `${reservationSite}`;
             normalizationRules.set(key, { phoneklModel, phoneklColor });
+            console.log(`정규화 규칙 추가: ${key} -> ${phoneklModel} ${phoneklColor}`);
           }
         }
       });
@@ -2343,7 +2344,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       
       if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) return;
       
-      // 정규화된 모델명 생성
+      // 정규화된 모델명 생성 (사전예약사이트 형식)
       const reservationSiteModel = `${model} ${capacity} ${color}`.trim();
       const normalizedRule = normalizationRules.get(reservationSiteModel);
       
@@ -2352,11 +2353,18 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
         return;
       }
       
+      console.log(`정규화 매칭 성공: ${reservationSiteModel} -> ${normalizedRule.phoneklModel} ${normalizedRule.phoneklColor}`);
+      
       const phoneklModel = normalizedRule.phoneklModel;
       const phoneklColor = normalizedRule.phoneklColor;
       
       // 재고 키 생성
       const inventoryKey = `${phoneklModel}_${phoneklColor}_${posCode}`;
+      console.log(`재고 키 생성: ${inventoryKey}`);
+      
+      // 해당 재고 확인
+      const availableSerials = availableInventory.get(inventoryKey) || [];
+      console.log(`사용 가능한 재고: ${availableSerials.length}개 (${inventoryKey})`);
       
       // 배정 상태 계산
       let assignmentStatus = '미배정';
@@ -2373,9 +2381,9 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
         if (activatedSerialNumbers.has(assignedSerialNumber)) {
           activationStatus = '개통완료';
         }
+        console.log(`이미 배정됨: ${reservationNumber} -> ${assignedSerial} (${activationStatus})`);
       } else {
         // 새로운 배정이 필요한 경우
-        const availableSerials = availableInventory.get(inventoryKey) || [];
         const unassignedSerials = availableSerials.filter(serial => !assignedSerialNumbers.has(serial));
         
         if (unassignedSerials.length > 0) {
@@ -2388,6 +2396,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
           if (activatedSerialNumbers.has(assignedSerial)) {
             activationStatus = '개통완료';
           }
+          console.log(`새로 배정됨: ${reservationNumber} -> ${assignedSerial} (${activationStatus})`);
         } else {
           // 배정 대기 중 - 순번 계산
           const allCustomersForModel = reservationSiteRows.filter(r => {
@@ -2435,6 +2444,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
             waitingOrder = currentIndex + 1;
             assignmentStatus = `미배정(${waitingOrder}번째)`;
           }
+          console.log(`배정 대기: ${reservationNumber} -> ${assignmentStatus}`);
         }
       }
       
