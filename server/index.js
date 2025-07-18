@@ -2207,7 +2207,7 @@ async function checkAndUpdateAddresses() {
 // 재고배정 상태 계산 API
 app.get('/api/inventory/assignment-status', async (req, res) => {
   try {
-    console.log('재고배정 상태 계산 요청');
+    console.log('🔍 [재고배정 디버깅] API 요청 시작');
     
     // 캐시 키 생성
     const cacheKey = 'inventory_assignment_status';
@@ -2215,7 +2215,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     // 캐시에서 먼저 확인 (30분 TTL)
     const cachedData = cacheUtils.get(cacheKey);
     if (cachedData) {
-      console.log('캐시된 재고배정 상태 반환');
+      console.log('🔍 [재고배정 디버깅] 캐시된 데이터 반환');
       return res.json(cachedData);
     }
     
@@ -2258,10 +2258,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       });
     }
     
-      // 정규화 규칙 로드 완료
-  console.log(`정규화 규칙 로드 완료: ${normalizationRules.size}개`);
-    
-    console.log(`정규화 규칙 로드 완료: ${normalizationRules.size}개`);
+    console.log(`🔍 [재고배정 디버깅] 정규화 규칙 로드: ${normalizationRules.size}개`);
     
     // 3. 폰클출고처데이터에서 POS코드 매핑 생성
     const storePosCodeMapping = new Map();
@@ -2276,7 +2273,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       }
     });
     
-    console.log(`폰클출고처 POS코드 매핑 로드 완료: ${storePosCodeMapping.size}개`);
+    console.log(`🔍 [재고배정 디버깅] POS코드 매핑: ${storePosCodeMapping.size}개`);
     
     // 4. 폰클재고데이터에서 사용 가능한 재고 정보 생성
     const availableInventory = new Map(); // key: "모델명_색상_POS코드", value: [일련번호들]
@@ -2305,7 +2302,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       }
     });
     
-    console.log(`폰클재고데이터 처리 완료: ${availableInventory.size}개 모델/색상/POS 조합`);
+    console.log(`🔍 [재고배정 디버깅] 재고 데이터: ${availableInventory.size}개 조합`);
     
     // 5. 폰클개통데이터에서 개통 완료된 일련번호 수집
     const activatedSerialNumbers = new Set();
@@ -2322,17 +2319,36 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       });
     }
     
-    console.log(`폰클개통데이터 처리 완료: ${activatedSerialNumbers.size}개 개통완료`);
+    console.log(`🔍 [재고배정 디버깅] 개통 데이터: ${activatedSerialNumbers.size}개`);
     
     // 6. 사전예약사이트 데이터 처리 및 배정 상태 계산
     const reservationSiteRows = reservationSiteValues.slice(1);
     const assignmentResults = [];
     
+    console.log(`🔍 [재고배정 디버깅] 사전예약사이트 데이터: ${reservationSiteRows.length}개 행`);
+    
     // 이미 배정된 일련번호 추적
     const assignedSerialNumbers = new Set();
     
+    // 정규화 규칙 디버깅 (처음 5개만)
+    console.log('🔍 [재고배정 디버깅] 정규화 규칙 샘플 (처음 5개):');
+    let ruleCount = 0;
+    normalizationRules.forEach((value, key) => {
+      if (ruleCount < 5) {
+        console.log(`  ${ruleCount + 1}. "${key}" -> "${value.phoneklModel} ${value.phoneklColor}"`);
+        ruleCount++;
+      }
+    });
+    
+    let processedCount = 0;
+    let skippedCount = 0;
+    let normalizationFailedCount = 0;
+    
     reservationSiteRows.forEach((row, index) => {
-      if (row.length < 35) return;
+      if (row.length < 35) {
+        skippedCount++;
+        return;
+      }
       
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const customerName = (row[7] || '').toString().trim(); // H열: 고객명
@@ -2345,15 +2361,33 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       const onSaleReceivedDate = (row[12] || '').toString().trim(); // M열: 온세일접수일 (임시)
       const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
       
-      if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) return;
+      if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) {
+        skippedCount++;
+        return;
+      }
       
       // 정규화된 모델명 생성 (사전예약사이트 형식)
       const reservationSiteModel = `${model} ${capacity} ${color}`.trim();
       const normalizedRule = normalizationRules.get(reservationSiteModel);
       
-      
+      // 처음 5개 고객에 대해 상세 디버깅
+      if (index < 5) {
+        console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 정규화 시도:`);
+        console.log(`  - 예약번호: "${reservationNumber}"`);
+        console.log(`  - 고객명: "${customerName}"`);
+        console.log(`  - 모델: "${model}"`);
+        console.log(`  - 용량: "${capacity}"`);
+        console.log(`  - 색상: "${color}"`);
+        console.log(`  - 조합된 키: "${reservationSiteModel}"`);
+        console.log(`  - 정규화 규칙 존재: ${normalizedRule ? '있음' : '없음'}`);
+        if (normalizedRule) {
+          console.log(`  - 매핑된 폰클모델: "${normalizedRule.phoneklModel}"`);
+          console.log(`  - 매핑된 폰클색상: "${normalizedRule.phoneklColor}"`);
+        }
+      }
       
       if (!normalizedRule) {
+        normalizationFailedCount++;
         return;
       }
       
@@ -2365,6 +2399,17 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       
       // 해당 재고 확인
       const availableSerials = availableInventory.get(inventoryKey) || [];
+      
+      // 처음 5개 고객에 대해 재고 상태 디버깅
+      if (index < 5) {
+        console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 재고 상태:`);
+        console.log(`  - 재고 키: "${inventoryKey}"`);
+        console.log(`  - 사용 가능한 일련번호: ${availableSerials.length}개`);
+        if (availableSerials.length > 0) {
+          console.log(`  - 첫 번째 일련번호: "${availableSerials[0]}"`);
+        }
+        console.log(`  - 이미 배정된 일련번호: ${assignedSerialNumber || '없음'}`);
+      }
       
       // 배정 상태 계산
       let assignmentStatus = '미배정';
@@ -2381,6 +2426,14 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
           if (activatedSerialNumbers.has(assignedSerialNumber)) {
             activationStatus = '개통완료';
           }
+          
+          // 처음 5개 고객에 대해 배정 상태 디버깅
+          if (index < 5) {
+            console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 기존 배정:`);
+            console.log(`  - 배정상태: "${assignmentStatus}"`);
+            console.log(`  - 개통상태: "${activationStatus}"`);
+            console.log(`  - 배정일련번호: "${assignedSerial}"`);
+          }
         } else {
           // 새로운 배정이 필요한 경우
           const unassignedSerials = availableSerials.filter(serial => !assignedSerialNumbers.has(serial));
@@ -2394,6 +2447,14 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
             // 개통 상태 확인
             if (activatedSerialNumbers.has(assignedSerial)) {
               activationStatus = '개통완료';
+            }
+            
+            // 처음 5개 고객에 대해 배정 상태 디버깅
+            if (index < 5) {
+              console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 새 배정:`);
+              console.log(`  - 배정상태: "${assignmentStatus}"`);
+              console.log(`  - 개통상태: "${activationStatus}"`);
+              console.log(`  - 배정일련번호: "${assignedSerial}"`);
             }
           } else {
             // 배정 대기 중 - 순번 계산
@@ -2458,9 +2519,16 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
         assignedSerialNumber: assignedSerial,
         waitingOrder
       });
+      
+      processedCount++;
     });
     
-    console.log(`재고배정 상태 계산 완료: ${assignmentResults.length}개 고객`);
+    console.log(`🔍 [재고배정 디버깅] 처리 결과 요약:`);
+    console.log(`  - 총 사전예약사이트 행: ${reservationSiteRows.length}개`);
+    console.log(`  - 처리된 고객: ${processedCount}개`);
+    console.log(`  - 건너뛴 고객: ${skippedCount}개`);
+    console.log(`  - 정규화 실패: ${normalizationFailedCount}개`);
+    console.log(`  - 최종 결과: ${assignmentResults.length}개`);
     
     // 핵심 디버깅 정보 출력
     const assignedCount = assignmentResults.filter(r => r.assignmentStatus === '배정완료').length;
@@ -2468,21 +2536,22 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     const activatedCount = assignmentResults.filter(r => r.activationStatus === '개통완료').length;
     const notActivatedCount = assignmentResults.filter(r => r.activationStatus === '미개통').length;
     
-    console.log(`📊 재고배정 통계:`);
+    console.log(`🔍 [재고배정 디버깅] 최종 통계:`);
     console.log(`  - 배정완료: ${assignedCount}개`);
     console.log(`  - 미배정: ${unassignedCount}개`);
     console.log(`  - 개통완료: ${activatedCount}개`);
     console.log(`  - 미개통: ${notActivatedCount}개`);
     
-    // 처음 5개 결과 샘플 출력
-    console.log(`📋 처음 5개 배정 결과 샘플:`);
+    // 처음 5개 결과 상세 출력
+    console.log(`🔍 [재고배정 디버깅] 처음 5개 결과 상세:`);
     assignmentResults.slice(0, 5).forEach((result, index) => {
       console.log(`  ${index + 1}. ${result.reservationNumber} (${result.customerName})`);
-      console.log(`     - 모델: ${result.model}`);
-      console.log(`     - POS: ${result.posCode}`);
-      console.log(`     - 배정상태: ${result.assignmentStatus}`);
-      console.log(`     - 개통상태: ${result.activationStatus}`);
-      console.log(`     - 배정일련번호: ${result.assignedSerialNumber || '없음'}`);
+      console.log(`     - 모델: "${result.model}"`);
+      console.log(`     - POS: "${result.posCode}"`);
+      console.log(`     - 배정상태: "${result.assignmentStatus}"`);
+      console.log(`     - 개통상태: "${result.activationStatus}"`);
+      console.log(`     - 배정일련번호: "${result.assignedSerialNumber || '없음'}"`);
+      console.log(`     - 대기순번: ${result.waitingOrder || 0}`);
     });
     
     const result = {
