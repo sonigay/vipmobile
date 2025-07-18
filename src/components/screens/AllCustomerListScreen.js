@@ -140,13 +140,10 @@ function AllCustomerListScreen({ loggedInStore }) {
   const refreshCache = useCallback(async () => {
     clearAllCustomerCache();
     await loadAllCustomerList();
-    await loadAssignmentStatus();
-  }, [loadAllCustomerList, loadAssignmentStatus]);
-
-  // 재고배정 상태 로드
-  const loadAssignmentStatus = useCallback(async () => {
-    setLoadingAssignment(true);
+    
+    // 재고배정 상태도 함께 로드
     try {
+      setLoadingAssignment(true);
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
       if (response.ok) {
         const result = await response.json();
@@ -169,7 +166,9 @@ function AllCustomerListScreen({ loggedInStore }) {
     } finally {
       setLoadingAssignment(false);
     }
-  }, []);
+  }, [loadAllCustomerList]);
+
+
 
   // 캐시 통계 업데이트
   const updateCacheStats = useCallback(() => {
@@ -278,8 +277,37 @@ function AllCustomerListScreen({ loggedInStore }) {
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     loadAllCustomerList();
+    
+    // 재고배정 상태도 함께 로드
+    const loadAssignmentStatus = async () => {
+      try {
+        setLoadingAssignment(true);
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            // 예약번호를 키로 하는 맵 생성
+            const statusMap = {};
+            result.data.forEach(item => {
+              statusMap[item.reservationNumber] = {
+                assignmentStatus: item.assignmentStatus,
+                activationStatus: item.activationStatus,
+                assignedSerialNumber: item.assignedSerialNumber,
+                waitingOrder: item.waitingOrder
+              };
+            });
+            setAssignmentStatus(statusMap);
+          }
+        }
+      } catch (error) {
+        console.error('재고배정 상태 로드 오류:', error);
+      } finally {
+        setLoadingAssignment(false);
+      }
+    };
+    
     loadAssignmentStatus();
-  }, [loadAllCustomerList, loadAssignmentStatus]);
+  }, [loadAllCustomerList]);
 
   // 필터 변경 시 적용
   useEffect(() => {
