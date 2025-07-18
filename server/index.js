@@ -2306,19 +2306,19 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
         const color = (row[6] || '').toString().trim(); // G열: 색상
         const storeName = (row[13] || '').toString().trim(); // N열: 출고처
         
-        if (serialNumber && modelCapacity && color && storeName) {
-          const posCode = storePosCodeMapping.get(storeName);
-          if (posCode) {
-            const key = `${modelCapacity}_${color}_${posCode}`;
-            
-            if (!availableInventory.has(key)) {
-              availableInventory.set(key, []);
+                  if (serialNumber && modelCapacity && color && storeName) {
+            const posCode = storePosCodeMapping.get(storeName);
+            if (posCode) {
+              const key = `${modelCapacity}_${posCode}`;
+              
+              if (!availableInventory.has(key)) {
+                availableInventory.set(key, []);
+              }
+              availableInventory.get(key).push(serialNumber);
+              
+              serialNumberToStore.set(serialNumber, storeName);
             }
-            availableInventory.get(key).push(serialNumber);
-            
-            serialNumberToStore.set(serialNumber, storeName);
           }
-        }
       }
     });
     
@@ -2403,7 +2403,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       const phoneklColor = normalizedRule.phoneklColor;
       
       // 재고 키 생성
-      const inventoryKey = `${phoneklModel}_${phoneklColor}_${posCode}`;
+      const inventoryKey = `${phoneklModel}_${posCode}`;
       
       // 해당 재고 확인
       const availableSerials = availableInventory.get(inventoryKey) || [];
