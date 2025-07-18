@@ -3497,6 +3497,39 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       posCodeMappingValues = [];
     }
     
+    // POS코드/이름 매핑 테이블 생성
+    const posCodeMapping = new Map();
+    const posNameMapping = new Map();
+    const posNameMappingWithReceiver = new Map();
+    
+    if (posCodeMappingValues && posCodeMappingValues.length > 1) {
+      posCodeMappingValues.slice(1).forEach(row => {
+        if (row.length >= 4) {
+          const originalCode = (row[0] || '').toString().trim();
+          const newCode = (row[1] || '').toString().trim();
+          const originalName = (row[2] || '').toString().trim();
+          const newName = (row[3] || '').toString().trim();
+          const receiver = row.length > 4 ? (row[4] || '').toString().trim() : '';
+          
+          if (originalCode && newCode) {
+            posCodeMapping.set(originalCode, newCode);
+          }
+          
+          if (originalName && newName) {
+            if (receiver) {
+              // 접수자별 매핑
+              const key = `${originalName}_${receiver}`;
+              posNameMappingWithReceiver.set(key, newName);
+            } else {
+              // 일반 매핑
+              posNameMapping.set(originalName, newName);
+            }
+          }
+        }
+      });
+      console.log(`POS별 고객리스트: POS코드 매핑 ${posCodeMapping.size}개, POS명 매핑 ${posNameMapping.size}개, 접수자별 매핑 ${posNameMappingWithReceiver.size}개 로드`);
+    }
+    
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
       throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
     }
@@ -3986,7 +4019,7 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       success: true,
       data: customerList,
       total: customerList.length,
-      model: model
+      model: req.params.model
     };
     
     // 결과 캐싱 (5분 TTL)
