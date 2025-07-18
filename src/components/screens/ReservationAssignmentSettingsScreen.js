@@ -138,6 +138,122 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
     stores: {}
   });
 
+  // 메모이제이션된 POS별 합산 계산
+  const generatePOSSummary = useCallback((assignments, agents) => {
+    const posMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent && agent.store) {
+        const key = `${agent.store}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
+        if (!posMap.has(key)) {
+          posMap.set(key, {
+            posName: agent.store,
+            model: assignment.model,
+            capacity: assignment.capacity,
+            color: assignment.color,
+            totalQuantity: 0,
+            agentCount: 0,
+            agents: new Set()
+          });
+        }
+        
+        const posData = posMap.get(key);
+        posData.totalQuantity += assignment.quantity;
+        posData.agents.add(assignment.agent);
+        posData.agentCount = posData.agents.size;
+      }
+    });
+    
+    return Array.from(posMap.values()).sort((a, b) => a.posName.localeCompare(b.posName));
+  }, []);
+
+  // 메모이제이션된 담당자별 합산 계산
+  const generateAgentSummary = useCallback((assignments, agents) => {
+    const agentMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent) {
+        const key = `${assignment.agent}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
+        if (!agentMap.has(key)) {
+          agentMap.set(key, {
+            agentName: assignment.agent,
+            posName: agent.store || '-',
+            model: assignment.model,
+            capacity: assignment.capacity,
+            color: assignment.color,
+            totalQuantity: 0
+          });
+        }
+        
+        agentMap.get(key).totalQuantity += assignment.quantity;
+      }
+    });
+    
+    return Array.from(agentMap.values()).sort((a, b) => a.agentName.localeCompare(b.agentName));
+  }, []);
+
+  // 메모이제이션된 소속별 합산 계산
+  const generateDepartmentSummary = useCallback((assignments, agents) => {
+    const deptMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent && agent.department) {
+        const key = `${agent.department}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
+        if (!deptMap.has(key)) {
+          deptMap.set(key, {
+            department: agent.department,
+            model: assignment.model,
+            capacity: assignment.capacity,
+            color: assignment.color,
+            totalQuantity: 0,
+            agentCount: 0,
+            agents: new Set()
+          });
+        }
+        
+        const deptData = deptMap.get(key);
+        deptData.totalQuantity += assignment.quantity;
+        deptData.agents.add(assignment.agent);
+        deptData.agentCount = deptData.agents.size;
+      }
+    });
+    
+    return Array.from(deptMap.values()).sort((a, b) => a.department.localeCompare(b.department));
+  }, []);
+
+  // 메모이제이션된 사무실별 합산 계산
+  const generateOfficeSummary = useCallback((assignments, agents) => {
+    const officeMap = new Map();
+    
+    assignments.forEach(assignment => {
+      const agent = agents.find(a => a.name === assignment.agent);
+      if (agent && agent.office) {
+        const key = `${agent.office}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
+        if (!officeMap.has(key)) {
+          officeMap.set(key, {
+            office: agent.office,
+            model: assignment.model,
+            capacity: assignment.capacity,
+            color: assignment.color,
+            totalQuantity: 0,
+            agentCount: 0,
+            agents: new Set()
+          });
+        }
+        
+        const officeData = officeMap.get(key);
+        officeData.totalQuantity += assignment.quantity;
+        officeData.agents.add(assignment.agent);
+        officeData.agentCount = officeData.agents.size;
+      }
+    });
+    
+    return Array.from(officeMap.values()).sort((a, b) => a.office.localeCompare(b.office));
+  }, []);
+
   // 계층 구조 캐시 로드
   useEffect(() => {
     const loadHierarchicalStructure = async () => {
@@ -1928,122 +2044,6 @@ function ReservationAssignmentSettingsScreen({ data, onBack, onLogout }) {
       </Dialog>
     </Box>
   );
-
-  // 메모이제이션된 POS별 합산 계산
-  const generatePOSSummary = useCallback((assignments, agents) => {
-    const posMap = new Map();
-    
-    assignments.forEach(assignment => {
-      const agent = agents.find(a => a.name === assignment.agent);
-      if (agent && agent.store) {
-        const key = `${agent.store}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
-        if (!posMap.has(key)) {
-          posMap.set(key, {
-            posName: agent.store,
-            model: assignment.model,
-            capacity: assignment.capacity,
-            color: assignment.color,
-            totalQuantity: 0,
-            agentCount: 0,
-            agents: new Set()
-          });
-        }
-        
-        const posData = posMap.get(key);
-        posData.totalQuantity += assignment.quantity;
-        posData.agents.add(assignment.agent);
-        posData.agentCount = posData.agents.size;
-      }
-    });
-    
-    return Array.from(posMap.values()).sort((a, b) => a.posName.localeCompare(b.posName));
-  }, []);
-
-  // 메모이제이션된 담당자별 합산 계산
-  const generateAgentSummary = useCallback((assignments, agents) => {
-    const agentMap = new Map();
-    
-    assignments.forEach(assignment => {
-      const agent = agents.find(a => a.name === assignment.agent);
-      if (agent) {
-        const key = `${assignment.agent}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
-        if (!agentMap.has(key)) {
-          agentMap.set(key, {
-            agentName: assignment.agent,
-            posName: agent.store || '-',
-            model: assignment.model,
-            capacity: assignment.capacity,
-            color: assignment.color,
-            totalQuantity: 0
-          });
-        }
-        
-        agentMap.get(key).totalQuantity += assignment.quantity;
-      }
-    });
-    
-    return Array.from(agentMap.values()).sort((a, b) => a.agentName.localeCompare(b.agentName));
-  }, []);
-
-  // 메모이제이션된 소속별 합산 계산
-  const generateDepartmentSummary = useCallback((assignments, agents) => {
-    const deptMap = new Map();
-    
-    assignments.forEach(assignment => {
-      const agent = agents.find(a => a.name === assignment.agent);
-      if (agent && agent.department) {
-        const key = `${agent.department}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
-        if (!deptMap.has(key)) {
-          deptMap.set(key, {
-            department: agent.department,
-            model: assignment.model,
-            capacity: assignment.capacity,
-            color: assignment.color,
-            totalQuantity: 0,
-            agentCount: 0,
-            agents: new Set()
-          });
-        }
-        
-        const deptData = deptMap.get(key);
-        deptData.totalQuantity += assignment.quantity;
-        deptData.agents.add(assignment.agent);
-        deptData.agentCount = deptData.agents.size;
-      }
-    });
-    
-    return Array.from(deptMap.values()).sort((a, b) => a.department.localeCompare(b.department));
-  }, []);
-
-  // 메모이제이션된 사무실별 합산 계산
-  const generateOfficeSummary = useCallback((assignments, agents) => {
-    const officeMap = new Map();
-    
-    assignments.forEach(assignment => {
-      const agent = agents.find(a => a.name === assignment.agent);
-      if (agent && agent.office) {
-        const key = `${agent.office}_${assignment.model}_${assignment.capacity}_${assignment.color}`;
-        if (!officeMap.has(key)) {
-          officeMap.set(key, {
-            office: agent.office,
-            model: assignment.model,
-            capacity: assignment.capacity,
-            color: assignment.color,
-            totalQuantity: 0,
-            agentCount: 0,
-            agents: new Set()
-          });
-        }
-        
-        const officeData = officeMap.get(key);
-        officeData.totalQuantity += assignment.quantity;
-        officeData.agents.add(assignment.agent);
-        officeData.agentCount = officeData.agents.size;
-      }
-    });
-    
-    return Array.from(officeMap.values()).sort((a, b) => a.office.localeCompare(b.office));
-  }, []);
 }
 
 export default ReservationAssignmentSettingsScreen; 
