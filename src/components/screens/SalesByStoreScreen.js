@@ -420,33 +420,7 @@ function SalesByStoreScreen({ loggedInStore }) {
     return {};
   };
 
-  // 재고배정 상태 로드
-  const loadAssignmentStatus = useCallback(async () => {
-    setLoadingAssignment(true);
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          // 예약번호를 키로 하는 맵 생성
-          const statusMap = {};
-          result.data.forEach(item => {
-            statusMap[item.reservationNumber] = {
-              assignmentStatus: item.assignmentStatus,
-              activationStatus: item.activationStatus,
-              assignedSerialNumber: item.assignedSerialNumber,
-              waitingOrder: item.waitingOrder
-            };
-          });
-          setAssignmentStatus(statusMap);
-        }
-      }
-    } catch (error) {
-      console.error('재고배정 상태 로드 오류:', error);
-    } finally {
-      setLoadingAssignment(false);
-    }
-  }, []);
+
 
   // 데이터 로드
   const loadData = async () => {
@@ -499,7 +473,30 @@ function SalesByStoreScreen({ loggedInStore }) {
     }
     
     // 재고배정 상태도 함께 로드
-    await loadAssignmentStatus();
+    try {
+      setLoadingAssignment(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 예약번호를 키로 하는 맵 생성
+          const statusMap = {};
+          result.data.forEach(item => {
+            statusMap[item.reservationNumber] = {
+              assignmentStatus: item.assignmentStatus,
+              activationStatus: item.activationStatus,
+              assignedSerialNumber: item.assignedSerialNumber,
+              waitingOrder: item.waitingOrder
+            };
+          });
+          setAssignmentStatus(statusMap);
+        }
+      }
+    } catch (error) {
+      console.error('재고배정 상태 로드 오류:', error);
+    } finally {
+      setLoadingAssignment(false);
+    }
   };
 
   // 담당자 수정 다이얼로그 열기 (현재는 비활성화)
