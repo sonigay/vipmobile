@@ -91,6 +91,11 @@ function ReservationSettingsScreen({ loggedInStore }) {
     normalizedModel: ''
   });
 
+  // POS코드변경설정 관련 상태
+  const [posCodeMappings, setPosCodeMappings] = useState([]);
+  const [loadingPosCodeMappings, setLoadingPosCodeMappings] = useState(false);
+  const [showPosCodeMappingSection, setShowPosCodeMappingSection] = useState(false);
+
   // 데이터 로드
   const loadData = async () => {
     setLoading(true);
@@ -145,6 +150,75 @@ function ReservationSettingsScreen({ loggedInStore }) {
     } finally {
       setLoadingNormalizedData(false);
     }
+  };
+
+  // POS코드변경설정 데이터 불러오기
+  const loadPosCodeMappings = async () => {
+    setLoadingPosCodeMappings(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/pos-code-mappings`);
+      if (response.ok) {
+        const data = await response.json();
+        setPosCodeMappings(data.mappings || []);
+        setMessage({ type: 'success', text: 'POS코드변경설정을 성공적으로 불러왔습니다.' });
+      } else {
+        throw new Error('POS코드변경설정 로드 실패');
+      }
+    } catch (error) {
+      console.error('POS코드변경설정 불러오기 오류:', error);
+      setMessage({ type: 'error', text: 'POS코드변경설정 로드 중 오류가 발생했습니다.' });
+    } finally {
+      setLoadingPosCodeMappings(false);
+    }
+  };
+
+  // POS코드변경설정 저장
+  const savePosCodeMappings = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/pos-code-mappings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mappings: posCodeMappings })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMessage({ type: 'success', text: 'POS코드변경설정을 성공적으로 저장했습니다.' });
+      } else {
+        throw new Error('POS코드변경설정 저장 실패');
+      }
+    } catch (error) {
+      console.error('POS코드변경설정 저장 오류:', error);
+      setMessage({ type: 'error', text: 'POS코드변경설정 저장 중 오류가 발생했습니다.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // POS코드 매핑 추가
+  const addPosCodeMapping = () => {
+    setPosCodeMappings(prev => [...prev, {
+      id: Date.now(),
+      originalCode: '',
+      receiver: '',
+      mappedCode: '',
+      description: ''
+    }]);
+  };
+
+  // POS코드 매핑 삭제
+  const removePosCodeMapping = (id) => {
+    setPosCodeMappings(prev => prev.filter(mapping => mapping.id !== id));
+  };
+
+  // POS코드 매핑 업데이트
+  const updatePosCodeMapping = (id, field, value) => {
+    setPosCodeMappings(prev => prev.map(mapping => 
+      mapping.id === id ? { ...mapping, [field]: value } : mapping
+    ));
   };
 
   // 정규화 항목 추가
@@ -361,6 +435,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
   useEffect(() => {
     loadData();
     loadSavedNormalizationList();
+    loadPosCodeMappings();
   }, []);
 
   return (
@@ -804,6 +879,166 @@ function ReservationSettingsScreen({ loggedInStore }) {
           </CardContent>
         </Card>
       </Collapse>
+
+      {/* POS코드변경설정 */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+              POS코드변경설정
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={showPosCodeMappingSection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                onClick={() => setShowPosCodeMappingSection(!showPosCodeMappingSection)}
+              >
+                {showPosCodeMappingSection ? '접기' : '펼치기'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={loadPosCodeMappings}
+                disabled={loadingPosCodeMappings}
+              >
+                {loadingPosCodeMappings ? <CircularProgress size={16} /> : '새로고침'}
+              </Button>
+            </Box>
+          </Box>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            사전예약사이트의 POS코드와 폰클출고처데이터의 매장코드 매칭을 위한 설정입니다.
+            접수자별로 다른 POS코드를 사용하는 경우 접수자명도 함께 설정할 수 있습니다.
+          </Typography>
+
+          <Collapse in={showPosCodeMappingSection}>
+            <Box sx={{ mt: 2 }}>
+              {/* 매핑 목록 */}
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                    POS코드 매핑 목록 ({posCodeMappings.length}개)
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={addPosCodeMapping}
+                    sx={{ backgroundColor: '#ff9a9e', '&:hover': { backgroundColor: '#f48fb1' } }}
+                  >
+                    매핑 추가
+                  </Button>
+                </Box>
+                
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell width="60px" align="center">순번</TableCell>
+                        <TableCell width="150px">원본 POS코드</TableCell>
+                        <TableCell width="120px">접수자명 (선택)</TableCell>
+                        <TableCell width="150px">변경될 POS코드</TableCell>
+                        <TableCell width="200px">설명</TableCell>
+                        <TableCell width="80px" align="center">작업</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {posCodeMappings.map((mapping, index) => (
+                        <TableRow key={mapping.id} hover>
+                          <TableCell align="center">
+                            <Chip
+                              label={index + 1}
+                              size="small"
+                              color="default"
+                              sx={{ fontSize: '0.7rem', fontWeight: 'bold' }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.originalCode}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'originalCode', e.target.value)}
+                              placeholder="예: 306891"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.receiver}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'receiver', e.target.value)}
+                              placeholder="예: 홍길동"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.mappedCode}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'mappedCode', e.target.value)}
+                              placeholder="예: 306891(경수)"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={mapping.description}
+                              onChange={(e) => updatePosCodeMapping(mapping.id, 'description', e.target.value)}
+                              placeholder="예: 경수대리점 POS코드 매핑"
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => removePosCodeMapping(mapping.id)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+
+              {/* 저장 버튼 */}
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={savePosCodeMappings}
+                  disabled={saving}
+                  sx={{ backgroundColor: '#ff9a9e', '&:hover': { backgroundColor: '#f48fb1' } }}
+                >
+                  {saving ? <CircularProgress size={20} /> : 'POS코드변경설정 저장'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => setPosCodeMappings([])}
+                >
+                  초기화
+                </Button>
+              </Box>
+
+              {/* 사용법 안내 */}
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  <strong>사용법:</strong><br/>
+                  1. <strong>일반 매핑:</strong> 접수자명을 비워두면 모든 접수자에 적용됩니다.<br/>
+                  2. <strong>접수자별 매핑:</strong> 접수자명을 입력하면 해당 접수자에게만 적용됩니다.<br/>
+                  3. <strong>우선순위:</strong> 접수자별 매핑이 일반 매핑보다 우선 적용됩니다.
+                </Typography>
+              </Alert>
+            </Box>
+          </Collapse>
+        </CardContent>
+      </Card>
 
       {/* 정규화 설정 테이블 */}
       <Card>

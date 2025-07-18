@@ -7396,7 +7396,13 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       range: '온세일!A:Z'
     });
 
-    if (!reservationResponse.data.values || !phoneklResponse.data.values || !yardResponse.data.values || !onSaleResponse.data.values) {
+    // 5. POS코드변경설정 시트 로드
+    const posCodeMappingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'POS코드변경설정!A:D'
+    });
+
+    if (!reservationResponse.data.values || !phoneklResponse.data.values || !yardResponse.data.values || !onSaleResponse.data.values || !posCodeMappingResponse.data.values) {
       throw new Error('시트 데이터를 불러올 수 없습니다.');
     }
 
@@ -7411,6 +7417,38 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     
     const onSaleHeaders = onSaleResponse.data.values[0];
     const onSaleData = onSaleResponse.data.values.slice(1);
+    
+    const posCodeMappingHeaders = posCodeMappingResponse.data.values[0];
+    const posCodeMappingData = posCodeMappingResponse.data.values.slice(1);
+
+    // POS코드 매핑 테이블 생성 (접수자별 매핑 지원)
+    const posCodeMapping = new Map();
+    const posCodeMappingWithReceiver = new Map(); // 접수자별 매핑
+    
+    posCodeMappingData.forEach((row, index) => {
+      const originalCode = row[0] || ''; // A열: 원본 POS코드
+      const receiver = row[1] || '';     // B열: 접수자명 (선택사항)
+      const mappedCode = row[2] || '';   // C열: 변경될 POS코드
+      const description = row[3] || '';  // D열: 설명
+      
+      if (originalCode && mappedCode) {
+        if (receiver) {
+          // 접수자별 매핑
+          const key = `${originalCode}_${receiver}`;
+          posCodeMappingWithReceiver.set(key, mappedCode);
+          console.log(`접수자별 매핑 ${index + 2}: ${key} -> ${mappedCode} (${description})`);
+        } else {
+          // 일반 매핑
+          posCodeMapping.set(originalCode, mappedCode);
+          console.log(`일반 매핑 ${index + 2}: ${originalCode} -> ${mappedCode} (${description})`);
+        }
+      }
+    });
+
+    console.log('POS코드 매핑 테이블 생성 완료:', {
+      일반매핑: posCodeMapping.size,
+      접수자별매핑: posCodeMappingWithReceiver.size
+    });
 
     // 담당자 이름 정규화 함수 (괄호 안 부서 정보 제거)
     const normalizeAgentName = (agentName) => {
@@ -7526,9 +7564,22 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const reservationNumber = row[8] || ''; // I열 (9번째, 0부터 시작)
       const storeCodeForLookup = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작): 접수자명
       
-      // 담당자 매칭 (VLOOKUP 방식) - 정규화된 이름 사용
-      let agent = storeAgentMap.get(storeCodeForLookup) || '';
+      // POS코드 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
+      let mappedStoreCode = storeCodeForLookup;
+      const receiverKey = `${storeCodeForLookup}_${receiver}`;
+      
+      if (posCodeMappingWithReceiver.has(receiverKey)) {
+        mappedStoreCode = posCodeMappingWithReceiver.get(receiverKey);
+        console.log(`접수자별 매핑 적용: ${storeCodeForLookup}(${receiver}) -> ${mappedStoreCode}`);
+      } else if (posCodeMapping.has(storeCodeForLookup)) {
+        mappedStoreCode = posCodeMapping.get(storeCodeForLookup);
+        console.log(`일반 매핑 적용: ${storeCodeForLookup} -> ${mappedStoreCode}`);
+      }
+      
+      // 담당자 매칭 (매핑된 POS코드 사용)
+      let agent = storeAgentMap.get(mappedStoreCode) || '';
       
       // 서류접수 상태 확인 (마당접수 OR 온세일 접수)
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
@@ -7576,6 +7627,44 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       담당자: item.agent,
       POS명: item.posName
     })));
+
+    // 매칭 실패 통계 분석
+    const matchingFailures = processedData.filter(item => !item.agent);
+    const failureStats = {};
+    const failureByPosCode = {};
+    
+    matchingFailures.forEach(item => {
+      const posCode = item.storeCodeForLookup;
+      const posName = item.posName;
+      
+      // POS코드별 실패 통계
+      failureStats[posCode] = (failureStats[posCode] || 0) + 1;
+      
+      // POS명별 실패 통계
+      if (!failureByPosCode[posCode]) {
+        failureByPosCode[posCode] = {
+          posName: posName,
+          count: 0,
+          items: []
+        };
+      }
+      failureByPosCode[posCode].count++;
+      failureByPosCode[posCode].items.push({
+        reservationNumber: item.reservationNumber,
+        customerName: item.originalRow[7] || '',
+        receiver: item.originalRow[25] || ''
+      });
+    });
+
+    console.log('매칭 실패 통계:', {
+      총실패건수: matchingFailures.length,
+      실패율: ((matchingFailures.length / processedData.length) * 100).toFixed(1) + '%',
+      실패POS코드수: Object.keys(failureStats).length,
+      상위실패POS코드: Object.entries(failureStats)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 10)
+        .map(([code, count]) => ({ code, count }))
+    });
 
     // 대리점코드별로 그룹화
     const groupedByStore = {};
@@ -7679,7 +7768,17 @@ app.get('/api/sales-by-store/data', async (req, res) => {
         totalAgents: Object.keys(groupedByAgent).length,
         totalItems: processedData.length,
         totalWithAgent: processedData.filter(item => item.agent).length,
-        totalDocumentReceived: processedData.filter(item => item.isDocumentReceived).length
+        totalDocumentReceived: processedData.filter(item => item.isDocumentReceived).length,
+        matchingSuccessRate: ((processedData.filter(item => item.agent).length / processedData.length) * 100).toFixed(1)
+      },
+      matchingFailures: {
+        totalFailures: matchingFailures.length,
+        failureRate: ((matchingFailures.length / processedData.length) * 100).toFixed(1),
+        failureByPosCode: failureByPosCode,
+        topFailurePosCodes: Object.entries(failureStats)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 10)
+          .map(([code, count]) => ({ code, count, posName: failureByPosCode[code]?.posName || '' }))
       },
       unmatchedOnSaleData: unmatchedOnSaleData // 온세일 매칭 실패 데이터 추가
     };
@@ -8250,6 +8349,109 @@ app.post('/api/sales-by-store/update-agent', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update agent',
+      message: error.message
+    });
+  }
+});
+
+// POS코드변경설정 조회 API
+app.get('/api/pos-code-mappings', async (req, res) => {
+  try {
+    console.log('POS코드변경설정 조회 요청');
+    
+    // POS코드변경설정 시트에서 데이터 로드
+    const posCodeMappingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'POS코드변경설정!A:D'
+    });
+
+    if (!posCodeMappingResponse.data.values) {
+      return res.json({
+        success: true,
+        mappings: []
+      });
+    }
+
+    const posCodeMappingData = posCodeMappingResponse.data.values.slice(1); // 헤더 제거
+    
+    // 매핑 데이터 변환
+    const mappings = posCodeMappingData.map((row, index) => ({
+      id: index + 1,
+      originalCode: row[0] || '', // A열: 원본 POS코드
+      receiver: row[1] || '',     // B열: 접수자명 (선택사항)
+      mappedCode: row[2] || '',   // C열: 변경될 POS코드
+      description: row[3] || ''   // D열: 설명
+    })).filter(mapping => mapping.originalCode && mapping.mappedCode); // 빈 데이터 제거
+
+    console.log(`POS코드변경설정 로드 완료: ${mappings.length}개 매핑`);
+
+    res.json({
+      success: true,
+      mappings
+    });
+  } catch (error) {
+    console.error('POS코드변경설정 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load POS code mappings',
+      message: error.message
+    });
+  }
+});
+
+// POS코드변경설정 저장 API
+app.post('/api/pos-code-mappings', async (req, res) => {
+  try {
+    const { mappings } = req.body;
+    console.log('POS코드변경설정 저장 요청:', mappings.length, '개 매핑');
+
+    // 데이터 검증
+    if (!Array.isArray(mappings)) {
+      throw new Error('매핑 데이터가 올바르지 않습니다.');
+    }
+
+    // 시트에 저장할 데이터 준비 (헤더 포함)
+    const sheetData = [
+      ['원본 POS코드', '접수자명', '변경될 POS코드', '설명'] // 헤더
+    ];
+
+    // 매핑 데이터 추가
+    mappings.forEach(mapping => {
+      if (mapping.originalCode && mapping.mappedCode) {
+        sheetData.push([
+          mapping.originalCode,
+          mapping.receiver || '',
+          mapping.mappedCode,
+          mapping.description || ''
+        ]);
+      }
+    });
+
+    // Google Sheets에 저장
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'POS코드변경설정!A:D',
+      valueInputOption: 'RAW',
+      resource: {
+        values: sheetData
+      }
+    });
+
+    console.log('POS코드변경설정 저장 완료');
+
+    // 캐시 무효화
+    cacheUtils.deletePattern('sales_by_store');
+
+    res.json({
+      success: true,
+      message: 'POS코드변경설정이 성공적으로 저장되었습니다.',
+      savedCount: mappings.length
+    });
+  } catch (error) {
+    console.error('POS코드변경설정 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save POS code mappings',
       message: error.message
     });
   }

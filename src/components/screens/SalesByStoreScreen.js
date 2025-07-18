@@ -36,6 +36,7 @@ import {
   Cancel as CancelIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
+  Error as ErrorIcon,
   Person as PersonIcon,
   Store as StoreIcon,
   ColorLens as ColorLensIcon,
@@ -77,6 +78,8 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [error, setError] = useState('');
   const [unmatchedOnSaleData, setUnmatchedOnSaleData] = useState([]);
   const [showUnmatchedPopup, setShowUnmatchedPopup] = useState(false);
+  const [matchingFailures, setMatchingFailures] = useState({});
+  const [showMatchingFailuresPopup, setShowMatchingFailuresPopup] = useState(false);
   const [viewMode, setViewMode] = useState('store'); // 'store', 'agent', 'modelColor'
   const [selectedStore, setSelectedStore] = useState(0);
   const [selectedAgent, setSelectedAgent] = useState(0);
@@ -431,12 +434,15 @@ function SalesByStoreScreen({ loggedInStore }) {
       if (result.success) {
         setData(result.data);
         setUnmatchedOnSaleData(result.unmatchedOnSaleData || []);
+        setMatchingFailures(result.matchingFailures || {});
         
         // 디버깅 로그 추가
         console.log('판매처별정리 데이터 로드 완료:', {
           byStore: Object.keys(result.data.byStore || {}).length,
           byAgent: Object.keys(result.data.byAgent || {}).length,
-          unmatchedOnSale: result.unmatchedOnSaleData?.length || 0
+          unmatchedOnSale: result.unmatchedOnSaleData?.length || 0,
+          matchingFailures: result.matchingFailures?.totalFailures || 0,
+          successRate: result.stats?.matchingSuccessRate || '0.0'
         });
         
         // 담당자별 데이터 상세 로그
@@ -1147,6 +1153,22 @@ function SalesByStoreScreen({ loggedInStore }) {
         >
           온세일매칭실패데이터 ({unmatchedOnSaleData.length})
         </Button>
+        
+        <Button
+          variant="outlined"
+          startIcon={<ErrorIcon />}
+          onClick={() => setShowMatchingFailuresPopup(true)}
+          disabled={matchingFailures.totalFailures === 0}
+          sx={{
+            backgroundColor: matchingFailures.totalFailures > 0 ? '#ff9800' : undefined,
+            color: matchingFailures.totalFailures > 0 ? 'white' : undefined,
+            '&:hover': {
+              backgroundColor: matchingFailures.totalFailures > 0 ? '#f57c00' : undefined
+            }
+          }}
+        >
+          POS코드매칭실패 ({matchingFailures.totalFailures || 0}건, {matchingFailures.failureRate || '0.0'}%)
+        </Button>
       </Box>
 
       {/* 대리점코드별 탭 */}
@@ -1594,6 +1616,105 @@ function SalesByStoreScreen({ loggedInStore }) {
           <Button onClick={() => setShowUnmatchedPopup(false)}>
             닫기
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* POS코드 매칭 실패 데이터 팝업 */}
+      <Dialog 
+        open={showMatchingFailuresPopup} 
+        onClose={() => setShowMatchingFailuresPopup(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: '#ff9800', fontWeight: 'bold' }}>
+          POS코드 매칭 실패 현황
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            담당자 매칭에 실패한 POS코드 현황입니다. ({matchingFailures.totalFailures || 0}건, 실패율: {matchingFailures.failureRate || '0.0'}%)
+          </Typography>
+          
+          <Typography variant="h6" sx={{ mb: 2, color: '#ff9800' }}>
+            상위 실패 POS코드 (Top 10)
+          </Typography>
+          
+          <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell width="60px" align="center">순위</TableCell>
+                  <TableCell width="150px">POS코드</TableCell>
+                  <TableCell width="200px">POS명</TableCell>
+                  <TableCell width="100px" align="center">실패건수</TableCell>
+                  <TableCell width="200px">설명</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(matchingFailures.topFailurePosCodes || []).map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell align="center">{index + 1}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>{item.code}</TableCell>
+                    <TableCell>{item.posName}</TableCell>
+                    <TableCell align="center">
+                      <Chip 
+                        label={item.count} 
+                        size="small" 
+                        color="error" 
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        POS코드변경설정에서 매핑 설정 필요
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          <Typography variant="h6" sx={{ mb: 2, color: '#ff9800' }}>
+            상세 실패 데이터
+          </Typography>
+          
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell width="60px" align="center">순번</TableCell>
+                  <TableCell width="150px">POS코드</TableCell>
+                  <TableCell width="200px">POS명</TableCell>
+                  <TableCell width="150px">예약번호</TableCell>
+                  <TableCell width="150px">고객명</TableCell>
+                  <TableCell width="120px">접수자</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {Object.entries(matchingFailures.failureByPosCode || {}).map(([posCode, posData], index) => 
+                  posData.items.map((item, itemIndex) => (
+                    <TableRow key={`${posCode}-${itemIndex}`}>
+                      <TableCell align="center">{index * 100 + itemIndex + 1}</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>{posCode}</TableCell>
+                      <TableCell>{posData.posName}</TableCell>
+                      <TableCell>{item.reservationNumber}</TableCell>
+                      <TableCell>{item.customerName}</TableCell>
+                      <TableCell>{item.receiver}</TableCell>
+                    </TableRow>
+                  ))
+                ).flat().slice(0, 50)} {/* 최대 50개만 표시 */}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          {Object.keys(matchingFailures.failureByPosCode || {}).length > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+              * 상위 50개 데이터만 표시됩니다. 전체 데이터는 엑셀 다운로드를 이용하세요.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowMatchingFailuresPopup(false)}>닫기</Button>
         </DialogActions>
       </Dialog>
 
