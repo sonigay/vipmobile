@@ -94,7 +94,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
   // POS코드변경설정 관련 상태
   const [posCodeMappings, setPosCodeMappings] = useState([]);
   const [loadingPosCodeMappings, setLoadingPosCodeMappings] = useState(false);
-  const [showPosCodeMappingSection, setShowPosCodeMappingSection] = useState(false);
+  const [showPosCodeMappingSection, setShowPosCodeMappingSection] = useState(true);
 
   // 데이터 로드
   const loadData = async () => {
@@ -885,7 +885,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
-              POS코드변경설정
+              🔧 POS코드변경설정 (NEW!)
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
@@ -908,10 +908,13 @@ function ReservationSettingsScreen({ loggedInStore }) {
             </Box>
           </Box>
           
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            사전예약사이트의 POS코드와 폰클출고처데이터의 매장코드 매칭을 위한 설정입니다.
-            접수자별로 다른 POS코드를 사용하는 경우 접수자명도 함께 설정할 수 있습니다.
-          </Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>💡 POS코드 매칭 실패 문제 해결!</strong><br/>
+              사전예약사이트의 POS코드와 폰클출고처데이터의 매장코드 매칭을 위한 설정입니다.
+              접수자별로 다른 POS코드를 사용하는 경우 접수자명도 함께 설정할 수 있습니다.
+            </Typography>
+          </Alert>
 
           <Collapse in={showPosCodeMappingSection}>
             <Box sx={{ mt: 2 }}>
