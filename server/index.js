@@ -2245,11 +2245,12 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     if (normalizationValues && normalizationValues.length > 1) {
       normalizationValues.slice(1).forEach(row => {
         if (row.length >= 3) {
-          const reservationSite = (row[0] || '').toString().trim(); // B열: 사전예약사이트
-          const phoneklModel = (row[1] || '').toString().trim(); // C열: 폰클
-          const phoneklColor = (row[2] || '').toString().trim(); // D열: 색상
+          const reservationSite = (row[1] || '').toString().trim(); // C열: 사전예약사이트 형식
+          const phoneklModel = (row[2] || '').toString().trim(); // D열: 폰클
+          const phoneklColor = (row[3] || '').toString().trim(); // E열: 색상
           
           if (reservationSite && phoneklModel && phoneklColor) {
+            // 정규화 규칙의 키를 사전예약사이트 형식으로 생성
             const key = `${reservationSite}`;
             normalizationRules.set(key, { phoneklModel, phoneklColor });
           }
