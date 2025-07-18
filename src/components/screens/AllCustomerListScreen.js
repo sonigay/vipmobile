@@ -144,6 +144,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     // 재고배정 상태도 함께 로드
     try {
       setLoadingAssignment(true);
+      console.log('🔄 재고배정 상태 로드 시작...');
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
       if (response.ok) {
         const result = await response.json();
@@ -159,10 +160,27 @@ function AllCustomerListScreen({ loggedInStore }) {
             };
           });
           setAssignmentStatus(statusMap);
+          
+          console.log('✅ 재고배정 상태 로드 완료');
+          console.log(`📊 받은 데이터: ${result.data.length}개 고객`);
+          console.log(`📊 서버 통계: 배정완료 ${result.stats.assigned}개, 미배정 ${result.stats.unassigned}개, 개통완료 ${result.stats.activated}개, 미개통 ${result.stats.notActivated}개`);
+          
+          // 처음 3개 데이터 샘플 출력
+          console.log('📋 처음 3개 배정 상태 샘플:');
+          result.data.slice(0, 3).forEach((item, index) => {
+            console.log(`  ${index + 1}. ${item.reservationNumber} (${item.customerName})`);
+            console.log(`     - 배정상태: ${item.assignmentStatus}`);
+            console.log(`     - 개통상태: ${item.activationStatus}`);
+            console.log(`     - 배정일련번호: ${item.assignedSerialNumber || '없음'}`);
+          });
+        } else {
+          console.error('❌ 재고배정 상태 API 응답 실패:', result);
         }
+      } else {
+        console.error('❌ 재고배정 상태 API 요청 실패:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('재고배정 상태 로드 오류:', error);
+      console.error('❌ 재고배정 상태 로드 오류:', error);
     } finally {
       setLoadingAssignment(false);
     }
@@ -282,6 +300,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     const loadAssignmentStatus = async () => {
       try {
         setLoadingAssignment(true);
+        console.log('🔄 재고배정 상태 로드 시작 (useEffect)...');
         const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
         if (response.ok) {
           const result = await response.json();
@@ -297,10 +316,27 @@ function AllCustomerListScreen({ loggedInStore }) {
               };
             });
             setAssignmentStatus(statusMap);
+            
+            console.log('✅ 재고배정 상태 로드 완료 (useEffect)');
+            console.log(`📊 받은 데이터: ${result.data.length}개 고객`);
+            console.log(`📊 서버 통계: 배정완료 ${result.stats.assigned}개, 미배정 ${result.stats.unassigned}개, 개통완료 ${result.stats.activated}개, 미개통 ${result.stats.notActivated}개`);
+            
+            // 처음 3개 데이터 샘플 출력
+            console.log('📋 처음 3개 배정 상태 샘플 (useEffect):');
+            result.data.slice(0, 3).forEach((item, index) => {
+              console.log(`  ${index + 1}. ${item.reservationNumber} (${item.customerName})`);
+              console.log(`     - 배정상태: ${item.assignmentStatus}`);
+              console.log(`     - 개통상태: ${item.activationStatus}`);
+              console.log(`     - 배정일련번호: ${item.assignedSerialNumber || '없음'}`);
+            });
+          } else {
+            console.error('❌ 재고배정 상태 API 응답 실패 (useEffect):', result);
           }
+        } else {
+          console.error('❌ 재고배정 상태 API 요청 실패 (useEffect):', response.status, response.statusText);
         }
       } catch (error) {
-        console.error('재고배정 상태 로드 오류:', error);
+        console.error('❌ 재고배정 상태 로드 오류 (useEffect):', error);
       } finally {
         setLoadingAssignment(false);
       }
