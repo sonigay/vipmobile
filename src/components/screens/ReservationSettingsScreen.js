@@ -92,7 +92,19 @@ function ReservationSettingsScreen({ loggedInStore }) {
   });
 
   // POS코드변경설정 관련 상태
-  const [posCodeMappings, setPosCodeMappings] = useState([]);
+  const [posCodeMappings, setPosCodeMappings] = useState([
+    {
+      id: Date.now(),
+      originalCode: '',
+      receiverCode: '',
+      mappedCode: '',
+      descriptionCode: '',
+      originalName: '',
+      receiverName: '',
+      mappedName: '',
+      descriptionName: ''
+    }
+  ]);
   const [loadingPosCodeMappings, setLoadingPosCodeMappings] = useState(false);
   const [showPosCodeMappingSection, setShowPosCodeMappingSection] = useState(true);
 
@@ -162,11 +174,15 @@ function ReservationSettingsScreen({ loggedInStore }) {
         setPosCodeMappings(data.mappings || []);
         setMessage({ type: 'success', text: 'POS코드변경설정을 성공적으로 불러왔습니다.' });
       } else {
-        throw new Error('POS코드변경설정 로드 실패');
+        const errorText = await response.text();
+        console.error('POS코드변경설정 로드 실패:', errorText);
+        throw new Error(`POS코드변경설정 로드 실패: ${errorText}`);
       }
     } catch (error) {
       console.error('POS코드변경설정 불러오기 오류:', error);
-      setMessage({ type: 'error', text: 'POS코드변경설정 로드 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: `POS코드변경설정 로드 중 오류가 발생했습니다: ${error.message}` });
+      // 에러가 발생해도 빈 배열로 초기화하여 UI가 보이도록 함
+      setPosCodeMappings([]);
     } finally {
       setLoadingPosCodeMappings(false);
     }
