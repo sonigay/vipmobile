@@ -3615,6 +3615,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       const color = (row[17] || '').toString().trim(); // R열: 색상
       const type = row.length > 31 ? (row[31] || '') : ''; // AF열: 유형
       const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
+      const originalPosName = (row[22] || '').toString().trim(); // W열: POS명 (원본)
       const reservationMemo = row.length > 34 ? (row[34] || '') : ''; // AI열: 예약메모
       const receiver = (row[25] || '').toString().trim(); // Z열: 접수자
       
@@ -3632,19 +3633,19 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
       
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
-      let mappedPosName = posName;
-      if (posName && receiver) {
+      let mappedPosName = originalPosName;
+      if (originalPosName && receiver) {
         // 접수자별 매핑 먼저 확인
-        const receiverKey = `${posName}_${receiver}`;
+        const receiverKey = `${originalPosName}_${receiver}`;
         if (posNameMappingWithReceiver.has(receiverKey)) {
           mappedPosName = posNameMappingWithReceiver.get(receiverKey);
-        } else if (posNameMapping.has(posName)) {
+        } else if (posNameMapping.has(originalPosName)) {
           // 일반 매핑 확인
-          mappedPosName = posNameMapping.get(posName);
+          mappedPosName = posNameMapping.get(originalPosName);
         }
-      } else if (posName && posNameMapping.has(posName)) {
+      } else if (originalPosName && posNameMapping.has(originalPosName)) {
         // 일반 매핑만 확인
-        mappedPosName = posNameMapping.get(posName);
+        mappedPosName = posNameMapping.get(originalPosName);
       }
       
       // 처음 5개 고객의 접수정보 디버깅 로그
@@ -3656,7 +3657,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
         console.log(`  접수메모: "${receivedMemo}"`);
         console.log(`  온세일접수일: "${onSaleReceivedDate}"`);
         console.log(`  모델명: "${model}"`);
-        console.log(`  원본 POS명: "${posName}" -> 매핑된 POS명: "${mappedPosName}"`);
+        console.log(`  원본 POS명: "${originalPosName}" -> 매핑된 POS명: "${mappedPosName}"`);
       }
       
       // 모델/용량/색상 조합
@@ -3759,6 +3760,39 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     } catch (error) {
       console.log('모델별 고객리스트: POS코드변경설정 시트 로드 실패 (무시됨):', error.message);
       posCodeMappingValues = [];
+    }
+    
+    // POS코드/이름 매핑 테이블 생성
+    const posCodeMapping = new Map();
+    const posNameMapping = new Map();
+    const posNameMappingWithReceiver = new Map();
+    
+    if (posCodeMappingValues && posCodeMappingValues.length > 1) {
+      posCodeMappingValues.slice(1).forEach(row => {
+        if (row.length >= 4) {
+          const originalCode = (row[0] || '').toString().trim();
+          const newCode = (row[1] || '').toString().trim();
+          const originalName = (row[2] || '').toString().trim();
+          const newName = (row[3] || '').toString().trim();
+          const receiver = row.length > 4 ? (row[4] || '').toString().trim() : '';
+          
+          if (originalCode && newCode) {
+            posCodeMapping.set(originalCode, newCode);
+          }
+          
+          if (originalName && newName) {
+            if (receiver) {
+              // 접수자별 매핑
+              const key = `${originalName}_${receiver}`;
+              posNameMappingWithReceiver.set(key, newName);
+            } else {
+              // 일반 매핑
+              posNameMapping.set(originalName, newName);
+            }
+          }
+        }
+      });
+      console.log(`모델별 고객리스트: POS코드 매핑 ${posCodeMapping.size}개, POS명 매핑 ${posNameMapping.size}개, 접수자별 매핑 ${posNameMappingWithReceiver.size}개 로드`);
     }
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
@@ -3892,6 +3926,22 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       const onSaleKey = `${customerName}_${storeCode}`;
       const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
       
+      // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
+      let mappedPosName = posName;
+      if (posName && receiver) {
+        // 접수자별 매핑 먼저 확인
+        const receiverKey = `${posName}_${receiver}`;
+        if (posNameMappingWithReceiver.has(receiverKey)) {
+          mappedPosName = posNameMappingWithReceiver.get(receiverKey);
+        } else if (posNameMapping.has(posName)) {
+          // 일반 매핑 확인
+          mappedPosName = posNameMapping.get(posName);
+        }
+      } else if (posName && posNameMapping.has(posName)) {
+        // 일반 매핑만 확인
+        mappedPosName = posNameMapping.get(posName);
+      }
+      
       // 처음 5개 고객의 접수정보 디버깅 로그
       if (index < 5) {
         console.log(`모델별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
@@ -3901,6 +3951,7 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         console.log(`  마당메모: "${receivedMemo}"`);
         console.log(`  온세일접수일: "${onSaleReceivedDate}"`);
         console.log(`  모델명: "${model}"`);
+        console.log(`  원본 POS명: "${posName}" -> 매핑된 POS명: "${mappedPosName}"`);
       }
       
       // 모델/용량/색상 조합
@@ -3915,7 +3966,7 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         modelCapacityColor, // 모델&용량&색상으로 변경
         type,
         storeCode,
-        posName,
+        posName: mappedPosName, // 매핑된 POS명 사용
         reservationMemo,
         yardReceivedMemo: receivedMemo,
         receiver
