@@ -2250,8 +2250,8 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
           const phoneklColor = (row[3] || '').toString().trim(); // E열: 색상
           
           if (reservationSite && phoneklModel && phoneklColor) {
-            // 정규화 규칙의 키를 사전예약사이트 형식으로 생성
-            const key = `${reservationSite}`;
+            // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
+            const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
             normalizationRules.set(key, { phoneklModel, phoneklColor });
           }
         }
