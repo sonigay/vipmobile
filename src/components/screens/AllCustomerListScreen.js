@@ -61,16 +61,22 @@ function AllCustomerListScreen({ loggedInStore }) {
     setError('');
 
     try {
+      console.log('🔍 [전체고객리스트 디버깅] 고객리스트 로드 시작');
       const result = await getCachedAllCustomerList(process.env.REACT_APP_API_URL);
       
       if (result.success) {
+        console.log('✅ [전체고객리스트 디버깅] 고객리스트 로드 성공');
+        console.log(`  - 로드된 고객 수: ${result.data.length}명`);
+        console.log(`  - 첫 번째 고객 예약번호: ${result.data[0]?.reservationNumber || '없음'}`);
+        console.log(`  - 마지막 고객 예약번호: ${result.data[result.data.length - 1]?.reservationNumber || '없음'}`);
+        
         setCustomerList(result.data);
         setFilteredCustomerList(result.data);
       } else {
         throw new Error(result.message || '전체 고객 리스트 로드에 실패했습니다.');
       }
     } catch (error) {
-      console.error('전체 고객 리스트 로드 오류:', error);
+      console.error('❌ [전체고객리스트 디버깅] 고객리스트 로드 오류:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -138,25 +144,23 @@ function AllCustomerListScreen({ loggedInStore }) {
 
   // 캐시 새로고침
   const refreshCache = useCallback(async () => {
+    console.log('🔄 [전체고객리스트 디버깅] 캐시 새로고침 시작');
     clearAllCustomerCache();
     await loadAllCustomerList();
     
     // 재고배정 상태도 함께 로드
     try {
       setLoadingAssignment(true);
-      console.log('🔍 [재고배정 디버깅] API 호출 시작...');
+      console.log('🔍 [재고배정 디버깅] API 요청 시작');
+      console.log(`  - API URL: ${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+      
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
       
-      console.log('🔍 [재고배정 디버깅] API 응답 상태:', response.status, response.statusText);
+      console.log('📡 [재고배정 디버깅] API 응답 상태:', response.status, response.statusText);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('🔍 [재고배정 디버깅] API 응답 데이터 구조:', {
-          success: result.success,
-          dataLength: result.data?.length || 0,
-          total: result.total,
-          stats: result.stats
-        });
+        console.log('📊 [재고배정 디버깅] API 응답 데이터:', result);
         
         if (result.success) {
           // 예약번호를 키로 하는 맵 생성
@@ -170,45 +174,64 @@ function AllCustomerListScreen({ loggedInStore }) {
             };
           });
           
-          console.log('🔍 [재고배정 디버깅] 상태 맵 생성 완료:', {
-            mapSize: Object.keys(statusMap).length,
-            sampleKeys: Object.keys(statusMap).slice(0, 3)
-          });
-          
           setAssignmentStatus(statusMap);
           
-          // 상세 디버깅: 실제 데이터와 매핑 확인
-          console.log('🔍 [재고배정 디버깅] 고객리스트와 배정상태 매핑 확인:');
-          console.log(`  - 고객리스트 개수: ${customerList.length}`);
-          console.log(`  - 배정상태 맵 개수: ${Object.keys(statusMap).length}`);
+          // 핵심 디버깅: 데이터 매핑 상태 확인
+          console.log('🔍 [재고배정 디버깅] 데이터 매핑 상태:');
+          console.log(`  - 고객리스트: ${customerList.length}개`);
+          console.log(`  - 배정상태 데이터: ${Object.keys(statusMap).length}개`);
+          console.log(`  - 매핑 성공률: ${((Object.keys(statusMap).length / customerList.length) * 100).toFixed(1)}%`);
           
-          // 처음 5개 고객의 매핑 상태 확인
-          customerList.slice(0, 5).forEach((customer, index) => {
-            const status = statusMap[customer.reservationNumber];
-            console.log(`  ${index + 1}. ${customer.reservationNumber} (${customer.customerName})`);
-            console.log(`     - 매핑 상태: ${status ? '성공' : '실패'}`);
-            if (status) {
-              console.log(`     - 배정상태: ${status.assignmentStatus}`);
-              console.log(`     - 개통상태: ${status.activationStatus}`);
-              console.log(`     - 배정일련번호: ${status.assignedSerialNumber || '없음'}`);
-            } else {
-              console.log(`     - 예약번호: "${customer.reservationNumber}"`);
-              console.log(`     - 매핑 실패 원인: 예약번호가 배정상태 데이터에 없음`);
-            }
+          // 상세 매핑 분석
+          const customerReservationNumbers = customerList.map(c => c.reservationNumber).filter(Boolean);
+          const statusReservationNumbers = Object.keys(statusMap);
+          
+          console.log('📋 [재고배정 디버깅] 예약번호 매핑 분석:');
+          console.log(`  - 고객리스트 예약번호 샘플 (처음 5개):`, customerReservationNumbers.slice(0, 5));
+          console.log(`  - 배정상태 예약번호 샘플 (처음 5개):`, statusReservationNumbers.slice(0, 5));
+          
+          // 매칭되지 않는 예약번호 찾기
+          const unmatchedCustomers = customerReservationNumbers.filter(
+            num => !statusReservationNumbers.includes(num)
+          );
+          console.log(`  - 매칭되지 않는 고객 수: ${unmatchedCustomers.length}개`);
+          if (unmatchedCustomers.length > 0) {
+            console.log(`  - 매칭되지 않는 예약번호 샘플:`, unmatchedCustomers.slice(0, 10));
+          }
+          
+          // 배정상태 통계
+          const assignmentStats = {
+            배정완료: 0,
+            미배정: 0,
+            개통완료: 0,
+            미개통: 0
+          };
+          
+          Object.values(statusMap).forEach(status => {
+            if (status.assignmentStatus === '배정완료') assignmentStats.배정완료++;
+            else if (status.assignmentStatus.startsWith('미배정')) assignmentStats.미배정++;
+            
+            if (status.activationStatus === '개통완료') assignmentStats.개통완료++;
+            else if (status.activationStatus === '미개통') assignmentStats.미개통++;
           });
+          
+          console.log('📈 [재고배정 디버깅] 배정상태 통계:', assignmentStats);
           
         } else {
           console.error('❌ [재고배정 디버깅] API 응답 실패:', result);
         }
       } else {
         console.error('❌ [재고배정 디버깅] API 요청 실패:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ [재고배정 디버깅] API 오류 상세:', errorText);
       }
     } catch (error) {
       console.error('❌ [재고배정 디버깅] 로드 오류:', error);
+      console.error('❌ [재고배정 디버깅] 오류 스택:', error.stack);
     } finally {
       setLoadingAssignment(false);
     }
-  }, [loadAllCustomerList]);
+  }, [loadAllCustomerList, customerList.length]);
 
 
 
@@ -324,19 +347,16 @@ function AllCustomerListScreen({ loggedInStore }) {
     const loadAssignmentStatus = async () => {
       try {
         setLoadingAssignment(true);
-        console.log('🔍 [재고배정 디버깅] useEffect에서 API 호출 시작...');
+        console.log('🔍 [재고배정 디버깅] useEffect에서 배정상태 로드 시작');
+        console.log(`  - 현재 고객리스트 길이: ${customerList.length}`);
+        
         const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
         
-        console.log('🔍 [재고배정 디버깅] useEffect API 응답 상태:', response.status, response.statusText);
+        console.log('📡 [재고배정 디버깅] useEffect API 응답 상태:', response.status, response.statusText);
         
         if (response.ok) {
           const result = await response.json();
-          console.log('🔍 [재고배정 디버깅] useEffect API 응답 데이터 구조:', {
-            success: result.success,
-            dataLength: result.data?.length || 0,
-            total: result.total,
-            stats: result.stats
-          });
+          console.log('📊 [재고배정 디버깅] useEffect API 응답 데이터:', result);
           
           if (result.success) {
             // 예약번호를 키로 하는 맵 생성
@@ -350,48 +370,53 @@ function AllCustomerListScreen({ loggedInStore }) {
               };
             });
             
-            console.log('🔍 [재고배정 디버깅] useEffect 상태 맵 생성 완료:', {
-              mapSize: Object.keys(statusMap).length,
-              sampleKeys: Object.keys(statusMap).slice(0, 3)
-            });
-            
             setAssignmentStatus(statusMap);
             
-            // 상세 디버깅: 실제 데이터와 매핑 확인
-            console.log('🔍 [재고배정 디버깅] useEffect 고객리스트와 배정상태 매핑 확인:');
-            console.log(`  - 고객리스트 개수: ${customerList.length}`);
-            console.log(`  - 배정상태 맵 개수: ${Object.keys(statusMap).length}`);
+            // 핵심 디버깅: 데이터 매핑 상태 확인
+            console.log('🔍 [재고배정 디버깅] useEffect 데이터 매핑 상태:');
+            console.log(`  - 고객리스트: ${customerList.length}개`);
+            console.log(`  - 배정상태 데이터: ${Object.keys(statusMap).length}개`);
+            console.log(`  - 매핑 성공률: ${((Object.keys(statusMap).length / customerList.length) * 100).toFixed(1)}%`);
             
-            // 처음 5개 고객의 매핑 상태 확인
-            customerList.slice(0, 5).forEach((customer, index) => {
-              const status = statusMap[customer.reservationNumber];
-              console.log(`  ${index + 1}. ${customer.reservationNumber} (${customer.customerName})`);
-              console.log(`     - 매핑 상태: ${status ? '성공' : '실패'}`);
-              if (status) {
-                console.log(`     - 배정상태: ${status.assignmentStatus}`);
-                console.log(`     - 개통상태: ${status.activationStatus}`);
-                console.log(`     - 배정일련번호: ${status.assignedSerialNumber || '없음'}`);
-              } else {
-                console.log(`     - 예약번호: "${customer.reservationNumber}"`);
-                console.log(`     - 매핑 실패 원인: 예약번호가 배정상태 데이터에 없음`);
-              }
-            });
+            // 상세 매핑 분석
+            const customerReservationNumbers = customerList.map(c => c.reservationNumber).filter(Boolean);
+            const statusReservationNumbers = Object.keys(statusMap);
+            
+            console.log('📋 [재고배정 디버깅] useEffect 예약번호 매핑 분석:');
+            console.log(`  - 고객리스트 예약번호 샘플 (처음 5개):`, customerReservationNumbers.slice(0, 5));
+            console.log(`  - 배정상태 예약번호 샘플 (처음 5개):`, statusReservationNumbers.slice(0, 5));
+            
+            // 매칭되지 않는 예약번호 찾기
+            const unmatchedCustomers = customerReservationNumbers.filter(
+              num => !statusReservationNumbers.includes(num)
+            );
+            console.log(`  - 매칭되지 않는 고객 수: ${unmatchedCustomers.length}개`);
+            if (unmatchedCustomers.length > 0) {
+              console.log(`  - 매칭되지 않는 예약번호 샘플:`, unmatchedCustomers.slice(0, 10));
+            }
             
           } else {
             console.error('❌ [재고배정 디버깅] useEffect API 응답 실패:', result);
           }
         } else {
           console.error('❌ [재고배정 디버깅] useEffect API 요청 실패:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ [재고배정 디버깅] useEffect API 오류 상세:', errorText);
         }
       } catch (error) {
         console.error('❌ [재고배정 디버깅] useEffect 로드 오류:', error);
+        console.error('❌ [재고배정 디버깅] useEffect 오류 스택:', error.stack);
       } finally {
         setLoadingAssignment(false);
       }
     };
     
-    loadAssignmentStatus();
-  }, [loadAllCustomerList]);
+    if (customerList.length > 0) {
+      loadAssignmentStatus();
+    } else {
+      console.log('⚠️ [재고배정 디버깅] 고객리스트가 비어있어 배정상태 로드를 건너뜀');
+    }
+  }, [customerList.length]);
 
   // 필터 변경 시 적용
   useEffect(() => {
@@ -728,30 +753,17 @@ function AllCustomerListScreen({ loggedInStore }) {
                           (() => {
                             const status = assignmentStatus[customer.reservationNumber];
                             
-                            // 디버깅: 첫 번째 고객만 상세 로그 출력
-                            if (index === 0) {
-                              console.log('🔍 [테이블 디버깅] 첫 번째 고객 재고배정 상태 확인:');
-                              console.log(`  - 예약번호: "${customer.reservationNumber}"`);
-                              console.log(`  - 고객명: "${customer.customerName}"`);
-                              console.log(`  - assignmentStatus 전체:`, assignmentStatus);
-                              console.log(`  - 매핑된 상태:`, status);
-                              console.log(`  - 상태 존재 여부: ${status ? '있음' : '없음'}`);
-                              if (status) {
-                                console.log(`  - 배정상태: "${status.assignmentStatus}"`);
-                                console.log(`  - 개통상태: "${status.activationStatus}"`);
-                              }
+                            // 디버깅: 개별 고객의 배정상태 확인
+                            if (index < 5) { // 처음 5개만 로그 출력
+                              console.log(`🔍 [테이블 디버깅] 고객 ${index + 1}:`, {
+                                reservationNumber: customer.reservationNumber,
+                                customerName: customer.customerName,
+                                status: status,
+                                hasStatus: !!status
+                              });
                             }
                             
                             if (!status) {
-                              // 디버깅: 상태가 없는 경우 원인 분석
-                              if (index < 3) {
-                                console.log(`🔍 [테이블 디버깅] ${index + 1}번째 고객 상태 없음:`, {
-                                  reservationNumber: customer.reservationNumber,
-                                  customerName: customer.customerName,
-                                  assignmentStatusKeys: Object.keys(assignmentStatus),
-                                  hasKey: assignmentStatus.hasOwnProperty(customer.reservationNumber)
-                                });
-                              }
                               return '-';
                             }
                             
@@ -781,14 +793,13 @@ function AllCustomerListScreen({ loggedInStore }) {
                           (() => {
                             const status = assignmentStatus[customer.reservationNumber];
                             
-                            // 디버깅: 첫 번째 고객만 상세 로그 출력
-                            if (index === 0) {
-                              console.log('🔍 [테이블 디버깅] 첫 번째 고객 개통완료 상태 확인:');
-                              console.log(`  - 예약번호: "${customer.reservationNumber}"`);
-                              console.log(`  - 매핑된 상태:`, status);
-                              if (status) {
-                                console.log(`  - 개통상태: "${status.activationStatus}"`);
-                              }
+                            // 디버깅: 개별 고객의 개통상태 확인
+                            if (index < 5) { // 처음 5개만 로그 출력
+                              console.log(`🔍 [테이블 디버깅] 고객 ${index + 1} 개통상태:`, {
+                                reservationNumber: customer.reservationNumber,
+                                activationStatus: status?.activationStatus || '없음',
+                                hasStatus: !!status
+                              });
                             }
                             
                             if (!status) return '-';

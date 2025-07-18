@@ -560,7 +560,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
       });
     }
     
-    console.log(`여직원검수데이터메모 시트 저장 완료: ${dataRows.length}개 항목`);
+
   } catch (error) {
     console.error('여직원검수데이터메모 시트 저장 실패:', error);
   }
@@ -603,7 +603,7 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
       });
     }
     
-    console.log(`여직원검수데이터메모 시트 정리 완료: ${validRows.length - 1}개 항목 유지`);
+
   } catch (error) {
     console.error('여직원검수데이터메모 시트 정리 실패:', error);
   }
@@ -2207,7 +2207,7 @@ async function checkAndUpdateAddresses() {
 // 재고배정 상태 계산 API
 app.get('/api/inventory/assignment-status', async (req, res) => {
   try {
-    console.log('🔍 [재고배정 디버깅] API 요청 시작');
+    console.log('🔍 [서버 디버깅] 재고배정 상태 API 호출 시작');
     
     // 캐시 키 생성
     const cacheKey = 'inventory_assignment_status';
@@ -2215,9 +2215,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     // 캐시에서 먼저 확인 (30분 TTL)
     const cachedData = cacheUtils.get(cacheKey);
     if (cachedData) {
-      console.log('🔍 [재고배정 디버깅] 캐시된 데이터 반환');
+      console.log('✅ [서버 디버깅] 캐시된 데이터 반환');
       return res.json(cachedData);
     }
+    
+    console.log('📊 [서버 디버깅] 시트 데이터 로드 시작');
     
     // 1. 필요한 시트 데이터 병렬로 가져오기
     const [reservationSiteValues, phoneklInventoryValues, phoneklStoreValues, phoneklActivationValues, normalizationValues] = await Promise.all([
@@ -2227,6 +2229,13 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       getSheetValues('폰클개통데이터'),
       getSheetValues('정규화작업')
     ]);
+    
+    console.log('📋 [서버 디버깅] 시트 데이터 로드 결과:');
+    console.log(`  - 사전예약사이트: ${reservationSiteValues?.length || 0}행`);
+    console.log(`  - 폰클재고데이터: ${phoneklInventoryValues?.length || 0}행`);
+    console.log(`  - 폰클출고처데이터: ${phoneklStoreValues?.length || 0}행`);
+    console.log(`  - 폰클개통데이터: ${phoneklActivationValues?.length || 0}행`);
+    console.log(`  - 정규화작업: ${normalizationValues?.length || 0}행`);
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
       throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
@@ -2241,6 +2250,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     }
     
     // 2. 정규화 규칙 로드
+    console.log('🔧 [서버 디버깅] 정규화 규칙 로드 시작');
     const normalizationRules = new Map();
     if (normalizationValues && normalizationValues.length > 1) {
       normalizationValues.slice(1).forEach(row => {
@@ -2258,9 +2268,14 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       });
     }
     
-    console.log(`🔍 [재고배정 디버깅] 정규화 규칙 로드: ${normalizationRules.size}개`);
+    console.log(`✅ [서버 디버깅] 정규화 규칙 로드 완료: ${normalizationRules.size}개 규칙`);
+    console.log('📋 [서버 디버깅] 정규화 규칙 샘플 (처음 5개):');
+    Array.from(normalizationRules.entries()).slice(0, 5).forEach(([key, value]) => {
+      console.log(`  - "${key}" → "${value.phoneklModel}" "${value.phoneklColor}"`);
+    });
     
     // 3. 폰클출고처데이터에서 POS코드 매핑 생성
+    console.log('🏪 [서버 디버깅] POS코드 매핑 생성 시작');
     const storePosCodeMapping = new Map();
     phoneklStoreValues.slice(1).forEach(row => {
       if (row.length >= 8) {
@@ -2273,9 +2288,14 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       }
     });
     
-    console.log(`🔍 [재고배정 디버깅] POS코드 매핑: ${storePosCodeMapping.size}개`);
+    console.log(`✅ [서버 디버깅] POS코드 매핑 생성 완료: ${storePosCodeMapping.size}개 매핑`);
+    console.log('📋 [서버 디버깅] POS코드 매핑 샘플 (처음 5개):');
+    Array.from(storePosCodeMapping.entries()).slice(0, 5).forEach(([store, pos]) => {
+      console.log(`  - "${store}" → "${pos}"`);
+    });
     
     // 4. 폰클재고데이터에서 사용 가능한 재고 정보 생성
+    console.log('📦 [서버 디버깅] 재고 정보 생성 시작');
     const availableInventory = new Map(); // key: "모델명_색상_POS코드", value: [일련번호들]
     const serialNumberToStore = new Map(); // key: 일련번호, value: 출고처명
     
@@ -2302,9 +2322,15 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       }
     });
     
-    console.log(`🔍 [재고배정 디버깅] 재고 데이터: ${availableInventory.size}개 조합`);
+    console.log(`✅ [서버 디버깅] 재고 정보 생성 완료: ${availableInventory.size}개 재고 그룹`);
+    console.log(`  - 총 일련번호 수: ${serialNumberToStore.size}개`);
+    console.log('📋 [서버 디버깅] 재고 그룹 샘플 (처음 5개):');
+    Array.from(availableInventory.entries()).slice(0, 5).forEach(([key, serials]) => {
+      console.log(`  - "${key}": ${serials.length}개 일련번호`);
+    });
     
     // 5. 폰클개통데이터에서 개통 완료된 일련번호 수집
+    console.log('📱 [서버 디버깅] 개통 데이터 처리 시작');
     const activatedSerialNumbers = new Set();
     if (phoneklActivationValues && phoneklActivationValues.length > 1) {
       phoneklActivationValues.slice(1).forEach(row => {
@@ -2319,30 +2345,23 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       });
     }
     
-    console.log(`🔍 [재고배정 디버깅] 개통 데이터: ${activatedSerialNumbers.size}개`);
+    console.log(`✅ [서버 디버깅] 개통 데이터 처리 완료: ${activatedSerialNumbers.size}개 개통된 일련번호`);
     
     // 6. 사전예약사이트 데이터 처리 및 배정 상태 계산
+    console.log('👥 [서버 디버깅] 고객 데이터 처리 시작');
     const reservationSiteRows = reservationSiteValues.slice(1);
     const assignmentResults = [];
-    
-    console.log(`🔍 [재고배정 디버깅] 사전예약사이트 데이터: ${reservationSiteRows.length}개 행`);
     
     // 이미 배정된 일련번호 추적
     const assignedSerialNumbers = new Set();
     
-    // 정규화 규칙 디버깅 (처음 5개만)
-    console.log('🔍 [재고배정 디버깅] 정규화 규칙 샘플 (처음 5개):');
-    let ruleCount = 0;
-    normalizationRules.forEach((value, key) => {
-      if (ruleCount < 5) {
-        console.log(`  ${ruleCount + 1}. "${key}" -> "${value.phoneklModel} ${value.phoneklColor}"`);
-        ruleCount++;
-      }
-    });
-    
     let processedCount = 0;
     let skippedCount = 0;
     let normalizationFailedCount = 0;
+    let successfulAssignmentCount = 0;
+    let waitingAssignmentCount = 0;
+    
+    console.log(`📊 [서버 디버깅] 처리할 고객 수: ${reservationSiteRows.length}명`);
     
     reservationSiteRows.forEach((row, index) => {
       if (row.length < 35) {
@@ -2370,24 +2389,13 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       const reservationSiteModel = `${model} ${capacity} ${color}`.trim();
       const normalizedRule = normalizationRules.get(reservationSiteModel);
       
-      // 처음 5개 고객에 대해 상세 디버깅
-      if (index < 5) {
-        console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 정규화 시도:`);
-        console.log(`  - 예약번호: "${reservationNumber}"`);
-        console.log(`  - 고객명: "${customerName}"`);
-        console.log(`  - 모델: "${model}"`);
-        console.log(`  - 용량: "${capacity}"`);
-        console.log(`  - 색상: "${color}"`);
-        console.log(`  - 조합된 키: "${reservationSiteModel}"`);
-        console.log(`  - 정규화 규칙 존재: ${normalizedRule ? '있음' : '없음'}`);
-        if (normalizedRule) {
-          console.log(`  - 매핑된 폰클모델: "${normalizedRule.phoneklModel}"`);
-          console.log(`  - 매핑된 폰클색상: "${normalizedRule.phoneklColor}"`);
-        }
-      }
+
       
       if (!normalizedRule) {
         normalizationFailedCount++;
+        if (index < 10) { // 처음 10개만 로그 출력
+          console.log(`❌ [서버 디버깅] 정규화 실패: "${reservationSiteModel}" (예약번호: ${reservationNumber})`);
+        }
         return;
       }
       
@@ -2400,16 +2408,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       // 해당 재고 확인
       const availableSerials = availableInventory.get(inventoryKey) || [];
       
-      // 처음 5개 고객에 대해 재고 상태 디버깅
-      if (index < 5) {
-        console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 재고 상태:`);
-        console.log(`  - 재고 키: "${inventoryKey}"`);
-        console.log(`  - 사용 가능한 일련번호: ${availableSerials.length}개`);
-        if (availableSerials.length > 0) {
-          console.log(`  - 첫 번째 일련번호: "${availableSerials[0]}"`);
-        }
-        console.log(`  - 이미 배정된 일련번호: ${assignedSerialNumber || '없음'}`);
-      }
+
       
       // 배정 상태 계산
       let assignmentStatus = '미배정';
@@ -2417,94 +2416,83 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       let assignedSerial = '';
       let waitingOrder = 0;
       
-              // 이미 배정된 일련번호가 있는 경우
-        if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
-          assignedSerial = assignedSerialNumber;
+      // 이미 배정된 일련번호가 있는 경우
+      if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
+        assignedSerial = assignedSerialNumber;
+        assignmentStatus = '배정완료';
+        successfulAssignmentCount++;
+        
+        // 개통 상태 확인
+        if (activatedSerialNumbers.has(assignedSerialNumber)) {
+          activationStatus = '개통완료';
+        }
+        
+      } else {
+        // 새로운 배정이 필요한 경우
+        const unassignedSerials = availableSerials.filter(serial => !assignedSerialNumbers.has(serial));
+        
+        if (unassignedSerials.length > 0) {
+          // 배정 가능한 재고가 있음
+          assignedSerial = unassignedSerials[0];
           assignmentStatus = '배정완료';
+          assignedSerialNumbers.add(assignedSerial);
+          successfulAssignmentCount++;
           
           // 개통 상태 확인
-          if (activatedSerialNumbers.has(assignedSerialNumber)) {
+          if (activatedSerialNumbers.has(assignedSerial)) {
             activationStatus = '개통완료';
           }
           
-          // 처음 5개 고객에 대해 배정 상태 디버깅
-          if (index < 5) {
-            console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 기존 배정:`);
-            console.log(`  - 배정상태: "${assignmentStatus}"`);
-            console.log(`  - 개통상태: "${activationStatus}"`);
-            console.log(`  - 배정일련번호: "${assignedSerial}"`);
-          }
         } else {
-          // 새로운 배정이 필요한 경우
-          const unassignedSerials = availableSerials.filter(serial => !assignedSerialNumbers.has(serial));
+          // 배정 대기 중 - 순번 계산
+          const allCustomersForModel = reservationSiteRows.filter(r => {
+            if (r.length < 35) return false;
+            const rModel = (r[15] || '').toString().trim();
+            const rCapacity = (r[16] || '').toString().trim();
+            const rColor = (r[17] || '').toString().trim();
+            const rPosCode = (r[21] || '').toString().trim();
+            return `${rModel} ${rCapacity} ${rColor}`.trim() === reservationSiteModel && rPosCode === posCode;
+          });
           
-          if (unassignedSerials.length > 0) {
-            // 배정 가능한 재고가 있음
-            assignedSerial = unassignedSerials[0];
-            assignmentStatus = '배정완료';
-            assignedSerialNumbers.add(assignedSerial);
+          // 우선순위별로 정렬 (온세일접수일 → 마당접수일 → 일반)
+          allCustomersForModel.sort((a, b) => {
+            const aOnSale = (a[12] || '').toString().trim();
+            const bOnSale = (b[12] || '').toString().trim();
+            const aYard = (a[11] || '').toString().trim();
+            const bYard = (b[11] || '').toString().trim();
+            const aDateTime = (a[14] || '').toString().trim();
+            const bDateTime = (b[14] || '').toString().trim();
             
-            // 개통 상태 확인
-            if (activatedSerialNumbers.has(assignedSerial)) {
-              activationStatus = '개통완료';
+            // 온세일접수일 우선
+            if (aOnSale && !bOnSale) return -1;
+            if (!aOnSale && bOnSale) return 1;
+            if (aOnSale && bOnSale) {
+              return new Date(aOnSale) - new Date(bOnSale);
             }
             
-            // 처음 5개 고객에 대해 배정 상태 디버깅
-            if (index < 5) {
-              console.log(`🔍 [재고배정 디버깅] ${index + 1}번째 고객 새 배정:`);
-              console.log(`  - 배정상태: "${assignmentStatus}"`);
-              console.log(`  - 개통상태: "${activationStatus}"`);
-              console.log(`  - 배정일련번호: "${assignedSerial}"`);
+            // 마당접수일 차선
+            if (aYard && !bYard) return -1;
+            if (!aYard && bYard) return 1;
+            if (aYard && bYard) {
+              return new Date(aYard) - new Date(bYard);
             }
-          } else {
-            // 배정 대기 중 - 순번 계산
-            const allCustomersForModel = reservationSiteRows.filter(r => {
-              if (r.length < 35) return false;
-              const rModel = (r[15] || '').toString().trim();
-              const rCapacity = (r[16] || '').toString().trim();
-              const rColor = (r[17] || '').toString().trim();
-              const rPosCode = (r[21] || '').toString().trim();
-              return `${rModel} ${rCapacity} ${rColor}`.trim() === reservationSiteModel && rPosCode === posCode;
-            });
             
-            // 우선순위별로 정렬 (온세일접수일 → 마당접수일 → 일반)
-            allCustomersForModel.sort((a, b) => {
-              const aOnSale = (a[12] || '').toString().trim();
-              const bOnSale = (b[12] || '').toString().trim();
-              const aYard = (a[11] || '').toString().trim();
-              const bYard = (b[11] || '').toString().trim();
-              const aDateTime = (a[14] || '').toString().trim();
-              const bDateTime = (b[14] || '').toString().trim();
-              
-              // 온세일접수일 우선
-              if (aOnSale && !bOnSale) return -1;
-              if (!aOnSale && bOnSale) return 1;
-              if (aOnSale && bOnSale) {
-                return new Date(aOnSale) - new Date(bOnSale);
-              }
-              
-              // 마당접수일 차선
-              if (aYard && !bYard) return -1;
-              if (!aYard && bYard) return 1;
-              if (aYard && bYard) {
-                return new Date(aYard) - new Date(bYard);
-              }
-              
-              // 사전예약일시
-              return new Date(aDateTime) - new Date(bDateTime);
-            });
-            
-            // 현재 고객의 순번 찾기
-            const currentIndex = allCustomersForModel.findIndex(r => 
-              (r[8] || '').toString().trim() === reservationNumber
-            );
-            
-            if (currentIndex !== -1) {
-              waitingOrder = currentIndex + 1;
-              assignmentStatus = `미배정(${waitingOrder}번째)`;
-            }
+            // 사전예약일시
+            return new Date(aDateTime) - new Date(bDateTime);
+          });
+          
+          // 현재 고객의 순번 찾기
+          const currentIndex = allCustomersForModel.findIndex(r => 
+            (r[8] || '').toString().trim() === reservationNumber
+          );
+          
+          if (currentIndex !== -1) {
+            waitingOrder = currentIndex + 1;
+            assignmentStatus = `미배정(${waitingOrder}번째)`;
+            waitingAssignmentCount++;
           }
         }
+      }
       
       assignmentResults.push({
         reservationNumber,
@@ -2523,12 +2511,12 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       processedCount++;
     });
     
-    console.log(`🔍 [재고배정 디버깅] 처리 결과 요약:`);
-    console.log(`  - 총 사전예약사이트 행: ${reservationSiteRows.length}개`);
-    console.log(`  - 처리된 고객: ${processedCount}개`);
-    console.log(`  - 건너뛴 고객: ${skippedCount}개`);
-    console.log(`  - 정규화 실패: ${normalizationFailedCount}개`);
-    console.log(`  - 최종 결과: ${assignmentResults.length}개`);
+    console.log('📊 [서버 디버깅] 고객 데이터 처리 완료:');
+    console.log(`  - 총 처리된 고객: ${processedCount}명`);
+    console.log(`  - 건너뛴 고객: ${skippedCount}명`);
+    console.log(`  - 정규화 실패: ${normalizationFailedCount}명`);
+    console.log(`  - 배정완료: ${successfulAssignmentCount}명`);
+    console.log(`  - 배정대기: ${waitingAssignmentCount}명`);
     
     // 핵심 디버깅 정보 출력
     const assignedCount = assignmentResults.filter(r => r.assignmentStatus === '배정완료').length;
@@ -2536,22 +2524,16 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     const activatedCount = assignmentResults.filter(r => r.activationStatus === '개통완료').length;
     const notActivatedCount = assignmentResults.filter(r => r.activationStatus === '미개통').length;
     
-    console.log(`🔍 [재고배정 디버깅] 최종 통계:`);
-    console.log(`  - 배정완료: ${assignedCount}개`);
-    console.log(`  - 미배정: ${unassignedCount}개`);
-    console.log(`  - 개통완료: ${activatedCount}개`);
-    console.log(`  - 미개통: ${notActivatedCount}개`);
+    console.log('📈 [서버 디버깅] 최종 통계:');
+    console.log(`  - 배정완료: ${assignedCount}명`);
+    console.log(`  - 미배정: ${unassignedCount}명`);
+    console.log(`  - 개통완료: ${activatedCount}명`);
+    console.log(`  - 미개통: ${notActivatedCount}명`);
     
-    // 처음 5개 결과 상세 출력
-    console.log(`🔍 [재고배정 디버깅] 처음 5개 결과 상세:`);
-    assignmentResults.slice(0, 5).forEach((result, index) => {
-      console.log(`  ${index + 1}. ${result.reservationNumber} (${result.customerName})`);
-      console.log(`     - 모델: "${result.model}"`);
-      console.log(`     - POS: "${result.posCode}"`);
-      console.log(`     - 배정상태: "${result.assignmentStatus}"`);
-      console.log(`     - 개통상태: "${result.activationStatus}"`);
-      console.log(`     - 배정일련번호: "${result.assignedSerialNumber || '없음'}"`);
-      console.log(`     - 대기순번: ${result.waitingOrder || 0}`);
+    // 예약번호 샘플 출력
+    console.log('📋 [서버 디버깅] 예약번호 샘플 (처음 10개):');
+    assignmentResults.slice(0, 10).forEach((result, index) => {
+      console.log(`  ${index + 1}. ${result.reservationNumber} - ${result.customerName} (${result.assignmentStatus})`);
     });
     
     const result = {
@@ -2568,11 +2550,14 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     
     // 결과 캐싱 (30분 TTL)
     cacheUtils.set(cacheKey, result, 30 * 60);
+    console.log('✅ [서버 디버깅] 결과 캐싱 완료');
     
+    console.log('🎉 [서버 디버깅] API 응답 전송 완료');
     res.json(result);
     
   } catch (error) {
-    console.error('재고배정 상태 계산 오류:', error);
+    console.error('❌ [서버 디버깅] 재고배정 상태 계산 오류:', error);
+    console.error('❌ [서버 디버깅] 오류 스택:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Failed to calculate inventory assignment status',
