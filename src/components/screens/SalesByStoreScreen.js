@@ -890,7 +890,10 @@ function SalesByStoreScreen({ loggedInStore }) {
     } finally {
       setLoadingModelColor(false);
     }
-  }, [normalizationStatus]);
+    
+    // 재고배정 상태도 함께 로드
+    await loadAssignmentStatus();
+  }, [normalizationStatus, loadAssignmentStatus]);
 
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
@@ -2156,31 +2159,45 @@ function SalesByStoreScreen({ loggedInStore }) {
                 {/* 재고 현황 통계 */}
                 <Box sx={{ mt: 2 }}>
                   <Grid container spacing={2}>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} md={2}>
                       <Chip
                         label={`총 모델: ${Object.keys(getCurrentInventoryData()).length}개`}
                         color="primary"
                         variant="outlined"
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} md={2}>
                       <Chip
                         label={`재고 충분: ${Object.values(getCurrentInventoryData()).filter(item => item.status === '충분').length}개`}
                         color="success"
                         variant="outlined"
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} md={2}>
                       <Chip
                         label={`재고 부족: ${Object.values(getCurrentInventoryData()).filter(item => item.status === '부족').length}개`}
                         color="warning"
                         variant="outlined"
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} md={2}>
                       <Chip
                         label={`초과예약: ${Object.values(getCurrentInventoryData()).filter(item => item.status === '초과예약').length}개`}
                         color="error"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Chip
+                        label={loadingAssignment ? '재고배정 로딩중...' : `재고배정: ${Object.values(assignmentStatus).filter(status => status.assignmentStatus === '배정완료').length}완료/${Object.values(assignmentStatus).filter(status => status.assignmentStatus.startsWith('미배정')).length}미배정`}
+                        color="success"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Chip
+                        label={loadingAssignment ? '개통완료 로딩중...' : `개통완료: ${Object.values(assignmentStatus).filter(status => status.activationStatus === '개통완료').length}완료/${Object.values(assignmentStatus).filter(status => status.activationStatus === '미개통').length}미개통`}
+                        color="info"
                         variant="outlined"
                       />
                     </Grid>
