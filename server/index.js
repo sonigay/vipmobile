@@ -3486,6 +3486,16 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       getSheetValues('마당접수'),
       getSheetValues('온세일')
     ]);
+
+    // 3. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
+    let posCodeMappingValues = null;
+    try {
+      posCodeMappingValues = await getSheetValues('POS코드변경설정');
+      console.log('POS별 고객리스트: POS코드변경설정 시트 로드 성공');
+    } catch (error) {
+      console.log('POS별 고객리스트: POS코드변경설정 시트 로드 실패 (무시됨):', error.message);
+      posCodeMappingValues = [];
+    }
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
       throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
@@ -3499,7 +3509,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       throw new Error('온세일 데이터를 가져올 수 없습니다.');
     }
     
-    // 3. 정규화 규칙 매핑 생성
+    // 4. 정규화 규칙 매핑 생성
     const normalizationRules = normalizedData.normalizationRules || [];
     const ruleMap = new Map();
     
@@ -3568,10 +3578,30 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
     const customerList = [];
     
     // POS별 필터링을 먼저 수행하여 처리할 데이터 양 줄이기
+    // 매핑된 POS명도 포함하여 필터링
+    const targetPosNames = new Set([posName]);
+    
+    // 매핑된 POS명에서 원본 POS명 찾기
+    for (const [originalName, mappedName] of posNameMapping.entries()) {
+      if (mappedName === posName) {
+        targetPosNames.add(originalName);
+      }
+    }
+    
+    // 접수자별 매핑에서도 원본 POS명 찾기
+    for (const [key, mappedName] of posNameMappingWithReceiver.entries()) {
+      if (mappedName === posName) {
+        const originalName = key.split('_')[0]; // key는 "원본POS명_접수자" 형태
+        targetPosNames.add(originalName);
+      }
+    }
+    
+    console.log(`POS "${posName}" 필터링 대상:`, Array.from(targetPosNames));
+    
     const filteredRows = reservationSiteRows.filter(row => {
       if (row.length < 30) return false;
       const rowPosName = (row[22] || '').toString().trim(); // W열: POS명
-      return rowPosName === posName;
+      return targetPosNames.has(rowPosName);
     });
     
     console.log(`POS "${posName}" 필터링 결과: ${filteredRows.length}개 행 (전체 ${reservationSiteRows.length}개 중)`);
@@ -3601,6 +3631,22 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       const onSaleKey = `${customerName}_${storeCode}`;
       const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
       
+      // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
+      let mappedPosName = posName;
+      if (posName && receiver) {
+        // 접수자별 매핑 먼저 확인
+        const receiverKey = `${posName}_${receiver}`;
+        if (posNameMappingWithReceiver.has(receiverKey)) {
+          mappedPosName = posNameMappingWithReceiver.get(receiverKey);
+        } else if (posNameMapping.has(posName)) {
+          // 일반 매핑 확인
+          mappedPosName = posNameMapping.get(posName);
+        }
+      } else if (posName && posNameMapping.has(posName)) {
+        // 일반 매핑만 확인
+        mappedPosName = posNameMapping.get(posName);
+      }
+      
       // 처음 5개 고객의 접수정보 디버깅 로그
       if (index < 5) {
         console.log(`POS별 고객리스트 접수정보 매칭: 고객명="${customerName}", 예약번호="${reservationNumber}"`);
@@ -3610,6 +3656,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
         console.log(`  접수메모: "${receivedMemo}"`);
         console.log(`  온세일접수일: "${onSaleReceivedDate}"`);
         console.log(`  모델명: "${model}"`);
+        console.log(`  원본 POS명: "${posName}" -> 매핑된 POS명: "${mappedPosName}"`);
       }
       
       // 모델/용량/색상 조합
@@ -3624,7 +3671,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
         modelCapacityColor, // 모델&용량&색상으로 변경
         type,
         storeCode,
-        posName,
+        posName: mappedPosName, // 매핑된 POS명 사용
         reservationMemo,
         yardReceivedMemo: receivedMemo,
         receiver
@@ -3898,6 +3945,32 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
     
   } catch (error) {
     console.error('모델별 고객 리스트 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load model-specific customer data',
+      message: error.message
+    });
+  }
+});
+
+// 모델별 고객 리스트 API (model-color 경로)
+app.get('/api/reservation-sales/model-color/by-model/:model', async (req, res) => {
+  try {
+    const { model } = req.params;
+    console.log(`모델별 고객 리스트 요청 (model-color): ${model}`);
+    
+    // 기존 customers/by-model API를 재사용
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/reservation-sales/customers/by-model/${encodeURIComponent(model)}`);
+    
+    if (!response.ok) {
+      throw new Error('모델별 고객 리스트를 불러올 수 없습니다.');
+    }
+    
+    const data = await response.json();
+    res.json(data);
+    
+  } catch (error) {
+    console.error('모델별 고객 리스트 조회 오류 (model-color):', error);
     res.status(500).json({
       success: false,
       error: 'Failed to load model-specific customer data',
