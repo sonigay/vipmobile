@@ -3164,10 +3164,11 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       cacheUtils.set(normalizedCacheKey, normalizedData, 600);
     }
     
-    // 2. 병렬로 시트 데이터 가져오기
-    const [reservationSiteValues, yardValues] = await Promise.all([
+    // 2. 병렬로 시트 데이터 가져오기 (온세일 포함)
+    const [reservationSiteValues, yardValues, onSaleValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
-      getSheetValues('마당접수')
+      getSheetValues('마당접수'),
+      getSheetValues('온세일')
     ]);
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
@@ -3176,6 +3177,10 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     
     if (!yardValues || yardValues.length < 2) {
       throw new Error('마당접수 데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!onSaleValues || onSaleValues.length < 2) {
+      throw new Error('온세일 데이터를 가져올 수 없습니다.');
     }
     
     // 4. 정규화 규칙 매핑 생성
@@ -3231,6 +3236,30 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     console.log(`마당접수 데이터 인덱싱 완료: ${yardIndex.size}개 예약번호 (총 ${yardIndexCount}개 처리)`);
     console.log(`마당접수 예약번호 샘플:`, Array.from(yardIndex.keys()).slice(0, 5));
     
+    // 온세일 데이터 인덱싱 (고객명 + 대리점코드 기준)
+    const onSaleIndex = new Map();
+    let onSaleIndexCount = 0;
+    
+    onSaleValues.slice(1).forEach((row, index) => {
+      const customerName = row[2] || ''; // C열 (3번째, 0부터 시작)
+      const storeCode = row[12] || ''; // M열 (13번째, 0부터 시작)
+      const receivedDate = row[5] || ''; // F열 (6번째, 0부터 시작)
+      
+      if (customerName && storeCode) {
+        const key = `${customerName}_${storeCode}`;
+        onSaleIndex.set(key, receivedDate);
+        onSaleIndexCount++;
+        
+        // 처음 5개만 디버깅 로그
+        if (index < 5) {
+          console.log(`온세일 행 ${index + 2}: 고객명="${customerName}", 대리점코드="${storeCode}", 접수일="${receivedDate}"`);
+        }
+      }
+    });
+
+    console.log(`온세일 데이터 인덱싱 완료: ${onSaleIndex.size}개 고객-대리점 조합 (총 ${onSaleIndexCount}개 처리)`);
+    console.log(`온세일 데이터 샘플:`, Array.from(onSaleIndex.entries()).slice(0, 5));
+    
     // 6. 사전예약사이트 데이터 처리
     const reservationSiteRows = reservationSiteValues.slice(1); // 헤더 제거
     const modelColorStats = new Map(); // 모델색상별 통계
@@ -3250,6 +3279,8 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const qValue = (row[16] || '').toString().trim(); // Q열
       const rValue = (row[17] || '').toString().trim(); // R열
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      const storeCode = (row[23] || '').toString().trim(); // X열: 대리점코드
       const type = (row[31] || '').toString().trim(); // AF열: 유형
       
       // 처음 몇 개 행의 데이터 확인
@@ -3342,15 +3373,17 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       const stats = modelColorStats.get(key);
       stats.total++;
       
-      // 서류접수 여부 확인 (인덱스 활용으로 빠른 검색)
+      // 서류접수 여부 확인 (마당접수 OR 온세일 접수)
       // 예약번호도 하이픈 제거하여 정규화된 형태로 비교
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-      const yardData = yardIndex.get(normalizedReservationNumber);
-      const isReceived = !!yardData;
+      const isYardReceived = yardIndex.has(normalizedReservationNumber);
+      const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
+      const isReceived = isYardReceived || isOnSaleReceived;
       
       if (index < 5) {
-        console.log(`서류접수 매칭 시도: 예약번호="${reservationNumber}" -> 정규화="${normalizedReservationNumber}" -> 매칭결과=${isReceived}`);
+        console.log(`서류접수 매칭 시도: 예약번호="${reservationNumber}" -> 정규화="${normalizedReservationNumber}" -> 마당접수=${isYardReceived}, 온세일접수=${isOnSaleReceived}, 최종결과=${isReceived}`);
         console.log(`  마당접수 인덱스에 존재: ${yardIndex.has(normalizedReservationNumber)}`);
+        console.log(`  온세일 인덱스에 존재: ${onSaleIndex.has(`${customerName}_${storeCode}`)}`);
       }
       
       if (isReceived) {
@@ -7357,7 +7390,13 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       range: '마당접수!A:V'
     });
 
-    if (!reservationResponse.data.values || !phoneklResponse.data.values || !yardResponse.data.values) {
+    // 4. 온세일 시트 로드 (온세일 접수 상태 확인용)
+    const onSaleResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일!A:Z'
+    });
+
+    if (!reservationResponse.data.values || !phoneklResponse.data.values || !yardResponse.data.values || !onSaleResponse.data.values) {
       throw new Error('시트 데이터를 불러올 수 없습니다.');
     }
 
@@ -7369,6 +7408,9 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     
     const yardHeaders = yardResponse.data.values[0];
     const yardData = yardResponse.data.values.slice(1);
+    
+    const onSaleHeaders = onSaleResponse.data.values[0];
+    const onSaleData = onSaleResponse.data.values.slice(1);
 
     // 담당자 이름 정규화 함수 (괄호 안 부서 정보 제거)
     const normalizeAgentName = (agentName) => {
@@ -7423,6 +7465,61 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     console.log('마당접수 예약번호 개수:', yardReservationMap.size);
     console.log('마당접수 예약번호 샘플:', Array.from(yardReservationMap).slice(0, 5));
 
+    // 온세일 데이터 인덱싱 (고객명 + 대리점코드 기준)
+    const onSaleIndex = new Map();
+    const unmatchedOnSaleData = [];
+    let onSaleIndexCount = 0;
+    
+    onSaleData.forEach((row, index) => {
+      const customerName = row[2] || ''; // C열 (3번째, 0부터 시작)
+      const storeCode = row[12] || ''; // M열 (13번째, 0부터 시작)
+      const receivedDate = row[5] || ''; // F열 (6번째, 0부터 시작)
+      
+      if (customerName && storeCode) {
+        const key = `${customerName}_${storeCode}`;
+        onSaleIndex.set(key, receivedDate);
+        onSaleIndexCount++;
+        
+        // 처음 5개만 디버깅 로그
+        if (index < 5) {
+          console.log(`온세일 행 ${index + 2}: 고객명="${customerName}", 대리점코드="${storeCode}", 접수일="${receivedDate}"`);
+        }
+      }
+    });
+
+    console.log('온세일 데이터 인덱싱 완료:', onSaleIndex.size, '개 고객-대리점 조합 (총', onSaleIndexCount, '개 처리)');
+    console.log('온세일 데이터 샘플:', Array.from(onSaleIndex.entries()).slice(0, 5));
+
+    // 온세일 매칭 실패 데이터 수집 (사전예약사이트에 없는 온세일 데이터)
+    onSaleData.forEach((row, index) => {
+      const customerName = row[2] || ''; // C열 (3번째, 0부터 시작)
+      const storeCode = row[12] || ''; // M열 (13번째, 0부터 시작)
+      const receivedDate = row[5] || ''; // F열 (6번째, 0부터 시작)
+      
+      if (customerName && storeCode) {
+        // 사전예약사이트에서 해당 고객명+대리점코드 조합이 있는지 확인
+        const isMatched = reservationData.some(reservationRow => {
+          const reservationCustomerName = (reservationRow[7] || '').toString().trim(); // H열: 고객명
+          const reservationStoreCode = (reservationRow[23] || '').toString().trim(); // X열: 대리점코드
+          return reservationCustomerName === customerName && reservationStoreCode === storeCode;
+        });
+        
+        if (!isMatched) {
+          unmatchedOnSaleData.push({
+            customerName,
+            storeCode,
+            receivedDate,
+            key: `${customerName}_${storeCode}`
+          });
+        }
+      }
+    });
+
+    console.log('온세일 매칭 실패 데이터:', unmatchedOnSaleData.length, '건');
+    if (unmatchedOnSaleData.length > 0) {
+      console.log('온세일 매칭 실패 샘플:', unmatchedOnSaleData.slice(0, 5));
+    }
+
     // 사전예약사이트 데이터 처리
     const processedData = reservationData.map((row, index) => {
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
@@ -7433,13 +7530,17 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       // 담당자 매칭 (VLOOKUP 방식) - 정규화된 이름 사용
       let agent = storeAgentMap.get(storeCodeForLookup) || '';
       
-      // 서류접수 상태 확인
+      // 서류접수 상태 확인 (마당접수 OR 온세일 접수)
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-      const isDocumentReceived = yardReservationMap.has(normalizedReservationNumber);
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      
+      const isYardReceived = yardReservationMap.has(normalizedReservationNumber);
+      const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
+      const isDocumentReceived = isYardReceived || isOnSaleReceived;
 
       // 디버깅용 로그 (처음 10개만)
       if (index < 10) {
-        console.log(`사전예약 행 ${index + 2}: 예약번호=${reservationNumber}, 정규화=${normalizedReservationNumber}, 접수=${isDocumentReceived}, 담당자=${agent}`);
+        console.log(`사전예약 행 ${index + 2}: 예약번호=${reservationNumber}, 정규화=${normalizedReservationNumber}, 마당접수=${isYardReceived}, 온세일접수=${isOnSaleReceived}, 최종접수=${isDocumentReceived}, 담당자=${agent}`);
       }
 
       return {
@@ -7579,7 +7680,8 @@ app.get('/api/sales-by-store/data', async (req, res) => {
         totalItems: processedData.length,
         totalWithAgent: processedData.filter(item => item.agent).length,
         totalDocumentReceived: processedData.filter(item => item.isDocumentReceived).length
-      }
+      },
+      unmatchedOnSaleData: unmatchedOnSaleData // 온세일 매칭 실패 데이터 추가
     };
 
     // 캐시에 저장 (10분)

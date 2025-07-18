@@ -75,6 +75,8 @@ function SalesByStoreScreen({ loggedInStore }) {
   const [data, setData] = useState({ byStore: {}, byAgent: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [unmatchedOnSaleData, setUnmatchedOnSaleData] = useState([]);
+  const [showUnmatchedPopup, setShowUnmatchedPopup] = useState(false);
   const [viewMode, setViewMode] = useState('store'); // 'store', 'agent', 'modelColor'
   const [selectedStore, setSelectedStore] = useState(0);
   const [selectedAgent, setSelectedAgent] = useState(0);
@@ -428,11 +430,13 @@ function SalesByStoreScreen({ loggedInStore }) {
       
       if (result.success) {
         setData(result.data);
+        setUnmatchedOnSaleData(result.unmatchedOnSaleData || []);
         
         // 디버깅 로그 추가
         console.log('판매처별정리 데이터 로드 완료:', {
           byStore: Object.keys(result.data.byStore || {}).length,
-          byAgent: Object.keys(result.data.byAgent || {}).length
+          byAgent: Object.keys(result.data.byAgent || {}).length,
+          unmatchedOnSale: result.unmatchedOnSaleData?.length || 0
         });
         
         // 담당자별 데이터 상세 로그
@@ -1127,6 +1131,22 @@ function SalesByStoreScreen({ loggedInStore }) {
         >
           {showFilters ? '필터 숨기기' : '고급 필터'}
         </Button>
+        
+        <Button
+          variant="outlined"
+          startIcon={<WarningIcon />}
+          onClick={() => setShowUnmatchedPopup(true)}
+          disabled={unmatchedOnSaleData.length === 0}
+          sx={{
+            backgroundColor: unmatchedOnSaleData.length > 0 ? '#ff6b6b' : undefined,
+            color: unmatchedOnSaleData.length > 0 ? 'white' : undefined,
+            '&:hover': {
+              backgroundColor: unmatchedOnSaleData.length > 0 ? '#ff5a5a' : undefined
+            }
+          }}
+        >
+          온세일매칭실패데이터 ({unmatchedOnSaleData.length})
+        </Button>
       </Box>
 
       {/* 대리점코드별 탭 */}
@@ -1509,6 +1529,73 @@ function SalesByStoreScreen({ loggedInStore }) {
           </CardContent>
         </Card>
       )}
+
+      {/* 온세일 매칭 실패 데이터 팝업 */}
+      <Dialog 
+        open={showUnmatchedPopup} 
+        onClose={() => setShowUnmatchedPopup(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: '#ff6b6b', fontWeight: 'bold' }}>
+          미매칭대상리스트입니다. 확인해주세요
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            사전예약사이트에 없지만 온세일 시트에 있는 데이터입니다. ({unmatchedOnSaleData.length}건)
+          </Typography>
+          
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell width="60px" align="center">순번</TableCell>
+                  <TableCell width="200px">고객명</TableCell>
+                  <TableCell width="150px" align="center">대리점코드</TableCell>
+                  <TableCell width="150px" align="center">온세일접수일</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {unmatchedOnSaleData.map((item, index) => (
+                  <TableRow key={index} hover>
+                    <TableCell align="center">
+                      <Chip
+                        label={index + 1}
+                        size="small"
+                        color="default"
+                        sx={{ fontSize: '0.7rem', fontWeight: 'bold' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium">
+                        {item.customerName}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={item.storeCode}
+                        color="primary"
+                        size="small"
+                        sx={{ fontSize: '0.8rem' }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        {item.receivedDate}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowUnmatchedPopup(false)}>
+            닫기
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 모델색상별 정리 탭 */}
       {viewMode === 'modelColor' && (
