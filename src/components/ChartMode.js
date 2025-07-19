@@ -894,93 +894,89 @@ function MonthlyAwardTab() {
         </Grid>
       </Paper>
 
-      {/* 만점기준 */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
-          만점기준
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
-              <Typography variant="body2" color="text.secondary">총점</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
-              <Typography variant="body2" color="text.secondary">업셀기변</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
-              <Typography variant="body2" color="text.secondary">기변105이상</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
-              <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
-            </Box>
-          </Grid>
-        </Grid>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
-              <Typography variant="body2" color="text.secondary">전략상품</Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* 달성상황 */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
-          달성상황
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#1976d2', fontWeight: 'bold' }}>5점</Typography>
-              <Typography variant="body2" color="text.secondary">총점</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>1점</Typography>
-              <Typography variant="body2" color="text.secondary">업셀기변</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#f57c00', fontWeight: 'bold' }}>2점</Typography>
-              <Typography variant="body2" color="text.secondary">기변105이상</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#c2185b', fontWeight: 'bold' }}>1점</Typography>
-              <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
-            </Box>
-          </Grid>
-        </Grid>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={12} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
-              <Typography variant="h5" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>1점</Typography>
-              <Typography variant="body2" color="text.secondary">전략상품</Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
       {/* 월간시상 Matrix */}
       <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
           월간시상 Matrix
         </Typography>
+        
+        {/* 만점기준 */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
+            만점기준
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
+                <Typography variant="body2" color="text.secondary">총점</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
+                <Typography variant="body2" color="text.secondary">업셀기변</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
+                <Typography variant="body2" color="text.secondary">기변105이상</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
+                <Typography variant="body2" color="text.secondary">전략상품</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
+                <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* 달성상황 */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
+            달성상황
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>5점</Typography>
+                <Typography variant="body2" color="text.secondary">총점</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>1점</Typography>
+                <Typography variant="body2" color="text.secondary">업셀기변</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>2점</Typography>
+                <Typography variant="body2" color="text.secondary">기변105이상</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>1점</Typography>
+                <Typography variant="body2" color="text.secondary">전략상품</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2.4}>
+              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>1점</Typography>
+                <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -1046,11 +1042,11 @@ function MonthlyAwardTab() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>채널</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>전략상품</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>인터넷 비중</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>채널</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
