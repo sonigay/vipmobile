@@ -921,7 +921,7 @@ function MonthlyAwardTab() {
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
               <Typography variant="h5" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
-              <Typography variant="body2" color="text.secondary">105군(디즈니,멀티팩)</Typography>
+              <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
             </Box>
           </Grid>
         </Grid>
@@ -962,7 +962,7 @@ function MonthlyAwardTab() {
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
               <Typography variant="h5" sx={{ color: '#c2185b', fontWeight: 'bold' }}>1점</Typography>
-              <Typography variant="body2" color="text.secondary">105군(디즈니,멀티팩)</Typography>
+              <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
             </Box>
           </Grid>
         </Grid>
@@ -976,49 +976,8 @@ function MonthlyAwardTab() {
         </Grid>
       </Paper>
 
-      {/* 상세 데이터 테이블 */}
-      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>채널</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>105이상건</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>105군(디즈니,멀티팩)</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>전략상품</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>인터넷 비중</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {/* 샘플 데이터 - 실제로는 props나 API에서 받아올 데이터 */}
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>강이준</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>100.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>1</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>50.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>강이준(별도)</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>90.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>3</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.6</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>12.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-              </TableRow>
-              {/* 더 많은 데이터 행들... */}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
       {/* 월간시상 Matrix */}
-      <Paper elevation={2} sx={{ p: 3, mt: 3, borderRadius: 2 }}>
+      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
           월간시상 Matrix
         </Typography>
@@ -1029,8 +988,8 @@ function MonthlyAwardTab() {
                 <TableCell sx={{ fontWeight: 'bold' }}>점수</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>105군(디즈니,멀티팩)</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>전략상품</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>인터넷 비중</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1038,44 +997,79 @@ function MonthlyAwardTab() {
                 <TableCell sx={{ fontWeight: 'bold' }}>6점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>92.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>62.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>60.0%</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>5점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>56.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>50.0%</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>4점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>50.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>3점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>44.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>15.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>2점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>72.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>38.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>10.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>1점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>71.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>37.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>5.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>10.0%</TableCell>
               </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* 상세 데이터 테이블 */}
+      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>채널</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>전략상품</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>인터넷 비중</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {/* 샘플 데이터 - 실제로는 props나 API에서 받아올 데이터 */}
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>강이준</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>100.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>50.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>강이준(별도)</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>90.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>12.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+              </TableRow>
+              {/* 더 많은 데이터 행들... */}
             </TableBody>
           </Table>
         </TableContainer>
