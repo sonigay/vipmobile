@@ -2491,11 +2491,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
             (r[8] || '').toString().trim() === reservationNumber
           );
           
-          if (currentIndex !== -1) {
-            waitingOrder = currentIndex + 1;
-            assignmentStatus = `미배정(${waitingOrder}번째)`;
-            waitingAssignmentCount++;
-          }
+                      if (currentIndex !== -1) {
+              waitingOrder = currentIndex + 1;
+              assignmentStatus = '미배정';
+              waitingAssignmentCount++;
+            }
         }
       }
       
