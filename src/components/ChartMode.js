@@ -981,11 +981,11 @@ function MonthlyAwardTab() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold' }}>점수</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>전략상품</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>인터넷 비중</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>점수</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
