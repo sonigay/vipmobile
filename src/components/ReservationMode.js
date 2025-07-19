@@ -26,7 +26,6 @@ import {
   Event as EventIcon,
   SwapHoriz as SwapHorizIcon,
   Settings as SettingsIcon,
-  Store as StoreIcon,
   TrendingUp as TrendingUpIcon,
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
@@ -34,12 +33,11 @@ import {
   Schedule as ScheduleIcon,
   People as PeopleIcon,
   Business as BusinessIcon,
-  Refresh as RefreshIcon,
-  PriorityHigh as PriorityHighIcon
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
-import SalesByStoreScreen from './screens/SalesByStoreScreen';
-import ReservationAssignmentSettingsScreen from './screens/ReservationAssignmentSettingsScreen';
+// SalesByStoreScreen import 제거됨
+// ReservationAssignmentSettingsScreen import 제거됨
 import AllCustomerListScreen from './screens/AllCustomerListScreen';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
 import UpdateProgressPopup from './UpdateProgressPopup';
@@ -408,22 +406,8 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                       >
                         사전예약정리 셋팅
                       </Button>
-                      <Button
-                        variant="outlined"
-                        startIcon={<StoreIcon />}
-                        onClick={() => setCurrentTab(2)}
-                        sx={{ justifyContent: 'flex-start', py: 1.5 }}
-                      >
-                        판매처별정리
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        startIcon={<PriorityHighIcon />}
-                        onClick={() => setCurrentTab(3)}
-                        sx={{ justifyContent: 'flex-start', py: 1.5 }}
-                      >
-                        배정셋팅
-                      </Button>
+                      {/* 판매처별정리 버튼 제거됨 */}
+                      {/* 배정셋팅 버튼 제거됨 */}
                       <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
@@ -517,21 +501,9 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             loggedInStore={loggedInStore}
           />
         );
-      case 2: // 판매처별정리 탭
-        return (
-          <SalesByStoreScreen 
-            loggedInStore={loggedInStore}
-          />
-        );
-      case 3: // 배정셋팅 탭
-        return (
-          <ReservationAssignmentSettingsScreen 
-            data={[]} // 매장 데이터는 필요에 따라 전달
-            onBack={() => setCurrentTab(0)}
-            onLogout={onLogout}
-          />
-        );
-      case 4: // 전체고객리스트 탭
+      // case 2: 판매처별정리 탭 제거됨
+      // case 2: 배정셋팅 탭 제거됨
+      case 2: // 전체고객리스트 탭 (인덱스 조정)
         return (
           <AllCustomerListScreen 
             loggedInStore={loggedInStore}
@@ -618,28 +590,8 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                 }
               }}
             />
-            <Tab 
-              label="판매처별정리" 
-              icon={<StoreIcon />} 
-              iconPosition="start"
-              sx={{ 
-                minHeight: 64,
-                '&.Mui-selected': {
-                  color: '#ff9a9e'
-                }
-              }}
-            />
-            <Tab 
-              label="배정셋팅" 
-              icon={<PriorityHighIcon />} 
-              iconPosition="start"
-              sx={{ 
-                minHeight: 64,
-                '&.Mui-selected': {
-                  color: '#ff9a9e'
-                }
-              }}
-            />
+            {/* 판매처별정리 탭 제거됨 */}
+            {/* 배정셋팅 탭 제거됨 */}
             <Tab 
               label="전체고객리스트" 
               icon={<PeopleIcon />} 
