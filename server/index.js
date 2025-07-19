@@ -2766,6 +2766,22 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
     let updatedCount = 0;
     let skippedCount = 0;
     
+    // 이미 배정된 일련번호 추적 (중복 배정 방지)
+    const assignedSerials = new Set();
+    
+    // 기존 배정된 일련번호들을 먼저 수집
+    for (let i = 1; i < reservationSiteValues.length; i++) {
+      const row = reservationSiteValues[i];
+      if (row.length < 22) continue;
+      
+      const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+      if (existingSerial && existingSerial.trim() !== '') {
+        assignedSerials.add(existingSerial);
+      }
+    }
+    
+    console.log(`📊 [배정저장 디버깅] 기존 배정된 일련번호 ${assignedSerials.size}개 확인`);
+    
     for (let i = 1; i < reservationSiteValues.length; i++) {
       const row = reservationSiteValues[i];
       if (row.length < 22) continue;
@@ -2783,8 +2799,16 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
           continue;
         }
         
+        // 새로운 배정 시 일련번호 중복 체크
+        if (assignedSerials.has(newSerial)) {
+          console.log(`❌ [배정저장 디버깅] 일련번호 중복으로 배정 실패: ${reservationNumber} → ${newSerial} (이미 배정됨)`);
+          skippedCount++;
+          continue;
+        }
+        
         // 새로운 배정 저장
         row[6] = newSerial; // G열에 일련번호 저장
+        assignedSerials.add(newSerial); // 배정된 일련번호 추적에 추가
         updatedCount++;
         console.log(`✅ [배정저장 디버깅] 배정 저장: ${reservationNumber} → ${newSerial}`);
       }
