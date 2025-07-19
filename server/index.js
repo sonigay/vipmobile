@@ -9394,7 +9394,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     try {
       posCodeMappingResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: 'POS코드변경설정!A:H'
+        range: 'POS코드변경설정!A:J' // I, J열 추가 (담당자 매핑용)
       });
       console.log('전체고객리스트: POS코드변경설정 시트 로드 성공');
     } catch (error) {
@@ -9572,9 +9572,23 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
       
-      // 담당자 정보 매핑 (V열 매장코드 기준)
-      const managerCode = row[21] || ''; // V열 (22번째, 0부터 시작) - 매장코드
-      const manager = managerMapping.get(managerCode) || '';
+      // 담당자 정보 매핑 (V열 매장코드 기준 + POS코드 변환 적용)
+      const originalManagerCode = row[21] || ''; // V열 (22번째, 0부터 시작) - 원본 매장코드
+      
+      // POS코드 변환 적용 (접수자별 매핑 우선, 일반 매핑 차선)
+      let mappedManagerCode = originalManagerCode;
+      const managerCodeReceiverKey = `${originalManagerCode}_${receiver}`;
+      
+      if (posCodeMappingWithReceiver.has(managerCodeReceiverKey)) {
+        mappedManagerCode = posCodeMappingWithReceiver.get(managerCodeReceiverKey);
+        console.log(`전체고객리스트: 매장코드 접수자별 매핑 적용: ${originalManagerCode}(${receiver}) -> ${mappedManagerCode}`);
+      } else if (posCodeMapping.has(originalManagerCode)) {
+        mappedManagerCode = posCodeMapping.get(originalManagerCode);
+        console.log(`전체고객리스트: 매장코드 일반 매핑 적용: ${originalManagerCode} -> ${mappedManagerCode}`);
+      }
+      
+      // 변환된 매장코드로 담당자 찾기
+      const manager = managerMapping.get(mappedManagerCode) || '';
 
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = posName;
