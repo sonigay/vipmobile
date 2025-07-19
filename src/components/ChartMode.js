@@ -102,12 +102,18 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab />,
+      component: <BondChartComingSoonTab />,
       hasPermission: loggedInStore?.modePermissions?.bondChart
     },
     {
-      label: '준비 중',
+      label: '지표장표',
       icon: <BarChartIcon />,
+      component: <ComingSoonTab />,
+      hasPermission: true // 지표장표 탭은 모든 사용자에게 표시
+    },
+    {
+      label: '준비 중',
+      icon: <TableChartIcon />,
       component: <ComingSoonTab />,
       hasPermission: true // 준비 중 탭은 모든 사용자에게 표시
     }
@@ -781,6 +787,34 @@ function BondChartTab() {
   );
 }
 
+// 채권장표 준비 중 탭 컴포넌트
+function BondChartComingSoonTab() {
+  return (
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 4, 
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        color: 'white',
+        borderRadius: 3
+      }}
+    >
+      <AccountBalanceIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
+      <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
+        채권장표
+      </Typography>
+      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+        준비 중입니다
+      </Typography>
+      <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
+        기존 OCR 기능 등을 새로운 형태로 재개발 중입니다.<br />
+        더 나은 사용자 경험을 제공하기 위해 준비하고 있습니다.
+      </Typography>
+    </Paper>
+  );
+}
+
 // 준비 중 탭 컴포넌트
 function ComingSoonTab() {
   return (
@@ -796,14 +830,14 @@ function ComingSoonTab() {
     >
       <BarChartIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
       <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
-        추가 기능
-      </Typography>
-      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
         준비 중입니다
       </Typography>
+      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+        새로운 형태로 개발 예정
+      </Typography>
       <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
-        추가적인 장표 및 차트 관련 기능이 개발 중입니다.<br />
-        빠른 시일 내에 서비스를 제공하겠습니다.
+        기존 OCR 기능 등을 새로운 형태로 재개발 중입니다.<br />
+        더 나은 사용자 경험을 제공하기 위해 준비하고 있습니다.
       </Typography>
     </Paper>
   );
