@@ -39,7 +39,11 @@ import {
   Close as CloseIcon,
   Edit as EditIcon,
   Save as SaveIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  TrendingUp as TrendingUpIcon,
+  Assessment as AssessmentIcon,
+  ShowChart as ShowChartIcon,
+  PieChart as PieChartIcon
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
 import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
@@ -108,7 +112,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     {
       label: '지표장표',
       icon: <BarChartIcon />,
-      component: <ComingSoonTab />,
+      component: <IndicatorChartTab />,
       hasPermission: true // 지표장표 탭은 모든 사용자에게 표시
     },
     {
@@ -784,6 +788,349 @@ function BondChartTab() {
         </DialogActions>
       </Dialog>
     </Box>
+  );
+}
+
+// 지표장표 탭 컴포넌트
+function IndicatorChartTab() {
+  const [activeSubTab, setActiveSubTab] = useState(0);
+
+  const subTabs = [
+    { label: '월간시상', icon: <TrendingUpIcon /> },
+    { label: '매출지표', icon: <AssessmentIcon /> },
+    { label: '판매량', icon: <ShowChartIcon /> },
+    { label: '구조정책', icon: <PieChartIcon /> }
+  ];
+
+  const handleSubTabChange = (event, newValue) => {
+    setActiveSubTab(newValue);
+  };
+
+  return (
+    <Box>
+      {/* 서브 탭 네비게이션 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs 
+          value={activeSubTab} 
+          onChange={handleSubTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': {
+              minHeight: 56,
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              color: '#666',
+              '&.Mui-selected': {
+                color: '#f5576c',
+                fontWeight: 'bold'
+              }
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#f5576c',
+              height: 3
+            }
+          }}
+        >
+          {subTabs.map((tab, index) => (
+            <Tab
+              key={index}
+              label={tab.label}
+              icon={tab.icon}
+              iconPosition="start"
+              sx={{ 
+                textTransform: 'none',
+                minHeight: 56,
+                py: 1
+              }}
+            />
+          ))}
+        </Tabs>
+      </Box>
+
+      {/* 서브 탭 컨텐츠 */}
+      {activeSubTab === 0 && <MonthlyAwardTab />}
+      {activeSubTab === 1 && <SalesIndicatorTab />}
+      {activeSubTab === 2 && <SalesVolumeTab />}
+      {activeSubTab === 3 && <StructurePolicyTab />}
+    </Box>
+  );
+}
+
+// 월간시상 탭 컴포넌트
+function MonthlyAwardTab() {
+  return (
+    <Box>
+      {/* 헤더 정보 */}
+      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
+          2025. 7. 20 월간시상 현황
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>0.00%</Typography>
+              <Typography variant="body2" color="text.secondary">업셀기변</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>75.57%</Typography>
+              <Typography variant="body2" color="text.secondary">기변105이상</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>22.4</Typography>
+              <Typography variant="body2" color="text.secondary">105군(디즈니,멀티팩)</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>33.77%</Typography>
+              <Typography variant="body2" color="text.secondary">VAS</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* 전체 요약 */}
+      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
+          전체 현황
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+              <Typography variant="h5" sx={{ color: '#1976d2', fontWeight: 'bold' }}>92%</Typography>
+              <Typography variant="body2" color="text.secondary">업셀기변</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
+              <Typography variant="h5" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>88%</Typography>
+              <Typography variant="body2" color="text.secondary">기변105이상</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+              <Typography variant="h5" sx={{ color: '#f57c00', fontWeight: 'bold' }}>62%</Typography>
+              <Typography variant="body2" color="text.secondary">105군(디즈니,멀티팩)</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
+              <Typography variant="h5" sx={{ color: '#c2185b', fontWeight: 'bold' }}>40%</Typography>
+              <Typography variant="body2" color="text.secondary">통화서비스</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* 상세 데이터 테이블 */}
+      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>채널</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변모수</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변자수</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변총개수</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>105이상건</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>105군(디즈니,멀티팩)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>VAS</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>총개통건</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>VAS유치건</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>통화서비스</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {/* 샘플 데이터 - 실제로는 props나 API에서 받아올 데이터 */}
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>강이준</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>100.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>1</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>1</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>50.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>8</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>4</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>강이준(별도)</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>90.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>4</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>3</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.6</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>12.00%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>25</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>3</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
+              </TableRow>
+              {/* 더 많은 데이터 행들... */}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* 월간시상 Matrix */}
+      <Paper elevation={2} sx={{ p: 3, mt: 3, borderRadius: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
+          월간시상 Matrix
+        </Typography>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>점수</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>업셀기변</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>기변105이상</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>105군(디즈니,멀티팩)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>통화연결음</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>6점</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>92.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>62.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>5점</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>56.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>4점</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>50.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>-</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>3점</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>44.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>2점</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>72.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>38.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>1점</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>71.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>37.0%</TableCell>
+                <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Box>
+  );
+}
+
+// 매출지표 탭 컴포넌트
+function SalesIndicatorTab() {
+  return (
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 4, 
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        borderRadius: 3
+      }}
+    >
+      <AssessmentIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
+      <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
+        매출지표
+      </Typography>
+      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+        준비 중입니다
+      </Typography>
+      <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
+        매출 관련 지표 및 분석 기능이 개발 중입니다.<br />
+        빠른 시일 내에 서비스를 제공하겠습니다.
+      </Typography>
+    </Paper>
+  );
+}
+
+// 판매량 탭 컴포넌트
+function SalesVolumeTab() {
+  return (
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 4, 
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        color: 'white',
+        borderRadius: 3
+      }}
+    >
+      <ShowChartIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
+      <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
+        판매량
+      </Typography>
+      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+        준비 중입니다
+      </Typography>
+      <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
+        판매량 관련 차트 및 분석 기능이 개발 중입니다.<br />
+        빠른 시일 내에 서비스를 제공하겠습니다.
+      </Typography>
+    </Paper>
+  );
+}
+
+// 구조정책 탭 컴포넌트
+function StructurePolicyTab() {
+  return (
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 4, 
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        color: 'white',
+        borderRadius: 3
+      }}
+    >
+      <PieChartIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
+      <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
+        구조정책
+      </Typography>
+      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
+        준비 중입니다
+      </Typography>
+      <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
+        구조정책 관련 분석 및 차트 기능이 개발 중입니다.<br />
+        빠른 시일 내에 서비스를 제공하겠습니다.
+      </Typography>
+    </Paper>
   );
 }
 
