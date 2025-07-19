@@ -2718,11 +2718,11 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
       if (updatedCount > 0) {
         try {
           const sheets = google.sheets({ version: 'v4', auth });
-          const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+          const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
           
           // spreadsheetId 검증
           if (!spreadsheetId) {
-            throw new Error('GOOGLE_SHEET_ID 환경변수가 설정되지 않았습니다.');
+            throw new Error('GOOGLE_SHEET_ID 또는 SHEET_ID 환경변수가 설정되지 않았습니다.');
           }
           
           console.log(`🔧 [배정저장 디버깅] Google Sheets 업데이트 시작 - Spreadsheet ID: ${spreadsheetId.substring(0, 10)}...`);
@@ -2872,9 +2872,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 환경변수 디버깅 (민감한 정보는 로깅하지 않음)
     console.log('🔧 [서버시작] 환경변수 상태 확인:');
     console.log('- GOOGLE_SHEET_ID 설정됨:', !!process.env.GOOGLE_SHEET_ID);
-    if (process.env.GOOGLE_SHEET_ID) {
-      console.log('- GOOGLE_SHEET_ID 길이:', process.env.GOOGLE_SHEET_ID.length);
-      console.log('- GOOGLE_SHEET_ID 시작:', process.env.GOOGLE_SHEET_ID.substring(0, 10) + '...');
+    console.log('- SHEET_ID 설정됨:', !!process.env.SHEET_ID);
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    console.log('- 최종 사용할 Spreadsheet ID 설정됨:', !!spreadsheetId);
+    
+    if (spreadsheetId) {
+      console.log('- Spreadsheet ID 길이:', spreadsheetId.length);
+      console.log('- Spreadsheet ID 시작:', spreadsheetId.substring(0, 10) + '...');
     }
     // console.log('Discord 봇 환경변수 상태:');
     // console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
@@ -3039,11 +3044,11 @@ const server = app.listen(port, '0.0.0.0', async () => {
         if (updatedCount > 0) {
           try {
             const sheets = google.sheets({ version: 'v4', auth });
-            const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+            const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
             
             // spreadsheetId 검증
             if (!spreadsheetId) {
-              throw new Error('GOOGLE_SHEET_ID 환경변수가 설정되지 않았습니다.');
+              throw new Error('GOOGLE_SHEET_ID 또는 SHEET_ID 환경변수가 설정되지 않았습니다.');
             }
             
             console.log(`🔧 [서버시작] Google Sheets 업데이트 시작 - Spreadsheet ID: ${spreadsheetId.substring(0, 10)}...`);
