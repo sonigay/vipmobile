@@ -319,7 +319,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                           총 재고 수량
                         </Typography>
                       </Box>
-                      <StoreIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
                   </CardContent>
                 </Card>
