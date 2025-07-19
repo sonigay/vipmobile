@@ -25,9 +25,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Divider,
-  Tabs,
-  Tab
+  Divider
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -35,9 +33,7 @@ import {
   Refresh as RefreshIcon,
   Clear as ClearIcon,
   Cached as CachedIcon,
-  FilterList as FilterIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon
+  FilterList as FilterIcon
 } from '@mui/icons-material';
 import { 
   getCachedAllCustomerList, 
@@ -60,7 +56,6 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [activationFilter, setActivationFilter] = useState('all'); // 'all', 'activated', 'notActivated'
   const [activationData, setActivationData] = useState({});
   const [loadingActivation, setLoadingActivation] = useState(false);
-  const [currentTab, setCurrentTab] = useState(0); // 0: 전체고객, 1: 온세일매칭실패, 2: POS코드매칭실패
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -94,26 +89,13 @@ function AllCustomerListScreen({ loggedInStore }) {
   const applyFilters = useCallback(() => {
     let filtered = customerList;
 
-    // 탭별 필터링 적용
-    if (currentTab === 1) { // 온세일매칭실패
-      filtered = filtered.filter(customer => {
-        const status = assignmentStatus[customer.reservationNumber];
-        return status && status.assignmentStatus && status.assignmentStatus.includes('온세일매칭실패');
-      });
-    } else if (currentTab === 2) { // POS코드매칭실패
-      filtered = filtered.filter(customer => {
-        const status = assignmentStatus[customer.reservationNumber];
-        return status && status.assignmentStatus && status.assignmentStatus.includes('POS코드매칭실패');
-      });
-    }
-
     // 검색 필터 적용
     if (searchQuery.trim()) {
       filtered = getCachedSearchResults(searchQuery, filtered);
     }
 
-    // 재고배정 상태 필터 적용 (전체고객 탭에서만)
-    if (currentTab === 0 && assignmentFilter !== 'all') {
+    // 재고배정 상태 필터 적용
+    if (assignmentFilter !== 'all') {
       filtered = filtered.filter(customer => {
         const status = assignmentStatus[customer.reservationNumber];
         if (!status) return false;
@@ -127,8 +109,8 @@ function AllCustomerListScreen({ loggedInStore }) {
       });
     }
 
-    // 개통완료 상태 필터 적용 (전체고객 탭에서만)
-    if (currentTab === 0 && activationFilter !== 'all') {
+    // 개통완료 상태 필터 적용
+    if (activationFilter !== 'all') {
       filtered = filtered.filter(customer => {
         const status = assignmentStatus[customer.reservationNumber];
         if (!status) return false;
@@ -143,7 +125,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
 
     setFilteredCustomerList(filtered);
-  }, [customerList, currentTab, searchQuery, assignmentFilter, activationFilter, assignmentStatus]);
+  }, [customerList, searchQuery, assignmentFilter, activationFilter, assignmentStatus]);
 
   // 검색 기능 (캐시 적용)
   const handleSearch = useCallback((query) => {
@@ -162,10 +144,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     setActivationFilter('all');
   }, []);
 
-  // 탭 변경 핸들러
-  const handleTabChange = useCallback((event, newValue) => {
-    setCurrentTab(newValue);
-  }, []);
+
 
   // 캐시 새로고침
   const refreshCache = useCallback(async () => {
@@ -546,7 +525,7 @@ function AllCustomerListScreen({ loggedInStore }) {
   // 필터 변경 시 적용
   useEffect(() => {
     applyFilters();
-  }, [applyFilters, currentTab]);
+  }, [applyFilters]);
 
   // 캐시 통계 주기적 업데이트
   useEffect(() => {
@@ -641,56 +620,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         )}
       </Box>
 
-      {/* 탭 네비게이션 */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ py: 1 }}>
-          <Tabs 
-            value={currentTab} 
-            onChange={handleTabChange}
-            sx={{
-              '& .MuiTab-root': {
-                minHeight: 48,
-                fontSize: '1rem',
-                fontWeight: 500
-              }
-            }}
-          >
-            <Tab 
-              label="전체고객" 
-              icon={<CachedIcon />} 
-              iconPosition="start"
-              sx={{ 
-                minHeight: 48,
-                '&.Mui-selected': {
-                  color: '#ff9a9e'
-                }
-              }}
-            />
-            <Tab 
-              label="온세일매칭실패" 
-              icon={<WarningIcon />} 
-              iconPosition="start"
-              sx={{ 
-                minHeight: 48,
-                '&.Mui-selected': {
-                  color: '#ff9a9e'
-                }
-              }}
-            />
-            <Tab 
-              label="POS코드매칭실패" 
-              icon={<ErrorIcon />} 
-              iconPosition="start"
-              sx={{ 
-                minHeight: 48,
-                '&.Mui-selected': {
-                  color: '#ff9a9e'
-                }
-              }}
-            />
-          </Tabs>
-        </CardContent>
-      </Card>
+
 
       {/* 검색 및 액션 버튼 */}
       <Card sx={{ mb: 3 }}>
@@ -743,8 +673,7 @@ function AllCustomerListScreen({ loggedInStore }) {
             </Button>
           </Box>
 
-          {/* 필터 UI - 전체고객 탭에서만 표시 */}
-          {currentTab === 0 && (
+          {/* 필터 UI */}
             <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <FilterIcon sx={{ color: 'text.secondary' }} />
@@ -793,14 +722,11 @@ function AllCustomerListScreen({ loggedInStore }) {
                 </Button>
               )}
             </Box>
-          )}
 
           {/* 검색 결과 정보 */}
           <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Typography variant="body2" color="text.secondary">
-              {currentTab === 0 && `총 ${customerList.length}명의 고객 중 ${filteredCustomerList.length}명 표시`}
-              {currentTab === 1 && `온세일매칭실패: ${filteredCustomerList.length}명`}
-              {currentTab === 2 && `POS코드매칭실패: ${filteredCustomerList.length}명`}
+              총 {customerList.length}명의 고객 중 {filteredCustomerList.length}명 표시
             </Typography>
             {searchQuery && (
               <Chip
@@ -810,7 +736,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                 color="primary"
               />
             )}
-            {currentTab === 0 && assignmentFilter !== 'all' && (
+            {assignmentFilter !== 'all' && (
               <Chip
                 label={`재고배정: ${assignmentFilter === 'assigned' ? '배정완료' : '미배정'}`}
                 size="small"
@@ -818,7 +744,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                 variant="outlined"
               />
             )}
-            {currentTab === 0 && activationFilter !== 'all' && (
+            {activationFilter !== 'all' && (
               <Chip
                 label={`개통완료: ${activationFilter === 'activated' ? '개통완료' : '미개통'}`}
                 size="small"
@@ -841,9 +767,7 @@ function AllCustomerListScreen({ loggedInStore }) {
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-            {currentTab === 0 && `고객 리스트 (${filteredCustomerList.length}명) - 모델/용량/색상`}
-            {currentTab === 1 && `온세일매칭실패 고객 (${filteredCustomerList.length}명)`}
-            {currentTab === 2 && `POS코드매칭실패 고객 (${filteredCustomerList.length}명)`}
+            고객 리스트 ({filteredCustomerList.length}명) - 모델/용량/색상
           </Typography>
           
           {loading ? (
