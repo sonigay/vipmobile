@@ -907,31 +907,31 @@ function MonthlyAwardTab() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
                 <Typography variant="body2" color="text.secondary">총점</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e8f5e8', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
                 <Typography variant="body2" color="text.secondary">업셀기변</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fff3e0', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#f3e5f5', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fce4ec', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
@@ -946,31 +946,31 @@ function MonthlyAwardTab() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>5점</Typography>
                 <Typography variant="body2" color="text.secondary">총점</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e8f5e8', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e8f5e8', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>1점</Typography>
                 <Typography variant="body2" color="text.secondary">업셀기변</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fff3e0', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>2점</Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#f3e5f5', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>1점</Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#fce4ec', borderRadius: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fce4ec', borderRadius: 1, minHeight: 56 }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>1점</Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
@@ -981,7 +981,7 @@ function MonthlyAwardTab() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>점수</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>점수</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
@@ -990,42 +990,42 @@ function MonthlyAwardTab() {
             </TableHead>
             <TableBody>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>6점</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>6점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>92.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>60.0%</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>5점</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>5점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>50.0%</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>4점</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>4점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>3점</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>3점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>15.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>2점</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>2점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>72.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>10.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>1점</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>1점</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>71.0%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>5.0%</TableCell>
@@ -1042,7 +1042,7 @@ function MonthlyAwardTab() {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>채널</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>채널</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
@@ -1052,14 +1052,14 @@ function MonthlyAwardTab() {
             <TableBody>
               {/* 샘플 데이터 - 실제로는 props나 API에서 받아올 데이터 */}
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>강이준</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>강이준</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>100.00%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>50.00%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>강이준(별도)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>강이준(별도)</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>90.00%</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>12.00%</TableCell>
