@@ -3046,6 +3046,58 @@ const server = app.listen(port, '0.0.0.0', async () => {
       
       console.log(`📈 [서버시작] 배정완료 재고 자동 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지`);
       
+      // 실제 시트 데이터와 비교 분석
+      console.log('🔍 [서버시작] 실제 시트 데이터와 배정 상태 비교 분석 시작');
+      
+      // 사전예약사이트에서 실제로 일련번호가 입력된 고객들 수집
+      const actualAssignedCustomers = [];
+      reservationSiteValues.slice(1).forEach(row => {
+        if (row.length >= 22) {
+          const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+          const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+          const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+          
+          if (reservationNumber && customerName && assignedSerialNumber) {
+            actualAssignedCustomers.push({
+              reservationNumber,
+              customerName,
+              assignedSerialNumber
+            });
+          }
+        }
+      });
+      
+      console.log(`📊 [서버시작] 실제 시트에 일련번호가 입력된 고객: ${actualAssignedCustomers.length}개`);
+      
+      // 재고관리에서 배정완료로 표시된 재고들
+      const inventoryAssignedCount = inventoryMap.size;
+      console.log(`📊 [서버시작] 재고관리에서 배정완료로 표시된 재고: ${inventoryAssignedCount}개`);
+      
+      // 차이점 분석
+      const difference = actualAssignedCustomers.length - inventoryAssignedCount;
+      console.log(`📊 [서버시작] 차이점: ${difference > 0 ? '+' : ''}${difference}개`);
+      
+      if (difference !== 0) {
+        console.log('⚠️ [서버시작] 불일치 발견! 상세 분석:');
+        
+        // 실제 시트에 있지만 재고관리에 없는 일련번호들
+        const actualSerialNumbers = new Set(actualAssignedCustomers.map(c => c.assignedSerialNumber));
+        const inventorySerialNumbers = new Set(inventoryMap.values());
+        
+        const onlyInSheet = [...actualSerialNumbers].filter(sn => !inventorySerialNumbers.has(sn));
+        const onlyInInventory = [...inventorySerialNumbers].filter(sn => !actualSerialNumbers.has(sn));
+        
+        console.log(`  - 시트에만 있는 일련번호: ${onlyInSheet.length}개`);
+        if (onlyInSheet.length > 0) {
+          console.log(`    샘플: ${onlyInSheet.slice(0, 5).join(', ')}`);
+        }
+        
+        console.log(`  - 재고관리에만 있는 일련번호: ${onlyInInventory.length}개`);
+        if (onlyInInventory.length > 0) {
+          console.log(`    샘플: ${onlyInInventory.slice(0, 5).join(', ')}`);
+        }
+      }
+      
     } catch (error) {
       console.error('❌ [서버시작] 배정완료 재고 자동 저장 오류:', error);
     }
