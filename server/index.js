@@ -2946,6 +2946,109 @@ const server = app.listen(port, '0.0.0.0', async () => {
     
     // 푸시 구독 정보 초기화
     await initializePushSubscriptions();
+    
+    // 서버 시작 시 배정완료된 재고 자동 저장
+    console.log('💾 [서버시작] 배정완료된 재고 자동 저장 시작');
+    try {
+      // 직접 배정 상태 데이터 가져오기
+      const inventoryValues = await getSheetValues('재고관리');
+      const reservationSiteValues = await getSheetValues('사전예약사이트');
+      
+      if (!inventoryValues || !reservationSiteValues) {
+        throw new Error('시트 데이터를 가져올 수 없습니다.');
+      }
+      
+      // 재고 데이터 처리
+      const inventoryMap = new Map();
+      inventoryValues.slice(1).forEach(row => {
+        if (row.length >= 8) {
+          const model = (row[1] || '').toString().trim(); // B열: 모델명
+          const color = (row[2] || '').toString().trim(); // C열: 색상
+          const capacity = (row[3] || '').toString().trim(); // D열: 용량
+          const posCode = (row[4] || '').toString().trim(); // E열: POS코드
+          const serialNumber = (row[5] || '').toString().trim(); // F열: 일련번호
+          const status = (row[6] || '').toString().trim(); // G열: 상태
+          
+          if (model && color && capacity && serialNumber) {
+            const normalizedModel = normalizeModelName(model);
+            const inventoryKey = `${normalizedModel}|${color}|${capacity}|${posCode}`;
+            
+            if (status === '배정완료') {
+              inventoryMap.set(inventoryKey, serialNumber);
+            }
+          }
+        }
+      });
+      
+      console.log(`💾 [서버시작] 재고 데이터 처리 완료: ${inventoryMap.size}개 배정완료 재고`);
+      
+      // 사전예약사이트 데이터와 매칭
+      const assignments = [];
+      let updatedCount = 0;
+      let skippedCount = 0;
+      
+      reservationSiteValues.slice(1).forEach((row, index) => {
+        if (row.length < 22) return;
+        
+        const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+        const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+        const model = (row[1] || '').toString().trim(); // B열: 모델명
+        const color = (row[2] || '').toString().trim(); // C열: 색상
+        const capacity = (row[3] || '').toString().trim(); // D열: 용량
+        const posCode = (row[4] || '').toString().trim(); // E열: POS코드
+        const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+        
+        if (reservationNumber && customerName && model && color && capacity) {
+          const normalizedModel = normalizeModelName(model);
+          const inventoryKey = `${normalizedModel}|${color}|${capacity}|${posCode}`;
+          
+          const assignedSerialNumber = inventoryMap.get(inventoryKey);
+          
+          if (assignedSerialNumber) {
+            // 이미 배정된 일련번호가 있고, 현재와 다른 경우에만 업데이트
+            if (currentSerialNumber !== assignedSerialNumber) {
+              row[6] = assignedSerialNumber; // G열 업데이트
+              updatedCount++;
+              
+              assignments.push({
+                reservationNumber,
+                assignedSerialNumber
+              });
+            } else {
+              skippedCount++;
+            }
+          }
+        }
+      });
+      
+      // Google Sheets에 저장
+      if (updatedCount > 0) {
+        try {
+          const sheets = google.sheets({ version: 'v4', auth });
+          const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+          
+          // G열만 업데이트 (배정일련번호)
+          const range = '사전예약사이트!G2:G' + (reservationSiteValues.length);
+          const values = reservationSiteValues.slice(1).map(row => [row[6] || '']); // G열 데이터만 추출
+          
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range,
+            valueInputOption: 'RAW',
+            resource: { values }
+          });
+          
+          console.log(`✅ [서버시작] Google Sheets 업데이트 완료: ${updatedCount}개 저장`);
+        } catch (error) {
+          console.error('❌ [서버시작] Google Sheets 업데이트 실패:', error);
+        }
+      }
+      
+      console.log(`📈 [서버시작] 배정완료 재고 자동 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지`);
+      
+    } catch (error) {
+      console.error('❌ [서버시작] 배정완료 재고 자동 저장 오류:', error);
+    }
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
   }
