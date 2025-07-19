@@ -9426,7 +9426,9 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
         
         if (storeCode && manager) {
-          managerMapping.set(storeCode, manager);
+          // 담당자 이름에서 괄호 부분 제거 (예: "홍기현(별도)" → "홍기현")
+          const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
+          managerMapping.set(storeCode, cleanManager);
         }
       }
     });

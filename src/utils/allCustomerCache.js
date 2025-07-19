@@ -160,6 +160,7 @@ export const getCachedSearchResults = (searchQuery, customerList) => {
       (customer.modelCapacityColor && customer.modelCapacityColor.toLowerCase().includes(searchLower)) ||
       (customer.storeCode && customer.storeCode.toLowerCase().includes(searchLower)) ||
       (customer.posName && customer.posName.toLowerCase().includes(searchLower)) ||
+      (customer.manager && customer.manager.toLowerCase().includes(searchLower)) ||
       (customer.reservationMemo && customer.reservationMemo.toLowerCase().includes(searchLower)) ||
       (customer.yardReceivedMemo && customer.yardReceivedMemo.toLowerCase().includes(searchLower))
     );
