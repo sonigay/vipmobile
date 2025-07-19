@@ -2546,7 +2546,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       processedCount++;
     });
     
-
+    // 통계 계산
+    const assignedCount = assignmentResults.filter(item => item.assignmentStatus === '배정완료').length;
+    const unassignedCount = assignmentResults.filter(item => item.assignmentStatus === '미배정').length;
+    const activatedCount = assignmentResults.filter(item => item.activationStatus === '개통완료').length;
+    const notActivatedCount = assignmentResults.filter(item => item.activationStatus === '미개통').length;
     
     const result = {
       success: true,
@@ -9379,7 +9383,13 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       range: '온세일!A:Z'
     });
 
-    // 4. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
+    // 4. 폰클출고처데이터 시트 로드 (담당자 매칭용)
+    const storeResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '폰클출고처데이터!A:N'
+    });
+
+    // 5. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
     let posCodeMappingResponse = null;
     try {
       posCodeMappingResponse = await sheets.spreadsheets.values.get({
@@ -9392,7 +9402,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       posCodeMappingResponse = { data: { values: null } };
     }
 
-    if (!reservationResponse.data.values || !yardResponse.data.values || !onSaleResponse.data.values) {
+    if (!reservationResponse.data.values || !yardResponse.data.values || !onSaleResponse.data.values || !storeResponse.data.values) {
       throw new Error('시트 데이터를 불러올 수 없습니다.');
     }
 
@@ -9404,6 +9414,24 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     
     const onSaleHeaders = onSaleResponse.data.values[0];
     const onSaleData = onSaleResponse.data.values.slice(1);
+
+    // 담당자 매핑 테이블 생성 (매장코드 -> 담당자)
+    const managerMapping = new Map();
+    const storeHeaders = storeResponse.data.values[0];
+    const storeData = storeResponse.data.values.slice(1);
+    
+    storeData.forEach(row => {
+      if (row.length >= 14) { // N열까지 필요
+        const storeCode = (row[7] || '').toString().trim(); // H열: 매장코드
+        const manager = (row[13] || '').toString().trim(); // N열: 담당자
+        
+        if (storeCode && manager) {
+          managerMapping.set(storeCode, manager);
+        }
+      }
+    });
+    
+    console.log(`담당자 매핑 테이블 생성 완료: ${managerMapping.size}개 매장-담당자 매핑`);
 
     // POS코드 매핑 테이블 생성 (접수자별 매핑 지원)
     const posCodeMapping = new Map();
@@ -9541,6 +9569,9 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작)
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
+      
+      // 담당자 정보 매핑 (매장코드 기준)
+      const manager = managerMapping.get(storeCode) || '';
 
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = posName;
@@ -9603,6 +9634,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         reservationMemo,
         storeCode,
         posName: mappedPosName, // 매핑된 POS명 사용
+        manager, // 담당자 정보 추가
         yardReceivedDate: yardInfo.receivedDate || '',
         yardReceivedMemo: yardInfo.receivedMemo || '',
         onSaleReceivedDate,
