@@ -560,7 +560,15 @@ function AllCustomerListScreen({ loggedInStore }) {
   }, [cacheStats, customerList.length, filteredCustomerList.length, assignmentStatus]);
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <Container 
+      maxWidth={false} 
+      sx={{ 
+        py: 3,
+        px: { xs: 2, sm: 3, md: 4 },
+        width: '100%',
+        maxWidth: '100%'
+      }}
+    >
       {/* 헤더 */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -775,7 +783,17 @@ function AllCustomerListScreen({ loggedInStore }) {
               <CircularProgress />
             </Box>
           ) : filteredCustomerList.length > 0 ? (
-            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
+            <TableContainer 
+              component={Paper} 
+              variant="outlined" 
+              sx={{ 
+                maxHeight: { xs: 400, sm: 500, md: 600 },
+                overflowX: 'auto',
+                '& .MuiTable-root': {
+                  minWidth: { xs: 800, sm: 1000, md: 1200 }
+                }
+              }}
+            >
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -788,6 +806,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                     <TableCell width="150px">모델/용량/색상</TableCell>
                     <TableCell width="80px">유형</TableCell>
                     <TableCell width="100px">대리점</TableCell>
+                    <TableCell width="100px">담당자</TableCell>
                     <TableCell width="100px">POS명</TableCell>
                     <TableCell width="100px" align="center">재고배정</TableCell>
                     <TableCell width="100px" align="center">개통완료</TableCell>
@@ -845,6 +864,11 @@ function AllCustomerListScreen({ loggedInStore }) {
                       <TableCell>
                         <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
                           {customer.storeCode || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          {customer.manager || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
