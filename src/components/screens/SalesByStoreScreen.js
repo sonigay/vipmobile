@@ -299,7 +299,7 @@ function SalesByStoreScreen({ loggedInStore }) {
 
   // 상세 통계 계산 함수
   const calculateDetailedStats = useCallback(() => {
-    if (!data.byAgent || !assignmentStatus) return null;
+    if (!data.byAgent || !data.byStore) return null;
 
     const stats = {
       byStore: {},
@@ -411,6 +411,10 @@ function SalesByStoreScreen({ loggedInStore }) {
       });
     }
 
+    console.log('📊 [세분화 통계 디버깅] 계산된 통계:', stats);
+    console.log('📊 [세분화 통계 디버깅] 대리점별 데이터:', stats.byStore);
+    console.log('📊 [세분화 통계 디버깅] 담당자별 데이터:', stats.byAgent);
+    console.log('📊 [세분화 통계 디버깅] 모델색상별 데이터:', stats.byModelColor);
     return stats;
   }, [data.byAgent, data.byStore, assignmentStatus, modelColorData]);
 
@@ -1577,7 +1581,7 @@ function SalesByStoreScreen({ loggedInStore }) {
             </TableContainer>
 
             {/* 세분화된 통계 테이블 */}
-            {detailedStats && (
+            {detailedStats && detailedStats.byStore && Object.keys(detailedStats.byStore).length > 0 && (
               <Box sx={{ mt: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
                   📊 세분화된 통계 현황
@@ -1832,7 +1836,7 @@ function SalesByStoreScreen({ loggedInStore }) {
             </TableContainer>
 
             {/* 세분화된 통계 테이블 */}
-            {detailedStats && (
+            {detailedStats && detailedStats.byAgent && Object.keys(detailedStats.byAgent).length > 0 && (
               <Box sx={{ mt: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
                   📊 세분화된 통계 현황
