@@ -2403,8 +2403,20 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     const reservationSiteRows = reservationSiteValues.slice(1);
     const assignmentResults = [];
     
-    // 이미 배정된 일련번호 추적
+    // 이미 배정된 일련번호 추적 (서버 시작 시 Google Sheets에서 동기화)
     const assignedSerialNumbers = new Set();
+    
+    // 서버 시작 시 Google Sheets에서 이미 배정된 일련번호들을 읽어와서 동기화
+    console.log('🔄 [배정동기화] Google Sheets에서 기존 배정 데이터 동기화 시작');
+    reservationSiteRows.forEach(row => {
+      if (row.length >= 22) {
+        const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+        if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
+          assignedSerialNumbers.add(assignedSerialNumber);
+        }
+      }
+    });
+    console.log(`✅ [배정동기화] 기존 배정된 일련번호 ${assignedSerialNumbers.size}개 동기화 완료`);
     
     let processedCount = 0;
     let skippedCount = 0;
@@ -2537,7 +2549,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
         } else {
           // 배정 대기 중 - 순번 계산
           const allCustomersForModel = reservationSiteRows.filter(r => {
-            if (r.length < 35) return false;
+            if (r.length < 22) return false;
             const rModel = (r[15] || '').toString().trim();
             const rCapacity = (r[16] || '').toString().trim();
             const rColor = (r[17] || '').toString().trim();
@@ -2545,30 +2557,37 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
             return `${rModel} ${rCapacity} ${rColor}`.trim() === reservationSiteModel && rPosCode === posCode;
           });
           
-          // 우선순위별로 정렬 (온세일접수일 → 마당접수일 → 일반)
+          // 개선된 우선순위별로 정렬 (예약번호 → 온세일일시 → 마당접수일 → 사이트예약일)
           allCustomersForModel.sort((a, b) => {
-            const aOnSale = (a[12] || '').toString().trim();
+            const aReservationNumber = (a[8] || '').toString().trim(); // I열: 예약번호
+            const bReservationNumber = (b[8] || '').toString().trim();
+            const aOnSale = (a[12] || '').toString().trim(); // M열: 온세일접수일
             const bOnSale = (b[12] || '').toString().trim();
-            const aYard = (a[11] || '').toString().trim();
+            const aYard = (a[11] || '').toString().trim(); // L열: 마당접수일
             const bYard = (b[11] || '').toString().trim();
-            const aDateTime = (a[14] || '').toString().trim();
+            const aDateTime = (a[14] || '').toString().trim(); // O열: 사이트예약일
             const bDateTime = (b[14] || '').toString().trim();
             
-            // 온세일접수일 우선
+            // 1순위: 예약번호 (고유문자, 순번이 아님)
+            if (aReservationNumber !== bReservationNumber) {
+              return aReservationNumber.localeCompare(bReservationNumber);
+            }
+            
+            // 2순위: 온세일일시 낮은순 (오래된 것 우선)
             if (aOnSale && !bOnSale) return -1;
             if (!aOnSale && bOnSale) return 1;
             if (aOnSale && bOnSale) {
               return new Date(aOnSale) - new Date(bOnSale);
             }
             
-            // 마당접수일 차선
+            // 3순위: 마당접수일 낮은순 (오래된 것 우선)
             if (aYard && !bYard) return -1;
             if (!aYard && bYard) return 1;
             if (aYard && bYard) {
               return new Date(aYard) - new Date(bYard);
             }
             
-            // 사전예약일시
+            // 4순위: 사이트예약일 낮은순 (오래된 것 우선)
             return new Date(aDateTime) - new Date(bDateTime);
           });
           
@@ -2686,6 +2705,63 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
       assignmentMap.set(assignment.reservationNumber, assignment.assignedSerialNumber);
     });
     
+    // 중복 배정 자동 정리 로직
+    console.log('🧹 [중복정리] 중복 배정 데이터 자동 정리 시작');
+    const serialToReservations = new Map(); // 일련번호별 예약번호 매핑
+    const reservationToSerial = new Map(); // 예약번호별 일련번호 매핑
+    
+    // 기존 배정 데이터 수집
+    for (let i = 1; i < reservationSiteValues.length; i++) {
+      const row = reservationSiteValues[i];
+      if (row.length < 22) continue;
+      
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+      
+      if (existingSerial && existingSerial.trim() !== '') {
+        if (!serialToReservations.has(existingSerial)) {
+          serialToReservations.set(existingSerial, []);
+        }
+        serialToReservations.get(existingSerial).push(reservationNumber);
+        reservationToSerial.set(reservationNumber, existingSerial);
+      }
+    }
+    
+    // 중복 배정된 일련번호들 정리
+    let cleanedCount = 0;
+    for (const [serialNumber, reservationNumbers] of serialToReservations.entries()) {
+      if (reservationNumbers.length > 1) {
+        console.log(`⚠️ [중복정리] 일련번호 ${serialNumber}에 ${reservationNumbers.length}개 고객 배정됨: ${reservationNumbers.join(', ')}`);
+        
+        // 우선순위에 따라 첫 번째 고객만 남기고 나머지는 배정 해제
+        const sortedReservations = reservationNumbers.sort((a, b) => {
+          // 예약번호 순서로 정렬 (고유문자)
+          return a.localeCompare(b);
+        });
+        
+        // 첫 번째 고객만 유지하고 나머지는 배정 해제
+        for (let i = 1; i < sortedReservations.length; i++) {
+          const reservationToRemove = sortedReservations[i];
+          
+          // 해당 행에서 배정 해제
+          for (let j = 1; j < reservationSiteValues.length; j++) {
+            const row = reservationSiteValues[j];
+            if (row.length < 22) continue;
+            
+            const reservationNumber = (row[8] || '').toString().trim();
+            if (reservationNumber === reservationToRemove) {
+              row[6] = ''; // G열 배정 해제
+              cleanedCount++;
+              console.log(`🧹 [중복정리] 배정 해제: ${reservationToRemove} (일련번호: ${serialNumber})`);
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ [중복정리] 중복 배정 정리 완료: ${cleanedCount}개 배정 해제`);
+    
     // 시트 데이터 업데이트 (G열에 일련번호 저장)
     let updatedCount = 0;
     let skippedCount = 0;
@@ -2727,9 +2803,9 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
           
           console.log(`🔧 [배정저장 디버깅] Google Sheets 업데이트 시작 - Spreadsheet ID: ${spreadsheetId.substring(0, 10)}...`);
           
-          // G열만 업데이트 (배정일련번호)
-          const range = '사전예약사이트!G2:G' + (reservationSiteValues.length);
-          const values = reservationSiteValues.slice(1).map(row => [row[6] || '']); // G열 데이터만 추출
+                      // G열만 업데이트 (배정일련번호) - 중복 정리된 데이터 포함
+            const range = '사전예약사이트!G2:G' + (reservationSiteValues.length);
+            const values = reservationSiteValues.slice(1).map(row => [row[6] || '']); // G열 데이터만 추출
           
           await sheets.spreadsheets.values.update({
             spreadsheetId,
@@ -2746,12 +2822,13 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
         }
       }
     
-    console.log(`📈 [배정저장 디버깅] 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지`);
+    console.log(`📈 [배정저장 디버깅] 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지, ${cleanedCount}개 중복정리`);
     
     res.json({
       success: true,
       updated: updatedCount,
       skipped: skippedCount,
+      cleaned: cleanedCount,
       total: assignments.length
     });
     
@@ -2966,8 +3043,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 푸시 구독 정보 초기화
     await initializePushSubscriptions();
     
-    // 서버 시작 시 배정완료된 재고 자동 저장
-    console.log('💾 [서버시작] 배정완료된 재고 자동 저장 시작');
+    // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리
+    console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작');
     try {
       // 직접 배정 상태 데이터 가져오기
       const inventoryValues = await getSheetValues('재고관리');
@@ -3005,6 +3082,53 @@ const server = app.listen(port, '0.0.0.0', async () => {
       const assignments = [];
       let updatedCount = 0;
       let skippedCount = 0;
+      
+      // 서버 시작 시 중복 배정 자동 정리
+      console.log('🧹 [서버시작] 중복 배정 데이터 자동 정리 시작');
+      const serialToReservations = new Map(); // 일련번호별 예약번호 매핑
+      
+      // 기존 배정 데이터 수집
+      reservationSiteValues.slice(1).forEach((row, index) => {
+        if (row.length < 22) return;
+        
+        const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+        const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+        
+        if (existingSerial && existingSerial.trim() !== '') {
+          if (!serialToReservations.has(existingSerial)) {
+            serialToReservations.set(existingSerial, []);
+          }
+          serialToReservations.get(existingSerial).push({
+            reservationNumber,
+            rowIndex: index + 1,
+            row: row
+          });
+        }
+      });
+      
+      // 중복 배정된 일련번호들 정리
+      let cleanedCount = 0;
+      for (const [serialNumber, reservations] of serialToReservations.entries()) {
+        if (reservations.length > 1) {
+          console.log(`⚠️ [서버시작] 일련번호 ${serialNumber}에 ${reservations.length}개 고객 배정됨: ${reservations.map(r => r.reservationNumber).join(', ')}`);
+          
+          // 우선순위에 따라 첫 번째 고객만 남기고 나머지는 배정 해제
+          const sortedReservations = reservations.sort((a, b) => {
+            // 예약번호 순서로 정렬 (고유문자)
+            return a.reservationNumber.localeCompare(b.reservationNumber);
+          });
+          
+          // 첫 번째 고객만 유지하고 나머지는 배정 해제
+          for (let i = 1; i < sortedReservations.length; i++) {
+            const reservationToRemove = sortedReservations[i];
+            reservationToRemove.row[6] = ''; // G열 배정 해제
+            cleanedCount++;
+            console.log(`🧹 [서버시작] 배정 해제: ${reservationToRemove.reservationNumber} (일련번호: ${serialNumber})`);
+          }
+        }
+      }
+      
+      console.log(`✅ [서버시작] 중복 배정 정리 완료: ${cleanedCount}개 배정 해제`);
       
       reservationSiteValues.slice(1).forEach((row, index) => {
         if (row.length < 22) return;
@@ -3064,14 +3188,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
               resource: { values }
             });
             
-            console.log(`✅ [서버시작] Google Sheets 업데이트 완료: ${updatedCount}개 저장`);
+            console.log(`✅ [서버시작] Google Sheets 업데이트 완료: ${updatedCount}개 저장, ${cleanedCount}개 중복정리`);
           } catch (error) {
             console.error('❌ [서버시작] Google Sheets 업데이트 실패:', error.message);
             console.error('❌ [서버시작] 환경변수 확인 필요: GOOGLE_SHEET_ID');
           }
         }
       
-      console.log(`📈 [서버시작] 배정완료 재고 자동 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지`);
+      console.log(`📈 [서버시작] 배정완료 재고 자동 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지, ${cleanedCount}개 중복정리`);
       
       // 실제 시트 데이터와 비교 분석
       console.log('🔍 [서버시작] 실제 시트 데이터와 배정 상태 비교 분석 시작');
