@@ -2309,7 +2309,12 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
                   if (serialNumber && modelCapacity && color && storeName) {
             const posCode = storePosCodeMapping.get(storeName);
             if (posCode) {
-              const key = `${modelCapacity}_${posCode}`;
+              // 모델명에 색상 정보가 없으면 추가
+              let modelWithColor = modelCapacity;
+              if (!modelCapacity.includes('|') && color) {
+                modelWithColor = `${modelCapacity} | ${color}`;
+              }
+              const key = `${modelWithColor}_${posCode}`;
               
               if (!availableInventory.has(key)) {
                 availableInventory.set(key, []);
