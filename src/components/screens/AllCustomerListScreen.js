@@ -789,47 +789,103 @@ function AllCustomerListScreen({ loggedInStore }) {
               sx={{ 
                 maxHeight: { xs: 400, sm: 500, md: 600 },
                 overflowX: 'auto',
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                border: '1px solid #e0e0e0',
                 '& .MuiTable-root': {
                   minWidth: { xs: 800, sm: 1000, md: 1200 }
+                },
+                '& .MuiTableHead-root': {
+                  backgroundColor: '#f8f9fa',
+                  '& .MuiTableCell-head': {
+                    backgroundColor: '#f8f9fa',
+                    color: '#2c3e50',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    borderBottom: '2px solid #dee2e6',
+                    textAlign: 'center',
+                    padding: '12px 8px'
+                  }
+                },
+                '& .MuiTableBody-root': {
+                  '& .MuiTableRow-root': {
+                    '&:hover': {
+                      backgroundColor: '#f8f9fa',
+                      transition: 'background-color 0.2s ease'
+                    },
+                    '&:nth-of-type(even)': {
+                      backgroundColor: '#fafbfc'
+                    }
+                  },
+                  '& .MuiTableCell-body': {
+                    borderBottom: '1px solid #e9ecef',
+                    padding: '10px 8px',
+                    fontSize: '0.8rem',
+                    color: '#495057'
+                  }
                 }
               }}
             >
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell width="60px" align="center">순번</TableCell>
-                    <TableCell width="120px">고객명</TableCell>
-                    <TableCell width="100px">예약번호</TableCell>
-                    <TableCell width="120px">사이트예약</TableCell>
-                    <TableCell width="120px">마당접수일</TableCell>
-                    <TableCell width="120px">온세일접수일</TableCell>
-                    <TableCell width="150px">모델/용량/색상</TableCell>
-                    <TableCell width="80px">유형</TableCell>
-                    <TableCell width="100px">대리점</TableCell>
-                    <TableCell width="100px">담당자</TableCell>
-                    <TableCell width="100px">POS명</TableCell>
-                    <TableCell width="100px" align="center">재고배정</TableCell>
-                    <TableCell width="100px" align="center">개통완료</TableCell>
-                    <TableCell width="200px">사이트메모</TableCell>
-                    <TableCell width="200px">마당메모</TableCell>
-                    <TableCell width="80px">접수자</TableCell>
+                    <TableCell width="60px" align="center" sx={{ fontWeight: 700, color: '#1a237e' }}>순번</TableCell>
+                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>고객명</TableCell>
+                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>예약번호</TableCell>
+                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>사이트예약</TableCell>
+                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>마당접수일</TableCell>
+                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>온세일접수일</TableCell>
+                    <TableCell width="150px" sx={{ fontWeight: 700, color: '#1a237e' }}>모델/용량/색상</TableCell>
+                    <TableCell width="80px" sx={{ fontWeight: 700, color: '#1a237e' }}>유형</TableCell>
+                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>대리점</TableCell>
+                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>담당자</TableCell>
+                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>POS명</TableCell>
+                    <TableCell width="100px" align="center" sx={{ fontWeight: 700, color: '#1a237e' }}>재고배정</TableCell>
+                    <TableCell width="100px" align="center" sx={{ fontWeight: 700, color: '#1a237e' }}>개통완료</TableCell>
+                    <TableCell width="200px" sx={{ fontWeight: 700, color: '#1a237e' }}>사이트메모</TableCell>
+                    <TableCell width="200px" sx={{ fontWeight: 700, color: '#1a237e' }}>마당메모</TableCell>
+                    <TableCell width="80px" sx={{ fontWeight: 700, color: '#1a237e' }}>접수자</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredCustomerList.map((customer, index) => (
                     <TableRow key={`${customer.reservationNumber}-${index}`} hover>
                       <TableCell align="center">
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ 
+                          fontSize: '0.85rem', 
+                          fontWeight: 600, 
+                          color: '#1976d2',
+                          backgroundColor: '#e3f2fd',
+                          borderRadius: 1,
+                          px: 1,
+                          py: 0.5,
+                          display: 'inline-block',
+                          minWidth: '24px',
+                          textAlign: 'center'
+                        }}>
                           {index + 1}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        <Typography variant="body2" sx={{ 
+                          fontWeight: 600, 
+                          color: '#2c3e50',
+                          fontSize: '0.85rem'
+                        }}>
                           {customer.customerName}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ 
+                          fontSize: '0.8rem',
+                          fontFamily: 'monospace',
+                          color: '#6c757d',
+                          backgroundColor: '#f8f9fa',
+                          borderRadius: 1,
+                          px: 1,
+                          py: 0.5,
+                          display: 'inline-block'
+                        }}>
                           {customer.reservationNumber}
                         </Typography>
                       </TableCell>
@@ -853,21 +909,52 @@ function AllCustomerListScreen({ loggedInStore }) {
                           label={customer.modelCapacityColor || '-'}
                           color="primary"
                           size="small"
-                          sx={{ fontSize: '0.7rem' }}
+                          sx={{ 
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            backgroundColor: '#3f51b5',
+                            color: 'white',
+                            '&:hover': {
+                              backgroundColor: '#303f9f'
+                            },
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                          }}
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ 
+                          fontSize: '0.8rem',
+                          color: '#6c757d',
+                          fontStyle: 'italic'
+                        }}>
                           {customer.type || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ 
+                          fontSize: '0.8rem',
+                          fontWeight: 500,
+                          color: '#495057',
+                          backgroundColor: '#e9ecef',
+                          borderRadius: 1,
+                          px: 1,
+                          py: 0.5,
+                          display: 'inline-block'
+                        }}>
                           {customer.storeCode || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ 
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: '#28a745',
+                          backgroundColor: '#d4edda',
+                          borderRadius: 1,
+                          px: 1,
+                          py: 0.5,
+                          display: 'inline-block'
+                        }}>
                           {customer.manager || '-'}
                         </Typography>
                       </TableCell>
@@ -906,10 +993,14 @@ function AllCustomerListScreen({ loggedInStore }) {
                                 size="small"
                                 color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
                                 sx={{
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
                                   backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
-                                  color: isAssigned || isWaiting ? 'white' : 'black',
-                                  fontWeight: 'bold'
+                                  color: isAssigned || isWaiting ? 'white' : '#6c757d',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                  '&:hover': {
+                                    backgroundColor: isAssigned ? '#45a049' : isWaiting ? '#e68900' : '#e9ecef'
+                                  }
                                 }}
                               />
                             );
@@ -942,10 +1033,14 @@ function AllCustomerListScreen({ loggedInStore }) {
                                 size="small"
                                 color={isActivated ? 'success' : 'default'}
                                 sx={{
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
                                   backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
-                                  color: isActivated ? 'white' : 'black',
-                                  fontWeight: 'bold'
+                                  color: isActivated ? 'white' : '#6c757d',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                  '&:hover': {
+                                    backgroundColor: isActivated ? '#1976d2' : '#e9ecef'
+                                  }
                                 }}
                               />
                             );
