@@ -2891,10 +2891,19 @@ app.get('/api/inventory/activation-status', async (req, res) => {
     const activatedSerialNumbers = new Set();
     let activationCount = 0;
     
-    phoneklActivationValues.slice(1).forEach(row => {
+    phoneklActivationValues.slice(1).forEach((row, index) => {
       if (row.length >= 16) {
         const serialNumber = (row[15] || '').toString().trim(); // P열: 일련번호
         const storeName = (row[6] || '').toString().trim(); // G열: 출고처
+        
+        // 테스트용 디버깅: 일련번호 1005552 확인
+        if (serialNumber === '1005552') {
+          console.log(`🎯 [개통상태 디버깅] 테스트 일련번호 발견! 행 ${index + 2}:`, {
+            serialNumber,
+            storeName,
+            rowLength: row.length
+          });
+        }
         
         if (serialNumber && storeName) {
           activatedSerialNumbers.add(serialNumber);
@@ -2915,12 +2924,22 @@ app.get('/api/inventory/activation-status', async (req, res) => {
     const activationResults = [];
     let matchedCount = 0;
     
-    reservationSiteValues.slice(1).forEach(row => {
+    reservationSiteValues.slice(1).forEach((row, index) => {
       if (row.length < 22) return;
       
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const customerName = (row[7] || '').toString().trim(); // H열: 고객명
       const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+      
+      // 테스트용 디버깅: 일련번호 1005552가 배정된 고객 확인
+      if (assignedSerialNumber === '1005552') {
+        console.log(`🎯 [개통상태 디버깅] 테스트 일련번호 배정 고객 발견! 행 ${index + 2}:`, {
+          reservationNumber,
+          customerName,
+          assignedSerialNumber,
+          isActivated: activatedSerialNumbers.has(assignedSerialNumber)
+        });
+      }
       
       if (reservationNumber && customerName && assignedSerialNumber) {
         const isActivated = activatedSerialNumbers.has(assignedSerialNumber);

@@ -184,6 +184,25 @@ function AllCustomerListScreen({ loggedInStore }) {
           console.log(`  - 배정상태 데이터: ${Object.keys(statusMap).length}개`);
           console.log(`  - 매핑 성공률: ${((Object.keys(statusMap).length / customerList.length) * 100).toFixed(1)}%`);
           
+          // 테스트용 디버깅: 일련번호 1005552 관련 고객 확인
+          const testCustomer = customerList.find(c => {
+            const status = statusMap[c.reservationNumber];
+            return status && status.assignedSerialNumber === '1005552';
+          });
+          
+          if (testCustomer) {
+            const testStatus = statusMap[testCustomer.reservationNumber];
+            console.log(`🎯 [전체고객리스트 디버깅] 테스트 고객 발견:`, {
+              reservationNumber: testCustomer.reservationNumber,
+              customerName: testCustomer.customerName,
+              assignedSerialNumber: testStatus.assignedSerialNumber,
+              assignmentStatus: testStatus.assignmentStatus,
+              activationStatus: testStatus.activationStatus
+            });
+          } else {
+            console.log(`❌ [전체고객리스트 디버깅] 일련번호 1005552가 배정된 고객을 찾을 수 없음`);
+          }
+          
           // 상세 매핑 분석
           const customerReservationNumbers = customerList.map(c => c.reservationNumber).filter(Boolean);
           const statusReservationNumbers = Object.keys(statusMap);
@@ -473,6 +492,19 @@ function AllCustomerListScreen({ loggedInStore }) {
               
               setActivationData(activationMap);
               console.log(`✅ [개통상태 디버깅] 개통 상태 로드 완료: ${Object.keys(activationMap).length}개`);
+              
+              // 테스트용 디버깅: 일련번호 1005552 관련 개통 상태 확인
+              const testActivation = result.data.find(item => item.assignedSerialNumber === '1005552');
+              if (testActivation) {
+                console.log(`🎯 [개통상태 디버깅] 테스트 일련번호 개통 상태:`, {
+                  reservationNumber: testActivation.reservationNumber,
+                  customerName: testActivation.customerName,
+                  assignedSerialNumber: testActivation.assignedSerialNumber,
+                  activationStatus: testActivation.activationStatus
+                });
+              } else {
+                console.log(`❌ [개통상태 디버깅] 일련번호 1005552의 개통 상태를 찾을 수 없음`);
+              }
             }
           }
         } catch (error) {
