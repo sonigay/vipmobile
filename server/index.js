@@ -108,6 +108,52 @@ setInterval(() => {
   cacheUtils.cleanup();
 }, 5 * 60 * 1000);
 
+// 주기적 배정 저장 (10분마다)
+setInterval(async () => {
+  try {
+    console.log('🔄 [자동배정저장] 주기적 배정 저장 시작');
+    
+    // 현재 배정 상태 가져오기
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+    
+    if (response.ok) {
+      const result = await response.json();
+      
+      if (result.success) {
+        // 배정완료된 고객들만 필터링
+        const assignments = result.data
+          .filter(item => item.assignmentStatus === '배정완료' && item.assignedSerialNumber)
+          .map(item => ({
+            reservationNumber: item.reservationNumber,
+            assignedSerialNumber: item.assignedSerialNumber
+          }));
+        
+        if (assignments.length > 0) {
+          // 배정 저장 API 호출
+          const saveResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/save-assignment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ assignments })
+          });
+          
+          if (saveResponse.ok) {
+            const saveResult = await saveResponse.json();
+            console.log(`✅ [자동배정저장] 배정 저장 완료: ${saveResult.updated}개 저장, ${saveResult.skipped}개 유지`);
+          } else {
+            console.error('❌ [자동배정저장] 배정 저장 실패:', saveResponse.status);
+          }
+        } else {
+          console.log('ℹ️ [자동배정저장] 저장할 배정이 없습니다');
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ [자동배정저장] 주기적 배정 저장 오류:', error);
+  }
+}, 10 * 60 * 1000); // 10분마다
+
 // Discord 봇 설정
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
@@ -2669,7 +2715,28 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
     }
     
     // 업데이트된 데이터를 시트에 저장
-    // TODO: Google Sheets API를 사용하여 실제 저장 구현
+    if (updatedCount > 0) {
+      try {
+        const sheets = google.sheets({ version: 'v4', auth });
+        const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+        
+        // G열만 업데이트 (배정일련번호)
+        const range = '사전예약사이트!G2:G' + (reservationSiteValues.length);
+        const values = reservationSiteValues.slice(1).map(row => [row[6] || '']); // G열 데이터만 추출
+        
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'RAW',
+          resource: { values }
+        });
+        
+        console.log(`💾 [배정저장 디버깅] Google Sheets 업데이트 완료: ${updatedCount}개 저장`);
+      } catch (error) {
+        console.error('❌ [배정저장 디버깅] Google Sheets 업데이트 실패:', error);
+        throw error;
+      }
+    }
     
     console.log(`📈 [배정저장 디버깅] 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지`);
     
@@ -2685,6 +2752,104 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to save assignment',
+      message: error.message
+    });
+  }
+});
+
+// 실시간 개통 상태 확인 API
+app.get('/api/inventory/activation-status', async (req, res) => {
+  try {
+    console.log('📱 [개통상태 디버깅] 개통 상태 확인 시작');
+    
+    // 캐시 키 생성
+    const cacheKey = 'inventory_activation_status';
+    
+    // 캐시에서 먼저 확인 (5분 TTL)
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      console.log('✅ [개통상태 디버깅] 캐시된 개통 상태 반환');
+      return res.json(cachedData);
+    }
+    
+    // 폰클개통데이터에서 개통 완료된 일련번호 수집
+    const phoneklActivationValues = await getSheetValues('폰클개통데이터');
+    
+    if (!phoneklActivationValues || phoneklActivationValues.length < 2) {
+      throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+    }
+    
+    const activatedSerialNumbers = new Set();
+    let activationCount = 0;
+    
+    phoneklActivationValues.slice(1).forEach(row => {
+      if (row.length >= 16) {
+        const serialNumber = (row[15] || '').toString().trim(); // P열: 일련번호
+        const storeName = (row[6] || '').toString().trim(); // G열: 출고처
+        
+        if (serialNumber && storeName) {
+          activatedSerialNumbers.add(serialNumber);
+          activationCount++;
+        }
+      }
+    });
+    
+    console.log(`📱 [개통상태 디버깅] 개통 데이터 처리 완료: ${activationCount}개 개통된 일련번호`);
+    
+    // 사전예약사이트에서 배정된 일련번호와 매칭
+    const reservationSiteValues = await getSheetValues('사전예약사이트');
+    
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    const activationResults = [];
+    let matchedCount = 0;
+    
+    reservationSiteValues.slice(1).forEach(row => {
+      if (row.length < 22) return;
+      
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
+      const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+      
+      if (reservationNumber && customerName && assignedSerialNumber) {
+        const isActivated = activatedSerialNumbers.has(assignedSerialNumber);
+        
+        activationResults.push({
+          reservationNumber,
+          customerName,
+          assignedSerialNumber,
+          activationStatus: isActivated ? '개통완료' : '미개통'
+        });
+        
+        if (isActivated) {
+          matchedCount++;
+        }
+      }
+    });
+    
+    console.log(`📈 [개통상태 디버깅] 개통 상태 매칭 완료: ${matchedCount}개 개통완료, ${activationResults.length - matchedCount}개 미개통`);
+    
+    const result = {
+      success: true,
+      data: activationResults,
+      total: activationResults.length,
+      activated: matchedCount,
+      notActivated: activationResults.length - matchedCount
+    };
+    
+    // 결과 캐싱 (5분 TTL)
+    cacheUtils.set(cacheKey, result, 5 * 60);
+    
+    console.log('✅ [개통상태 디버깅] 개통 상태 확인 완료');
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ [개통상태 디버깅] 개통 상태 확인 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check activation status',
       message: error.message
     });
   }

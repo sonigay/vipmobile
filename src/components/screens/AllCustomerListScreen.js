@@ -54,6 +54,8 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [loadingAssignment, setLoadingAssignment] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'assigned', 'unassigned'
   const [activationFilter, setActivationFilter] = useState('all'); // 'all', 'activated', 'notActivated'
+  const [activationData, setActivationData] = useState({});
+  const [loadingActivation, setLoadingActivation] = useState(false);
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -395,6 +397,39 @@ function AllCustomerListScreen({ loggedInStore }) {
               console.log(`  - 매칭되지 않는 예약번호 샘플:`, unmatchedCustomers.slice(0, 10));
             }
             
+            // 배정완료된 고객들이 있으면 자동으로 저장 API 호출
+            const completedAssignments = result.data.filter(item => 
+              item.assignmentStatus === '배정완료' && item.assignedSerialNumber
+            );
+            
+            if (completedAssignments.length > 0) {
+              console.log('💾 [전체고객리스트 디버깅] 배정완료 고객 발견, 자동 저장 시작:', completedAssignments.length, '개');
+              
+              const assignments = completedAssignments.map(item => ({
+                reservationNumber: item.reservationNumber,
+                assignedSerialNumber: item.assignedSerialNumber
+              }));
+              
+              try {
+                const saveResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/save-assignment`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ assignments })
+                });
+                
+                if (saveResponse.ok) {
+                  const saveResult = await saveResponse.json();
+                  console.log('✅ [전체고객리스트 디버깅] 자동 저장 완료:', saveResult.updated, '개 저장,', saveResult.skipped, '개 유지');
+                } else {
+                  console.error('❌ [전체고객리스트 디버깅] 자동 저장 실패:', saveResponse.status);
+                }
+              } catch (saveError) {
+                console.error('❌ [전체고객리스트 디버깅] 자동 저장 오류:', saveError);
+              }
+            }
+            
           } else {
             console.error('❌ [재고배정 디버깅] useEffect API 응답 실패:', result);
           }
@@ -413,6 +448,41 @@ function AllCustomerListScreen({ loggedInStore }) {
     
     if (customerList.length > 0) {
       loadAssignmentStatus();
+      
+      // 개통 상태도 함께 로드
+      const loadActivationStatus = async () => {
+        try {
+          setLoadingActivation(true);
+          console.log('📱 [개통상태 디버깅] 개통 상태 로드 시작');
+          
+          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log('📊 [개통상태 디버깅] 개통 상태 응답:', result);
+            
+            if (result.success) {
+              // 예약번호를 키로 하는 맵 생성
+              const activationMap = {};
+              result.data.forEach(item => {
+                activationMap[item.reservationNumber] = {
+                  activationStatus: item.activationStatus,
+                  assignedSerialNumber: item.assignedSerialNumber
+                };
+              });
+              
+              setActivationData(activationMap);
+              console.log(`✅ [개통상태 디버깅] 개통 상태 로드 완료: ${Object.keys(activationMap).length}개`);
+            }
+          }
+        } catch (error) {
+          console.error('❌ [개통상태 디버깅] 개통 상태 로드 오류:', error);
+        } finally {
+          setLoadingActivation(false);
+        }
+      };
+      
+      loadActivationStatus();
     } else {
       console.log('⚠️ [재고배정 디버깅] 고객리스트가 비어있어 배정상태 로드를 건너뜀');
     }
