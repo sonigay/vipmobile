@@ -2371,6 +2371,9 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     reservationSiteRows.forEach((row, index) => {
       if (row.length < 35) {
         skippedCount++;
+        if (index < 10) {
+          console.log(`❌ [건너뛴 고객 디버깅] 행 ${index + 1}: 열 개수 부족 (${row.length}/35)`);
+        }
         return;
       }
       
@@ -2387,6 +2390,16 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       
       if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) {
         skippedCount++;
+        if (index < 10) {
+          console.log(`❌ [건너뛴 고객 디버깅] 행 ${index + 1}: 필수 필드 누락`, {
+            reservationNumber: !!reservationNumber,
+            customerName: !!customerName,
+            model: !!model,
+            capacity: !!capacity,
+            color: !!color,
+            posCode: !!posCode
+          });
+        }
         return;
       }
       
@@ -2409,6 +2422,20 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       
       // 재고 키 생성
       const inventoryKey = `${phoneklModel}_${posCode}`;
+      
+      // 디버깅: 재고 키 매칭 확인
+      if (index < 10) { // 처음 10개만 로그 출력
+        console.log(`🔍 [재고매칭 디버깅] 고객 ${index + 1}:`, {
+          reservationNumber,
+          customerName,
+          reservationSiteModel,
+          phoneklModel,
+          posCode,
+          inventoryKey,
+          hasInventory: availableInventory.has(inventoryKey),
+          availableSerialsCount: availableInventory.get(inventoryKey)?.length || 0
+        });
+      }
       
       // 해당 재고 확인
       const availableSerials = availableInventory.get(inventoryKey) || [];
@@ -2442,6 +2469,18 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
           assignmentStatus = '배정완료';
           assignedSerialNumbers.add(assignedSerial);
           successfulAssignmentCount++;
+          
+          // 디버깅: 배정완료 로그
+          if (index < 10) {
+            console.log(`✅ [배정완료 디버깅] 고객 ${index + 1} 배정완료:`, {
+              reservationNumber,
+              customerName,
+              inventoryKey,
+              assignedSerial,
+              availableSerialsCount: availableSerials.length,
+              unassignedSerialsCount: unassignedSerials.length
+            });
+          }
           
           // 개통 상태 확인
           if (activatedSerialNumbers.has(assignedSerial)) {
