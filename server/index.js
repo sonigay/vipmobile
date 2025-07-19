@@ -2369,10 +2369,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     console.log(`📊 [서버 디버깅] 처리할 고객 수: ${reservationSiteRows.length}명`);
     
     reservationSiteRows.forEach((row, index) => {
-      if (row.length < 35) {
+      // 필요한 열들이 있는지 확인 (V열까지 = 22개 열 필요)
+      if (row.length < 22) {
         skippedCount++;
         if (index < 10) {
-          console.log(`❌ [건너뛴 고객 디버깅] 행 ${index + 1}: 열 개수 부족 (${row.length}/35)`);
+          console.log(`❌ [건너뛴 고객 디버깅] 행 ${index + 1}: 열 개수 부족 (${row.length}/22)`);
         }
         return;
       }
