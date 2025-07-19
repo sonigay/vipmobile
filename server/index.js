@@ -9566,12 +9566,13 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const color = row[17] || ''; // R열 (18번째, 0부터 시작) - 색상
       const type = row.length > 31 ? (row[31] || '') : ''; // AF열 (32번째, 0부터 시작) - 유형
       const reservationMemo = row.length > 34 ? (row[34] || '') : ''; // AI열 (35번째, 0부터 시작) - 사이트메모
-      const storeCode = row[21] || ''; // V열 (22번째, 0부터 시작)
+      const storeCode = row[23] || ''; // X열 (24번째, 0부터 시작) - 대리점 코드
       const posName = row[22] || ''; // W열 (23번째, 0부터 시작)
       const receiver = row[25] || ''; // Z열 (26번째, 0부터 시작) - 접수자
       
-      // 담당자 정보 매핑 (매장코드 기준)
-      const manager = managerMapping.get(storeCode) || '';
+      // 담당자 정보 매핑 (V열 매장코드 기준)
+      const managerCode = row[21] || ''; // V열 (22번째, 0부터 시작) - 매장코드
+      const manager = managerMapping.get(managerCode) || '';
 
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = posName;
