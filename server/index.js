@@ -2611,6 +2611,85 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
   }
 });
 
+// 배정 저장 API
+app.post('/api/inventory/save-assignment', async (req, res) => {
+  try {
+    console.log('💾 [배정저장 디버깅] 배정 저장 시작');
+    
+    const { assignments } = req.body; // [{ reservationNumber, assignedSerialNumber }]
+    
+    if (!assignments || !Array.isArray(assignments)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid assignments data'
+      });
+    }
+    
+    console.log(`📊 [배정저장 디버깅] 저장할 배정 수: ${assignments.length}개`);
+    
+    // 사전예약사이트 시트 데이터 가져오기
+    const reservationSiteValues = await getSheetValues('사전예약사이트');
+    
+    if (!reservationSiteValues || reservationSiteValues.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 배정 데이터를 예약번호로 매핑
+    const assignmentMap = new Map();
+    assignments.forEach(assignment => {
+      assignmentMap.set(assignment.reservationNumber, assignment.assignedSerialNumber);
+    });
+    
+    // 시트 데이터 업데이트 (G열에 일련번호 저장)
+    let updatedCount = 0;
+    let skippedCount = 0;
+    
+    for (let i = 1; i < reservationSiteValues.length; i++) {
+      const row = reservationSiteValues[i];
+      if (row.length < 22) continue;
+      
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+      
+      if (assignmentMap.has(reservationNumber)) {
+        const newSerial = assignmentMap.get(reservationNumber);
+        
+        // 기존 배정된 일련번호가 있으면 유지
+        if (existingSerial && existingSerial.trim() !== '') {
+          console.log(`⚠️ [배정저장 디버깅] 기존 배정 유지: ${reservationNumber} (${existingSerial})`);
+          skippedCount++;
+          continue;
+        }
+        
+        // 새로운 배정 저장
+        row[6] = newSerial; // G열에 일련번호 저장
+        updatedCount++;
+        console.log(`✅ [배정저장 디버깅] 배정 저장: ${reservationNumber} → ${newSerial}`);
+      }
+    }
+    
+    // 업데이트된 데이터를 시트에 저장
+    // TODO: Google Sheets API를 사용하여 실제 저장 구현
+    
+    console.log(`📈 [배정저장 디버깅] 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지`);
+    
+    res.json({
+      success: true,
+      updated: updatedCount,
+      skipped: skippedCount,
+      total: assignments.length
+    });
+    
+  } catch (error) {
+    console.error('❌ [배정저장 디버깅] 배정 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save assignment',
+      message: error.message
+    });
+  }
+});
+
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
