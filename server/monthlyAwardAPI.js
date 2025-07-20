@@ -572,6 +572,16 @@ async function getMonthlyAwardData(req, res) {
       console.log('DO열(93) - 유플릭스:', firstRow[93]);
       console.log('DS열(95) - 통화연결음:', firstRow[95]);
       console.log('================================');
+      
+      // 전략상품 관련 컬럼들을 더 넓게 확인 (70-100 범위)
+      console.log('=== 전략상품 관련 컬럼 확장 확인 ===');
+      for (let i = 70; i <= 100; i++) {
+        const value = firstRow[i];
+        if (value && value.toString().trim() !== '') {
+          console.log(`${i}열: "${value}"`);
+        }
+      }
+      console.log('================================');
     }
     
     let matchedCount = 0;
@@ -773,6 +783,20 @@ async function getMonthlyAwardData(req, res) {
       console.log('E열(4) - 상태:', firstStoreRow[4]);
       console.log('H열(7) - 실판매POS 코드:', firstStoreRow[7]);
       console.log('N열(13) - 담당자:', firstStoreRow[13]);
+      console.log('================================');
+      
+      // 폰클출고처데이터의 실제 업체명들 확인 (처음 10개)
+      console.log('=== 폰클출고처데이터 업체명 샘플 ===');
+      storeRows.slice(1, 11).forEach((row, index) => {
+        if (row.length >= 14) {
+          const companyName = (row[2] || '').toString().trim();
+          const manager = (row[13] || '').toString().trim();
+          const status = (row[4] || '').toString().trim();
+          if (companyName && manager && status !== '미사용') {
+            console.log(`${index + 1}. "${companyName}" -> "${manager}"`);
+          }
+        }
+      });
       console.log('================================');
     }
     
