@@ -73,6 +73,9 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [manualAssignmentLoading, setManualAssignmentLoading] = useState(false);
+  const [manualAssignmentMessage, setManualAssignmentMessage] = useState('');
+  const [lastCheckTime, setLastCheckTime] = useState(Date.now());
 
   // 새로운 배포 감지
   useEffect(() => {
@@ -209,11 +212,72 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
     }
   };
 
+  // 수동 배정 실행 함수
+  const handleManualAssignment = async () => {
+    try {
+      setManualAssignmentLoading(true);
+      setManualAssignmentMessage('');
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation/manual-assignment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('수동 배정 요청에 실패했습니다.');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setManualAssignmentMessage(result.message);
+        // 배정 완료 후 대시보드 데이터 새로고침
+        await loadDashboardData();
+      } else {
+        throw new Error(result.message || '수동 배정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('수동 배정 오류:', error);
+      setManualAssignmentMessage(`오류: ${error.message}`);
+    } finally {
+      setManualAssignmentLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (currentTab === 0) {
       loadDashboardData();
     }
   }, [currentTab]);
+
+  // 실시간 업데이트 (1분마다 변경사항 확인)
+  useEffect(() => {
+    if (currentTab === 0) {
+      const checkForChanges = async () => {
+        try {
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation/assignment-changes?lastCheck=${lastCheckTime}`);
+          
+          if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success && result.hasChanges) {
+              console.log(`🔄 변경사항 감지: ${result.changeCount}개 - 대시보드 새로고침`);
+              setLastCheckTime(Date.now());
+              await loadDashboardData();
+            }
+          }
+        } catch (error) {
+          console.error('실시간 변경 감지 오류:', error);
+        }
+      };
+
+      const interval = setInterval(checkForChanges, 60 * 1000); // 1분마다
+
+      return () => clearInterval(interval);
+    }
+  }, [currentTab, lastCheckTime]);
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
@@ -333,6 +397,48 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                 </Card>
               </Grid>
             </Grid>
+
+            {/* 수동 배정 버튼 */}
+            <Box sx={{ mb: 4 }}>
+              <Card sx={{ 
+                background: 'linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)',
+                color: 'white'
+              }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                        📋 수동 배정 실행
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
+                        현재 배정 상태를 확인하고 일련번호를 즉시 입력합니다
+                      </Typography>
+                      {manualAssignmentMessage && (
+                        <Alert severity={manualAssignmentMessage.includes('오류') ? 'error' : 'success'} sx={{ mb: 2 }}>
+                          {manualAssignmentMessage}
+                        </Alert>
+                      )}
+                      <Button
+                        variant="contained"
+                        onClick={handleManualAssignment}
+                        disabled={manualAssignmentLoading}
+                        startIcon={manualAssignmentLoading ? <CircularProgress size={20} /> : <AssignmentIcon />}
+                        sx={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.3)'
+                          }
+                        }}
+                      >
+                        {manualAssignmentLoading ? '배정 중...' : '수동 배정 실행'}
+                      </Button>
+                    </Box>
+                    <AssignmentIcon sx={{ fontSize: 60, opacity: 0.8 }} />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
 
             {/* 사무실별 재고 현황 카드 */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
