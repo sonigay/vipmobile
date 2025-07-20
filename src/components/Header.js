@@ -22,7 +22,7 @@ import {
   debugPushNotificationStatus
 } from '../utils/pushNotificationUtils';
 
-function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate }) {
+function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -486,7 +486,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
             </IconButton>
           </Tooltip>
           
-          {onCheckUpdate && (
+          {typeof onCheckUpdate === 'function' && (
             <Button
               color="inherit"
               startIcon={<UpdateIcon />}
