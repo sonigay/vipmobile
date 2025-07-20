@@ -10,6 +10,14 @@ const monthlyAwardAPI = require('./monthlyAwardAPI');
 const app = express();
 const port = process.env.PORT || 4000;
 
+// CORS 설정 - 모든 도메인 허용
+app.use(cors({
+  origin: ['https://vipmobile.netlify.app', 'http://localhost:3000', 'http://localhost:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 // VAPID 키 설정 (환경변수에서 가져오거나 생성)
 const vapidKeys = process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY 
   ? {
