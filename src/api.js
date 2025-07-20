@@ -1,4 +1,53 @@
-const API_URL = process.env.REACT_APP_API_URL;
+// API 기본 URL 설정
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://jegomap2-server.onrender.com';
+
+// API 호출 함수들
+export const api = {
+  // 월간시상 데이터 가져오기
+  getMonthlyAwardData: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/monthly-award/data`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('월간시상 데이터 로드 오류:', error);
+      throw error;
+    }
+  },
+
+  // 월간시상 셋팅 저장
+  saveMonthlyAwardSettings: async (type, data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/monthly-award/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({ type, data })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('월간시상 셋팅 저장 오류:', error);
+      throw error;
+    }
+  }
+};
 
 // 프론트엔드 캐싱 시스템
 const clientCache = new Map();
@@ -157,7 +206,7 @@ export async function fetchData(includeShipped = true, timestamp = null) {
     // console.log(`서버에서 매장 데이터 요청 중... (includeShipped: ${includeShipped})`);
     const startTime = Date.now();
     
-    const response = await fetch(`${API_URL}/api/stores?includeShipped=${includeShipped}`);
+    const response = await fetch(`${API_BASE_URL}/api/stores?includeShipped=${includeShipped}`);
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
@@ -226,7 +275,7 @@ export async function fetchModels() {
     // console.log('서버에서 모델 데이터 요청 중...');
     const startTime = Date.now();
     
-    const response = await fetch(`${API_URL}/api/models`);
+    const response = await fetch(`${API_BASE_URL}/api/models`);
     const data = await response.json();
     
     const fetchTime = Date.now() - startTime;
@@ -264,7 +313,7 @@ export const fetchAgentData = async () => {
     // console.log('서버에서 대리점 데이터 요청 중...');
     const startTime = Date.now();
     
-    const response = await fetch(`${API_URL}/api/agents`);
+    const response = await fetch(`${API_BASE_URL}/api/agents`);
     
     if (!response.ok) {
       const errorData = await response.json();
