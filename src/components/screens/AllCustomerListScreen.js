@@ -409,7 +409,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     loadAllCustomerList();
     
     // 재고배정 상태도 함께 로드
-    const loadAssignmentStatus = async () => {
+    const loadAssignmentStatus = useCallback(async () => {
       try {
         setLoadingAssignment(true);
         console.log('🔍 [재고배정 디버깅] useEffect에서 배정상태 로드 시작');
@@ -507,7 +507,7 @@ function AllCustomerListScreen({ loggedInStore }) {
       } finally {
         setLoadingAssignment(false);
       }
-    };
+    }, [customerList.length]);
     
     if (customerList.length > 0) {
       loadAssignmentStatus();
