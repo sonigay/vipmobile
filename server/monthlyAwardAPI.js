@@ -158,6 +158,7 @@ async function getMonthlyAwardData(req, res) {
 
     // 담당자 매핑 테이블 생성 (수기초에 있는 실판매POS 코드만)
     const managerMapping = new Map();
+    const companyManagerMapping = new Map(); // 업체명 → 담당자 매핑 (인터넷 비중용)
     const managerOfficeMapping = new Map(); // 담당자별 사무실/소속 매핑
     const storeRows = storeData.slice(1);
     
@@ -179,6 +180,7 @@ async function getMonthlyAwardData(req, res) {
     storeRows.forEach(row => {
       if (row.length >= 14) {
         const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+        const companyName = (row[6] || '').toString().trim(); // G열: 업체명
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
         const status = (row[4] || '').toString().trim(); // E열: 상태
         
@@ -187,6 +189,11 @@ async function getMonthlyAwardData(req, res) {
           // 담당자 이름에서 괄호 부분 제거
           const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
           managerMapping.set(posCode, cleanManager);
+          
+          // 업체명 → 담당자 매핑도 추가
+          if (companyName) {
+            companyManagerMapping.set(companyName, cleanManager);
+          }
         }
       }
     });
@@ -679,7 +686,7 @@ async function getMonthlyAwardData(req, res) {
         }
         
         // 담당자 매칭 확인 (업체명으로 매칭)
-        const matchedManager = managerMapping.get(companyName);
+        const matchedManager = companyManagerMapping.get(companyName);
         if (matchedManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
@@ -690,6 +697,9 @@ async function getMonthlyAwardData(req, res) {
       console.log(`${manager} 모수(분모) 계산 결과: ${denominator}건`);
       
       // 홈데이터 기준으로 자수 계산
+      let matchedHomeRows = 0;
+      let internetRows = 0;
+      
       homeRows.forEach(row => {
         if (row.length < 8) return;
         
@@ -697,13 +707,16 @@ async function getMonthlyAwardData(req, res) {
         const companyName = (row[2] || '').toString().trim(); // C열: 업체명 (폰클홈데이터)
         
         // 담당자 매칭 확인 (업체명으로 매칭)
-        const matchedManager = managerMapping.get(companyName);
+        const matchedManager = companyManagerMapping.get(companyName);
         if (matchedManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
         
+        matchedHomeRows++;
+        
         // 자수 조건 확인
         if (product === '인터넷') {
+          internetRows++;
           // 동판 문구가 없는 경우에만 추가 조건 확인
           if (!product.includes('동판')) {
             if (product !== '선불' && product !== '소호') {
@@ -716,6 +729,14 @@ async function getMonthlyAwardData(req, res) {
       });
       
       console.log(`${manager} 자수(분자) 계산 결과: ${numerator}건`);
+      console.log(`${manager} 홈데이터 매칭된 행: ${matchedHomeRows}건`);
+      console.log(`${manager} 홈데이터 인터넷 행: ${internetRows}건`);
+      
+      // 매칭되지 않은 업체명 확인
+      if (matchedHomeRows === 0) {
+        console.log(`⚠️ ${manager}: 홈데이터에서 매칭된 업체가 없음!`);
+        console.log(`매핑 테이블에 있는 업체들:`, Array.from(companyManagerMapping.entries()).filter(([company, mgr]) => mgr === manager).map(([company]) => company));
+      }
       
       console.log(`${manager} 인터넷 비중 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
