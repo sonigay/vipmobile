@@ -359,11 +359,15 @@ async function getMonthlyAwardData(req, res) {
       
       if (matrixData.length > 1) {
         const matrixRows = matrixData.slice(1); // 헤더 제외
-        matrixRows.forEach(row => {
+        console.log('Matrix 행 데이터:', matrixRows);
+        matrixRows.forEach((row, index) => {
+          console.log(`행 ${index}:`, row);
           if (row.length >= 3 && row[1] && row[2]) { // 점수와 퍼센트가 있는 경우만
             const score = parseInt(row[1]);
             const percentage = parseFloat(row[2]);
             const indicator = row[3] || ''; // 설명에서 지표 추출
+            
+            console.log(`처리 중: score=${score}, percentage=${percentage}, indicator="${indicator}"`);
             
             if (!isNaN(score) && !isNaN(percentage)) {
               // 지표명에서 indicator 추출
@@ -378,12 +382,15 @@ async function getMonthlyAwardData(req, res) {
                 indicatorType = 'internet';
               }
               
+              console.log(`지표 추출 결과: ${indicatorType}`);
+              
               if (indicatorType) {
                 matrixCriteria.push({ 
                   score, 
                   percentage, 
                   indicator: indicatorType 
                 });
+                console.log(`Matrix 기준값 추가: ${indicatorType} ${score}점 ${percentage}%`);
               }
             }
           }
