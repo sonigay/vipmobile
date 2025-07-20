@@ -1486,6 +1486,7 @@ function App() {
     processLogin(modifiedStore);
     
     // 모드 진입 시 업데이트 팝업 표시
+    console.log('handleModeSelect - 모드 진입 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
     
@@ -1565,6 +1566,7 @@ function App() {
     }
     
     // 모드 진입 시 업데이트 팝업 표시
+    console.log('handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
     
@@ -2838,6 +2840,8 @@ function App() {
           console.log('새 업데이트가 추가되었습니다.');
         }}
       />
+      {/* 디버깅용 로그 */}
+      {console.log('AppUpdatePopup props:', { showAppUpdatePopup, currentMode, loggedInStore: loggedInStore?.name })}
     </ThemeProvider>
   );
 }

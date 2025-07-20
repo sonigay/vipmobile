@@ -317,8 +317,14 @@ function AllCustomerListScreen({ loggedInStore }) {
     setError('');
 
     try {
-      // XLSX 라이브러리 동적 import
-      const XLSX = await import('xlsx');
+      // XLSX 라이브러리 동적 import (에러 처리 강화)
+      let XLSX;
+      try {
+        XLSX = await import('xlsx');
+      } catch (importError) {
+        console.error('XLSX 라이브러리 로드 실패:', importError);
+        throw new Error('엑셀 라이브러리를 불러올 수 없습니다.');
+      }
       
       // 헤더 정의
       const headers = [
@@ -505,64 +511,57 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
   }, [customerList.length]);
 
+  // 개통 상태 로드 함수
+  const loadActivationStatus = useCallback(async () => {
+    try {
+      setLoadingActivation(true);
+      console.log('📱 [개통상태 디버깅] 개통 상태 로드 시작');
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📊 [개통상태 디버깅] 개통 상태 응답:', result);
+        
+        if (result.success) {
+          // 예약번호를 키로 하는 맵 생성
+          const activationMap = {};
+          result.data.forEach(item => {
+            activationMap[item.reservationNumber] = {
+              activationStatus: item.activationStatus,
+              assignedSerialNumber: item.assignedSerialNumber
+            };
+          });
+          
+          setActivationData(activationMap);
+          console.log(`✅ [개통상태 디버깅] 개통 상태 로드 완료: ${Object.keys(activationMap).length}개`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [개통상태 디버깅] 개통 상태 로드 오류:', error);
+    } finally {
+      setLoadingActivation(false);
+    }
+  }, []);
+
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
-    loadAllCustomerList();
-    
-    if (customerList.length > 0) {
-      loadAssignmentStatus();
-      
-      // 개통 상태도 함께 로드
-      const loadActivationStatus = async () => {
-        try {
-          setLoadingActivation(true);
-          console.log('📱 [개통상태 디버깅] 개통 상태 로드 시작');
-          
-          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
-          
-          if (response.ok) {
-            const result = await response.json();
-            console.log('📊 [개통상태 디버깅] 개통 상태 응답:', result);
-            
-            if (result.success) {
-              // 예약번호를 키로 하는 맵 생성
-              const activationMap = {};
-              result.data.forEach(item => {
-                activationMap[item.reservationNumber] = {
-                  activationStatus: item.activationStatus,
-                  assignedSerialNumber: item.assignedSerialNumber
-                };
-              });
-              
-              setActivationData(activationMap);
-              console.log(`✅ [개통상태 디버깅] 개통 상태 로드 완료: ${Object.keys(activationMap).length}개`);
-              
-              // 테스트용 디버깅: 일련번호 1005552 관련 개통 상태 확인
-              const testActivation = result.data.find(item => item.assignedSerialNumber === '1005552');
-              if (testActivation) {
-                console.log(`🎯 [개통상태 디버깅] 테스트 일련번호 개통 상태:`, {
-                  reservationNumber: testActivation.reservationNumber,
-                  customerName: testActivation.customerName,
-                  assignedSerialNumber: testActivation.assignedSerialNumber,
-                  activationStatus: testActivation.activationStatus
-                });
-              } else {
-                console.log(`❌ [개통상태 디버깅] 일련번호 1005552의 개통 상태를 찾을 수 없음`);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('❌ [개통상태 디버깅] 개통 상태 로드 오류:', error);
-        } finally {
-          setLoadingActivation(false);
+    const initializeData = async () => {
+      try {
+        await loadAllCustomerList();
+        
+        if (customerList.length > 0) {
+          await loadAssignmentStatus();
+          await loadActivationStatus();
         }
-      };
-      
-      loadActivationStatus();
-    } else {
-      console.log('⚠️ [재고배정 디버깅] 고객리스트가 비어있어 배정상태 로드를 건너뜀');
-    }
-  }, [customerList.length, loadInventoryStatus, loadAssignmentStatus]);
+      } catch (error) {
+        console.error('❌ [전체고객리스트 디버깅] 초기화 오류:', error);
+        setError('데이터 로드 중 오류가 발생했습니다.');
+      }
+    };
+    
+    initializeData();
+  }, [loadAllCustomerList, loadAssignmentStatus, loadActivationStatus]);
 
   // 필터 변경 시 적용
   useEffect(() => {
