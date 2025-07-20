@@ -3038,6 +3038,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
       const reservationSiteValues = await getSheetValues('사전예약사이트');
       console.log(`🔍 [서버시작] 사전예약사이트 로드 완료: ${reservationSiteValues ? reservationSiteValues.length : 0}개 행`);
       
+      // 폰클출고처데이터 로드 (POS점 매핑용)
+      const phoneklStoreValues = await getSheetValues('폰클출고처데이터');
+      console.log(`🔍 [서버시작] 폰클출고처데이터 로드 완료: ${phoneklStoreValues ? phoneklStoreValues.length : 0}개 행`);
+      
       // 정규화 규칙 로드
       const normalizationValues = await getSheetValues('정규화작업');
       console.log(`🔍 [서버시작] 정규화작업 로드 완료: ${normalizationValues ? normalizationValues.length : 0}개 행`);
@@ -3065,7 +3069,23 @@ const server = app.listen(port, '0.0.0.0', async () => {
         throw new Error('시트 데이터를 가져올 수 없습니다.');
       }
       
-      // 폰클재고데이터 처리 (사용 가능한 재고 - 정상 상태인 재고)
+      // 폰클출고처데이터에서 출고처별 P코드 매핑 생성
+      const storeToPosCodeMap = new Map();
+      if (phoneklStoreValues && phoneklStoreValues.length > 1) {
+        phoneklStoreValues.slice(1).forEach(row => {
+          if (row.length >= 8) {
+            const storeName = (row[6] || '').toString().trim(); // G열: 출고처명
+            const posCode = (row[7] || '').toString().trim(); // H열: P코드
+            
+            if (storeName && posCode) {
+              storeToPosCodeMap.set(storeName, posCode);
+            }
+          }
+        });
+        console.log(`🔧 [서버시작] 출고처-P코드 매핑 생성 완료: ${storeToPosCodeMap.size}개`);
+      }
+      
+      // 폰클재고데이터 처리 (배정완료된 재고만 - N열 출고처에 값이 있는 재고)
       const inventoryMap = new Map();
       phoneklInventoryValues.slice(1).forEach(row => {
         if (row.length >= 15) {
@@ -3074,21 +3094,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
           const color = (row[6] || '').toString().trim(); // G열: 색상
           const storeName = (row[13] || '').toString().trim(); // N열: 출고처
           
-          if (serialNumber && modelCapacity && color && storeName) {
-            // 사무실명 추출 (평택사무실, 인천사무실, 군산사무실)
-            let officeName = '';
-            if (storeName.includes('평택')) {
-              officeName = '평택사무실';
-            } else if (storeName.includes('인천')) {
-              officeName = '인천사무실';
-            } else if (storeName.includes('군산')) {
-              officeName = '군산사무실';
-            }
-            
-            if (officeName) {
-              const inventoryKey = `${modelCapacity} | ${color}`;
-              inventoryMap.set(inventoryKey, serialNumber);
-            }
+          // N열 출고처에 값이 있으면 배정완료로 간주
+          if (serialNumber && modelCapacity && color && storeName && storeName.trim() !== '') {
+            const inventoryKey = `${modelCapacity} | ${color}`;
+            inventoryMap.set(inventoryKey, serialNumber);
           }
         }
       });
