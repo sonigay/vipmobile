@@ -1353,8 +1353,8 @@ function MonthlyAwardTab() {
           <Tabs value={settingsTab} onChange={(e, newValue) => setSettingsTab(newValue)} sx={{ mb: 3 }}>
             <Tab label="Matrix 기준값" />
             <Tab label="전략상품 관리" />
-            <Tab label="요금제 매핑" />
             <Tab label="업체 매핑" />
+            <Tab label="요금제 매핑" />
             <Tab label="담당자 관리" />
           </Tabs>
 
@@ -1653,8 +1653,76 @@ function MonthlyAwardTab() {
             </Box>
           )}
 
-          {/* 요금제 매핑 탭 */}
+          {/* 업체 매핑 탭 */}
           {settingsTab === 2 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>인터넷 비중 업체명 매핑</Typography>
+              
+              <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매핑 규칙</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • 개통데이터/홈데이터 G열(업체명) ↔ 폰클출고처데이터 C열(출고처 업체명)<br/>
+                  • 정확한 업체명 매칭이 필요한 경우에만 사용합니다<br/>
+                  • 매칭되지 않은 업체는 인터넷 비중 계산에서 제외됩니다
+                </Typography>
+              </Paper>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>매핑되지 않은 업체 목록</Typography>
+              <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                {data.unmatchedItems?.companies && data.unmatchedItems.companies.length > 0 ? (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      다음 업체명들이 폰클출고처데이터와 매칭되지 않았습니다. 각 업체명에 대해 정확한 매핑을 설정해주세요.
+                    </Typography>
+                    {data.unmatchedItems.companies.map((company, index) => (
+                      <Box key={index} sx={{ mb: 1, p: 1, bgcolor: '#fff3cd', borderRadius: 1, border: '1px solid #ffeaa7' }}>
+                        <Typography variant="body2" color="warning.dark">
+                          <strong>매칭되지 않은 업체명:</strong> {company}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    매칭되지 않은 업체가 없습니다.
+                  </Typography>
+                )}
+              </Paper>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>업체명 매핑 추가</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="개통데이터/홈데이터 업체명"
+                    placeholder="예: (주)본앤코리아(원주단계)"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="폰클출고처데이터 업체명"
+                    placeholder="예: (주)본앤코리아"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button variant="outlined" fullWidth sx={{ height: 56 }}>
+                    매핑 추가
+                  </Button>
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>현재 매핑 목록</Typography>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  설정된 매핑이 없습니다. 위에서 매핑을 추가하면 여기에 표시됩니다.
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+
+          {/* 요금제 매핑 탭 */}
+          {settingsTab === 3 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>요금제 매핑 설정</Typography>
               
@@ -1730,7 +1798,7 @@ function MonthlyAwardTab() {
             </Box>
           )}
 
-          {/* 업체 매핑 탭 */}
+          {/* 담당자 관리 탭 */}
           {settingsTab === 4 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>담당자별 설정</Typography>
