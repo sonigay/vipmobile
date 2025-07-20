@@ -736,6 +736,8 @@ async function getMonthlyAwardData(req, res) {
       if (matchedHomeRows === 0) {
         console.log(`⚠️ ${manager}: 홈데이터에서 매칭된 업체가 없음!`);
         console.log(`매핑 테이블에 있는 업체들:`, Array.from(companyManagerMapping.entries()).filter(([company, mgr]) => mgr === manager).map(([company]) => company));
+        console.log(`전체 매핑 테이블 크기:`, companyManagerMapping.size);
+        console.log(`홈데이터 업체명 샘플:`, homeRows.slice(0, 5).map(row => row[2]).filter(Boolean));
       }
       
       console.log(`${manager} 인터넷 비중 결과: numerator=${numerator}, denominator=${denominator}`);

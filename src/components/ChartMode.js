@@ -1115,7 +1115,9 @@ function MonthlyAwardTab() {
                   {getPerformanceIcon(data.indicators.internetRatio.percentage, 60.0)}
                   {calculateScore(parseFloat(data.indicators.internetRatio.percentage), data.matrixCriteria?.filter(c => c.indicator === 'internet') || [], data.maxScores?.internet || 6)}점
                 </Typography>
-                <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  인터넷 비중 ({data.indicators.internetRatio.percentage}%)
+                </Typography>
               </Box>
             </Grid>
           </Grid>
