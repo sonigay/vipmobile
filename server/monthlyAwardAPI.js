@@ -114,7 +114,7 @@ async function getMonthlyAwardData(req, res) {
     
     storeRows.forEach(row => {
       if (row.length >= 14) {
-        const posCode = (row[8] || '').toString().trim(); // I열: 실판매POS
+        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
         
         if (posCode && manager) {
@@ -477,7 +477,7 @@ async function getMonthlyAwardData(req, res) {
     manualRows.forEach(row => {
       if (row.length < 90) return;
       
-      const posCode = (row[8] || '').toString().trim(); // I열: 실판매POS
+      const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
       const manager = managerMapping.get(posCode);
       
       if (manager) {
