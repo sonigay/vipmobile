@@ -8678,6 +8678,9 @@ app.get('/api/office-inventory', async (req, res) => {
     let processedCount = 0;
     let filteredCount = 0;
     
+    // 출고처별 통계를 위한 임시 객체
+    const storeNameStats = {};
+    
     // 헤더 제거하고 데이터 처리 (3행부터 시작)
     phoneklInventoryValues.slice(2).forEach((row, index) => {
       if (row.length >= 15) {
@@ -8685,21 +8688,26 @@ app.get('/api/office-inventory', async (req, res) => {
         const color = (row[6] || '').toString().trim(); // G열: 색상
         const storeName = (row[13] || '').toString().trim(); // N열: 출고처
         
+        // 출고처별 통계 수집
+        if (storeName) {
+          storeNameStats[storeName] = (storeNameStats[storeName] || 0) + 1;
+        }
+        
         if (modelCapacity && color && storeName) {
           // 정규화작업시트 C열과 매칭되는 모델만 처리
           const combinedModel = `${modelCapacity} | ${color}`;
           
           // 허용된 모델인지 확인
           if (allowedModels.has(combinedModel)) {
-            // 사무실명 추출
+            // 사무실명 추출 (정확한 매칭)
             let officeName = '';
-            if (storeName.includes('평택')) {
+            if (storeName === '평택사무실' || storeName === '평택') {
               officeName = '평택사무실';
-            } else if (storeName.includes('인천')) {
+            } else if (storeName === '인천사무실' || storeName === '인천') {
               officeName = '인천사무실';
-            } else if (storeName.includes('군산')) {
+            } else if (storeName === '군산사무실' || storeName === '군산') {
               officeName = '군산사무실';
-            } else if (storeName.includes('안산')) {
+            } else if (storeName === '안산사무실' || storeName === '안산') {
               officeName = '안산사무실';
             }
             
@@ -8716,6 +8724,9 @@ app.get('/api/office-inventory', async (req, res) => {
         }
       }
     });
+    
+    // 출고처별 통계 로그
+    console.log('📊 [사무실재고] 출고처별 데이터 통계:', storeNameStats);
     
     console.log(`📊 [사무실재고] 처리된 재고 항목: ${processedCount}개, 필터링된 항목: ${filteredCount}개`);
     
