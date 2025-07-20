@@ -1306,6 +1306,10 @@ async function saveMonthlyAwardSettings(req, res) {
 
     let sheetData = [];
     
+    console.log('=== 전략상품 저장 디버깅 ===');
+    console.log('저장 타입:', type);
+    console.log('원본 데이터:', data);
+    
     switch (type) {
       case 'matrix_criteria':
         // Matrix 기준값 저장
@@ -1314,11 +1318,12 @@ async function saveMonthlyAwardSettings(req, res) {
       case 'strategic_products':
         // 전략상품 리스트 저장
         sheetData = data.map(item => [
-          item.subCategory,
-          item.serviceCode,
-          item.serviceName,
-          item.points
+          item.subCategory || '',
+          item.serviceCode || '',
+          item.serviceName || '',
+          parseFloat(item.points) || 0 // 명시적으로 숫자로 변환
         ]);
+        console.log('전략상품 변환된 데이터:', sheetData);
         break;
       default:
         return res.status(400).json({
@@ -1331,7 +1336,7 @@ async function saveMonthlyAwardSettings(req, res) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A:D`,
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED', // 숫자 형식 유지
       resource: {
         values: sheetData
       }
