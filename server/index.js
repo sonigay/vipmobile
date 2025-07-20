@@ -11388,3 +11388,96 @@ app.get('/api/reservation-data/reservation-site', async (req, res) => {
 // 월간시상 API 라우트
 app.get('/api/monthly-award/data', monthlyAwardAPI.getMonthlyAwardData);
 app.post('/api/monthly-award/settings', monthlyAwardAPI.saveMonthlyAwardSettings);
+
+// 어플업데이트 API 라우트
+app.get('/api/app-updates', async (req, res) => {
+  try {
+    console.log('어플업데이트 데이터 요청');
+    
+    const values = await getSheetValues(UPDATE_SHEET_NAME);
+    
+    if (!values || values.length === 0) {
+      console.log('어플업데이트 데이터가 없습니다.');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제거하고 데이터 반환
+    const dataRows = values.slice(1);
+    
+    // 빈 행 제거
+    const filteredData = dataRows.filter(row => 
+      row.length > 0 && row.some(cell => cell && cell.toString().trim() !== '')
+    );
+    
+    console.log(`어플업데이트 데이터 처리 완료: ${filteredData.length}건`);
+    
+    res.json({ success: true, data: filteredData });
+    
+  } catch (error) {
+    console.error('어플업데이트 데이터 가져오기 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/app-updates', async (req, res) => {
+  try {
+    console.log('새 어플업데이트 추가 요청:', req.body);
+    
+    const { mode, date, content } = req.body;
+    
+    if (!mode || !date || !content) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '모드, 날짜, 내용이 모두 필요합니다.' 
+      });
+    }
+    
+    // 모드별 컬럼 매핑
+    const modeColumnMap = {
+      'general': 1,    // B열: 일반모드
+      'agent': 2,      // C열: 관리자모드
+      'inventory': 3,  // D열: 재고관리모드
+      'settlement': 4, // E열: 정산모드
+      'inspection': 5, // F열: 검수모드
+      'policy': 6,     // G열: 정책모드
+      'meeting': 7,    // H열: 회의모드
+      'reservation': 8 // I열: 사전예약모드
+    };
+    
+    const columnIndex = modeColumnMap[mode];
+    if (columnIndex === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '유효하지 않은 모드입니다.' 
+      });
+    }
+    
+    // 새 행 데이터 생성
+    const newRow = new Array(10).fill(''); // A~J열 (10개 컬럼)
+    newRow[0] = date;  // A열: 날짜
+    newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
+    
+    // Google Sheets에 새 행 추가
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${UPDATE_SHEET_NAME}!A:J`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    console.log('어플업데이트 추가 완료:', response.data);
+    
+    res.json({ 
+      success: true, 
+      message: '업데이트가 성공적으로 추가되었습니다.',
+      data: response.data
+    });
+    
+  } catch (error) {
+    console.error('어플업데이트 추가 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});

@@ -32,6 +32,7 @@ import ReservationMode from './components/ReservationMode';
 
 
 import UpdateProgressScreen from './components/UpdateProgressScreen';
+import AppUpdatePopup from './components/AppUpdatePopup';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
 // 모바일 최적화 관련 import 제거 (재고 모드로 이동)
 // 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
@@ -172,6 +173,8 @@ function App() {
   // 업데이트 관련 상태
   const [showUpdateProgress, setShowUpdateProgress] = useState(false);
   const [isUpdateInProgress, setIsUpdateInProgress] = useState(false);
+  const [showAppUpdatePopup, setShowAppUpdatePopup] = useState(false);
+  const [currentMode, setCurrentMode] = useState('');
   
   // 맵 확대 토글 핸들러 (스크롤 자동 조정 포함)
   const handleMapExpandToggle = () => {
@@ -1549,6 +1552,10 @@ function App() {
         break;
     }
     
+    // 모드 진입 시 업데이트 팝업 표시
+    setCurrentMode(selectedMode);
+    setShowAppUpdatePopup(true);
+    
     // 모드 선택 팝업 닫기
     setShowModeSelection(false);
     setModeSelectionRequired(false);
@@ -2810,6 +2817,18 @@ function App() {
       {showUpdateProgress && (
         <UpdateProgressScreen onUpdateComplete={handleUpdateComplete} />
       )}
+
+      {/* 모드별 업데이트 팝업 */}
+      <AppUpdatePopup
+        open={showAppUpdatePopup}
+        onClose={() => setShowAppUpdatePopup(false)}
+        mode={currentMode}
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          // 업데이트 추가 시 캐시 무효화 등의 처리
+          console.log('새 업데이트가 추가되었습니다.');
+        }}
+      />
     </ThemeProvider>
   );
 }
