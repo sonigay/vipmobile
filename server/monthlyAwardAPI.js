@@ -546,6 +546,10 @@ async function getMonthlyAwardData(req, res) {
     // 담당자별 상세 데이터 계산
     const agentMap = new Map();
     
+    // 매칭되지 않은 항목들 추적 (전역으로 이동)
+    const unmatchedCompanies = new Set(); // 인터넷 비중용
+    const unmatchedStrategicProducts = new Set(); // 전략상품용
+    
     // 담당자별 데이터 수집
     const manualRows = manualData.slice(1);
     console.log('매뉴얼데이터 행 수:', manualRows.length);
@@ -668,13 +672,8 @@ async function getMonthlyAwardData(req, res) {
             if (manager === Array.from(agentMap.keys())[0]) {
               console.log(`${manager} 전략상품 확인: "${service}"`);
             }
-            // 1. 부가서비스명으로 정확히 매칭
-            let product = finalStrategicProducts.find(p => p.serviceName === service);
-            
-            // 2. 부가서비스명 매칭이 안되면 소분류로 매칭
-            if (!product) {
-              product = finalStrategicProducts.find(p => p.subCategory === service);
-            }
+            // 부가서비스명으로만 매칭 (소분류 매칭 제거)
+            const product = finalStrategicProducts.find(p => p.serviceName === service);
             
             if (product) {
               totalPoints += product.points;
@@ -711,10 +710,6 @@ async function getMonthlyAwardData(req, res) {
     // 담당자별 인터넷 비중 계산
     const activationRows = activationData.slice(1);
     const homeRows = homeData.slice(1);
-    
-    // 매칭되지 않은 항목들 추적
-    const unmatchedCompanies = new Set(); // 인터넷 비중용
-    const unmatchedStrategicProducts = new Set(); // 전략상품용
     
     // 개통데이터/홈데이터의 업체명을 폰클출고처데이터와 매칭하기 위한 매핑 생성
     const companyNameMapping = new Map();
