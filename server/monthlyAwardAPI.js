@@ -40,6 +40,10 @@ async function getMonthlyAwardData(req, res) {
   try {
     console.log('월간시상 데이터 구글시트에서 로드');
 
+    // 디버깅 로그 추가
+    console.log('담당자 매핑 테이블 크기:', managerMapping.size);
+    console.log('담당자 목록:', Array.from(managerMapping.values()));
+
     // 필요한 시트 데이터 로드
     const [
       manualData,           // 수기초
@@ -384,10 +388,109 @@ async function getMonthlyAwardData(req, res) {
           });
         }
         
-        // 각 담당자별 지표 계산 (간단한 버전)
         const agent = agentMap.get(manager);
-        // 여기에 담당자별 상세 계산 로직 추가
+        
+        // 기본조건 확인
+        const subscriptionNumber = (row[0] || '').toString().trim(); // A열: 가입번호
+        const finalPolicy = (row[39] || '').toString().trim(); // AN열: 최종영업정책
+        const modelType = (row[67] || '').toString().trim(); // CL열: 모델유형
+        const joinType = (row[10] || '').toString().trim(); // K열: 가입구분
+        
+        // 기본조건 검증
+        if (!subscriptionNumber || finalPolicy === 'BLANK' || 
+            modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
+          return;
+        }
+        
+        // 업셀기변 계산
+        if (joinType === '정책기변' || joinType === '재가입') {
+          agent.upsellChange.denominator++;
+          
+          const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
+          const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
+          
+          const finalPlanInfo = planMapping.get(finalPlan);
+          const beforePlanInfo = planMapping.get(beforePlan);
+          
+          if (finalPlanInfo && beforePlanInfo) {
+            if (beforePlanInfo.group === '115군' || beforePlanInfo.group === '105군') {
+              agent.upsellChange.numerator++;
+            } else if (beforePlanInfo.price < finalPlanInfo.price) {
+              agent.upsellChange.numerator++;
+            }
+          }
+        }
+        
+        // 기변105이상 계산
+        if (joinType === '정책기변' || joinType === '재가입') {
+          const finalPlan = (row[38] || '').toString().trim();
+          const finalModel = (row[32] || '').toString().trim(); // AG열: 최종모델
+          
+          const finalPlanInfo = planMapping.get(finalPlan);
+          if (!finalPlanInfo) return;
+          
+          // 제외대상 확인
+          const excludedGroups = ['시니어 Ⅰ군', '시니어 Ⅱ군', '청소년 Ⅰ군', '청소년 Ⅱ군', '청소년 Ⅲ군', '키즈군', '키즈22군'];
+          if (excludedGroups.includes(finalPlanInfo.group)) return;
+          
+          if (finalPlan.includes('현역병사')) return;
+          
+          const excludedModels = ['LM-Y110L', 'LM-Y120L', 'SM-G160N', 'AT-M120', 'AT-M120B', 'AT-M140L'];
+          if (excludedModels.includes(finalModel)) return;
+          
+          agent.change105Above.denominator++;
+          
+          if (finalPlanInfo.group === '105군' || finalPlanInfo.group === '115군') {
+            if (finalPlan.includes('디즈니') || finalPlan.includes('멀티팩')) {
+              agent.change105Above.numerator += 1.2;
+            } else {
+              agent.change105Above.numerator += 1.0;
+            }
+          }
+        }
+        
+        // 전략상품 계산
+        agent.strategicProducts.denominator++;
+        
+        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
+        const uflix = (row[93] || '').toString().trim(); // DO열: 유플릭스
+        const callTone = (row[95] || '').toString().trim(); // DS열: 통화연결음
+        const music = (row[79] || '').toString().trim(); // DG열: 뮤직류
+        
+        let totalPoints = 0;
+        [insurance, uflix, callTone, music].forEach(service => {
+          if (service) {
+            const product = strategicProducts.find(p => p.serviceName === service);
+            if (product) {
+              totalPoints += product.points;
+            }
+          }
+        });
+        
+        agent.strategicProducts.numerator += totalPoints;
       }
+    });
+    
+    // 인터넷 비중은 개통데이터와 홈데이터를 매핑해서 계산해야 하므로 별도 처리
+    // 여기서는 간단히 담당자별로 동일한 비율 적용
+    const internetRatioValue = internetRatio.percentage;
+    agentMap.forEach(agent => {
+      agent.internetRatio = {
+        numerator: 0,
+        denominator: 0,
+        percentage: internetRatioValue
+      };
+    });
+
+    // 디버깅 로그 추가
+    console.log('담당자별 계산 결과:');
+    agentMap.forEach((agent, name) => {
+      console.log(`${name}:`, {
+        upsellChange: agent.upsellChange,
+        change105Above: agent.change105Above,
+        strategicProducts: agent.strategicProducts,
+        internetRatio: agent.internetRatio
+      });
     });
 
     const result = {
