@@ -142,6 +142,8 @@ function AllCustomerListScreen({ loggedInStore }) {
           return onSaleReceived && !yardReceived;
         } else if (receptionFilter === 'both') {
           return yardReceived && onSaleReceived;
+        } else if (receptionFilter === 'either') {
+          return (yardReceived && !onSaleReceived) || (onSaleReceived && !yardReceived);
         }
         return true;
       });
@@ -913,6 +915,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                   <MenuItem value="yard">마당접수만</MenuItem>
                   <MenuItem value="onsale">온세일접수만</MenuItem>
                   <MenuItem value="both">양쪽접수</MenuItem>
+                  <MenuItem value="either">둘중한곳접수</MenuItem>
                 </Select>
               </FormControl>
 
@@ -999,7 +1002,8 @@ function AllCustomerListScreen({ loggedInStore }) {
                 label={`접수상태: ${
                   receptionFilter === 'yard' ? '마당접수만' : 
                   receptionFilter === 'onsale' ? '온세일접수만' : 
-                  '양쪽접수'
+                  receptionFilter === 'both' ? '양쪽접수' :
+                  '둘중한곳접수'
                 }`}
                 size="small"
                 color="warning"
