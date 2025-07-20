@@ -3046,15 +3046,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
       const normalizationRules = new Map();
       if (normalizationValues && normalizationValues.length > 1) {
         normalizationValues.slice(1).forEach(row => {
-          if (row.length >= 3) {
-            const reservationSite = (row[1] || '').toString().trim(); // C열: 사전예약사이트 형식
-            const phoneklModel = (row[2] || '').toString().trim(); // D열: 폰클
-            const phoneklColor = (row[3] || '').toString().trim(); // E열: 색상
+          if (row.length >= 4) {
+            const reservationSite = (row[1] || '').toString().trim(); // B열: 사전예약사이트 형식
+            const phoneklFormat = (row[2] || '').toString().trim(); // C열: 폰클형식
+            const combinedFormat = (row[3] || '').toString().trim(); // D열: 사전예약사이트&폰클형식
             
-            if (reservationSite && phoneklModel && phoneklColor) {
+            if (reservationSite && phoneklFormat) {
               // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
               const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
-              normalizationRules.set(key, { phoneklModel, phoneklColor });
+              normalizationRules.set(key, { phoneklFormat });
             }
           }
         });
@@ -3172,7 +3172,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
           // 정규화 규칙에서 매칭되는 키 찾기
           for (const [ruleKey, ruleValue] of normalizationRules.entries()) {
             if (originalKey.includes(ruleKey) || ruleKey.includes(originalKey)) {
-              normalizedKey = `${ruleValue.phoneklModel} | ${ruleValue.phoneklColor}`;
+              normalizedKey = ruleValue.phoneklFormat;
               if (index < 5) {
                 console.log(`🔧 [서버시작] 정규화 적용: "${originalKey}" → "${normalizedKey}"`);
               }
