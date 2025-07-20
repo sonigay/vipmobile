@@ -249,9 +249,9 @@ async function getMonthlyAwardData(req, res) {
     // 수기초에서 실제 사용되는 요금제명들 수집
     const manualRowsForPlanMapping = manualData.slice(1);
     manualRowsForPlanMapping.forEach(row => {
-      if (row.length >= 76) {
+      if (row.length >= 102) {
         const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
-        const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
+        const beforePlan = (row[101] || '').toString().trim(); // CX열: 변경전요금제
         
         if (finalPlan && !planMapping.has(finalPlan)) {
           unmatchedPlansForDebug.add(finalPlan);
@@ -275,12 +275,12 @@ async function getMonthlyAwardData(req, res) {
     const uniqueCodes = new Set();
     
     manualRowsForCodeMapping.forEach(row => {
-      if (row.length >= 96) {
+      if (row.length >= 123) {
         // 전략상품 관련 컬럼들 확인
-        const musicCode = (row[79] || '').toString().trim(); // DG열: 뮤직류
-        const insuranceCode = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
-        const uflixCode = (row[93] || '').toString().trim(); // DO열: 유플릭스
-        const callToneCode = (row[95] || '').toString().trim(); // DS열: 통화연결음
+        const musicCode = (row[110] || '').toString().trim(); // DG열: 뮤직류
+        const insuranceCode = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
+        const uflixCode = (row[118] || '').toString().trim(); // DO열: 유플릭스
+        const callToneCode = (row[122] || '').toString().trim(); // DS열: 통화연결음
         
         // 고유한 코드들 수집
         if (musicCode) uniqueCodes.add(musicCode);
@@ -424,7 +424,7 @@ async function getMonthlyAwardData(req, res) {
         
         // 최종요금제와 변경전요금제 기본료 추출
         const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
-        const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
+        const beforePlan = (row[101] || '').toString().trim(); // CX열: 변경전요금제
         
         const finalPlanInfo = planMapping.get(finalPlan);
         const beforePlanInfo = planMapping.get(beforePlan);
@@ -554,10 +554,10 @@ async function getMonthlyAwardData(req, res) {
         denominator++;
         
         // 자수 계산 (전략상품 포인트 합계)
-        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
-        const uflix = (row[93] || '').toString().trim(); // DO열: 유플릭스
-        const callTone = (row[95] || '').toString().trim(); // DS열: 통화연결음
-        const music = (row[79] || '').toString().trim(); // DG열: 뮤직류
+        const insurance = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
+        const uflix = (row[118] || '').toString().trim(); // DO열: 유플릭스
+        const callTone = (row[122] || '').toString().trim(); // DS열: 통화연결음
+        const music = (row[110] || '').toString().trim(); // DG열: 뮤직류
         
         let totalPoints = 0;
         
@@ -741,7 +741,7 @@ async function getMonthlyAwardData(req, res) {
           agent.upsellChange.denominator++;
           
           const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
-          const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
+          const beforePlan = (row[101] || '').toString().trim(); // CX열: 변경전요금제
           
           // 첫 번째 담당자만 로그 출력 (너무 많은 로그 방지)
           if (manager === Array.from(agentMap.keys())[0] && finalPlan && beforePlan) {
@@ -804,19 +804,19 @@ async function getMonthlyAwardData(req, res) {
         // 전략상품 계산 (모든 행에 대해 계산)
         agent.strategicProducts.denominator++;
         
-        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
-        const uflix = (row[93] || '').toString().trim(); // DO열: 유플릭스
-        const callTone = (row[95] || '').toString().trim(); // DS열: 통화연결음
-        const music = (row[79] || '').toString().trim(); // DG열: 뮤직류
+        const insurance = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
+        const uflix = (row[118] || '').toString().trim(); // DO열: 유플릭스
+        const callTone = (row[122] || '').toString().trim(); // DS열: 통화연결음
+        const music = (row[110] || '').toString().trim(); // DG열: 뮤직류
         
         // 첫 번째 담당자의 첫 번째 행에서만 전체 컬럼 정보 출력
         if (manager === Array.from(agentMap.keys())[0] && manualRows.indexOf(row) === 0) {
           console.log('=== 전략상품 컬럼 디버깅 ===');
           console.log('전체 행 길이:', row.length);
-          console.log('DL열(83):', row[83], '타입:', typeof row[83]);
-          console.log('DO열(93):', row[93], '타입:', typeof row[93]);
-          console.log('DS열(95):', row[95], '타입:', typeof row[95]);
-          console.log('DG열(79):', row[79], '타입:', typeof row[79]);
+          console.log('DL열(115):', row[115], '타입:', typeof row[115]);
+          console.log('DO열(118):', row[118], '타입:', typeof row[118]);
+          console.log('DS열(122):', row[122], '타입:', typeof row[122]);
+          console.log('DG열(110):', row[110], '타입:', typeof row[110]);
           console.log('========================');
         }
         
