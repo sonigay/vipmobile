@@ -82,9 +82,13 @@ function AllCustomerListScreen({ loggedInStore }) {
         if (result.success) {
           setAgentOfficeData(result.data);
         }
+      } else {
+        console.warn('⚠️ [대리점관리 디버깅] API 응답 실패');
+        setAgentOfficeData({ offices: [], departments: {}, agentInfo: {} });
       }
     } catch (error) {
       console.error('❌ [대리점관리 디버깅] 사무실별, 소속별 데이터 로드 오류:', error);
+      setAgentOfficeData({ offices: [], departments: {}, agentInfo: {} });
     } finally {
       setLoadingAgentData(false);
     }
@@ -195,7 +199,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     // 사무실별 필터 적용
     if (officeFilter !== 'all') {
       filtered = filtered.filter(customer => {
-        const agentInfo = agentOfficeData.agentInfo[customer.agent];
+        const agentInfo = agentOfficeData.agentInfo[customer.manager];
         return agentInfo && agentInfo.office === officeFilter;
       });
     }
@@ -203,7 +207,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     // 소속별 필터 적용
     if (departmentFilter !== 'all') {
       filtered = filtered.filter(customer => {
-        const agentInfo = agentOfficeData.agentInfo[customer.agent];
+        const agentInfo = agentOfficeData.agentInfo[customer.manager];
         return agentInfo && agentInfo.department === departmentFilter;
       });
     }
@@ -824,21 +828,21 @@ function AllCustomerListScreen({ loggedInStore }) {
               </Typography>
             </Box>
 
-            {/* 재고 현황 새로고침 버튼 */}
+            {/* 사무실재고보기 버튼 */}
             <Button
               variant="outlined"
               onClick={loadInventoryStatus}
               disabled={loadingInventory}
             >
-              {loadingInventory ? <CircularProgress size={16} /> : '재고 현황 새로고침'}
+              {loadingInventory ? <CircularProgress size={16} /> : '사무실재고보기'}
             </Button>
           </Box>
 
-                        {/* 정규화작업시트 C열 기준 사무실별 재고 현황 */}
+                        {/* 사무실별 보유재고 */}
               {Object.keys(inventoryStatus).length > 0 && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                    정규화작업시트 C열 기준 사무실별 재고 현황
+                    사무실별 보유재고
                   </Typography>
               {Object.entries(inventoryStatus).map(([officeName, models]) => (
                 <Box key={officeName} sx={{ mb: 2 }}>

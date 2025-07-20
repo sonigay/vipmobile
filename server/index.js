@@ -2639,14 +2639,19 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
     // 캐시에서 먼저 확인 (10분 TTL)
     const cachedData = cacheUtils.get(cacheKey);
     if (cachedData) {
+      console.log('📊 [재고현황 디버깅] 캐시에서 데이터 반환');
       return res.json(cachedData);
     }
+    
+    console.log('📊 [재고현황 디버깅] 시트 데이터 로드 시작');
     
     // 필요한 시트 데이터 병렬로 가져오기
     const [normalizationValues, phoneklInventoryValues] = await Promise.all([
       getSheetValues('정규화작업'),
       getSheetValues('폰클재고데이터')
     ]);
+    
+    console.log('📊 [재고현황 디버깅] 시트 데이터 로드 완료');
     
     if (!normalizationValues || normalizationValues.length < 2) {
       throw new Error('정규화작업 데이터를 가져올 수 없습니다.');
@@ -2658,31 +2663,23 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
     
     console.log(`📊 [재고현황 디버깅] 정규화작업 데이터: ${normalizationValues.length}행, 폰클재고데이터: ${phoneklInventoryValues.length}행`);
     
-    // 정규화 규칙 로드 (C열에 있는 모델들만)
-    const normalizationRules = new Map();
-    const validReservationModels = new Set(); // C열에 있는 모델들
-    
+    // 정규화작업 C열에 있는 모델들만 추출
+    const validModels = new Set();
     normalizationValues.slice(1).forEach(row => {
-      if (row.length >= 3) {
-        const reservationSite = (row[1] || '').toString().trim(); // C열: 사전예약사이트 형식
-        const phoneklModel = (row[2] || '').toString().trim(); // D열: 폰클
-        const phoneklColor = (row[3] || '').toString().trim(); // E열: 색상
-        
-        if (reservationSite && phoneklModel && phoneklColor) {
-          // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
-          const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
-          normalizationRules.set(key, { phoneklModel, phoneklColor });
-          validReservationModels.add(key);
-          console.log(`📊 [재고현황 디버깅] 정규화 규칙 추가: ${key} -> ${phoneklModel} | ${phoneklColor}`);
+      if (row.length >= 2) {
+        const reservationSiteModel = (row[1] || '').toString().trim(); // C열: 사전예약사이트 형식
+        if (reservationSiteModel) {
+          validModels.add(reservationSiteModel);
+          console.log(`📊 [재고현황 디버깅] 유효한 모델 추가: ${reservationSiteModel}`);
         }
       }
     });
     
-    console.log(`📊 [재고현황 디버깅] 정규화 규칙 개수: ${normalizationRules.size}`);
+    console.log(`📊 [재고현황 디버깅] 유효한 모델 개수: ${validModels.size}`);
     
-    // 폰클재고데이터에서 사무실별 모델별 재고 수량 집계 (정규화 규칙에 있는 모델만)
+    // 폰클재고데이터에서 사무실별 모델별 재고 수량 집계
     const officeInventory = {
-      '평택사무실': new Map(), // key: "모델명_색상", value: 수량
+      '평택사무실': new Map(), // key: "모델명|색상", value: 수량
       '인천사무실': new Map(),
       '군산사무실': new Map(),
       '안산사무실': new Map()
@@ -2717,29 +2714,19 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
           }
           
           if (officeName && officeInventory[officeName]) {
-            // 모델명에 색상 정보가 없으면 추가
-            let modelWithColor = modelCapacity;
-            if (!modelCapacity.includes('|') && color) {
-              modelWithColor = `${modelCapacity} | ${color}`;
-            }
+            // F열 + "|" + G열 조합 생성
+            const modelWithColor = `${modelCapacity} | ${color}`;
             
-            // 정규화 규칙에 있는 모델인지 확인
-            let isMatchedModel = false;
-            normalizationRules.forEach((phoneklData, reservationSiteModel) => {
-              const phoneklKey = `${phoneklData.phoneklModel} | ${phoneklData.phoneklColor}`;
-              if (modelWithColor === phoneklKey) {
-                isMatchedModel = true;
-                matchedModels++;
-                
-                // 사전예약사이트 형식으로 저장
-                if (!officeInventory[officeName].has(reservationSiteModel)) {
-                  officeInventory[officeName].set(reservationSiteModel, 0);
-                }
-                officeInventory[officeName].set(reservationSiteModel, officeInventory[officeName].get(reservationSiteModel) + 1);
+            // 정규화작업 C열에 있는 모델인지 확인
+            if (validModels.has(modelWithColor)) {
+              matchedModels++;
+              
+              // 사무실별로 카운팅
+              if (!officeInventory[officeName].has(modelWithColor)) {
+                officeInventory[officeName].set(modelWithColor, 0);
               }
-            });
-            
-            if (isMatchedModel) {
+              officeInventory[officeName].set(modelWithColor, officeInventory[officeName].get(modelWithColor) + 1);
+              
               matchedOffices++;
             }
           }
