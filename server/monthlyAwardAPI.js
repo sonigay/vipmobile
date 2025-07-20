@@ -573,7 +573,7 @@ async function getMonthlyAwardData(req, res) {
         
         agent.strategicProducts.numerator += totalPoints;
       } else {
-        unmatchedStores.add(storeName);
+        unmatchedStores.add(posCode);
       }
     });
     
