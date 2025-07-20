@@ -1872,6 +1872,21 @@ function MonthlyAwardTab() {
                   { serviceName: '뮤직류', points: parseFloat(document.querySelector('input[label*="뮤직류"]')?.value || 0) }
                 ];
                 await api.saveMonthlyAwardSettings('strategic_products', strategicProducts);
+              } else if (settingsTab === 2) {
+                // 업체 매핑 저장
+                const companyMappings = [];
+                // 업체 매핑 데이터 수집 (실제 구현 시 입력 필드에서 데이터 가져오기)
+                await api.saveMonthlyAwardSettings('company_mapping', companyMappings);
+              } else if (settingsTab === 3) {
+                // 요금제 매핑 저장
+                const planMappings = [];
+                // 요금제 매핑 데이터 수집 (실제 구현 시 입력 필드에서 데이터 가져오기)
+                await api.saveMonthlyAwardSettings('plan_mapping', planMappings);
+              } else if (settingsTab === 4) {
+                // 담당자 관리 저장
+                const managerSettings = [];
+                // 담당자 관리 데이터 수집 (실제 구현 시 입력 필드에서 데이터 가져오기)
+                await api.saveMonthlyAwardSettings('manager_settings', managerSettings);
               }
               
               alert('설정이 저장되었습니다.');

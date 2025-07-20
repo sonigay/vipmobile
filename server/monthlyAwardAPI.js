@@ -1379,6 +1379,72 @@ async function saveMonthlyAwardSettings(req, res) {
           error: '전략상품 저장 기능이 임시로 비활성화되어 있습니다. 추가 버튼을 사용해주세요.'
         });
         break;
+      case 'company_mapping':
+        // 업체 매핑 저장
+        console.log('=== 업체 매핑 저장 디버깅 ===');
+        console.log('원본 데이터:', data);
+        
+        sheetData = [
+          ['개통데이터업체명', '폰클출고처업체명', '매핑상태', '비고']
+        ];
+        
+        if (data && Array.isArray(data)) {
+          data.forEach(item => {
+            sheetData.push([
+              item.sourceCompany || '',
+              item.targetCompany || '',
+              '매핑완료',
+              '인터넷비중계산용'
+            ]);
+          });
+        }
+        
+        console.log('업체 매핑 데이터:', sheetData);
+        break;
+      case 'plan_mapping':
+        // 요금제 매핑 저장
+        console.log('=== 요금제 매핑 저장 디버깅 ===');
+        console.log('원본 데이터:', data);
+        
+        sheetData = [
+          ['요금제명', '요금제군', '기본료', '매핑상태']
+        ];
+        
+        if (data && Array.isArray(data)) {
+          data.forEach(item => {
+            sheetData.push([
+              item.planName || '',
+              item.planGroup || '',
+              item.baseFee || '',
+              '매핑완료'
+            ]);
+          });
+        }
+        
+        console.log('요금제 매핑 데이터:', sheetData);
+        break;
+      case 'manager_settings':
+        // 담당자 관리 저장
+        console.log('=== 담당자 관리 저장 디버깅 ===');
+        console.log('원본 데이터:', data);
+        
+        sheetData = [
+          ['담당자명', '활성화상태', '목표달성률', '비고']
+        ];
+        
+        if (data && Array.isArray(data)) {
+          data.forEach(item => {
+            sheetData.push([
+              item.managerName || '',
+              item.status || '활성',
+              item.targetRate || '',
+              item.note || ''
+            ]);
+          });
+        }
+        
+        console.log('담당자 관리 데이터:', sheetData);
+        break;
       default:
         return res.status(400).json({
           success: false,
@@ -1386,10 +1452,40 @@ async function saveMonthlyAwardSettings(req, res) {
         });
     }
 
-    // Google Sheets에 저장 (기존 데이터 유지하고 추가)
-    await sheets.spreadsheets.values.append({
+    // Google Sheets에 저장 (메뉴별로 다른 위치에 저장)
+    let targetRange = '';
+    
+    switch (type) {
+      case 'matrix_criteria':
+        // Matrix 기준값: A1:D30 영역에 저장
+        targetRange = `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A1:D30`;
+        break;
+      case 'strategic_products':
+        // 전략상품: F1:I50 영역에 저장
+        targetRange = `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!F1:I50`;
+        break;
+      case 'company_mapping':
+        // 업체 매핑: K1:N100 영역에 저장
+        targetRange = `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!K1:N100`;
+        break;
+      case 'plan_mapping':
+        // 요금제 매핑: P1:S100 영역에 저장
+        targetRange = `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!P1:S100`;
+        break;
+      case 'manager_settings':
+        // 담당자 관리: U1:X50 영역에 저장
+        targetRange = `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!U1:X50`;
+        break;
+      default:
+        targetRange = `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A:D`;
+    }
+    
+    console.log(`저장 위치: ${targetRange}`);
+    
+    // 기존 데이터를 지우고 새로운 데이터로 교체
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A:D`,
+      range: targetRange,
       valueInputOption: 'USER_ENTERED', // 숫자 형식 유지
       resource: {
         values: sheetData
