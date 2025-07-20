@@ -47,7 +47,8 @@ const MODE_COLORS = {
   'inspection': '#7b1fa2', // 보라색
   'policy': '#00bcd4',     // 청록색
   'meeting': '#667eea',    // 보라파란색
-  'reservation': '#ff9a9e' // 핑크색
+  'reservation': '#ff9a9e', // 핑크색
+  'chart': '#ff9800'       // 주황색
 };
 
 // 모드별 제목
@@ -59,7 +60,8 @@ const MODE_TITLES = {
   'inspection': '검수 모드',
   'policy': '정책 모드',
   'meeting': '회의 모드',
-  'reservation': '사전예약 모드'
+  'reservation': '사전예약 모드',
+  'chart': '장표 모드'
 };
 
 function AppUpdatePopup({ 
@@ -92,12 +94,14 @@ function AppUpdatePopup({
     setError('');
     
     try {
+      console.log(`업데이트 로드 시작: ${mode} 모드, showAll: ${showAll}`);
       let updateData;
       if (showAll) {
         updateData = await getUpdatesForMode(mode);
       } else {
         updateData = await getLatestUpdateForMode(mode, 1);
       }
+      console.log(`업데이트 로드 완료: ${mode} 모드, 데이터 개수: ${updateData.length}`);
       setUpdates(updateData);
     } catch (error) {
       console.error('업데이트 로드 오류:', error);
@@ -198,6 +202,7 @@ function AppUpdatePopup({
 
   // 초기화
   useEffect(() => {
+    console.log('AppUpdatePopup useEffect:', { open, mode, showHistory });
     if (open && mode) {
       loadUpdates(showHistory);
       loadAvailableDates();
@@ -206,6 +211,7 @@ function AppUpdatePopup({
       // 오늘 하루 보지 않기 설정 확인
       const hideUntil = localStorage.getItem(`hideUpdate_${mode}`);
       if (hideUntil && new Date() < new Date(hideUntil)) {
+        console.log(`팝업 숨김 설정됨: ${mode} 모드`);
         onClose();
         return;
       }

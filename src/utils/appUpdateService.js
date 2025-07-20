@@ -11,7 +11,8 @@ const UPDATE_SHEET_COLUMNS = {
   POLICY: 6,         // G열: 정책모드 업데이트내용
   MEETING: 7,        // H열: 회의모드 업데이트내용
   RESERVATION: 8,    // I열: 사전예약모드 업데이트내용
-  ADMIN_IDS: 9       // J열: 관리자아이디
+  CHART: 9,          // J열: 장표모드 업데이트내용
+  ADMIN_IDS: 10      // K열: 관리자아이디
 };
 
 // 모드별 컬럼 매핑
@@ -23,7 +24,8 @@ const MODE_COLUMN_MAP = {
   'inspection': UPDATE_SHEET_COLUMNS.INSPECTION,
   'policy': UPDATE_SHEET_COLUMNS.POLICY,
   'meeting': UPDATE_SHEET_COLUMNS.MEETING,
-  'reservation': UPDATE_SHEET_COLUMNS.RESERVATION
+  'reservation': UPDATE_SHEET_COLUMNS.RESERVATION,
+  'chart': UPDATE_SHEET_COLUMNS.CHART
 };
 
 // 캐시 설정

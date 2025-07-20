@@ -11203,7 +11203,8 @@ app.post('/api/app-updates', async (req, res) => {
       'inspection': 5, // F열: 검수모드
       'policy': 6,     // G열: 정책모드
       'meeting': 7,    // H열: 회의모드
-      'reservation': 8 // I열: 사전예약모드
+      'reservation': 8, // I열: 사전예약모드
+      'chart': 9       // J열: 장표모드
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -11215,14 +11216,14 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(10).fill(''); // A~J열 (10개 컬럼)
+    const newRow = new Array(11).fill(''); // A~K열 (11개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:J`,
+      range: `${UPDATE_SHEET_NAME}!A:K`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
