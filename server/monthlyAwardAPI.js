@@ -87,6 +87,9 @@ async function getMonthlyAwardData(req, res) {
   try {
     console.log('월간시상 데이터 구글시트에서 로드');
 
+    // 캐시 무효화 (개발 중이므로 캐시 비활성화)
+    invalidateCache();
+
     // 필요한 시트 데이터 로드
     const [
       manualData,           // 수기초
