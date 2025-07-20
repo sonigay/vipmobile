@@ -818,6 +818,16 @@ async function getMonthlyAwardData(req, res) {
         // 전략상품 계산 (모든 행에 대해 계산)
         agent.strategicProducts.denominator++;
         
+        // 전략상품 디버깅 로그 (첫 번째 담당자만)
+        if (manager === Array.from(agentMap.keys())[0] && manualRows.indexOf(row) < 5) {
+          console.log(`=== ${manager} 전략상품 계산 디버깅 (${manualRows.indexOf(row) + 1}번째 행) ===`);
+          console.log('기본조건 확인:', {
+            subscriptionNumber: (row[0] || '').toString().trim(),
+            finalPolicy: (row[39] || '').toString().trim(),
+            modelType: (row[67] || '').toString().trim()
+          });
+        }
+        
         const insurance = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
         const uflix = (row[118] || '').toString().trim(); // DO열: 유플릭스
         const callTone = (row[122] || '').toString().trim(); // DS열: 통화연결음
@@ -879,6 +889,12 @@ async function getMonthlyAwardData(req, res) {
     // 담당자별 인터넷 비중 계산
     const activationRows = activationData.slice(1);
     const homeRows = homeData.slice(1);
+    
+    console.log('=== 인터넷 비중 계산 디버깅 ===');
+    console.log('개통데이터 행 수:', activationRows.length);
+    console.log('홈데이터 행 수:', homeRows.length);
+    console.log('담당자 매핑 테이블 크기:', managerMapping.size);
+    console.log('담당자 목록:', Array.from(managerMapping.values()));
     
     // 개통데이터/홈데이터 컬럼 구조 확인
     if (activationRows.length > 0) {
@@ -949,6 +965,9 @@ async function getMonthlyAwardData(req, res) {
     console.log('업체명 매핑 예시:', Array.from(companyNameMapping.entries()).slice(0, 5));
     
     // 개통데이터에서 담당자별 모수 계산
+    let activationProcessedCount = 0;
+    let activationMatchedCount = 0;
+    
     activationRows.forEach(row => {
       if (row.length < 38) return;
       
@@ -957,6 +976,8 @@ async function getMonthlyAwardData(req, res) {
       const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
       const planName = (row[21] || '').toString().trim(); // V열: 요금제
       const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (개통데이터는 G열)
+      
+      activationProcessedCount++;
       
       // 담당자 매칭 확인 (업체명으로 매칭)
       const manager = companyNameMapping.get(companyName);
@@ -980,15 +1001,28 @@ async function getMonthlyAwardData(req, res) {
       // 해당 담당자의 모수 증가
       if (agentMap.has(manager)) {
         agentMap.get(manager).internetRatio.denominator++;
+        activationMatchedCount++;
       }
     });
     
+    console.log('개통데이터 처리 결과:', {
+      processed: activationProcessedCount,
+      matched: activationMatchedCount,
+      unmatchedCompanies: Array.from(unmatchedCompanies).slice(0, 10) // 처음 10개만 표시
+    });
+    
     // 홈데이터에서 담당자별 자수 계산
+    let homeProcessedCount = 0;
+    let homeMatchedCount = 0;
+    let internetCount = 0;
+    
     homeRows.forEach(row => {
       if (row.length < 10) return;
       
       const product = (row[9] || '').toString().trim(); // J열: 가입상품
       const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (홈데이터도 G열)
+      
+      homeProcessedCount++;
       
       // 담당자 매칭 확인 (업체명으로 매칭)
       const manager = companyNameMapping.get(companyName);
@@ -1000,19 +1034,29 @@ async function getMonthlyAwardData(req, res) {
       
       // 자수 조건 확인
       if (product === '인터넷') {
+        internetCount++;
         // 동판 문구가 없는 경우에만 추가 조건 확인
         if (!product.includes('동판')) {
           if (product !== '선불' && product !== '소호') {
             if (agentMap.has(manager)) {
               agentMap.get(manager).internetRatio.numerator++;
+              homeMatchedCount++;
             }
           }
         } else {
           if (agentMap.has(manager)) {
             agentMap.get(manager).internetRatio.numerator++;
+            homeMatchedCount++;
           }
         }
       }
+    });
+    
+    console.log('홈데이터 처리 결과:', {
+      processed: homeProcessedCount,
+      matched: homeMatchedCount,
+      internetProducts: internetCount,
+      unmatchedCompanies: Array.from(unmatchedCompanies).slice(0, 10) // 처음 10개만 표시
     });
 
     // 담당자별 percentage 계산
