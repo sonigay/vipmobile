@@ -14,7 +14,7 @@ import {
   Divider
 } from '@mui/material';
 import axios from 'axios';
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 
 function Login({ onLogin }) {
@@ -26,7 +26,7 @@ function Login({ onLogin }) {
   const [userConsent, setUserConsent] = useState(false);
   const [showConsentForm, setShowConsentForm] = useState(false);
   const [storedIpInfo, setStoredIpInfo] = useState(null);
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
 
   // 사용자 기기 정보 수집
   useEffect(() => {
@@ -121,9 +121,7 @@ function Login({ onLogin }) {
 
 
   // 업데이트 진행 팝업 닫기 핸들러
-  const handleUpdateProgressPopupClose = () => {
-    setShowUpdateProgressPopup(false);
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -439,10 +437,7 @@ function Login({ onLogin }) {
       </Box>
       
       {/* 업데이트 진행 팝업 */}
-      <UpdateProgressPopup
-        open={showUpdateProgressPopup}
-        onClose={handleUpdateProgressPopupClose}
-      />
+      
     </Container>
   );
 }

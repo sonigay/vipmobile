@@ -52,11 +52,11 @@ import {
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
 
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = useState(0);
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
 
 
 
@@ -187,10 +187,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       </Container>
 
       {/* 업데이트 진행 팝업 */}
-      <UpdateProgressPopup
-        open={showUpdateProgressPopup}
-        onClose={() => setShowUpdateProgressPopup(false)}
-      />
+      
     </Box>
   );
 }

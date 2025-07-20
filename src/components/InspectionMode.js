@@ -70,7 +70,7 @@ import {
   updateModificationNotes
 } from '../utils/inspectionUtils';
 
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 상태 관리
@@ -79,7 +79,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc' - 기본값을 오름차순으로 설정
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
   
   // 필터 상태
   const [filters, setFilters] = useState({
@@ -1293,7 +1293,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       </Dialog>
 
       {/* 업데이트 진행 팝업 */}
-      {showUpdateProgressPopup && <UpdateProgressPopup onClose={() => setShowUpdateProgressPopup(false)} />}
+      
     </Box>
   );
 }

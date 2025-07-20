@@ -13,10 +13,10 @@ import {
   SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
 
 
 
@@ -89,7 +89,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           </Typography>
         </Paper>
       </Container>
-      {showUpdateProgressPopup && <UpdateProgressPopup onClose={() => setShowUpdateProgressPopup(false)} />}
+      
     </Box>
   );
 }

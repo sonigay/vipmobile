@@ -60,7 +60,7 @@ import {
   SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { fetchData } from '../api';
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 import NotificationButton from './NotificationButton';
 import AnnouncementBanner from './AnnouncementBanner';
@@ -123,7 +123,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
   // 탭 상태
   const [tabValue, setTabValue] = useState(0);
   // 업데이트 진행 팝업 상태
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
   // 알림 시스템 및 모바일 최적화 초기화 상태
   const [notificationInitialized, setNotificationInitialized] = useState(false);
 
@@ -346,9 +346,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
   }, []);
 
   // 업데이트 진행 팝업 닫기 핸들러
-  const handleUpdateProgressPopupClose = useCallback(() => {
-    setShowUpdateProgressPopup(false);
-  }, []);
+
 
   // 매장별 재고 정보 정리 (메모이제이션 적용)
   const getStoreInventorySummary = useCallback((store) => {
@@ -1184,10 +1182,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
       </Box>
       
       {/* 업데이트 진행 팝업 */}
-      <UpdateProgressPopup
-        open={showUpdateProgressPopup}
-        onClose={handleUpdateProgressPopupClose}
-      />
+      
     </Box>
   );
 }

@@ -40,11 +40,11 @@ import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 // ReservationAssignmentSettingsScreen import 제거됨
 import AllCustomerListScreen from './screens/AllCustomerListScreen';
 
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [currentTab, setCurrentTab] = useState(0);
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
   const [dashboardData, setDashboardData] = useState({
     totalReservations: 0,
     completedReservations: 0,
@@ -650,7 +650,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
         {renderTabContent()}
       </Box>
 
-      {showUpdateProgressPopup && <UpdateProgressPopup />}
+      
     </Box>
   );
 }

@@ -19,14 +19,14 @@ import DownloadIcon from '@mui/icons-material/Download';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import * as XLSX from 'xlsx';
 
-import UpdateProgressPopup from './UpdateProgressPopup';
+
 
 function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeChange, availableModes }) {
   const [excelData, setExcelData] = useState(null);
   const [originalFileName, setOriginalFileName] = useState(''); // 원본 파일명 저장
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showUpdateProgressPopup, setShowUpdateProgressPopup] = useState(false);
+
 
 
 
@@ -272,7 +272,7 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
           </Paper>
         )}
       </Box>
-      {showUpdateProgressPopup && <UpdateProgressPopup onClose={() => setShowUpdateProgressPopup(false)} />}
+      
     </Container>
   );
 }
