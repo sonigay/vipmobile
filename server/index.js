@@ -2998,18 +2998,34 @@ const server = app.listen(port, '0.0.0.0', async () => {
     }
     
     // 주소 업데이트 함수 호출
-          // console.log('모든 사용 중인 주소에 대해 위도/경도 값을 업데이트합니다...');
-    await checkAndUpdateAddresses();
+    console.log('🔍 [서버시작] 주소 업데이트 함수 시작');
+    try {
+      await checkAndUpdateAddresses();
+      console.log('✅ [서버시작] 주소 업데이트 함수 완료');
+    } catch (error) {
+      console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
+    }
     
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
     setInterval(checkAndUpdateAddresses, 3600000);
     
     // Git 커밋 히스토리를 구글시트에 자동 입력
-          // console.log('Git 커밋 히스토리를 구글시트에 자동 입력합니다...');
-    await updateGoogleSheetWithGitHistory();
+    console.log('🔍 [서버시작] Git 히스토리 업데이트 시작');
+    try {
+      await updateGoogleSheetWithGitHistory();
+      console.log('✅ [서버시작] Git 히스토리 업데이트 완료');
+    } catch (error) {
+      console.error('❌ [서버시작] Git 히스토리 업데이트 실패:', error.message);
+    }
     
     // 푸시 구독 정보 초기화
-    await initializePushSubscriptions();
+    console.log('🔍 [서버시작] 푸시 구독 초기화 시작');
+    try {
+      await initializePushSubscriptions();
+      console.log('✅ [서버시작] 푸시 구독 초기화 완료');
+    } catch (error) {
+      console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
+    }
     
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작');
