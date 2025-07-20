@@ -873,6 +873,13 @@ function MonthlyAwardTab() {
   const [isDepartmentTableExpanded, setIsDepartmentTableExpanded] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState(0); // 셋팅 다이얼로그에서 현재 탭 상태 관리
+  
+  // 추가 전략상품 상태
+  const [newStrategicProduct, setNewStrategicProduct] = useState({
+    subCategory: '',
+    serviceName: '',
+    points: 0
+  });
 
   // 데이터 로드
   useEffect(() => {
@@ -909,6 +916,43 @@ function MonthlyAwardTab() {
     if (percentage >= targetPercentage) return '🏆';
     if (percentage >= targetPercentage * 0.8) return '👍';
     return '⚠️';
+  };
+
+  // 추가 전략상품 핸들러
+  const handleAddStrategicProduct = async () => {
+    if (!newStrategicProduct.subCategory || !newStrategicProduct.serviceName || newStrategicProduct.points <= 0) {
+      alert('모든 필드를 입력해주세요.');
+      return;
+    }
+
+    try {
+      const updatedProducts = [
+        ...(data.strategicProductsList || []),
+        {
+          subCategory: newStrategicProduct.subCategory,
+          serviceCode: '', // 빈 값으로 설정
+          serviceName: newStrategicProduct.serviceName,
+          points: newStrategicProduct.points
+        }
+      ];
+
+      await api.saveMonthlyAwardSettings('strategic_products', updatedProducts);
+      
+      // 데이터 새로고침
+      const result = await api.getMonthlyAwardData();
+      setData(result);
+      
+      // 입력 필드 초기화
+      setNewStrategicProduct({
+        subCategory: '',
+        serviceName: '',
+        points: 0
+      });
+      
+      alert('전략상품이 추가되었습니다.');
+    } catch (error) {
+      alert('전략상품 추가 중 오류가 발생했습니다: ' + error.message);
+    }
   };
 
   if (loading) {
@@ -1449,6 +1493,11 @@ function MonthlyAwardTab() {
                     fullWidth
                     label="소분류"
                     placeholder="예: 보험(폰교체)"
+                    value={newStrategicProduct.subCategory}
+                    onChange={(e) => setNewStrategicProduct(prev => ({
+                      ...prev,
+                      subCategory: e.target.value
+                    }))}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -1456,6 +1505,11 @@ function MonthlyAwardTab() {
                     fullWidth
                     label="부가서비스명"
                     placeholder="예: 폰교체슬림"
+                    value={newStrategicProduct.serviceName}
+                    onChange={(e) => setNewStrategicProduct(prev => ({
+                      ...prev,
+                      serviceName: e.target.value
+                    }))}
                   />
                 </Grid>
                 <Grid item xs={12} md={3}>
@@ -1464,11 +1518,22 @@ function MonthlyAwardTab() {
                     label="포인트"
                     type="number"
                     placeholder="0"
+                    value={newStrategicProduct.points}
+                    onChange={(e) => setNewStrategicProduct(prev => ({
+                      ...prev,
+                      points: parseFloat(e.target.value) || 0
+                    }))}
                     inputProps={{ min: 0, step: 0.1 }}
                   />
                 </Grid>
                 <Grid item xs={12} md={1}>
-                  <Button variant="outlined" fullWidth sx={{ height: 56 }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    sx={{ height: 56 }}
+                    onClick={handleAddStrategicProduct}
+                    disabled={!newStrategicProduct.subCategory || !newStrategicProduct.serviceName || newStrategicProduct.points <= 0}
+                  >
                     추가
                   </Button>
                 </Grid>
