@@ -2325,6 +2325,7 @@ function App() {
               setShowModeSelection(true);
             }}
             availableModes={availableModes}
+            onCheckUpdate={() => setShowAppUpdatePopup(true)}
           />
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
