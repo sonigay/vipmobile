@@ -59,6 +59,16 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
       modelsWithSufficientStock: 0,
       modelsWithInsufficientStock: 0,
       modelsWithOverReservation: 0
+    },
+    officeInventory: {
+      '평택사무실': {},
+      '인천사무실': {},
+      '군산사무실': {}
+    },
+    officeStats: {
+      '평택사무실': { totalInventory: 0, modelCount: 0 },
+      '인천사무실': { totalInventory: 0, modelCount: 0 },
+      '군산사무실': { totalInventory: 0, modelCount: 0 }
     }
   });
   const [loading, setLoading] = useState(true);
@@ -145,6 +155,31 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
           console.error('재고 현황 데이터 로드 실패:', error);
         }
         
+        // 사무실별 재고 현황 데이터 로드
+        let officeInventory = {
+          '평택사무실': {},
+          '인천사무실': {},
+          '군산사무실': {}
+        };
+        let officeStats = {
+          '평택사무실': { totalInventory: 0, modelCount: 0 },
+          '인천사무실': { totalInventory: 0, modelCount: 0 },
+          '군산사무실': { totalInventory: 0, modelCount: 0 }
+        };
+        
+        try {
+          const reservationInventoryResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-inventory-status`);
+          if (reservationInventoryResponse.ok) {
+            const reservationInventoryResult = await reservationInventoryResponse.json();
+            if (reservationInventoryResult.success) {
+              officeInventory = reservationInventoryResult.officeInventory;
+              officeStats = reservationInventoryResult.stats.officeStats;
+            }
+          }
+        } catch (error) {
+          console.error('사무실별 재고 현황 데이터 로드 실패:', error);
+        }
+        
         // 최근 활동 데이터 (임시)
         const recentActivity = [
           { type: 'reservation', message: '새로운 사전예약이 등록되었습니다.', time: '5분 전' },
@@ -159,7 +194,9 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
           totalAgents,
           totalStores,
           recentActivity,
-          inventoryStats
+          inventoryStats,
+          officeInventory,
+          officeStats
         });
       } else {
         throw new Error(result.message || '데이터 로드에 실패했습니다.');
@@ -291,6 +328,99 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                         </Typography>
                       </Box>
                       <PeopleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* 사무실별 재고 현황 카드 */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+                  🏢 사무실별 재고 현황 (폰클재고데이터 기준)
+                </Typography>
+              </Grid>
+              
+              {/* 평택사무실 */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                      평택사무실
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.officeStats['평택사무실']?.totalInventory || 0}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          총 재고 수량
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          {dashboardData.officeStats['평택사무실']?.modelCount || 0}개 모델
+                        </Typography>
+                      </Box>
+                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              {/* 인천사무실 */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                      인천사무실
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.officeStats['인천사무실']?.totalInventory || 0}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          총 재고 수량
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          {dashboardData.officeStats['인천사무실']?.modelCount || 0}개 모델
+                        </Typography>
+                      </Box>
+                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              {/* 군산사무실 */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
+                  color: 'white'
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
+                      군산사무실
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                          {dashboardData.officeStats['군산사무실']?.totalInventory || 0}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          총 재고 수량
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          {dashboardData.officeStats['군산사무실']?.modelCount || 0}개 모델
+                        </Typography>
+                      </Box>
+                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
                     </Box>
                   </CardContent>
                 </Card>

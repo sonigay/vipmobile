@@ -8079,6 +8079,107 @@ app.get('/api/reservation-settings/data', async (req, res) => {
   }
 });
 
+// 사전예약 재고 현황 API (평택사무실, 인천사무실, 군산사무실 수량 카운팅)
+app.get('/api/reservation-inventory-status', async (req, res) => {
+  try {
+    console.log('사전예약 재고 현황 요청');
+    
+    // 캐시 키 생성
+    const cacheKey = 'reservation_inventory_status';
+    
+    // 캐시에서 먼저 확인 (5분 TTL)
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      console.log('캐시된 사전예약 재고 현황 반환');
+      return res.json(cachedData);
+    }
+    
+    // 폰클재고데이터에서 재고 정보 수집
+    const phoneklInventoryValues = await getSheetValues('폰클재고데이터');
+    
+    if (!phoneklInventoryValues || phoneklInventoryValues.length < 2) {
+      throw new Error('폰클재고데이터를 가져올 수 없습니다.');
+    }
+    
+    // 사무실별 재고 카운팅
+    const officeInventory = {
+      '평택사무실': {},
+      '인천사무실': {},
+      '군산사무실': {}
+    };
+    
+    // 헤더 제거하고 데이터 처리
+    phoneklInventoryValues.slice(1).forEach(row => {
+      if (row.length >= 15) {
+        const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
+        const color = (row[6] || '').toString().trim(); // G열: 색상
+        const storeName = (row[13] || '').toString().trim(); // N열: 출고처
+        
+        if (modelCapacity && color && storeName) {
+          // 사무실명 추출 (평택사무실, 인천사무실, 군산사무실)
+          let officeName = '';
+          if (storeName.includes('평택')) {
+            officeName = '평택사무실';
+          } else if (storeName.includes('인천')) {
+            officeName = '인천사무실';
+          } else if (storeName.includes('군산')) {
+            officeName = '군산사무실';
+          }
+          
+          if (officeName && officeInventory[officeName]) {
+            const key = `${modelCapacity} | ${color}`;
+            
+            if (!officeInventory[officeName][key]) {
+              officeInventory[officeName][key] = 0;
+            }
+            officeInventory[officeName][key]++;
+          }
+        }
+      }
+    });
+    
+    // 통계 계산
+    const stats = {
+      totalModels: 0,
+      totalInventory: 0,
+      officeStats: {}
+    };
+    
+    Object.entries(officeInventory).forEach(([officeName, inventory]) => {
+      const officeTotal = Object.values(inventory).reduce((sum, count) => sum + count, 0);
+      const modelCount = Object.keys(inventory).length;
+      
+      stats.officeStats[officeName] = {
+        totalInventory: officeTotal,
+        modelCount: modelCount
+      };
+      
+      stats.totalInventory += officeTotal;
+      stats.totalModels = Math.max(stats.totalModels, modelCount);
+    });
+    
+    const result = {
+      success: true,
+      officeInventory,
+      stats
+    };
+    
+    // 결과 캐싱 (5분 TTL)
+    cacheUtils.set(cacheKey, result, 300);
+    
+    console.log('사전예약 재고 현황 처리 완료:', stats);
+    res.json(result);
+    
+  } catch (error) {
+    console.error('사전예약 재고 현황 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load reservation inventory status',
+      message: error.message
+    });
+  }
+});
+
 // 사전예약 설정 저장 API
 app.post('/api/reservation-settings/save', async (req, res) => {
   try {
