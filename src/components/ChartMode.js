@@ -1268,8 +1268,19 @@ function MonthlyAwardTab() {
           {settingsTab === 1 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>전략상품 포인트 설정</Typography>
+              
+              <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매칭 규칙</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • 1순위: 부가서비스명과 정확히 일치하는 경우<br/>
+                  • 2순위: 소분류와 일치하는 경우<br/>
+                  • 소분류와 부가서비스명을 모두 설정할 수 있습니다
+                </Typography>
+              </Paper>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>기본 전략상품</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={3}>
                   <TextField
                     fullWidth
                     label="보험(폰교체) 포인트"
@@ -1278,7 +1289,7 @@ function MonthlyAwardTab() {
                     inputProps={{ min: 0, step: 0.1 }}
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={3}>
                   <TextField
                     fullWidth
                     label="유플릭스 포인트"
@@ -1287,7 +1298,7 @@ function MonthlyAwardTab() {
                     inputProps={{ min: 0, step: 0.1 }}
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={3}>
                   <TextField
                     fullWidth
                     label="통화연결음 포인트"
@@ -1296,7 +1307,7 @@ function MonthlyAwardTab() {
                     inputProps={{ min: 0, step: 0.1 }}
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={3}>
                   <TextField
                     fullWidth
                     label="뮤직류 포인트"
@@ -1312,11 +1323,18 @@ function MonthlyAwardTab() {
                 <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
-                    label="서비스명"
-                    placeholder="새로운 서비스명"
+                    label="소분류"
+                    placeholder="예: 보험(폰교체)"
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="부가서비스명"
+                    placeholder="예: 폰교체슬림"
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
                   <TextField
                     fullWidth
                     label="포인트"
@@ -1325,12 +1343,31 @@ function MonthlyAwardTab() {
                     inputProps={{ min: 0, step: 0.1 }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={1}>
                   <Button variant="outlined" fullWidth sx={{ height: 56 }}>
                     추가
                   </Button>
                 </Grid>
               </Grid>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>현재 설정된 전략상품 목록</Typography>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {data.strategicProductsList && data.strategicProductsList.length > 0 ? (
+                    data.strategicProductsList.map((product, index) => (
+                      <Box key={index} sx={{ mb: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        <Typography variant="body2">
+                          <strong>소분류:</strong> {product.subCategory} | 
+                          <strong>부가서비스명:</strong> {product.serviceName} | 
+                          <strong>포인트:</strong> {product.points}
+                        </Typography>
+                      </Box>
+                    ))
+                  ) : (
+                    "설정된 전략상품이 없습니다."
+                  )}
+                </Typography>
+              </Paper>
             </Box>
           )}
 

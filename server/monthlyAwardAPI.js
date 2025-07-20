@@ -108,16 +108,28 @@ async function getMonthlyAwardData(req, res) {
       throw new Error('필요한 시트 데이터를 불러올 수 없습니다.');
     }
 
-    // 담당자 매핑 테이블 생성 (실판매POS 기준)
+    // 담당자 매핑 테이블 생성 (수기초에 있는 실판매POS 코드만)
     const managerMapping = new Map();
     const storeRows = storeData.slice(1);
     
+    // 수기초에 있는 실판매POS 코드 수집
+    const manualPosCodes = new Set();
+    manualData.slice(1).forEach(row => {
+      if (row.length >= 8) {
+        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+        if (posCode) {
+          manualPosCodes.add(posCode);
+        }
+      }
+    });
+    
+    // 수기초에 있는 실판매POS 코드만 매핑
     storeRows.forEach(row => {
       if (row.length >= 14) {
         const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
         
-        if (posCode && manager) {
+        if (posCode && manager && manualPosCodes.has(posCode)) {
           // 담당자 이름에서 괄호 부분 제거
           const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
           managerMapping.set(posCode, cleanManager);
@@ -155,13 +167,12 @@ async function getMonthlyAwardData(req, res) {
     if (settingsData && settingsData.length > 1) {
       const settingsRows = settingsData.slice(1);
       settingsRows.forEach(row => {
-        if (row.length >= 5) {
+        if (row.length >= 4) {
           strategicProducts.push({
-            category: row[0] || '',           // 대분류
-            subCategory: row[1] || '',        // 소분류
-            serviceCode: row[2] || '',        // 부가서비스 코드
-            serviceName: row[3] || '',        // 부가서비스명
-            points: parseFloat(row[4] || 0)   // 포인트
+            subCategory: row[0] || '',        // 소분류
+            serviceCode: row[1] || '',        // 부가서비스 코드
+            serviceName: row[2] || '',        // 부가서비스명
+            points: parseFloat(row[3] || 0)   // 포인트
           });
         }
       });
@@ -169,10 +180,10 @@ async function getMonthlyAwardData(req, res) {
 
     // 기본 전략상품 포인트 (설정이 없을 때 사용)
     const defaultStrategicProducts = [
-      { serviceName: '보험(폰교체)', points: 2.0 },
-      { serviceName: '유플릭스', points: 1.5 },
-      { serviceName: '통화연결음', points: 1.0 },
-      { serviceName: '뮤직류', points: 1.0 }
+      { subCategory: '보험(폰교체)', serviceName: '보험(폰교체)', points: 2.0 },
+      { subCategory: '유플릭스', serviceName: '유플릭스', points: 1.5 },
+      { subCategory: '통화연결음', serviceName: '통화연결음', points: 1.0 },
+      { subCategory: '뮤직류', serviceName: '뮤직류', points: 1.0 }
     ];
 
     // 설정된 값이 없으면 기본값 사용
@@ -374,10 +385,17 @@ async function getMonthlyAwardData(req, res) {
         
         let totalPoints = 0;
         
-        // 각 항목별 포인트 계산
+        // 각 항목별 포인트 계산 (소분류 또는 부가서비스명으로 매칭)
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            const product = finalStrategicProducts.find(p => p.serviceName === service);
+            // 1. 부가서비스명으로 정확히 매칭
+            let product = finalStrategicProducts.find(p => p.serviceName === service);
+            
+            // 2. 부가서비스명 매칭이 안되면 소분류로 매칭
+            if (!product) {
+              product = finalStrategicProducts.find(p => p.subCategory === service);
+            }
+            
             if (product) {
               totalPoints += product.points;
             }
@@ -556,7 +574,7 @@ async function getMonthlyAwardData(req, res) {
         // 전략상품 계산
         agent.strategicProducts.denominator++;
         
-        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
+        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체
         const uflix = (row[93] || '').toString().trim(); // DO열: 유플릭스
         const callTone = (row[95] || '').toString().trim(); // DS열: 통화연결음
         const music = (row[79] || '').toString().trim(); // DG열: 뮤직류
@@ -564,7 +582,14 @@ async function getMonthlyAwardData(req, res) {
         let totalPoints = 0;
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            const product = finalStrategicProducts.find(p => p.serviceName === service);
+            // 1. 부가서비스명으로 정확히 매칭
+            let product = finalStrategicProducts.find(p => p.serviceName === service);
+            
+            // 2. 부가서비스명 매칭이 안되면 소분류로 매칭
+            if (!product) {
+              product = finalStrategicProducts.find(p => p.subCategory === service);
+            }
+            
             if (product) {
               totalPoints += product.points;
             }
@@ -587,6 +612,64 @@ async function getMonthlyAwardData(req, res) {
       console.log(`실판매POS: "${posCode}"`);
     }
 
+    // 담당자별 인터넷 비중 계산
+    const activationRows = activationData.slice(1);
+    const homeRows = homeData.slice(1);
+    
+    // 개통데이터에서 담당자별 모수 계산
+    activationRows.forEach(row => {
+      if (row.length < 38) return;
+      
+      const activation = (row[37] || '').toString().trim(); // AL열: 개통
+      const modelName = (row[13] || '').toString().trim(); // N열: 모델명
+      const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
+      const planName = (row[21] || '').toString().trim(); // V열: 요금제
+      const posCode = (row[7] || '').toString().trim(); // H열: P코드
+      
+      // 모수 조건 확인
+      if (activation === '선불개통' || !modelName || inputStore === '중고') {
+        return;
+      }
+      
+      // 요금제군 확인 (2nd군 제외)
+      const planInfo = planMapping.get(planName);
+      if (planInfo && planInfo.group === '2nd군') {
+        return;
+      }
+      
+      // 담당자 매핑
+      const manager = managerMapping.get(posCode);
+      if (manager && agentMap.has(manager)) {
+        agentMap.get(manager).internetRatio.denominator++;
+      }
+    });
+    
+    // 홈데이터에서 담당자별 자수 계산
+    homeRows.forEach(row => {
+      if (row.length < 10) return;
+      
+      const product = (row[9] || '').toString().trim(); // J열: 가입상품
+      const posCode = (row[7] || '').toString().trim(); // H열: P코드
+      
+      // 자수 조건 확인
+      if (product === '인터넷') {
+        // 동판 문구가 없는 경우에만 추가 조건 확인
+        if (!product.includes('동판')) {
+          if (product !== '선불' && product !== '소호') {
+            const manager = managerMapping.get(posCode);
+            if (manager && agentMap.has(manager)) {
+              agentMap.get(manager).internetRatio.numerator++;
+            }
+          }
+        } else {
+          const manager = managerMapping.get(posCode);
+          if (manager && agentMap.has(manager)) {
+            agentMap.get(manager).internetRatio.numerator++;
+          }
+        }
+      }
+    });
+
     // 담당자별 percentage 계산
     agentMap.forEach(agent => {
       // 업셀기변 percentage 계산
@@ -604,12 +687,10 @@ async function getMonthlyAwardData(req, res) {
         ? (agent.strategicProducts.numerator / agent.strategicProducts.denominator * 100).toFixed(2) 
         : '0.00';
       
-      // 인터넷 비중은 전체 비율 적용
-      agent.internetRatio = {
-        numerator: 0,
-        denominator: 0,
-        percentage: internetRatio.percentage
-      };
+      // 인터넷 비중 percentage 계산
+      agent.internetRatio.percentage = agent.internetRatio.denominator > 0 
+        ? (agent.internetRatio.numerator / agent.internetRatio.denominator * 100).toFixed(2) 
+        : '0.00';
     });
 
     // 디버깅 로그 추가
@@ -670,7 +751,6 @@ async function saveMonthlyAwardSettings(req, res) {
       case 'strategic_products':
         // 전략상품 리스트 저장
         sheetData = data.map(item => [
-          item.category,
           item.subCategory,
           item.serviceCode,
           item.serviceName,
