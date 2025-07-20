@@ -870,7 +870,7 @@ function MonthlyAwardTab() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/monthly-award/data');
+        const response = await fetch('https://jegomap2-server.onrender.com/api/monthly-award/data');
         if (!response.ok) {
           throw new Error('데이터를 불러올 수 없습니다.');
         }
@@ -1213,7 +1213,37 @@ function MonthlyAwardTab() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowSettings(false)}>취소</Button>
-          <Button onClick={() => setShowSettings(false)} variant="contained">저장</Button>
+          <Button onClick={async () => {
+            try {
+              const formData = new FormData();
+              const matrixCriteria = [6, 5, 4, 3, 2, 1].map(score => ({
+                score,
+                percentage: parseFloat(document.querySelector(`input[type="number"][label*="${score}점"]`)?.value || 0)
+              }));
+              
+              const response = await fetch('https://jegomap2-server.onrender.com/api/monthly-award/settings', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  type: 'matrix_criteria',
+                  data: matrixCriteria
+                })
+              });
+              
+              if (response.ok) {
+                alert('설정이 저장되었습니다.');
+                setShowSettings(false);
+                // 데이터 다시 로드
+                window.location.reload();
+              } else {
+                alert('설정 저장에 실패했습니다.');
+              }
+            } catch (error) {
+              alert('설정 저장 중 오류가 발생했습니다.');
+            }
+          }} variant="contained">저장</Button>
         </DialogActions>
       </Dialog>
     </Box>
