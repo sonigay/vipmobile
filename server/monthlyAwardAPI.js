@@ -596,7 +596,7 @@ async function getMonthlyAwardData(req, res) {
           const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
           
           // 첫 번째 담당자만 로그 출력 (너무 많은 로그 방지)
-          if (manager === Array.from(agentMap.keys())[0]) {
+          if (manager === Array.from(agentMap.keys())[0] && finalPlan && beforePlan) {
             console.log(`${manager} 업셀기변 확인: finalPlan="${finalPlan}", beforePlan="${beforePlan}"`);
           }
           
@@ -682,6 +682,7 @@ async function getMonthlyAwardData(req, res) {
                 console.log(`${manager} 전략상품 매칭: ${service} -> ${product.points}점`);
               }
             } else {
+              unmatchedStrategicProducts.add(service);
               if (manager === Array.from(agentMap.keys())[0]) {
                 console.log(`${manager} 전략상품 매칭 실패: "${service}"`);
               }
@@ -711,8 +712,13 @@ async function getMonthlyAwardData(req, res) {
     const activationRows = activationData.slice(1);
     const homeRows = homeData.slice(1);
     
+    // 매칭되지 않은 항목들 추적
+    const unmatchedCompanies = new Set(); // 인터넷 비중용
+    const unmatchedStrategicProducts = new Set(); // 전략상품용
+    
     // 개통데이터/홈데이터의 업체명을 폰클출고처데이터와 매칭하기 위한 매핑 생성
     const companyNameMapping = new Map();
+    
     storeRows.forEach(row => {
       if (row.length >= 14) {
         const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
@@ -742,11 +748,9 @@ async function getMonthlyAwardData(req, res) {
       
       // 담당자 매칭 확인 (업체명으로 매칭)
       const manager = companyNameMapping.get(companyName);
+      
       if (!manager) {
-        // 첫 번째 업체만 로그 출력 (너무 많은 로그 방지)
-        if (!companyNameMapping.has(companyName)) {
-          console.log(`인터넷 비중 - 매칭되지 않은 업체명: "${companyName}"`);
-        }
+        unmatchedCompanies.add(companyName);
         return;
       }
       
@@ -776,7 +780,11 @@ async function getMonthlyAwardData(req, res) {
       
       // 담당자 매칭 확인 (업체명으로 매칭)
       const manager = companyNameMapping.get(companyName);
-      if (!manager) return;
+      
+      if (!manager) {
+        unmatchedCompanies.add(companyName);
+        return;
+      }
       
       // 자수 조건 확인
       if (product === '인터넷') {
@@ -972,7 +980,11 @@ async function getMonthlyAwardData(req, res) {
       strategicProductsList: finalStrategicProducts,
       agentDetails: Array.from(agentMap.values()),
       officeGroups: Array.from(officeGroupMap.values()),
-      departmentGroups: Array.from(departmentGroupMap.values())
+      departmentGroups: Array.from(departmentGroupMap.values()),
+      unmatchedItems: {
+        companies: Array.from(unmatchedCompanies),
+        strategicProducts: Array.from(unmatchedStrategicProducts)
+      }
     };
 
     res.json(result);
