@@ -362,23 +362,23 @@ async function getMonthlyAwardData(req, res) {
         console.log('Matrix 행 데이터:', matrixRows);
         matrixRows.forEach((row, index) => {
           console.log(`행 ${index}:`, row);
-          if (row.length >= 3 && row[1] && row[2]) { // 점수와 퍼센트가 있는 경우만
-            const score = parseInt(row[1]);
-            const percentage = parseFloat(row[2]);
-            const indicator = row[3] || ''; // 설명에서 지표 추출
+          if (row.length >= 3 && row[0] && row[1] && row[2]) { // 지표명, 점수, 퍼센트가 있는 경우만
+            const indicatorName = row[0] || ''; // A열: 지표명
+            const score = parseInt(row[1]); // B열: 점수
+            const percentage = parseFloat(row[2]); // C열: 퍼센트
             
-            console.log(`처리 중: score=${score}, percentage=${percentage}, indicator="${indicator}"`);
+            console.log(`처리 중: indicatorName="${indicatorName}", score=${score}, percentage=${percentage}`);
             
             if (!isNaN(score) && !isNaN(percentage)) {
               // 지표명에서 indicator 추출
               let indicatorType = '';
-              if (indicator.includes('업셀기변') || indicator.includes('upsell')) {
+              if (indicatorName.includes('업셀기변')) {
                 indicatorType = 'upsell';
-              } else if (indicator.includes('기변105이상') || indicator.includes('change105')) {
+              } else if (indicatorName.includes('기변105이상')) {
                 indicatorType = 'change105';
-              } else if (indicator.includes('전략상품') || indicator.includes('strategic')) {
+              } else if (indicatorName.includes('전략상품')) {
                 indicatorType = 'strategic';
-              } else if (indicator.includes('인터넷 비중') || indicator.includes('internet')) {
+              } else if (indicatorName.includes('인터넷 비중')) {
                 indicatorType = 'internet';
               }
               
