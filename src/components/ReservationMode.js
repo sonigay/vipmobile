@@ -73,8 +73,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [manualAssignmentLoading, setManualAssignmentLoading] = useState(false);
-  const [manualAssignmentMessage, setManualAssignmentMessage] = useState('');
+
   const [lastCheckTime, setLastCheckTime] = useState(Date.now());
 
   // 새로운 배포 감지
@@ -212,39 +211,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
     }
   };
 
-  // 수동 배정 실행 함수
-  const handleManualAssignment = async () => {
-    try {
-      setManualAssignmentLoading(true);
-      setManualAssignmentMessage('');
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation/manual-assignment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('수동 배정 요청에 실패했습니다.');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        setManualAssignmentMessage(result.message);
-        // 배정 완료 후 대시보드 데이터 새로고침
-        await loadDashboardData();
-      } else {
-        throw new Error(result.message || '수동 배정에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('수동 배정 오류:', error);
-      setManualAssignmentMessage(`오류: ${error.message}`);
-    } finally {
-      setManualAssignmentLoading(false);
-    }
-  };
+
 
   useEffect(() => {
     if (currentTab === 0) {
@@ -252,7 +219,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
     }
   }, [currentTab]);
 
-  // 실시간 업데이트 (1분마다 변경사항 확인)
+  // 실시간 업데이트 (5분마다 변경사항 확인 - API 부하 최적화)
   useEffect(() => {
     if (currentTab === 0) {
       const checkForChanges = async () => {
@@ -273,7 +240,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
         }
       };
 
-      const interval = setInterval(checkForChanges, 60 * 1000); // 1분마다
+      const interval = setInterval(checkForChanges, 5 * 60 * 1000); // 5분마다 (API 부하 최적화)
 
       return () => clearInterval(interval);
     }
@@ -398,140 +365,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
               </Grid>
             </Grid>
 
-            {/* 수동 배정 버튼 */}
-            <Box sx={{ mb: 4 }}>
-              <Card sx={{ 
-                background: 'linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)',
-                color: 'white'
-              }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                        📋 수동 배정 실행
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
-                        현재 배정 상태를 확인하고 일련번호를 즉시 입력합니다
-                      </Typography>
-                      {manualAssignmentMessage && (
-                        <Alert severity={manualAssignmentMessage.includes('오류') ? 'error' : 'success'} sx={{ mb: 2 }}>
-                          {manualAssignmentMessage}
-                        </Alert>
-                      )}
-                      <Button
-                        variant="contained"
-                        onClick={handleManualAssignment}
-                        disabled={manualAssignmentLoading}
-                        startIcon={manualAssignmentLoading ? <CircularProgress size={20} /> : <AssignmentIcon />}
-                        sx={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          '&:hover': {
-                            backgroundColor: 'rgba(255, 255, 255, 0.3)'
-                          }
-                        }}
-                      >
-                        {manualAssignmentLoading ? '배정 중...' : '수동 배정 실행'}
-                      </Button>
-                    </Box>
-                    <AssignmentIcon sx={{ fontSize: 60, opacity: 0.8 }} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
 
-            {/* 사무실별 재고 현황 카드 */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12}>
-                <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                  🏢 사무실별 재고 현황 (폰클재고데이터 기준)
-                </Typography>
-              </Grid>
-              
-              {/* 평택사무실 */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                      평택사무실
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                          {dashboardData.officeStats['평택사무실']?.totalInventory || 0}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          총 재고 수량
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          {dashboardData.officeStats['평택사무실']?.modelCount || 0}개 모델
-                        </Typography>
-                      </Box>
-                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              {/* 인천사무실 */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                      인천사무실
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                          {dashboardData.officeStats['인천사무실']?.totalInventory || 0}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          총 재고 수량
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          {dashboardData.officeStats['인천사무실']?.modelCount || 0}개 모델
-                        </Typography>
-                      </Box>
-                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              {/* 군산사무실 */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                      군산사무실
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                          {dashboardData.officeStats['군산사무실']?.totalInventory || 0}
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          총 재고 수량
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                          {dashboardData.officeStats['군산사무실']?.modelCount || 0}개 모델
-                        </Typography>
-                      </Box>
-                      <BusinessIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
 
             {/* 재고 현황 카드 */}
             <Grid container spacing={3} sx={{ mb: 4 }}>

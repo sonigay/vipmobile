@@ -56,6 +56,9 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [activationFilter, setActivationFilter] = useState('all'); // 'all', 'activated', 'notActivated'
   const [activationData, setActivationData] = useState({});
   const [loadingActivation, setLoadingActivation] = useState(false);
+  const [inventoryStatus, setInventoryStatus] = useState({});
+  const [loadingInventory, setLoadingInventory] = useState(false);
+  const [manualAssignmentLoading, setManualAssignmentLoading] = useState(false);
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -520,7 +523,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     } else {
       console.log('⚠️ [재고배정 디버깅] 고객리스트가 비어있어 배정상태 로드를 건너뜀');
     }
-  }, [customerList.length]);
+  }, [customerList.length, loadInventoryStatus]);
 
   // 필터 변경 시 적용
   useEffect(() => {
@@ -533,6 +536,62 @@ function AllCustomerListScreen({ loggedInStore }) {
     const interval = setInterval(updateCacheStats, 10000); // 10초마다 업데이트
     return () => clearInterval(interval);
   }, [updateCacheStats]);
+
+  // 정규화작업시트 C열 기준 재고 현황 로드
+  const loadInventoryStatus = useCallback(async () => {
+    setLoadingInventory(true);
+    try {
+      console.log('🔍 [재고현황 디버깅] 정규화작업시트 C열 기준 재고 현황 로드 시작');
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/normalized-status`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📊 [재고현황 디버깅] 재고 현황 데이터:', result);
+        
+        if (result.success) {
+          setInventoryStatus(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [재고현황 디버깅] 재고 현황 로드 오류:', error);
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, []);
+
+  // 수동 배정 실행
+  const executeManualAssignment = useCallback(async () => {
+    setManualAssignmentLoading(true);
+    try {
+      console.log('🔍 [수동배정 디버깅] 수동 배정 실행 시작');
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/manual-assignment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📊 [수동배정 디버깅] 수동 배정 결과:', result);
+        
+        if (result.success) {
+          // 배정 상태 새로고침
+          await loadAssignmentStatus();
+          alert('수동 배정이 완료되었습니다.');
+        } else {
+          alert(`수동 배정 실패: ${result.message}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [수동배정 디버깅] 수동 배정 오류:', error);
+      alert('수동 배정 중 오류가 발생했습니다.');
+    } finally {
+      setManualAssignmentLoading(false);
+    }
+  }, [loadAssignmentStatus]);
 
   // 메모이제이션된 통계 정보
   const statsInfo = useMemo(() => {
@@ -629,6 +688,61 @@ function AllCustomerListScreen({ loggedInStore }) {
       </Box>
 
 
+
+      {/* 수동 배정 및 재고 현황 */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+            {/* 수동 배정 실행 버튼 */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={executeManualAssignment}
+                disabled={manualAssignmentLoading}
+                sx={{ 
+                  backgroundColor: '#4caf50',
+                  '&:hover': { backgroundColor: '#45a049' }
+                }}
+              >
+                {manualAssignmentLoading ? <CircularProgress size={16} /> : '수동 배정 실행'}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                📋 폰클에 출고된 변경내용이 있다면 버튼을 눌러주세요
+              </Typography>
+            </Box>
+
+            {/* 재고 현황 새로고침 버튼 */}
+            <Button
+              variant="outlined"
+              onClick={loadInventoryStatus}
+              disabled={loadingInventory}
+            >
+              {loadingInventory ? <CircularProgress size={16} /> : '재고 현황 새로고침'}
+            </Button>
+          </Box>
+
+          {/* 정규화작업시트 C열 기준 재고 현황 */}
+          {Object.keys(inventoryStatus).length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+                정규화작업시트 C열 기준 재고 현황
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {Object.entries(inventoryStatus).map(([model, count]) => (
+                  <Chip
+                    key={model}
+                    label={`${model}: ${count}대`}
+                    variant="outlined"
+                    size="small"
+                    color="primary"
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 검색 및 액션 버튼 */}
       <Card sx={{ mb: 3 }}>
