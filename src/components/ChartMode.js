@@ -28,7 +28,11 @@ import {
   Chip,
   Grid,
   IconButton,
-  Collapse
+  Collapse,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   BarChart as BarChartIcon,
@@ -865,6 +869,7 @@ function MonthlyAwardTab() {
   const [error, setError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState(0); // 셋팅 다이얼로그에서 현재 탭 상태 관리
 
   // 데이터 로드
   useEffect(() => {
@@ -993,71 +998,72 @@ function MonthlyAwardTab() {
       </Paper>
 
       {/* 월간시상 Matrix */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
-          월간시상 Matrix
-        </Typography>
-        
-        {/* 만점기준 */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
-            만점기준
+      <Collapse in={isExpanded}>
+        <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
+            월간시상 Matrix
           </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
-                <Typography variant="body2" color="text.secondary">총점</Typography>
-              </Box>
+          
+          {/* 만점기준 */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
+              만점기준
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
+                  <Typography variant="body2" color="text.secondary">총점</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
+                  <Typography variant="body2" color="text.secondary">업셀기변</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
+                  <Typography variant="body2" color="text.secondary">기변105이상</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
+                  <Typography variant="body2" color="text.secondary">전략상품</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
+                  <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
+                </Box>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
-                <Typography variant="body2" color="text.secondary">업셀기변</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
-                <Typography variant="body2" color="text.secondary">기변105이상</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
-                <Typography variant="body2" color="text.secondary">전략상품</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
-                <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </Box>
+          </Box>
 
-        {/* 달성상황 */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
-            달성상황
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>{data.totalScore}점</Typography>
-                <Typography variant="body2" color="text.secondary">총점</Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                  {getPerformanceIcon(data.indicators.upsellChange.percentage, 92.0)}
-                  {Math.round(data.indicators.upsellChange.percentage / 92.0 * 6)}점
-                </Typography>
-                <Typography variant="body2" color="text.secondary">업셀기변</Typography>
-              </Box>
-            </Grid>
+          {/* 달성상황 */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
+              달성상황
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>{data.totalScore}점</Typography>
+                  <Typography variant="body2" color="text.secondary">총점</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
+                    {getPerformanceIcon(data.indicators.upsellChange.percentage, 92.0)}
+                    {Math.round(data.indicators.upsellChange.percentage / 92.0 * 6)}점
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">업셀기변</Typography>
+                </Box>
+              </Grid>
             <Grid item xs={12} md={2.4}>
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
@@ -1144,6 +1150,7 @@ function MonthlyAwardTab() {
           </TableContainer>
         </Collapse>
       </Paper>
+        </Collapse>
 
       {/* 상세 데이터 테이블 */}
       <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
@@ -1193,147 +1200,278 @@ function MonthlyAwardTab() {
       <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="lg" fullWidth>
         <DialogTitle>월간시상 셋팅</DialogTitle>
         <DialogContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Matrix 기준값 설정</Typography>
-          
-          {/* 업셀기변 기준값 */}
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#2e7d32' }}>업셀기변 기준값</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {[6, 5, 4, 3, 2, 1].map((score) => (
-              <Grid item xs={12} md={4} key={`upsell-${score}`}>
-                <TextField
-                  fullWidth
-                  label={`${score}점 기준 (%)`}
-                  type="number"
-                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}
-                  inputProps={{ min: 0, max: 100, step: 0.1 }}
-                  sx={{ mb: 1 }}
-                />
-              </Grid>
-            ))}
-          </Grid>
+          <Tabs value={settingsTab} onChange={(e, newValue) => setSettingsTab(newValue)} sx={{ mb: 3 }}>
+            <Tab label="Matrix 기준값" />
+            <Tab label="전략상품 관리" />
+            <Tab label="업체 매핑" />
+            <Tab label="담당자 관리" />
+          </Tabs>
 
-          {/* 기변105이상 기준값 */}
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#f57c00' }}>기변105이상 기준값</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {[6, 5, 4, 3, 2, 1].map((score) => (
-              <Grid item xs={12} md={4} key={`change105-${score}`}>
-                <TextField
-                  fullWidth
-                  label={`${score}점 기준 (%)`}
-                  type="number"
-                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}
-                  inputProps={{ min: 0, max: 100, step: 0.1 }}
-                  sx={{ mb: 1 }}
-                />
+          {/* Matrix 기준값 탭 */}
+          {settingsTab === 0 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>Matrix 기준값 설정</Typography>
+              
+              {/* 업셀기변 기준값 */}
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#2e7d32' }}>업셀기변 기준값</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[6, 5, 4, 3, 2, 1].map((score) => (
+                  <Grid item xs={12} md={4} key={`upsell-${score}`}>
+                    <TextField
+                      fullWidth
+                      label={`${score}점 기준 (%)`}
+                      type="number"
+                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}
+                      inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
 
-          {/* 전략상품 기준값 */}
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#7b1fa2' }}>전략상품 기준값</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {[6, 5, 4, 3, 2, 1].map((score) => (
-              <Grid item xs={12} md={4} key={`strategic-${score}`}>
-                <TextField
-                  fullWidth
-                  label={`${score}점 기준 (%)`}
-                  type="number"
-                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}
-                  inputProps={{ min: 0, max: 100, step: 0.1 }}
-                  sx={{ mb: 1 }}
-                />
+              {/* 기변105이상 기준값 */}
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#f57c00' }}>기변105이상 기준값</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[6, 5, 4, 3, 2, 1].map((score) => (
+                  <Grid item xs={12} md={4} key={`change105-${score}`}>
+                    <TextField
+                      fullWidth
+                      label={`${score}점 기준 (%)`}
+                      type="number"
+                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}
+                      inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
 
-          {/* 인터넷 비중 기준값 */}
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#c2185b' }}>인터넷 비중 기준값</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {[6, 5, 4, 3, 2, 1].map((score) => (
-              <Grid item xs={12} md={4} key={`internet-${score}`}>
-                <TextField
-                  fullWidth
-                  label={`${score}점 기준 (%)`}
-                  type="number"
-                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}
-                  inputProps={{ min: 0, max: 100, step: 0.1 }}
-                  sx={{ mb: 1 }}
-                />
+              {/* 전략상품 기준값 */}
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#7b1fa2' }}>전략상품 기준값</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[6, 5, 4, 3, 2, 1].map((score) => (
+                  <Grid item xs={12} md={4} key={`strategic-${score}`}>
+                    <TextField
+                      fullWidth
+                      label={`${score}점 기준 (%)`}
+                      type="number"
+                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}
+                      inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
 
-          {/* 전략상품 포인트 설정 */}
-          <Typography variant="h6" sx={{ mb: 2, mt: 4 }}>전략상품 포인트 설정</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="보험(폰교체) 포인트"
-                type="number"
-                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '보험(폰교체)')?.points || 0}
-                inputProps={{ min: 0, step: 0.1 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="유플릭스 포인트"
-                type="number"
-                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '유플릭스')?.points || 0}
-                inputProps={{ min: 0, step: 0.1 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="통화연결음 포인트"
-                type="number"
-                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '통화연결음')?.points || 0}
-                inputProps={{ min: 0, step: 0.1 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="뮤직류 포인트"
-                type="number"
-                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '뮤직류')?.points || 0}
-                inputProps={{ min: 0, step: 0.1 }}
-              />
-            </Grid>
-          </Grid>
+              {/* 인터넷 비중 기준값 */}
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#c2185b' }}>인터넷 비중 기준값</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[6, 5, 4, 3, 2, 1].map((score) => (
+                  <Grid item xs={12} md={4} key={`internet-${score}`}>
+                    <TextField
+                      fullWidth
+                      label={`${score}점 기준 (%)`}
+                      type="number"
+                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}
+                      inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      sx={{ mb: 1 }}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+
+          {/* 전략상품 관리 탭 */}
+          {settingsTab === 1 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>전략상품 포인트 설정</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="보험(폰교체) 포인트"
+                    type="number"
+                    defaultValue={data.strategicProductsList?.find(p => p.serviceName === '보험(폰교체)')?.points || 0}
+                    inputProps={{ min: 0, step: 0.1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="유플릭스 포인트"
+                    type="number"
+                    defaultValue={data.strategicProductsList?.find(p => p.serviceName === '유플릭스')?.points || 0}
+                    inputProps={{ min: 0, step: 0.1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="통화연결음 포인트"
+                    type="number"
+                    defaultValue={data.strategicProductsList?.find(p => p.serviceName === '통화연결음')?.points || 0}
+                    inputProps={{ min: 0, step: 0.1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="뮤직류 포인트"
+                    type="number"
+                    defaultValue={data.strategicProductsList?.find(p => p.serviceName === '뮤직류')?.points || 0}
+                    inputProps={{ min: 0, step: 0.1 }}
+                  />
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>추가 전략상품</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="서비스명"
+                    placeholder="새로운 서비스명"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="포인트"
+                    type="number"
+                    placeholder="0"
+                    inputProps={{ min: 0, step: 0.1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button variant="outlined" fullWidth sx={{ height: 56 }}>
+                    추가
+                  </Button>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* 업체 매핑 탭 */}
+          {settingsTab === 2 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>출고처 업체명 매핑</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                매뉴얼데이터의 출고처와 담당자 매핑 테이블의 업체명이 일치하지 않는 경우를 관리합니다.
+              </Typography>
+              
+              <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매핑 규칙</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • 매뉴얼데이터 G열(출고처) ↔ 담당자매핑 G열(업체명)<br/>
+                  • 담당자 이름에서 괄호 부분은 자동으로 제거됩니다<br/>
+                  • 매칭되지 않은 업체는 담당자별 계산에서 제외됩니다
+                </Typography>
+              </Paper>
+
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="매뉴얼데이터 출고처명"
+                    placeholder="실제 출고처명 입력"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="매핑할 업체명"
+                    placeholder="담당자매핑의 업체명"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button variant="outlined" fullWidth sx={{ height: 56 }}>
+                    매핑 추가
+                  </Button>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* 담당자 관리 탭 */}
+          {settingsTab === 3 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>담당자별 설정</Typography>
+              
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="담당자명"
+                    placeholder="담당자 이름"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>활성화 상태</InputLabel>
+                    <Select defaultValue="active">
+                      <MenuItem value="active">활성</MenuItem>
+                      <MenuItem value="inactive">비활성</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="목표 달성률 (%)"
+                    type="number"
+                    placeholder="100"
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Button variant="outlined" fullWidth sx={{ height: 56 }}>
+                    담당자 추가
+                  </Button>
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>담당자 목록</Typography>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  담당자 매핑 테이블에서 관리됩니다. Google Sheets에서 직접 수정하거나<br/>
+                  위의 매핑 기능을 통해 자동으로 관리할 수 있습니다.
+                </Typography>
+              </Paper>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowSettings(false)}>취소</Button>
           <Button onClick={async () => {
             try {
-              // Matrix 기준값 수집
-              const matrixCriteria = [];
-              ['upsell', 'change105', 'strategic', 'internet'].forEach(indicator => {
-                [6, 5, 4, 3, 2, 1].forEach(score => {
-                  const input = document.querySelector(`input[type="number"][key*="${indicator}-${score}"]`);
-                  if (input) {
-                    matrixCriteria.push({
-                      score,
-                      indicator,
-                      percentage: parseFloat(input.value || 0)
-                    });
-                  }
+              // 현재 탭에 따른 저장 로직
+              if (settingsTab === 0) {
+                // Matrix 기준값 저장
+                const matrixCriteria = [];
+                ['upsell', 'change105', 'strategic', 'internet'].forEach(indicator => {
+                  [6, 5, 4, 3, 2, 1].forEach(score => {
+                    const input = document.querySelector(`input[type="number"][key*="${indicator}-${score}"]`);
+                    if (input) {
+                      matrixCriteria.push({
+                        score,
+                        indicator,
+                        percentage: parseFloat(input.value || 0)
+                      });
+                    }
+                  });
                 });
-              });
-
-              // 전략상품 포인트 수집
-              const strategicProducts = [
-                { serviceName: '보험(폰교체)', points: parseFloat(document.querySelector('input[label*="보험"]')?.value || 0) },
-                { serviceName: '유플릭스', points: parseFloat(document.querySelector('input[label*="유플릭스"]')?.value || 0) },
-                { serviceName: '통화연결음', points: parseFloat(document.querySelector('input[label*="통화연결음"]')?.value || 0) },
-                { serviceName: '뮤직류', points: parseFloat(document.querySelector('input[label*="뮤직류"]')?.value || 0) }
-              ];
-
-              // 설정 저장
-              await api.saveMonthlyAwardSettings('matrix_criteria', matrixCriteria);
-              await api.saveMonthlyAwardSettings('strategic_products', strategicProducts);
+                await api.saveMonthlyAwardSettings('matrix_criteria', matrixCriteria);
+              } else if (settingsTab === 1) {
+                // 전략상품 포인트 저장
+                const strategicProducts = [
+                  { serviceName: '보험(폰교체)', points: parseFloat(document.querySelector('input[label*="보험"]')?.value || 0) },
+                  { serviceName: '유플릭스', points: parseFloat(document.querySelector('input[label*="유플릭스"]')?.value || 0) },
+                  { serviceName: '통화연결음', points: parseFloat(document.querySelector('input[label*="통화연결음"]')?.value || 0) },
+                  { serviceName: '뮤직류', points: parseFloat(document.querySelector('input[label*="뮤직류"]')?.value || 0) }
+                ];
+                await api.saveMonthlyAwardSettings('strategic_products', strategicProducts);
+              }
               
               alert('설정이 저장되었습니다.');
               setShowSettings(false);

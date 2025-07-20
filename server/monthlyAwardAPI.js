@@ -43,6 +43,8 @@ async function getMonthlyAwardData(req, res) {
     // 디버깅 로그 추가
     console.log('담당자 매핑 테이블 크기:', managerMapping.size);
     console.log('담당자 목록:', Array.from(managerMapping.values()));
+    console.log('매뉴얼데이터 첫 번째 행:', manualData[0]);
+    console.log('매뉴얼데이터 두 번째 행:', manualData[1]);
 
     // 필요한 시트 데이터 로드
     const [
@@ -118,6 +120,17 @@ async function getMonthlyAwardData(req, res) {
       });
     }
 
+    // 기본 전략상품 포인트 (설정이 없을 때 사용)
+    const defaultStrategicProducts = [
+      { serviceName: '보험(폰교체)', points: 2.0 },
+      { serviceName: '유플릭스', points: 1.5 },
+      { serviceName: '통화연결음', points: 1.0 },
+      { serviceName: '뮤직류', points: 1.0 }
+    ];
+
+    // 설정된 값이 없으면 기본값 사용
+    const finalStrategicProducts = strategicProducts.length > 0 ? strategicProducts : defaultStrategicProducts;
+
     // Matrix 기준값 로드 (셋팅에서)
     const matrixCriteria = [];
     if (settingsData && settingsData.length > 1) {
@@ -132,6 +145,44 @@ async function getMonthlyAwardData(req, res) {
         }
       });
     }
+
+    // 기본 Matrix 기준값 (설정이 없을 때 사용)
+    const defaultMatrixCriteria = [
+      // 업셀기변 기준값
+      { score: 6, indicator: 'upsell', percentage: 92.0 },
+      { score: 5, indicator: 'upsell', percentage: 85.0 },
+      { score: 4, indicator: 'upsell', percentage: 78.0 },
+      { score: 3, indicator: 'upsell', percentage: 70.0 },
+      { score: 2, indicator: 'upsell', percentage: 60.0 },
+      { score: 1, indicator: 'upsell', percentage: 50.0 },
+      
+      // 기변105이상 기준값
+      { score: 6, indicator: 'change105', percentage: 88.0 },
+      { score: 5, indicator: 'change105', percentage: 80.0 },
+      { score: 4, indicator: 'change105', percentage: 72.0 },
+      { score: 3, indicator: 'change105', percentage: 64.0 },
+      { score: 2, indicator: 'change105', percentage: 56.0 },
+      { score: 1, indicator: 'change105', percentage: 48.0 },
+      
+      // 전략상품 기준값
+      { score: 6, indicator: 'strategic', percentage: 40.0 },
+      { score: 5, indicator: 'strategic', percentage: 35.0 },
+      { score: 4, indicator: 'strategic', percentage: 30.0 },
+      { score: 3, indicator: 'strategic', percentage: 25.0 },
+      { score: 2, indicator: 'strategic', percentage: 20.0 },
+      { score: 1, indicator: 'strategic', percentage: 15.0 },
+      
+      // 인터넷 비중 기준값
+      { score: 6, indicator: 'internet', percentage: 60.0 },
+      { score: 5, indicator: 'internet', percentage: 55.0 },
+      { score: 4, indicator: 'internet', percentage: 50.0 },
+      { score: 3, indicator: 'internet', percentage: 45.0 },
+      { score: 2, indicator: 'internet', percentage: 40.0 },
+      { score: 1, indicator: 'internet', percentage: 35.0 }
+    ];
+
+    // 설정된 값이 없으면 기본값 사용
+    const finalMatrixCriteria = matrixCriteria.length > 0 ? matrixCriteria : defaultMatrixCriteria;
 
     // 월간시상 계산 함수들
     const calculateUpsellChange = () => {
@@ -279,7 +330,7 @@ async function getMonthlyAwardData(req, res) {
         // 각 항목별 포인트 계산
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            const product = strategicProducts.find(p => p.serviceName === service);
+            const product = finalStrategicProducts.find(p => p.serviceName === service);
             if (product) {
               totalPoints += product.points;
             }
@@ -371,6 +422,11 @@ async function getMonthlyAwardData(req, res) {
     
     // 담당자별 데이터 수집
     const manualRows = manualData.slice(1);
+    console.log('매뉴얼데이터 행 수:', manualRows.length);
+    
+    let matchedCount = 0;
+    let unmatchedStores = new Set();
+    
     manualRows.forEach(row => {
       if (row.length < 90) return;
       
@@ -378,6 +434,7 @@ async function getMonthlyAwardData(req, res) {
       const manager = managerMapping.get(storeName);
       
       if (manager) {
+        matchedCount++;
         if (!agentMap.has(manager)) {
           agentMap.set(manager, {
             name: manager,
@@ -460,7 +517,7 @@ async function getMonthlyAwardData(req, res) {
         let totalPoints = 0;
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            const product = strategicProducts.find(p => p.serviceName === service);
+            const product = finalStrategicProducts.find(p => p.serviceName === service);
             if (product) {
               totalPoints += product.points;
             }
@@ -468,9 +525,15 @@ async function getMonthlyAwardData(req, res) {
         });
         
         agent.strategicProducts.numerator += totalPoints;
+      } else {
+        unmatchedStores.add(storeName);
       }
     });
     
+    // 디버깅 로그 추가
+    console.log('매칭된 담당자 수:', matchedCount);
+    console.log('매칭되지 않은 업체들:', Array.from(unmatchedStores));
+
     // 인터넷 비중은 개통데이터와 홈데이터를 매핑해서 계산해야 하므로 별도 처리
     // 여기서는 간단히 담당자별로 동일한 비율 적용
     const internetRatioValue = internetRatio.percentage;
@@ -502,8 +565,8 @@ async function getMonthlyAwardData(req, res) {
         internetRatio
       },
       totalScore,
-      matrixCriteria,
-      strategicProductsList: strategicProducts,
+      matrixCriteria: finalMatrixCriteria,
+      strategicProductsList: finalStrategicProducts,
       agentDetails: Array.from(agentMap.values())
     };
 
