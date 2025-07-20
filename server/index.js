@@ -3094,8 +3094,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
           const color = (row[6] || '').toString().trim(); // G열: 색상
           const storeName = (row[13] || '').toString().trim(); // N열: 출고처
           
-          // N열 출고처에 값이 있으면 배정완료로 간주
-          if (serialNumber && modelCapacity && color && storeName && storeName.trim() !== '') {
+          // N열 출고처가 비어있는 재고만 사용 가능한 재고로 간주 (아직 배정되지 않은 재고)
+          if (serialNumber && modelCapacity && color && (!storeName || storeName.trim() === '')) {
             const inventoryKey = `${modelCapacity} | ${color}`;
             
             // 같은 모델의 재고를 배열로 저장
@@ -3176,9 +3176,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
         const model = (row[15] || '').toString().trim(); // P열: 모델명
         const capacity = (row[16] || '').toString().trim(); // Q열: 용량
         const color = (row[17] || '').toString().trim(); // R열: 색상
+        const posCode = (row[21] || '').toString().trim(); // V열: POS코드
         const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
         
-        if (reservationNumber && customerName && model && color && capacity) {
+        if (reservationNumber && customerName && model && color && capacity && posCode) {
           // 정규화 규칙 적용
           const originalKey = `${model} ${capacity} ${color}`;
           let normalizedKey = originalKey;
@@ -3201,9 +3202,42 @@ const server = app.listen(port, '0.0.0.0', async () => {
             console.log(`🔍 [서버시작] 행 ${index + 2}: 예약번호="${reservationNumber}", 모델="${model} ${capacity} ${color}", 현재일련번호="${currentSerialNumber}"`);
           }
           
-          const availableSerials = inventoryMap.get(inventoryKey);
+          // POS코드에 해당하는 출고처 찾기
+          let targetStoreName = null;
+          for (const [storeName, storePosCode] of storeToPosCodeMap.entries()) {
+            if (storePosCode === posCode) {
+              targetStoreName = storeName;
+              break;
+            }
+          }
           
-          if (availableSerials && availableSerials.length > 0) {
+          if (!targetStoreName) {
+            noMatchCount++;
+            if (index < 5) {
+              console.log(`❌ [서버시작] 행 ${index + 2}: POS코드 "${posCode}"에 해당하는 출고처 없음`);
+            }
+            return;
+          }
+          
+          // 해당 출고처에 배정된 재고 찾기
+          const availableSerials = [];
+          phoneklInventoryValues.slice(1).forEach(inventoryRow => {
+            if (inventoryRow.length >= 15) {
+              const inventorySerialNumber = (inventoryRow[3] || '').toString().trim(); // D열: 일련번호
+              const inventoryModelCapacity = (inventoryRow[5] || '').toString().trim(); // F열: 모델명&용량
+              const inventoryColor = (inventoryRow[6] || '').toString().trim(); // G열: 색상
+              const inventoryStoreName = (inventoryRow[13] || '').toString().trim(); // N열: 출고처
+              
+              // 해당 출고처에 배정된 재고이고, 모델이 일치하는 경우
+              if (inventorySerialNumber && inventoryModelCapacity && inventoryColor && 
+                  inventoryStoreName === targetStoreName && 
+                  `${inventoryModelCapacity} | ${inventoryColor}` === inventoryKey) {
+                availableSerials.push(inventorySerialNumber);
+              }
+            }
+          });
+          
+          if (availableSerials.length > 0) {
             // 기존 배정 상태 확인
             const existingAssignment = assignmentMemory.get(reservationNumber);
             
