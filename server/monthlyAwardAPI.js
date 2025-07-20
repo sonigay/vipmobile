@@ -416,6 +416,7 @@ async function getMonthlyAwardData(req, res) {
       
       console.log(`\n=== ${manager} 전략상품 계산 시작 ===`);
       console.log(`전략상품 설정:`, finalStrategicProducts);
+      console.log(`전략상품 설정 개수:`, finalStrategicProducts.length);
       
       manualRows.forEach(row => {
         if (row.length < 90) return;
@@ -588,15 +589,22 @@ async function getMonthlyAwardData(req, res) {
           const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
           const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
           
+          console.log(`${manager} 업셀기변 확인: finalPlan="${finalPlan}", beforePlan="${beforePlan}"`);
+          
           const finalPlanInfo = planMapping.get(finalPlan);
           const beforePlanInfo = planMapping.get(beforePlan);
           
           if (finalPlanInfo && beforePlanInfo) {
+            console.log(`${manager} 요금제 정보: final=${finalPlanInfo.group}(${finalPlanInfo.price}), before=${beforePlanInfo.group}(${beforePlanInfo.price})`);
             if (beforePlanInfo.group === '115군' || beforePlanInfo.group === '105군') {
               agent.upsellChange.numerator++;
+              console.log(`${manager} 업셀기변 인정: 115군/105군 조건`);
             } else if (beforePlanInfo.price < finalPlanInfo.price) {
               agent.upsellChange.numerator++;
+              console.log(`${manager} 업셀기변 인정: 가격 상승 조건`);
             }
+          } else {
+            console.log(`${manager} 요금제 정보 없음: finalPlanInfo=${!!finalPlanInfo}, beforePlanInfo=${!!beforePlanInfo}`);
           }
         }
         
@@ -688,7 +696,10 @@ async function getMonthlyAwardData(req, res) {
       
       // 담당자 매칭 확인
       const manager = managerMapping.get(posCode);
-      if (!manager) return;
+      if (!manager) {
+        console.log(`인터넷 비중 - 매칭되지 않은 POS: "${posCode}"`);
+        return;
+      }
       
       // 모수 조건 확인
       if (activation === '선불개통' || !modelName || inputStore === '중고') {

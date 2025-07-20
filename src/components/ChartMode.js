@@ -1133,7 +1133,7 @@ function MonthlyAwardTab() {
         </Collapse>
 
       {/* 상세 데이터 테이블 */}
-      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
