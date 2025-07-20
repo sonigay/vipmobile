@@ -918,6 +918,21 @@ function MonthlyAwardTab() {
     return '⚠️';
   };
 
+  // 점수 계산 함수
+  const calculateScore = (percentage, criteria, maxScore) => {
+    if (!criteria || criteria.length === 0) return 0;
+    
+    // 기준값을 내림차순으로 정렬 (높은 점수부터 확인)
+    const sortedCriteria = [...criteria].sort((a, b) => b.score - a.score);
+    
+    for (let i = 0; i < sortedCriteria.length; i++) {
+      if (percentage >= sortedCriteria[i].percentage) {
+        return sortedCriteria[i].score;
+      }
+    }
+    return 0; // 기준 미달 시 0점
+  };
+
   // 추가 전략상품 핸들러
   const handleAddStrategicProduct = async () => {
     if (!newStrategicProduct.subCategory || !newStrategicProduct.serviceName || newStrategicProduct.points <= 0) {
@@ -1106,7 +1121,7 @@ function MonthlyAwardTab() {
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
                     {getPerformanceIcon(data.indicators.upsellChange.percentage, 92.0)}
-                    {Math.round(data.indicators.upsellChange.percentage / 92.0 * 6)}점
+                    {calculateScore(data.indicators.upsellChange.percentage, data.matrixCriteria?.filter(c => c.indicator === 'upsell') || [], 6)}점
                   </Typography>
                   <Typography variant="body2" color="text.secondary">업셀기변</Typography>
                 </Box>
@@ -1115,7 +1130,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.change105Above.percentage, 88.0)}
-                  {Math.round(data.indicators.change105Above.percentage / 88.0 * 6)}점
+                  {calculateScore(data.indicators.change105Above.percentage, data.matrixCriteria?.filter(c => c.indicator === 'change105') || [], 6)}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
@@ -1124,7 +1139,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.strategicProducts.percentage, 40.0)}
-                  {Math.round(data.indicators.strategicProducts.percentage / 40.0 * 3)}점
+                  {calculateScore(data.indicators.strategicProducts.percentage, data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [], 3)}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
@@ -1133,7 +1148,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.internetRatio.percentage, 60.0)}
-                  {Math.round(data.indicators.internetRatio.percentage / 60.0 * 6)}점
+                  {calculateScore(data.indicators.internetRatio.percentage, data.matrixCriteria?.filter(c => c.indicator === 'internet') || [], 6)}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
@@ -1155,23 +1170,39 @@ function MonthlyAwardTab() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {[6, 5, 4, 3, 2, 1].map((score) => (
-                  <TableRow key={score}>
-                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}%
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}%
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}%
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}%
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {[6, 5, 4, 3, 2, 1].map((score) => {
+                  const upsellCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell');
+                  const change105Criteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105');
+                  const strategicCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic');
+                  const internetCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet');
+                  
+                  const isUpsellAchieved = upsellCriteria && parseFloat(data.indicators.upsellChange.percentage) >= upsellCriteria.percentage;
+                  const isChange105Achieved = change105Criteria && parseFloat(data.indicators.change105Above.percentage) >= change105Criteria.percentage;
+                  const isStrategicAchieved = strategicCriteria && parseFloat(data.indicators.strategicProducts.percentage) >= strategicCriteria.percentage;
+                  const isInternetAchieved = internetCriteria && parseFloat(data.indicators.internetRatio.percentage) >= internetCriteria.percentage;
+                  
+                  return (
+                    <TableRow key={score}>
+                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
+                      <TableCell sx={{ textAlign: 'center', bgcolor: isUpsellAchieved ? '#e8f5e8' : 'transparent' }}>
+                        {upsellCriteria?.percentage || 0}%
+                        {isUpsellAchieved && <span style={{ marginLeft: '8px', color: '#2e7d32' }}>✓</span>}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center', bgcolor: isChange105Achieved ? '#fff3e0' : 'transparent' }}>
+                        {change105Criteria?.percentage || 0}%
+                        {isChange105Achieved && <span style={{ marginLeft: '8px', color: '#f57c00' }}>✓</span>}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center', bgcolor: isStrategicAchieved ? '#f3e5f5' : 'transparent' }}>
+                        {strategicCriteria?.percentage || 0}%
+                        {isStrategicAchieved && <span style={{ marginLeft: '8px', color: '#7b1fa2' }}>✓</span>}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center', bgcolor: isInternetAchieved ? '#fce4ec' : 'transparent' }}>
+                        {internetCriteria?.percentage || 0}%
+                        {isInternetAchieved && <span style={{ marginLeft: '8px', color: '#c2185b' }}>✓</span>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

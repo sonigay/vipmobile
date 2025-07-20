@@ -608,12 +608,13 @@ async function getMonthlyAwardData(req, res) {
       
       // 개통데이터 기준으로 모수 계산
       activationRows.forEach(row => {
-        if (row.length < 38) return;
+        if (row.length < 8) return;
         
         const activation = (row[37] || '').toString().trim(); // AL열: 개통
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
         const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
         const planName = (row[21] || '').toString().trim(); // V열: 요금제
+        const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (폰클개통데이터)
         
         // 모수 조건 확인
         if (activation === '선불개통' || !modelName || inputStore === '중고') {
@@ -626,14 +627,27 @@ async function getMonthlyAwardData(req, res) {
           return;
         }
         
+        // 담당자 매칭 확인 (업체명으로 매칭)
+        const matchedManager = managerMapping.get(companyName);
+        if (matchedManager !== manager) {
+          return; // 해당 담당자가 아닌 경우 제외
+        }
+        
         denominator++;
       });
       
       // 홈데이터 기준으로 자수 계산
       homeRows.forEach(row => {
-        if (row.length < 10) return;
+        if (row.length < 8) return;
         
         const product = (row[9] || '').toString().trim(); // J열: 가입상품
+        const companyName = (row[2] || '').toString().trim(); // C열: 업체명 (폰클홈데이터)
+        
+        // 담당자 매칭 확인 (업체명으로 매칭)
+        const matchedManager = managerMapping.get(companyName);
+        if (matchedManager !== manager) {
+          return; // 해당 담당자가 아닌 경우 제외
+        }
         
         // 자수 조건 확인
         if (product === '인터넷') {
@@ -680,11 +694,11 @@ async function getMonthlyAwardData(req, res) {
       console.log('AM열(38) - 최종요금제:', firstRow[38]);
       console.log('AN열(39) - 최종영업정책:', firstRow[39]);
       console.log('CL열(67) - 모델유형:', firstRow[67]);
-      console.log('CX열(75) - 변경전요금제:', firstRow[75]);
-      console.log('DG열(79) - 뮤직류:', firstRow[79]);
-      console.log('DL열(83) - 보험(폰교체):', firstRow[83]);
-      console.log('DO열(93) - 유플릭스:', firstRow[93]);
-      console.log('DS열(95) - 통화연결음:', firstRow[95]);
+      console.log('CX열(101) - 변경전요금제:', firstRow[101]);
+      console.log('DG열(110) - 뮤직류:', firstRow[110]);
+      console.log('DL열(115) - 보험(폰교체):', firstRow[115]);
+      console.log('DO열(118) - 유플릭스:', firstRow[118]);
+      console.log('DS열(122) - 통화연결음:', firstRow[122]);
       console.log('================================');
       
       // 전략상품 관련 컬럼들을 더 넓게 확인 (70-100 범위)
@@ -1146,13 +1160,49 @@ async function getMonthlyAwardData(req, res) {
       ? (totalInternetRatio.numerator / totalInternetRatio.denominator * 100).toFixed(2) 
       : '0.00';
 
-    // 총점 계산
-    const totalScore = (
-      parseFloat(totalUpsellChange.percentage) +
-      parseFloat(totalChange105Above.percentage) +
-      parseFloat(totalStrategicProducts.percentage) +
-      parseFloat(totalInternetRatio.percentage)
-    ).toFixed(2);
+    // 각 지표별 점수 계산 함수
+    const calculateScore = (percentage, criteria, maxScore) => {
+      for (let i = 0; i < criteria.length; i++) {
+        if (percentage >= criteria[i].percentage) {
+          return criteria[i].score;
+        }
+      }
+      return 0; // 기준 미달 시 0점
+    };
+
+    // 각 지표별 점수 계산
+    const upsellScore = calculateScore(
+      parseFloat(totalUpsellChange.percentage), 
+      finalMatrixCriteria.filter(c => c.indicator === 'upsell'), 
+      6
+    );
+    const change105Score = calculateScore(
+      parseFloat(totalChange105Above.percentage), 
+      finalMatrixCriteria.filter(c => c.indicator === 'change105'), 
+      6
+    );
+    const strategicScore = calculateScore(
+      parseFloat(totalStrategicProducts.percentage), 
+      finalMatrixCriteria.filter(c => c.indicator === 'strategic'), 
+      3
+    );
+    const internetScore = calculateScore(
+      parseFloat(totalInternetRatio.percentage), 
+      finalMatrixCriteria.filter(c => c.indicator === 'internet'), 
+      6
+    );
+
+    // 총점 계산 (각 지표별 점수 합산)
+    const totalScore = (upsellScore + change105Score + strategicScore + internetScore).toFixed(0);
+
+    // 디버깅 로그
+    console.log('점수 계산 결과:', {
+      upsellChange: { percentage: totalUpsellChange.percentage, score: upsellScore },
+      change105Above: { percentage: totalChange105Above.percentage, score: change105Score },
+      strategicProducts: { percentage: totalStrategicProducts.percentage, score: strategicScore },
+      internetRatio: { percentage: totalInternetRatio.percentage, score: internetScore },
+      totalScore
+    });
 
     // 디버깅 로그 추가
     console.log('담당자별 계산 결과:');
