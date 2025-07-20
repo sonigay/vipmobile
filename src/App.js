@@ -751,6 +751,8 @@ function App() {
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
   }, [activationData, isAgentMode, agentTarget]);
 
+  // 로그인 상태 복원
+  useEffect(() => {
     // 로그인 상태 복원
     const savedLoginState = localStorage.getItem('loginState');
     if (savedLoginState) {
