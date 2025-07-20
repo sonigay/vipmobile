@@ -11163,8 +11163,8 @@ app.get('/api/app-updates', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
     
-    // 헤더 제거하고 데이터 반환
-    const dataRows = values.slice(1);
+    // 헤더 2행 제거하고 데이터 반환 (3행부터 시작)
+    const dataRows = values.slice(2);
     
     // 빈 행 제거
     const filteredData = dataRows.filter(row => 
