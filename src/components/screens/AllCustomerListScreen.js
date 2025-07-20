@@ -629,24 +629,24 @@ function AllCustomerListScreen({ loggedInStore }) {
     return () => clearInterval(interval);
   }, [updateCacheStats]);
 
-  // 정규화작업시트 C열 기준 재고 현황 로드
+  // 사무실별 재고 현황 로드
   const loadInventoryStatus = useCallback(async () => {
     setLoadingInventory(true);
     try {
-      console.log('🔍 [재고현황 디버깅] 정규화작업시트 C열 기준 재고 현황 로드 시작');
+      console.log('🔍 [재고현황 디버깅] 사무실별 재고 현황 로드 시작');
       
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/normalized-status`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/office-inventory`);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('📊 [재고현황 디버깅] 재고 현황 데이터:', result);
+        console.log('📊 [재고현황 디버깅] 사무실별 재고 현황 데이터:', result);
         
         if (result.success) {
-          setInventoryStatus(result.data);
+          setInventoryStatus(result);
         }
       }
     } catch (error) {
-      console.error('❌ [재고현황 디버깅] 재고 현황 로드 오류:', error);
+      console.error('❌ [재고현황 디버깅] 사무실별 재고 현황 로드 오류:', error);
     } finally {
       setLoadingInventory(false);
     }
@@ -839,31 +839,101 @@ function AllCustomerListScreen({ loggedInStore }) {
           </Box>
 
                         {/* 사무실별 보유재고 */}
-              {Object.keys(inventoryStatus).length > 0 && (
+              {inventoryStatus.success && inventoryStatus.officeInventory && (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                    사무실별 보유재고
-                  </Typography>
-              {Object.entries(inventoryStatus).map(([officeName, models]) => (
-                <Box key={officeName} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                    {officeName}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {Object.entries(models).map(([model, count]) => (
-                      <Chip
-                        key={`${officeName}-${model}`}
-                        label={`${model}: ${count}대`}
-                        variant="outlined"
-                        size="small"
-                        color="primary"
-                      />
-                    ))}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+                      📱 사무실별 보유재고 현황
+                    </Typography>
+                    {inventoryStatus.lastUpdated && (
+                      <Typography variant="caption" color="text.secondary">
+                        마지막 업데이트: {new Date(inventoryStatus.lastUpdated).toLocaleString()}
+                      </Typography>
+                    )}
+                  </Box>
+                  
+                  {/* 전체 통계 */}
+                  {inventoryStatus.stats && (
+                    <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
+                        📊 전체 통계
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Chip 
+                          label={`총 재고: ${inventoryStatus.stats.totalInventory}대`} 
+                          color="primary" 
+                          variant="outlined"
+                        />
+                        {Object.entries(inventoryStatus.stats.officeStats).map(([office, stats]) => (
+                          <Chip
+                            key={office}
+                            label={`${office}: ${stats.totalInventory}대 (${stats.modelCount}종)`}
+                            color="secondary"
+                            variant="outlined"
+                            size="small"
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                  
+                  {/* 사무실별 상세 재고 */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                    {Object.entries(inventoryStatus.officeInventory).map(([officeName, models]) => {
+                      const totalCount = Object.values(models).reduce((sum, count) => sum + count, 0);
+                      const modelCount = Object.keys(models).length;
+                      
+                      return (
+                        <Card key={officeName} sx={{ p: 2, border: '1px solid #e0e0e0' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#333' }}>
+                              🏢 {officeName}
+                            </Typography>
+                            <Chip 
+                              label={`${totalCount}대 (${modelCount}종)`} 
+                              color="primary" 
+                              size="small"
+                            />
+                          </Box>
+                          
+                          {Object.keys(models).length > 0 ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              {Object.entries(models).map(([model, count]) => (
+                                <Box key={model} sx={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center',
+                                  p: 1,
+                                  bgcolor: count > 0 ? '#e8f5e8' : '#fff3cd',
+                                  borderRadius: 0.5,
+                                  border: '1px solid #ddd'
+                                }}>
+                                  <Typography variant="body2" sx={{ 
+                                    fontWeight: count > 0 ? 'bold' : 'normal',
+                                    color: count > 0 ? '#2e7d32' : '#856404'
+                                  }}>
+                                    📱 {model}
+                                  </Typography>
+                                  <Chip
+                                    label={`${count}대`}
+                                    size="small"
+                                    color={count > 0 ? 'success' : 'warning'}
+                                    variant="filled"
+                                  />
+                                </Box>
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                              보유 재고가 없습니다
+                            </Typography>
+                          )}
+                        </Card>
+                      );
+                    })}
                   </Box>
                 </Box>
-              ))}
-            </Box>
-          )}
+              )}
         </CardContent>
       </Card>
 
