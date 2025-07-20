@@ -1327,10 +1327,10 @@ async function saveMonthlyAwardSettings(req, res) {
         });
     }
 
-    // Google Sheets에 저장
-    await sheets.spreadsheets.values.update({
+    // Google Sheets에 저장 (기존 데이터 유지하고 추가)
+    await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A:Z`,
+      range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A:D`,
       valueInputOption: 'RAW',
       resource: {
         values: sheetData
