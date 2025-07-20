@@ -1486,9 +1486,10 @@ function App() {
     processLogin(modifiedStore);
     
     // 모드 진입 시 업데이트 팝업 표시
-    console.log('handleModeSelect - 모드 진입 시 팝업 표시:', selectedMode);
+    console.log('🔍 [App] handleModeSelect - 모드 진입 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
+    console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     
     // 상태 초기화
     setPendingLoginData(null);
@@ -1566,9 +1567,10 @@ function App() {
     }
     
     // 모드 진입 시 업데이트 팝업 표시
-    console.log('handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
+    console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
+    console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     
     // 모드 선택 팝업 닫기
     setShowModeSelection(false);
@@ -2841,7 +2843,12 @@ function App() {
         }}
       />
       {/* 디버깅용 로그 */}
-      {console.log('AppUpdatePopup props:', { showAppUpdatePopup, currentMode, loggedInStore: loggedInStore?.name })}
+      {console.log('🔍 [App] AppUpdatePopup props:', { 
+        showAppUpdatePopup, 
+        currentMode, 
+        loggedInStore: loggedInStore?.name,
+        hideUntil: currentMode ? localStorage.getItem(`hideUpdate_${currentMode}`) : null
+      })}
     </ThemeProvider>
   );
 }

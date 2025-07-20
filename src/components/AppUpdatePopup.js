@@ -202,19 +202,27 @@ function AppUpdatePopup({
 
   // 초기화
   useEffect(() => {
-    console.log('AppUpdatePopup useEffect:', { open, mode, showHistory });
+    console.log('🔍 [AppUpdatePopup] useEffect 호출:', { open, mode, showHistory });
+    
     if (open && mode) {
-      loadUpdates(showHistory);
-      loadAvailableDates();
-      checkAdmin();
+      console.log('🔍 [AppUpdatePopup] 팝업 열기 시작:', mode);
       
       // 오늘 하루 보지 않기 설정 확인
       const hideUntil = localStorage.getItem(`hideUpdate_${mode}`);
+      console.log('🔍 [AppUpdatePopup] 숨김 설정 확인:', { hideUntil, currentTime: new Date().toISOString() });
+      
       if (hideUntil && new Date() < new Date(hideUntil)) {
-        console.log(`팝업 숨김 설정됨: ${mode} 모드`);
+        console.log(`❌ [AppUpdatePopup] 팝업 숨김 설정됨: ${mode} 모드`);
         onClose();
         return;
       }
+      
+      console.log('✅ [AppUpdatePopup] 팝업 표시 진행');
+      loadUpdates(showHistory);
+      loadAvailableDates();
+      checkAdmin();
+    } else {
+      console.log('❌ [AppUpdatePopup] 팝업 열기 조건 불만족:', { open, mode });
     }
   }, [open, mode, showHistory]);
 
@@ -379,16 +387,33 @@ function AppUpdatePopup({
             )}
           </Box>
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={hideToday}
-                onChange={(e) => setHideToday(e.target.checked)}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={hideToday}
+                  onChange={(e) => setHideToday(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="오늘 하루 보지 않기"
+            />
+            
+            {/* 개발자용: localStorage 초기화 버튼 */}
+            {process.env.NODE_ENV === 'development' && (
+              <Button
+                variant="outlined"
                 size="small"
-              />
-            }
-            label="오늘 하루 보지 않기"
-          />
+                onClick={() => {
+                  localStorage.removeItem(`hideUpdate_${mode}`);
+                  alert(`${mode} 모드의 숨김 설정이 초기화되었습니다.`);
+                }}
+                sx={{ fontSize: '0.7rem', height: '24px' }}
+              >
+                숨김 설정 초기화
+              </Button>
+            )}
+          </Box>
         </Box>
 
         <Divider sx={{ my: 2 }} />

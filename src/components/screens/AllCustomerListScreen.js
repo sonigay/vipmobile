@@ -897,32 +897,38 @@ function AllCustomerListScreen({ loggedInStore }) {
                   )}
                   
                                     {/* 사무실별 간결한 재고 현황 */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 1.5 }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
                     {Object.entries(inventoryStatus.officeInventory).map(([officeName, models]) => {
                       const totalCount = Object.values(models).reduce((sum, count) => sum + count, 0);
                       const modelCount = Object.keys(models).length;
                       
                       return (
                         <Card key={officeName} sx={{ 
-                          p: 1.5, 
+                          p: 2, 
                           border: '1px solid #e0e0e0',
-                          minHeight: '120px',
+                          minHeight: '160px',
                           display: 'flex',
-                          flexDirection: 'column'
+                          flexDirection: 'column',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          '&:hover': {
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            transform: 'translateY(-2px)',
+                            transition: 'all 0.2s ease'
+                          }
                         }}>
                           {/* 사무실 헤더 */}
                           <Box sx={{ 
                             display: 'flex', 
                             justifyContent: 'space-between', 
                             alignItems: 'center', 
-                            mb: 1,
-                            pb: 0.5,
-                            borderBottom: '1px solid #f0f0f0'
+                            mb: 1.5,
+                            pb: 1,
+                            borderBottom: '2px solid #f0f0f0'
                           }}>
-                            <Typography variant="subtitle2" sx={{ 
+                            <Typography variant="subtitle1" sx={{ 
                               fontWeight: 'bold', 
                               color: '#333',
-                              fontSize: '0.85rem'
+                              fontSize: '1rem'
                             }}>
                               🏢 {officeName}
                             </Typography>
@@ -930,12 +936,16 @@ function AllCustomerListScreen({ loggedInStore }) {
                               label={`${totalCount}대`} 
                               color="primary" 
                               size="small"
-                              sx={{ fontSize: '0.7rem', height: '20px' }}
+                              sx={{ 
+                                fontSize: '0.8rem', 
+                                height: '24px',
+                                fontWeight: 'bold'
+                              }}
                             />
                           </Box>
                           
                           {Object.keys(models).length > 0 ? (
-                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                               {(() => {
                                 // 모델명용량별로 그룹화 및 정렬
                                 const groupedModels = {};
@@ -956,21 +966,21 @@ function AllCustomerListScreen({ loggedInStore }) {
                                   return (
                                     <Box key={modelCapacity} sx={{ 
                                       border: '1px solid #e8e8e8',
-                                      borderRadius: 1,
-                                      p: 0.5,
+                                      borderRadius: 1.5,
+                                      p: 1,
                                       bgcolor: '#fafafa'
                                     }}>
-                                      <Typography variant="caption" sx={{ 
+                                      <Typography variant="body2" sx={{ 
                                         fontWeight: 'bold',
                                         color: '#555',
-                                        fontSize: '0.7rem',
+                                        fontSize: '0.85rem',
                                         display: 'block',
-                                        mb: 0.5
+                                        mb: 0.8
                                       }}>
                                         📱 {modelCapacity}
                                       </Typography>
                                       
-                                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                         {colorItems.slice(0, 2).map(({ color, count }) => {
                                           const getColorStyle = (colorName) => {
                                             const colorLower = colorName.toLowerCase();
@@ -997,33 +1007,53 @@ function AllCustomerListScreen({ loggedInStore }) {
                                           const isAvailable = count > 0;
                                           
                                           return (
-                                            <Chip
-                                              key={color}
-                                              label={`${color} ${count}대`}
-                                              size="small"
-                                              sx={{
-                                                bgcolor: isAvailable ? colorStyle.bg : '#f0f0f0',
-                                                color: isAvailable ? colorStyle.text : '#999',
-                                                fontSize: '0.65rem',
-                                                height: '18px',
-                                                '& .MuiChip-label': {
-                                                  px: 0.5
-                                                }
-                                              }}
-                                            />
+                                            <Box key={color} sx={{
+                                              display: 'flex',
+                                              justifyContent: 'space-between',
+                                              alignItems: 'center',
+                                              p: 0.5,
+                                              bgcolor: isAvailable ? colorStyle.bg : '#f8f8f8',
+                                              borderRadius: 0.5,
+                                              border: `1px solid ${isAvailable ? colorStyle.text + '30' : '#e0e0e0'}`
+                                            }}>
+                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                <Box sx={{ 
+                                                  width: 8, 
+                                                  height: 8, 
+                                                  borderRadius: '50%',
+                                                  bgcolor: isAvailable ? colorStyle.text : '#ccc'
+                                                }} />
+                                                <Typography variant="body2" sx={{ 
+                                                  fontWeight: 'medium',
+                                                  color: isAvailable ? colorStyle.text : '#999',
+                                                  fontSize: '0.75rem'
+                                                }}>
+                                                  {color}
+                                                </Typography>
+                                              </Box>
+                                              <Chip
+                                                label={`${count}대`}
+                                                size="small"
+                                                sx={{
+                                                  bgcolor: isAvailable ? colorStyle.text : '#ccc',
+                                                  color: isAvailable ? colorStyle.bg : '#fff',
+                                                  fontSize: '0.7rem',
+                                                  height: '20px',
+                                                  fontWeight: 'bold'
+                                                }}
+                                              />
+                                            </Box>
                                           );
                                         })}
                                         {colorItems.length > 2 && (
-                                          <Chip
-                                            label={`+${colorItems.length - 2}종`}
-                                            size="small"
-                                            sx={{
-                                              bgcolor: '#e0e0e0',
-                                              color: '#666',
-                                              fontSize: '0.65rem',
-                                              height: '18px'
-                                            }}
-                                          />
+                                          <Typography variant="caption" sx={{ 
+                                            color: '#666',
+                                            textAlign: 'center',
+                                            mt: 0.5,
+                                            fontSize: '0.7rem'
+                                          }}>
+                                            +{colorItems.length - 2}개 색상 더...
+                                          </Typography>
                                         )}
                                       </Box>
                                     </Box>
@@ -1047,8 +1077,9 @@ function AllCustomerListScreen({ loggedInStore }) {
                                     <Typography variant="caption" sx={{ 
                                       color: '#666',
                                       textAlign: 'center',
-                                      mt: 0.5,
-                                      fontSize: '0.65rem'
+                                      mt: 1,
+                                      fontSize: '0.75rem',
+                                      fontStyle: 'italic'
                                     }}>
                                       외 {modelCount - 3}개 모델 더...
                                     </Typography>
@@ -1058,10 +1089,10 @@ function AllCustomerListScreen({ loggedInStore }) {
                               })()}
                             </Box>
                           ) : (
-                            <Typography variant="caption" color="text.secondary" sx={{ 
+                            <Typography variant="body2" color="text.secondary" sx={{ 
                               textAlign: 'center', 
-                              py: 1,
-                              fontSize: '0.7rem'
+                              py: 2,
+                              fontSize: '0.8rem'
                             }}>
                               보유 재고 없음
                             </Typography>
