@@ -581,14 +581,28 @@ async function getMonthlyAwardData(req, res) {
     console.log('매칭된 담당자 수:', matchedCount);
     console.log('매칭되지 않은 업체들:', Array.from(unmatchedStores));
 
-    // 인터넷 비중은 개통데이터와 홈데이터를 매핑해서 계산해야 하므로 별도 처리
-    // 여기서는 간단히 담당자별로 동일한 비율 적용
-    const internetRatioValue = internetRatio.percentage;
+    // 담당자별 percentage 계산
     agentMap.forEach(agent => {
+      // 업셀기변 percentage 계산
+      agent.upsellChange.percentage = agent.upsellChange.denominator > 0 
+        ? (agent.upsellChange.numerator / agent.upsellChange.denominator * 100).toFixed(2) 
+        : '0.00';
+      
+      // 기변105이상 percentage 계산
+      agent.change105Above.percentage = agent.change105Above.denominator > 0 
+        ? (agent.change105Above.numerator / agent.change105Above.denominator * 100).toFixed(2) 
+        : '0.00';
+      
+      // 전략상품 percentage 계산
+      agent.strategicProducts.percentage = agent.strategicProducts.denominator > 0 
+        ? (agent.strategicProducts.numerator / agent.strategicProducts.denominator * 100).toFixed(2) 
+        : '0.00';
+      
+      // 인터넷 비중은 전체 비율 적용
       agent.internetRatio = {
         numerator: 0,
         denominator: 0,
-        percentage: internetRatioValue
+        percentage: internetRatio.percentage
       };
     });
 

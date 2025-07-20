@@ -1095,7 +1095,7 @@ function MonthlyAwardTab() {
         </Box>
 
         {/* Matrix 테이블 */}
-        <Collapse in={!isExpanded}>
+        <Collapse in={isExpanded}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -1166,31 +1166,33 @@ function MonthlyAwardTab() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.agentDetails?.map((agent, index) => (
-                  <TableRow key={index}>
-                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{agent.name}</TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {agent.upsellChange.denominator > 0 
-                        ? (agent.upsellChange.numerator / agent.upsellChange.denominator * 100).toFixed(2)
-                        : '0.00'}%
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {agent.change105Above.denominator > 0 
-                        ? (agent.change105Above.numerator / agent.change105Above.denominator * 100).toFixed(2)
-                        : '0.00'}%
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {agent.strategicProducts.denominator > 0 
-                        ? (agent.strategicProducts.numerator / agent.strategicProducts.denominator * 100).toFixed(2)
-                        : '0.00'}%
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {agent.internetRatio.denominator > 0 
-                        ? (agent.internetRatio.numerator / agent.internetRatio.denominator * 100).toFixed(2)
-                        : '0.00'}%
+                {data.agentDetails && data.agentDetails.length > 0 ? (
+                  data.agentDetails.map((agent, index) => (
+                    <TableRow key={index}>
+                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{agent.name}</TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
+                        {agent.upsellChange.percentage}%
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
+                        {agent.change105Above.percentage}%
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
+                        {agent.strategicProducts.percentage}%
+                      </TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
+                        {agent.internetRatio.percentage}%
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        담당자 데이터가 없습니다. 업체 매핑을 확인해주세요.
+                      </Typography>
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </TableContainer>
