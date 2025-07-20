@@ -665,6 +665,17 @@ async function getMonthlyAwardData(req, res) {
         const callTone = (row[95] || '').toString().trim(); // DS열: 통화연결음
         const music = (row[79] || '').toString().trim(); // DG열: 뮤직류
         
+        // 첫 번째 담당자의 첫 번째 행에서만 전체 컬럼 정보 출력
+        if (manager === Array.from(agentMap.keys())[0] && manualRows.indexOf(row) === 0) {
+          console.log('=== 전략상품 컬럼 디버깅 ===');
+          console.log('전체 행 길이:', row.length);
+          console.log('DL열(83):', row[83], '타입:', typeof row[83]);
+          console.log('DO열(93):', row[93], '타입:', typeof row[93]);
+          console.log('DS열(95):', row[95], '타입:', typeof row[95]);
+          console.log('DG열(79):', row[79], '타입:', typeof row[79]);
+          console.log('========================');
+        }
+        
         let totalPoints = 0;
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
