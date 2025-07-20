@@ -3038,6 +3038,29 @@ const server = app.listen(port, '0.0.0.0', async () => {
       const reservationSiteValues = await getSheetValues('사전예약사이트');
       console.log(`🔍 [서버시작] 사전예약사이트 로드 완료: ${reservationSiteValues ? reservationSiteValues.length : 0}개 행`);
       
+      // 정규화 규칙 로드
+      const normalizationValues = await getSheetValues('정규화작업');
+      console.log(`🔍 [서버시작] 정규화작업 로드 완료: ${normalizationValues ? normalizationValues.length : 0}개 행`);
+      
+      // 정규화 규칙 생성
+      const normalizationRules = new Map();
+      if (normalizationValues && normalizationValues.length > 1) {
+        normalizationValues.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const reservationSite = (row[1] || '').toString().trim(); // C열: 사전예약사이트 형식
+            const phoneklModel = (row[2] || '').toString().trim(); // D열: 폰클
+            const phoneklColor = (row[3] || '').toString().trim(); // E열: 색상
+            
+            if (reservationSite && phoneklModel && phoneklColor) {
+              // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
+              const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
+              normalizationRules.set(key, { phoneklModel, phoneklColor });
+            }
+          }
+        });
+        console.log(`🔧 [서버시작] 정규화 규칙 로드 완료: ${normalizationRules.size}개 규칙`);
+      }
+      
       if (!phoneklInventoryValues || !reservationSiteValues) {
         throw new Error('시트 데이터를 가져올 수 없습니다.');
       }
@@ -3142,7 +3165,22 @@ const server = app.listen(port, '0.0.0.0', async () => {
         const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
         
         if (reservationNumber && customerName && model && color && capacity) {
-          const inventoryKey = `${model} ${capacity} ${color}`;
+          // 정규화 규칙 적용
+          const originalKey = `${model} ${capacity} ${color}`;
+          let normalizedKey = originalKey;
+          
+          // 정규화 규칙에서 매칭되는 키 찾기
+          for (const [ruleKey, ruleValue] of normalizationRules.entries()) {
+            if (originalKey.includes(ruleKey) || ruleKey.includes(originalKey)) {
+              normalizedKey = `${ruleValue.phoneklModel} | ${ruleValue.phoneklColor}`;
+              if (index < 5) {
+                console.log(`🔧 [서버시작] 정규화 적용: "${originalKey}" → "${normalizedKey}"`);
+              }
+              break;
+            }
+          }
+          
+          const inventoryKey = normalizedKey;
           
           // 처음 5개 행은 상세 로그
           if (index < 5) {
