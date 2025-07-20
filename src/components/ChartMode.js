@@ -1089,63 +1089,64 @@ function MonthlyAwardTab() {
         </Box>
 
         {/* Matrix 테이블 */}
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>점수</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {[6, 5, 4, 3, 2, 1].map((score) => (
-                <TableRow key={score}>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
-                  <TableCell 
-                    sx={{ 
-                      textAlign: 'center',
-                      backgroundColor: getMatrixCellColor(score, data.indicators.upsellChange.percentage)
-                    }}
-                  >
-                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
-                  </TableCell>
-                  <TableCell 
-                    sx={{ 
-                      textAlign: 'center',
-                      backgroundColor: getMatrixCellColor(score, data.indicators.change105Above.percentage)
-                    }}
-                  >
-                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
-                  </TableCell>
-                  <TableCell 
-                    sx={{ 
-                      textAlign: 'center',
-                      backgroundColor: getMatrixCellColor(score, data.indicators.strategicProducts.percentage)
-                    }}
-                  >
-                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
-                  </TableCell>
-                  <TableCell 
-                    sx={{ 
-                      textAlign: 'center',
-                      backgroundColor: getMatrixCellColor(score, data.indicators.internetRatio.percentage)
-                    }}
-                  >
-                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
-                  </TableCell>
+        <Collapse in={!isExpanded}>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>점수</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {[6, 5, 4, 3, 2, 1].map((score) => (
+                  <TableRow key={score}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
+                    <TableCell 
+                      sx={{ 
+                        textAlign: 'center',
+                        backgroundColor: getMatrixCellColor(score, data.indicators.upsellChange.percentage)
+                      }}
+                    >
+                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}%
+                    </TableCell>
+                    <TableCell 
+                      sx={{ 
+                        textAlign: 'center',
+                        backgroundColor: getMatrixCellColor(score, data.indicators.change105Above.percentage)
+                      }}
+                    >
+                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}%
+                    </TableCell>
+                    <TableCell 
+                      sx={{ 
+                        textAlign: 'center',
+                        backgroundColor: getMatrixCellColor(score, data.indicators.strategicProducts.percentage)
+                      }}
+                    >
+                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}%
+                    </TableCell>
+                    <TableCell 
+                      sx={{ 
+                        textAlign: 'center',
+                        backgroundColor: getMatrixCellColor(score, data.indicators.internetRatio.percentage)
+                      }}
+                    >
+                      {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Collapse>
       </Paper>
 
       {/* 상세 데이터 테이블 */}
-      <Collapse in={!isExpanded}>
-        <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -1187,37 +1188,153 @@ function MonthlyAwardTab() {
             </Table>
           </TableContainer>
         </Paper>
-      </Collapse>
 
       {/* 셋팅 다이얼로그 */}
-      <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="md" fullWidth>
+      <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="lg" fullWidth>
         <DialogTitle>월간시상 셋팅</DialogTitle>
         <DialogContent>
           <Typography variant="h6" sx={{ mb: 2 }}>Matrix 기준값 설정</Typography>
-          <Grid container spacing={2}>
+          
+          {/* 업셀기변 기준값 */}
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#2e7d32' }}>업셀기변 기준값</Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
             {[6, 5, 4, 3, 2, 1].map((score) => (
-              <Grid item xs={12} md={6} key={score}>
+              <Grid item xs={12} md={4} key={`upsell-${score}`}>
                 <TextField
                   fullWidth
                   label={`${score}점 기준 (%)`}
                   type="number"
-                  defaultValue={data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}
+                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}
                   inputProps={{ min: 0, max: 100, step: 0.1 }}
+                  sx={{ mb: 1 }}
                 />
               </Grid>
             ))}
+          </Grid>
+
+          {/* 기변105이상 기준값 */}
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#f57c00' }}>기변105이상 기준값</Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {[6, 5, 4, 3, 2, 1].map((score) => (
+              <Grid item xs={12} md={4} key={`change105-${score}`}>
+                <TextField
+                  fullWidth
+                  label={`${score}점 기준 (%)`}
+                  type="number"
+                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                  sx={{ mb: 1 }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* 전략상품 기준값 */}
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#7b1fa2' }}>전략상품 기준값</Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {[6, 5, 4, 3, 2, 1].map((score) => (
+              <Grid item xs={12} md={4} key={`strategic-${score}`}>
+                <TextField
+                  fullWidth
+                  label={`${score}점 기준 (%)`}
+                  type="number"
+                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                  sx={{ mb: 1 }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* 인터넷 비중 기준값 */}
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#c2185b' }}>인터넷 비중 기준값</Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {[6, 5, 4, 3, 2, 1].map((score) => (
+              <Grid item xs={12} md={4} key={`internet-${score}`}>
+                <TextField
+                  fullWidth
+                  label={`${score}점 기준 (%)`}
+                  type="number"
+                  defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                  sx={{ mb: 1 }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* 전략상품 포인트 설정 */}
+          <Typography variant="h6" sx={{ mb: 2, mt: 4 }}>전략상품 포인트 설정</Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="보험(폰교체) 포인트"
+                type="number"
+                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '보험(폰교체)')?.points || 0}
+                inputProps={{ min: 0, step: 0.1 }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="유플릭스 포인트"
+                type="number"
+                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '유플릭스')?.points || 0}
+                inputProps={{ min: 0, step: 0.1 }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="통화연결음 포인트"
+                type="number"
+                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '통화연결음')?.points || 0}
+                inputProps={{ min: 0, step: 0.1 }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="뮤직류 포인트"
+                type="number"
+                defaultValue={data.strategicProductsList?.find(p => p.serviceName === '뮤직류')?.points || 0}
+                inputProps={{ min: 0, step: 0.1 }}
+              />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowSettings(false)}>취소</Button>
           <Button onClick={async () => {
             try {
-              const matrixCriteria = [6, 5, 4, 3, 2, 1].map(score => ({
-                score,
-                percentage: parseFloat(document.querySelector(`input[type="number"][label*="${score}점"]`)?.value || 0)
-              }));
-              
+              // Matrix 기준값 수집
+              const matrixCriteria = [];
+              ['upsell', 'change105', 'strategic', 'internet'].forEach(indicator => {
+                [6, 5, 4, 3, 2, 1].forEach(score => {
+                  const input = document.querySelector(`input[type="number"][key*="${indicator}-${score}"]`);
+                  if (input) {
+                    matrixCriteria.push({
+                      score,
+                      indicator,
+                      percentage: parseFloat(input.value || 0)
+                    });
+                  }
+                });
+              });
+
+              // 전략상품 포인트 수집
+              const strategicProducts = [
+                { serviceName: '보험(폰교체)', points: parseFloat(document.querySelector('input[label*="보험"]')?.value || 0) },
+                { serviceName: '유플릭스', points: parseFloat(document.querySelector('input[label*="유플릭스"]')?.value || 0) },
+                { serviceName: '통화연결음', points: parseFloat(document.querySelector('input[label*="통화연결음"]')?.value || 0) },
+                { serviceName: '뮤직류', points: parseFloat(document.querySelector('input[label*="뮤직류"]')?.value || 0) }
+              ];
+
+              // 설정 저장
               await api.saveMonthlyAwardSettings('matrix_criteria', matrixCriteria);
+              await api.saveMonthlyAwardSettings('strategic_products', strategicProducts);
+              
               alert('설정이 저장되었습니다.');
               setShowSettings(false);
               // 데이터 다시 로드
