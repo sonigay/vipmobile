@@ -195,6 +195,9 @@ async function getMonthlyAwardData(req, res) {
         }
       }
     });
+    
+    console.log('요금제 매핑 테이블 크기:', planMapping.size);
+    console.log('요금제 매핑 예시:', Array.from(planMapping.entries()).slice(0, 5));
 
     // 전략상품 리스트 로드 (셋팅에서)
     const strategicProducts = [];
@@ -222,6 +225,9 @@ async function getMonthlyAwardData(req, res) {
 
     // 설정된 값이 없으면 기본값 사용
     const finalStrategicProducts = strategicProducts.length > 0 ? strategicProducts : defaultStrategicProducts;
+    
+    console.log('전략상품 설정 개수:', finalStrategicProducts.length);
+    console.log('전략상품 설정:', finalStrategicProducts);
 
     // Matrix 기준값 로드 (셋팅에서)
     const matrixCriteria = [];
@@ -589,22 +595,33 @@ async function getMonthlyAwardData(req, res) {
           const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
           const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
           
-          console.log(`${manager} 업셀기변 확인: finalPlan="${finalPlan}", beforePlan="${beforePlan}"`);
+          // 첫 번째 담당자만 로그 출력 (너무 많은 로그 방지)
+          if (manager === Array.from(agentMap.keys())[0]) {
+            console.log(`${manager} 업셀기변 확인: finalPlan="${finalPlan}", beforePlan="${beforePlan}"`);
+          }
           
           const finalPlanInfo = planMapping.get(finalPlan);
           const beforePlanInfo = planMapping.get(beforePlan);
           
           if (finalPlanInfo && beforePlanInfo) {
-            console.log(`${manager} 요금제 정보: final=${finalPlanInfo.group}(${finalPlanInfo.price}), before=${beforePlanInfo.group}(${beforePlanInfo.price})`);
+            if (manager === Array.from(agentMap.keys())[0]) {
+              console.log(`${manager} 요금제 정보: final=${finalPlanInfo.group}(${finalPlanInfo.price}), before=${beforePlanInfo.group}(${beforePlanInfo.price})`);
+            }
             if (beforePlanInfo.group === '115군' || beforePlanInfo.group === '105군') {
               agent.upsellChange.numerator++;
-              console.log(`${manager} 업셀기변 인정: 115군/105군 조건`);
+              if (manager === Array.from(agentMap.keys())[0]) {
+                console.log(`${manager} 업셀기변 인정: 115군/105군 조건`);
+              }
             } else if (beforePlanInfo.price < finalPlanInfo.price) {
               agent.upsellChange.numerator++;
-              console.log(`${manager} 업셀기변 인정: 가격 상승 조건`);
+              if (manager === Array.from(agentMap.keys())[0]) {
+                console.log(`${manager} 업셀기변 인정: 가격 상승 조건`);
+              }
             }
           } else {
-            console.log(`${manager} 요금제 정보 없음: finalPlanInfo=${!!finalPlanInfo}, beforePlanInfo=${!!beforePlanInfo}`);
+            if (manager === Array.from(agentMap.keys())[0]) {
+              console.log(`${manager} 요금제 정보 없음: finalPlanInfo=${!!finalPlanInfo}, beforePlanInfo=${!!beforePlanInfo}`);
+            }
           }
         }
         
@@ -647,7 +664,10 @@ async function getMonthlyAwardData(req, res) {
         let totalPoints = 0;
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            console.log(`${manager} 전략상품 확인: "${service}"`);
+            // 첫 번째 담당자만 로그 출력 (너무 많은 로그 방지)
+            if (manager === Array.from(agentMap.keys())[0]) {
+              console.log(`${manager} 전략상품 확인: "${service}"`);
+            }
             // 1. 부가서비스명으로 정확히 매칭
             let product = finalStrategicProducts.find(p => p.serviceName === service);
             
@@ -658,9 +678,13 @@ async function getMonthlyAwardData(req, res) {
             
             if (product) {
               totalPoints += product.points;
-              console.log(`${manager} 전략상품 매칭: ${service} -> ${product.points}점`);
+              if (manager === Array.from(agentMap.keys())[0]) {
+                console.log(`${manager} 전략상품 매칭: ${service} -> ${product.points}점`);
+              }
             } else {
-              console.log(`${manager} 전략상품 매칭 실패: "${service}"`);
+              if (manager === Array.from(agentMap.keys())[0]) {
+                console.log(`${manager} 전략상품 매칭 실패: "${service}"`);
+              }
             }
           }
         });
@@ -687,6 +711,25 @@ async function getMonthlyAwardData(req, res) {
     const activationRows = activationData.slice(1);
     const homeRows = homeData.slice(1);
     
+    // 개통데이터/홈데이터의 업체명을 폰클출고처데이터와 매칭하기 위한 매핑 생성
+    const companyNameMapping = new Map();
+    storeRows.forEach(row => {
+      if (row.length >= 14) {
+        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+        const companyName = (row[2] || '').toString().trim(); // C열: 출고처 업체명
+        const manager = (row[13] || '').toString().trim(); // N열: 담당자
+        const status = (row[4] || '').toString().trim(); // E열: 상태
+        
+        if (companyName && manager && status !== '미사용') {
+          const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
+          companyNameMapping.set(companyName, cleanManager);
+        }
+      }
+    });
+    
+    console.log('업체명 매핑 테이블 크기:', companyNameMapping.size);
+    console.log('업체명 매핑 예시:', Array.from(companyNameMapping.entries()).slice(0, 5));
+    
     // 개통데이터에서 담당자별 모수 계산
     activationRows.forEach(row => {
       if (row.length < 38) return;
@@ -695,12 +738,15 @@ async function getMonthlyAwardData(req, res) {
       const modelName = (row[13] || '').toString().trim(); // N열: 모델명
       const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
       const planName = (row[21] || '').toString().trim(); // V열: 요금제
-      const posCode = (row[6] || '').toString().trim(); // G열: 실판매POS 코드 (개통데이터는 G열)
+      const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (개통데이터는 G열)
       
-      // 담당자 매칭 확인
-      const manager = managerMapping.get(posCode);
+      // 담당자 매칭 확인 (업체명으로 매칭)
+      const manager = companyNameMapping.get(companyName);
       if (!manager) {
-        console.log(`인터넷 비중 - 매칭되지 않은 POS: "${posCode}"`);
+        // 첫 번째 업체만 로그 출력 (너무 많은 로그 방지)
+        if (!companyNameMapping.has(companyName)) {
+          console.log(`인터넷 비중 - 매칭되지 않은 업체명: "${companyName}"`);
+        }
         return;
       }
       
@@ -726,10 +772,10 @@ async function getMonthlyAwardData(req, res) {
       if (row.length < 10) return;
       
       const product = (row[9] || '').toString().trim(); // J열: 가입상품
-      const posCode = (row[6] || '').toString().trim(); // G열: 실판매POS 코드 (홈데이터도 G열)
+      const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (홈데이터도 G열)
       
-      // 담당자 매칭 확인
-      const manager = managerMapping.get(posCode);
+      // 담당자 매칭 확인 (업체명으로 매칭)
+      const manager = companyNameMapping.get(companyName);
       if (!manager) return;
       
       // 자수 조건 확인
