@@ -122,7 +122,7 @@ setInterval(async () => {
   try {
     console.log('🔄 [자동배정저장] 주기적 배정 저장 시작');
     
-    // 현재 배정 상태 가져오기
+    // 폰클재고데이터 기준으로 현재 배정 상태 가져오기
     const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
     
     if (response.ok) {
@@ -3014,17 +3014,17 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작');
     try {
-      // 직접 배정 상태 데이터 가져오기
-      const inventoryValues = await getSheetValues('재고관리');
+      // 폰클재고데이터를 기준으로 배정 상태 데이터 가져오기
+      const phoneklInventoryValues = await getSheetValues('폰클재고데이터');
       const reservationSiteValues = await getSheetValues('사전예약사이트');
       
-      if (!inventoryValues || !reservationSiteValues) {
+      if (!phoneklInventoryValues || !reservationSiteValues) {
         throw new Error('시트 데이터를 가져올 수 없습니다.');
       }
       
-      // 재고 데이터 처리
+      // 폰클재고데이터 처리 (사용 가능한 재고 - 정상 상태인 재고)
       const inventoryMap = new Map();
-      inventoryValues.slice(1).forEach(row => {
+      phoneklInventoryValues.slice(1).forEach(row => {
         if (row.length >= 8) {
           const model = (row[1] || '').toString().trim(); // B열: 모델명
           const color = (row[2] || '').toString().trim(); // C열: 색상
@@ -3037,7 +3037,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
             const normalizedModel = normalizeModelName(model);
             const inventoryKey = `${normalizedModel}|${color}|${capacity}|${posCode}`;
             
-            if (status === '배정완료') {
+            // 정상 상태이거나 배정완료 상태인 재고를 사용 가능한 재고로 간주
+            if (status === '정상' || status === '배정완료') {
               inventoryMap.set(inventoryKey, serialNumber);
             }
           }
