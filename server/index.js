@@ -3206,17 +3206,40 @@ const server = app.listen(port, '0.0.0.0', async () => {
             if (currentSerialNumber !== assignedSerialNumber) {
               // 기존에 배정된 적이 없거나, 다른 일련번호로 배정된 경우에만 업데이트
               if (!existingAssignment || existingAssignment.serialNumber !== assignedSerialNumber) {
-                row[6] = assignedSerialNumber; // G열 업데이트
-                updatedCount++;
-                
-                if (index < 5) {
-                  console.log(`✅ [서버시작] 행 ${index + 2}: 일련번호 업데이트 "${currentSerialNumber}" → "${assignedSerialNumber}" (새로운 배정)`);
+                // 중복 배정 체크: 같은 일련번호가 이미 다른 고객에게 배정되었는지 확인
+                let isDuplicate = false;
+                for (let i = 0; i < index; i++) {
+                  const prevRow = reservationSiteValues[i + 1];
+                  if (prevRow && prevRow.length >= 22) {
+                    const prevSerial = (prevRow[6] || '').toString().trim();
+                    if (prevSerial === assignedSerialNumber) {
+                      isDuplicate = true;
+                      if (index < 5) {
+                        console.log(`⚠️ [서버시작] 행 ${index + 2}: 일련번호 "${assignedSerialNumber}" 중복 배정 감지 (이미 행 ${i + 2}에 배정됨)`);
+                      }
+                      break;
+                    }
+                  }
                 }
                 
-                assignments.push({
-                  reservationNumber,
-                  assignedSerialNumber
-                });
+                if (!isDuplicate) {
+                  row[6] = assignedSerialNumber; // G열 업데이트
+                  updatedCount++;
+                  
+                  if (index < 5) {
+                    console.log(`✅ [서버시작] 행 ${index + 2}: 일련번호 업데이트 "${currentSerialNumber}" → "${assignedSerialNumber}" (새로운 배정)`);
+                  }
+                  
+                  assignments.push({
+                    reservationNumber,
+                    assignedSerialNumber
+                  });
+                } else {
+                  noMatchCount++;
+                  if (index < 5) {
+                    console.log(`❌ [서버시작] 행 ${index + 2}: 중복 배정으로 인한 매칭 실패 "${inventoryKey}"`);
+                  }
+                }
               } else {
                 skippedCount++;
                 if (index < 5) {
