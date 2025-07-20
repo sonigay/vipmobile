@@ -31,7 +31,7 @@ import MeetingMode from './components/MeetingMode';
 import ReservationMode from './components/ReservationMode';
 
 
-import UpdateProgressScreen from './components/UpdateProgressScreen';
+
 import AppUpdatePopup from './components/AppUpdatePopup';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
 // 모바일 최적화 관련 import 제거 (재고 모드로 이동)
@@ -171,8 +171,7 @@ function App() {
   const [modeSelectionRequired, setModeSelectionRequired] = useState(false);
   
   // 업데이트 관련 상태
-  const [showUpdateProgress, setShowUpdateProgress] = useState(false);
-  const [isUpdateInProgress, setIsUpdateInProgress] = useState(false);
+
   const [showAppUpdatePopup, setShowAppUpdatePopup] = useState(false);
   const [currentMode, setCurrentMode] = useState('');
   
@@ -2813,10 +2812,7 @@ function App() {
         userName={pendingLoginData?.target || '사용자'}
       />
 
-      {/* 업데이트 진행 화면 */}
-      {showUpdateProgress && (
-        <UpdateProgressScreen onUpdateComplete={handleUpdateComplete} />
-      )}
+
 
       {/* 모드별 업데이트 팝업 */}
       <AppUpdatePopup
