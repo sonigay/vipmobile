@@ -907,31 +907,31 @@ function MonthlyAwardTab() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
                 <Typography variant="body2" color="text.secondary">총점</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e8f5e8', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
                 <Typography variant="body2" color="text.secondary">업셀기변</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fff3e0', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#f3e5f5', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fce4ec', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
@@ -946,31 +946,31 @@ function MonthlyAwardTab() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e3f2fd', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>5점</Typography>
                 <Typography variant="body2" color="text.secondary">총점</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#e8f5e8', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>1점</Typography>
                 <Typography variant="body2" color="text.secondary">업셀기변</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fff3e0', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>2점</Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#f3e5f5', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>1점</Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1.5, bgcolor: '#fce4ec', borderRadius: 1, minHeight: 56 }}>
+              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>1점</Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
