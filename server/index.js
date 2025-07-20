@@ -2597,7 +2597,8 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
     const officeInventory = {
       '평택사무실': new Map(), // key: "모델명_색상", value: 수량
       '인천사무실': new Map(),
-      '군산사무실': new Map()
+      '군산사무실': new Map(),
+      '안산사무실': new Map()
     };
     
     phoneklInventoryValues.slice(1).forEach(row => {
@@ -2607,14 +2608,19 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
         const storeName = (row[13] || '').toString().trim(); // N열: 출고처
         
         if (modelCapacity && color && storeName) {
-          // 사무실명 추출
+          // 사무실명 추출 (괄호 안 부가 정보 제거하여 매핑)
           let officeName = '';
-          if (storeName.includes('평택')) {
+          // 괄호 안의 부가 정보 제거 (예: "안산사무실(안산고잔)" -> "안산사무실")
+          const cleanStoreName = storeName.replace(/\([^)]*\)/g, '').trim();
+          
+          if (cleanStoreName.includes('평택')) {
             officeName = '평택사무실';
-          } else if (storeName.includes('인천')) {
+          } else if (cleanStoreName.includes('인천')) {
             officeName = '인천사무실';
-          } else if (storeName.includes('군산')) {
+          } else if (cleanStoreName.includes('군산')) {
             officeName = '군산사무실';
+          } else if (cleanStoreName.includes('안산')) {
+            officeName = '안산사무실';
           }
           
           if (officeName && officeInventory[officeName]) {
@@ -2635,7 +2641,8 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
     const result = {
       '평택사무실': {},
       '인천사무실': {},
-      '군산사무실': {}
+      '군산사무실': {},
+      '안산사무실': {}
     };
     
     normalizationRules.forEach((phoneklData, reservationSiteModel) => {
