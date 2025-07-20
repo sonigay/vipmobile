@@ -9,6 +9,28 @@ const CURRENT_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터';
 const PHONEKL_HOME_DATA_SHEET_NAME = '폰클홈데이터';
 const MONTHLY_AWARD_SETTINGS_SHEET_NAME = '장표모드셋팅메뉴';
 
+// 실제 시트 이름 확인을 위한 디버깅 함수
+async function debugSheetNames() {
+  try {
+    console.log('=== 사용 가능한 시트 목록 확인 ===');
+    const response = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    
+    const sheetsList = response.data.sheets || [];
+    console.log('전체 시트 목록:');
+    sheetsList.forEach((sheet, index) => {
+      console.log(`${index + 1}. ${sheet.properties.title}`);
+    });
+    console.log('================================');
+    
+    return sheetsList.map(sheet => sheet.properties.title);
+  } catch (error) {
+    console.error('시트 목록 확인 실패:', error);
+    return [];
+  }
+}
+
 // Google API 인증 설정
 const auth = new google.auth.JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -89,6 +111,27 @@ async function getMonthlyAwardData(req, res) {
 
     // 캐시 무효화 (개발 중이므로 캐시 비활성화)
     invalidateCache();
+
+    // 1단계: 사용 가능한 시트 목록 확인
+    const availableSheets = await debugSheetNames();
+    
+    // 2단계: 필요한 시트들이 존재하는지 확인
+    const requiredSheets = [
+      MANUAL_DATA_SHEET_NAME,
+      PLAN_SHEET_NAME,
+      STORE_SHEET_NAME,
+      CURRENT_MONTH_ACTIVATION_SHEET_NAME,
+      PHONEKL_HOME_DATA_SHEET_NAME,
+      MONTHLY_AWARD_SETTINGS_SHEET_NAME,
+      '대리점아이디관리'
+    ];
+    
+    console.log('=== 필요한 시트 존재 여부 확인 ===');
+    requiredSheets.forEach(sheetName => {
+      const exists = availableSheets.includes(sheetName);
+      console.log(`${sheetName}: ${exists ? '✅ 존재' : '❌ 없음'}`);
+    });
+    console.log('================================');
 
     // 필요한 시트 데이터 로드
     const [
@@ -198,6 +241,68 @@ async function getMonthlyAwardData(req, res) {
     
     console.log('요금제 매핑 테이블 크기:', planMapping.size);
     console.log('요금제 매핑 예시:', Array.from(planMapping.entries()).slice(0, 5));
+
+    // 요금제 매핑 실패 케이스 수집
+    const unmatchedPlansForDebug = new Set();
+    const unmatchedPlanGroups = new Set();
+    
+    // 수기초에서 실제 사용되는 요금제명들 수집
+    const manualRowsForPlanMapping = manualData.slice(1);
+    manualRowsForPlanMapping.forEach(row => {
+      if (row.length >= 76) {
+        const finalPlan = (row[38] || '').toString().trim(); // AM열: 최종요금제
+        const beforePlan = (row[75] || '').toString().trim(); // CX열: 변경전요금제
+        
+        if (finalPlan && !planMapping.has(finalPlan)) {
+          unmatchedPlansForDebug.add(finalPlan);
+        }
+        if (beforePlan && !planMapping.has(beforePlan)) {
+          unmatchedPlansForDebug.add(beforePlan);
+        }
+      }
+    });
+    
+    console.log('=== 요금제 매핑 실패 정보 ===');
+    console.log('매칭되지 않은 요금제명 수:', unmatchedPlansForDebug.size);
+    console.log('매칭되지 않은 요금제명 목록:', Array.from(unmatchedPlansForDebug));
+    console.log('================================');
+
+    // 전략상품 코드 매핑 테이블 생성 (숫자 코드 -> 부가서비스명)
+    const strategicProductCodeMapping = new Map();
+    
+    // 매뉴얼데이터에서 실제 전략상품 코드와 부가서비스명 매핑 수집
+    const manualRowsForCodeMapping = manualData.slice(1);
+    const uniqueCodes = new Set();
+    
+    manualRowsForCodeMapping.forEach(row => {
+      if (row.length >= 96) {
+        // 전략상품 관련 컬럼들 확인
+        const musicCode = (row[79] || '').toString().trim(); // DG열: 뮤직류
+        const insuranceCode = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
+        const uflixCode = (row[93] || '').toString().trim(); // DO열: 유플릭스
+        const callToneCode = (row[95] || '').toString().trim(); // DS열: 통화연결음
+        
+        // 고유한 코드들 수집
+        if (musicCode) uniqueCodes.add(musicCode);
+        if (insuranceCode) uniqueCodes.add(insuranceCode);
+        if (uflixCode) uniqueCodes.add(uflixCode);
+        if (callToneCode) uniqueCodes.add(callToneCode);
+      }
+    });
+    
+    console.log('=== 전략상품 코드 매핑 정보 ===');
+    console.log('발견된 고유 전략상품 코드 수:', uniqueCodes.size);
+    console.log('전략상품 코드 목록:', Array.from(uniqueCodes));
+    
+    // 기본 매핑 규칙 (실제 데이터에 맞게 조정 필요)
+    strategicProductCodeMapping.set('1900030850', '통화연결음');
+    strategicProductCodeMapping.set('1900032727', '통화연결음');
+    strategicProductCodeMapping.set('1900032118', '통화연결음');
+    strategicProductCodeMapping.set('1411727779', '뮤직류');
+    strategicProductCodeMapping.set('674704', '뮤직류');
+    
+    console.log('전략상품 코드 매핑 테이블:', Object.fromEntries(strategicProductCodeMapping));
+    console.log('================================');
 
     // 전략상품 리스트 로드 (셋팅에서)
     const strategicProducts = [];
@@ -456,19 +561,27 @@ async function getMonthlyAwardData(req, res) {
         
         let totalPoints = 0;
         
-        // 각 항목별 포인트 계산 (소분류 또는 부가서비스명으로 매칭)
+        // 각 항목별 포인트 계산 (코드 매핑 적용)
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            // 1. 부가서비스명으로 정확히 매칭
-            let product = finalStrategicProducts.find(p => p.serviceName === service);
+            // 1. 코드 매핑 테이블에서 부가서비스명 찾기
+            const mappedServiceName = strategicProductCodeMapping.get(service);
             
-            // 2. 부가서비스명 매칭이 안되면 소분류로 매칭
-            if (!product) {
-              product = finalStrategicProducts.find(p => p.subCategory === service);
-            }
-            
-            if (product) {
-              totalPoints += product.points;
+            if (mappedServiceName) {
+              // 2. 부가서비스명으로 포인트 찾기
+              let product = finalStrategicProducts.find(p => p.serviceName === mappedServiceName);
+              
+              // 3. 부가서비스명 매칭이 안되면 소분류로 매칭
+              if (!product) {
+                product = finalStrategicProducts.find(p => p.subCategory === mappedServiceName);
+              }
+              
+              if (product) {
+                totalPoints += product.points;
+              }
+            } else {
+              // 매핑되지 않은 코드는 디버깅용으로 수집
+              unmatchedStrategicProducts.add(service);
             }
           }
         });
@@ -549,6 +662,7 @@ async function getMonthlyAwardData(req, res) {
     // 매칭되지 않은 항목들 추적 (전역으로 이동)
     const unmatchedCompanies = new Set(); // 인터넷 비중용
     const unmatchedStrategicProducts = new Set(); // 전략상품용
+    const unmatchedPlans = new Set(); // 요금제 매핑용
     
     // 담당자별 데이터 수집
     const manualRows = manualData.slice(1);
@@ -1067,7 +1181,8 @@ async function getMonthlyAwardData(req, res) {
       departmentGroups: Array.from(departmentGroupMap.values()),
       unmatchedItems: {
         companies: Array.from(unmatchedCompanies),
-        strategicProducts: Array.from(unmatchedStrategicProducts)
+        strategicProducts: Array.from(unmatchedStrategicProducts),
+        plans: Array.from(unmatchedPlans)
       }
     };
 

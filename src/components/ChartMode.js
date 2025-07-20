@@ -1353,6 +1353,7 @@ function MonthlyAwardTab() {
           <Tabs value={settingsTab} onChange={(e, newValue) => setSettingsTab(newValue)} sx={{ mb: 3 }}>
             <Tab label="Matrix 기준값" />
             <Tab label="전략상품 관리" />
+            <Tab label="요금제 매핑" />
             <Tab label="업체 매핑" />
             <Tab label="담당자 관리" />
           </Tabs>
@@ -1652,8 +1653,85 @@ function MonthlyAwardTab() {
             </Box>
           )}
 
-          {/* 담당자 관리 탭 */}
-          {settingsTab === 3 && (
+          {/* 요금제 매핑 탭 */}
+          {settingsTab === 2 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>요금제 매핑 설정</Typography>
+              
+              <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매핑 규칙</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • 수기초에 있는 요금제명이 무선요금제군에 없을 때 매핑 설정<br/>
+                  • 요금제군과 기본료를 설정하여 업셀기변, 기변105이상 계산에 사용<br/>
+                  • 매핑되지 않은 요금제는 계산에서 제외됩니다
+                </Typography>
+              </Paper>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>매핑되지 않은 요금제 목록</Typography>
+              <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                {data.unmatchedItems?.plans && data.unmatchedItems.plans.length > 0 ? (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      다음 요금제명들이 무선요금제군과 매칭되지 않았습니다. 각 요금제에 대해 요금제군과 기본료를 설정해주세요.
+                    </Typography>
+                    {data.unmatchedItems.plans.map((plan, index) => (
+                      <Box key={index} sx={{ mb: 1, p: 1, bgcolor: '#fff3cd', borderRadius: 1, border: '1px solid #ffeaa7' }}>
+                        <Typography variant="body2" color="warning.dark">
+                          <strong>매칭되지 않은 요금제명:</strong> {plan}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    매칭되지 않은 요금제가 없습니다.
+                  </Typography>
+                )}
+              </Paper>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>요금제 매핑 추가</Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="요금제명"
+                    placeholder="예: 5G 프리미어 레귤러"
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="요금제군"
+                    placeholder="예: 115군"
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="기본료"
+                    type="number"
+                    placeholder="118"
+                    inputProps={{ min: 0, step: 1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Button variant="outlined" fullWidth sx={{ height: 56 }}>
+                    매핑 추가
+                  </Button>
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>현재 매핑 목록</Typography>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  설정된 매핑이 없습니다. 위에서 매핑을 추가하면 여기에 표시됩니다.
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+
+          {/* 업체 매핑 탭 */}
+          {settingsTab === 4 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>담당자별 설정</Typography>
               
