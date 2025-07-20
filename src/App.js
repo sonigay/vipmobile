@@ -170,8 +170,6 @@ function App() {
   const [pendingLoginData, setPendingLoginData] = useState(null);
   const [modeSelectionRequired, setModeSelectionRequired] = useState(false);
   
-  // 업데이트 관련 상태
-
   const [showAppUpdatePopup, setShowAppUpdatePopup] = useState(false);
   const [currentMode, setCurrentMode] = useState('');
   
