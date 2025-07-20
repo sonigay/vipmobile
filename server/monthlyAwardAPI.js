@@ -554,6 +554,26 @@ async function getMonthlyAwardData(req, res) {
     const manualRows = manualData.slice(1);
     console.log('매뉴얼데이터 행 수:', manualRows.length);
     
+    // 첫 번째 행에서 컬럼 구조 확인
+    if (manualRows.length > 0) {
+      const firstRow = manualRows[0];
+      console.log('=== 매뉴얼데이터 컬럼 구조 확인 ===');
+      console.log('전체 행 길이:', firstRow.length);
+      console.log('A열(0) - 가입번호:', firstRow[0]);
+      console.log('H열(7) - 실판매POS 코드:', firstRow[7]);
+      console.log('K열(10) - 가입구분:', firstRow[10]);
+      console.log('AG열(32) - 최종모델:', firstRow[32]);
+      console.log('AM열(38) - 최종요금제:', firstRow[38]);
+      console.log('AN열(39) - 최종영업정책:', firstRow[39]);
+      console.log('CL열(67) - 모델유형:', firstRow[67]);
+      console.log('CX열(75) - 변경전요금제:', firstRow[75]);
+      console.log('DG열(79) - 뮤직류:', firstRow[79]);
+      console.log('DL열(83) - 보험(폰교체):', firstRow[83]);
+      console.log('DO열(93) - 유플릭스:', firstRow[93]);
+      console.log('DS열(95) - 통화연결음:', firstRow[95]);
+      console.log('================================');
+    }
+    
     let matchedCount = 0;
     let unmatchedStores = new Set();
     
@@ -721,6 +741,40 @@ async function getMonthlyAwardData(req, res) {
     // 담당자별 인터넷 비중 계산
     const activationRows = activationData.slice(1);
     const homeRows = homeData.slice(1);
+    
+    // 개통데이터/홈데이터 컬럼 구조 확인
+    if (activationRows.length > 0) {
+      const firstActivationRow = activationRows[0];
+      console.log('=== 개통데이터 컬럼 구조 확인 ===');
+      console.log('전체 행 길이:', firstActivationRow.length);
+      console.log('E열(4) - 입고처:', firstActivationRow[4]);
+      console.log('G열(6) - 업체명:', firstActivationRow[6]);
+      console.log('N열(13) - 모델명:', firstActivationRow[13]);
+      console.log('V열(21) - 요금제:', firstActivationRow[21]);
+      console.log('AL열(37) - 개통:', firstActivationRow[37]);
+      console.log('================================');
+    }
+    
+    if (homeRows.length > 0) {
+      const firstHomeRow = homeRows[0];
+      console.log('=== 홈데이터 컬럼 구조 확인 ===');
+      console.log('전체 행 길이:', firstHomeRow.length);
+      console.log('G열(6) - 업체명:', firstHomeRow[6]);
+      console.log('J열(9) - 가입상품:', firstHomeRow[9]);
+      console.log('================================');
+    }
+    
+    // 폰클출고처데이터 컬럼 구조 확인
+    if (storeRows.length > 0) {
+      const firstStoreRow = storeRows[0];
+      console.log('=== 폰클출고처데이터 컬럼 구조 확인 ===');
+      console.log('전체 행 길이:', firstStoreRow.length);
+      console.log('C열(2) - 출고처 업체명:', firstStoreRow[2]);
+      console.log('E열(4) - 상태:', firstStoreRow[4]);
+      console.log('H열(7) - 실판매POS 코드:', firstStoreRow[7]);
+      console.log('N열(13) - 담당자:', firstStoreRow[13]);
+      console.log('================================');
+    }
     
     // 개통데이터/홈데이터의 업체명을 폰클출고처데이터와 매칭하기 위한 매핑 생성
     const companyNameMapping = new Map();
