@@ -868,6 +868,9 @@ function MonthlyAwardTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isAgentTableExpanded, setIsAgentTableExpanded] = useState(true);
+  const [isOfficeTableExpanded, setIsOfficeTableExpanded] = useState(true);
+  const [isDepartmentTableExpanded, setIsDepartmentTableExpanded] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState(0); // 셋팅 다이얼로그에서 현재 탭 상태 관리
 
@@ -1134,6 +1137,20 @@ function MonthlyAwardTab() {
 
       {/* 상세 데이터 테이블 */}
       <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
+            채널별 성과 현황
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setIsAgentTableExpanded(!isAgentTableExpanded)}
+            startIcon={isAgentTableExpanded ? <CloseIcon /> : <ShowChartIcon />}
+          >
+            {isAgentTableExpanded ? '축소' : '확대'}
+          </Button>
+        </Box>
+        <Collapse in={isAgentTableExpanded}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -1176,14 +1193,26 @@ function MonthlyAwardTab() {
               </TableBody>
             </Table>
           </TableContainer>
-        </Paper>
+        </Collapse>
+      </Paper>
 
       {/* 사무실별 성과 테이블 */}
       {data.officeGroups && data.officeGroups.length > 0 && (
-        <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
-            사무실별 성과 현황
-          </Typography>
+        <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
+              사무실별 성과 현황
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setIsOfficeTableExpanded(!isOfficeTableExpanded)}
+              startIcon={isOfficeTableExpanded ? <CloseIcon /> : <ShowChartIcon />}
+            >
+              {isOfficeTableExpanded ? '축소' : '확대'}
+            </Button>
+          </Box>
+          <Collapse in={isOfficeTableExpanded}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -1216,15 +1245,27 @@ function MonthlyAwardTab() {
               </TableBody>
             </Table>
           </TableContainer>
-        </Paper>
+        </Collapse>
+      </Paper>
       )}
 
       {/* 소속별 성과 테이블 */}
       {data.departmentGroups && data.departmentGroups.length > 0 && (
-        <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
-            소속별 성과 현황
-          </Typography>
+        <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
+              소속별 성과 현황
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setIsDepartmentTableExpanded(!isDepartmentTableExpanded)}
+              startIcon={isDepartmentTableExpanded ? <CloseIcon /> : <ShowChartIcon />}
+            >
+              {isDepartmentTableExpanded ? '축소' : '확대'}
+            </Button>
+          </Box>
+          <Collapse in={isDepartmentTableExpanded}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -1257,7 +1298,8 @@ function MonthlyAwardTab() {
               </TableBody>
             </Table>
           </TableContainer>
-        </Paper>
+        </Collapse>
+      </Paper>
       )}
 
       {/* 셋팅 다이얼로그 */}

@@ -647,6 +647,7 @@ async function getMonthlyAwardData(req, res) {
         let totalPoints = 0;
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
+            console.log(`${manager} 전략상품 확인: "${service}"`);
             // 1. 부가서비스명으로 정확히 매칭
             let product = finalStrategicProducts.find(p => p.serviceName === service);
             
@@ -658,6 +659,8 @@ async function getMonthlyAwardData(req, res) {
             if (product) {
               totalPoints += product.points;
               console.log(`${manager} 전략상품 매칭: ${service} -> ${product.points}점`);
+            } else {
+              console.log(`${manager} 전략상품 매칭 실패: "${service}"`);
             }
           }
         });
@@ -692,7 +695,7 @@ async function getMonthlyAwardData(req, res) {
       const modelName = (row[13] || '').toString().trim(); // N열: 모델명
       const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
       const planName = (row[21] || '').toString().trim(); // V열: 요금제
-      const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+      const posCode = (row[6] || '').toString().trim(); // G열: 실판매POS 코드 (개통데이터는 G열)
       
       // 담당자 매칭 확인
       const manager = managerMapping.get(posCode);
@@ -723,7 +726,7 @@ async function getMonthlyAwardData(req, res) {
       if (row.length < 10) return;
       
       const product = (row[9] || '').toString().trim(); // J열: 가입상품
-      const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+      const posCode = (row[6] || '').toString().trim(); // G열: 실판매POS 코드 (홈데이터도 G열)
       
       // 담당자 매칭 확인
       const manager = managerMapping.get(posCode);
