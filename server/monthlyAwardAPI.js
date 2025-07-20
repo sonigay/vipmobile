@@ -662,7 +662,9 @@ async function getMonthlyAwardData(req, res) {
       let numerator = 0;
       let denominator = 0;
       
-      console.log(`\n=== ${manager} 인터넷 비중 계산 시작 ===`);
+      // 인터넷 비중 계산 (로그 최소화)
+      let matchedHomeRows = 0;
+      let internetRows = 0;
       
       // 개통데이터 기준으로 모수 계산
       activationRows.forEach(row => {
@@ -694,12 +696,7 @@ async function getMonthlyAwardData(req, res) {
         denominator++;
       });
       
-      console.log(`${manager} 모수(분모) 계산 결과: ${denominator}건`);
-      
       // 홈데이터 기준으로 자수 계산
-      let matchedHomeRows = 0;
-      let internetRows = 0;
-      
       homeRows.forEach(row => {
         if (row.length < 8) return;
         
@@ -728,19 +725,22 @@ async function getMonthlyAwardData(req, res) {
         }
       });
       
-      console.log(`${manager} 자수(분자) 계산 결과: ${numerator}건`);
-      console.log(`${manager} 홈데이터 매칭된 행: ${matchedHomeRows}건`);
-      console.log(`${manager} 홈데이터 인터넷 행: ${internetRows}건`);
-      
-      // 매칭되지 않은 업체명 확인
+      // 매칭되지 않은 경우에만 로그 출력
       if (matchedHomeRows === 0) {
-        console.log(`⚠️ ${manager}: 홈데이터에서 매칭된 업체가 없음!`);
-        console.log(`매핑 테이블에 있는 업체들:`, Array.from(companyManagerMapping.entries()).filter(([company, mgr]) => mgr === manager).map(([company]) => company));
-        console.log(`전체 매핑 테이블 크기:`, companyManagerMapping.size);
-        console.log(`홈데이터 업체명 샘플:`, homeRows.slice(0, 5).map(row => row[2]).filter(Boolean));
+        const logMessage = `🔍 [인터넷 비중] ${manager}: 매칭된 업체 없음 (분모: ${denominator}, 분자: 0)\n   매핑테이블 업체: ${Array.from(companyManagerMapping.entries()).filter(([company, mgr]) => mgr === manager).map(([company]) => company).join(', ')}\n   홈데이터 샘플: ${homeRows.slice(0, 3).map(row => row[2]).filter(Boolean).join(', ')}`;
+        console.log(logMessage);
+        
+        // 파일로도 저장
+        const fs = require('fs');
+        fs.appendFileSync('internet_ratio_debug.log', `${new Date().toISOString()} - ${logMessage}\n`);
+      } else if (numerator > 0) {
+        const logMessage = `✅ [인터넷 비중] ${manager}: ${numerator}/${denominator} = ${((numerator/denominator)*100).toFixed(2)}%`;
+        console.log(logMessage);
+        
+        // 파일로도 저장
+        const fs = require('fs');
+        fs.appendFileSync('internet_ratio_debug.log', `${new Date().toISOString()} - ${logMessage}\n`);
       }
-      
-      console.log(`${manager} 인터넷 비중 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
         numerator,
         denominator,
