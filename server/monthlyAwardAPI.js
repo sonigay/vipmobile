@@ -687,6 +687,8 @@ async function getMonthlyAwardData(req, res) {
         denominator++;
       });
       
+      console.log(`${manager} 모수(분모) 계산 결과: ${denominator}건`);
+      
       // 홈데이터 기준으로 자수 계산
       homeRows.forEach(row => {
         if (row.length < 8) return;
@@ -712,6 +714,8 @@ async function getMonthlyAwardData(req, res) {
           }
         }
       });
+      
+      console.log(`${manager} 자수(분자) 계산 결과: ${numerator}건`);
       
       console.log(`${manager} 인터넷 비중 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
@@ -1311,6 +1315,17 @@ async function getMonthlyAwardData(req, res) {
       });
     });
 
+    // 각 지표별 최대 점수 계산
+    const maxScores = {
+      upsell: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'upsell').map(c => c.score), 6),
+      change105: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'change105').map(c => c.score), 6),
+      strategic: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'strategic').map(c => c.score), 3),
+      internet: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'internet').map(c => c.score), 6)
+    };
+    
+    // 총점 계산
+    const totalMaxScore = maxScores.upsell + maxScores.change105 + maxScores.strategic + maxScores.internet;
+
     const result = {
       date: new Date().toISOString().split('T')[0],
       indicators: {
@@ -1320,6 +1335,8 @@ async function getMonthlyAwardData(req, res) {
         internetRatio: totalInternetRatio
       },
       totalScore,
+      maxScores, // 각 지표별 최대 점수
+      totalMaxScore, // 총점 만점
       matrixCriteria: finalMatrixCriteria,
       strategicProductsList: finalStrategicProducts,
       agentDetails: Array.from(agentMap.values()),

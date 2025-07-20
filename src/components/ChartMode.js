@@ -1039,31 +1039,31 @@ function MonthlyAwardTab() {
             <Grid container spacing={2}>
               <Grid item xs={12} md={2.4}>
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>21점</Typography>
+                  <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>{data.totalMaxScore || 21}점</Typography>
                   <Typography variant="body2" color="text.secondary">총점</Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={2.4}>
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>6점</Typography>
+                  <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>{data.maxScores?.upsell || 6}점</Typography>
                   <Typography variant="body2" color="text.secondary">업셀기변</Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={2.4}>
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>6점</Typography>
+                  <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>{data.maxScores?.change105 || 6}점</Typography>
                   <Typography variant="body2" color="text.secondary">기변105이상</Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={2.4}>
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>3점</Typography>
+                  <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>{data.maxScores?.strategic || 3}점</Typography>
                   <Typography variant="body2" color="text.secondary">전략상품</Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={2.4}>
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>6점</Typography>
+                  <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>{data.maxScores?.internet || 6}점</Typography>
                   <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
                 </Box>
               </Grid>
@@ -1086,7 +1086,7 @@ function MonthlyAwardTab() {
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
                     {getPerformanceIcon(data.indicators.upsellChange.percentage, 92.0)}
-                    {calculateScore(data.indicators.upsellChange.percentage, data.matrixCriteria?.filter(c => c.indicator === 'upsell') || [], 6)}점
+                    {calculateScore(parseFloat(data.indicators.upsellChange.percentage), data.matrixCriteria?.filter(c => c.indicator === 'upsell') || [], data.maxScores?.upsell || 6)}점
                   </Typography>
                   <Typography variant="body2" color="text.secondary">업셀기변</Typography>
                 </Box>
@@ -1095,7 +1095,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.change105Above.percentage, 88.0)}
-                  {calculateScore(data.indicators.change105Above.percentage, data.matrixCriteria?.filter(c => c.indicator === 'change105') || [], 6)}점
+                  {calculateScore(parseFloat(data.indicators.change105Above.percentage), data.matrixCriteria?.filter(c => c.indicator === 'change105') || [], data.maxScores?.change105 || 6)}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
@@ -1104,7 +1104,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.strategicProducts.percentage, 40.0)}
-                  {calculateScore(data.indicators.strategicProducts.percentage, data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [], 3)}점
+                  {calculateScore(parseFloat(data.indicators.strategicProducts.percentage), data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [], data.maxScores?.strategic || 3)}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
@@ -1113,7 +1113,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.internetRatio.percentage, 60.0)}
-                  {calculateScore(data.indicators.internetRatio.percentage, data.matrixCriteria?.filter(c => c.indicator === 'internet') || [], 6)}점
+                  {calculateScore(parseFloat(data.indicators.internetRatio.percentage), data.matrixCriteria?.filter(c => c.indicator === 'internet') || [], data.maxScores?.internet || 6)}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
