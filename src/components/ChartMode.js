@@ -1111,36 +1111,16 @@ function MonthlyAwardTab() {
                 {[6, 5, 4, 3, 2, 1].map((score) => (
                   <TableRow key={score}>
                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
-                    <TableCell 
-                      sx={{ 
-                        textAlign: 'center',
-                        backgroundColor: getMatrixCellColor(score, data.indicators.upsellChange.percentage)
-                      }}
-                    >
+                    <TableCell sx={{ textAlign: 'center' }}>
                       {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}%
                     </TableCell>
-                    <TableCell 
-                      sx={{ 
-                        textAlign: 'center',
-                        backgroundColor: getMatrixCellColor(score, data.indicators.change105Above.percentage)
-                      }}
-                    >
+                    <TableCell sx={{ textAlign: 'center' }}>
                       {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}%
                     </TableCell>
-                    <TableCell 
-                      sx={{ 
-                        textAlign: 'center',
-                        backgroundColor: getMatrixCellColor(score, data.indicators.strategicProducts.percentage)
-                      }}
-                    >
+                    <TableCell sx={{ textAlign: 'center' }}>
                       {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}%
                     </TableCell>
-                    <TableCell 
-                      sx={{ 
-                        textAlign: 'center',
-                        backgroundColor: getMatrixCellColor(score, data.indicators.internetRatio.percentage)
-                      }}
-                    >
+                    <TableCell sx={{ textAlign: 'center' }}>
                       {data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}%
                     </TableCell>
                   </TableRow>

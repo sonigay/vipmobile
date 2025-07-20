@@ -108,19 +108,19 @@ async function getMonthlyAwardData(req, res) {
       throw new Error('필요한 시트 데이터를 불러올 수 없습니다.');
     }
 
-    // 담당자 매핑 테이블 생성
+    // 담당자 매핑 테이블 생성 (실판매POS 기준)
     const managerMapping = new Map();
     const storeRows = storeData.slice(1);
     
     storeRows.forEach(row => {
       if (row.length >= 14) {
-        const storeName = (row[6] || '').toString().trim(); // G열: 업체명
+        const posCode = (row[8] || '').toString().trim(); // I열: 실판매POS
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
         
-        if (storeName && manager) {
+        if (posCode && manager) {
           // 담당자 이름에서 괄호 부분 제거
           const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
-          managerMapping.set(storeName, cleanManager);
+          managerMapping.set(posCode, cleanManager);
         }
       }
     });
@@ -477,8 +477,8 @@ async function getMonthlyAwardData(req, res) {
     manualRows.forEach(row => {
       if (row.length < 90) return;
       
-      const storeName = (row[6] || '').toString().trim(); // G열: 출고처
-      const manager = managerMapping.get(storeName);
+      const posCode = (row[8] || '').toString().trim(); // I열: 실판매POS
+      const manager = managerMapping.get(posCode);
       
       if (manager) {
         matchedCount++;
@@ -580,6 +580,12 @@ async function getMonthlyAwardData(req, res) {
     // 디버깅 로그 추가
     console.log('매칭된 담당자 수:', matchedCount);
     console.log('매칭되지 않은 업체들:', Array.from(unmatchedStores));
+    console.log('매칭 예시:');
+    if (manualRows.length > 0) {
+      const firstRow = manualRows[0];
+      const posCode = (firstRow[8] || '').toString().trim();
+      console.log(`실판매POS: "${posCode}"`);
+    }
 
     // 담당자별 percentage 계산
     agentMap.forEach(agent => {
