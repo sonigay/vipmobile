@@ -617,8 +617,32 @@ function AllCustomerListScreen({ loggedInStore }) {
         console.log('📊 [수동배정 디버깅] 수동 배정 결과:', result);
         
         if (result.success) {
-          // 배정 상태 새로고침
-          await loadAssignmentStatus();
+          // 배정 상태 새로고침 - 직접 API 호출
+          try {
+            setLoadingAssignment(true);
+            const statusResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
+            
+            if (statusResponse.ok) {
+              const statusResult = await statusResponse.json();
+              if (statusResult.success) {
+                const statusMap = {};
+                statusResult.data.forEach(item => {
+                  statusMap[item.reservationNumber] = {
+                    assignmentStatus: item.assignmentStatus,
+                    activationStatus: item.activationStatus,
+                    assignedSerialNumber: item.assignedSerialNumber,
+                    waitingOrder: item.waitingOrder
+                  };
+                });
+                setAssignmentStatus(statusMap);
+              }
+            }
+          } catch (statusError) {
+            console.error('❌ [수동배정 디버깅] 배정 상태 새로고침 오류:', statusError);
+          } finally {
+            setLoadingAssignment(false);
+          }
+          
           alert('수동 배정이 완료되었습니다.');
         } else {
           alert(`수동 배정 실패: ${result.message}`);
@@ -630,7 +654,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     } finally {
       setManualAssignmentLoading(false);
     }
-  }, [loadAssignmentStatus]);
+  }, []);
 
   // 메모이제이션된 통계 정보
   const statsInfo = useMemo(() => {
