@@ -2546,10 +2546,10 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
   }
 });
 
-// 정규화작업시트 C열 기준 재고 현황 API
+// 정규화작업시트 C열 기준 사무실별 재고 현황 API
 app.get('/api/inventory/normalized-status', async (req, res) => {
   try {
-    console.log('📊 [재고현황 디버깅] 정규화작업시트 C열 기준 재고 현황 로드 시작');
+    console.log('📊 [재고현황 디버깅] 정규화작업시트 C열 기준 사무실별 재고 현황 로드 시작');
     
     // 캐시 키 생성
     const cacheKey = 'inventory_normalized_status';
@@ -2574,11 +2574,12 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
       throw new Error('폰클재고데이터를 가져올 수 없습니다.');
     }
     
-    // 정규화작업시트에서 C열(사전예약사이트 형식) 기준으로 모델별 재고 집계
-    const normalizedInventory = new Map(); // key: 정규화된 모델명, value: 재고 수량
+    console.log(`📊 [재고현황 디버깅] 정규화작업 데이터: ${normalizationValues.length}행, 폰클재고데이터: ${phoneklInventoryValues.length}행`);
     
-    // 정규화 규칙 로드
+    // 정규화 규칙 로드 (C열에 있는 모델들만)
     const normalizationRules = new Map();
+    const validReservationModels = new Set(); // C열에 있는 모델들
+    
     normalizationValues.slice(1).forEach(row => {
       if (row.length >= 3) {
         const reservationSite = (row[1] || '').toString().trim(); // C열: 사전예약사이트 형식
@@ -2589,17 +2590,25 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
           // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
           const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
           normalizationRules.set(key, { phoneklModel, phoneklColor });
+          validReservationModels.add(key);
+          console.log(`📊 [재고현황 디버깅] 정규화 규칙 추가: ${key} -> ${phoneklModel} | ${phoneklColor}`);
         }
       }
     });
     
-    // 폰클재고데이터에서 사무실별 모델별 재고 수량 집계
+    console.log(`📊 [재고현황 디버깅] 정규화 규칙 개수: ${normalizationRules.size}`);
+    
+    // 폰클재고데이터에서 사무실별 모델별 재고 수량 집계 (정규화 규칙에 있는 모델만)
     const officeInventory = {
       '평택사무실': new Map(), // key: "모델명_색상", value: 수량
       '인천사무실': new Map(),
       '군산사무실': new Map(),
       '안산사무실': new Map()
     };
+    
+    let processedRows = 0;
+    let matchedOffices = 0;
+    let matchedModels = 0;
     
     phoneklInventoryValues.slice(1).forEach(row => {
       if (row.length >= 15) {
@@ -2608,6 +2617,8 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
         const storeName = (row[13] || '').toString().trim(); // N열: 출고처
         
         if (modelCapacity && color && storeName) {
+          processedRows++;
+          
           // 사무실명 추출 (괄호 안 부가 정보 제거하여 매핑)
           let officeName = '';
           // 괄호 안의 부가 정보 제거 (예: "안산사무실(안산고잔)" -> "안산사무실")
@@ -2630,12 +2641,31 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
               modelWithColor = `${modelCapacity} | ${color}`;
             }
             
-            const key = modelWithColor;
-            officeInventory[officeName].set(key, (officeInventory[officeName].get(key) || 0) + 1);
+            // 정규화 규칙에 있는 모델인지 확인
+            let isMatchedModel = false;
+            normalizationRules.forEach((phoneklData, reservationSiteModel) => {
+              const phoneklKey = `${phoneklData.phoneklModel} | ${phoneklData.phoneklColor}`;
+              if (modelWithColor === phoneklKey) {
+                isMatchedModel = true;
+                matchedModels++;
+                
+                // 사전예약사이트 형식으로 저장
+                if (!officeInventory[officeName].has(reservationSiteModel)) {
+                  officeInventory[officeName].set(reservationSiteModel, 0);
+                }
+                officeInventory[officeName].set(reservationSiteModel, officeInventory[officeName].get(reservationSiteModel) + 1);
+              }
+            });
+            
+            if (isMatchedModel) {
+              matchedOffices++;
+            }
           }
         }
       }
     });
+    
+    console.log(`📊 [재고현황 디버깅] 처리된 행: ${processedRows}, 매칭된 사무실: ${matchedOffices}, 매칭된 모델: ${matchedModels}`);
     
     // 정규화 규칙을 통해 사무실별 사전예약사이트 형식으로 변환
     const result = {
@@ -2645,22 +2675,20 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
       '안산사무실': {}
     };
     
-    normalizationRules.forEach((phoneklData, reservationSiteModel) => {
-      const phoneklKey = `${phoneklData.phoneklModel} | ${phoneklData.phoneklColor}`;
-      
-      // 각 사무실별로 정규화된 모델별 재고 카운트
-      Object.keys(officeInventory).forEach(officeName => {
-        const count = officeInventory[officeName].get(phoneklKey) || 0;
+    Object.keys(officeInventory).forEach(officeName => {
+      const officeData = officeInventory[officeName];
+      officeData.forEach((count, reservationSiteModel) => {
         if (count > 0) {
-          if (!result[officeName][reservationSiteModel]) {
-            result[officeName][reservationSiteModel] = 0;
-          }
-          result[officeName][reservationSiteModel] += count;
+          result[officeName][reservationSiteModel] = count;
         }
       });
     });
     
-    console.log(`📊 [재고현황 디버깅] 정규화작업시트 C열 기준 재고 현황 완료: ${Object.keys(result).length}개 모델`);
+    // 각 사무실별 모델 개수 로그
+    Object.keys(result).forEach(officeName => {
+      const modelCount = Object.keys(result[officeName]).length;
+      console.log(`📊 [재고현황 디버깅] ${officeName}: ${modelCount}개 모델`);
+    });
     
     const responseData = {
       success: true,

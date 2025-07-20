@@ -784,12 +784,12 @@ function AllCustomerListScreen({ loggedInStore }) {
             </Button>
           </Box>
 
-          {/* 정규화작업시트 C열 기준 사무실별 재고 현황 */}
-          {Object.keys(inventoryStatus).length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                정규화작업시트 C열 기준 사무실별 재고 현황
-              </Typography>
+                        {/* 정규화작업시트 C열 기준 사무실별 재고 현황 */}
+              {Object.keys(inventoryStatus).length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
+                    정규화작업시트 C열 기준 사무실별 재고 현황
+                  </Typography>
               {Object.entries(inventoryStatus).map(([officeName, models]) => (
                 <Box key={officeName} sx={{ mb: 2 }}>
                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
