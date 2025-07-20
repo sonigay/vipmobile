@@ -1312,8 +1312,64 @@ async function saveMonthlyAwardSettings(req, res) {
     
     switch (type) {
       case 'matrix_criteria':
-        // Matrix 기준값 저장
-        sheetData = data.map(item => [item.score, item.percentage]);
+        // Matrix 기준값 저장 (만점 기준 반영)
+        console.log('=== Matrix 기준값 저장 디버깅 ===');
+        console.log('원본 데이터:', data);
+        
+        // 각 지표별 최대 점수 설정
+        const maxScores = {
+          'upsell': 6,      // 업셀기변: 6점
+          'change105': 6,   // 기변105이상: 6점
+          'strategic': 3,   // 전략상품: 3점
+          'internet': 6     // 인터넷 비중: 6점
+        };
+        
+        // 총점 계산 (21점 만점)
+        const totalMaxScore = 21;
+        
+        // 각 지표별로 데이터 정리
+        const organizedData = [];
+        
+        // 헤더 추가
+        organizedData.push(['지표명', '점수', '퍼센트', '설명']);
+        
+        // 각 지표별 데이터 추가
+        ['upsell', 'change105', 'strategic', 'internet'].forEach(indicator => {
+          const indicatorData = data.filter(item => item.indicator === indicator);
+          const maxScore = maxScores[indicator];
+          
+          // 지표별 헤더 추가
+          const indicatorNames = {
+            'upsell': '업셀기변',
+            'change105': '기변105이상', 
+            'strategic': '전략상품',
+            'internet': '인터넷 비중'
+          };
+          
+          organizedData.push([`${indicatorNames[indicator]} (${maxScore}점)`, '', '', '']);
+          
+          // 점수별 데이터 추가 (6점부터 1점까지, 또는 3점부터 1점까지)
+          const scoreRange = indicator === 'strategic' ? [3, 2, 1] : [6, 5, 4, 3, 2, 1];
+          
+                     for (let i = 0; i < scoreRange.length; i++) {
+             const score = scoreRange[i];
+             const item = indicatorData.find(d => d.score === score);
+             if (item && item.percentage > 0) {
+               organizedData.push(['', score, item.percentage, `${score}점 기준`]);
+             } else {
+               // 빈 값이면 해당 점수까지만 만점으로 인식
+               break;
+             }
+           }
+          
+          organizedData.push(['', '', '', '']); // 빈 줄 추가
+        });
+        
+        // 총점 정보 추가
+        organizedData.push(['총점', totalMaxScore, '', '만점']);
+        
+        sheetData = organizedData;
+        console.log('정리된 데이터:', sheetData);
         break;
       case 'strategic_products':
         // 전략상품 리스트 저장 (임시 비활성화)
