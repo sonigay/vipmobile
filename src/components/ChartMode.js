@@ -859,36 +859,137 @@ function IndicatorChartTab() {
 
 // 월간시상 탭 컴포넌트
 function MonthlyAwardTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // 데이터 로드
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/monthly-award/data');
+        if (!response.ok) {
+          throw new Error('데이터를 불러올 수 없습니다.');
+        }
+        const result = await response.json();
+        setData(result);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Matrix 셀 색상 계산
+  const getMatrixCellColor = (score, percentage) => {
+    if (!data?.matrixCriteria) return '#ffffff';
+    
+    const criteria = data.matrixCriteria.find(c => c.score === score);
+    if (!criteria) return '#ffffff';
+    
+    const targetPercentage = criteria.percentage;
+    if (percentage >= targetPercentage) return '#4caf50'; // 녹색
+    if (percentage >= targetPercentage * 0.8) return '#ff9800'; // 주황색
+    return '#f44336'; // 빨간색
+  };
+
+  // 성과 아이콘 계산
+  const getPerformanceIcon = (percentage, targetPercentage) => {
+    if (percentage >= targetPercentage) return '🏆';
+    if (percentage >= targetPercentage * 0.8) return '👍';
+    return '⚠️';
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Alert severity="info" sx={{ m: 2 }}>
+        데이터가 없습니다.
+      </Alert>
+    );
+  }
+
   return (
     <Box>
       {/* 헤더 정보 */}
       <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
-          2025. 7. 20 월간시상 현황
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
+            {data.date} 월간시상 현황
+          </Typography>
+          <Box>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setIsExpanded(!isExpanded)}
+              startIcon={isExpanded ? <CloseIcon /> : <ShowChartIcon />}
+              sx={{ mr: 1 }}
+            >
+              {isExpanded ? '축소' : '확대'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setShowSettings(true)}
+              startIcon={<EditIcon />}
+            >
+              셋팅
+            </Button>
+          </Box>
+        </Box>
+        
         <Grid container spacing={2}>
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>0.00%</Typography>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>
+                {data.indicators.upsellChange.percentage}%
+              </Typography>
               <Typography variant="body2" color="text.secondary">업셀기변</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>75.57%</Typography>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>
+                {data.indicators.change105Above.percentage}%
+              </Typography>
               <Typography variant="body2" color="text.secondary">기변105이상</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>22.4</Typography>
-              <Typography variant="body2" color="text.secondary">105군(디즈니,멀티팩)</Typography>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>
+                {data.indicators.strategicProducts.percentage}%
+              </Typography>
+              <Typography variant="body2" color="text.secondary">전략상품</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>33.77%</Typography>
-              <Typography variant="body2" color="text.secondary">VAS</Typography>
+              <Typography variant="h4" sx={{ color: '#f5576c', fontWeight: 'bold' }}>
+                {data.indicators.internetRatio.percentage}%
+              </Typography>
+              <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
             </Box>
           </Grid>
         </Grid>
@@ -947,36 +1048,50 @@ function MonthlyAwardTab() {
           <Grid container spacing={2}>
             <Grid item xs={12} md={2.4}>
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e3f2fd', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>5점</Typography>
+                <Typography variant="h6" sx={{ color: '#1976d2', fontWeight: 'bold' }}>{data.totalScore}점</Typography>
                 <Typography variant="body2" color="text.secondary">총점</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>1점</Typography>
+                <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
+                  {getPerformanceIcon(data.indicators.upsellChange.percentage, 92.0)}
+                  {Math.round(data.indicators.upsellChange.percentage / 92.0 * 6)}점
+                </Typography>
                 <Typography variant="body2" color="text.secondary">업셀기변</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>2점</Typography>
+                <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
+                  {getPerformanceIcon(data.indicators.change105Above.percentage, 88.0)}
+                  {Math.round(data.indicators.change105Above.percentage / 88.0 * 6)}점
+                </Typography>
                 <Typography variant="body2" color="text.secondary">기변105이상</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>1점</Typography>
+                <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>
+                  {getPerformanceIcon(data.indicators.strategicProducts.percentage, 40.0)}
+                  {Math.round(data.indicators.strategicProducts.percentage / 40.0 * 3)}점
+                </Typography>
                 <Typography variant="body2" color="text.secondary">전략상품</Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={2.4}>
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>1점</Typography>
+                <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>
+                  {getPerformanceIcon(data.indicators.internetRatio.percentage, 60.0)}
+                  {Math.round(data.indicators.internetRatio.percentage / 60.0 * 6)}점
+                </Typography>
                 <Typography variant="body2" color="text.secondary">인터넷 비중</Typography>
               </Box>
             </Grid>
           </Grid>
         </Box>
+
+        {/* Matrix 테이블 */}
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -989,87 +1104,118 @@ function MonthlyAwardTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>6점</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>92.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>60.0%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>5점</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>88.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>50.0%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>4점</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>84.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>40.0%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>3점</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>80.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>15.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>30.0%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>2점</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>72.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>10.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>20.0%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>1점</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>76.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>71.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>5.0%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>10.0%</TableCell>
-              </TableRow>
+              {[6, 5, 4, 3, 2, 1].map((score) => (
+                <TableRow key={score}>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
+                  <TableCell 
+                    sx={{ 
+                      textAlign: 'center',
+                      backgroundColor: getMatrixCellColor(score, data.indicators.upsellChange.percentage)
+                    }}
+                  >
+                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
+                  </TableCell>
+                  <TableCell 
+                    sx={{ 
+                      textAlign: 'center',
+                      backgroundColor: getMatrixCellColor(score, data.indicators.change105Above.percentage)
+                    }}
+                  >
+                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
+                  </TableCell>
+                  <TableCell 
+                    sx={{ 
+                      textAlign: 'center',
+                      backgroundColor: getMatrixCellColor(score, data.indicators.strategicProducts.percentage)
+                    }}
+                  >
+                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
+                  </TableCell>
+                  <TableCell 
+                    sx={{ 
+                      textAlign: 'center',
+                      backgroundColor: getMatrixCellColor(score, data.indicators.internetRatio.percentage)
+                    }}
+                  >
+                    {data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}%
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
       </Paper>
 
       {/* 상세 데이터 테이블 */}
-      <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>채널</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {/* 샘플 데이터 - 실제로는 props나 API에서 받아올 데이터 */}
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>강이준</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>100.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>50.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>강이준(별도)</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>90.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>12.00%</TableCell>
-                <TableCell sx={{ textAlign: 'center' }}>0.00%</TableCell>
-              </TableRow>
-              {/* 더 많은 데이터 행들... */}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+      <Collapse in={!isExpanded}>
+        <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>채널</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.agentDetails?.map((agent, index) => (
+                  <TableRow key={index}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{agent.name}</TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {agent.upsellChange.denominator > 0 
+                        ? (agent.upsellChange.numerator / agent.upsellChange.denominator * 100).toFixed(2)
+                        : '0.00'}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {agent.change105Above.denominator > 0 
+                        ? (agent.change105Above.numerator / agent.change105Above.denominator * 100).toFixed(2)
+                        : '0.00'}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {agent.strategicProducts.denominator > 0 
+                        ? (agent.strategicProducts.numerator / agent.strategicProducts.denominator * 100).toFixed(2)
+                        : '0.00'}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {agent.internetRatio.denominator > 0 
+                        ? (agent.internetRatio.numerator / agent.internetRatio.denominator * 100).toFixed(2)
+                        : '0.00'}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Collapse>
+
+      {/* 셋팅 다이얼로그 */}
+      <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="md" fullWidth>
+        <DialogTitle>월간시상 셋팅</DialogTitle>
+        <DialogContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>Matrix 기준값 설정</Typography>
+          <Grid container spacing={2}>
+            {[6, 5, 4, 3, 2, 1].map((score) => (
+              <Grid item xs={12} md={6} key={score}>
+                <TextField
+                  fullWidth
+                  label={`${score}점 기준 (%)`}
+                  type="number"
+                  defaultValue={data.matrixCriteria?.find(c => c.score === score)?.percentage || 0}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSettings(false)}>취소</Button>
+          <Button onClick={() => setShowSettings(false)} variant="contained">저장</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

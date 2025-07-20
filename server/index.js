@@ -4,6 +4,7 @@ const cors = require('cors');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
+const monthlyAwardAPI = require('./monthlyAwardAPI');
 
 // 기본 설정
 const app = express();
@@ -334,6 +335,16 @@ const MANUAL_DATA_SHEET_NAME = '수기초';  // 수기초 데이터
 const INSPECTION_RESULT_SHEET_NAME = '검수결과';  // 검수 결과 데이터
 const NORMALIZATION_HISTORY_SHEET_NAME = '정규화이력';  // 정규화 이력 데이터
 const INSPECTION_MEMO_SHEET_NAME = '여직원검수데이터메모';  // 여직원 검수 데이터 메모 시트 추가
+const INSPECTION_SETTINGS_SHEET_NAME = '검수설정';  // 검수 설정 시트
+const RESERVATION_SITE_SHEET_NAME = '사전예약사이트';  // 사전예약사이트 시트
+const YARD_RECEIPT_SHEET_NAME = '마당접수';  // 마당접수 시트
+const ON_SALE_SHEET_NAME = '온세일';  // 온세일 시트
+const POS_CODE_MAPPING_SHEET_NAME = 'POS코드변경설정';  // POS코드변경설정 시트
+const NORMALIZATION_WORK_SHEET_NAME = '정규화작업';  // 정규화작업 시트
+
+// 월간시상 관련 시트 이름 추가
+const PHONEKL_HOME_DATA_SHEET_NAME = '폰클홈데이터';  // 폰클홈데이터 시트
+const MONTHLY_AWARD_SETTINGS_SHEET_NAME = '장표모드셋팅메뉴';  // 월간시상 셋팅 메뉴 시트
 
 // Kakao geocoding 함수 (개선된 버전)
 async function geocodeAddressWithKakao(address, retryCount = 0) {
@@ -10577,3 +10588,7 @@ app.get('/api/reservation-data/reservation-site', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// 월간시상 API 라우트
+app.get('/api/monthly-award/data', monthlyAwardAPI.getMonthlyAwardData);
+app.post('/api/monthly-award/settings', monthlyAwardAPI.saveMonthlyAwardSettings);
