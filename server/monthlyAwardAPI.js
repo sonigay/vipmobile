@@ -304,20 +304,32 @@ async function getMonthlyAwardData(req, res) {
     console.log('전략상품 코드 매핑 테이블:', Object.fromEntries(strategicProductCodeMapping));
     console.log('================================');
 
-    // 전략상품 리스트 로드 (셋팅에서)
+    // 전략상품 리스트 로드 (F1:I50 영역에서)
     const strategicProducts = [];
-    if (settingsData && settingsData.length > 1) {
-      const settingsRows = settingsData.slice(1);
-      settingsRows.forEach(row => {
-        if (row.length >= 4) {
-          strategicProducts.push({
-            subCategory: row[0] || '',        // 소분류
-            serviceCode: row[1] || '',        // 부가서비스 코드
-            serviceName: row[2] || '',        // 부가서비스명
-            points: parseFloat(row[3] || 0)   // 포인트
-          });
-        }
+    try {
+      const strategicProductsResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!F1:I50`
       });
+      
+      const strategicProductsData = strategicProductsResponse.data.values || [];
+      console.log('전략상품 시트 데이터:', strategicProductsData);
+      
+      if (strategicProductsData.length > 1) {
+        const strategicProductsRows = strategicProductsData.slice(1); // 헤더 제외
+        strategicProductsRows.forEach(row => {
+          if (row.length >= 4 && row[0] && row[2] && row[3]) { // 소분류, 부가서비스명, 포인트가 있는 경우만
+            strategicProducts.push({
+              subCategory: row[0] || '',        // F열: 소분류
+              serviceCode: row[1] || '',        // G열: 부가서비스 코드
+              serviceName: row[2] || '',        // H열: 부가서비스명
+              points: parseFloat(row[3] || 0)   // I열: 포인트
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.log('전략상품 데이터 로드 실패, 기본값 사용:', error.message);
     }
 
     // 기본 전략상품 포인트 (설정이 없을 때 사용)
@@ -334,19 +346,51 @@ async function getMonthlyAwardData(req, res) {
     console.log('전략상품 설정 개수:', finalStrategicProducts.length);
     console.log('전략상품 설정:', finalStrategicProducts);
 
-    // Matrix 기준값 로드 (셋팅에서)
+    // Matrix 기준값 로드 (A1:D30 영역에서)
     const matrixCriteria = [];
-    if (settingsData && settingsData.length > 1) {
-      const settingsRows = settingsData.slice(1);
-      settingsRows.forEach(row => {
-        if (row.length >= 2 && row[0] && row[1]) {
-          const score = parseInt(row[0]);
-          const percentage = parseFloat(row[1]);
-          if (!isNaN(score) && !isNaN(percentage)) {
-            matrixCriteria.push({ score, percentage });
-          }
-        }
+    try {
+      const matrixResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A1:D30`
       });
+      
+      const matrixData = matrixResponse.data.values || [];
+      console.log('Matrix 기준값 시트 데이터:', matrixData);
+      
+      if (matrixData.length > 1) {
+        const matrixRows = matrixData.slice(1); // 헤더 제외
+        matrixRows.forEach(row => {
+          if (row.length >= 3 && row[1] && row[2]) { // 점수와 퍼센트가 있는 경우만
+            const score = parseInt(row[1]);
+            const percentage = parseFloat(row[2]);
+            const indicator = row[3] || ''; // 설명에서 지표 추출
+            
+            if (!isNaN(score) && !isNaN(percentage)) {
+              // 지표명에서 indicator 추출
+              let indicatorType = '';
+              if (indicator.includes('업셀기변') || indicator.includes('upsell')) {
+                indicatorType = 'upsell';
+              } else if (indicator.includes('기변105이상') || indicator.includes('change105')) {
+                indicatorType = 'change105';
+              } else if (indicator.includes('전략상품') || indicator.includes('strategic')) {
+                indicatorType = 'strategic';
+              } else if (indicator.includes('인터넷 비중') || indicator.includes('internet')) {
+                indicatorType = 'internet';
+              }
+              
+              if (indicatorType) {
+                matrixCriteria.push({ 
+                  score, 
+                  percentage, 
+                  indicator: indicatorType 
+                });
+              }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.log('Matrix 기준값 데이터 로드 실패, 기본값 사용:', error.message);
     }
 
     // 기본 Matrix 기준값 (설정이 없을 때 사용)
