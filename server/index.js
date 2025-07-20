@@ -3086,7 +3086,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
       }
       
       // 폰클재고데이터 처리 (배정완료된 재고만 - N열 출고처에 값이 있는 재고)
-      const inventoryMap = new Map();
+      const inventoryMap = new Map(); // 모델별 일련번호 배열 저장
       phoneklInventoryValues.slice(1).forEach(row => {
         if (row.length >= 15) {
           const serialNumber = (row[3] || '').toString().trim(); // D열: 일련번호
@@ -3097,7 +3097,12 @@ const server = app.listen(port, '0.0.0.0', async () => {
           // N열 출고처에 값이 있으면 배정완료로 간주
           if (serialNumber && modelCapacity && color && storeName && storeName.trim() !== '') {
             const inventoryKey = `${modelCapacity} | ${color}`;
-            inventoryMap.set(inventoryKey, serialNumber);
+            
+            // 같은 모델의 재고를 배열로 저장
+            if (!inventoryMap.has(inventoryKey)) {
+              inventoryMap.set(inventoryKey, []);
+            }
+            inventoryMap.get(inventoryKey).push(serialNumber);
           }
         }
       });
@@ -3196,60 +3201,57 @@ const server = app.listen(port, '0.0.0.0', async () => {
             console.log(`🔍 [서버시작] 행 ${index + 2}: 예약번호="${reservationNumber}", 모델="${model} ${capacity} ${color}", 현재일련번호="${currentSerialNumber}"`);
           }
           
-          const assignedSerialNumber = inventoryMap.get(inventoryKey);
+          const availableSerials = inventoryMap.get(inventoryKey);
           
-          if (assignedSerialNumber) {
+          if (availableSerials && availableSerials.length > 0) {
             // 기존 배정 상태 확인
             const existingAssignment = assignmentMemory.get(reservationNumber);
             
-            // 이미 배정된 일련번호가 있고, 현재와 다른 경우에만 업데이트
-            if (currentSerialNumber !== assignedSerialNumber) {
-              // 기존에 배정된 적이 없거나, 다른 일련번호로 배정된 경우에만 업데이트
-              if (!existingAssignment || existingAssignment.serialNumber !== assignedSerialNumber) {
-                // 중복 배정 체크: 같은 일련번호가 이미 다른 고객에게 배정되었는지 확인
-                let isDuplicate = false;
-                for (let i = 0; i < index; i++) {
-                  const prevRow = reservationSiteValues[i + 1];
-                  if (prevRow && prevRow.length >= 22) {
-                    const prevSerial = (prevRow[6] || '').toString().trim();
-                    if (prevSerial === assignedSerialNumber) {
-                      isDuplicate = true;
-                      if (index < 5) {
-                        console.log(`⚠️ [서버시작] 행 ${index + 2}: 일련번호 "${assignedSerialNumber}" 중복 배정 감지 (이미 행 ${i + 2}에 배정됨)`);
+            // 사용 가능한 일련번호 중에서 중복되지 않는 것을 찾기
+            let assignedSerialNumber = null;
+            
+            for (const serial of availableSerials) {
+              // 이미 배정된 일련번호가 있고, 현재와 다른 경우에만 업데이트
+              if (currentSerialNumber !== serial) {
+                // 기존에 배정된 적이 없거나, 다른 일련번호로 배정된 경우에만 업데이트
+                if (!existingAssignment || existingAssignment.serialNumber !== serial) {
+                  // 중복 배정 체크: 같은 일련번호가 이미 다른 고객에게 배정되었는지 확인
+                  let isDuplicate = false;
+                  for (let i = 0; i < index; i++) {
+                    const prevRow = reservationSiteValues[i + 1];
+                    if (prevRow && prevRow.length >= 22) {
+                      const prevSerial = (prevRow[6] || '').toString().trim();
+                      if (prevSerial === serial) {
+                        isDuplicate = true;
+                        break;
                       }
-                      break;
                     }
                   }
-                }
-                
-                if (!isDuplicate) {
-                  row[6] = assignedSerialNumber; // G열 업데이트
-                  updatedCount++;
                   
-                  if (index < 5) {
-                    console.log(`✅ [서버시작] 행 ${index + 2}: 일련번호 업데이트 "${currentSerialNumber}" → "${assignedSerialNumber}" (새로운 배정)`);
+                  if (!isDuplicate) {
+                    assignedSerialNumber = serial;
+                    break; // 사용 가능한 일련번호를 찾았으므로 루프 종료
                   }
-                  
-                  assignments.push({
-                    reservationNumber,
-                    assignedSerialNumber
-                  });
-                } else {
-                  noMatchCount++;
-                  if (index < 5) {
-                    console.log(`❌ [서버시작] 행 ${index + 2}: 중복 배정으로 인한 매칭 실패 "${inventoryKey}"`);
-                  }
-                }
-              } else {
-                skippedCount++;
-                if (index < 5) {
-                  console.log(`⏭️ [서버시작] 행 ${index + 2}: 이미 배정된 일련번호 "${assignedSerialNumber}" (메모리 확인)`);
                 }
               }
-            } else {
-              skippedCount++;
+            }
+            
+            if (assignedSerialNumber) {
+              row[6] = assignedSerialNumber; // G열 업데이트
+              updatedCount++;
+              
               if (index < 5) {
-                console.log(`⏭️ [서버시작] 행 ${index + 2}: 이미 올바른 일련번호 "${currentSerialNumber}"`);
+                console.log(`✅ [서버시작] 행 ${index + 2}: 일련번호 업데이트 "${currentSerialNumber}" → "${assignedSerialNumber}" (새로운 배정)`);
+              }
+              
+              assignments.push({
+                reservationNumber,
+                assignedSerialNumber
+              });
+            } else {
+              noMatchCount++;
+              if (index < 5) {
+                console.log(`❌ [서버시작] 행 ${index + 2}: 사용 가능한 일련번호 없음 "${inventoryKey}"`);
               }
             }
           } else {
