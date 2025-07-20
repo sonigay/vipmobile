@@ -59,9 +59,36 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [inventoryStatus, setInventoryStatus] = useState({});
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [manualAssignmentLoading, setManualAssignmentLoading] = useState(false);
-  const [receptionFilter, setReceptionFilter] = useState('all'); // 'all', 'yard', 'onsale', 'both'
+  const [receptionFilter, setReceptionFilter] = useState('all'); // 'all', 'yard', 'onsale', 'both', 'either'
   const [yardDateFilter, setYardDateFilter] = useState('');
   const [onsaleDateFilter, setOnsaleDateFilter] = useState('');
+  const [officeFilter, setOfficeFilter] = useState('all'); // 'all' 또는 사무실명
+  const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' 또는 소속명
+  const [agentOfficeData, setAgentOfficeData] = useState({ offices: [], departments: {}, agentInfo: {} });
+  const [loadingAgentData, setLoadingAgentData] = useState(false);
+
+  // 대리점아이디관리 데이터 로드
+  const loadAgentOfficeData = useCallback(async () => {
+    setLoadingAgentData(true);
+    try {
+      console.log('🔍 [대리점관리 디버깅] 사무실별, 소속별 데이터 로드 시작');
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/agent-office-department`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📊 [대리점관리 디버깅] 사무실별, 소속별 데이터:', result);
+        
+        if (result.success) {
+          setAgentOfficeData(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [대리점관리 디버깅] 사무실별, 소속별 데이터 로드 오류:', error);
+    } finally {
+      setLoadingAgentData(false);
+    }
+  }, []);
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -165,8 +192,24 @@ function AllCustomerListScreen({ loggedInStore }) {
       });
     }
 
+    // 사무실별 필터 적용
+    if (officeFilter !== 'all') {
+      filtered = filtered.filter(customer => {
+        const agentInfo = agentOfficeData.agentInfo[customer.agent];
+        return agentInfo && agentInfo.office === officeFilter;
+      });
+    }
+
+    // 소속별 필터 적용
+    if (departmentFilter !== 'all') {
+      filtered = filtered.filter(customer => {
+        const agentInfo = agentOfficeData.agentInfo[customer.agent];
+        return agentInfo && agentInfo.department === departmentFilter;
+      });
+    }
+
     setFilteredCustomerList(filtered);
-  }, [customerList, searchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, assignmentStatus]);
+  }, [customerList, searchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, assignmentStatus]);
 
   // 검색 기능 (캐시 적용)
   const handleSearch = useCallback((query) => {
@@ -186,6 +229,8 @@ function AllCustomerListScreen({ loggedInStore }) {
     setReceptionFilter('all');
     setYardDateFilter('');
     setOnsaleDateFilter('');
+    setOfficeFilter('all');
+    setDepartmentFilter('all');
   }, []);
 
 
@@ -550,7 +595,10 @@ function AllCustomerListScreen({ loggedInStore }) {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        await loadAllCustomerList();
+        await Promise.all([
+          loadAllCustomerList(),
+          loadAgentOfficeData()
+        ]);
         
         if (customerList.length > 0) {
           await loadAssignmentStatus();
@@ -563,7 +611,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     };
     
     initializeData();
-  }, [loadAllCustomerList, loadAssignmentStatus, loadActivationStatus]);
+  }, [loadAllCustomerList, loadAgentOfficeData, loadAssignmentStatus, loadActivationStatus]);
 
   // 필터 변경 시 적용
   useEffect(() => {
@@ -955,8 +1003,43 @@ function AllCustomerListScreen({ loggedInStore }) {
                 }}
               />
 
+              {/* 사무실별 필터 */}
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>사무실</InputLabel>
+                <Select
+                  value={officeFilter}
+                  label="사무실"
+                  onChange={(e) => {
+                    setOfficeFilter(e.target.value);
+                    setDepartmentFilter('all'); // 사무실 변경 시 소속 필터 초기화
+                  }}
+                  disabled={loadingAgentData}
+                >
+                  <MenuItem value="all">전체</MenuItem>
+                  {agentOfficeData.offices.map((office) => (
+                    <MenuItem key={office} value={office}>{office}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* 소속별 필터 */}
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>소속</InputLabel>
+                <Select
+                  value={departmentFilter}
+                  label="소속"
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  disabled={loadingAgentData || officeFilter === 'all'}
+                >
+                  <MenuItem value="all">전체</MenuItem>
+                  {officeFilter !== 'all' && agentOfficeData.departments[officeFilter]?.map((department) => (
+                    <MenuItem key={department} value={department}>{department}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
               {/* 필터 초기화 버튼 */}
-              {(assignmentFilter !== 'all' || activationFilter !== 'all' || receptionFilter !== 'all' || searchQuery || yardDateFilter || onsaleDateFilter) && (
+              {(assignmentFilter !== 'all' || activationFilter !== 'all' || receptionFilter !== 'all' || officeFilter !== 'all' || departmentFilter !== 'all' || searchQuery || yardDateFilter || onsaleDateFilter) && (
                 <Button
                   variant="outlined"
                   size="small"
@@ -1026,6 +1109,24 @@ function AllCustomerListScreen({ loggedInStore }) {
                 color="secondary"
                 variant="outlined"
                 onDelete={() => setOnsaleDateFilter('')}
+              />
+            )}
+            {officeFilter !== 'all' && (
+              <Chip
+                label={`사무실: ${officeFilter}`}
+                size="small"
+                color="primary"
+                variant="outlined"
+                onDelete={() => setOfficeFilter('all')}
+              />
+            )}
+            {departmentFilter !== 'all' && (
+              <Chip
+                label={`소속: ${departmentFilter}`}
+                size="small"
+                color="primary"
+                variant="outlined"
+                onDelete={() => setDepartmentFilter('all')}
               />
             )}
           </Box>

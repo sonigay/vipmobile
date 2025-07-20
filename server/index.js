@@ -2546,6 +2546,88 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
   }
 });
 
+// 대리점아이디관리 시트에서 사무실별, 소속별 데이터 가져오기 API
+app.get('/api/agent-office-department', async (req, res) => {
+  try {
+    console.log('📊 [대리점관리 디버깅] 사무실별, 소속별 데이터 로드 시작');
+    
+    // 캐시 키 생성
+    const cacheKey = 'agent_office_department';
+    
+    // 캐시에서 먼저 확인 (30분 TTL)
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+    
+    // 대리점아이디관리 시트 데이터 가져오기
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    
+    if (!agentValues || agentValues.length < 2) {
+      throw new Error('대리점아이디관리 데이터를 가져올 수 없습니다.');
+    }
+    
+    console.log(`📊 [대리점관리 디버깅] 대리점아이디관리 데이터: ${agentValues.length}행`);
+    
+    // 사무실별, 소속별 데이터 추출
+    const offices = new Set();
+    const departments = new Map(); // key: 사무실, value: Set of 소속들
+    const agentInfo = new Map(); // key: 담당자명, value: { office, department }
+    
+    agentValues.slice(1).forEach(row => {
+      if (row.length >= 5) {
+        const agentName = (row[0] || '').toString().trim(); // A열: 담당자명
+        const office = (row[3] || '').toString().trim(); // D열: 사무실
+        const department = (row[4] || '').toString().trim(); // E열: 소속
+        
+        if (agentName && office) {
+          offices.add(office);
+          
+          if (!departments.has(office)) {
+            departments.set(office, new Set());
+          }
+          departments.get(office).add(department);
+          
+          agentInfo.set(agentName, { office, department });
+        }
+      }
+    });
+    
+    // 결과 데이터 구성
+    const result = {
+      offices: Array.from(offices).sort(),
+      departments: {},
+      agentInfo: Object.fromEntries(agentInfo)
+    };
+    
+    // 사무실별 소속 목록 구성
+    departments.forEach((deptSet, office) => {
+      result.departments[office] = Array.from(deptSet).filter(Boolean).sort();
+    });
+    
+    console.log(`📊 [대리점관리 디버깅] 사무실: ${result.offices.length}개, 담당자: ${Object.keys(result.agentInfo).length}명`);
+    
+    const responseData = {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString()
+    };
+    
+    // 캐시에 저장 (30분 TTL)
+    cacheUtils.set(cacheKey, responseData, 30 * 60 * 1000);
+    
+    res.json(responseData);
+    
+  } catch (error) {
+    console.error('❌ [대리점관리 디버깅] 데이터 로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load agent office department data',
+      message: error.message
+    });
+  }
+});
+
 // 정규화작업시트 C열 기준 사무실별 재고 현황 API
 app.get('/api/inventory/normalized-status', async (req, res) => {
   try {
