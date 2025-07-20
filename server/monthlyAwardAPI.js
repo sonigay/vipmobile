@@ -97,14 +97,16 @@ async function getMonthlyAwardData(req, res) {
       storeData,            // 폰클출고처데이터
       activationData,       // 폰클개통데이터
       homeData,             // 폰클홈데이터
-      settingsData          // 장표모드셋팅메뉴
+      settingsData,         // 장표모드셋팅메뉴
+      officeData            // 대리점아이디관리
     ] = await Promise.all([
       getSheetValues(MANUAL_DATA_SHEET_NAME),
       getSheetValues(PLAN_SHEET_NAME),
       getSheetValues(STORE_SHEET_NAME),
       getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME),
       getSheetValues(PHONEKL_HOME_DATA_SHEET_NAME),
-      getSheetValues(MONTHLY_AWARD_SETTINGS_SHEET_NAME)
+      getSheetValues(MONTHLY_AWARD_SETTINGS_SHEET_NAME),
+      getSheetValues('대리점아이디관리')
     ]);
 
     if (!manualData || !planData || !storeData || !activationData || !homeData) {
@@ -113,6 +115,7 @@ async function getMonthlyAwardData(req, res) {
 
     // 담당자 매핑 테이블 생성 (수기초에 있는 실판매POS 코드만)
     const managerMapping = new Map();
+    const managerOfficeMapping = new Map(); // 담당자별 사무실/소속 매핑
     const storeRows = storeData.slice(1);
     
     // 수기초에 있는 실판매POS 코드 수집
@@ -152,6 +155,27 @@ async function getMonthlyAwardData(req, res) {
     console.log('매핑된 실판매POS 코드 예시:', Array.from(managerMapping.keys()).slice(0, 10));
     console.log('매뉴얼데이터 첫 번째 행:', manualData[0]);
     console.log('매뉴얼데이터 두 번째 행:', manualData[1]);
+
+    // 담당자별 사무실/소속 정보 수집 (대리점아이디관리 시트)
+    if (officeData && officeData.length > 1) {
+      const officeRows = officeData.slice(1);
+      officeRows.forEach(row => {
+        if (row.length >= 5) {
+          const manager = (row[0] || '').toString().trim(); // A열: 담당자
+          const office = (row[3] || '').toString().trim(); // D열: 사무실
+          const department = (row[4] || '').toString().trim(); // E열: 소속
+          
+          if (manager) {
+            managerOfficeMapping.set(manager, {
+              office: office,
+              department: department
+            });
+          }
+        }
+      });
+    }
+    
+    console.log('담당자별 사무실/소속 매핑:', Object.fromEntries(managerOfficeMapping));
 
     // 요금제 매핑 테이블 생성
     const planMapping = new Map();
@@ -512,20 +536,6 @@ async function getMonthlyAwardData(req, res) {
       };
     };
 
-    // 각 지표 계산 (담당자별로 계산)
-    const upsellChange = calculateUpsellChange(manager);
-    const change105Above = calculateChange105Above(manager);
-    const strategicProductsResult = calculateStrategicProducts(manager);
-    const internetRatio = calculateInternetRatio(manager);
-
-    // 총점 계산
-    const totalScore = (
-      parseFloat(upsellChange.percentage) +
-      parseFloat(change105Above.percentage) +
-      parseFloat(strategicProductsResult.percentage) +
-      parseFloat(internetRatio.percentage)
-    ).toFixed(2);
-
     // 담당자별 상세 데이터 계산
     const agentMap = new Map();
     
@@ -545,8 +555,11 @@ async function getMonthlyAwardData(req, res) {
       if (manager) {
         matchedCount++;
         if (!agentMap.has(manager)) {
+          const officeInfo = managerOfficeMapping.get(manager) || { office: '', department: '' };
           agentMap.set(manager, {
             name: manager,
+            office: officeInfo.office,
+            department: officeInfo.department,
             upsellChange: { numerator: 0, denominator: 0 },
             change105Above: { numerator: 0, denominator: 0 },
             strategicProducts: { numerator: 0, denominator: 0 },
@@ -618,7 +631,7 @@ async function getMonthlyAwardData(req, res) {
         // 전략상품 계산
         agent.strategicProducts.denominator++;
         
-        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체
+        const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
         const uflix = (row[93] || '').toString().trim(); // DO열: 유플릭스
         const callTone = (row[95] || '').toString().trim(); // DS열: 통화연결음
         const music = (row[79] || '').toString().trim(); // DG열: 뮤직류
@@ -652,9 +665,11 @@ async function getMonthlyAwardData(req, res) {
     console.log('매칭 예시:');
     if (manualRows.length > 0) {
       const firstRow = manualRows[0];
-      const posCode = (firstRow[8] || '').toString().trim();
+      const posCode = (firstRow[7] || '').toString().trim();
       console.log(`실판매POS: "${posCode}"`);
     }
+
+
 
     // 담당자별 인터넷 비중 계산
     const activationRows = activationData.slice(1);
@@ -737,6 +752,97 @@ async function getMonthlyAwardData(req, res) {
         : '0.00';
     });
 
+    // 사무실별/소속별 그룹화된 데이터 생성
+    const officeGroupMap = new Map();
+    const departmentGroupMap = new Map();
+    
+    agentMap.forEach(agent => {
+      // 사무실별 그룹화
+      const officeKey = agent.office || '미분류';
+      if (!officeGroupMap.has(officeKey)) {
+        officeGroupMap.set(officeKey, {
+          office: officeKey,
+          agents: [],
+          totalUpsellChange: { numerator: 0, denominator: 0, percentage: '0.00' },
+          totalChange105Above: { numerator: 0, denominator: 0, percentage: '0.00' },
+          totalStrategicProducts: { numerator: 0, denominator: 0, percentage: '0.00' },
+          totalInternetRatio: { numerator: 0, denominator: 0, percentage: '0.00' }
+        });
+      }
+      const officeGroup = officeGroupMap.get(officeKey);
+      officeGroup.agents.push(agent);
+      
+      // 소속별 그룹화
+      const departmentKey = agent.department || '미분류';
+      if (!departmentGroupMap.has(departmentKey)) {
+        departmentGroupMap.set(departmentKey, {
+          department: departmentKey,
+          agents: [],
+          totalUpsellChange: { numerator: 0, denominator: 0, percentage: '0.00' },
+          totalChange105Above: { numerator: 0, denominator: 0, percentage: '0.00' },
+          totalStrategicProducts: { numerator: 0, denominator: 0, percentage: '0.00' },
+          totalInternetRatio: { numerator: 0, denominator: 0, percentage: '0.00' }
+        });
+      }
+      const departmentGroup = departmentGroupMap.get(departmentKey);
+      departmentGroup.agents.push(agent);
+    });
+    
+    // 사무실별/소속별 합계 계산
+    officeGroupMap.forEach(group => {
+      group.agents.forEach(agent => {
+        group.totalUpsellChange.numerator += agent.upsellChange.numerator;
+        group.totalUpsellChange.denominator += agent.upsellChange.denominator;
+        group.totalChange105Above.numerator += agent.change105Above.numerator;
+        group.totalChange105Above.denominator += agent.change105Above.denominator;
+        group.totalStrategicProducts.numerator += agent.strategicProducts.numerator;
+        group.totalStrategicProducts.denominator += agent.strategicProducts.denominator;
+        group.totalInternetRatio.numerator += agent.internetRatio.numerator;
+        group.totalInternetRatio.denominator += agent.internetRatio.denominator;
+      });
+      
+      // percentage 계산
+      group.totalUpsellChange.percentage = group.totalUpsellChange.denominator > 0 
+        ? (group.totalUpsellChange.numerator / group.totalUpsellChange.denominator * 100).toFixed(2) 
+        : '0.00';
+      group.totalChange105Above.percentage = group.totalChange105Above.denominator > 0 
+        ? (group.totalChange105Above.numerator / group.totalChange105Above.denominator * 100).toFixed(2) 
+        : '0.00';
+      group.totalStrategicProducts.percentage = group.totalStrategicProducts.denominator > 0 
+        ? (group.totalStrategicProducts.numerator / group.totalStrategicProducts.denominator * 100).toFixed(2) 
+        : '0.00';
+      group.totalInternetRatio.percentage = group.totalInternetRatio.denominator > 0 
+        ? (group.totalInternetRatio.numerator / group.totalInternetRatio.denominator * 100).toFixed(2) 
+        : '0.00';
+    });
+    
+    departmentGroupMap.forEach(group => {
+      group.agents.forEach(agent => {
+        group.totalUpsellChange.numerator += agent.upsellChange.numerator;
+        group.totalUpsellChange.denominator += agent.upsellChange.denominator;
+        group.totalChange105Above.numerator += agent.change105Above.numerator;
+        group.totalChange105Above.denominator += agent.change105Above.denominator;
+        group.totalStrategicProducts.numerator += agent.strategicProducts.numerator;
+        group.totalStrategicProducts.denominator += agent.strategicProducts.denominator;
+        group.totalInternetRatio.numerator += agent.internetRatio.numerator;
+        group.totalInternetRatio.denominator += agent.internetRatio.denominator;
+      });
+      
+      // percentage 계산
+      group.totalUpsellChange.percentage = group.totalUpsellChange.denominator > 0 
+        ? (group.totalUpsellChange.numerator / group.totalUpsellChange.denominator * 100).toFixed(2) 
+        : '0.00';
+      group.totalChange105Above.percentage = group.totalChange105Above.denominator > 0 
+        ? (group.totalChange105Above.numerator / group.totalChange105Above.denominator * 100).toFixed(2) 
+        : '0.00';
+      group.totalStrategicProducts.percentage = group.totalStrategicProducts.denominator > 0 
+        ? (group.totalStrategicProducts.numerator / group.totalStrategicProducts.denominator * 100).toFixed(2) 
+        : '0.00';
+      group.totalInternetRatio.percentage = group.totalInternetRatio.denominator > 0 
+        ? (group.totalInternetRatio.numerator / group.totalInternetRatio.denominator * 100).toFixed(2) 
+        : '0.00';
+    });
+
     // 디버깅 로그 추가
     console.log('담당자별 계산 결과:');
     agentMap.forEach((agent, name) => {
@@ -759,7 +865,9 @@ async function getMonthlyAwardData(req, res) {
       totalScore,
       matrixCriteria: finalMatrixCriteria,
       strategicProductsList: finalStrategicProducts,
-      agentDetails: Array.from(agentMap.values())
+      agentDetails: Array.from(agentMap.values()),
+      officeGroups: Array.from(officeGroupMap.values()),
+      departmentGroups: Array.from(departmentGroupMap.values())
     };
 
     res.json(result);

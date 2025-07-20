@@ -1178,6 +1178,88 @@ function MonthlyAwardTab() {
           </TableContainer>
         </Paper>
 
+      {/* 사무실별 성과 테이블 */}
+      {data.officeGroups && data.officeGroups.length > 0 && (
+        <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
+            사무실별 성과 현황
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>사무실</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.officeGroups.map((group, index) => (
+                  <TableRow key={index}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.office}</TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalUpsellChange.percentage}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalChange105Above.percentage}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalStrategicProducts.percentage}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalInternetRatio.percentage}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+
+      {/* 소속별 성과 테이블 */}
+      {data.departmentGroups && data.departmentGroups.length > 0 && (
+        <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
+            소속별 성과 현황
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>소속</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.departmentGroups.map((group, index) => (
+                  <TableRow key={index}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.department}</TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalUpsellChange.percentage}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalChange105Above.percentage}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalStrategicProducts.percentage}%
+                    </TableCell>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {group.totalInternetRatio.percentage}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+
       {/* 셋팅 다이얼로그 */}
       <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="lg" fullWidth>
         <DialogTitle>월간시상 셋팅</DialogTitle>
