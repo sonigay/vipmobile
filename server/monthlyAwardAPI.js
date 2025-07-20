@@ -1316,14 +1316,12 @@ async function saveMonthlyAwardSettings(req, res) {
         sheetData = data.map(item => [item.score, item.percentage]);
         break;
       case 'strategic_products':
-        // 전략상품 리스트 저장
-        sheetData = data.map(item => [
-          item.subCategory || '',
-          item.serviceCode || '',
-          item.serviceName || '',
-          parseFloat(item.points) || 0 // 명시적으로 숫자로 변환
-        ]);
-        console.log('전략상품 변환된 데이터:', sheetData);
+        // 전략상품 리스트 저장 (임시 비활성화)
+        console.log('전략상품 저장 요청이 비활성화되어 있습니다.');
+        return res.status(400).json({
+          success: false,
+          error: '전략상품 저장 기능이 임시로 비활성화되어 있습니다. 추가 버튼을 사용해주세요.'
+        });
         break;
       default:
         return res.status(400).json({
