@@ -3014,9 +3014,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작');
     try {
+      console.log('🔍 [서버시작] 1단계: 시트 데이터 가져오기 시작');
+      
       // 폰클재고데이터를 기준으로 배정 상태 데이터 가져오기
       const phoneklInventoryValues = await getSheetValues('폰클재고데이터');
+      console.log(`🔍 [서버시작] 폰클재고데이터 로드 완료: ${phoneklInventoryValues ? phoneklInventoryValues.length : 0}개 행`);
+      
       const reservationSiteValues = await getSheetValues('사전예약사이트');
+      console.log(`🔍 [서버시작] 사전예약사이트 로드 완료: ${reservationSiteValues ? reservationSiteValues.length : 0}개 행`);
       
       if (!phoneklInventoryValues || !reservationSiteValues) {
         throw new Error('시트 데이터를 가져올 수 없습니다.');
@@ -3281,6 +3286,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
       
     } catch (error) {
       console.error('❌ [서버시작] 배정완료 재고 자동 저장 오류:', error);
+      console.error('❌ [서버시작] 오류 상세:', error.message);
+      console.error('❌ [서버시작] 오류 스택:', error.stack);
     }
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
