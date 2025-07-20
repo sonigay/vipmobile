@@ -19,19 +19,66 @@ const auth = new google.auth.JWT({
 const sheets = google.sheets({ version: 'v4', auth });
 const SPREADSHEET_ID = process.env.SHEET_ID;
 
+// 캐시 시스템
+const cache = {
+  data: new Map(),
+  timestamps: new Map(),
+  TTL: 5 * 60 * 1000 // 5분 캐시
+};
+
+// 캐시에서 데이터 가져오기
+function getFromCache(key) {
+  const timestamp = cache.timestamps.get(key);
+  if (timestamp && Date.now() - timestamp < cache.TTL) {
+    return cache.data.get(key);
+  }
+  return null;
+}
+
+// 캐시에 데이터 저장
+function setCache(key, data) {
+  cache.data.set(key, data);
+  cache.timestamps.set(key, Date.now());
+}
+
 // 데이터 시트에서 값 가져오기 (캐싱 적용)
 async function getSheetValues(sheetName) {
   try {
+    // 캐시에서 먼저 확인
+    const cachedData = getFromCache(sheetName);
+    if (cachedData) {
+      console.log(`캐시에서 ${sheetName} 데이터 로드`);
+      return cachedData;
+    }
+
+    console.log(`Google Sheets에서 ${sheetName} 데이터 로드`);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: sheetName
     });
     
     const data = response.data.values || [];
+    
+    // 캐시에 저장
+    setCache(sheetName, data);
+    
     return data;
   } catch (error) {
     console.error(`Error fetching sheet ${sheetName}:`, error);
     throw error;
+  }
+}
+
+// 캐시 무효화 함수
+function invalidateCache(sheetName = null) {
+  if (sheetName) {
+    cache.data.delete(sheetName);
+    cache.timestamps.delete(sheetName);
+    console.log(`${sheetName} 캐시 무효화`);
+  } else {
+    cache.data.clear();
+    cache.timestamps.clear();
+    console.log('모든 캐시 무효화');
   }
 }
 
@@ -626,6 +673,14 @@ async function saveMonthlyAwardSettings(req, res) {
         values: sheetData
       }
     });
+
+    // 캐시 무효화
+    invalidateCache(MANUAL_DATA_SHEET_NAME);
+    invalidateCache(PLAN_SHEET_NAME);
+    invalidateCache(STORE_SHEET_NAME);
+    invalidateCache(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
+    invalidateCache(PHONEKL_HOME_DATA_SHEET_NAME);
+    invalidateCache(MONTHLY_AWARD_SETTINGS_SHEET_NAME);
 
     res.json({
       success: true,
