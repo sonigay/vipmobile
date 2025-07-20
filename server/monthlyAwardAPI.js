@@ -253,11 +253,13 @@ async function getMonthlyAwardData(req, res) {
     const finalMatrixCriteria = matrixCriteria.length > 0 ? matrixCriteria : defaultMatrixCriteria;
 
     // 월간시상 계산 함수들
-    const calculateUpsellChange = () => {
+    const calculateUpsellChange = (manager) => {
       const manualRows = manualData.slice(1);
       
       let numerator = 0; // 자수
       let denominator = 0; // 모수
+      
+      console.log(`\n=== ${manager} 업셀기변 계산 시작 ===`);
       
       manualRows.forEach(row => {
         if (row.length < 90) return; // 최소 필요한 열 수 확인
@@ -267,6 +269,13 @@ async function getMonthlyAwardData(req, res) {
         const finalPolicy = (row[39] || '').toString().trim(); // AN열: 최종영업정책
         const modelType = (row[67] || '').toString().trim(); // CL열: 모델유형
         const joinType = (row[10] || '').toString().trim(); // K열: 가입구분
+        
+        // 담당자 매칭 확인
+        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+        const matchedManager = managerMapping.get(posCode);
+        if (matchedManager !== manager) {
+          return; // 해당 담당자가 아닌 경우 제외
+        }
         
         // 기본조건 검증
         if (!subscriptionNumber || finalPolicy === 'BLANK' || 
@@ -297,6 +306,7 @@ async function getMonthlyAwardData(req, res) {
         }
       });
       
+      console.log(`${manager} 업셀기변 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
         numerator,
         denominator,
@@ -304,14 +314,23 @@ async function getMonthlyAwardData(req, res) {
       };
     };
 
-    const calculateChange105Above = () => {
+    const calculateChange105Above = (manager) => {
       const manualRows = manualData.slice(1);
       
       let numerator = 0;
       let denominator = 0;
       
+      console.log(`\n=== ${manager} 기변105이상 계산 시작 ===`);
+      
       manualRows.forEach(row => {
         if (row.length < 90) return;
+        
+        // 담당자 매칭 확인
+        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+        const matchedManager = managerMapping.get(posCode);
+        if (matchedManager !== manager) {
+          return; // 해당 담당자가 아닌 경우 제외
+        }
         
         // 기본조건 확인
         const subscriptionNumber = (row[0] || '').toString().trim();
@@ -357,6 +376,7 @@ async function getMonthlyAwardData(req, res) {
         }
       });
       
+      console.log(`${manager} 기변105이상 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
         numerator,
         denominator,
@@ -364,14 +384,24 @@ async function getMonthlyAwardData(req, res) {
       };
     };
 
-    const calculateStrategicProducts = () => {
+    const calculateStrategicProducts = (manager) => {
       const manualRows = manualData.slice(1);
       
       let numerator = 0;
       let denominator = 0;
       
+      console.log(`\n=== ${manager} 전략상품 계산 시작 ===`);
+      console.log(`전략상품 설정:`, finalStrategicProducts);
+      
       manualRows.forEach(row => {
         if (row.length < 90) return;
+        
+        // 담당자 매칭 확인
+        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+        const matchedManager = managerMapping.get(posCode);
+        if (matchedManager !== manager) {
+          return; // 해당 담당자가 아닌 경우 제외
+        }
         
         // 기본조건 확인
         const subscriptionNumber = (row[0] || '').toString().trim();
@@ -415,6 +445,7 @@ async function getMonthlyAwardData(req, res) {
         numerator += totalPoints;
       });
       
+      console.log(`${manager} 전략상품 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
         numerator,
         denominator,
@@ -422,12 +453,14 @@ async function getMonthlyAwardData(req, res) {
       };
     };
 
-    const calculateInternetRatio = () => {
+    const calculateInternetRatio = (manager) => {
       const activationRows = activationData.slice(1);
       const homeRows = homeData.slice(1);
       
       let numerator = 0;
       let denominator = 0;
+      
+      console.log(`\n=== ${manager} 인터넷 비중 계산 시작 ===`);
       
       // 개통데이터 기준으로 모수 계산
       activationRows.forEach(row => {
@@ -471,6 +504,7 @@ async function getMonthlyAwardData(req, res) {
         }
       });
       
+      console.log(`${manager} 인터넷 비중 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
         numerator,
         denominator,
@@ -478,11 +512,11 @@ async function getMonthlyAwardData(req, res) {
       };
     };
 
-    // 각 지표 계산
-    const upsellChange = calculateUpsellChange();
-    const change105Above = calculateChange105Above();
-    const strategicProductsResult = calculateStrategicProducts();
-    const internetRatio = calculateInternetRatio();
+    // 각 지표 계산 (담당자별로 계산)
+    const upsellChange = calculateUpsellChange(manager);
+    const change105Above = calculateChange105Above(manager);
+    const strategicProductsResult = calculateStrategicProducts(manager);
+    const internetRatio = calculateInternetRatio(manager);
 
     // 총점 계산
     const totalScore = (
