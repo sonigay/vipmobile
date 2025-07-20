@@ -913,7 +913,7 @@ async function getMonthlyAwardData(req, res) {
       const firstHomeRow = homeRows[0];
       console.log('=== 홈데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstHomeRow.length);
-      console.log('G열(6) - 업체명:', firstHomeRow[6]);
+      console.log('C열(2) - 업체명:', firstHomeRow[2]); // 수정됨
       console.log('J열(9) - 가입상품:', firstHomeRow[9]);
       console.log('================================');
     }
@@ -923,7 +923,8 @@ async function getMonthlyAwardData(req, res) {
       const firstStoreRow = storeRows[0];
       console.log('=== 폰클출고처데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstStoreRow.length);
-      console.log('C열(2) - 출고처 업체명:', firstStoreRow[2]);
+      console.log('C열(2) - 출고처:', firstStoreRow[2]);
+      console.log('G열(6) - 업체명:', firstStoreRow[6]); // 수정됨
       console.log('E열(4) - 상태:', firstStoreRow[4]);
       console.log('H열(7) - 실판매POS 코드:', firstStoreRow[7]);
       console.log('N열(13) - 담당자:', firstStoreRow[13]);
@@ -933,7 +934,7 @@ async function getMonthlyAwardData(req, res) {
       console.log('=== 폰클출고처데이터 업체명 샘플 ===');
       storeRows.slice(1, 11).forEach((row, index) => {
         if (row.length >= 14) {
-          const companyName = (row[2] || '').toString().trim();
+          const companyName = (row[6] || '').toString().trim(); // G열로 수정
           const manager = (row[13] || '').toString().trim();
           const status = (row[4] || '').toString().trim();
           if (companyName && manager && status !== '미사용') {
@@ -950,7 +951,7 @@ async function getMonthlyAwardData(req, res) {
     storeRows.forEach(row => {
       if (row.length >= 14) {
         const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
-        const companyName = (row[2] || '').toString().trim(); // C열: 출고처 업체명
+        const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (수정됨)
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
         const status = (row[4] || '').toString().trim(); // E열: 상태
         
@@ -1020,7 +1021,7 @@ async function getMonthlyAwardData(req, res) {
       if (row.length < 10) return;
       
       const product = (row[9] || '').toString().trim(); // J열: 가입상품
-      const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (홈데이터도 G열)
+      const companyName = (row[2] || '').toString().trim(); // C열: 업체명 (홈데이터는 C열)
       
       homeProcessedCount++;
       
