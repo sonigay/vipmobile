@@ -628,7 +628,7 @@ async function getMonthlyAwardData(req, res) {
           }
         }
         
-        // 전략상품 계산
+        // 전략상품 계산 (모든 행에 대해 계산)
         agent.strategicProducts.denominator++;
         
         const insurance = (row[83] || '').toString().trim(); // DL열: 보험(폰교체)
@@ -649,6 +649,7 @@ async function getMonthlyAwardData(req, res) {
             
             if (product) {
               totalPoints += product.points;
+              console.log(`${manager} 전략상품 매칭: ${service} -> ${product.points}점`);
             }
           }
         });
@@ -683,7 +684,11 @@ async function getMonthlyAwardData(req, res) {
       const modelName = (row[13] || '').toString().trim(); // N열: 모델명
       const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
       const planName = (row[21] || '').toString().trim(); // V열: 요금제
-      const posCode = (row[7] || '').toString().trim(); // H열: P코드
+      const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+      
+      // 담당자 매칭 확인
+      const manager = managerMapping.get(posCode);
+      if (!manager) return;
       
       // 모수 조건 확인
       if (activation === '선불개통' || !modelName || inputStore === '중고') {
@@ -696,9 +701,8 @@ async function getMonthlyAwardData(req, res) {
         return;
       }
       
-      // 담당자 매핑
-      const manager = managerMapping.get(posCode);
-      if (manager && agentMap.has(manager)) {
+      // 해당 담당자의 모수 증가
+      if (agentMap.has(manager)) {
         agentMap.get(manager).internetRatio.denominator++;
       }
     });
@@ -708,21 +712,23 @@ async function getMonthlyAwardData(req, res) {
       if (row.length < 10) return;
       
       const product = (row[9] || '').toString().trim(); // J열: 가입상품
-      const posCode = (row[7] || '').toString().trim(); // H열: P코드
+      const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
+      
+      // 담당자 매칭 확인
+      const manager = managerMapping.get(posCode);
+      if (!manager) return;
       
       // 자수 조건 확인
       if (product === '인터넷') {
         // 동판 문구가 없는 경우에만 추가 조건 확인
         if (!product.includes('동판')) {
           if (product !== '선불' && product !== '소호') {
-            const manager = managerMapping.get(posCode);
-            if (manager && agentMap.has(manager)) {
+            if (agentMap.has(manager)) {
               agentMap.get(manager).internetRatio.numerator++;
             }
           }
         } else {
-          const manager = managerMapping.get(posCode);
-          if (manager && agentMap.has(manager)) {
+          if (agentMap.has(manager)) {
             agentMap.get(manager).internetRatio.numerator++;
           }
         }
