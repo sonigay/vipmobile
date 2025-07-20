@@ -126,13 +126,18 @@ async function getMonthlyAwardData(req, res) {
       }
     });
     
-    // 수기초에 있는 실판매POS 코드만 매핑
+    console.log('수기초에 있는 실판매POS 코드 수:', manualPosCodes.size);
+    console.log('수기초 실판매POS 코드 예시:', Array.from(manualPosCodes).slice(0, 10));
+    
+    // 수기초에 있는 실판매POS 코드만 매핑 (미사용 상태 제외)
     storeRows.forEach(row => {
       if (row.length >= 14) {
         const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
         const manager = (row[13] || '').toString().trim(); // N열: 담당자
+        const status = (row[4] || '').toString().trim(); // E열: 상태
         
-        if (posCode && manager && manualPosCodes.has(posCode)) {
+        // 미사용 상태 제외하고, 수기초에 있는 실판매POS 코드만 매핑
+        if (posCode && manager && status !== '미사용' && manualPosCodes.has(posCode)) {
           // 담당자 이름에서 괄호 부분 제거
           const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
           managerMapping.set(posCode, cleanManager);
@@ -143,6 +148,8 @@ async function getMonthlyAwardData(req, res) {
     // 디버깅 로그 추가
     console.log('담당자 매핑 테이블 크기:', managerMapping.size);
     console.log('담당자 목록:', Array.from(managerMapping.values()));
+    console.log('매핑된 실판매POS 코드 수:', managerMapping.size);
+    console.log('매핑된 실판매POS 코드 예시:', Array.from(managerMapping.keys()).slice(0, 10));
     console.log('매뉴얼데이터 첫 번째 행:', manualData[0]);
     console.log('매뉴얼데이터 두 번째 행:', manualData[1]);
 
