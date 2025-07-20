@@ -843,6 +843,45 @@ async function getMonthlyAwardData(req, res) {
         : '0.00';
     });
 
+    // 전체 합계 계산
+    let totalUpsellChange = { numerator: 0, denominator: 0, percentage: '0.00' };
+    let totalChange105Above = { numerator: 0, denominator: 0, percentage: '0.00' };
+    let totalStrategicProducts = { numerator: 0, denominator: 0, percentage: '0.00' };
+    let totalInternetRatio = { numerator: 0, denominator: 0, percentage: '0.00' };
+
+    agentMap.forEach(agent => {
+      totalUpsellChange.numerator += agent.upsellChange.numerator;
+      totalUpsellChange.denominator += agent.upsellChange.denominator;
+      totalChange105Above.numerator += agent.change105Above.numerator;
+      totalChange105Above.denominator += agent.change105Above.denominator;
+      totalStrategicProducts.numerator += agent.strategicProducts.numerator;
+      totalStrategicProducts.denominator += agent.strategicProducts.denominator;
+      totalInternetRatio.numerator += agent.internetRatio.numerator;
+      totalInternetRatio.denominator += agent.internetRatio.denominator;
+    });
+
+    // 전체 percentage 계산
+    totalUpsellChange.percentage = totalUpsellChange.denominator > 0 
+      ? (totalUpsellChange.numerator / totalUpsellChange.denominator * 100).toFixed(2) 
+      : '0.00';
+    totalChange105Above.percentage = totalChange105Above.denominator > 0 
+      ? (totalChange105Above.numerator / totalChange105Above.denominator * 100).toFixed(2) 
+      : '0.00';
+    totalStrategicProducts.percentage = totalStrategicProducts.denominator > 0 
+      ? (totalStrategicProducts.numerator / totalStrategicProducts.denominator * 100).toFixed(2) 
+      : '0.00';
+    totalInternetRatio.percentage = totalInternetRatio.denominator > 0 
+      ? (totalInternetRatio.numerator / totalInternetRatio.denominator * 100).toFixed(2) 
+      : '0.00';
+
+    // 총점 계산
+    const totalScore = (
+      parseFloat(totalUpsellChange.percentage) +
+      parseFloat(totalChange105Above.percentage) +
+      parseFloat(totalStrategicProducts.percentage) +
+      parseFloat(totalInternetRatio.percentage)
+    ).toFixed(2);
+
     // 디버깅 로그 추가
     console.log('담당자별 계산 결과:');
     agentMap.forEach((agent, name) => {
@@ -857,10 +896,10 @@ async function getMonthlyAwardData(req, res) {
     const result = {
       date: new Date().toISOString().split('T')[0],
       indicators: {
-        upsellChange,
-        change105Above,
-        strategicProducts: strategicProductsResult,
-        internetRatio
+        upsellChange: totalUpsellChange,
+        change105Above: totalChange105Above,
+        strategicProducts: totalStrategicProducts,
+        internetRatio: totalInternetRatio
       },
       totalScore,
       matrixCriteria: finalMatrixCriteria,
