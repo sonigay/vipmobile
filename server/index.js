@@ -2838,35 +2838,64 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
       }
     });
     
-    // 폰클재고데이터에서 모델별 재고 수량 집계
-    const phoneklInventory = new Map(); // key: "모델명_색상", value: 수량
+    // 폰클재고데이터에서 사무실별 모델별 재고 수량 집계
+    const officeInventory = {
+      '평택사무실': new Map(), // key: "모델명_색상", value: 수량
+      '인천사무실': new Map(),
+      '군산사무실': new Map()
+    };
+    
     phoneklInventoryValues.slice(1).forEach(row => {
-      if (row.length >= 7) {
+      if (row.length >= 15) {
         const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
         const color = (row[6] || '').toString().trim(); // G열: 색상
+        const storeName = (row[13] || '').toString().trim(); // N열: 출고처
         
-        if (modelCapacity && color) {
-          // 모델명에 색상 정보가 없으면 추가
-          let modelWithColor = modelCapacity;
-          if (!modelCapacity.includes('|') && color) {
-            modelWithColor = `${modelCapacity} | ${color}`;
+        if (modelCapacity && color && storeName) {
+          // 사무실명 추출
+          let officeName = '';
+          if (storeName.includes('평택')) {
+            officeName = '평택사무실';
+          } else if (storeName.includes('인천')) {
+            officeName = '인천사무실';
+          } else if (storeName.includes('군산')) {
+            officeName = '군산사무실';
           }
           
-          const key = modelWithColor;
-          normalizedInventory.set(key, (normalizedInventory.get(key) || 0) + 1);
+          if (officeName && officeInventory[officeName]) {
+            // 모델명에 색상 정보가 없으면 추가
+            let modelWithColor = modelCapacity;
+            if (!modelCapacity.includes('|') && color) {
+              modelWithColor = `${modelCapacity} | ${color}`;
+            }
+            
+            const key = modelWithColor;
+            officeInventory[officeName].set(key, (officeInventory[officeName].get(key) || 0) + 1);
+          }
         }
       }
     });
     
-    // 정규화 규칙을 통해 사전예약사이트 형식으로 변환
-    const result = {};
+    // 정규화 규칙을 통해 사무실별 사전예약사이트 형식으로 변환
+    const result = {
+      '평택사무실': {},
+      '인천사무실': {},
+      '군산사무실': {}
+    };
+    
     normalizationRules.forEach((phoneklData, reservationSiteModel) => {
       const phoneklKey = `${phoneklData.phoneklModel} | ${phoneklData.phoneklColor}`;
-      const count = normalizedInventory.get(phoneklKey) || 0;
       
-      if (count > 0) {
-        result[reservationSiteModel] = count;
-      }
+      // 각 사무실별로 정규화된 모델별 재고 카운트
+      Object.keys(officeInventory).forEach(officeName => {
+        const count = officeInventory[officeName].get(phoneklKey) || 0;
+        if (count > 0) {
+          if (!result[officeName][reservationSiteModel]) {
+            result[officeName][reservationSiteModel] = 0;
+          }
+          result[officeName][reservationSiteModel] += count;
+        }
+      });
     });
     
     console.log(`📊 [재고현황 디버깅] 정규화작업시트 C열 기준 재고 현황 완료: ${Object.keys(result).length}개 모델`);

@@ -59,6 +59,9 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [inventoryStatus, setInventoryStatus] = useState({});
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [manualAssignmentLoading, setManualAssignmentLoading] = useState(false);
+  const [receptionFilter, setReceptionFilter] = useState('all'); // 'all', 'yard', 'onsale', 'both'
+  const [yardDateFilter, setYardDateFilter] = useState('');
+  const [onsaleDateFilter, setOnsaleDateFilter] = useState('');
 
   // 전체 고객리스트 로드 (캐시 적용)
   const loadAllCustomerList = useCallback(async () => {
@@ -127,8 +130,41 @@ function AllCustomerListScreen({ loggedInStore }) {
       });
     }
 
+    // 접수 상태 필터 적용
+    if (receptionFilter !== 'all') {
+      filtered = filtered.filter(customer => {
+        const yardReceived = customer.yardReceivedDate && customer.yardReceivedDate.trim() !== '';
+        const onSaleReceived = customer.onSaleReceivedDate && customer.onSaleReceivedDate.trim() !== '';
+        
+        if (receptionFilter === 'yard') {
+          return yardReceived && !onSaleReceived;
+        } else if (receptionFilter === 'onsale') {
+          return onSaleReceived && !yardReceived;
+        } else if (receptionFilter === 'both') {
+          return yardReceived && onSaleReceived;
+        }
+        return true;
+      });
+    }
+
+    // 마당접수일 필터 적용
+    if (yardDateFilter.trim()) {
+      filtered = filtered.filter(customer => {
+        if (!customer.yardReceivedDate) return false;
+        return customer.yardReceivedDate.includes(yardDateFilter);
+      });
+    }
+
+    // 온세일접수일 필터 적용
+    if (onsaleDateFilter.trim()) {
+      filtered = filtered.filter(customer => {
+        if (!customer.onSaleReceivedDate) return false;
+        return customer.onSaleReceivedDate.includes(onsaleDateFilter);
+      });
+    }
+
     setFilteredCustomerList(filtered);
-  }, [customerList, searchQuery, assignmentFilter, activationFilter, assignmentStatus]);
+  }, [customerList, searchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, assignmentStatus]);
 
   // 검색 기능 (캐시 적용)
   const handleSearch = useCallback((query) => {
@@ -145,6 +181,9 @@ function AllCustomerListScreen({ loggedInStore }) {
     setSearchQuery('');
     setAssignmentFilter('all');
     setActivationFilter('all');
+    setReceptionFilter('all');
+    setYardDateFilter('');
+    setOnsaleDateFilter('');
   }, []);
 
 
@@ -347,11 +386,11 @@ function AllCustomerListScreen({ loggedInStore }) {
       ws['!cols'] = colWidths;
 
       // 워크시트를 워크북에 추가
-      XLSX.utils.book_append_sheet(wb, ws, '전체고객리스트');
+              XLSX.utils.book_append_sheet(wb, ws, '사전예약고객리스트');
 
       // 파일명 생성
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      const fileName = `전체고객리스트_${timestamp}.xlsx`;
+              const fileName = `사전예약고객리스트_${timestamp}.xlsx`;
 
       // 엑셀 파일 다운로드
       XLSX.writeFile(wb, fileName);
@@ -632,7 +671,7 @@ function AllCustomerListScreen({ loggedInStore }) {
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: '#ff9a9e' }}>
-            전체고객리스트
+            사전예약고객리스트
           </Typography>
           
           {/* 캐시 상태 표시 */}
@@ -654,7 +693,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         </Box>
         
         <Typography variant="body1" color="text.secondary">
-          전체 고객 정보를 확인하고 검색할 수 있습니다 (모델/용량/색상)
+          사전예약 고객 정보를 확인하고 검색할 수 있습니다 (모델/용량/색상)
         </Typography>
         
         {/* 통계 정보 */}
@@ -722,23 +761,30 @@ function AllCustomerListScreen({ loggedInStore }) {
             </Button>
           </Box>
 
-          {/* 정규화작업시트 C열 기준 재고 현황 */}
+          {/* 정규화작업시트 C열 기준 사무실별 재고 현황 */}
           {Object.keys(inventoryStatus).length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
-                정규화작업시트 C열 기준 재고 현황
+                정규화작업시트 C열 기준 사무실별 재고 현황
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {Object.entries(inventoryStatus).map(([model, count]) => (
-                  <Chip
-                    key={model}
-                    label={`${model}: ${count}대`}
-                    variant="outlined"
-                    size="small"
-                    color="primary"
-                  />
-                ))}
-              </Box>
+              {Object.entries(inventoryStatus).map(([officeName, models]) => (
+                <Box key={officeName} sx={{ mb: 2 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
+                    {officeName}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {Object.entries(models).map(([model, count]) => (
+                      <Chip
+                        key={`${officeName}-${model}`}
+                        label={`${model}: ${count}대`}
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              ))}
             </Box>
           )}
         </CardContent>
@@ -832,8 +878,59 @@ function AllCustomerListScreen({ loggedInStore }) {
                 </Select>
               </FormControl>
 
+              {/* 접수 상태 필터 */}
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>접수상태</InputLabel>
+                <Select
+                  value={receptionFilter}
+                  label="접수상태"
+                  onChange={(e) => setReceptionFilter(e.target.value)}
+                >
+                  <MenuItem value="all">전체</MenuItem>
+                  <MenuItem value="yard">마당접수만</MenuItem>
+                  <MenuItem value="onsale">온세일접수만</MenuItem>
+                  <MenuItem value="both">양쪽접수</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* 마당접수일 필터 */}
+              <TextField
+                size="small"
+                placeholder="마당접수일"
+                value={yardDateFilter}
+                onChange={(e) => setYardDateFilter(e.target.value)}
+                sx={{ minWidth: 120 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                        마당
+                      </Typography>
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              {/* 온세일접수일 필터 */}
+              <TextField
+                size="small"
+                placeholder="온세일접수일"
+                value={onsaleDateFilter}
+                onChange={(e) => setOnsaleDateFilter(e.target.value)}
+                sx={{ minWidth: 120 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                        온세일
+                      </Typography>
+                    </InputAdornment>
+                  )
+                }}
+              />
+
               {/* 필터 초기화 버튼 */}
-              {(assignmentFilter !== 'all' || activationFilter !== 'all' || searchQuery) && (
+              {(assignmentFilter !== 'all' || activationFilter !== 'all' || receptionFilter !== 'all' || searchQuery || yardDateFilter || onsaleDateFilter) && (
                 <Button
                   variant="outlined"
                   size="small"
@@ -872,6 +969,36 @@ function AllCustomerListScreen({ loggedInStore }) {
                 size="small"
                 color="info"
                 variant="outlined"
+              />
+            )}
+            {receptionFilter !== 'all' && (
+              <Chip
+                label={`접수상태: ${
+                  receptionFilter === 'yard' ? '마당접수만' : 
+                  receptionFilter === 'onsale' ? '온세일접수만' : 
+                  '양쪽접수'
+                }`}
+                size="small"
+                color="warning"
+                variant="outlined"
+              />
+            )}
+            {yardDateFilter && (
+              <Chip
+                label={`마당접수일: ${yardDateFilter}`}
+                size="small"
+                color="secondary"
+                variant="outlined"
+                onDelete={() => setYardDateFilter('')}
+              />
+            )}
+            {onsaleDateFilter && (
+              <Chip
+                label={`온세일접수일: ${onsaleDateFilter}`}
+                size="small"
+                color="secondary"
+                variant="outlined"
+                onDelete={() => setOnsaleDateFilter('')}
               />
             )}
           </Box>

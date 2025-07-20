@@ -663,7 +663,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             {/* 판매처별정리 탭 제거됨 */}
             {/* 배정셋팅 탭 제거됨 */}
             <Tab 
-              label="전체고객리스트" 
+              label="사전예약고객리스트" 
               icon={<PeopleIcon />} 
               iconPosition="start"
               sx={{ 
