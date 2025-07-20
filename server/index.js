@@ -3051,11 +3051,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
       });
       
       console.log(`💾 [서버시작] 재고 데이터 처리 완료: ${inventoryMap.size}개 배정완료 재고`);
+      console.log(`🔍 [서버시작] 재고 데이터 샘플:`, Array.from(inventoryMap.entries()).slice(0, 5));
       
       // 사전예약사이트 데이터와 매칭
       const assignments = [];
       let updatedCount = 0;
       let skippedCount = 0;
+      let noMatchCount = 0;
       
       // 서버 시작 시 중복 배정 자동 정리
       console.log('🧹 [서버시작] 중복 배정 데이터 자동 정리 시작');
@@ -3104,8 +3106,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
       
       console.log(`✅ [서버시작] 중복 배정 정리 완료: ${cleanedCount}개 배정 해제`);
       
+      console.log(`🔍 [서버시작] 사전예약사이트 데이터 처리 시작: ${reservationSiteValues.length - 1}개 행`);
+      
       reservationSiteValues.slice(1).forEach((row, index) => {
-        if (row.length < 22) return;
+        if (row.length < 22) {
+          console.log(`⚠️ [서버시작] 행 ${index + 2}: 컬럼 수 부족 (${row.length})`);
+          return;
+        }
         
         const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
         const customerName = (row[7] || '').toString().trim(); // H열: 고객명
@@ -3117,27 +3124,78 @@ const server = app.listen(port, '0.0.0.0', async () => {
         if (reservationNumber && customerName && model && color && capacity) {
           const inventoryKey = `${model} ${capacity} ${color}`;
           
+          // 처음 5개 행은 상세 로그
+          if (index < 5) {
+            console.log(`🔍 [서버시작] 행 ${index + 2}: 예약번호="${reservationNumber}", 모델="${model} ${capacity} ${color}", 현재일련번호="${currentSerialNumber}"`);
+          }
+          
           const assignedSerialNumber = inventoryMap.get(inventoryKey);
           
           if (assignedSerialNumber) {
+            // 기존 배정 상태 확인
+            const existingAssignment = assignmentMemory.get(reservationNumber);
+            
             // 이미 배정된 일련번호가 있고, 현재와 다른 경우에만 업데이트
             if (currentSerialNumber !== assignedSerialNumber) {
-              row[6] = assignedSerialNumber; // G열 업데이트
-              updatedCount++;
-              
-              assignments.push({
-                reservationNumber,
-                assignedSerialNumber
-              });
+              // 기존에 배정된 적이 없거나, 다른 일련번호로 배정된 경우에만 업데이트
+              if (!existingAssignment || existingAssignment.serialNumber !== assignedSerialNumber) {
+                row[6] = assignedSerialNumber; // G열 업데이트
+                updatedCount++;
+                
+                if (index < 5) {
+                  console.log(`✅ [서버시작] 행 ${index + 2}: 일련번호 업데이트 "${currentSerialNumber}" → "${assignedSerialNumber}" (새로운 배정)`);
+                }
+                
+                assignments.push({
+                  reservationNumber,
+                  assignedSerialNumber
+                });
+              } else {
+                skippedCount++;
+                if (index < 5) {
+                  console.log(`⏭️ [서버시작] 행 ${index + 2}: 이미 배정된 일련번호 "${assignedSerialNumber}" (메모리 확인)`);
+                }
+              }
             } else {
               skippedCount++;
+              if (index < 5) {
+                console.log(`⏭️ [서버시작] 행 ${index + 2}: 이미 올바른 일련번호 "${currentSerialNumber}"`);
+              }
             }
+          } else {
+            noMatchCount++;
+            if (index < 5) {
+              console.log(`❌ [서버시작] 행 ${index + 2}: 재고 매칭 실패 "${inventoryKey}"`);
+            }
+          }
+        } else {
+          if (index < 5) {
+            console.log(`⚠️ [서버시작] 행 ${index + 2}: 필수 데이터 누락 - 예약번호:${!!reservationNumber}, 고객명:${!!customerName}, 모델:${!!model}, 용량:${!!capacity}, 색상:${!!color}`);
           }
         }
       });
       
-              // Google Sheets에 저장
-        if (updatedCount > 0) {
+      console.log(`📊 [서버시작] 매칭 결과: 업데이트=${updatedCount}, 유지=${skippedCount}, 매칭실패=${noMatchCount}`);
+      
+      // 기존 배정 상태를 메모리에 로드
+      console.log(`💾 [서버시작] 기존 배정 상태 메모리 로드 시작`);
+      reservationSiteValues.slice(1).forEach((row, index) => {
+        if (row.length >= 22) {
+          const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+          const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+          
+          if (reservationNumber && currentSerialNumber) {
+            assignmentMemory.set(reservationNumber, {
+              serialNumber: currentSerialNumber,
+              timestamp: Date.now()
+            });
+          }
+        }
+      });
+      console.log(`💾 [서버시작] 기존 배정 상태 ${assignmentMemory.size}개 메모리 로드 완료`);
+      
+      // Google Sheets에 저장
+      if (updatedCount > 0) {
           try {
             const sheets = google.sheets({ version: 'v4', auth });
             const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
@@ -8082,6 +8140,71 @@ app.get('/api/reservation-settings/data', async (req, res) => {
   }
 });
 
+// 배정 상태 메모리 저장소 (서버 재시작 시 초기화됨)
+const assignmentMemory = new Map(); // key: reservationNumber, value: { serialNumber, timestamp }
+
+// 배정 상태 저장 API
+app.post('/api/reservation/save-assignment-memory', async (req, res) => {
+  try {
+    const { assignments } = req.body;
+    
+    if (!Array.isArray(assignments)) {
+      throw new Error('배정 데이터가 올바르지 않습니다.');
+    }
+    
+    // 메모리에 배정 상태 저장
+    assignments.forEach(assignment => {
+      if (assignment.reservationNumber && assignment.assignedSerialNumber) {
+        assignmentMemory.set(assignment.reservationNumber, {
+          serialNumber: assignment.assignedSerialNumber,
+          timestamp: Date.now()
+        });
+      }
+    });
+    
+    console.log(`💾 [배정메모리] ${assignments.length}개 배정 상태 저장됨`);
+    
+    res.json({
+      success: true,
+      message: `${assignments.length}개 배정 상태가 메모리에 저장되었습니다.`,
+      memorySize: assignmentMemory.size
+    });
+    
+  } catch (error) {
+    console.error('❌ [배정메모리] 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '배정 상태 저장 실패',
+      message: error.message
+    });
+  }
+});
+
+// 배정 상태 조회 API
+app.get('/api/reservation/assignment-memory', async (req, res) => {
+  try {
+    const memoryData = Array.from(assignmentMemory.entries()).map(([reservationNumber, data]) => ({
+      reservationNumber,
+      serialNumber: data.serialNumber,
+      timestamp: data.timestamp
+    }));
+    
+    res.json({
+      success: true,
+      memorySize: assignmentMemory.size,
+      data: memoryData
+    });
+    
+  } catch (error) {
+    console.error('❌ [배정메모리] 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '배정 상태 조회 실패',
+      message: error.message
+    });
+  }
+});
+
 // 배정 상태 변경 감지 API (실시간 업데이트용)
 app.get('/api/reservation/assignment-changes', async (req, res) => {
   try {
@@ -8183,6 +8306,19 @@ app.post('/api/reservation/manual-assignment', async (req, res) => {
     }
     
     const saveResult = await saveResponse.json();
+    
+    // 배정 상태를 메모리에 저장
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/reservation/save-assignment-memory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ assignments })
+      });
+    } catch (error) {
+      console.error('❌ [수동배정] 메모리 저장 실패:', error);
+    }
     
     console.log(`✅ [수동배정] 배정 완료: ${saveResult.updated}개 저장, ${saveResult.skipped}개 유지`);
     
