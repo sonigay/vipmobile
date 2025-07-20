@@ -87,12 +87,6 @@ async function getMonthlyAwardData(req, res) {
   try {
     console.log('월간시상 데이터 구글시트에서 로드');
 
-    // 디버깅 로그 추가
-    console.log('담당자 매핑 테이블 크기:', managerMapping.size);
-    console.log('담당자 목록:', Array.from(managerMapping.values()));
-    console.log('매뉴얼데이터 첫 번째 행:', manualData[0]);
-    console.log('매뉴얼데이터 두 번째 행:', manualData[1]);
-
     // 필요한 시트 데이터 로드
     const [
       manualData,           // 수기초
@@ -130,6 +124,12 @@ async function getMonthlyAwardData(req, res) {
         }
       }
     });
+
+    // 디버깅 로그 추가
+    console.log('담당자 매핑 테이블 크기:', managerMapping.size);
+    console.log('담당자 목록:', Array.from(managerMapping.values()));
+    console.log('매뉴얼데이터 첫 번째 행:', manualData[0]);
+    console.log('매뉴얼데이터 두 번째 행:', manualData[1]);
 
     // 요금제 매핑 테이블 생성
     const planMapping = new Map();
