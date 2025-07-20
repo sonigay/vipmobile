@@ -69,7 +69,7 @@ import {
   updateModificationComplete,
   updateModificationNotes
 } from '../utils/inspectionUtils';
-import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+
 import UpdateProgressPopup from './UpdateProgressPopup';
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -102,39 +102,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   // 완료된 항목 추적 (해시화된 ID 사용)
   const [completedItems, setCompletedItems] = useState(new Set());
   
-  // 새로운 배포 감지
-  useEffect(() => {
-    const checkForNewDeployment = async () => {
-      // 새로운 배포가 있는지 확인
-      if (shouldCheckForUpdates()) {
-        const hasNew = await hasNewDeployment();
-        if (hasNew) {
-          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
-          await performAutoLogout();
-          // 업데이트 진행 팝업 표시
-          setShowUpdateProgressPopup(true);
-          return;
-        }
-        setLastUpdateCheck();
-      }
-    };
 
-    // 새로운 배포 체크
-    checkForNewDeployment();
-  }, []);
-
-  // Service Worker 메시지 리스너
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
-          console.log('Service Worker에서 자동 로그아웃 요청 받음');
-          performAutoLogout();
-          setShowUpdateProgressPopup(true);
-        }
-      });
-    }
-  }, []);
   
   // 완료 상태 로드
   const loadCompletionStatus = useCallback(async () => {

@@ -39,7 +39,7 @@ import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 // SalesByStoreScreen import 제거됨
 // ReservationAssignmentSettingsScreen import 제거됨
 import AllCustomerListScreen from './screens/AllCustomerListScreen';
-import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+
 import UpdateProgressPopup from './UpdateProgressPopup';
 
 function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -76,39 +76,7 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
 
   const [lastCheckTime, setLastCheckTime] = useState(Date.now());
 
-  // 새로운 배포 감지
-  useEffect(() => {
-    const checkForNewDeployment = async () => {
-      // 새로운 배포가 있는지 확인
-      if (shouldCheckForUpdates()) {
-        const hasNew = await hasNewDeployment();
-        if (hasNew) {
-          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
-          await performAutoLogout();
-          // 업데이트 진행 팝업 표시
-          setShowUpdateProgressPopup(true);
-          return;
-        }
-        setLastUpdateCheck();
-      }
-    };
 
-    // 새로운 배포 체크
-    checkForNewDeployment();
-  }, []);
-
-  // Service Worker 메시지 리스너
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
-          console.log('Service Worker에서 자동 로그아웃 요청 받음');
-          performAutoLogout();
-          setShowUpdateProgressPopup(true);
-        }
-      });
-    }
-  }, []);
 
   // 대시보드 데이터 로드
   const loadDashboardData = async () => {

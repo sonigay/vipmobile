@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import UpdateProgressPopup from './UpdateProgressPopup';
-import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+
 
 function Login({ onLogin }) {
   const [storeId, setStoreId] = useState('');

@@ -29,8 +29,8 @@ import ChartMode from './components/ChartMode';
 import PolicyMode from './components/PolicyMode';
 import MeetingMode from './components/MeetingMode';
 import ReservationMode from './components/ReservationMode';
-import { hasNewUpdates, getUnreadUpdates, getAllUpdates, setLastUpdateVersion, setHideUntilDate } from './utils/updateHistory';
-import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from './utils/updateDetection';
+
+
 import UpdateProgressScreen from './components/UpdateProgressScreen';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
 // 모바일 최적화 관련 import 제거 (재고 모드로 이동)
@@ -751,24 +751,6 @@ function App() {
     return storeStats.sort((a, b) => b.currentMonth - a.currentMonth);
   }, [activationData, isAgentMode, agentTarget]);
 
-  // 로그인 상태 복원 및 새로운 배포 감지
-  useEffect(() => {
-    const checkForNewDeployment = async () => {
-      // 새로운 배포가 있는지 확인
-      if (shouldCheckForUpdates()) {
-        const hasNew = await hasNewDeployment();
-        if (hasNew) {
-          // console.log('새로운 배포 감지 - 자동 로그아웃 실행');
-          await performAutoLogout();
-          return;
-        }
-        setLastUpdateCheck();
-      }
-    };
-
-    // 새로운 배포 체크
-    checkForNewDeployment();
-
     // 로그인 상태 복원
     const savedLoginState = localStorage.getItem('loginState');
     if (savedLoginState) {
@@ -837,13 +819,7 @@ function App() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event) => {
-        // console.log('Service Worker 메시지 수신:', event.data);
-        
-        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
-                      // console.log('Service Worker에서 자동 로그아웃 요청 받음');
-          performAutoLogout();
-        } else if (event.data && event.data.type === 'PLAY_NOTIFICATION_SOUND') {
-                      // console.log('알림 사운드 재생 요청 받음:', event.data.soundUrl);
+        if (event.data && event.data.type === 'PLAY_NOTIFICATION_SOUND') {
           try {
             const audio = new Audio(event.data.soundUrl);
             audio.volume = 0.5;
@@ -857,117 +833,6 @@ function App() {
       });
     }
   }, []);
-
-  // 업데이트 확인 및 팝업 표시 (앱 시작 시 + 주기적 감지)
-  useEffect(() => {
-    // 로그인 상태와 관계없이 앱 시작 시 업데이트 체크
-    const checkForUpdates = async () => {
-      try {
-        // 하이브리드 업데이트 체크 (프론트엔드 + 백엔드)
-        const hasNew = await hasNewDeployment();
-        
-        if (hasNew) {
-          // 업데이트가 있으면 사용자에게 알림
-          console.log('새로운 업데이트 발견 - 하이브리드 시스템');
-          
-          // 업데이트 진행 상태 설정
-          setIsUpdateInProgress(true);
-          setShowUpdateProgress(true);
-          
-          // 로그인 상태 저장 (재시작 후 복원용)
-          const currentLoginState = localStorage.getItem('loginState');
-          localStorage.setItem('pendingLoginState', currentLoginState || '');
-          
-          // 업데이트 플래그 설정
-          localStorage.setItem('updateInProgress', 'true');
-        }
-      } catch (error) {
-        console.error('업데이트 확인 중 오류:', error);
-      }
-    };
-    
-    // 앱 시작 시 업데이트 체크 (지연 실행으로 안정성 향상)
-    setTimeout(() => {
-      checkForUpdates();
-    }, 1000);
-    
-    // 주기적 업데이트 감지 (30초마다 - 더 자주 체크)
-    const interval = setInterval(() => {
-      console.log('주기적 업데이트 감지 실행...');
-      checkForUpdates();
-    }, 30 * 1000); // 30초마다
-    
-    // 컴포넌트 언마운트 시 인터벌 정리
-    return () => {
-      clearInterval(interval);
-    };
-  }, []); // 의존성 배열을 비워서 앱 시작 시 한 번만 실행
-
-  // 업데이트 완료 처리 (화면 깜빡임 개선)
-  const handleUpdateComplete = async () => {
-    try {
-      // 업데이트 진행 상태 해제
-      setIsUpdateInProgress(false);
-      setShowUpdateProgress(false);
-      
-      // 캐시 삭제
-      if ('caches' in window) {
-        try {
-          const cacheNames = await caches.keys();
-          await Promise.all(
-            cacheNames.map(cacheName => caches.delete(cacheName))
-          );
-        } catch (error) {
-          console.warn('캐시 삭제 실패:', error);
-        }
-      }
-      
-      // Service Worker 업데이트
-      if ('serviceWorker' in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.getRegistration();
-          if (registration) {
-            await registration.update();
-          }
-        } catch (error) {
-          console.warn('Service Worker 업데이트 실패:', error);
-        }
-      }
-      
-      // 로그인 상태 정리 (깜빡임 방지를 위해 부드럽게 처리)
-      const currentLoginState = localStorage.getItem('loginState');
-      if (currentLoginState) {
-        // 로그인 상태를 임시로 보존
-        localStorage.setItem('tempLoginState', currentLoginState);
-      }
-      
-      // 업데이트 플래그 정리
-      localStorage.removeItem('updateInProgress');
-      
-      // 부드러운 로그아웃 처리
-      setIsLoggedIn(false);
-      setLoggedInStore(null);
-      setIsAgentMode(false);
-      setAgentTarget('');
-      setAgentQualification('');
-      setAgentContactId('');
-      setCurrentView('all');
-      
-      // 앱 완전 종료 및 재시작 (깜빡임 방지를 위해 지연)
-      setTimeout(() => {
-        // 임시 로그인 상태 복원
-        const tempLoginState = localStorage.getItem('tempLoginState');
-        if (tempLoginState) {
-          localStorage.setItem('loginState', tempLoginState);
-          localStorage.removeItem('tempLoginState');
-        }
-        
-        window.location.reload();
-      }, 2000); // 2초 지연으로 깜빡임 방지
-    } catch (error) {
-      console.error('업데이트 완료 처리 중 오류:', error);
-    }
-  };
 
   // 담당자별 재고 필터링 함수 (useEffect보다 먼저 정의)
   const filterStoresByAgent = useCallback((stores, agentTarget) => {
@@ -1943,70 +1808,7 @@ function App() {
 
 
 
-  // 업데이트 확인 핸들러
-  const handleCheckUpdate = useCallback(async () => {
-    try {
-      const hasNew = await hasNewUpdates();
-      if (hasNew) {
-        const updates = await getUnreadUpdates();
-        console.log('업데이트 확인 - 새로운 업데이트 발견:', updates.length, '개');
-        
-        // 사용자에게 업데이트 알림
-        const shouldUpdate = window.confirm(
-          '업데이트 내용이 있습니다.\n\n' +
-          '업데이트를 적용하시겠습니까?\n\n' +
-          '확인을 누르면 앱이 재시작됩니다.'
-        );
-        
-        if (shouldUpdate) {
-          // 로그인 상태 저장 (재시작 후 복원용)
-          const currentLoginState = localStorage.getItem('loginState');
-          
-          // 업데이트 플래그 설정
-          localStorage.setItem('updateInProgress', 'true');
-          localStorage.setItem('pendingLoginState', currentLoginState || '');
-          
-          // 캐시 삭제
-          if ('caches' in window) {
-            try {
-              const cacheNames = await caches.keys();
-              await Promise.all(
-                cacheNames.map(cacheName => caches.delete(cacheName))
-              );
-            } catch (error) {
-              console.warn('캐시 삭제 실패:', error);
-            }
-          }
-          
-          // Service Worker 업데이트
-          if ('serviceWorker' in navigator) {
-            try {
-              const registration = await navigator.serviceWorker.getRegistration();
-              if (registration) {
-                await registration.update();
-              }
-            } catch (error) {
-              console.warn('Service Worker 업데이트 실패:', error);
-            }
-          }
-          
-          // 강제 로그아웃
-          handleLogout();
-          
-          // 페이지 새로고침으로 앱 재시작
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
-      } else {
-        // 최신 버전인 경우 간단한 알림만 표시
-        alert('현재 최신 버전을 사용하고 있습니다.');
-      }
-    } catch (error) {
-      console.error('업데이트 확인 중 오류:', error);
-      alert('업데이트 확인 중 오류가 발생했습니다.');
-    }
-  }, []);
+
 
 
 

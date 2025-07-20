@@ -61,7 +61,7 @@ import {
 } from '@mui/icons-material';
 import { fetchData } from '../api';
 import UpdateProgressPopup from './UpdateProgressPopup';
-import { hasNewDeployment, performAutoLogout, shouldCheckForUpdates, setLastUpdateCheck } from '../utils/updateDetection';
+
 import NotificationButton from './NotificationButton';
 import AnnouncementBanner from './AnnouncementBanner';
 import { notificationManager } from '../utils/notificationUtils';
@@ -146,39 +146,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
     }
   }, []);
 
-  // 새로운 배포 감지
-  useEffect(() => {
-    const checkForNewDeployment = async () => {
-      // 새로운 배포가 있는지 확인
-      if (shouldCheckForUpdates()) {
-        const hasNew = await hasNewDeployment();
-        if (hasNew) {
-          console.log('새로운 배포 감지 - 자동 로그아웃 실행');
-          await performAutoLogout();
-          // 업데이트 진행 팝업 표시
-          setShowUpdateProgressPopup(true);
-          return;
-        }
-        setLastUpdateCheck();
-      }
-    };
 
-    // 새로운 배포 체크
-    checkForNewDeployment();
-  }, []);
-
-  // Service Worker 메시지 리스너
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'AUTO_LOGOUT_REQUIRED') {
-          console.log('Service Worker에서 자동 로그아웃 요청 받음');
-          performAutoLogout();
-          setShowUpdateProgressPopup(true);
-        }
-      });
-    }
-  }, []);
 
   // 알림 시스템 및 모바일 최적화 초기화
   useEffect(() => {
