@@ -1167,6 +1167,7 @@ function App() {
       setIsChartMode(false);
       setIsPolicyMode(false);
       setIsReservationMode(false);
+      setCurrentMode('meeting');
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1192,6 +1193,7 @@ function App() {
       setIsChartMode(false);
       setIsPolicyMode(false);
       setIsMeetingMode(false);
+      setCurrentMode('reservation');
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1217,6 +1219,7 @@ function App() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('inspection');
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1242,6 +1245,7 @@ function App() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('chart');
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1267,6 +1271,7 @@ function App() {
       setIsChartMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('policy');
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1292,6 +1297,7 @@ function App() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('settlement');
       
       setSettlementUserName(store.manager || '정산관리자');
               // console.log(`정산모드 접속자: ${store.manager || '정산관리자'}`);
@@ -1321,6 +1327,7 @@ function App() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('inventory');
       
       setInventoryUserName(store.manager || '재고관리자');
               // console.log(`재고모드 접속자: ${store.manager || '재고관리자'}`);
@@ -1357,6 +1364,7 @@ function App() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('agent');
       
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
       const agentTarget = store.target || store.name || '';
@@ -1403,6 +1411,7 @@ function App() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setCurrentMode('general');
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -1475,6 +1484,10 @@ function App() {
     
     // 수정된 store로 로그인 처리
     processLogin(modifiedStore);
+    
+    // 모드 진입 시 업데이트 팝업 표시
+    setCurrentMode(selectedMode);
+    setShowAppUpdatePopup(true);
     
     // 상태 초기화
     setPendingLoginData(null);
