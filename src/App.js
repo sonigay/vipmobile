@@ -2308,7 +2308,6 @@ function App() {
       }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', gap: 2 }}>
           <Header 
-            onCheckUpdate={handleCheckUpdate}
             inventoryUserName={inventoryUserName}
             isInventoryMode={isInventoryMode}
             currentUserId={loggedInStore?.id}
