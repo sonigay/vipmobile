@@ -5387,8 +5387,10 @@ async function initializeInspectionMemoData() {
   }
 }
 
-// 서버 시작 시 초기화 실행
-initializeInspectionMemoData();
+// 서버 시작 시 초기화 실행 (비동기로 처리하여 다른 초기화를 방해하지 않도록)
+initializeInspectionMemoData().catch(error => {
+  console.error('여직원검수데이터메모 초기화 실패 (무시됨):', error);
+});
 
 // 수정완료 상태 조회 API
 app.get('/api/inspection/modification-completion-status', async (req, res) => {
