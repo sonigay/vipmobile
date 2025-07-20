@@ -856,14 +856,33 @@ function AllCustomerListScreen({ loggedInStore }) {
                   {inventoryStatus.stats && (
                     <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
                       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                        📊 전체 통계
+                        📊 전체 통계 (정규화작업시트 C열 기준)
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                         <Chip 
                           label={`총 재고: ${inventoryStatus.stats.totalInventory}대`} 
                           color="primary" 
                           variant="outlined"
                         />
+                        <Chip 
+                          label={`허용 모델: ${inventoryStatus.stats.allowedModelsCount}종`} 
+                          color="info" 
+                          variant="outlined"
+                        />
+                        <Chip 
+                          label={`처리: ${inventoryStatus.stats.processedCount}개`} 
+                          color="success" 
+                          variant="outlined"
+                        />
+                        {inventoryStatus.stats.filteredCount > 0 && (
+                          <Chip 
+                            label={`필터링: ${inventoryStatus.stats.filteredCount}개`} 
+                            color="warning" 
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                         {Object.entries(inventoryStatus.stats.officeStats).map(([office, stats]) => (
                           <Chip
                             key={office}
@@ -896,33 +915,87 @@ function AllCustomerListScreen({ loggedInStore }) {
                             />
                           </Box>
                           
-                          {Object.keys(models).length > 0 ? (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              {Object.entries(models).map(([model, count]) => (
-                                <Box key={model} sx={{ 
-                                  display: 'flex', 
-                                  justifyContent: 'space-between', 
-                                  alignItems: 'center',
-                                  p: 1,
-                                  bgcolor: count > 0 ? '#e8f5e8' : '#fff3cd',
-                                  borderRadius: 0.5,
-                                  border: '1px solid #ddd'
-                                }}>
-                                  <Typography variant="body2" sx={{ 
-                                    fontWeight: count > 0 ? 'bold' : 'normal',
-                                    color: count > 0 ? '#2e7d32' : '#856404'
-                                  }}>
-                                    📱 {model}
-                                  </Typography>
-                                  <Chip
-                                    label={`${count}대`}
-                                    size="small"
-                                    color={count > 0 ? 'success' : 'warning'}
-                                    variant="filled"
-                                  />
-                                </Box>
-                              ))}
-                            </Box>
+                                                     {Object.keys(models).length > 0 ? (
+                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                               {Object.entries(models).map(([model, count], index) => {
+                                 // 모델별 색상 매핑
+                                 const getModelColor = (modelName) => {
+                                   if (modelName.includes('Z Flip7')) {
+                                     return { bg: '#e3f2fd', border: '#2196f3', text: '#1565c0' };
+                                   } else if (modelName.includes('Z Fold7')) {
+                                     return { bg: '#f3e5f5', border: '#9c27b0', text: '#7b1fa2' };
+                                   } else if (modelName.includes('Galaxy S')) {
+                                     return { bg: '#e8f5e8', border: '#4caf50', text: '#2e7d32' };
+                                   } else if (modelName.includes('Galaxy A')) {
+                                     return { bg: '#fff3e0', border: '#ff9800', text: '#e65100' };
+                                   } else if (modelName.includes('Galaxy M')) {
+                                     return { bg: '#fce4ec', border: '#e91e63', text: '#c2185b' };
+                                   } else if (modelName.includes('Galaxy Note')) {
+                                     return { bg: '#e0f2f1', border: '#009688', text: '#00695c' };
+                                   } else {
+                                     // 기본 색상 (인덱스 기반)
+                                     const colors = [
+                                       { bg: '#e8f5e8', border: '#4caf50', text: '#2e7d32' },
+                                       { bg: '#e3f2fd', border: '#2196f3', text: '#1565c0' },
+                                       { bg: '#f3e5f5', border: '#9c27b0', text: '#7b1fa2' },
+                                       { bg: '#fff3e0', border: '#ff9800', text: '#e65100' },
+                                       { bg: '#fce4ec', border: '#e91e63', text: '#c2185b' },
+                                       { bg: '#e0f2f1', border: '#009688', text: '#00695c' },
+                                       { bg: '#f1f8e9', border: '#8bc34a', text: '#558b2f' },
+                                       { bg: '#fff8e1', border: '#ffc107', text: '#f57f17' }
+                                     ];
+                                     return colors[index % colors.length];
+                                   }
+                                 };
+                                 
+                                 const modelColor = getModelColor(model);
+                                 const isAvailable = count > 0;
+                                 
+                                 return (
+                                   <Box key={model} sx={{ 
+                                     display: 'flex', 
+                                     justifyContent: 'space-between', 
+                                     alignItems: 'center',
+                                     p: 1.5,
+                                     bgcolor: isAvailable ? modelColor.bg : '#f5f5f5',
+                                     borderRadius: 1,
+                                     border: `2px solid ${isAvailable ? modelColor.border : '#ddd'}`,
+                                     transition: 'all 0.2s ease',
+                                     '&:hover': {
+                                       transform: 'translateY(-1px)',
+                                       boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                     }
+                                   }}>
+                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                       <Typography variant="body2" sx={{ 
+                                         fontWeight: 'bold',
+                                         color: isAvailable ? modelColor.text : '#666',
+                                         fontSize: '0.875rem'
+                                       }}>
+                                         📱 {model}
+                                       </Typography>
+                                       <Typography variant="caption" sx={{ 
+                                         color: isAvailable ? modelColor.text : '#999',
+                                         opacity: 0.8
+                                       }}>
+                                         {isAvailable ? '재고 보유' : '재고 없음'}
+                                       </Typography>
+                                     </Box>
+                                     <Chip
+                                       label={`${count}대`}
+                                       size="small"
+                                       sx={{
+                                         bgcolor: isAvailable ? modelColor.border : '#ccc',
+                                         color: 'white',
+                                         fontWeight: 'bold',
+                                         fontSize: '0.75rem',
+                                         minWidth: '40px'
+                                       }}
+                                     />
+                                   </Box>
+                                 );
+                               })}
+                             </Box>
                           ) : (
                             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                               보유 재고가 없습니다

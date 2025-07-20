@@ -8624,13 +8624,13 @@ app.get('/api/reservation/assignment-changes', async (req, res) => {
 
 
 
-// 사무실별 재고 현황 API (간단한 버전)
+// 사무실별 재고 현황 API (정규화작업시트 C열 필터링 적용)
 app.get('/api/office-inventory', async (req, res) => {
   try {
     console.log('🔍 [사무실재고] 사무실별 재고 현황 요청');
     
     // 캐시 키 생성
-    const cacheKey = 'office_inventory_simple';
+    const cacheKey = 'office_inventory_normalized';
     
     // 캐시에서 먼저 확인 (3분 TTL)
     const cachedData = cacheUtils.get(cacheKey);
@@ -8638,6 +8638,25 @@ app.get('/api/office-inventory', async (req, res) => {
       console.log('✅ [사무실재고] 캐시된 데이터 반환');
       return res.json(cachedData);
     }
+    
+    // 정규화작업시트에서 허용된 모델 목록 가져오기
+    const normalizedValues = await getSheetValues('정규화작업');
+    const allowedModels = new Set();
+    
+    if (normalizedValues && normalizedValues.length > 1) {
+      // C열(인덱스 2)에서 허용된 모델명 추출
+      normalizedValues.slice(1).forEach(row => {
+        if (row.length > 2 && row[2]) {
+          const normalizedModel = row[2].toString().trim();
+          if (normalizedModel) {
+            allowedModels.add(normalizedModel);
+          }
+        }
+      });
+    }
+    
+    console.log(`📋 [사무실재고] 정규화작업시트 C열 허용 모델: ${allowedModels.size}개`);
+    console.log('📋 [사무실재고] 허용 모델 목록:', Array.from(allowedModels));
     
     // 폰클재고데이터에서 재고 정보 수집
     const phoneklInventoryValues = await getSheetValues('폰클재고데이터');
@@ -8657,6 +8676,7 @@ app.get('/api/office-inventory', async (req, res) => {
     };
     
     let processedCount = 0;
+    let filteredCount = 0;
     
     // 헤더 제거하고 데이터 처리 (3행부터 시작)
     phoneklInventoryValues.slice(2).forEach((row, index) => {
@@ -8666,37 +8686,46 @@ app.get('/api/office-inventory', async (req, res) => {
         const storeName = (row[13] || '').toString().trim(); // N열: 출고처
         
         if (modelCapacity && color && storeName) {
-          // 사무실명 추출
-          let officeName = '';
-          if (storeName.includes('평택')) {
-            officeName = '평택사무실';
-          } else if (storeName.includes('인천')) {
-            officeName = '인천사무실';
-          } else if (storeName.includes('군산')) {
-            officeName = '군산사무실';
-          } else if (storeName.includes('안산')) {
-            officeName = '안산사무실';
-          }
+          // 정규화작업시트 C열과 매칭되는 모델만 처리
+          const combinedModel = `${modelCapacity} | ${color}`;
           
-          if (officeName && officeInventory[officeName]) {
-            const key = `${modelCapacity} | ${color}`;
-            
-            if (!officeInventory[officeName][key]) {
-              officeInventory[officeName][key] = 0;
+          // 허용된 모델인지 확인
+          if (allowedModels.has(combinedModel)) {
+            // 사무실명 추출
+            let officeName = '';
+            if (storeName.includes('평택')) {
+              officeName = '평택사무실';
+            } else if (storeName.includes('인천')) {
+              officeName = '인천사무실';
+            } else if (storeName.includes('군산')) {
+              officeName = '군산사무실';
+            } else if (storeName.includes('안산')) {
+              officeName = '안산사무실';
             }
-            officeInventory[officeName][key]++;
-            processedCount++;
+            
+            if (officeName && officeInventory[officeName]) {
+              if (!officeInventory[officeName][combinedModel]) {
+                officeInventory[officeName][combinedModel] = 0;
+              }
+              officeInventory[officeName][combinedModel]++;
+              processedCount++;
+            }
+          } else {
+            filteredCount++;
           }
         }
       }
     });
     
-    console.log(`📊 [사무실재고] 처리된 재고 항목: ${processedCount}개`);
+    console.log(`📊 [사무실재고] 처리된 재고 항목: ${processedCount}개, 필터링된 항목: ${filteredCount}개`);
     
     // 통계 계산
     const stats = {
       totalInventory: 0,
-      officeStats: {}
+      officeStats: {},
+      allowedModelsCount: allowedModels.size,
+      processedCount,
+      filteredCount
     };
     
     Object.entries(officeInventory).forEach(([officeName, inventory]) => {
@@ -8715,6 +8744,7 @@ app.get('/api/office-inventory', async (req, res) => {
       success: true,
       officeInventory,
       stats,
+      allowedModels: Array.from(allowedModels),
       lastUpdated: new Date().toISOString()
     };
     
