@@ -9368,10 +9368,13 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
       });
     }
 
+    console.log(`🗑️ [취소체크] 삭제 대상 예약번호: ${reservationNumbers.join(', ')}`);
+
     // 현재 취소 데이터 로드
     const currentData = await getSheetValues('사전예약사이트취소데이터');
     
     if (!currentData || currentData.length < 2) {
+      console.log('🗑️ [취소체크] 삭제할 데이터가 없습니다 (시트가 비어있음)');
       return res.json({
         success: true,
         message: '삭제할 데이터가 없습니다.',
@@ -9379,17 +9382,30 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
       });
     }
 
+    console.log(`🗑️ [취소체크] 현재 시트 데이터: ${currentData.length}행`);
+
     // 헤더와 삭제할 예약번호가 아닌 데이터만 필터링
     const header = currentData[0];
     const dataRows = currentData.slice(1);
+    
+    console.log(`🗑️ [취소체크] 기존 데이터 행: ${dataRows.length}개`);
+    console.log(`🗑️ [취소체크] 기존 예약번호들: ${dataRows.map(row => row[0]).join(', ')}`);
+    
     const filteredData = dataRows.filter(row => {
       const reservationNumber = row[0];
-      return !reservationNumbers.includes(reservationNumber);
+      const shouldKeep = !reservationNumbers.includes(reservationNumber);
+      if (!shouldKeep) {
+        console.log(`🗑️ [취소체크] 삭제 대상 발견: ${reservationNumber}`);
+      }
+      return shouldKeep;
     });
 
     const deletedCount = dataRows.length - filteredData.length;
     
+    console.log(`🗑️ [취소체크] 필터링 후 데이터: ${filteredData.length}개, 삭제 예정: ${deletedCount}개`);
+    
     if (deletedCount === 0) {
+      console.log('🗑️ [취소체크] 삭제할 데이터가 없습니다 (매칭되는 예약번호 없음)');
       return res.json({
         success: true,
         message: '삭제할 데이터가 없습니다.',
@@ -9401,23 +9417,33 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
     const newData = [header, ...filteredData];
     
     console.log(`🗑️ [취소체크] 삭제 전 데이터: ${dataRows.length}건, 삭제 후 데이터: ${filteredData.length}건`);
+    console.log(`🗑️ [취소체크] 새 데이터 구조:`, newData);
     
-    // 먼저 시트를 완전히 비우고 새 데이터로 업데이트
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트취소데이터'
-    });
-    
-    const response = await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트취소데이터!A:C',
-      valueInputOption: 'RAW',
-      resource: {
-        values: newData
-      }
-    });
+    try {
+      // 먼저 시트를 완전히 비우고 새 데이터로 업데이트
+      console.log('🗑️ [취소체크] 시트 초기화 시작...');
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트취소데이터'
+      });
+      console.log('🗑️ [취소체크] 시트 초기화 완료');
+      
+      console.log('🗑️ [취소체크] 새 데이터 쓰기 시작...');
+      const response = await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트취소데이터!A:C',
+        valueInputOption: 'RAW',
+        resource: {
+          values: newData
+        }
+      });
+      console.log('🗑️ [취소체크] 새 데이터 쓰기 완료:', response.data);
 
-    console.log(`🗑️ [취소체크] 취소 데이터 삭제 완료: ${deletedCount}건`);
+      console.log(`🗑️ [취소체크] 취소 데이터 삭제 완료: ${deletedCount}건`);
+    } catch (sheetError) {
+      console.error('🗑️ [취소체크] 시트 작업 중 오류:', sheetError);
+      throw sheetError;
+    }
 
     res.json({
       success: true,
