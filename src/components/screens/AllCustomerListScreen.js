@@ -313,6 +313,7 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [agentOfficeData, setAgentOfficeData] = useState({ offices: [], departments: {}, agentInfo: {} });
   const [loadingAgentData, setLoadingAgentData] = useState(false);
   const [expandedColors, setExpandedColors] = useState({}); // 색상 확장 상태 관리
+  const [expandedModels, setExpandedModels] = useState({}); // 모델 확장 상태 관리
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
 
   // 디바운스된 검색어 (300ms 지연)
@@ -971,7 +972,10 @@ function AllCustomerListScreen({ loggedInStore }) {
                               groupedModels[modelCapacity].push({ color, count });
                             });
                             const sortedModelCapacities = Object.keys(groupedModels).sort();
-                            return sortedModelCapacities.slice(0, 3).map((modelCapacity) => {
+                            const displayModels = expandedModels[officeName] 
+                              ? sortedModelCapacities 
+                              : sortedModelCapacities.slice(0, 3);
+                            return displayModels.map((modelCapacity) => {
                               const colorItems = groupedModels[modelCapacity];
                               const modelTotal = colorItems.reduce((sum, item) => sum + item.count, 0);
                               return (
@@ -1093,15 +1097,30 @@ function AllCustomerListScreen({ loggedInStore }) {
                             const modelCount = Object.keys(groupedModels).length;
                             if (modelCount > 3) {
                               return (
-                                <Typography variant="caption" sx={{ 
-                                  color: '#666',
-                                  textAlign: 'center',
-                                  mt: 1,
-                                  fontSize: '0.75rem',
-                                  fontStyle: 'italic'
-                                }}>
-                                  외 {modelCount - 3}개 모델 더...
-                                </Typography>
+                                <Button
+                                  variant="text"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedModels(prev => ({
+                                      ...prev,
+                                      [officeName]: !prev[officeName]
+                                    }));
+                                  }}
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    color: '#666',
+                                    fontStyle: 'italic',
+                                    mt: 1,
+                                    '&:hover': {
+                                      textDecoration: 'underline',
+                                      color: '#1976d2'
+                                    }
+                                  }}
+                                >
+                                  {expandedModels[officeName] ? '접기' : `외 ${modelCount - 3}개 모델 더...`}
+                                </Button>
                               );
                             }
                             return null;
