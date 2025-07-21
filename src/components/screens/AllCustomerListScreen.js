@@ -707,11 +707,6 @@ function AllCustomerListScreen({ loggedInStore }) {
     return () => clearInterval(interval);
   }, [updateCacheStats]);
 
-  // 사무실별 재고 현황 자동 로드
-  useEffect(() => {
-    loadInventoryStatus();
-  }, [loadInventoryStatus]);
-
   // 사무실별 재고 현황 로드 (마운트 시 자동)
   const loadInventoryStatus = useCallback(async () => {
     setLoadingInventory(true);
@@ -729,6 +724,11 @@ function AllCustomerListScreen({ loggedInStore }) {
       setLoadingInventory(false);
     }
   }, []);
+
+  // 사무실별 재고 현황 자동 로드
+  useEffect(() => {
+    loadInventoryStatus();
+  }, [loadInventoryStatus]);
 
   // 메모이제이션된 통계 정보
   const statsInfo = useMemo(() => {
