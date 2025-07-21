@@ -455,9 +455,12 @@ async function getSheetValues(sheetName) {
   }
   
   try {
+    // 시트 이름을 안전하게 처리
+    const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: sheetName
+      range: safeSheetName
     });
     
     const data = response.data.values || [];
@@ -468,7 +471,39 @@ async function getSheetValues(sheetName) {
     return data;
   } catch (error) {
     console.error(`Error fetching sheet ${sheetName}:`, error);
-    throw error;
+    
+    // 첫 번째 시도가 실패하면 시트 목록을 가져와서 정확한 이름 확인
+    try {
+      console.log(`🔄 [시트조회] 시트 목록 확인 중...`);
+      const spreadsheet = await sheets.spreadsheets.get({
+        spreadsheetId: SPREADSHEET_ID
+      });
+      
+      const sheetNames = spreadsheet.data.sheets.map(sheet => sheet.properties.title);
+      console.log(`📋 [시트조회] 사용 가능한 시트:`, sheetNames);
+      
+      // 정확한 시트 이름 찾기
+      const exactSheetName = sheetNames.find(name => name === sheetName);
+      if (exactSheetName) {
+        console.log(`✅ [시트조회] 정확한 시트 이름 발견: '${exactSheetName}'`);
+        const safeSheetName = `'${exactSheetName}'`;
+        
+        const retryResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: safeSheetName
+        });
+        
+        const data = retryResponse.data.values || [];
+        cacheUtils.set(cacheKey, data);
+        return data;
+      } else {
+        console.error(`❌ [시트조회] 시트 '${sheetName}'을 찾을 수 없습니다.`);
+        throw new Error(`Sheet '${sheetName}' not found. Available sheets: ${sheetNames.join(', ')}`);
+      }
+    } catch (retryError) {
+      console.error(`❌ [시트조회] 재시도 실패:`, retryError);
+      throw error; // 원래 오류를 다시 던짐
+    }
   }
 }
 
@@ -8838,7 +8873,10 @@ app.get('/api/unmatched-customers', async (req, res) => {
     
     // 1. 마당접수 미매칭 확인
     try {
+      console.log('🔄 [미매칭고객] 마당접수 데이터 로드 중...');
       const yardData = await getSheetValues('마당접수');
+      console.log(`📋 [미매칭고객] 마당접수 데이터 로드 완료: ${yardData ? yardData.length : 0}행`);
+      
       if (yardData && yardData.length > 1) {
         yardData.slice(1).forEach(row => {
           if (row.length >= 3) {
@@ -8860,14 +8898,21 @@ app.get('/api/unmatched-customers', async (req, res) => {
             }
           }
         });
+        console.log(`✅ [미매칭고객] 마당접수 미매칭: ${unmatchedData.yard.length}건`);
+      } else {
+        console.log('⚠️ [미매칭고객] 마당접수 데이터가 없거나 헤더만 존재');
       }
     } catch (error) {
-      console.error('마당접수 데이터 로드 오류:', error);
+      console.error('❌ [미매칭고객] 마당접수 데이터 로드 오류:', error);
+      // 오류가 발생해도 다른 시트는 계속 처리
     }
     
     // 2. 온세일시트 미매칭 확인
     try {
+      console.log('🔄 [미매칭고객] 온세일시트 데이터 로드 중...');
       const onSaleData = await getSheetValues('온세일시트');
+      console.log(`📋 [미매칭고객] 온세일시트 데이터 로드 완료: ${onSaleData ? onSaleData.length : 0}행`);
+      
       if (onSaleData && onSaleData.length > 1) {
         onSaleData.slice(1).forEach(row => {
           if (row.length >= 3) {
@@ -8889,14 +8934,21 @@ app.get('/api/unmatched-customers', async (req, res) => {
             }
           }
         });
+        console.log(`✅ [미매칭고객] 온세일시트 미매칭: ${unmatchedData.onSale.length}건`);
+      } else {
+        console.log('⚠️ [미매칭고객] 온세일시트 데이터가 없거나 헤더만 존재');
       }
     } catch (error) {
-      console.error('온세일시트 데이터 로드 오류:', error);
+      console.error('❌ [미매칭고객] 온세일시트 데이터 로드 오류:', error);
+      // 오류가 발생해도 다른 시트는 계속 처리
     }
     
     // 3. 모바일가입내역 미매칭 확인
     try {
+      console.log('🔄 [미매칭고객] 모바일가입내역 데이터 로드 중...');
       const mobileData = await getSheetValues('모바일가입내역');
+      console.log(`📋 [미매칭고객] 모바일가입내역 데이터 로드 완료: ${mobileData ? mobileData.length : 0}행`);
+      
       if (mobileData && mobileData.length > 1) {
         mobileData.slice(1).forEach(row => {
           if (row.length >= 3) {
@@ -8918,9 +8970,13 @@ app.get('/api/unmatched-customers', async (req, res) => {
             }
           }
         });
+        console.log(`✅ [미매칭고객] 모바일가입내역 미매칭: ${unmatchedData.mobile.length}건`);
+      } else {
+        console.log('⚠️ [미매칭고객] 모바일가입내역 데이터가 없거나 헤더만 존재');
       }
     } catch (error) {
-      console.error('모바일가입내역 데이터 로드 오류:', error);
+      console.error('❌ [미매칭고객] 모바일가입내역 데이터 로드 오류:', error);
+      // 오류가 발생해도 다른 시트는 계속 처리
     }
     
     const totalUnmatched = unmatchedData.yard.length + unmatchedData.onSale.length + unmatchedData.mobile.length;
