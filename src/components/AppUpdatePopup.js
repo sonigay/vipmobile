@@ -94,18 +94,18 @@ function AppUpdatePopup({
     setError('');
     
     try {
-      console.log(`업데이트 로드 시작: ${mode} 모드, showAll: ${showAll}`);
+      console.log(`🔍 [AppUpdatePopup] 업데이트 로드 시작: ${mode} 모드, showAll: ${showAll}`);
       let updateData;
       if (showAll) {
         updateData = await getUpdatesForMode(mode);
       } else {
         updateData = await getLatestUpdateForMode(mode, 1);
       }
-      console.log(`업데이트 로드 완료: ${mode} 모드, 데이터 개수: ${updateData.length}`);
+      console.log(`✅ [AppUpdatePopup] 업데이트 로드 완료: ${mode} 모드, 데이터 개수: ${updateData.length}`, updateData);
       setUpdates(updateData);
     } catch (error) {
-      console.error('업데이트 로드 오류:', error);
-      setError('업데이트 내용을 불러오는데 실패했습니다.');
+      console.error('❌ [AppUpdatePopup] 업데이트 로드 오류:', error);
+      setError(`업데이트 내용을 불러오는데 실패했습니다: ${error.message}`);
     } finally {
       setLoading(false);
     }

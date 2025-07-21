@@ -33,33 +33,49 @@ let updateDataCache = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5분
 
+// API URL 헬퍼 함수
+function getApiUrl() {
+  const url = process.env.REACT_APP_API_URL;
+  if (!url) {
+    throw new Error('REACT_APP_API_URL 환경변수가 설정되어 있지 않습니다.');
+  }
+  return url;
+}
+
 // 어플업데이트 시트에서 데이터 가져오기
 export const fetchAppUpdates = async () => {
   const now = Date.now();
   
   // 캐시가 유효한 경우 캐시된 데이터 반환
   if (updateDataCache && (now - lastFetchTime) < CACHE_DURATION) {
+    console.log('🔍 [appUpdateService] 캐시된 데이터 사용');
     return updateDataCache;
   }
   
   try {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/app-updates`);
+    console.log('🔍 [appUpdateService] API 호출 시작');
+    const apiUrl = getApiUrl();
+    console.log('🔍 [appUpdateService] API URL:', apiUrl);
+    
+    const response = await fetch(`${apiUrl}/api/app-updates`);
     
     if (!response.ok) {
       throw new Error(`API 요청 실패: ${response.status}`);
     }
     
     const result = await response.json();
+    console.log('🔍 [appUpdateService] API 응답:', result);
     
     if (result.success) {
       updateDataCache = result.data;
       lastFetchTime = now;
+      console.log('✅ [appUpdateService] 데이터 로드 성공:', result.data.length, '건');
       return result.data;
     } else {
       throw new Error(result.message || '업데이트 데이터 로드 실패');
     }
   } catch (error) {
-    console.error('어플업데이트 데이터 로드 오류:', error);
+    console.error('❌ [appUpdateService] 어플업데이트 데이터 로드 오류:', error);
     return [];
   }
 };
@@ -127,7 +143,7 @@ export const checkAdminPermission = async (userId) => {
 // 새 업데이트 추가 (관리자만)
 export const addNewUpdate = async (updateData) => {
   try {
-    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/app-updates`, {
+    const response = await fetch(`${getApiUrl()}/api/app-updates`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

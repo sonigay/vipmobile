@@ -837,19 +837,37 @@ function AllCustomerListScreen({ loggedInStore }) {
               {inventoryExpanded ? '사무실별 보유재고 접기' : '사무실별 보유재고 보기'}
             </Button>
           </Box>
-          {inventoryExpanded && inventoryStatus.success && inventoryStatus.officeInventory && (
+          {inventoryExpanded && (
             <Box sx={{ mt: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
                   📱 사무실별 보유재고 현황
                 </Typography>
-                {inventoryStatus.lastUpdated && (
+                {inventoryStatus?.lastUpdated && (
                   <Typography variant="caption" color="text.secondary">
                     마지막 업데이트: {new Date(inventoryStatus.lastUpdated).toLocaleString()}
                   </Typography>
                 )}
               </Box>
-              {/* 전체 통계 */}
+              
+              {/* 로딩 상태 */}
+              {loadingInventory && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              )}
+              
+              {/* 에러 상태 */}
+              {!loadingInventory && inventoryStatus && !inventoryStatus.success && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  재고 데이터를 불러오는데 실패했습니다. 다시 시도해주세요.
+                </Alert>
+              )}
+              
+              {/* 데이터가 있을 때만 표시 */}
+              {!loadingInventory && inventoryStatus?.success && inventoryStatus?.officeInventory && (
+                <>
+                  {/* 전체 통계 */}
               {inventoryStatus.stats && (
                 <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
@@ -1100,6 +1118,8 @@ function AllCustomerListScreen({ loggedInStore }) {
                   );
                 })}
               </Box>
+                </>
+              )}
             </Box>
           )}
         </CardContent>
