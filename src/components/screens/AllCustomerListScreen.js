@@ -941,7 +941,7 @@ function AllCustomerListScreen({ loggedInStore }) {
           // 성공 시에만 상태 업데이트
           setCancelCheckedItems(prev => prev.filter(item => item !== reservationNumber));
           setError('');
-          console.log(`✅ 취소 체크 해제 완료: ${reservationNumber}`);
+          console.log(`✅ 취소 체크 해제 완료: ${reservationNumber} (삭제된 건수: ${result.deletedCount})`);
         } else {
           setError(result.message || '취소 체크 해제에 실패했습니다.');
           console.error('❌ 취소 체크 해제 실패:', result.message);

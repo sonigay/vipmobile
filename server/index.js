@@ -9402,6 +9402,12 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
     
     console.log(`🗑️ [취소체크] 삭제 전 데이터: ${dataRows.length}건, 삭제 후 데이터: ${filteredData.length}건`);
     
+    // 먼저 시트를 완전히 비우고 새 데이터로 업데이트
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트취소데이터'
+    });
+    
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: '사전예약사이트취소데이터!A:C',
