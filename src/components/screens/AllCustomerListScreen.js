@@ -760,7 +760,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     };
     
     initializeData();
-  }, [loadAllCustomerList, loadAgentOfficeData, loadAssignmentStatus, loadActivationStatus, loadCancelCheckData]);
+  }, [loadAllCustomerList, loadAgentOfficeData, loadAssignmentStatus, loadActivationStatus]);
 
   // 필터 변경 시 적용 (디바운스된 검색어 사용)
   useEffect(() => {
@@ -844,7 +844,7 @@ function AllCustomerListScreen({ loggedInStore }) {
   }, []);
 
   // 취소 체크 데이터 로드
-  const loadCancelCheckData = useCallback(async () => {
+  const loadCancelCheckData = async () => {
     setLoadingCancelData(true);
     try {
       const response = await fetch(`${getApiUrl()}/api/cancel-check/list`);
@@ -859,10 +859,10 @@ function AllCustomerListScreen({ loggedInStore }) {
     } finally {
       setLoadingCancelData(false);
     }
-  }, []);
+  };
 
   // 취소 체크 토글 (즉시 저장/삭제)
-  const handleCancelCheckToggle = useCallback(async (reservationNumber) => {
+  const handleCancelCheckToggle = async (reservationNumber) => {
     // 이미 처리 중이면 무시
     setProcessingCancelCheck(prev => {
       if (prev.has(reservationNumber)) {
@@ -939,7 +939,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         return newSet;
       });
     }
-  }, []);
+  };
 
 
 
