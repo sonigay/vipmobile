@@ -4464,11 +4464,12 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
       cacheUtils.set(normalizedCacheKey, normalizedData, 600);
     }
     
-    // 2. 병렬로 시트 데이터 가져오기 (온세일 포함)
-    const [reservationSiteValues, yardValues, onSaleValues] = await Promise.all([
+    // 2. 병렬로 시트 데이터 가져오기 (온세일, 모바일가입내역 포함)
+    const [reservationSiteValues, yardValues, onSaleValues, mobileJoinValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
       getSheetValues('마당접수'),
-      getSheetValues('온세일')
+      getSheetValues('온세일'),
+      getSheetValues('모바일가입내역')
     ]);
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
@@ -4481,6 +4482,10 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     
     if (!onSaleValues || onSaleValues.length < 2) {
       throw new Error('온세일 데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!mobileJoinValues || mobileJoinValues.length < 2) {
+      console.log('모바일가입내역 데이터를 가져올 수 없습니다. (무시됨)');
     }
     
     // 4. 정규화 규칙 매핑 생성
@@ -4507,7 +4512,7 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
         const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
         const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
-        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedMemo = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         
         // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
         const reservationPattern = /[A-Z]{2}\d{6}/g;
@@ -4559,6 +4564,32 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
 
     console.log(`온세일 데이터 인덱싱 완료: ${onSaleIndex.size}개 고객-대리점 조합 (총 ${onSaleIndexCount}개 처리)`);
     console.log(`온세일 데이터 샘플:`, Array.from(onSaleIndex.entries()).slice(0, 5));
+    
+    // 모바일가입내역 데이터 인덱싱 (예약번호 기준)
+    const mobileJoinIndex = new Map();
+    let mobileJoinIndexCount = 0;
+    
+    if (mobileJoinValues && mobileJoinValues.length > 1) {
+      mobileJoinValues.slice(1).forEach((row, index) => {
+        const reservationNumber = (row[6] || '').toString().trim(); // G열 (7번째, 0부터 시작): 예약번호
+        const reservationDateTime = (row[9] || '').toString().trim(); // J열 (10번째, 0부터 시작): 예약일시
+        
+        if (reservationNumber) {
+          // 예약번호 정규화 (하이픈 제거)
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          mobileJoinIndex.set(normalizedReservationNumber, reservationDateTime);
+          mobileJoinIndexCount++;
+          
+          // 처음 5개만 디버깅 로그
+          if (index < 5) {
+            console.log(`모바일가입내역 행 ${index + 2}: 예약번호="${reservationNumber}", 정규화="${normalizedReservationNumber}", 예약일시="${reservationDateTime}"`);
+          }
+        }
+      });
+    }
+    
+    console.log(`모바일가입내역 데이터 인덱싱 완료: ${mobileJoinIndex.size}개 예약번호 (총 ${mobileJoinIndexCount}개 처리)`);
+    console.log(`모바일가입내역 데이터 샘플:`, Array.from(mobileJoinIndex.entries()).slice(0, 5));
     
     // 6. 사전예약사이트 데이터 처리
     const reservationSiteRows = reservationSiteValues.slice(1); // 헤더 제거
@@ -4859,7 +4890,7 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
         const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
         const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
-        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedMemo = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         
         // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
         const reservationPattern = /[A-Z]{2}\d{6}/g;
@@ -4961,9 +4992,17 @@ app.get('/api/reservation-sales/model-color/by-pos/:posName', async (req, res) =
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
       
-      // 온세일접수 정보 매칭
+      // 온세일접수 정보 매칭 (온세일 → 모바일가입내역 순서로 찾기)
       const onSaleKey = `${customerName}_${storeCode}`;
-      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      let onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      
+      // 온세일에서 찾지 못한 경우 모바일가입내역에서 찾기
+      if (!onSaleReceivedDate && mobileJoinIndex.has(normalizedReservationNumber)) {
+        onSaleReceivedDate = mobileJoinIndex.get(normalizedReservationNumber);
+        if (index < 5) {
+          console.log(`  모바일가입내역에서 온세일접수일 찾음: "${onSaleReceivedDate}"`);
+        }
+      }
       
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = originalPosName;
@@ -5078,11 +5117,12 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       cacheUtils.set(normalizedCacheKey, normalizedData, 600);
     }
     
-    // 2. 병렬로 시트 데이터 가져오기 (온세일 포함)
-    const [reservationSiteValues, yardValues, onSaleValues] = await Promise.all([
+    // 2. 병렬로 시트 데이터 가져오기 (온세일, 모바일가입내역 포함)
+    const [reservationSiteValues, yardValues, onSaleValues, mobileJoinValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
       getSheetValues('마당접수'),
-      getSheetValues('온세일')
+      getSheetValues('온세일'),
+      getSheetValues('모바일가입내역')
     ]);
 
     // 3. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
@@ -5155,6 +5195,10 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       throw new Error('마당접수 데이터를 가져올 수 없습니다.');
     }
     
+    if (!mobileJoinValues || mobileJoinValues.length < 2) {
+      console.log('모바일가입내역 데이터를 가져올 수 없습니다. (무시됨)');
+    }
+    
     // 온세일 데이터 인덱싱 (고객명 + 대리점코드 기준)
     const onSaleIndex = new Map();
     let onSaleIndexCount = 0;
@@ -5168,6 +5212,31 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         onSaleIndexCount++;
       }
     });
+    
+    // 모바일가입내역 데이터 인덱싱 (예약번호 기준)
+    const mobileJoinIndex = new Map();
+    let mobileJoinIndexCount = 0;
+    
+    if (mobileJoinValues && mobileJoinValues.length > 1) {
+      mobileJoinValues.slice(1).forEach((row, index) => {
+        const reservationNumber = (row[6] || '').toString().trim(); // G열 (7번째, 0부터 시작): 예약번호
+        const reservationDateTime = (row[9] || '').toString().trim(); // J열 (10번째, 0부터 시작): 예약일시
+        
+        if (reservationNumber) {
+          // 예약번호 정규화 (하이픈 제거)
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          mobileJoinIndex.set(normalizedReservationNumber, reservationDateTime);
+          mobileJoinIndexCount++;
+          
+          // 처음 5개만 디버깅 로그
+          if (index < 5) {
+            console.log(`모델별 모바일가입내역 행 ${index + 2}: 예약번호="${reservationNumber}", 정규화="${normalizedReservationNumber}", 예약일시="${reservationDateTime}"`);
+          }
+        }
+      });
+    }
+    
+    console.log(`모델별 모바일가입내역 데이터 인덱싱 완료: ${mobileJoinIndex.size}개 예약번호 (총 ${mobileJoinIndexCount}개 처리)`);
     
     // 3. 정규화 규칙 매핑 생성
     const normalizationRules = normalizedData.normalizationRules || [];
@@ -5186,7 +5255,7 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
         const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
         const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
-        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedMemo = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         
         // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
         const reservationPattern = /[A-Z]{2}\d{6}/g;
@@ -5274,9 +5343,17 @@ app.get('/api/reservation-sales/customers/by-model/:model', async (req, res) => 
       const receivedDateTime = yardData.receivedDateTime || '';
       const receivedMemo = yardData.receivedMemo || '';
       
-      // 온세일 접수일
+      // 온세일 접수일 (온세일 → 모바일가입내역 순서로 찾기)
       const onSaleKey = `${customerName}_${storeCode}`;
-      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      let onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      
+      // 온세일에서 찾지 못한 경우 모바일가입내역에서 찾기
+      if (!onSaleReceivedDate && mobileJoinIndex.has(normalizedReservationNumber)) {
+        onSaleReceivedDate = mobileJoinIndex.get(normalizedReservationNumber);
+        if (index < 5) {
+          console.log(`  모바일가입내역에서 온세일접수일 찾음: "${onSaleReceivedDate}"`);
+        }
+      }
       
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = posName;
@@ -9689,11 +9766,12 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
       cacheUtils.set(normalizedCacheKey, normalizedData, 600);
     }
     
-    // 2. 병렬로 시트 데이터 가져오기 (온세일 포함)
-    const [reservationSiteValues, yardValues, onSaleValues] = await Promise.all([
+    // 2. 병렬로 시트 데이터 가져오기 (온세일, 모바일가입내역 포함)
+    const [reservationSiteValues, yardValues, onSaleValues, mobileJoinValues] = await Promise.all([
       getSheetValues('사전예약사이트'),
       getSheetValues('마당접수'),
-      getSheetValues('온세일')
+      getSheetValues('온세일'),
+      getSheetValues('모바일가입내역')
     ]);
 
     // 3. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
@@ -9716,6 +9794,10 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
     
     if (!onSaleValues || onSaleValues.length < 2) {
       throw new Error('온세일 데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!mobileJoinValues || mobileJoinValues.length < 2) {
+      console.log('모바일가입내역 데이터를 가져올 수 없습니다. (무시됨)');
     }
     
     // 4. 정규화 규칙 매핑 생성
@@ -9808,7 +9890,7 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
         const uValue = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         const vValue = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
         const receivedDateTime = (yardRow[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
-        const receivedMemo = (yardRow[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedMemo = (yardRow[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         
         // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
         const reservationPattern = /[A-Z]{2}\d{6}/g;
@@ -9853,6 +9935,31 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
     });
     
     console.log(`담당자별 온세일 데이터 인덱싱 완료: ${onSaleIndex.size}개 고객-대리점 조합`);
+    
+    // 6-1. 모바일가입내역 데이터 인덱싱 (예약번호 기준)
+    const mobileJoinIndex = new Map();
+    let mobileJoinIndexCount = 0;
+    
+    if (mobileJoinValues && mobileJoinValues.length > 1) {
+      mobileJoinValues.slice(1).forEach((row, index) => {
+        const reservationNumber = (row[6] || '').toString().trim(); // G열 (7번째, 0부터 시작): 예약번호
+        const reservationDateTime = (row[9] || '').toString().trim(); // J열 (10번째, 0부터 시작): 예약일시
+        
+        if (reservationNumber) {
+          // 예약번호 정규화 (하이픈 제거)
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          mobileJoinIndex.set(normalizedReservationNumber, reservationDateTime);
+          mobileJoinIndexCount++;
+          
+          // 처음 5개만 디버깅 로그
+          if (index < 5) {
+            console.log(`담당자별 모바일가입내역 행 ${index + 2}: 예약번호="${reservationNumber}", 정규화="${normalizedReservationNumber}", 예약일시="${reservationDateTime}"`);
+          }
+        }
+      });
+    }
+    
+    console.log(`담당자별 모바일가입내역 데이터 인덱싱 완료: ${mobileJoinIndex.size}개 예약번호 (총 ${mobileJoinIndexCount}개 처리)`);
     
     // 7. 사전예약사이트 데이터 처리 (담당자별 필터링)
     const reservationSiteRows = reservationSiteValues.slice(1);
@@ -9900,9 +10007,17 @@ app.get('/api/reservation-sales/customer-list/by-agent/:agentName', async (req, 
         console.log(`  담당자: "${agent}"`);
       }
       
-      // 온세일 접수일 찾기
+      // 온세일 접수일 찾기 (온세일 → 모바일가입내역 순서로 찾기)
       const onSaleKey = `${customerName}_${storeCode}`;
-      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      let onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      
+      // 온세일에서 찾지 못한 경우 모바일가입내역에서 찾기
+      if (!onSaleReceivedDate && mobileJoinIndex.has(normalizedReservationNumber)) {
+        onSaleReceivedDate = mobileJoinIndex.get(normalizedReservationNumber);
+        if (index < 5) {
+          console.log(`  모바일가입내역에서 온세일접수일 찾음: "${onSaleReceivedDate}"`);
+        }
+      }
       
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = posName;
@@ -10099,6 +10214,19 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       range: '온세일!A:Z'
     });
 
+    // 3-1. 모바일가입내역 데이터 로드
+    let mobileJoinResponse = null;
+    try {
+      mobileJoinResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '모바일가입내역!A:Z'
+      });
+      console.log('전체고객리스트: 모바일가입내역 시트 로드 성공');
+    } catch (error) {
+      console.log('전체고객리스트: 모바일가입내역 시트 로드 실패 (무시됨):', error.message);
+      mobileJoinResponse = { data: { values: null } };
+    }
+
     // 4. 폰클출고처데이터 시트 로드 (담당자 매칭용)
     const storeResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -10226,7 +10354,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
         const uValue = (row[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         const vValue = (row[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
         const receivedDate = (row[11] || '').toString().trim(); // L열 (12번째, 0부터 시작)
-        const receivedMemo = (row[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+        const receivedMemo = (row[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
         const receiver = (row[24] || '').toString().trim(); // Y열 (25번째, 0부터 시작)
         
         // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
@@ -10273,6 +10401,32 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     });
 
     console.log(`온세일 데이터 인덱싱 완료: ${onSaleIndex.size}개 고객-대리점 조합 (총 ${onSaleIndexCount}개 처리)`);
+
+    // 모바일가입내역 데이터 인덱싱 (예약번호 기준)
+    const mobileJoinIndex = new Map();
+    let mobileJoinIndexCount = 0;
+    
+    if (mobileJoinResponse && mobileJoinResponse.data.values && mobileJoinResponse.data.values.length > 1) {
+      const mobileJoinData = mobileJoinResponse.data.values.slice(1);
+      mobileJoinData.forEach((row, index) => {
+        const reservationNumber = (row[6] || '').toString().trim(); // G열 (7번째, 0부터 시작): 예약번호
+        const reservationDateTime = (row[9] || '').toString().trim(); // J열 (10번째, 0부터 시작): 예약일시
+        
+        if (reservationNumber) {
+          // 예약번호 정규화 (하이픈 제거)
+          const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+          mobileJoinIndex.set(normalizedReservationNumber, reservationDateTime);
+          mobileJoinIndexCount++;
+          
+          // 처음 5개만 디버깅 로그
+          if (index < 5) {
+            console.log(`전체고객리스트 모바일가입내역 행 ${index + 2}: 예약번호="${reservationNumber}", 정규화="${normalizedReservationNumber}", 예약일시="${reservationDateTime}"`);
+          }
+        }
+      });
+    }
+    
+    console.log(`전체고객리스트 모바일가입내역 데이터 인덱싱 완료: ${mobileJoinIndex.size}개 예약번호 (총 ${mobileJoinIndexCount}개 처리)`);
 
     // 전체 고객리스트 생성
     const customerList = reservationData.map((row, index) => {
@@ -10354,9 +10508,14 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       const normalizedReservationNumber = normalizeReservationNumber(reservationNumber);
       const yardInfo = yardIndex.get(normalizedReservationNumber) || {};
       
-      // 온세일접수 정보 매칭
+      // 온세일접수 정보 매칭 (온세일 → 모바일가입내역 순서로 찾기)
       const onSaleKey = `${customerName}_${storeCode}`;
-      const onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      let onSaleReceivedDate = onSaleIndex.get(onSaleKey) || '';
+      
+      // 온세일에서 찾지 못한 경우 모바일가입내역에서 찾기
+      if (!onSaleReceivedDate && mobileJoinIndex.has(normalizedReservationNumber)) {
+        onSaleReceivedDate = mobileJoinIndex.get(normalizedReservationNumber);
+      }
 
       return {
         reservationNumber,

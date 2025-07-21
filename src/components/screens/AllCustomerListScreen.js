@@ -66,6 +66,7 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' 또는 소속명
   const [agentOfficeData, setAgentOfficeData] = useState({ offices: [], departments: {}, agentInfo: {} });
   const [loadingAgentData, setLoadingAgentData] = useState(false);
+  const [expandedColors, setExpandedColors] = useState({}); // 색상 확장 상태 관리
 
   // 대리점아이디관리 데이터 로드
   const loadAgentOfficeData = useCallback(async () => {
@@ -513,38 +514,23 @@ function AllCustomerListScreen({ loggedInStore }) {
             console.log(`  - 매칭되지 않는 예약번호 샘플:`, unmatchedCustomers.slice(0, 10));
           }
           
-          // 배정완료된 고객들이 있으면 자동으로 저장 API 호출
-          const completedAssignments = result.data.filter(item => 
-            item.assignmentStatus === '배정완료' && item.assignedSerialNumber
-          );
+          // 배정상태 통계
+          const assignmentStats = {
+            배정완료: 0,
+            미배정: 0,
+            개통완료: 0,
+            미개통: 0
+          };
           
-          if (completedAssignments.length > 0) {
-            console.log('💾 [전체고객리스트 디버깅] 배정완료 고객 발견, 자동 저장 시작:', completedAssignments.length, '개');
+          Object.values(statusMap).forEach(status => {
+            if (status.assignmentStatus === '배정완료') assignmentStats.배정완료++;
+            else if (status.assignmentStatus.startsWith('미배정')) assignmentStats.미배정++;
             
-            const assignments = completedAssignments.map(item => ({
-              reservationNumber: item.reservationNumber,
-              assignedSerialNumber: item.assignedSerialNumber
-            }));
-            
-            try {
-              const saveResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/save-assignment`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ assignments })
-              });
-              
-              if (saveResponse.ok) {
-                const saveResult = await saveResponse.json();
-                console.log('✅ [전체고객리스트 디버깅] 자동 저장 완료:', saveResult.updated, '개 저장,', saveResult.skipped, '개 유지');
-              } else {
-                console.error('❌ [전체고객리스트 디버깅] 자동 저장 실패:', saveResponse.status);
-              }
-            } catch (saveError) {
-              console.error('❌ [전체고객리스트 디버깅] 자동 저장 오류:', saveError);
-            }
-          }
+            if (status.activationStatus === '개통완료') assignmentStats.개통완료++;
+            else if (status.activationStatus === '미개통') assignmentStats.미개통++;
+          });
+          
+          console.log('📈 [재고배정 디버깅] 배정상태 통계:', assignmentStats);
           
         } else {
           console.error('❌ [재고배정 디버깅] API 응답 실패:', result);
@@ -981,7 +967,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                                       </Typography>
                                       
                                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                        {colorItems.slice(0, 2).map(({ color, count }) => {
+                                        {colorItems.slice(0, expandedColors[modelCapacity] ? colorItems.length : 2).map(({ color, count }) => {
                                           const getColorStyle = (colorName) => {
                                             const colorLower = colorName.toLowerCase();
                                             if (colorLower.includes('블랙') || colorLower.includes('제트블랙')) {
@@ -1046,14 +1032,27 @@ function AllCustomerListScreen({ loggedInStore }) {
                                           );
                                         })}
                                         {colorItems.length > 2 && (
-                                          <Typography variant="caption" sx={{ 
-                                            color: '#666',
-                                            textAlign: 'center',
-                                            mt: 0.5,
-                                            fontSize: '0.7rem'
-                                          }}>
-                                            +{colorItems.length - 2}개 색상 더...
-                                          </Typography>
+                                          <Button
+                                            variant="text"
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation(); // 부모 카드의 클릭 이벤트 방지
+                                              setExpandedColors(prev => ({
+                                                ...prev,
+                                                [modelCapacity]: !prev[modelCapacity]
+                                              }));
+                                            }}
+                                            sx={{
+                                              textTransform: 'none',
+                                              fontSize: '0.7rem',
+                                              color: '#1976d2',
+                                              '&:hover': {
+                                                textDecoration: 'underline'
+                                              }
+                                            }}
+                                          >
+                                                                                         {expandedColors[modelCapacity] ? '접기' : `+${colorItems.length - 2}개 색상 더...`}
+                                          </Button>
                                         )}
                                       </Box>
                                     </Box>

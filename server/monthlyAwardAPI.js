@@ -727,19 +727,9 @@ async function getMonthlyAwardData(req, res) {
       
       // 매칭되지 않은 경우에만 로그 출력
       if (matchedHomeRows === 0) {
-        const logMessage = `🔍 [인터넷 비중] ${manager}: 매칭된 업체 없음 (분모: ${denominator}, 분자: 0)\n   매핑테이블 업체: ${Array.from(companyManagerMapping.entries()).filter(([company, mgr]) => mgr === manager).map(([company]) => company).join(', ')}\n   홈데이터 샘플: ${homeRows.slice(0, 3).map(row => row[2]).filter(Boolean).join(', ')}`;
-        console.log(logMessage);
-        
-        // 파일로도 저장
-        const fs = require('fs');
-        fs.appendFileSync('internet_ratio_debug.log', `${new Date().toISOString()} - ${logMessage}\n`);
+        console.log(`🔍 [인터넷 비중] ${manager}: 매칭된 업체 없음 (분모: ${denominator}, 분자: 0)`);
       } else if (numerator > 0) {
-        const logMessage = `✅ [인터넷 비중] ${manager}: ${numerator}/${denominator} = ${((numerator/denominator)*100).toFixed(2)}%`;
-        console.log(logMessage);
-        
-        // 파일로도 저장
-        const fs = require('fs');
-        fs.appendFileSync('internet_ratio_debug.log', `${new Date().toISOString()} - ${logMessage}\n`);
+        console.log(`✅ [인터넷 비중] ${manager}: ${numerator}/${denominator} = ${((numerator/denominator)*100).toFixed(2)}%`);
       }
       return {
         numerator,
