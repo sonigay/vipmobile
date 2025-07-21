@@ -8804,10 +8804,29 @@ app.get('/api/reservation-inventory-status', async (req, res) => {
   }
 });
 
-// 사무실별 보유재고 현황 API (간단 버전)
+// 사무실별 보유재고 현황 API (정규화작업시트 C열 필터링 적용)
 app.get('/api/office-inventory', async (req, res) => {
   try {
     console.log('🔍 [사무실재고] 사무실별 보유재고 현황 요청');
+    
+    // 정규화작업시트에서 허용된 모델 목록 가져오기
+    const normalizedValues = await getSheetValues('정규화작업');
+    const allowedModels = new Set();
+    
+    if (normalizedValues && normalizedValues.length > 1) {
+      // C열(인덱스 2)에서 허용된 모델명 추출
+      normalizedValues.slice(1).forEach(row => {
+        if (row.length > 2 && row[2]) {
+          const normalizedModel = row[2].toString().trim();
+          if (normalizedModel) {
+            allowedModels.add(normalizedModel);
+          }
+        }
+      });
+    }
+    
+    console.log(`📋 [사무실재고] 정규화작업시트 C열 허용 모델: ${allowedModels.size}개`);
+    console.log('📋 [사무실재고] 허용 모델 목록:', Array.from(allowedModels));
     
     // 폰클재고데이터에서 재고 정보 수집
     const inventoryValues = await getSheetValues('폰클재고데이터');
@@ -8827,6 +8846,7 @@ app.get('/api/office-inventory', async (req, res) => {
     };
     
     let processedCount = 0;
+    let filteredCount = 0;
     let totalCount = 0;
     
     // 헤더 제거하고 데이터 처리 (2행부터 시작)
@@ -8842,36 +8862,43 @@ app.get('/api/office-inventory', async (req, res) => {
         if (model && color && storeName && status === '정상') {
           const combinedModel = `${model} | ${color}`;
           
-          // 사무실명 추출
-          let officeName = '';
-          if (storeName.includes('평택사무실')) {
-            officeName = '평택사무실';
-          } else if (storeName.includes('인천사무실')) {
-            officeName = '인천사무실';
-          } else if (storeName.includes('군산사무실')) {
-            officeName = '군산사무실';
-          } else if (storeName.includes('안산사무실')) {
-            officeName = '안산사무실';
-          }
-          
-          if (officeName && officeInventory[officeName]) {
-            if (!officeInventory[officeName][combinedModel]) {
-              officeInventory[officeName][combinedModel] = 0;
+          // 정규화작업시트 C열과 매칭되는 모델만 처리
+          if (allowedModels.has(combinedModel)) {
+            // 사무실명 추출
+            let officeName = '';
+            if (storeName.includes('평택사무실')) {
+              officeName = '평택사무실';
+            } else if (storeName.includes('인천사무실')) {
+              officeName = '인천사무실';
+            } else if (storeName.includes('군산사무실')) {
+              officeName = '군산사무실';
+            } else if (storeName.includes('안산사무실')) {
+              officeName = '안산사무실';
             }
-            officeInventory[officeName][combinedModel]++;
-            processedCount++;
+            
+            if (officeName && officeInventory[officeName]) {
+              if (!officeInventory[officeName][combinedModel]) {
+                officeInventory[officeName][combinedModel] = 0;
+              }
+              officeInventory[officeName][combinedModel]++;
+              processedCount++;
+            }
+          } else {
+            filteredCount++;
           }
         }
       }
     });
     
-    console.log(`📊 [사무실재고] 총 데이터: ${totalCount}개, 처리된 재고: ${processedCount}개`);
+    console.log(`📊 [사무실재고] 총 데이터: ${totalCount}개, 처리된 재고: ${processedCount}개, 필터링된 항목: ${filteredCount}개`);
     
     // 통계 계산
     const stats = {
       totalInventory: 0,
       officeStats: {},
+      allowedModelsCount: allowedModels.size,
       processedCount,
+      filteredCount,
       totalCount
     };
     
@@ -8891,6 +8918,7 @@ app.get('/api/office-inventory', async (req, res) => {
       success: true,
       officeInventory,
       stats,
+      allowedModels: Array.from(allowedModels),
       lastUpdated: new Date().toISOString()
     };
     
