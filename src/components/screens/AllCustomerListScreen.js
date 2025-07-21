@@ -683,13 +683,10 @@ function AllCustomerListScreen({ loggedInStore }) {
       try {
         await Promise.all([
           loadAllCustomerList(),
-          loadAgentOfficeData()
+          loadAgentOfficeData(),
+          loadAssignmentStatus(),
+          loadActivationStatus()
         ]);
-        
-        if (customerList.length > 0) {
-          await loadAssignmentStatus();
-          await loadActivationStatus();
-        }
       } catch (error) {
         setError('데이터 로드 중 오류가 발생했습니다.');
       }
@@ -709,6 +706,11 @@ function AllCustomerListScreen({ loggedInStore }) {
     const interval = setInterval(updateCacheStats, 10000); // 10초마다 업데이트
     return () => clearInterval(interval);
   }, [updateCacheStats]);
+
+  // 사무실별 재고 현황 자동 로드
+  useEffect(() => {
+    loadInventoryStatus();
+  }, [loadInventoryStatus]);
 
   // 사무실별 재고 현황 로드 (마운트 시 자동)
   const loadInventoryStatus = useCallback(async () => {
