@@ -1297,12 +1297,12 @@ async function getMonthlyAwardData(req, res) {
     const strategicScore = calculateScore(
       parseFloat(totalStrategicProducts.percentage), 
       finalMatrixCriteria.filter(c => c.indicator === 'strategic'), 
-      3
+      6 // 전략상품은 6점으로 수정
     );
     const internetScore = calculateScore(
       parseFloat(totalInternetRatio.percentage), 
       finalMatrixCriteria.filter(c => c.indicator === 'internet'), 
-      6
+      3 // 인터넷 비중은 3점으로 수정
     );
 
     // 총점 계산 (각 지표별 점수 합산)
@@ -1328,12 +1328,12 @@ async function getMonthlyAwardData(req, res) {
       });
     });
 
-    // 각 지표별 최대 점수 계산
+    // 각 지표별 최대 점수 계산 (시트에서 설정된 값 사용)
     const maxScores = {
       upsell: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'upsell').map(c => c.score), 6),
       change105: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'change105').map(c => c.score), 6),
-      strategic: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'strategic').map(c => c.score), 3),
-      internet: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'internet').map(c => c.score), 6)
+      strategic: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'strategic').map(c => c.score), 6), // 전략상품은 6점으로 수정
+      internet: Math.max(...finalMatrixCriteria.filter(c => c.indicator === 'internet').map(c => c.score), 3) // 인터넷 비중은 3점으로 수정
     };
     
     // 총점 계산
@@ -1401,11 +1401,11 @@ async function saveMonthlyAwardSettings(req, res) {
         const maxScores = {
           'upsell': 6,      // 업셀기변: 6점
           'change105': 6,   // 기변105이상: 6점
-          'strategic': 3,   // 전략상품: 3점
-          'internet': 6     // 인터넷 비중: 6점
+          'strategic': 6,   // 전략상품: 6점
+          'internet': 3     // 인터넷 비중: 3점으로 수정
         };
         
-        // 총점 계산 (21점 만점)
+        // 총점 계산 (21점 만점으로 수정: 6+6+6+3)
         const totalMaxScore = 21;
         
         // 각 지표별로 데이터 정리
@@ -1429,8 +1429,8 @@ async function saveMonthlyAwardSettings(req, res) {
           
           organizedData.push([`${indicatorNames[indicator]} (${maxScore}점)`, '', '', '']);
           
-          // 점수별 데이터 추가 (6점부터 1점까지, 또는 3점부터 1점까지)
-          const scoreRange = indicator === 'strategic' ? [3, 2, 1] : [6, 5, 4, 3, 2, 1];
+          // 점수별 데이터 추가 (6점부터 1점까지)
+          const scoreRange = [6, 5, 4, 3, 2, 1];
           
                      for (let i = 0; i < scoreRange.length; i++) {
              const score = scoreRange[i];
