@@ -1246,36 +1246,44 @@ function MonthlyAwardTab() {
                   data.agentDetails.map((agent, index) => (
                     <TableRow key={index}>
                       <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{agent.name}</TableCell>
-                      <TableCell sx={{ textAlign: 'center' }}>
+                      <TableCell sx={{ 
+                        textAlign: 'center', 
+                        bgcolor: parseFloat(agent.upsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee' 
+                      }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                             {agent.upsellChange.percentage}%
                           </Typography>
-
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ textAlign: 'center' }}>
+                      <TableCell sx={{ 
+                        textAlign: 'center', 
+                        bgcolor: parseFloat(agent.change105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee' 
+                      }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                             {agent.change105Above.percentage}%
                           </Typography>
-
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ textAlign: 'center' }}>
+                      <TableCell sx={{ 
+                        textAlign: 'center', 
+                        bgcolor: parseFloat(agent.strategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee' 
+                      }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                             {agent.strategicProducts.percentage}%
                           </Typography>
-
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ textAlign: 'center' }}>
+                      <TableCell sx={{ 
+                        textAlign: 'center', 
+                        bgcolor: parseFloat(agent.internetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee' 
+                      }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                             {agent.internetRatio.percentage}%
                           </Typography>
-
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -1327,45 +1335,43 @@ function MonthlyAwardTab() {
                 {data.officeGroups.map((group, index) => (
                   <TableRow key={index}>
                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.office}</TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalUpsellChange.percentage}%
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalChange105Above.percentage}%
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalStrategicProducts.percentage}%
                         </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? '#2e7d32' : '#d32f2f',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem'
-                        }}>
-                          {getAchievementText(parseFloat(group.totalStrategicProducts.percentage), 'strategic')}
-                        </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalInternetRatio.percentage}%
-                        </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? '#2e7d32' : '#d32f2f',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem'
-                        }}>
-                          {getAchievementText(parseFloat(group.totalInternetRatio.percentage), 'internet')}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -1410,59 +1416,43 @@ function MonthlyAwardTab() {
                 {data.departmentGroups.map((group, index) => (
                   <TableRow key={index}>
                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.department}</TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalUpsellChange.percentage}%
                         </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? '#2e7d32' : '#d32f2f',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem'
-                        }}>
-                          {getAchievementText(parseFloat(group.totalUpsellChange.percentage), 'upsell')}
-                        </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalChange105Above.percentage}%
                         </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? '#2e7d32' : '#d32f2f',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem'
-                        }}>
-                          {getAchievementText(parseFloat(group.totalChange105Above.percentage), 'change105')}
-                        </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalStrategicProducts.percentage}%
                         </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? '#2e7d32' : '#d32f2f',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem'
-                        }}>
-                          {getAchievementText(parseFloat(group.totalStrategicProducts.percentage), 'strategic')}
-                        </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
+                    <TableCell sx={{ 
+                      textAlign: 'center', 
+                      bgcolor: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee' 
+                    }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                           {group.totalInternetRatio.percentage}%
-                        </Typography>
-                        <Typography variant="caption" sx={{ 
-                          color: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? '#2e7d32' : '#d32f2f',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem'
-                        }}>
-                          {getAchievementText(parseFloat(group.totalInternetRatio.percentage), 'internet')}
                         </Typography>
                       </Box>
                     </TableCell>
