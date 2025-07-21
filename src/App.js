@@ -1490,6 +1490,7 @@ function App() {
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
     console.log('✅ [App] showAppUpdatePopup을 true로 설정');
+    console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
     
     // 상태 초기화
     setPendingLoginData(null);
@@ -1571,6 +1572,7 @@ function App() {
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
     console.log('✅ [App] showAppUpdatePopup을 true로 설정');
+    console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
     
     // 모드 선택 팝업 닫기
     setShowModeSelection(false);

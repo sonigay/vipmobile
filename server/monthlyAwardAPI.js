@@ -34,7 +34,7 @@ async function debugSheetNames() {
 // Google API 인증 설정
 const auth = new google.auth.JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY.includes('\\n') ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : process.env.GOOGLE_PRIVATE_KEY,
+  key: process.env.GOOGLE_PRIVATE_KEY ? (process.env.GOOGLE_PRIVATE_KEY.includes('\\n') ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : process.env.GOOGLE_PRIVATE_KEY) : '',
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
@@ -425,21 +425,18 @@ async function getMonthlyAwardData(req, res) {
       { score: 2, indicator: 'change105', percentage: 56.0 },
       { score: 1, indicator: 'change105', percentage: 48.0 },
       
-      // 전략상품 기준값
-      { score: 6, indicator: 'strategic', percentage: 40.0 },
-      { score: 5, indicator: 'strategic', percentage: 35.0 },
-      { score: 4, indicator: 'strategic', percentage: 30.0 },
-      { score: 3, indicator: 'strategic', percentage: 25.0 },
-      { score: 2, indicator: 'strategic', percentage: 20.0 },
-      { score: 1, indicator: 'strategic', percentage: 15.0 },
+      // 전략상품 기준값 (90%에서 6점)
+      { score: 6, indicator: 'strategic', percentage: 90.0 },
+      { score: 5, indicator: 'strategic', percentage: 80.0 },
+      { score: 4, indicator: 'strategic', percentage: 70.0 },
+      { score: 3, indicator: 'strategic', percentage: 60.0 },
+      { score: 2, indicator: 'strategic', percentage: 50.0 },
+      { score: 1, indicator: 'strategic', percentage: 40.0 },
       
-      // 인터넷 비중 기준값
-      { score: 6, indicator: 'internet', percentage: 60.0 },
-      { score: 5, indicator: 'internet', percentage: 55.0 },
-      { score: 4, indicator: 'internet', percentage: 50.0 },
-      { score: 3, indicator: 'internet', percentage: 45.0 },
-      { score: 2, indicator: 'internet', percentage: 40.0 },
-      { score: 1, indicator: 'internet', percentage: 35.0 }
+      // 인터넷 비중 기준값 (7%에서 3점)
+      { score: 3, indicator: 'internet', percentage: 7.0 },
+      { score: 2, indicator: 'internet', percentage: 6.0 },
+      { score: 1, indicator: 'internet', percentage: 5.0 }
     ];
 
     // 설정된 값이 없으면 기본값 사용

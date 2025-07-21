@@ -102,6 +102,13 @@ function AppUpdatePopup({
         updateData = await getLatestUpdateForMode(mode, 1);
       }
       console.log(`✅ [AppUpdatePopup] 업데이트 로드 완료: ${mode} 모드, 데이터 개수: ${updateData.length}`, updateData);
+      
+      // 데이터가 없을 때의 처리
+      if (updateData.length === 0) {
+        console.log(`⚠️ [AppUpdatePopup] ${mode} 모드에 업데이트 데이터가 없습니다.`);
+        // 데이터가 없어도 팝업은 표시하되, "최신 업데이트가 없습니다" 메시지를 보여줌
+      }
+      
       setUpdates(updateData);
     } catch (error) {
       console.error('❌ [AppUpdatePopup] 업데이트 로드 오류:', error);
@@ -225,6 +232,16 @@ function AppUpdatePopup({
       console.log('❌ [AppUpdatePopup] 팝업 열기 조건 불만족:', { open, mode });
     }
   }, [open, mode, showHistory]);
+
+  // 팝업 렌더링 상태 로그
+  console.log('🔍 [AppUpdatePopup] 렌더링 상태:', { 
+    open, 
+    mode, 
+    updatesCount: updates.length,
+    loading,
+    error,
+    isAdmin
+  });
 
   return (
     <Dialog 
