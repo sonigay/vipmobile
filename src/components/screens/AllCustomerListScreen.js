@@ -856,64 +856,71 @@ function AllCustomerListScreen({ loggedInStore }) {
 
   // 취소 체크 토글 (즉시 저장/삭제)
   const handleCancelCheckToggle = useCallback(async (reservationNumber) => {
-    const isCurrentlyChecked = cancelCheckedItems.includes(reservationNumber);
-    
     // 이미 처리 중이면 무시
-    if (processingCancelCheck.has(reservationNumber)) {
-      return;
-    }
-    
-    // 처리 중 상태 추가
-    setProcessingCancelCheck(prev => new Set(prev).add(reservationNumber));
+    setProcessingCancelCheck(prev => {
+      if (prev.has(reservationNumber)) {
+        return prev; // 이미 처리 중이면 기존 상태 유지
+      }
+      return new Set(prev).add(reservationNumber);
+    });
     
     try {
-      if (isCurrentlyChecked) {
-        // 체크 해제 - 시트에서 삭제
-        const response = await fetch(`${getApiUrl()}/api/cancel-check/delete`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            reservationNumbers: [reservationNumber]
+      // 현재 상태를 함수 내부에서 확인
+      setCancelCheckedItems(prev => {
+        const isCurrentlyChecked = prev.includes(reservationNumber);
+        
+        if (isCurrentlyChecked) {
+          // 체크 해제 - 시트에서 삭제
+          fetch(`${getApiUrl()}/api/cancel-check/delete`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservationNumbers: [reservationNumber]
+            })
           })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setCancelCheckedItems(prev => prev.filter(item => item !== reservationNumber));
-            setError('');
-          } else {
-            setError(result.message || '취소 체크 해제에 실패했습니다.');
-          }
-        } else {
-          setError('취소 체크 해제에 실패했습니다.');
-        }
-      } else {
-        // 체크 - 시트에 저장
-        const response = await fetch(`${getApiUrl()}/api/cancel-check/save`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            reservationNumbers: [reservationNumber]
+          .then(response => response.json())
+          .then(result => {
+            if (result.success) {
+              setError('');
+            } else {
+              setError(result.message || '취소 체크 해제에 실패했습니다.');
+            }
           })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setCancelCheckedItems(prev => [...prev, reservationNumber]);
-            setError('');
-          } else {
-            setError(result.message || '취소 체크 저장에 실패했습니다.');
-          }
+          .catch(error => {
+            console.error('취소 체크 해제 오류:', error);
+            setError('취소 체크 해제에 실패했습니다.');
+          });
+          
+          return prev.filter(item => item !== reservationNumber);
         } else {
-          setError('취소 체크 저장에 실패했습니다.');
+          // 체크 - 시트에 저장
+          fetch(`${getApiUrl()}/api/cancel-check/save`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservationNumbers: [reservationNumber]
+            })
+          })
+          .then(response => response.json())
+          .then(result => {
+            if (result.success) {
+              setError('');
+            } else {
+              setError(result.message || '취소 체크 저장에 실패했습니다.');
+            }
+          })
+          .catch(error => {
+            console.error('취소 체크 저장 오류:', error);
+            setError('취소 체크 저장에 실패했습니다.');
+          });
+          
+          return [...prev, reservationNumber];
         }
-      }
+      });
     } catch (error) {
       console.error('취소 체크 토글 오류:', error);
       setError('취소 체크 처리 중 오류가 발생했습니다.');
@@ -925,7 +932,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         return newSet;
       });
     }
-  }, [cancelCheckedItems, processingCancelCheck]);
+  }, []);
 
 
 
