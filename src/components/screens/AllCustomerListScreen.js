@@ -88,7 +88,8 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
     loadingAssignment, 
     cancelCheckedItems, 
     onCancelCheckToggle,
-    processingCancelCheck
+    processingCancelCheck,
+    loadingCancelData
   } = data;
   const customer = filteredCustomerList[index];
 
@@ -324,10 +325,16 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           <IconButton
             size="small"
             onClick={() => onCancelCheckToggle(customer.reservationNumber)}
+            disabled={loadingCancelData} // 데이터 로딩 중에는 비활성화
             sx={{
               color: isCancelChecked ? '#d32f2f' : '#757575',
+              opacity: loadingCancelData ? 0.5 : 1,
               '&:hover': {
                 backgroundColor: isCancelChecked ? '#ffcdd2' : '#f5f5f5'
+              },
+              '&:disabled': {
+                opacity: 0.5,
+                cursor: 'not-allowed'
               }
             }}
           >
@@ -803,15 +810,36 @@ function AllCustomerListScreen({ loggedInStore }) {
   const loadUnmatchedData = useCallback(async () => {
     setLoadingUnmatched(true);
     try {
+      console.log('🔄 [미매칭] 데이터 로드 시작');
       const response = await fetch(`${getApiUrl()}/api/unmatched-customers`);
+      console.log('📡 [미매칭] API 응답 상태:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
+        console.log('📊 [미매칭] API 응답 데이터:', result);
+        
         if (result.success) {
           setUnmatchedData(result.data);
+          console.log(`✅ [미매칭] 데이터 로드 완료:`, {
+            yard: result.data.yard?.length || 0,
+            onSale: result.data.onSale?.length || 0,
+            mobile: result.data.mobile?.length || 0,
+            total: (result.data.yard?.length || 0) + (result.data.onSale?.length || 0) + (result.data.mobile?.length || 0)
+          });
+        } else {
+          console.error('❌ [미매칭] API 응답 실패:', result.message);
+          setUnmatchedData({ yard: [], onSale: [], mobile: [] });
+          setError(`미매칭 데이터 로드 실패: ${result.message}`);
         }
+      } else {
+        console.error('❌ [미매칭] API 응답 오류:', response.status, response.statusText);
+        setUnmatchedData({ yard: [], onSale: [], mobile: [] });
+        setError(`미매칭 데이터 로드 실패: HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error('미매칭 데이터 로드 오류:', error);
+      console.error('❌ [미매칭] 데이터 로드 오류:', error);
+      setUnmatchedData({ yard: [], onSale: [], mobile: [] });
+      setError(`미매칭 데이터 로드 중 오류가 발생했습니다: ${error.message}`);
     } finally {
       setLoadingUnmatched(false);
     }
@@ -824,9 +852,15 @@ function AllCustomerListScreen({ loggedInStore }) {
   }, [loadUnmatchedData]);
 
   // 미매칭 데이터 엑셀 다운로드
+  const [downloadingUnmatchedExcel, setDownloadingUnmatchedExcel] = useState(false);
+  
   const downloadUnmatchedExcel = useCallback(async () => {
+    setDownloadingUnmatchedExcel(true);
     try {
+      console.log('🔄 [미매칭] 엑셀 다운로드 시작');
       const response = await fetch(`${getApiUrl()}/api/unmatched-customers/excel`);
+      console.log('📡 [미매칭] 엑셀 다운로드 응답 상태:', response.status);
+      
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -837,9 +871,16 @@ function AllCustomerListScreen({ loggedInStore }) {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        console.log('✅ [미매칭] 엑셀 다운로드 완료');
+      } else {
+        console.error('❌ [미매칭] 엑셀 다운로드 실패:', response.status, response.statusText);
+        setError('엑셀 파일 다운로드에 실패했습니다.');
       }
     } catch (error) {
-      console.error('미매칭 데이터 엑셀 다운로드 오류:', error);
+      console.error('❌ [미매칭] 엑셀 다운로드 오류:', error);
+      setError('엑셀 파일 다운로드 중 오류가 발생했습니다.');
+    } finally {
+      setDownloadingUnmatchedExcel(false);
     }
   }, []);
 
@@ -847,15 +888,24 @@ function AllCustomerListScreen({ loggedInStore }) {
   const loadCancelCheckData = async () => {
     setLoadingCancelData(true);
     try {
+      console.log('🔄 [취소체크] 데이터 로드 시작');
       const response = await fetch(`${getApiUrl()}/api/cancel-check/list`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
           setCancelCheckedItems(result.data);
+          console.log(`✅ [취소체크] 데이터 로드 완료: ${result.data.length}건`);
+        } else {
+          console.error('❌ [취소체크] 데이터 로드 실패:', result.message);
+          setCancelCheckedItems([]); // 실패 시 빈 배열로 초기화
         }
+      } else {
+        console.error('❌ [취소체크] API 응답 오류:', response.status);
+        setCancelCheckedItems([]); // 오류 시 빈 배열로 초기화
       }
     } catch (error) {
-      console.error('취소 체크 데이터 로드 오류:', error);
+      console.error('❌ [취소체크] 데이터 로드 오류:', error);
+      setCancelCheckedItems([]); // 오류 시 빈 배열로 초기화
     } finally {
       setLoadingCancelData(false);
     }
@@ -864,72 +914,64 @@ function AllCustomerListScreen({ loggedInStore }) {
   // 취소 체크 토글 (즉시 저장/삭제)
   const handleCancelCheckToggle = async (reservationNumber) => {
     // 이미 처리 중이면 무시
-    setProcessingCancelCheck(prev => {
-      if (prev.has(reservationNumber)) {
-        return prev; // 이미 처리 중이면 기존 상태 유지
-      }
-      return new Set(prev).add(reservationNumber);
-    });
+    if (processingCancelCheck.has(reservationNumber)) {
+      return;
+    }
+    
+    setProcessingCancelCheck(prev => new Set(prev).add(reservationNumber));
     
     try {
-      // 현재 상태를 함수 내부에서 확인
-      setCancelCheckedItems(prev => {
-        const isCurrentlyChecked = prev.includes(reservationNumber);
+      const isCurrentlyChecked = cancelCheckedItems.includes(reservationNumber);
+      
+      if (isCurrentlyChecked) {
+        // 체크 해제 - 시트에서 삭제
+        const response = await fetch(`${getApiUrl()}/api/cancel-check/delete`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationNumbers: [reservationNumber]
+          })
+        });
         
-        if (isCurrentlyChecked) {
-          // 체크 해제 - 시트에서 삭제
-          fetch(`${getApiUrl()}/api/cancel-check/delete`, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              reservationNumbers: [reservationNumber]
-            })
-          })
-          .then(response => response.json())
-          .then(result => {
-            if (result.success) {
-              setError('');
-            } else {
-              setError(result.message || '취소 체크 해제에 실패했습니다.');
-            }
-          })
-          .catch(error => {
-            console.error('취소 체크 해제 오류:', error);
-            setError('취소 체크 해제에 실패했습니다.');
-          });
-          
-          return prev.filter(item => item !== reservationNumber);
+        const result = await response.json();
+        
+        if (result.success) {
+          // 성공 시에만 상태 업데이트
+          setCancelCheckedItems(prev => prev.filter(item => item !== reservationNumber));
+          setError('');
+          console.log(`✅ 취소 체크 해제 완료: ${reservationNumber}`);
         } else {
-          // 체크 - 시트에 저장
-          fetch(`${getApiUrl()}/api/cancel-check/save`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              reservationNumbers: [reservationNumber]
-            })
-          })
-          .then(response => response.json())
-          .then(result => {
-            if (result.success) {
-              setError('');
-            } else {
-              setError(result.message || '취소 체크 저장에 실패했습니다.');
-            }
-          })
-          .catch(error => {
-            console.error('취소 체크 저장 오류:', error);
-            setError('취소 체크 저장에 실패했습니다.');
-          });
-          
-          return [...prev, reservationNumber];
+          setError(result.message || '취소 체크 해제에 실패했습니다.');
+          console.error('❌ 취소 체크 해제 실패:', result.message);
         }
-      });
+      } else {
+        // 체크 - 시트에 저장
+        const response = await fetch(`${getApiUrl()}/api/cancel-check/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationNumbers: [reservationNumber]
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // 성공 시에만 상태 업데이트
+          setCancelCheckedItems(prev => [...prev, reservationNumber]);
+          setError('');
+          console.log(`✅ 취소 체크 저장 완료: ${reservationNumber}`);
+        } else {
+          setError(result.message || '취소 체크 저장에 실패했습니다.');
+          console.error('❌ 취소 체크 저장 실패:', result.message);
+        }
+      }
     } catch (error) {
-      console.error('취소 체크 토글 오류:', error);
+      console.error('❌ 취소 체크 토글 오류:', error);
       setError('취소 체크 처리 중 오류가 발생했습니다.');
     } finally {
       // 처리 중 상태 제거
@@ -1681,7 +1723,8 @@ function AllCustomerListScreen({ loggedInStore }) {
                   loadingAssignment, 
                   cancelCheckedItems, 
                   onCancelCheckToggle: handleCancelCheckToggle,
-                  processingCancelCheck
+                  processingCancelCheck,
+                  loadingCancelData
                 }}
                 width="100%"
                 style={{ backgroundColor: '#fff' }}
@@ -1882,18 +1925,23 @@ function AllCustomerListScreen({ loggedInStore }) {
         <DialogActions sx={{ p: 2, backgroundColor: '#fafafa' }}>
           <Button 
             onClick={downloadUnmatchedExcel}
+            disabled={downloadingUnmatchedExcel || loadingUnmatched}
             variant="outlined"
-            startIcon={<DownloadIcon />}
+            startIcon={downloadingUnmatchedExcel ? <CircularProgress size={16} /> : <DownloadIcon />}
             sx={{ 
               borderColor: '#4caf50',
               color: '#4caf50',
               '&:hover': { 
                 borderColor: '#388e3c',
                 backgroundColor: '#e8f5e8'
+              },
+              '&:disabled': {
+                borderColor: '#ccc',
+                color: '#ccc'
               }
             }}
           >
-            엑셀 다운로드
+            {downloadingUnmatchedExcel ? '다운로드 중...' : '엑셀 다운로드'}
           </Button>
           <Button 
             onClick={() => setShowUnmatchedDialog(false)}

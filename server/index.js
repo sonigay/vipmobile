@@ -9386,8 +9386,20 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
       return !reservationNumbers.includes(reservationNumber);
     });
 
+    const deletedCount = dataRows.length - filteredData.length;
+    
+    if (deletedCount === 0) {
+      return res.json({
+        success: true,
+        message: '삭제할 데이터가 없습니다.',
+        deletedCount: 0
+      });
+    }
+
     // 전체 데이터를 새로 쓰기 (헤더 + 필터링된 데이터)
     const newData = [header, ...filteredData];
+    
+    console.log(`🗑️ [취소체크] 삭제 전 데이터: ${dataRows.length}건, 삭제 후 데이터: ${filteredData.length}건`);
     
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
@@ -9398,7 +9410,6 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
       }
     });
 
-    const deletedCount = dataRows.length - filteredData.length;
     console.log(`🗑️ [취소체크] 취소 데이터 삭제 완료: ${deletedCount}건`);
 
     res.json({
