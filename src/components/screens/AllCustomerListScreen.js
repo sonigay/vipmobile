@@ -1783,7 +1783,7 @@ function AllCustomerListScreen({ loggedInStore }) {
               }}
             />
             <Tab 
-              label={`온세일시트 미매칭 (${unmatchedData.onSale.length}건)`}
+              label={`온세일 미매칭 (${unmatchedData.onSale.length}건)`}
               sx={{ 
                 color: '#1976d2',
                 fontWeight: 'bold',
@@ -1844,11 +1844,11 @@ function AllCustomerListScreen({ loggedInStore }) {
                   </Box>
                 )}
 
-                {/* 온세일시트 미매칭 */}
+                {/* 온세일 미매칭 */}
                 {unmatchedTab === 1 && (
                   <Box>
                     <Typography variant="subtitle1" sx={{ mb: 2, color: '#1976d2', fontWeight: 'bold' }}>
-                      💻 온세일시트에서만 확인되는 고객 ({unmatchedData.onSale.length}건)
+                      💻 온세일에서만 확인되는 고객 ({unmatchedData.onSale.length}건)
                     </Typography>
                     {unmatchedData.onSale.length > 0 ? (
                       <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
@@ -1876,7 +1876,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                         </Table>
                       </TableContainer>
                     ) : (
-                      <Alert severity="success">온세일시트 미매칭 고객이 없습니다.</Alert>
+                      <Alert severity="success">온세일 미매칭 고객이 없습니다.</Alert>
                     )}
                   </Box>
                 )}

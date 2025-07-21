@@ -8907,11 +8907,11 @@ app.get('/api/unmatched-customers', async (req, res) => {
       // 오류가 발생해도 다른 시트는 계속 처리
     }
     
-    // 2. 온세일시트 미매칭 확인
+    // 2. 온세일 미매칭 확인
     try {
-      console.log('🔄 [미매칭고객] 온세일시트 데이터 로드 중...');
-      const onSaleData = await getSheetValues('온세일시트');
-      console.log(`📋 [미매칭고객] 온세일시트 데이터 로드 완료: ${onSaleData ? onSaleData.length : 0}행`);
+      console.log('🔄 [미매칭고객] 온세일 데이터 로드 중...');
+      const onSaleData = await getSheetValues('온세일');
+      console.log(`📋 [미매칭고객] 온세일 데이터 로드 완료: ${onSaleData ? onSaleData.length : 0}행`);
       
       if (onSaleData && onSaleData.length > 1) {
         onSaleData.slice(1).forEach(row => {
@@ -8934,12 +8934,12 @@ app.get('/api/unmatched-customers', async (req, res) => {
             }
           }
         });
-        console.log(`✅ [미매칭고객] 온세일시트 미매칭: ${unmatchedData.onSale.length}건`);
+        console.log(`✅ [미매칭고객] 온세일 미매칭: ${unmatchedData.onSale.length}건`);
       } else {
-        console.log('⚠️ [미매칭고객] 온세일시트 데이터가 없거나 헤더만 존재');
+        console.log('⚠️ [미매칭고객] 온세일 데이터가 없거나 헤더만 존재');
       }
     } catch (error) {
-      console.error('❌ [미매칭고객] 온세일시트 데이터 로드 오류:', error);
+      console.error('❌ [미매칭고객] 온세일 데이터 로드 오류:', error);
       // 오류가 발생해도 다른 시트는 계속 처리
     }
     
@@ -8981,7 +8981,7 @@ app.get('/api/unmatched-customers', async (req, res) => {
     
     const totalUnmatched = unmatchedData.yard.length + unmatchedData.onSale.length + unmatchedData.mobile.length;
     
-    console.log(`📊 [미매칭고객] 미매칭 현황: 마당접수 ${unmatchedData.yard.length}건, 온세일시트 ${unmatchedData.onSale.length}건, 모바일가입내역 ${unmatchedData.mobile.length}건 (총 ${totalUnmatched}건)`);
+    console.log(`📊 [미매칭고객] 미매칭 현황: 마당접수 ${unmatchedData.yard.length}건, 온세일 ${unmatchedData.onSale.length}건, 모바일가입내역 ${unmatchedData.mobile.length}건 (총 ${totalUnmatched}건)`);
     
     const result = {
       success: true,
@@ -9068,9 +9068,9 @@ app.get('/api/unmatched-customers/excel', async (req, res) => {
       console.error('마당접수 데이터 로드 오류:', error);
     }
     
-    // 2. 온세일시트 미매칭 확인
+    // 2. 온세일 미매칭 확인
     try {
-      const onSaleData = await getSheetValues('온세일시트');
+      const onSaleData = await getSheetValues('온세일');
       if (onSaleData && onSaleData.length > 1) {
         onSaleData.slice(1).forEach(row => {
           if (row.length >= 3) {
@@ -9094,7 +9094,7 @@ app.get('/api/unmatched-customers/excel', async (req, res) => {
         });
       }
     } catch (error) {
-      console.error('온세일시트 데이터 로드 오류:', error);
+      console.error('온세일 데이터 로드 오류:', error);
     }
     
     // 3. 모바일가입내역 미매칭 확인
@@ -9148,7 +9148,7 @@ app.get('/api/unmatched-customers/excel', async (req, res) => {
       yardSheet.addRow(item);
     });
     
-    // 2. 온세일시트 미매칭 시트
+    // 2. 온세일 미매칭 시트
     const onSaleSheet = workbook.addWorksheet('온세일미매칭');
     onSaleSheet.columns = [
       { header: '고객명', key: 'customerName', width: 15 },
@@ -9185,7 +9185,7 @@ app.get('/api/unmatched-customers/excel', async (req, res) => {
     ];
     
     summarySheet.addRow({ category: '마당접수 미매칭', count: unmatchedData.yard.length, note: '사전예약사이트에 없는 고객' });
-    summarySheet.addRow({ category: '온세일시트 미매칭', count: unmatchedData.onSale.length, note: '사전예약사이트에 없는 고객' });
+    summarySheet.addRow({ category: '온세일 미매칭', count: unmatchedData.onSale.length, note: '사전예약사이트에 없는 고객' });
     summarySheet.addRow({ category: '모바일가입내역 미매칭', count: unmatchedData.mobile.length, note: '사전예약사이트에 없는 고객' });
     summarySheet.addRow({ category: '총 미매칭 건수', count: unmatchedData.yard.length + unmatchedData.onSale.length + unmatchedData.mobile.length, note: '전체 미매칭 합계' });
     summarySheet.addRow({ category: '사전예약사이트 기준', count: reservationIds.size, note: '매칭 기준이 되는 고객 수' });
@@ -9218,9 +9218,10 @@ app.get('/api/unmatched-customers/excel', async (req, res) => {
     
     // 응답 헤더 설정
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=미매칭고객현황_${dateStr}.xlsx`);
+    const filename = `unmatched_customers_${dateStr}.xlsx`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(`미매칭고객현황_${dateStr}.xlsx`)}`);
     
-    console.log(`📊 [미매칭고객] 엑셀 파일 생성 완료: 마당접수 ${unmatchedData.yard.length}건, 온세일시트 ${unmatchedData.onSale.length}건, 모바일가입내역 ${unmatchedData.mobile.length}건`);
+    console.log(`📊 [미매칭고객] 엑셀 파일 생성 완료: 마당접수 ${unmatchedData.yard.length}건, 온세일 ${unmatchedData.onSale.length}건, 모바일가입내역 ${unmatchedData.mobile.length}건`);
     
     res.send(buffer);
     
