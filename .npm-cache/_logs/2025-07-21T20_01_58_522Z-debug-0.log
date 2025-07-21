@@ -1,0 +1,25 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.7.0
+2 info using node@v20.15.0
+3 silly config:load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config:load:file:C:\Users\s0105\OneDrive\바탕 화면\jegomap2\.npmrc
+5 silly config:load:file:C:\Users\s0105\.npmrc
+6 silly config:load:file:C:\Users\s0105\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install exceljs
+8 verbose argv "install" "exceljs"
+9 verbose logfile logs-max:10 dir:C:\Users\s0105\OneDrive\바탕 화면\jegomap2\.npm-cache\_logs\2025-07-21T20_01_58_522Z-
+10 verbose logfile C:\Users\s0105\OneDrive\바탕 화면\jegomap2\.npm-cache\_logs\2025-07-21T20_01_58_522Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly logfile done cleaning log files
+13 silly idealTree buildDeps
+14 silly fetch manifest exceljs@^4.4.0
+15 http fetch GET 200 https://registry.npmjs.org/exceljs 885ms (cache stale)
+16 silly placeDep ROOT exceljs@4.4.0 REPLACE for: (주)브이아이피플러스@1.0.0 want: ^4.4.0
+17 silly reify moves {}
+18 verbose reify failed optional dependency C:\Users\s0105\OneDrive\바탕 화면\jegomap2\node_modules\fsevents
+19 silly reify mark deleted [
+19 silly reify   'C:\\Users\\s0105\\OneDrive\\바탕 화면\\jegomap2\\node_modules\\fsevents'
+19 silly reify ]
+20 silly ADD
+21 verbose exit 0
+22 info ok
