@@ -8741,13 +8741,13 @@ app.get('/api/office-inventory', async (req, res) => {
           
           // 사무실명 추출
           let officeName = '';
-          if (storeName.includes('평택사무실') || storeName.includes('평택')) {
+          if (storeName.includes('평택사무실')) {
             officeName = '평택사무실';
-          } else if (storeName.includes('인천사무실') || storeName.includes('인천')) {
+          } else if (storeName.includes('인천사무실')) {
             officeName = '인천사무실';
-          } else if (storeName.includes('군산사무실') || storeName.includes('군산')) {
+          } else if (storeName.includes('군산사무실')) {
             officeName = '군산사무실';
-          } else if (storeName.includes('안산사무실') || storeName.includes('안산')) {
+          } else if (storeName.includes('안산사무실')) {
             officeName = '안산사무실';
           }
           
