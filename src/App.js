@@ -33,6 +33,7 @@ import ReservationMode from './components/ReservationMode';
 
 
 import AppUpdatePopup from './components/AppUpdatePopup';
+import ErrorBoundary from './components/ErrorBoundary';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
 // 모바일 최적화 관련 import 제거 (재고 모드로 이동)
 // 실시간 대시보드 관련 import 제거 (재고 모드로 이동)
@@ -99,7 +100,7 @@ const theme = createTheme({
   },
 });
 
-function App() {
+function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [data, setData] = useState(null);
   const [selectedModel, setSelectedModel] = useState('');
@@ -2852,6 +2853,14 @@ function App() {
         hideUntil: currentMode ? localStorage.getItem(`hideUpdate_${currentMode}`) : null
       })}
     </ThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 

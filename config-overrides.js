@@ -49,5 +49,31 @@ module.exports = function override(config) {
         }
     });
 
+    // 번들링 최적화 설정 추가
+    config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+            chunks: 'all',
+            cacheGroups: {
+                vendor: {
+                    test: /[\\/]node_modules[\\/]/,
+                    name: 'vendors',
+                    chunks: 'all',
+                },
+                common: {
+                    name: 'common',
+                    minChunks: 2,
+                    chunks: 'all',
+                    enforce: true
+                }
+            }
+        }
+    };
+
+    // 소스맵 설정 개선
+    if (config.mode === 'production') {
+        config.devtool = 'source-map';
+    }
+
     return config;
 } 
