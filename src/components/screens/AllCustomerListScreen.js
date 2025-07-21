@@ -513,7 +513,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
 
     setFilteredCustomerList(filtered);
-  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, assignmentStatus]);
+  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData]);
 
   // 검색 기능 (최적화)
   const handleSearch = useCallback((query) => {
@@ -767,6 +767,13 @@ function AllCustomerListScreen({ loggedInStore }) {
     applyFilters();
   }, [applyFilters]);
 
+  // assignmentStatus 변경 시 필터 재적용
+  useEffect(() => {
+    if (Object.keys(assignmentStatus).length > 0) {
+      applyFilters();
+    }
+  }, [assignmentStatus, applyFilters]);
+
   // 캐시 통계 주기적 업데이트
   useEffect(() => {
     updateCacheStats();
@@ -964,7 +971,7 @@ function AllCustomerListScreen({ loggedInStore }) {
       cacheHitRate: cacheStats.size > 0 ? '활성' : '비활성',
       assignmentStats
     };
-  }, [cacheStats, customerList.length, filteredCustomerList.length, assignmentStatus]);
+  }, [cacheStats, customerList.length, filteredCustomerList.length]);
 
   return (
     <Container 
