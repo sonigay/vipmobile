@@ -4,6 +4,7 @@ const cors = require('cors');
 const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
+const ExcelJS = require('exceljs');
 const monthlyAwardAPI = require('./monthlyAwardAPI');
 
 // 기본 설정
@@ -8799,6 +8800,563 @@ app.get('/api/reservation-inventory-status', async (req, res) => {
     res.status(500).json({
       success: false,
       error: '사전예약 재고 조회 실패',
+      message: error.message
+    });
+  }
+});
+
+// 미매칭 고객 확인 API
+app.get('/api/unmatched-customers', async (req, res) => {
+  try {
+    console.log('🔍 [미매칭고객] 미매칭 고객 확인 요청');
+    
+    // 사전예약사이트 데이터 로드 (기준 데이터)
+    const reservationData = await getSheetValues('사전예약사이트');
+    if (!reservationData || reservationData.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 사전예약사이트의 고유 식별자 추출 (예약번호 또는 전화번호)
+    const reservationIds = new Set();
+    reservationData.slice(1).forEach(row => {
+      if (row.length >= 3) {
+        const reservationNumber = (row[2] || '').toString().trim(); // C열: 예약번호
+        const phoneNumber = (row[3] || '').toString().trim(); // D열: 전화번호
+        if (reservationNumber) reservationIds.add(reservationNumber);
+        if (phoneNumber) reservationIds.add(phoneNumber);
+      }
+    });
+    
+    console.log(`📋 [미매칭고객] 사전예약사이트 기준 ID: ${reservationIds.size}개`);
+    
+    // 각 시트별 데이터 로드 및 미매칭 찾기
+    const unmatchedData = {
+      yard: [],
+      onSale: [],
+      mobile: []
+    };
+    
+    // 1. 마당접수 미매칭 확인
+    try {
+      const yardData = await getSheetValues('마당접수');
+      if (yardData && yardData.length > 1) {
+        yardData.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+            const phoneNumber = (row[2] || '').toString().trim(); // C열: 전화번호
+            const receptionDate = (row[3] || '').toString().trim(); // D열: 접수일
+            const model = (row[4] || '').toString().trim(); // E열: 모델
+            const memo = (row[5] || '').toString().trim(); // F열: 메모
+            
+            // 사전예약사이트에 없는 고객만 추가
+            if (customerName && phoneNumber && !reservationIds.has(phoneNumber)) {
+              unmatchedData.yard.push({
+                customerName,
+                phoneNumber,
+                receptionDate,
+                model,
+                memo
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('마당접수 데이터 로드 오류:', error);
+    }
+    
+    // 2. 온세일시트 미매칭 확인
+    try {
+      const onSaleData = await getSheetValues('온세일시트');
+      if (onSaleData && onSaleData.length > 1) {
+        onSaleData.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+            const phoneNumber = (row[2] || '').toString().trim(); // C열: 전화번호
+            const receptionDate = (row[3] || '').toString().trim(); // D열: 접수일
+            const model = (row[4] || '').toString().trim(); // E열: 모델
+            const memo = (row[5] || '').toString().trim(); // F열: 메모
+            
+            // 사전예약사이트에 없는 고객만 추가
+            if (customerName && phoneNumber && !reservationIds.has(phoneNumber)) {
+              unmatchedData.onSale.push({
+                customerName,
+                phoneNumber,
+                receptionDate,
+                model,
+                memo
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('온세일시트 데이터 로드 오류:', error);
+    }
+    
+    // 3. 모바일가입내역 미매칭 확인
+    try {
+      const mobileData = await getSheetValues('모바일가입내역');
+      if (mobileData && mobileData.length > 1) {
+        mobileData.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+            const phoneNumber = (row[2] || '').toString().trim(); // C열: 전화번호
+            const joinDate = (row[3] || '').toString().trim(); // D열: 가입일
+            const model = (row[4] || '').toString().trim(); // E열: 모델
+            const memo = (row[5] || '').toString().trim(); // F열: 메모
+            
+            // 사전예약사이트에 없는 고객만 추가
+            if (customerName && phoneNumber && !reservationIds.has(phoneNumber)) {
+              unmatchedData.mobile.push({
+                customerName,
+                phoneNumber,
+                joinDate,
+                model,
+                memo
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('모바일가입내역 데이터 로드 오류:', error);
+    }
+    
+    const totalUnmatched = unmatchedData.yard.length + unmatchedData.onSale.length + unmatchedData.mobile.length;
+    
+    console.log(`📊 [미매칭고객] 미매칭 현황: 마당접수 ${unmatchedData.yard.length}건, 온세일시트 ${unmatchedData.onSale.length}건, 모바일가입내역 ${unmatchedData.mobile.length}건 (총 ${totalUnmatched}건)`);
+    
+    const result = {
+      success: true,
+      data: unmatchedData,
+      stats: {
+        totalUnmatched,
+        yardCount: unmatchedData.yard.length,
+        onSaleCount: unmatchedData.onSale.length,
+        mobileCount: unmatchedData.mobile.length,
+        reservationBaseCount: reservationIds.size
+      },
+      lastUpdated: new Date().toISOString()
+    };
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('❌ [미매칭고객] 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '미매칭 고객 조회 실패',
+      message: error.message
+    });
+  }
+});
+
+// 미매칭 고객 엑셀 다운로드 API
+app.get('/api/unmatched-customers/excel', async (req, res) => {
+  try {
+    console.log('📊 [미매칭고객] 엑셀 다운로드 요청');
+    
+    // 사전예약사이트 데이터 로드 (기준 데이터)
+    const reservationData = await getSheetValues('사전예약사이트');
+    if (!reservationData || reservationData.length < 2) {
+      throw new Error('사전예약사이트 데이터를 가져올 수 없습니다.');
+    }
+    
+    // 사전예약사이트의 고유 식별자 추출 (예약번호 또는 전화번호)
+    const reservationIds = new Set();
+    reservationData.slice(1).forEach(row => {
+      if (row.length >= 3) {
+        const reservationNumber = (row[2] || '').toString().trim(); // C열: 예약번호
+        const phoneNumber = (row[3] || '').toString().trim(); // D열: 전화번호
+        if (reservationNumber) reservationIds.add(reservationNumber);
+        if (phoneNumber) reservationIds.add(phoneNumber);
+      }
+    });
+    
+    console.log(`📋 [미매칭고객] 사전예약사이트 기준 ID: ${reservationIds.size}개`);
+    
+    // 각 시트별 데이터 로드 및 미매칭 찾기
+    const unmatchedData = {
+      yard: [],
+      onSale: [],
+      mobile: []
+    };
+    
+    // 1. 마당접수 미매칭 확인
+    try {
+      const yardData = await getSheetValues('마당접수');
+      if (yardData && yardData.length > 1) {
+        yardData.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+            const phoneNumber = (row[2] || '').toString().trim(); // C열: 전화번호
+            const receptionDate = (row[3] || '').toString().trim(); // D열: 접수일
+            const model = (row[4] || '').toString().trim(); // E열: 모델
+            const memo = (row[5] || '').toString().trim(); // F열: 메모
+            
+            // 사전예약사이트에 없는 고객만 추가
+            if (customerName && phoneNumber && !reservationIds.has(phoneNumber)) {
+              unmatchedData.yard.push({
+                customerName,
+                phoneNumber,
+                receptionDate,
+                model,
+                memo
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('마당접수 데이터 로드 오류:', error);
+    }
+    
+    // 2. 온세일시트 미매칭 확인
+    try {
+      const onSaleData = await getSheetValues('온세일시트');
+      if (onSaleData && onSaleData.length > 1) {
+        onSaleData.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+            const phoneNumber = (row[2] || '').toString().trim(); // C열: 전화번호
+            const receptionDate = (row[3] || '').toString().trim(); // D열: 접수일
+            const model = (row[4] || '').toString().trim(); // E열: 모델
+            const memo = (row[5] || '').toString().trim(); // F열: 메모
+            
+            // 사전예약사이트에 없는 고객만 추가
+            if (customerName && phoneNumber && !reservationIds.has(phoneNumber)) {
+              unmatchedData.onSale.push({
+                customerName,
+                phoneNumber,
+                receptionDate,
+                model,
+                memo
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('온세일시트 데이터 로드 오류:', error);
+    }
+    
+    // 3. 모바일가입내역 미매칭 확인
+    try {
+      const mobileData = await getSheetValues('모바일가입내역');
+      if (mobileData && mobileData.length > 1) {
+        mobileData.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+            const phoneNumber = (row[2] || '').toString().trim(); // C열: 전화번호
+            const joinDate = (row[3] || '').toString().trim(); // D열: 가입일
+            const model = (row[4] || '').toString().trim(); // E열: 모델
+            const memo = (row[5] || '').toString().trim(); // F열: 메모
+            
+            // 사전예약사이트에 없는 고객만 추가
+            if (customerName && phoneNumber && !reservationIds.has(phoneNumber)) {
+              unmatchedData.mobile.push({
+                customerName,
+                phoneNumber,
+                joinDate,
+                model,
+                memo
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('모바일가입내역 데이터 로드 오류:', error);
+    }
+    
+    // Excel 파일 생성
+    const workbook = new ExcelJS.Workbook();
+    const dateStr = new Date().toISOString().split('T')[0];
+    workbook.creator = 'VIP Plus';
+    workbook.lastModifiedBy = 'VIP Plus';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+    
+    // 1. 마당접수 미매칭 시트
+    const yardSheet = workbook.addWorksheet('마당접수미매칭');
+    yardSheet.columns = [
+      { header: '고객명', key: 'customerName', width: 15 },
+      { header: '전화번호', key: 'phoneNumber', width: 15 },
+      { header: '접수일', key: 'receptionDate', width: 12 },
+      { header: '모델', key: 'model', width: 20 },
+      { header: '메모', key: 'memo', width: 30 }
+    ];
+    
+    unmatchedData.yard.forEach(item => {
+      yardSheet.addRow(item);
+    });
+    
+    // 2. 온세일시트 미매칭 시트
+    const onSaleSheet = workbook.addWorksheet('온세일미매칭');
+    onSaleSheet.columns = [
+      { header: '고객명', key: 'customerName', width: 15 },
+      { header: '전화번호', key: 'phoneNumber', width: 15 },
+      { header: '접수일', key: 'receptionDate', width: 12 },
+      { header: '모델', key: 'model', width: 20 },
+      { header: '메모', key: 'memo', width: 30 }
+    ];
+    
+    unmatchedData.onSale.forEach(item => {
+      onSaleSheet.addRow(item);
+    });
+    
+    // 3. 모바일가입내역 미매칭 시트
+    const mobileSheet = workbook.addWorksheet('모바일가입내역미매칭');
+    mobileSheet.columns = [
+      { header: '고객명', key: 'customerName', width: 15 },
+      { header: '전화번호', key: 'phoneNumber', width: 15 },
+      { header: '가입일', key: 'joinDate', width: 12 },
+      { header: '모델', key: 'model', width: 20 },
+      { header: '메모', key: 'memo', width: 30 }
+    ];
+    
+    unmatchedData.mobile.forEach(item => {
+      mobileSheet.addRow(item);
+    });
+    
+    // 4. 요약 시트
+    const summarySheet = workbook.addWorksheet('요약');
+    summarySheet.columns = [
+      { header: '구분', key: 'category', width: 20 },
+      { header: '미매칭 건수', key: 'count', width: 15 },
+      { header: '비고', key: 'note', width: 30 }
+    ];
+    
+    summarySheet.addRow({ category: '마당접수 미매칭', count: unmatchedData.yard.length, note: '사전예약사이트에 없는 고객' });
+    summarySheet.addRow({ category: '온세일시트 미매칭', count: unmatchedData.onSale.length, note: '사전예약사이트에 없는 고객' });
+    summarySheet.addRow({ category: '모바일가입내역 미매칭', count: unmatchedData.mobile.length, note: '사전예약사이트에 없는 고객' });
+    summarySheet.addRow({ category: '총 미매칭 건수', count: unmatchedData.yard.length + unmatchedData.onSale.length + unmatchedData.mobile.length, note: '전체 미매칭 합계' });
+    summarySheet.addRow({ category: '사전예약사이트 기준', count: reservationIds.size, note: '매칭 기준이 되는 고객 수' });
+    
+    // 스타일 적용
+    [yardSheet, onSaleSheet, mobileSheet, summarySheet].forEach(sheet => {
+      // 헤더 스타일
+      sheet.getRow(1).font = { bold: true };
+      sheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+      
+      // 테두리 스타일
+      sheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
+      });
+    });
+    
+    // 파일 생성
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    // 응답 헤더 설정
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=미매칭고객현황_${dateStr}.xlsx`);
+    
+    console.log(`📊 [미매칭고객] 엑셀 파일 생성 완료: 마당접수 ${unmatchedData.yard.length}건, 온세일시트 ${unmatchedData.onSale.length}건, 모바일가입내역 ${unmatchedData.mobile.length}건`);
+    
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error('❌ [미매칭고객] 엑셀 다운로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '엑셀 파일 생성 실패',
+      message: error.message
+    });
+  }
+});
+
+// 취소 체크 데이터 저장 API
+app.post('/api/cancel-check/save', async (req, res) => {
+  try {
+    console.log('📝 [취소체크] 취소 체크 데이터 저장 요청:', req.body);
+    
+    const { reservationNumbers } = req.body;
+    
+    if (!Array.isArray(reservationNumbers)) {
+      return res.status(400).json({
+        success: false,
+        error: '예약번호 배열이 필요합니다.'
+      });
+    }
+
+    // 기존 취소 데이터 로드
+    let existingData = [];
+    try {
+      const currentData = await getSheetValues('사전예약사이트취소데이터');
+      if (currentData && currentData.length > 1) {
+        existingData = currentData.slice(1); // 헤더 제외
+      }
+    } catch (error) {
+      console.log('기존 취소 데이터가 없습니다. 새로 생성합니다.');
+    }
+
+    // 새로운 취소 데이터 추가
+    const newCancelData = reservationNumbers.map(reservationNumber => [
+      reservationNumber,
+      new Date().toISOString(),
+      '취소체크'
+    ]);
+
+    // 중복 제거 (예약번호 기준)
+    const existingReservationNumbers = new Set(existingData.map(row => row[0]));
+    const uniqueNewData = newCancelData.filter(row => !existingReservationNumbers.has(row[0]));
+
+    if (uniqueNewData.length === 0) {
+      return res.json({
+        success: true,
+        message: '이미 체크된 예약번호들입니다.',
+        savedCount: 0
+      });
+    }
+
+    // Google Sheets에 데이터 추가
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트취소데이터!A:C',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: uniqueNewData
+      }
+    });
+
+    console.log(`📝 [취소체크] 취소 데이터 저장 완료: ${uniqueNewData.length}건`);
+
+    res.json({
+      success: true,
+      message: '취소 체크 데이터가 저장되었습니다.',
+      savedCount: uniqueNewData.length,
+      data: response.data
+    });
+
+  } catch (error) {
+    console.error('❌ [취소체크] 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '취소 체크 데이터 저장 실패',
+      message: error.message
+    });
+  }
+});
+
+// 취소 체크 데이터 조회 API
+app.get('/api/cancel-check/list', async (req, res) => {
+  try {
+    console.log('📋 [취소체크] 취소 체크 데이터 조회 요청');
+    
+    const cancelData = await getSheetValues('사전예약사이트취소데이터');
+    
+    if (!cancelData || cancelData.length < 2) {
+      return res.json({
+        success: true,
+        data: [],
+        count: 0
+      });
+    }
+
+    // 헤더 제외하고 데이터만 반환
+    const dataRows = cancelData.slice(1);
+    const cancelReservationNumbers = dataRows.map(row => row[0]); // 예약번호만 추출
+
+    console.log(`📋 [취소체크] 취소 체크 데이터 조회 완료: ${cancelReservationNumbers.length}건`);
+
+    res.json({
+      success: true,
+      data: cancelReservationNumbers,
+      count: cancelReservationNumbers.length
+    });
+
+  } catch (error) {
+    console.error('❌ [취소체크] 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '취소 체크 데이터 조회 실패',
+      message: error.message
+    });
+  }
+});
+
+// 취소 체크 데이터 삭제 API
+app.delete('/api/cancel-check/delete', async (req, res) => {
+  try {
+    console.log('🗑️ [취소체크] 취소 체크 데이터 삭제 요청:', req.body);
+    
+    const { reservationNumbers } = req.body;
+    
+    if (!Array.isArray(reservationNumbers)) {
+      return res.status(400).json({
+        success: false,
+        error: '예약번호 배열이 필요합니다.'
+      });
+    }
+
+    if (reservationNumbers.length === 0) {
+      return res.json({
+        success: true,
+        message: '삭제할 데이터가 없습니다.',
+        deletedCount: 0
+      });
+    }
+
+    // 현재 취소 데이터 로드
+    const currentData = await getSheetValues('사전예약사이트취소데이터');
+    
+    if (!currentData || currentData.length < 2) {
+      return res.json({
+        success: true,
+        message: '삭제할 데이터가 없습니다.',
+        deletedCount: 0
+      });
+    }
+
+    // 헤더와 삭제할 예약번호가 아닌 데이터만 필터링
+    const header = currentData[0];
+    const dataRows = currentData.slice(1);
+    const filteredData = dataRows.filter(row => {
+      const reservationNumber = row[0];
+      return !reservationNumbers.includes(reservationNumber);
+    });
+
+    // 전체 데이터를 새로 쓰기 (헤더 + 필터링된 데이터)
+    const newData = [header, ...filteredData];
+    
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트취소데이터!A:C',
+      valueInputOption: 'RAW',
+      resource: {
+        values: newData
+      }
+    });
+
+    const deletedCount = dataRows.length - filteredData.length;
+    console.log(`🗑️ [취소체크] 취소 데이터 삭제 완료: ${deletedCount}건`);
+
+    res.json({
+      success: true,
+      message: '취소 체크 데이터가 삭제되었습니다.',
+      deletedCount,
+      data: response.data
+    });
+
+  } catch (error) {
+    console.error('❌ [취소체크] 삭제 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '취소 체크 데이터 삭제 실패',
       message: error.message
     });
   }

@@ -25,7 +25,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -33,7 +39,10 @@ import {
   Refresh as RefreshIcon,
   Clear as ClearIcon,
   Cached as CachedIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { FixedSizeList as List } from 'react-window';
 import { 
@@ -73,10 +82,32 @@ const useDebounce = (value, delay) => {
 
 // 가상화된 테이블 행 컴포넌트
 const VirtualizedTableRow = React.memo(({ index, style, data }) => {
-  const { filteredCustomerList, assignmentStatus, loadingAssignment } = data;
+  const { 
+    filteredCustomerList, 
+    assignmentStatus, 
+    loadingAssignment, 
+    cancelCheckedItems, 
+    onCancelCheckToggle,
+    processingCancelCheck
+  } = data;
   const customer = filteredCustomerList[index];
 
   if (!customer) return null;
+
+  // 배경색 결정
+  let rowBg = undefined;
+  const status = assignmentStatus[customer.reservationNumber];
+  const isCancelChecked = cancelCheckedItems.includes(customer.reservationNumber);
+  
+  if (isCancelChecked) {
+    rowBg = '#ffebee'; // 붉은색 계열 (취소 체크된 경우)
+  } else if (status) {
+    if (status.activationStatus === '개통완료') {
+      rowBg = '#e3f2fd'; // 파란색 계열
+    } else if (status.assignmentStatus === '배정완료') {
+      rowBg = '#e8f5e9'; // 초록색 계열
+    }
+  }
 
   return (
     <Box 
@@ -84,11 +115,12 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       sx={{ 
         display: 'flex',
         borderBottom: '1px solid #e9ecef',
+        backgroundColor: rowBg,
         '&:hover': {
-          backgroundColor: '#f8f9fa'
+          backgroundColor: rowBg ? rowBg : '#f8f9fa'
         },
         '&:nth-of-type(even)': {
-          backgroundColor: '#fafbfc'
+          backgroundColor: rowBg ? rowBg : '#fafbfc'
         }
       }}
     >
@@ -285,6 +317,24 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           {customer.receiver || '-'}
         </Typography>
       </Box>
+      <Box sx={{ width: '60px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {processingCancelCheck.has(customer.reservationNumber) ? (
+          <CircularProgress size={16} />
+        ) : (
+          <IconButton
+            size="small"
+            onClick={() => onCancelCheckToggle(customer.reservationNumber)}
+            sx={{
+              color: isCancelChecked ? '#d32f2f' : '#757575',
+              '&:hover': {
+                backgroundColor: isCancelChecked ? '#ffcdd2' : '#f5f5f5'
+              }
+            }}
+          >
+            {isCancelChecked ? <CheckBoxIcon /> : <CheckBoxOutlineBlankIcon />}
+          </IconButton>
+        )}
+      </Box>
     </Box>
   );
 });
@@ -315,6 +365,17 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [expandedColors, setExpandedColors] = useState({}); // 색상 확장 상태 관리
   const [expandedModels, setExpandedModels] = useState({}); // 모델 확장 상태 관리
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
+  
+  // 미매칭건 확인 관련 상태
+  const [showUnmatchedDialog, setShowUnmatchedDialog] = useState(false);
+  const [unmatchedData, setUnmatchedData] = useState({ yard: [], onSale: [], mobile: [] });
+  const [loadingUnmatched, setLoadingUnmatched] = useState(false);
+  const [unmatchedTab, setUnmatchedTab] = useState(0);
+  
+  // 취소 체크 관련 상태
+  const [cancelCheckedItems, setCancelCheckedItems] = useState([]);
+  const [loadingCancelData, setLoadingCancelData] = useState(false);
+  const [processingCancelCheck, setProcessingCancelCheck] = useState(new Set());
 
   // 디바운스된 검색어 (300ms 지연)
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -552,12 +613,14 @@ function AllCustomerListScreen({ loggedInStore }) {
         '개통완료',
         '사이트메모',
         '마당메모',
-        '접수자'
+        '접수자',
+        '취소체크'
       ];
 
       // 데이터 준비
       const excelData = filteredCustomerList.map((customer, index) => {
         const status = assignmentStatus[customer.reservationNumber];
+        const isCancelChecked = cancelCheckedItems.includes(customer.reservationNumber);
         return [
           index + 1,
           customer.customerName || '',
@@ -573,7 +636,8 @@ function AllCustomerListScreen({ loggedInStore }) {
           status?.activationStatus || '로딩중...',
           customer.reservationMemo || '',
           customer.yardReceivedMemo || '',
-          customer.receiver || ''
+          customer.receiver || '',
+          isCancelChecked ? '체크됨' : ''
         ];
       });
 
@@ -597,7 +661,8 @@ function AllCustomerListScreen({ loggedInStore }) {
         { wch: 12 },  // 개통완료
         { wch: 20 },  // 사이트메모
         { wch: 20 },  // 마당메모
-        { wch: 10 }   // 접수자
+        { wch: 10 },  // 접수자
+        { wch: 10 }   // 취소체크
       ];
       ws['!cols'] = colWidths;
 
@@ -686,7 +751,8 @@ function AllCustomerListScreen({ loggedInStore }) {
           loadAllCustomerList(),
           loadAgentOfficeData(),
           loadAssignmentStatus(),
-          loadActivationStatus()
+          loadActivationStatus(),
+          loadCancelCheckData()
         ]);
       } catch (error) {
         setError('데이터 로드 중 오류가 발생했습니다.');
@@ -694,7 +760,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     };
     
     initializeData();
-  }, [loadAllCustomerList, loadAgentOfficeData, loadAssignmentStatus, loadActivationStatus]);
+  }, [loadAllCustomerList, loadAgentOfficeData, loadAssignmentStatus, loadActivationStatus, loadCancelCheckData]);
 
   // 필터 변경 시 적용 (디바운스된 검색어 사용)
   useEffect(() => {
@@ -725,6 +791,143 @@ function AllCustomerListScreen({ loggedInStore }) {
       setLoadingInventory(false);
     }
   }, []);
+
+  // 미매칭 데이터 로드
+  const loadUnmatchedData = useCallback(async () => {
+    setLoadingUnmatched(true);
+    try {
+      const response = await fetch(`${getApiUrl()}/api/unmatched-customers`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setUnmatchedData(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('미매칭 데이터 로드 오류:', error);
+    } finally {
+      setLoadingUnmatched(false);
+    }
+  }, []);
+
+  // 미매칭건 확인 다이얼로그 열기
+  const handleShowUnmatched = useCallback(async () => {
+    setShowUnmatchedDialog(true);
+    await loadUnmatchedData();
+  }, [loadUnmatchedData]);
+
+  // 미매칭 데이터 엑셀 다운로드
+  const downloadUnmatchedExcel = useCallback(async () => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/unmatched-customers/excel`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `미매칭고객현황_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('미매칭 데이터 엑셀 다운로드 오류:', error);
+    }
+  }, []);
+
+  // 취소 체크 데이터 로드
+  const loadCancelCheckData = useCallback(async () => {
+    setLoadingCancelData(true);
+    try {
+      const response = await fetch(`${getApiUrl()}/api/cancel-check/list`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setCancelCheckedItems(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('취소 체크 데이터 로드 오류:', error);
+    } finally {
+      setLoadingCancelData(false);
+    }
+  }, []);
+
+  // 취소 체크 토글 (즉시 저장/삭제)
+  const handleCancelCheckToggle = useCallback(async (reservationNumber) => {
+    const isCurrentlyChecked = cancelCheckedItems.includes(reservationNumber);
+    
+    // 이미 처리 중이면 무시
+    if (processingCancelCheck.has(reservationNumber)) {
+      return;
+    }
+    
+    // 처리 중 상태 추가
+    setProcessingCancelCheck(prev => new Set(prev).add(reservationNumber));
+    
+    try {
+      if (isCurrentlyChecked) {
+        // 체크 해제 - 시트에서 삭제
+        const response = await fetch(`${getApiUrl()}/api/cancel-check/delete`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationNumbers: [reservationNumber]
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setCancelCheckedItems(prev => prev.filter(item => item !== reservationNumber));
+            setError('');
+          } else {
+            setError(result.message || '취소 체크 해제에 실패했습니다.');
+          }
+        } else {
+          setError('취소 체크 해제에 실패했습니다.');
+        }
+      } else {
+        // 체크 - 시트에 저장
+        const response = await fetch(`${getApiUrl()}/api/cancel-check/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationNumbers: [reservationNumber]
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setCancelCheckedItems(prev => [...prev, reservationNumber]);
+            setError('');
+          } else {
+            setError(result.message || '취소 체크 저장에 실패했습니다.');
+          }
+        } else {
+          setError('취소 체크 저장에 실패했습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('취소 체크 토글 오류:', error);
+      setError('취소 체크 처리 중 오류가 발생했습니다.');
+    } finally {
+      // 처리 중 상태 제거
+      setProcessingCancelCheck(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reservationNumber);
+        return newSet;
+      });
+    }
+  }, [cancelCheckedItems, processingCancelCheck]);
+
+
 
   // 사무실별 재고 현황 자동 로드
   useEffect(() => {
@@ -820,6 +1023,12 @@ function AllCustomerListScreen({ loggedInStore }) {
               variant="outlined" 
               size="small" 
               color="info"
+            />
+            <Chip 
+              label={`취소체크: ${cancelCheckedItems.length}건`} 
+              variant="outlined" 
+              size="small" 
+              color="error"
             />
           </Box>
         )}
@@ -1200,6 +1409,26 @@ function AllCustomerListScreen({ loggedInStore }) {
             >
               {downloadingExcel ? <CircularProgress size={16} /> : '엑셀 다운로드'}
             </Button>
+
+            {/* 미매칭건 확인 버튼 */}
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={handleShowUnmatched}
+              disabled={loadingUnmatched}
+              sx={{ 
+                borderColor: '#ff9800',
+                color: '#ff9800',
+                '&:hover': { 
+                  borderColor: '#f57c00',
+                  backgroundColor: '#fff3e0'
+                }
+              }}
+            >
+              {loadingUnmatched ? <CircularProgress size={16} /> : '미매칭건 확인하기'}
+            </Button>
+
+
           </Box>
 
           {/* 필터 UI */}
@@ -1425,13 +1654,21 @@ function AllCustomerListScreen({ loggedInStore }) {
                 <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트메모</Box>
                 <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당메모</Box>
                 <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>접수자</Box>
+                <Box sx={{ width: '60px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>취소체크</Box>
               </Box>
               {/* 가상화된 테이블 바디 */}
               <List
                 height={Math.min(filteredCustomerList.length * 50, 500)}
                 itemCount={filteredCustomerList.length}
                 itemSize={50}
-                itemData={{ filteredCustomerList, assignmentStatus, loadingAssignment }}
+                itemData={{ 
+                  filteredCustomerList, 
+                  assignmentStatus, 
+                  loadingAssignment, 
+                  cancelCheckedItems, 
+                  onCancelCheckToggle: handleCancelCheckToggle,
+                  processingCancelCheck
+                }}
                 width="100%"
                 style={{ backgroundColor: '#fff' }}
               >
@@ -1445,6 +1682,217 @@ function AllCustomerListScreen({ loggedInStore }) {
           )}
         </CardContent>
       </Card>
+
+      {/* 미매칭 데이터 다이얼로그 */}
+      <Dialog 
+        open={showUnmatchedDialog} 
+        onClose={() => setShowUnmatchedDialog(false)} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          backgroundColor: '#fff3e0', 
+          borderBottom: '2px solid #ff9800',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Typography variant="h6" sx={{ color: '#e65100', fontWeight: 'bold' }}>
+            📋 미매칭 고객 현황
+          </Typography>
+          <Chip 
+            label={`총 ${unmatchedData.yard.length + unmatchedData.onSale.length + unmatchedData.mobile.length}건`}
+            color="warning"
+            variant="outlined"
+          />
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 0 }}>
+          <Tabs 
+            value={unmatchedTab} 
+            onChange={(e, newValue) => setUnmatchedTab(newValue)}
+            sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              backgroundColor: '#fafafa'
+            }}
+          >
+            <Tab 
+              label={`마당접수 미매칭 (${unmatchedData.yard.length}건)`}
+              sx={{ 
+                color: '#d32f2f',
+                fontWeight: 'bold',
+                '&.Mui-selected': { color: '#d32f2f' }
+              }}
+            />
+            <Tab 
+              label={`온세일시트 미매칭 (${unmatchedData.onSale.length}건)`}
+              sx={{ 
+                color: '#1976d2',
+                fontWeight: 'bold',
+                '&.Mui-selected': { color: '#1976d2' }
+              }}
+            />
+            <Tab 
+              label={`모바일가입내역 미매칭 (${unmatchedData.mobile.length}건)`}
+              sx={{ 
+                color: '#388e3c',
+                fontWeight: 'bold',
+                '&.Mui-selected': { color: '#388e3c' }
+              }}
+            />
+          </Tabs>
+
+          <Box sx={{ p: 2, maxHeight: 500, overflow: 'auto' }}>
+            {loadingUnmatched ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {/* 마당접수 미매칭 */}
+                {unmatchedTab === 0 && (
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 2, color: '#d32f2f', fontWeight: 'bold' }}>
+                      🏢 마당접수에서만 확인되는 고객 ({unmatchedData.yard.length}건)
+                    </Typography>
+                    {unmatchedData.yard.length > 0 ? (
+                      <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ backgroundColor: '#ffebee' }}>
+                              <TableCell sx={{ fontWeight: 'bold' }}>고객명</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>전화번호</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>접수일</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>모델</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>메모</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {unmatchedData.yard.map((customer, index) => (
+                              <TableRow key={index} sx={{ '&:nth-of-type(even)': { backgroundColor: '#fafafa' } }}>
+                                <TableCell>{customer.customerName || '-'}</TableCell>
+                                <TableCell>{customer.phoneNumber || '-'}</TableCell>
+                                <TableCell>{customer.receptionDate || '-'}</TableCell>
+                                <TableCell>{customer.model || '-'}</TableCell>
+                                <TableCell>{customer.memo || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Alert severity="success">마당접수 미매칭 고객이 없습니다.</Alert>
+                    )}
+                  </Box>
+                )}
+
+                {/* 온세일시트 미매칭 */}
+                {unmatchedTab === 1 && (
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 2, color: '#1976d2', fontWeight: 'bold' }}>
+                      💻 온세일시트에서만 확인되는 고객 ({unmatchedData.onSale.length}건)
+                    </Typography>
+                    {unmatchedData.onSale.length > 0 ? (
+                      <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
+                              <TableCell sx={{ fontWeight: 'bold' }}>고객명</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>전화번호</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>접수일</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>모델</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>메모</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {unmatchedData.onSale.map((customer, index) => (
+                              <TableRow key={index} sx={{ '&:nth-of-type(even)': { backgroundColor: '#fafafa' } }}>
+                                <TableCell>{customer.customerName || '-'}</TableCell>
+                                <TableCell>{customer.phoneNumber || '-'}</TableCell>
+                                <TableCell>{customer.receptionDate || '-'}</TableCell>
+                                <TableCell>{customer.model || '-'}</TableCell>
+                                <TableCell>{customer.memo || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Alert severity="success">온세일시트 미매칭 고객이 없습니다.</Alert>
+                    )}
+                  </Box>
+                )}
+
+                {/* 모바일가입내역 미매칭 */}
+                {unmatchedTab === 2 && (
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 2, color: '#388e3c', fontWeight: 'bold' }}>
+                      📱 모바일가입내역에서만 확인되는 고객 ({unmatchedData.mobile.length}건)
+                    </Typography>
+                    {unmatchedData.mobile.length > 0 ? (
+                      <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ backgroundColor: '#e8f5e8' }}>
+                              <TableCell sx={{ fontWeight: 'bold' }}>고객명</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>전화번호</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>가입일</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>모델</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>메모</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {unmatchedData.mobile.map((customer, index) => (
+                              <TableRow key={index} sx={{ '&:nth-of-type(even)': { backgroundColor: '#fafafa' } }}>
+                                <TableCell>{customer.customerName || '-'}</TableCell>
+                                <TableCell>{customer.phoneNumber || '-'}</TableCell>
+                                <TableCell>{customer.joinDate || '-'}</TableCell>
+                                <TableCell>{customer.model || '-'}</TableCell>
+                                <TableCell>{customer.memo || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Alert severity="success">모바일가입내역 미매칭 고객이 없습니다.</Alert>
+                    )}
+                  </Box>
+                )}
+              </>
+            )}
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, backgroundColor: '#fafafa' }}>
+          <Button 
+            onClick={downloadUnmatchedExcel}
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            sx={{ 
+              borderColor: '#4caf50',
+              color: '#4caf50',
+              '&:hover': { 
+                borderColor: '#388e3c',
+                backgroundColor: '#e8f5e8'
+              }
+            }}
+          >
+            엑셀 다운로드
+          </Button>
+          <Button 
+            onClick={() => setShowUnmatchedDialog(false)}
+            variant="contained"
+            sx={{ 
+              backgroundColor: '#ff9800',
+              '&:hover': { backgroundColor: '#f57c00' }
+            }}
+          >
+            닫기
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
