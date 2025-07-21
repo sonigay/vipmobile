@@ -31,15 +31,40 @@ async function debugSheetNames() {
   }
 }
 
-// Google API 인증 설정
-const auth = new google.auth.JWT({
-  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY ? (process.env.GOOGLE_PRIVATE_KEY.includes('\\n') ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : process.env.GOOGLE_PRIVATE_KEY) : '',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
+// 환경변수 체크
+const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
 const SPREADSHEET_ID = process.env.SHEET_ID;
+
+// 환경변수가 없으면 경고 로그만 출력하고 계속 진행
+if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !SPREADSHEET_ID) {
+  console.warn('⚠️ 환경변수가 설정되지 않았습니다. Google Sheets 기능이 제한될 수 있습니다.');
+  console.warn('필요한 환경변수:', {
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: !!GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    GOOGLE_PRIVATE_KEY: !!GOOGLE_PRIVATE_KEY,
+    SPREADSHEET_ID: !!SPREADSHEET_ID
+  });
+}
+
+// Google API 인증 설정 (환경변수가 있을 때만)
+let auth = null;
+let sheets = null;
+
+if (GOOGLE_SERVICE_ACCOUNT_EMAIL && GOOGLE_PRIVATE_KEY) {
+  try {
+    auth = new google.auth.JWT({
+      email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: GOOGLE_PRIVATE_KEY.includes('\\n') ? GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : GOOGLE_PRIVATE_KEY,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    sheets = google.sheets({ version: 'v4', auth });
+    console.log('✅ Google Sheets API 인증 설정 완료');
+  } catch (error) {
+    console.error('❌ Google Sheets API 인증 설정 실패:', error);
+  }
+} else {
+  console.warn('⚠️ Google Sheets API 인증 설정을 건너뜁니다.');
+}
 
 // 캐시 시스템
 const cache = {
@@ -66,6 +91,12 @@ function setCache(key, data) {
 // 데이터 시트에서 값 가져오기 (캐싱 적용)
 async function getSheetValues(sheetName) {
   try {
+    // 환경변수가 없으면 빈 배열 반환
+    if (!sheets || !SPREADSHEET_ID) {
+      console.warn(`⚠️ Google Sheets API가 설정되지 않아 ${sheetName} 데이터를 가져올 수 없습니다.`);
+      return [];
+    }
+
     // 캐시에서 먼저 확인
     const cachedData = getFromCache(sheetName);
     if (cachedData) {
@@ -356,52 +387,57 @@ async function getMonthlyAwardData(req, res) {
     // Matrix 기준값 로드 (A1:D30 영역에서)
     const matrixCriteria = [];
     try {
-      const matrixResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A1:D30`
-      });
-      
-      const matrixData = matrixResponse.data.values || [];
-      console.log('Matrix 기준값 시트 데이터:', matrixData);
-      
-      if (matrixData.length > 1) {
-        const matrixRows = matrixData.slice(1); // 헤더 제외
-        console.log('Matrix 행 데이터:', matrixRows);
-        matrixRows.forEach((row, index) => {
-          console.log(`행 ${index}:`, row);
-          if (row.length >= 3 && row[0] && row[1] && row[2]) { // 지표명, 점수, 퍼센트가 있는 경우만
-            const indicatorName = row[0] || ''; // A열: 지표명
-            const score = parseInt(row[1]); // B열: 점수
-            const percentage = parseFloat(row[2]); // C열: 퍼센트
-            
-            console.log(`처리 중: indicatorName="${indicatorName}", score=${score}, percentage=${percentage}`);
-            
-            if (!isNaN(score) && !isNaN(percentage)) {
-              // 지표명에서 indicator 추출
-              let indicatorType = '';
-              if (indicatorName.includes('업셀기변')) {
-                indicatorType = 'upsell';
-              } else if (indicatorName.includes('기변105이상')) {
-                indicatorType = 'change105';
-              } else if (indicatorName.includes('전략상품')) {
-                indicatorType = 'strategic';
-              } else if (indicatorName.includes('인터넷 비중')) {
-                indicatorType = 'internet';
-              }
+      // 환경변수가 없으면 기본값 사용
+      if (!sheets || !SPREADSHEET_ID) {
+        console.log('Google Sheets API가 설정되지 않아 기본 Matrix 기준값을 사용합니다.');
+      } else {
+        const matrixResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${MONTHLY_AWARD_SETTINGS_SHEET_NAME}!A1:D30`
+        });
+        
+        const matrixData = matrixResponse.data.values || [];
+        console.log('Matrix 기준값 시트 데이터:', matrixData);
+        
+        if (matrixData.length > 1) {
+          const matrixRows = matrixData.slice(1); // 헤더 제외
+          console.log('Matrix 행 데이터:', matrixRows);
+          matrixRows.forEach((row, index) => {
+            console.log(`행 ${index}:`, row);
+            if (row.length >= 3 && row[0] && row[1] && row[2]) { // 지표명, 점수, 퍼센트가 있는 경우만
+              const indicatorName = row[0] || ''; // A열: 지표명
+              const score = parseInt(row[1]); // B열: 점수
+              const percentage = parseFloat(row[2]); // C열: 퍼센트
               
-              console.log(`지표 추출 결과: ${indicatorType}`);
+              console.log(`처리 중: indicatorName="${indicatorName}", score=${score}, percentage=${percentage}`);
               
-              if (indicatorType) {
-                matrixCriteria.push({ 
-                  score, 
-                  percentage, 
-                  indicator: indicatorType 
-                });
-                console.log(`Matrix 기준값 추가: ${indicatorType} ${score}점 ${percentage}%`);
+              if (!isNaN(score) && !isNaN(percentage)) {
+                // 지표명에서 indicator 추출
+                let indicatorType = '';
+                if (indicatorName.includes('업셀기변')) {
+                  indicatorType = 'upsell';
+                } else if (indicatorName.includes('기변105이상')) {
+                  indicatorType = 'change105';
+                } else if (indicatorName.includes('전략상품')) {
+                  indicatorType = 'strategic';
+                } else if (indicatorName.includes('인터넷 비중')) {
+                  indicatorType = 'internet';
+                }
+                
+                console.log(`지표 추출 결과: ${indicatorType}`);
+                
+                if (indicatorType) {
+                  matrixCriteria.push({ 
+                    score, 
+                    percentage, 
+                    indicator: indicatorType 
+                  });
+                  console.log(`Matrix 기준값 추가: ${indicatorType} ${score}점 ${percentage}%`);
+                }
               }
             }
-          }
-        });
+          });
+        }
       }
     } catch (error) {
       console.log('Matrix 기준값 데이터 로드 실패, 기본값 사용:', error.message);
