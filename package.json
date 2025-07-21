@@ -20,6 +20,8 @@
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
     "react-scripts": "5.0.1",
+    "react-window": "^1.8.11",
+    "react-window-infinite-loader": "^1.0.10",
     "recharts": "^3.0.2",
     "tesseract.js": "^6.0.1",
     "xlsx": "^0.18.5"

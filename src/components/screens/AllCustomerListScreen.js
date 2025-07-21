@@ -35,12 +35,259 @@ import {
   Cached as CachedIcon,
   FilterList as FilterIcon
 } from '@mui/icons-material';
+import { FixedSizeList as List } from 'react-window';
 import { 
   getCachedAllCustomerList, 
   getCachedSearchResults, 
   clearAllCustomerCache, 
   getAllCustomerCacheStats 
 } from '../../utils/allCustomerCache';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+
+// API URL 헬퍼 함수
+function getApiUrl() {
+  const url = process.env.REACT_APP_API_URL;
+  if (!url) {
+    throw new Error('REACT_APP_API_URL 환경변수가 설정되어 있지 않습니다.');
+  }
+  return url;
+}
+
+// 디바운스 훅
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+// 가상화된 테이블 행 컴포넌트
+const VirtualizedTableRow = React.memo(({ index, style, data }) => {
+  const { filteredCustomerList, assignmentStatus, loadingAssignment } = data;
+  const customer = filteredCustomerList[index];
+
+  if (!customer) return null;
+
+  return (
+    <Box 
+      style={style} 
+      sx={{ 
+        display: 'flex',
+        borderBottom: '1px solid #e9ecef',
+        '&:hover': {
+          backgroundColor: '#f8f9fa'
+        },
+        '&:nth-of-type(even)': {
+          backgroundColor: '#fafbfc'
+        }
+      }}
+    >
+      <Box sx={{ width: '60px', p: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontSize: '0.85rem', 
+          fontWeight: 600, 
+          color: '#1976d2',
+          backgroundColor: '#e3f2fd',
+          borderRadius: 1,
+          px: 1,
+          py: 0.5,
+          display: 'inline-block',
+          minWidth: '24px',
+          textAlign: 'center'
+        }}>
+          {index + 1}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontWeight: 600, 
+          color: '#2c3e50',
+          fontSize: '0.85rem'
+        }}>
+          {customer.customerName}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontSize: '0.8rem',
+          fontFamily: 'monospace',
+          color: '#6c757d',
+          backgroundColor: '#f8f9fa',
+          borderRadius: 1,
+          px: 1,
+          py: 0.5,
+          display: 'inline-block'
+        }}>
+          {customer.reservationNumber}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.reservationDateTime}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.yardReceivedDate || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.onSaleReceivedDate || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '150px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Chip
+          label={customer.modelCapacityColor || '-'}
+          color="primary"
+          size="small"
+          sx={{ 
+            fontSize: '0.75rem',
+            fontWeight: 500,
+            backgroundColor: '#3f51b5',
+            color: 'white',
+            '&:hover': {
+              backgroundColor: '#303f9f'
+            },
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        />
+      </Box>
+      <Box sx={{ width: '80px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontSize: '0.8rem',
+          color: '#6c757d',
+          fontStyle: 'italic'
+        }}>
+          {customer.type || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontSize: '0.8rem',
+          fontWeight: 500,
+          color: '#495057',
+          backgroundColor: '#e9ecef',
+          borderRadius: 1,
+          px: 1,
+          py: 0.5,
+          display: 'inline-block'
+        }}>
+          {customer.storeCode || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          color: '#28a745',
+          backgroundColor: '#d4edda',
+          borderRadius: 1,
+          px: 1,
+          py: 0.5,
+          display: 'inline-block'
+        }}>
+          {customer.manager || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.posName || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {loadingAssignment ? (
+          <CircularProgress size={16} />
+        ) : (
+          (() => {
+            const status = assignmentStatus[customer.reservationNumber];
+            
+            if (!status) {
+              return '-';
+            }
+            
+            const isAssigned = status.assignmentStatus === '배정완료';
+            const isWaiting = status.assignmentStatus.startsWith('미배정');
+            
+            return (
+              <Chip
+                label={status.assignmentStatus}
+                size="small"
+                color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
+                sx={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
+                  color: isAssigned || isWaiting ? 'white' : '#6c757d',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  '&:hover': {
+                    backgroundColor: isAssigned ? '#45a049' : isWaiting ? '#e68900' : '#e9ecef'
+                  }
+                }}
+              />
+            );
+          })()
+        )}
+      </Box>
+      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {loadingAssignment ? (
+          <CircularProgress size={16} />
+        ) : (
+          (() => {
+            const status = assignmentStatus[customer.reservationNumber];
+            
+            if (!status) return '-';
+            
+            const isActivated = status.activationStatus === '개통완료';
+            
+            return (
+              <Chip
+                label={status.activationStatus}
+                size="small"
+                color={isActivated ? 'success' : 'default'}
+                sx={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
+                  color: isActivated ? 'white' : '#6c757d',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  '&:hover': {
+                    backgroundColor: isActivated ? '#1976d2' : '#e9ecef'
+                  }
+                }}
+              />
+            );
+          })()
+        )}
+      </Box>
+      <Box sx={{ width: '200px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.reservationMemo || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '200px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.yardReceivedMemo || '-'}
+        </Typography>
+      </Box>
+      <Box sx={{ width: '80px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+          {customer.receiver || '-'}
+        </Typography>
+      </Box>
+    </Box>
+  );
+});
 
 function AllCustomerListScreen({ loggedInStore }) {
   const [customerList, setCustomerList] = useState([]);
@@ -58,7 +305,6 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [loadingActivation, setLoadingActivation] = useState(false);
   const [inventoryStatus, setInventoryStatus] = useState({});
   const [loadingInventory, setLoadingInventory] = useState(false);
-  const [manualAssignmentLoading, setManualAssignmentLoading] = useState(false);
   const [receptionFilter, setReceptionFilter] = useState('all'); // 'all', 'yard', 'onsale', 'both', 'either'
   const [yardDateFilter, setYardDateFilter] = useState('');
   const [onsaleDateFilter, setOnsaleDateFilter] = useState('');
@@ -67,28 +313,26 @@ function AllCustomerListScreen({ loggedInStore }) {
   const [agentOfficeData, setAgentOfficeData] = useState({ offices: [], departments: {}, agentInfo: {} });
   const [loadingAgentData, setLoadingAgentData] = useState(false);
   const [expandedColors, setExpandedColors] = useState({}); // 색상 확장 상태 관리
+  const [inventoryExpanded, setInventoryExpanded] = useState(false);
+
+  // 디바운스된 검색어 (300ms 지연)
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // 대리점아이디관리 데이터 로드
   const loadAgentOfficeData = useCallback(async () => {
     setLoadingAgentData(true);
     try {
-      console.log('🔍 [대리점관리 디버깅] 사무실별, 소속별 데이터 로드 시작');
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/agent-office-department`);
+      const response = await fetch(`${getApiUrl()}/api/agent-office-department`);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('📊 [대리점관리 디버깅] 사무실별, 소속별 데이터:', result);
-        
         if (result.success) {
           setAgentOfficeData(result.data);
         }
       } else {
-        console.warn('⚠️ [대리점관리 디버깅] API 응답 실패');
         setAgentOfficeData({ offices: [], departments: {}, agentInfo: {} });
       }
     } catch (error) {
-      console.error('❌ [대리점관리 디버깅] 사무실별, 소속별 데이터 로드 오류:', error);
       setAgentOfficeData({ offices: [], departments: {}, agentInfo: {} });
     } finally {
       setLoadingAgentData(false);
@@ -101,35 +345,28 @@ function AllCustomerListScreen({ loggedInStore }) {
     setError('');
 
     try {
-      console.log('🔍 [전체고객리스트 디버깅] 고객리스트 로드 시작');
-      const result = await getCachedAllCustomerList(process.env.REACT_APP_API_URL);
+      const result = await getCachedAllCustomerList(getApiUrl());
       
       if (result.success) {
-        console.log('✅ [전체고객리스트 디버깅] 고객리스트 로드 성공');
-        console.log(`  - 로드된 고객 수: ${result.data.length}명`);
-        console.log(`  - 첫 번째 고객 예약번호: ${result.data[0]?.reservationNumber || '없음'}`);
-        console.log(`  - 마지막 고객 예약번호: ${result.data[result.data.length - 1]?.reservationNumber || '없음'}`);
-        
         setCustomerList(result.data);
         setFilteredCustomerList(result.data);
       } else {
         throw new Error(result.message || '전체 고객 리스트 로드에 실패했습니다.');
       }
     } catch (error) {
-      console.error('❌ [전체고객리스트 디버깅] 고객리스트 로드 오류:', error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 필터링 및 검색 적용
+  // 필터링 및 검색 적용 (최적화)
   const applyFilters = useCallback(() => {
     let filtered = customerList;
 
-    // 검색 필터 적용
-    if (searchQuery.trim()) {
-      filtered = getCachedSearchResults(searchQuery, filtered);
+    // 검색 필터 적용 (디바운스된 검색어 사용)
+    if (debouncedSearchQuery.trim()) {
+      filtered = getCachedSearchResults(debouncedSearchQuery, filtered);
     }
 
     // 재고배정 상태 필터 적용
@@ -214,9 +451,9 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
 
     setFilteredCustomerList(filtered);
-  }, [customerList, searchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, assignmentStatus]);
+  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, assignmentStatus]);
 
-  // 검색 기능 (캐시 적용)
+  // 검색 기능 (최적화)
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
   }, []);
@@ -238,28 +475,18 @@ function AllCustomerListScreen({ loggedInStore }) {
     setDepartmentFilter('all');
   }, []);
 
-
-
   // 캐시 새로고침
   const refreshCache = useCallback(async () => {
-    console.log('🔄 [전체고객리스트 디버깅] 캐시 새로고침 시작');
     clearAllCustomerCache();
     await loadAllCustomerList();
     
     // 재고배정 상태도 함께 로드
     try {
       setLoadingAssignment(true);
-      console.log('🔍 [재고배정 디버깅] API 요청 시작');
-      console.log(`  - API URL: ${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
-      
-      console.log('📡 [재고배정 디버깅] API 응답 상태:', response.status, response.statusText);
+      const response = await fetch(`${getApiUrl()}/api/inventory/assignment-status`);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('📊 [재고배정 디버깅] API 응답 데이터:', result);
-        
         if (result.success) {
           // 예약번호를 키로 하는 맵 생성
           const statusMap = {};
@@ -273,84 +500,14 @@ function AllCustomerListScreen({ loggedInStore }) {
           });
           
           setAssignmentStatus(statusMap);
-          
-          // 핵심 디버깅: 데이터 매핑 상태 확인
-          console.log('🔍 [재고배정 디버깅] 데이터 매핑 상태:');
-          console.log(`  - 고객리스트: ${customerList.length}개`);
-          console.log(`  - 배정상태 데이터: ${Object.keys(statusMap).length}개`);
-          console.log(`  - 매핑 성공률: ${((Object.keys(statusMap).length / customerList.length) * 100).toFixed(1)}%`);
-          
-          // 테스트용 디버깅: 일련번호 1005552 관련 고객 확인
-          const testCustomer = customerList.find(c => {
-            const status = statusMap[c.reservationNumber];
-            return status && status.assignedSerialNumber === '1005552';
-          });
-          
-          if (testCustomer) {
-            const testStatus = statusMap[testCustomer.reservationNumber];
-            console.log(`🎯 [전체고객리스트 디버깅] 테스트 고객 발견:`, {
-              reservationNumber: testCustomer.reservationNumber,
-              customerName: testCustomer.customerName,
-              assignedSerialNumber: testStatus.assignedSerialNumber,
-              assignmentStatus: testStatus.assignmentStatus,
-              activationStatus: testStatus.activationStatus
-            });
-          } else {
-            console.log(`❌ [전체고객리스트 디버깅] 일련번호 1005552가 배정된 고객을 찾을 수 없음`);
-          }
-          
-          // 상세 매핑 분석
-          const customerReservationNumbers = customerList.map(c => c.reservationNumber).filter(Boolean);
-          const statusReservationNumbers = Object.keys(statusMap);
-          
-          console.log('📋 [재고배정 디버깅] 예약번호 매핑 분석:');
-          console.log(`  - 고객리스트 예약번호 샘플 (처음 5개):`, customerReservationNumbers.slice(0, 5));
-          console.log(`  - 배정상태 예약번호 샘플 (처음 5개):`, statusReservationNumbers.slice(0, 5));
-          
-          // 매칭되지 않는 예약번호 찾기
-          const unmatchedCustomers = customerReservationNumbers.filter(
-            num => !statusReservationNumbers.includes(num)
-          );
-          console.log(`  - 매칭되지 않는 고객 수: ${unmatchedCustomers.length}개`);
-          if (unmatchedCustomers.length > 0) {
-            console.log(`  - 매칭되지 않는 예약번호 샘플:`, unmatchedCustomers.slice(0, 10));
-          }
-          
-          // 배정상태 통계
-          const assignmentStats = {
-            배정완료: 0,
-            미배정: 0,
-            개통완료: 0,
-            미개통: 0
-          };
-          
-          Object.values(statusMap).forEach(status => {
-            if (status.assignmentStatus === '배정완료') assignmentStats.배정완료++;
-            else if (status.assignmentStatus.startsWith('미배정')) assignmentStats.미배정++;
-            
-            if (status.activationStatus === '개통완료') assignmentStats.개통완료++;
-            else if (status.activationStatus === '미개통') assignmentStats.미개통++;
-          });
-          
-          console.log('📈 [재고배정 디버깅] 배정상태 통계:', assignmentStats);
-          
-        } else {
-          console.error('❌ [재고배정 디버깅] API 응답 실패:', result);
         }
-      } else {
-        console.error('❌ [재고배정 디버깅] API 요청 실패:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('❌ [재고배정 디버깅] API 오류 상세:', errorText);
       }
     } catch (error) {
-      console.error('❌ [재고배정 디버깅] 로드 오류:', error);
-      console.error('❌ [재고배정 디버깅] 오류 스택:', error.stack);
+      console.error('재고배정 상태 로드 오류:', error);
     } finally {
       setLoadingAssignment(false);
     }
-  }, [loadAllCustomerList, customerList.length]);
-
-
+  }, [loadAllCustomerList]);
 
   // 캐시 통계 업데이트
   const updateCacheStats = useCallback(() => {
@@ -444,11 +601,11 @@ function AllCustomerListScreen({ loggedInStore }) {
       ws['!cols'] = colWidths;
 
       // 워크시트를 워크북에 추가
-              XLSX.utils.book_append_sheet(wb, ws, '사전예약고객리스트');
+      XLSX.utils.book_append_sheet(wb, ws, '사전예약고객리스트');
 
       // 파일명 생성
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-              const fileName = `사전예약고객리스트_${timestamp}.xlsx`;
+      const fileName = `사전예약고객리스트_${timestamp}.xlsx`;
 
       // 엑셀 파일 다운로드
       XLSX.writeFile(wb, fileName);
@@ -462,21 +619,14 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
   }, [filteredCustomerList]);
 
-  // 재고배정 상태 로드 함수
+  // 재고배정 상태 로드 함수 (최적화)
   const loadAssignmentStatus = useCallback(async () => {
     try {
       setLoadingAssignment(true);
-      console.log('🔍 [재고배정 디버깅] 배정상태 로드 시작');
-      console.log(`  - 현재 고객리스트 길이: ${customerList.length}`);
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
-      
-      console.log('📡 [재고배정 디버깅] API 응답 상태:', response.status, response.statusText);
+      const response = await fetch(`${getApiUrl()}/api/inventory/assignment-status`);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('📊 [재고배정 디버깅] API 응답 데이터:', result);
-        
         if (result.success) {
           // 예약번호를 키로 하는 맵 생성
           const statusMap = {};
@@ -490,76 +640,23 @@ function AllCustomerListScreen({ loggedInStore }) {
           });
           
           setAssignmentStatus(statusMap);
-          
-          // 핵심 디버깅: 데이터 매핑 상태 확인
-          console.log('🔍 [재고배정 디버깅] 데이터 매핑 상태:');
-          console.log(`  - 고객리스트: ${customerList.length}개`);
-          console.log(`  - 배정상태 데이터: ${Object.keys(statusMap).length}개`);
-          console.log(`  - 매핑 성공률: ${((Object.keys(statusMap).length / customerList.length) * 100).toFixed(1)}%`);
-          
-          // 상세 매핑 분석
-          const customerReservationNumbers = customerList.map(c => c.reservationNumber).filter(Boolean);
-          const statusReservationNumbers = Object.keys(statusMap);
-          
-          console.log('📋 [재고배정 디버깅] 예약번호 매핑 분석:');
-          console.log(`  - 고객리스트 예약번호 샘플 (처음 5개):`, customerReservationNumbers.slice(0, 5));
-          console.log(`  - 배정상태 예약번호 샘플 (처음 5개):`, statusReservationNumbers.slice(0, 5));
-          
-          // 매칭되지 않는 예약번호 찾기
-          const unmatchedCustomers = customerReservationNumbers.filter(
-            num => !statusReservationNumbers.includes(num)
-          );
-          console.log(`  - 매칭되지 않는 고객 수: ${unmatchedCustomers.length}개`);
-          if (unmatchedCustomers.length > 0) {
-            console.log(`  - 매칭되지 않는 예약번호 샘플:`, unmatchedCustomers.slice(0, 10));
-          }
-          
-          // 배정상태 통계
-          const assignmentStats = {
-            배정완료: 0,
-            미배정: 0,
-            개통완료: 0,
-            미개통: 0
-          };
-          
-          Object.values(statusMap).forEach(status => {
-            if (status.assignmentStatus === '배정완료') assignmentStats.배정완료++;
-            else if (status.assignmentStatus.startsWith('미배정')) assignmentStats.미배정++;
-            
-            if (status.activationStatus === '개통완료') assignmentStats.개통완료++;
-            else if (status.activationStatus === '미개통') assignmentStats.미개통++;
-          });
-          
-          console.log('📈 [재고배정 디버깅] 배정상태 통계:', assignmentStats);
-          
-        } else {
-          console.error('❌ [재고배정 디버깅] API 응답 실패:', result);
         }
-      } else {
-        console.error('❌ [재고배정 디버깅] API 요청 실패:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('❌ [재고배정 디버깅] API 오류 상세:', errorText);
       }
     } catch (error) {
-      console.error('❌ [재고배정 디버깅] 로드 오류:', error);
-      console.error('❌ [재고배정 디버깅] 오류 스택:', error.stack);
+      console.error('재고배정 상태 로드 오류:', error);
     } finally {
       setLoadingAssignment(false);
     }
-  }, [customerList.length]);
+  }, []);
 
-  // 개통 상태 로드 함수
+  // 개통 상태 로드 함수 (최적화)
   const loadActivationStatus = useCallback(async () => {
     try {
       setLoadingActivation(true);
-      console.log('📱 [개통상태 디버깅] 개통 상태 로드 시작');
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
+      const response = await fetch(`${getApiUrl()}/api/inventory/activation-status`);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('📊 [개통상태 디버깅] 개통 상태 응답:', result);
-        
         if (result.success) {
           // 예약번호를 키로 하는 맵 생성
           const activationMap = {};
@@ -571,11 +668,10 @@ function AllCustomerListScreen({ loggedInStore }) {
           });
           
           setActivationData(activationMap);
-          console.log(`✅ [개통상태 디버깅] 개통 상태 로드 완료: ${Object.keys(activationMap).length}개`);
         }
       }
     } catch (error) {
-      console.error('❌ [개통상태 디버깅] 개통 상태 로드 오류:', error);
+      console.error('개통 상태 로드 오류:', error);
     } finally {
       setLoadingActivation(false);
     }
@@ -595,7 +691,6 @@ function AllCustomerListScreen({ loggedInStore }) {
           await loadActivationStatus();
         }
       } catch (error) {
-        console.error('❌ [전체고객리스트 디버깅] 초기화 오류:', error);
         setError('데이터 로드 중 오류가 발생했습니다.');
       }
     };
@@ -603,7 +698,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     initializeData();
   }, [loadAllCustomerList, loadAgentOfficeData, loadAssignmentStatus, loadActivationStatus]);
 
-  // 필터 변경 시 적용
+  // 필터 변경 시 적용 (디바운스된 검색어 사용)
   useEffect(() => {
     applyFilters();
   }, [applyFilters]);
@@ -615,83 +710,21 @@ function AllCustomerListScreen({ loggedInStore }) {
     return () => clearInterval(interval);
   }, [updateCacheStats]);
 
-  // 사무실별 재고 현황 로드
+  // 사무실별 재고 현황 로드 (마운트 시 자동)
   const loadInventoryStatus = useCallback(async () => {
     setLoadingInventory(true);
     try {
-      console.log('🔍 [재고현황 디버깅] 사무실별 재고 현황 로드 시작');
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/office-inventory`);
-      
+      const response = await fetch(`${getApiUrl()}/api/office-inventory`);
       if (response.ok) {
         const result = await response.json();
-        console.log('📊 [재고현황 디버깅] 사무실별 재고 현황 데이터:', result);
-        
         if (result.success) {
           setInventoryStatus(result);
         }
       }
     } catch (error) {
-      console.error('❌ [재고현황 디버깅] 사무실별 재고 현황 로드 오류:', error);
+      console.error('사무실별 재고 현황 로드 오류:', error);
     } finally {
       setLoadingInventory(false);
-    }
-  }, []);
-
-  // 수동 배정 실행
-  const executeManualAssignment = useCallback(async () => {
-    setManualAssignmentLoading(true);
-    try {
-      console.log('🔍 [수동배정 디버깅] 수동 배정 실행 시작');
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/manual-assignment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('📊 [수동배정 디버깅] 수동 배정 결과:', result);
-        
-        if (result.success) {
-          // 배정 상태 새로고침 - 직접 API 호출
-          try {
-            setLoadingAssignment(true);
-            const statusResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
-            
-            if (statusResponse.ok) {
-              const statusResult = await statusResponse.json();
-              if (statusResult.success) {
-                const statusMap = {};
-                statusResult.data.forEach(item => {
-                  statusMap[item.reservationNumber] = {
-                    assignmentStatus: item.assignmentStatus,
-                    activationStatus: item.activationStatus,
-                    assignedSerialNumber: item.assignedSerialNumber,
-                    waitingOrder: item.waitingOrder
-                  };
-                });
-                setAssignmentStatus(statusMap);
-              }
-            }
-          } catch (statusError) {
-            console.error('❌ [수동배정 디버깅] 배정 상태 새로고침 오류:', statusError);
-          } finally {
-            setLoadingAssignment(false);
-          }
-          
-          alert('수동 배정이 완료되었습니다.');
-        } else {
-          alert(`수동 배정 실패: ${result.message}`);
-        }
-      }
-    } catch (error) {
-      console.error('❌ [수동배정 디버깅] 수동 배정 오류:', error);
-      alert('수동 배정 중 오류가 발생했습니다.');
-    } finally {
-      setManualAssignmentLoading(false);
     }
   }, []);
 
@@ -794,314 +827,281 @@ function AllCustomerListScreen({ loggedInStore }) {
       {/* 수동 배정 및 재고 현황 */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
-            {/* 수동 배정 실행 버튼 */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={executeManualAssignment}
-                disabled={manualAssignmentLoading}
-                sx={{ 
-                  backgroundColor: '#4caf50',
-                  '&:hover': { backgroundColor: '#45a049' }
-                }}
-              >
-                {manualAssignmentLoading ? <CircularProgress size={16} /> : '수동 배정 실행'}
-              </Button>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                📋 폰클에 출고된 변경내용이 있다면 버튼을 눌러주세요
-              </Typography>
-            </Box>
-
-            {/* 사무실재고보기 버튼 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <Button
-              variant="outlined"
-              onClick={loadInventoryStatus}
-              disabled={loadingInventory}
+              variant="text"
+              startIcon={inventoryExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              onClick={() => setInventoryExpanded((prev) => !prev)}
+              sx={{ fontWeight: 'bold', fontSize: '1rem', color: '#ff9a9e' }}
             >
-              {loadingInventory ? <CircularProgress size={16} /> : '사무실재고보기'}
+              {inventoryExpanded ? '사무실별 보유재고 접기' : '사무실별 보유재고 보기'}
             </Button>
           </Box>
-
-                        {/* 사무실별 보유재고 */}
-              {inventoryStatus.success && inventoryStatus.officeInventory && (
-                <Box sx={{ mt: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
-                      📱 사무실별 보유재고 현황
-                    </Typography>
-                    {inventoryStatus.lastUpdated && (
-                      <Typography variant="caption" color="text.secondary">
-                        마지막 업데이트: {new Date(inventoryStatus.lastUpdated).toLocaleString()}
-                      </Typography>
+          {inventoryExpanded && inventoryStatus.success && inventoryStatus.officeInventory && (
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ color: '#ff9a9e', fontWeight: 'bold' }}>
+                  📱 사무실별 보유재고 현황
+                </Typography>
+                {inventoryStatus.lastUpdated && (
+                  <Typography variant="caption" color="text.secondary">
+                    마지막 업데이트: {new Date(inventoryStatus.lastUpdated).toLocaleString()}
+                  </Typography>
+                )}
+              </Box>
+              {/* 전체 통계 */}
+              {inventoryStatus.stats && (
+                <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
+                    📊 전체 통계 (정규화작업시트 C열 기준)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                    <Chip 
+                      label={`총 재고: ${inventoryStatus.stats.totalInventory}대`} 
+                      color="primary" 
+                      variant="outlined"
+                    />
+                    <Chip 
+                      label={`허용 모델: ${inventoryStatus.stats.allowedModelsCount}종`} 
+                      color="info" 
+                      variant="outlined"
+                    />
+                    <Chip 
+                      label={`처리: ${inventoryStatus.stats.processedCount}개`} 
+                      color="success" 
+                      variant="outlined"
+                    />
+                    {inventoryStatus.stats.filteredCount > 0 && (
+                      <Chip 
+                        label={`필터링: ${inventoryStatus.stats.filteredCount}개`} 
+                        color="warning" 
+                        variant="outlined"
+                      />
                     )}
                   </Box>
-                  
-                  {/* 전체 통계 */}
-                  {inventoryStatus.stats && (
-                    <Box sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                        📊 전체 통계 (정규화작업시트 C열 기준)
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-                        <Chip 
-                          label={`총 재고: ${inventoryStatus.stats.totalInventory}대`} 
-                          color="primary" 
-                          variant="outlined"
-                        />
-                        <Chip 
-                          label={`허용 모델: ${inventoryStatus.stats.allowedModelsCount}종`} 
-                          color="info" 
-                          variant="outlined"
-                        />
-                        <Chip 
-                          label={`처리: ${inventoryStatus.stats.processedCount}개`} 
-                          color="success" 
-                          variant="outlined"
-                        />
-                        {inventoryStatus.stats.filteredCount > 0 && (
-                          <Chip 
-                            label={`필터링: ${inventoryStatus.stats.filteredCount}개`} 
-                            color="warning" 
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                        {Object.entries(inventoryStatus.stats.officeStats).map(([office, stats]) => (
-                          <Chip
-                            key={office}
-                            label={`${office}: ${stats.totalInventory}대 (${stats.modelCount}종)`}
-                            color="secondary"
-                            variant="outlined"
-                            size="small"
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                  
-                                    {/* 사무실별 간결한 재고 현황 */}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
-                    {Object.entries(inventoryStatus.officeInventory).map(([officeName, models]) => {
-                      const totalCount = Object.values(models).reduce((sum, count) => sum + count, 0);
-                      const modelCount = Object.keys(models).length;
-                      
-                      return (
-                        <Card key={officeName} sx={{ 
-                          p: 2, 
-                          border: '1px solid #e0e0e0',
-                          minHeight: '160px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                          '&:hover': {
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                            transform: 'translateY(-2px)',
-                            transition: 'all 0.2s ease'
-                          }
-                        }}>
-                          {/* 사무실 헤더 */}
-                          <Box sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center', 
-                            mb: 1.5,
-                            pb: 1,
-                            borderBottom: '2px solid #f0f0f0'
-                          }}>
-                            <Typography variant="subtitle1" sx={{ 
-                              fontWeight: 'bold', 
-                              color: '#333',
-                              fontSize: '1rem'
-                            }}>
-                              🏢 {officeName}
-                            </Typography>
-                            <Chip 
-                              label={`${totalCount}대`} 
-                              color="primary" 
-                              size="small"
-                              sx={{ 
-                                fontSize: '0.8rem', 
-                                height: '24px',
-                                fontWeight: 'bold'
-                              }}
-                            />
-                          </Box>
-                          
-                          {Object.keys(models).length > 0 ? (
-                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              {(() => {
-                                // 모델명용량별로 그룹화 및 정렬
-                                const groupedModels = {};
-                                Object.entries(models).forEach(([model, count]) => {
-                                  const [modelCapacity, color] = model.split(' | ');
-                                  if (!groupedModels[modelCapacity]) {
-                                    groupedModels[modelCapacity] = [];
-                                  }
-                                  groupedModels[modelCapacity].push({ color, count });
-                                });
-                                
-                                const sortedModelCapacities = Object.keys(groupedModels).sort();
-                                
-                                return sortedModelCapacities.slice(0, 3).map((modelCapacity) => {
-                                  const colorItems = groupedModels[modelCapacity];
-                                  const modelTotal = colorItems.reduce((sum, item) => sum + item.count, 0);
-                                  
-                                  return (
-                                    <Box key={modelCapacity} sx={{ 
-                                      border: '1px solid #e8e8e8',
-                                      borderRadius: 1.5,
-                                      p: 1,
-                                      bgcolor: '#fafafa'
-                                    }}>
-                                      <Typography variant="body2" sx={{ 
-                                        fontWeight: 'bold',
-                                        color: '#555',
-                                        fontSize: '0.85rem',
-                                        display: 'block',
-                                        mb: 0.8
-                                      }}>
-                                        📱 {modelCapacity}
-                                      </Typography>
-                                      
-                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                        {colorItems.slice(0, expandedColors[modelCapacity] ? colorItems.length : 2).map(({ color, count }) => {
-                                          const getColorStyle = (colorName) => {
-                                            const colorLower = colorName.toLowerCase();
-                                            if (colorLower.includes('블랙') || colorLower.includes('제트블랙')) {
-                                              return { bg: '#2c2c2c', text: '#ffffff' };
-                                            } else if (colorLower.includes('화이트') || colorLower.includes('실버')) {
-                                              return { bg: '#f5f5f5', text: '#333333' };
-                                            } else if (colorLower.includes('블루')) {
-                                              return { bg: '#e3f2fd', text: '#1565c0' };
-                                            } else if (colorLower.includes('레드') || colorLower.includes('코랄')) {
-                                              return { bg: '#ffebee', text: '#c62828' };
-                                            } else if (colorLower.includes('그린')) {
-                                              return { bg: '#e8f5e8', text: '#2e7d32' };
-                                            } else if (colorLower.includes('골드')) {
-                                              return { bg: '#fff8e1', text: '#f57f17' };
-                                            } else if (colorLower.includes('퍼플')) {
-                                              return { bg: '#f3e5f5', text: '#7b1fa2' };
-                                            } else {
-                                              return { bg: '#f8f9fa', text: '#495057' };
-                                            }
-                                          };
-                                          
-                                          const colorStyle = getColorStyle(color);
-                                          const isAvailable = count > 0;
-                                          
-                                          return (
-                                            <Box key={color} sx={{
-                                              display: 'flex',
-                                              justifyContent: 'space-between',
-                                              alignItems: 'center',
-                                              p: 0.5,
-                                              bgcolor: isAvailable ? colorStyle.bg : '#f8f8f8',
-                                              borderRadius: 0.5,
-                                              border: `1px solid ${isAvailable ? colorStyle.text + '30' : '#e0e0e0'}`
-                                            }}>
-                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <Box sx={{ 
-                                                  width: 8, 
-                                                  height: 8, 
-                                                  borderRadius: '50%',
-                                                  bgcolor: isAvailable ? colorStyle.text : '#ccc'
-                                                }} />
-                                                <Typography variant="body2" sx={{ 
-                                                  fontWeight: 'medium',
-                                                  color: isAvailable ? colorStyle.text : '#999',
-                                                  fontSize: '0.75rem'
-                                                }}>
-                                                  {color}
-                                                </Typography>
-                                              </Box>
-                                              <Chip
-                                                label={`${count}대`}
-                                                size="small"
-                                                sx={{
-                                                  bgcolor: isAvailable ? colorStyle.text : '#ccc',
-                                                  color: isAvailable ? colorStyle.bg : '#fff',
-                                                  fontSize: '0.7rem',
-                                                  height: '20px',
-                                                  fontWeight: 'bold'
-                                                }}
-                                              />
-                                            </Box>
-                                          );
-                                        })}
-                                        {colorItems.length > 2 && (
-                                          <Button
-                                            variant="text"
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation(); // 부모 카드의 클릭 이벤트 방지
-                                              setExpandedColors(prev => ({
-                                                ...prev,
-                                                [modelCapacity]: !prev[modelCapacity]
-                                              }));
-                                            }}
-                                            sx={{
-                                              textTransform: 'none',
-                                              fontSize: '0.7rem',
-                                              color: '#1976d2',
-                                              '&:hover': {
-                                                textDecoration: 'underline'
-                                              }
-                                            }}
-                                          >
-                                                                                         {expandedColors[modelCapacity] ? '접기' : `+${colorItems.length - 2}개 색상 더...`}
-                                          </Button>
-                                        )}
-                                      </Box>
-                                    </Box>
-                                  );
-                                });
-                              })()}
-                              
-                              {(() => {
-                                const groupedModels = {};
-                                Object.entries(models).forEach(([model, count]) => {
-                                  const [modelCapacity] = model.split(' | ');
-                                  if (!groupedModels[modelCapacity]) {
-                                    groupedModels[modelCapacity] = [];
-                                  }
-                                  groupedModels[modelCapacity].push({ model, count });
-                                });
-                                
-                                const modelCount = Object.keys(groupedModels).length;
-                                if (modelCount > 3) {
-                                  return (
-                                    <Typography variant="caption" sx={{ 
-                                      color: '#666',
-                                      textAlign: 'center',
-                                      mt: 1,
-                                      fontSize: '0.75rem',
-                                      fontStyle: 'italic'
-                                    }}>
-                                      외 {modelCount - 3}개 모델 더...
-                                    </Typography>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary" sx={{ 
-                              textAlign: 'center', 
-                              py: 2,
-                              fontSize: '0.8rem'
-                            }}>
-                              보유 재고 없음
-                            </Typography>
-                          )}
-                        </Card>
-                      );
-                    })}
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {Object.entries(inventoryStatus.stats.officeStats).map(([office, stats]) => (
+                      <Chip
+                        key={office}
+                        label={`${office}: ${stats.totalInventory}대 (${stats.modelCount}종)`}
+                        color="secondary"
+                        variant="outlined"
+                        size="small"
+                      />
+                    ))}
                   </Box>
                 </Box>
               )}
+              {/* 사무실별 간결한 재고 현황 */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+                {Object.entries(inventoryStatus.officeInventory).map(([officeName, models]) => {
+                  const totalCount = Object.values(models).reduce((sum, count) => sum + count, 0);
+                  const modelCount = Object.keys(models).length;
+                  return (
+                    <Card key={officeName} sx={{ 
+                      p: 2, 
+                      border: '1px solid #e0e0e0',
+                      minHeight: '160px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      '&:hover': {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        transform: 'translateY(-2px)',
+                        transition: 'all 0.2s ease'
+                      }
+                    }}>
+                      {/* 사무실 헤더 */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        mb: 1.5,
+                        pb: 1,
+                        borderBottom: '2px solid #f0f0f0'
+                      }}>
+                        <Typography variant="subtitle1" sx={{ 
+                          fontWeight: 'bold', 
+                          color: '#333',
+                          fontSize: '1rem'
+                        }}>
+                          🏢 {officeName}
+                        </Typography>
+                        <Chip 
+                          label={`${totalCount}대`} 
+                          color="primary" 
+                          size="small"
+                          sx={{ 
+                            fontSize: '0.8rem', 
+                            height: '24px',
+                            fontWeight: 'bold'
+                          }}
+                        />
+                      </Box>
+                      {Object.keys(models).length > 0 ? (
+                        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {(() => {
+                            // 모델명용량별로 그룹화 및 정렬
+                            const groupedModels = {};
+                            Object.entries(models).forEach(([model, count]) => {
+                              const [modelCapacity, color] = model.split(' | ');
+                              if (!groupedModels[modelCapacity]) {
+                                groupedModels[modelCapacity] = [];
+                              }
+                              groupedModels[modelCapacity].push({ color, count });
+                            });
+                            const sortedModelCapacities = Object.keys(groupedModels).sort();
+                            return sortedModelCapacities.slice(0, 3).map((modelCapacity) => {
+                              const colorItems = groupedModels[modelCapacity];
+                              const modelTotal = colorItems.reduce((sum, item) => sum + item.count, 0);
+                              return (
+                                <Box key={modelCapacity} sx={{ 
+                                  border: '1px solid #e8e8e8',
+                                  borderRadius: 1.5,
+                                  p: 1,
+                                  bgcolor: '#fafafa'
+                                }}>
+                                  <Typography variant="body2" sx={{ 
+                                    fontWeight: 'bold',
+                                    color: '#555',
+                                    fontSize: '0.85rem',
+                                    display: 'block',
+                                    mb: 0.8
+                                  }}>
+                                    📱 {modelCapacity}
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                    {colorItems.slice(0, expandedColors[modelCapacity] ? colorItems.length : 2).map(({ color, count }) => {
+                                      const getColorStyle = (colorName) => {
+                                        const colorLower = colorName.toLowerCase();
+                                        if (colorLower.includes('블랙') || colorLower.includes('제트블랙')) {
+                                          return { bg: '#2c2c2c', text: '#ffffff' };
+                                        } else if (colorLower.includes('화이트') || colorLower.includes('실버')) {
+                                          return { bg: '#f5f5f5', text: '#333333' };
+                                        } else if (colorLower.includes('블루')) {
+                                          return { bg: '#e3f2fd', text: '#1565c0' };
+                                        } else if (colorLower.includes('레드') || colorLower.includes('코랄')) {
+                                          return { bg: '#ffebee', text: '#c62828' };
+                                        } else if (colorLower.includes('그린')) {
+                                          return { bg: '#e8f5e8', text: '#2e7d32' };
+                                        } else if (colorLower.includes('골드')) {
+                                          return { bg: '#fff8e1', text: '#f57f17' };
+                                        } else if (colorLower.includes('퍼플')) {
+                                          return { bg: '#f3e5f5', text: '#7b1fa2' };
+                                        } else {
+                                          return { bg: '#f8f9fa', text: '#495057' };
+                                        }
+                                      };
+                                      const colorStyle = getColorStyle(color);
+                                      const isAvailable = count > 0;
+                                      return (
+                                        <Box key={color} sx={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          p: 0.5,
+                                          bgcolor: isAvailable ? colorStyle.bg : '#f8f8f8',
+                                          borderRadius: 0.5,
+                                          border: `1px solid ${isAvailable ? colorStyle.text + '30' : '#e0e0e0'}`
+                                        }}>
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Box sx={{ 
+                                              width: 8, 
+                                              height: 8, 
+                                              borderRadius: '50%',
+                                              bgcolor: isAvailable ? colorStyle.text : '#ccc'
+                                            }} />
+                                            <Typography variant="body2" sx={{ 
+                                              fontWeight: 'medium',
+                                              color: isAvailable ? colorStyle.text : '#999',
+                                              fontSize: '0.75rem'
+                                            }}>
+                                              {color}
+                                            </Typography>
+                                          </Box>
+                                          <Chip
+                                            label={`${count}대`}
+                                            size="small"
+                                            sx={{
+                                              bgcolor: isAvailable ? colorStyle.text : '#ccc',
+                                              color: isAvailable ? colorStyle.bg : '#fff',
+                                              fontSize: '0.7rem',
+                                              height: '20px',
+                                              fontWeight: 'bold'
+                                            }}
+                                          />
+                                        </Box>
+                                      );
+                                    })}
+                                    {colorItems.length > 2 && (
+                                      <Button
+                                        variant="text"
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // 부모 카드의 클릭 이벤트 방지
+                                          setExpandedColors(prev => ({
+                                            ...prev,
+                                            [modelCapacity]: !prev[modelCapacity]
+                                          }));
+                                        }}
+                                        sx={{
+                                          textTransform: 'none',
+                                          fontSize: '0.7rem',
+                                          color: '#1976d2',
+                                          '&:hover': {
+                                            textDecoration: 'underline'
+                                          }
+                                        }}
+                                      >
+                                        {expandedColors[modelCapacity] ? '접기' : `+${colorItems.length - 2}개 색상 더...`}
+                                      </Button>
+                                    )}
+                                  </Box>
+                                </Box>
+                              );
+                            });
+                          })()}
+                          {(() => {
+                            const groupedModels = {};
+                            Object.entries(models).forEach(([model, count]) => {
+                              const [modelCapacity] = model.split(' | ');
+                              if (!groupedModels[modelCapacity]) {
+                                groupedModels[modelCapacity] = [];
+                              }
+                              groupedModels[modelCapacity].push({ model, count });
+                            });
+                            const modelCount = Object.keys(groupedModels).length;
+                            if (modelCount > 3) {
+                              return (
+                                <Typography variant="caption" sx={{ 
+                                  color: '#666',
+                                  textAlign: 'center',
+                                  mt: 1,
+                                  fontSize: '0.75rem',
+                                  fontStyle: 'italic'
+                                }}>
+                                  외 {modelCount - 3}개 모델 더...
+                                </Typography>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ 
+                          textAlign: 'center', 
+                          py: 2,
+                          fontSize: '0.8rem'
+                        }}>
+                          보유 재고 없음
+                        </Typography>
+                      )}
+                    </Card>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
@@ -1128,6 +1128,11 @@ function AllCustomerListScreen({ loggedInStore }) {
                     </IconButton>
                   </InputAdornment>
                 )
+              }}
+              // 성능 최적화를 위한 props
+              inputProps={{
+                autoComplete: 'off',
+                'aria-autocomplete': 'none'
               }}
             />
 
@@ -1297,10 +1302,13 @@ function AllCustomerListScreen({ loggedInStore }) {
           <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Typography variant="body2" color="text.secondary">
               총 {customerList.length}명의 고객 중 {filteredCustomerList.length}명 표시
+              {debouncedSearchQuery && debouncedSearchQuery !== searchQuery && (
+                <span style={{ color: '#ff9800' }}> (검색 중...)</span>
+              )}
             </Typography>
-            {searchQuery && (
+            {debouncedSearchQuery && (
               <Chip
-                label={`검색어: "${searchQuery}"`}
+                label={`검색어: "${debouncedSearchQuery}"`}
                 size="small"
                 onDelete={clearSearch}
                 color="primary"
@@ -1322,55 +1330,6 @@ function AllCustomerListScreen({ loggedInStore }) {
                 variant="outlined"
               />
             )}
-            {receptionFilter !== 'all' && (
-              <Chip
-                label={`접수상태: ${
-                  receptionFilter === 'yard' ? '마당접수만' : 
-                  receptionFilter === 'onsale' ? '온세일접수만' : 
-                  receptionFilter === 'both' ? '양쪽접수' :
-                  '둘중한곳접수'
-                }`}
-                size="small"
-                color="warning"
-                variant="outlined"
-              />
-            )}
-            {yardDateFilter && (
-              <Chip
-                label={`마당접수일: ${yardDateFilter}`}
-                size="small"
-                color="secondary"
-                variant="outlined"
-                onDelete={() => setYardDateFilter('')}
-              />
-            )}
-            {onsaleDateFilter && (
-              <Chip
-                label={`온세일접수일: ${onsaleDateFilter}`}
-                size="small"
-                color="secondary"
-                variant="outlined"
-                onDelete={() => setOnsaleDateFilter('')}
-              />
-            )}
-            {officeFilter !== 'all' && (
-              <Chip
-                label={`사무실: ${officeFilter}`}
-                size="small"
-                color="primary"
-                variant="outlined"
-                onDelete={() => setOfficeFilter('all')}
-              />
-            )}
-            {departmentFilter !== 'all' && (
-              <Chip
-                label={`소속: ${departmentFilter}`}
-                size="small"
-                color="primary"
-                variant="outlined"
-                onDelete={() => setDepartmentFilter('all')}
-              />
-            )}
           </Box>
         </CardContent>
       </Card>
@@ -1388,296 +1347,56 @@ function AllCustomerListScreen({ loggedInStore }) {
           <Typography variant="h6" sx={{ mb: 2, color: '#ff9a9e', fontWeight: 'bold' }}>
             고객 리스트 ({filteredCustomerList.length}명) - 모델/용량/색상
           </Typography>
-          
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
             </Box>
           ) : filteredCustomerList.length > 0 ? (
-            <TableContainer 
-              component={Paper} 
-              variant="outlined" 
-              sx={{ 
-                maxHeight: { xs: 400, sm: 500, md: 600 },
-                overflowX: 'auto',
-                borderRadius: 2,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                border: '1px solid #e0e0e0',
-                '& .MuiTable-root': {
-                  minWidth: { xs: 800, sm: 1000, md: 1200 }
-                },
-                '& .MuiTableHead-root': {
-                  backgroundColor: '#f8f9fa',
-                  '& .MuiTableCell-head': {
-                    backgroundColor: '#f8f9fa',
-                    color: '#2c3e50',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    borderBottom: '2px solid #dee2e6',
-                    textAlign: 'center',
-                    padding: '12px 8px'
-                  }
-                },
-                '& .MuiTableBody-root': {
-                  '& .MuiTableRow-root': {
-                    '&:hover': {
-                      backgroundColor: '#f8f9fa',
-                      transition: 'background-color 0.2s ease'
-                    },
-                    '&:nth-of-type(even)': {
-                      backgroundColor: '#fafbfc'
-                    }
-                  },
-                  '& .MuiTableCell-body': {
-                    borderBottom: '1px solid #e9ecef',
-                    padding: '10px 8px',
-                    fontSize: '0.8rem',
-                    color: '#495057'
-                  }
-                }
-              }}
-            >
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell width="60px" align="center" sx={{ fontWeight: 700, color: '#1a237e' }}>순번</TableCell>
-                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>고객명</TableCell>
-                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>예약번호</TableCell>
-                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>사이트예약</TableCell>
-                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>마당접수일</TableCell>
-                    <TableCell width="120px" sx={{ fontWeight: 700, color: '#1a237e' }}>온세일접수일</TableCell>
-                    <TableCell width="150px" sx={{ fontWeight: 700, color: '#1a237e' }}>모델/용량/색상</TableCell>
-                    <TableCell width="80px" sx={{ fontWeight: 700, color: '#1a237e' }}>유형</TableCell>
-                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>대리점</TableCell>
-                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>담당자</TableCell>
-                    <TableCell width="100px" sx={{ fontWeight: 700, color: '#1a237e' }}>POS명</TableCell>
-                    <TableCell width="100px" align="center" sx={{ fontWeight: 700, color: '#1a237e' }}>재고배정</TableCell>
-                    <TableCell width="100px" align="center" sx={{ fontWeight: 700, color: '#1a237e' }}>개통완료</TableCell>
-                    <TableCell width="200px" sx={{ fontWeight: 700, color: '#1a237e' }}>사이트메모</TableCell>
-                    <TableCell width="200px" sx={{ fontWeight: 700, color: '#1a237e' }}>마당메모</TableCell>
-                    <TableCell width="80px" sx={{ fontWeight: 700, color: '#1a237e' }}>접수자</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredCustomerList.map((customer, index) => (
-                    <TableRow key={`${customer.reservationNumber}-${index}`} hover>
-                      <TableCell align="center">
-                        <Typography variant="body2" sx={{ 
-                          fontSize: '0.85rem', 
-                          fontWeight: 600, 
-                          color: '#1976d2',
-                          backgroundColor: '#e3f2fd',
-                          borderRadius: 1,
-                          px: 1,
-                          py: 0.5,
-                          display: 'inline-block',
-                          minWidth: '24px',
-                          textAlign: 'center'
-                        }}>
-                          {index + 1}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ 
-                          fontWeight: 600, 
-                          color: '#2c3e50',
-                          fontSize: '0.85rem'
-                        }}>
-                          {customer.customerName}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ 
-                          fontSize: '0.8rem',
-                          fontFamily: 'monospace',
-                          color: '#6c757d',
-                          backgroundColor: '#f8f9fa',
-                          borderRadius: 1,
-                          px: 1,
-                          py: 0.5,
-                          display: 'inline-block'
-                        }}>
-                          {customer.reservationNumber}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.reservationDateTime}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.yardReceivedDate || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.onSaleReceivedDate || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={customer.modelCapacityColor || '-'}
-                          color="primary"
-                          size="small"
-                          sx={{ 
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            backgroundColor: '#3f51b5',
-                            color: 'white',
-                            '&:hover': {
-                              backgroundColor: '#303f9f'
-                            },
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ 
-                          fontSize: '0.8rem',
-                          color: '#6c757d',
-                          fontStyle: 'italic'
-                        }}>
-                          {customer.type || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ 
-                          fontSize: '0.8rem',
-                          fontWeight: 500,
-                          color: '#495057',
-                          backgroundColor: '#e9ecef',
-                          borderRadius: 1,
-                          px: 1,
-                          py: 0.5,
-                          display: 'inline-block'
-                        }}>
-                          {customer.storeCode || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ 
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          color: '#28a745',
-                          backgroundColor: '#d4edda',
-                          borderRadius: 1,
-                          px: 1,
-                          py: 0.5,
-                          display: 'inline-block'
-                        }}>
-                          {customer.manager || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.posName || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        {loadingAssignment ? (
-                          <CircularProgress size={16} />
-                        ) : (
-                          (() => {
-                            const status = assignmentStatus[customer.reservationNumber];
-                            
-                            // 디버깅: 개별 고객의 배정상태 확인
-                            if (index < 5) { // 처음 5개만 로그 출력
-                              console.log(`🔍 [테이블 디버깅] 고객 ${index + 1}:`, {
-                                reservationNumber: customer.reservationNumber,
-                                customerName: customer.customerName,
-                                status: status,
-                                hasStatus: !!status
-                              });
-                            }
-                            
-                            if (!status) {
-                              return '-';
-                            }
-                            
-                            const isAssigned = status.assignmentStatus === '배정완료';
-                            const isWaiting = status.assignmentStatus.startsWith('미배정');
-                            
-                            return (
-                              <Chip
-                                label={status.assignmentStatus}
-                                size="small"
-                                color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
-                                  color: isAssigned || isWaiting ? 'white' : '#6c757d',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                  '&:hover': {
-                                    backgroundColor: isAssigned ? '#45a049' : isWaiting ? '#e68900' : '#e9ecef'
-                                  }
-                                }}
-                              />
-                            );
-                          })()
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        {loadingAssignment ? (
-                          <CircularProgress size={16} />
-                        ) : (
-                          (() => {
-                            const status = assignmentStatus[customer.reservationNumber];
-                            
-                            // 디버깅: 개별 고객의 개통상태 확인
-                            if (index < 5) { // 처음 5개만 로그 출력
-                              console.log(`🔍 [테이블 디버깅] 고객 ${index + 1} 개통상태:`, {
-                                reservationNumber: customer.reservationNumber,
-                                activationStatus: status?.activationStatus || '없음',
-                                hasStatus: !!status
-                              });
-                            }
-                            
-                            if (!status) return '-';
-                            
-                            const isActivated = status.activationStatus === '개통완료';
-                            
-                            return (
-                              <Chip
-                                label={status.activationStatus}
-                                size="small"
-                                color={isActivated ? 'success' : 'default'}
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
-                                  color: isActivated ? 'white' : '#6c757d',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                  '&:hover': {
-                                    backgroundColor: isActivated ? '#1976d2' : '#e9ecef'
-                                  }
-                                }}
-                              />
-                            );
-                          })()
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.reservationMemo || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.yardReceivedMemo || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          {customer.receiver || '-'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <Box sx={{ 
+              height: { xs: 400, sm: 500, md: 600 },
+              borderRadius: 2,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              border: '1px solid #e0e0e0',
+              overflow: 'hidden'
+            }}>
+              {/* 테이블 헤더 */}
+              <Box sx={{ 
+                backgroundColor: '#f8f9fa',
+                borderBottom: '2px solid #dee2e6',
+                display: 'flex',
+                position: 'sticky',
+                top: 0,
+                zIndex: 1
+              }}>
+                <Box sx={{ width: '60px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>순번</Box>
+                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>고객명</Box>
+                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>예약번호</Box>
+                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트예약</Box>
+                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당접수일</Box>
+                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>온세일접수일</Box>
+                <Box sx={{ width: '150px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>모델/용량/색상</Box>
+                <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>유형</Box>
+                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>대리점</Box>
+                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>담당자</Box>
+                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>POS명</Box>
+                <Box sx={{ width: '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>재고배정</Box>
+                <Box sx={{ width: '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>개통완료</Box>
+                <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트메모</Box>
+                <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당메모</Box>
+                <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>접수자</Box>
+              </Box>
+              {/* 가상화된 테이블 바디 */}
+              <List
+                height={Math.min(filteredCustomerList.length * 50, 500)}
+                itemCount={filteredCustomerList.length}
+                itemSize={50}
+                itemData={{ filteredCustomerList, assignmentStatus, loadingAssignment }}
+                width="100%"
+                style={{ backgroundColor: '#fff' }}
+              >
+                {VirtualizedTableRow}
+              </List>
+            </Box>
           ) : (
             <Alert severity="info">
               {searchQuery ? '검색 결과가 없습니다.' : '고객 리스트 데이터가 없습니다. 새로고침 버튼을 클릭하여 데이터를 로드해주세요.'}
@@ -1689,4 +1408,4 @@ function AllCustomerListScreen({ loggedInStore }) {
   );
 }
 
-export default AllCustomerListScreen; 
+export default AllCustomerListScreen;

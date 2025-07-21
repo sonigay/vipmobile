@@ -110,12 +110,10 @@ export const getCachedAllCustomerList = async (apiUrl) => {
   // 캐시에서 확인
   const cached = allCustomerCache.get(key);
   if (cached) {
-    console.log('✅ 캐시에서 전체 고객리스트 로드');
     return cached;
   }
 
   // API 호출
-  console.log('🔄 전체 고객리스트 API 호출');
   try {
     const response = await fetch(`${apiUrl}/api/reservation-sales/all-customers`);
     
@@ -128,13 +126,12 @@ export const getCachedAllCustomerList = async (apiUrl) => {
     if (data.success) {
       // 캐시에 저장 (15분 TTL)
       allCustomerCache.set(key, data, 15 * 60 * 1000);
-      console.log('💾 전체 고객리스트 캐시에 저장');
       return data;
     } else {
       throw new Error(data.message || '전체 고객 리스트 로드에 실패했습니다.');
     }
   } catch (error) {
-    console.error('❌ 전체 고객리스트 로드 실패:', error);
+    console.error('전체 고객리스트 로드 실패:', error);
     throw error;
   }
 };
@@ -146,12 +143,10 @@ export const getCachedSearchResults = (searchQuery, customerList) => {
   // 캐시에서 확인
   const cached = allCustomerCache.get(key);
   if (cached) {
-    console.log(`✅ 캐시에서 검색 결과 로드: "${searchQuery}"`);
     return cached;
   }
 
   // 검색 실행
-  console.log(`🔄 검색 실행: "${searchQuery}"`);
   const filtered = customerList.filter(customer => {
     const searchLower = searchQuery.toLowerCase();
     return (
@@ -168,7 +163,6 @@ export const getCachedSearchResults = (searchQuery, customerList) => {
 
   // 캐시에 저장 (5분 TTL)
   allCustomerCache.set(key, filtered, 5 * 60 * 1000);
-  console.log(`💾 검색 결과 캐시에 저장: "${searchQuery}"`);
   
   return filtered;
 };
@@ -177,10 +171,8 @@ export const getCachedSearchResults = (searchQuery, customerList) => {
 export const clearAllCustomerCache = (type = null) => {
   if (type) {
     allCustomerCache.clearByType(type);
-    console.log(`🧹 ${type} 타입 전체고객리스트 캐시 클리어 완료`);
   } else {
     allCustomerCache.clear();
-    console.log('🧹 전체 전체고객리스트 캐시 클리어 완료');
   }
 };
 
@@ -190,7 +182,6 @@ export const getAllCustomerCacheStats = () => {
 
 export const cleanupExpiredAllCustomerCache = () => {
   allCustomerCache.cleanup();
-  console.log('🧹 만료된 전체고객리스트 캐시 정리 완료');
 };
 
 // 주기적 캐시 정리 (5분마다)

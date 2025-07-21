@@ -1,0 +1,49 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.7.0
+2 info using node@v20.15.0
+3 silly config:load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config:load:file:C:\Users\s0105\OneDrive\바탕 화면\jegomap2\.npmrc
+5 silly config:load:file:C:\Users\s0105\.npmrc
+6 silly config:load:file:C:\Users\s0105\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install react-window react-window-infinite-loader
+8 verbose argv "install" "react-window" "react-window-infinite-loader"
+9 verbose logfile logs-max:10 dir:C:\Users\s0105\OneDrive\바탕 화면\jegomap2\.npm-cache\_logs\2025-07-21T17_51_45_215Z-
+10 verbose logfile C:\Users\s0105\OneDrive\바탕 화면\jegomap2\.npm-cache\_logs\2025-07-21T17_51_45_215Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly idealTree buildDeps
+13 silly fetch manifest react-window@*
+14 http fetch GET 200 https://registry.npmjs.org/npm 1199ms
+15 http fetch GET 200 https://registry.npmjs.org/react-window 1020ms (cache miss)
+16 silly fetch manifest react@^18.2.0
+17 http fetch GET 200 https://registry.npmjs.org/react 150ms (cache miss)
+18 silly fetch manifest react-dom@^18.2.0
+19 http fetch GET 200 https://registry.npmjs.org/react-dom 160ms (cache miss)
+20 silly fetch manifest react-window-infinite-loader@*
+21 http fetch GET 200 https://registry.npmjs.org/react-window-infinite-loader 498ms (cache miss)
+22 silly placeDep ROOT react-window@1.8.11 OK for: (주)브이아이피플러스@1.0.0 want: *
+23 silly placeDep ROOT react-window-infinite-loader@1.0.10 OK for: (주)브이아이피플러스@1.0.0 want: *
+24 silly fetch manifest memoize-one@>=3.1.1 <6
+25 http fetch GET 200 https://registry.npmjs.org/memoize-one 529ms (cache miss)
+26 silly placeDep ROOT memoize-one@5.2.1 OK for: react-window@1.8.11 want: >=3.1.1 <6
+27 silly reify moves {}
+28 verbose reify failed optional dependency C:\Users\s0105\OneDrive\바탕 화면\jegomap2\node_modules\fsevents
+29 silly reify mark deleted [
+29 silly reify   'C:\\Users\\s0105\\OneDrive\\바탕 화면\\jegomap2\\node_modules\\fsevents'
+29 silly reify ]
+30 silly tarball no local data for memoize-one@https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz. Extracting by manifest.
+31 silly tarball no local data for react-window-infinite-loader@https://registry.npmjs.org/react-window-infinite-loader/-/react-window-infinite-loader-1.0.10.tgz. Extracting by manifest.
+32 silly tarball no local data for react-window@https://registry.npmjs.org/react-window/-/react-window-1.8.11.tgz. Extracting by manifest.
+33 http fetch GET 200 https://registry.npmjs.org/react-window-infinite-loader/-/react-window-infinite-loader-1.0.10.tgz 50ms (cache miss)
+34 http fetch GET 200 https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz 51ms (cache miss)
+35 http fetch GET 200 https://registry.npmjs.org/react-window/-/react-window-1.8.11.tgz 139ms (cache miss)
+36 silly ADD node_modules/memoize-one
+37 silly ADD node_modules/react-window-infinite-loader
+38 silly ADD node_modules/react-window
+39 silly ADD
+40 notice
+40 notice New [31mmajor[39m version of npm available! [31m10.7.0[39m -> [34m11.4.2[39m
+40 notice Changelog: [34mhttps://github.com/npm/cli/releases/tag/v11.4.2[39m
+40 notice To update run: [4mnpm install -g npm@11.4.2[24m
+40 notice  { force: true, [Symbol(proc-log.meta)]: true }
+41 verbose exit 0
+42 info ok

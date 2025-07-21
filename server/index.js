@@ -3221,7 +3221,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log(`🔍 [서버시작] 폰클재고데이터 로드 완료: ${phoneklInventoryValues ? phoneklInventoryValues.length : 0}개 행`);
       
       const reservationSiteValues = await getSheetValues('사전예약사이트');
-      console.log(`🔍 [서버시작] 사전예약사이트 로드 완료: ${reservationSiteValues ? reservationSiteValues.length : 0}개 행`);
+      // 사전예약사이트 로드 완료
       
       // 폰클출고처데이터 로드 (POS점 매핑용)
       const phoneklStoreValues = await getSheetValues('폰클출고처데이터');
@@ -3348,7 +3348,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
       
       console.log(`✅ [서버시작] 중복 배정 정리 완료: ${cleanedCount}개 배정 해제`);
       
-      console.log(`🔍 [서버시작] 사전예약사이트 데이터 처리 시작: ${reservationSiteValues.length - 1}개 행`);
+      // 사전예약사이트 데이터 처리 시작
       
       reservationSiteValues.slice(1).forEach((row, index) => {
         if (row.length < 22) {
@@ -4595,7 +4595,7 @@ app.get('/api/reservation-sales/model-color', async (req, res) => {
     const reservationSiteRows = reservationSiteValues.slice(1); // 헤더 제거
     const modelColorStats = new Map(); // 모델색상별 통계
     
-    console.log(`사전예약사이트 데이터 행 수: ${reservationSiteRows.length}`);
+    // 사전예약사이트 데이터 처리
     
     let processedCount = 0;
     let matchedCount = 0;
@@ -8355,7 +8355,7 @@ app.get('/api/inspection/completion-status', async (req, res) => {
 // 사전예약사이트 모델/용량/색상 데이터 API
 app.get('/api/reservation-settings/model-data', async (req, res) => {
   try {
-    console.log('사전예약사이트 모델/용량/색상 데이터 요청');
+    // 사전예약사이트 모델/용량/색상 데이터 요청
     
     // 캐시 키 생성
     const cacheKey = 'reservation_site_model_data';
@@ -8363,7 +8363,7 @@ app.get('/api/reservation-settings/model-data', async (req, res) => {
     // 캐시에서 먼저 확인 (10분 TTL)
     const cachedData = cacheUtils.get(cacheKey);
     if (cachedData) {
-      console.log('캐시된 사전예약사이트 모델 데이터 반환');
+      // 캐시된 사전예약사이트 모델 데이터 반환
       return res.json(cachedData);
     }
     
@@ -8383,7 +8383,7 @@ app.get('/api/reservation-settings/model-data', async (req, res) => {
     const colors = new Set();
     const modelCapacityColors = new Map();
     
-    console.log(`사전예약사이트 데이터 행 수: ${rows.length}`);
+    // 사전예약사이트 데이터 처리
     
     rows.forEach((row, index) => {
       if (row.length < 3) return;
@@ -8440,7 +8440,7 @@ app.get('/api/reservation-settings/model-data', async (req, res) => {
       }
     };
     
-    console.log(`사전예약사이트 모델 데이터 처리 완료: ${result.stats.totalModels}개 모델, ${result.stats.totalCapacities}개 용량, ${result.stats.totalColors}개 색상`);
+    // 사전예약사이트 모델 데이터 처리 완료
     
     // 결과 캐싱 (10분 TTL)
     cacheUtils.set(cacheKey, result, 600);
@@ -8487,7 +8487,7 @@ app.get('/api/reservation-settings/data', async (req, res) => {
         };
       }
     } catch (error) {
-      console.log('사전예약사이트 시트 로드 실패:', error.message);
+      // 사전예약사이트 시트 로드 실패
     }
 
     // 폰클재고데이터 시트에서 F, G열 데이터 로드
@@ -9126,7 +9126,7 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
         });
       }
     } catch (error) {
-      console.log('사전예약사이트 시트 로드 실패:', error.message);
+      // 사전예약사이트 시트 로드 실패
     }
 
     // 3. 폰클재고데이터 시트의 원본 데이터 읽기
@@ -10820,11 +10820,11 @@ app.get('/api/inventory-analysis', async (req, res) => {
         // 대리점 코드별 필터링 적용
         if (storeCode) {
           reservationData = reservationData.filter(item => item.storeCode === storeCode);
-          console.log(`사전예약 대리점 코드 ${storeCode} 필터링 적용: ${reservationData.length}개 항목`);
+          // 대리점 코드 필터링 적용
         }
       }
     } catch (error) {
-      console.log('사전예약사이트 시트 로드 실패:', error.message);
+      // 사전예약사이트 시트 로드 실패
     }
 
     // 3. 폰클재고데이터 로드 (재고 수량 포함, 대리점별 필터링)
@@ -10916,7 +10916,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
         // 대리점 코드별 필터링 적용
         if (storeCode) {
           inventoryData = inventoryData.filter(item => item.storeCode === storeCode);
-          console.log(`대리점 코드 ${storeCode} 필터링 적용: ${inventoryData.length}개 항목`);
+          // 대리점 코드 필터링 적용
         }
       }
     } catch (error) {
@@ -11389,7 +11389,7 @@ app.get('/api/reservation-data/yard-receipt', async (req, res) => {
 
 app.get('/api/reservation-data/reservation-site', async (req, res) => {
   try {
-    console.log('사전예약사이트 데이터 요청');
+    // 사전예약사이트 데이터 요청
     
     // 사전예약사이트 시트에서 데이터 가져오기
     const sheetName = '사전예약사이트';
