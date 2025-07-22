@@ -1411,11 +1411,16 @@ async function saveMonthlyAwardSettings(req, res) {
   try {
     const { type, data } = req.body;
     
-    if (!type || !data) {
+    if (!type) {
       return res.status(400).json({
         success: false,
-        error: 'Type and data are required'
+        error: 'Type is required'
       });
+    }
+
+    // data가 없거나 빈 배열인 경우 기본값 설정
+    if (!data) {
+      data = [];
     }
 
     let sheetData = [];
@@ -1430,6 +1435,34 @@ async function saveMonthlyAwardSettings(req, res) {
         console.log('=== Matrix 기준값 저장 디버깅 ===');
         console.log('원본 데이터:', data);
         
+        // data가 배열이 아니거나 비어있는 경우 기본값 사용
+        if (!Array.isArray(data) || data.length === 0) {
+          console.log('Matrix 기준값이 비어있어 기본값을 사용합니다.');
+          data = [
+            { score: 6, indicator: 'upsell', percentage: 92.0 },
+            { score: 5, indicator: 'upsell', percentage: 85.0 },
+            { score: 4, indicator: 'upsell', percentage: 78.0 },
+            { score: 3, indicator: 'upsell', percentage: 70.0 },
+            { score: 2, indicator: 'upsell', percentage: 60.0 },
+            { score: 1, indicator: 'upsell', percentage: 50.0 },
+            { score: 6, indicator: 'change105', percentage: 88.0 },
+            { score: 5, indicator: 'change105', percentage: 80.0 },
+            { score: 4, indicator: 'change105', percentage: 72.0 },
+            { score: 3, indicator: 'change105', percentage: 64.0 },
+            { score: 2, indicator: 'change105', percentage: 56.0 },
+            { score: 1, indicator: 'change105', percentage: 48.0 },
+            { score: 6, indicator: 'strategic', percentage: 90.0 },
+            { score: 5, indicator: 'strategic', percentage: 80.0 },
+            { score: 4, indicator: 'strategic', percentage: 70.0 },
+            { score: 3, indicator: 'strategic', percentage: 60.0 },
+            { score: 2, indicator: 'strategic', percentage: 50.0 },
+            { score: 1, indicator: 'strategic', percentage: 40.0 },
+            { score: 3, indicator: 'internet', percentage: 7.0 },
+            { score: 2, indicator: 'internet', percentage: 6.0 },
+            { score: 1, indicator: 'internet', percentage: 5.0 }
+          ];
+        }
+        
         // 각 지표별 최대 점수 설정
         const maxScores = {
           'upsell': 6,      // 업셀기변: 6점
@@ -1441,7 +1474,7 @@ async function saveMonthlyAwardSettings(req, res) {
         // 총점 계산 (21점 만점으로 수정: 6+6+6+3)
         const totalMaxScore = 21;
         
-        // 각 지표별로 데이터 정리
+        // 단순한 테이블 형태로 데이터 정리
         const organizedData = [];
         
         // 헤더 추가
@@ -1460,38 +1493,50 @@ async function saveMonthlyAwardSettings(req, res) {
             'internet': '인터넷 비중'
           };
           
-          organizedData.push([`${indicatorNames[indicator]} (${maxScore}점)`, '', '', '']);
+          // 점수별 데이터 추가 (6점부터 1점까지, 또는 3점부터 1점까지)
+          const scoreRange = indicator === 'internet' ? [3, 2, 1] : [6, 5, 4, 3, 2, 1];
           
-          // 점수별 데이터 추가 (6점부터 1점까지)
-          const scoreRange = [6, 5, 4, 3, 2, 1];
-          
-                     for (let i = 0; i < scoreRange.length; i++) {
-             const score = scoreRange[i];
-             const item = indicatorData.find(d => d.score === score);
-             if (item && item.percentage > 0) {
-               organizedData.push(['', score, item.percentage, `${score}점 기준`]);
-             } else {
-               // 빈 값이면 해당 점수까지만 만점으로 인식
-               break;
-             }
-           }
-          
-          organizedData.push(['', '', '', '']); // 빈 줄 추가
+          for (let i = 0; i < scoreRange.length; i++) {
+            const score = scoreRange[i];
+            const item = indicatorData.find(d => d.score === score);
+            if (item && item.percentage > 0) {
+              const description = i === 0 ? '만점' : ''; // 첫 번째 점수만 '만점' 표시
+              organizedData.push([
+                `${indicatorNames[indicator]} (${maxScore}점)`,
+                score,
+                item.percentage,
+                description
+              ]);
+            }
+          }
         });
-        
-        // 총점 정보 추가
-        organizedData.push(['총점', totalMaxScore, '', '만점']);
         
         sheetData = organizedData;
         console.log('정리된 데이터:', sheetData);
         break;
       case 'strategic_products':
-        // 전략상품 리스트 저장 (임시 비활성화)
-        console.log('전략상품 저장 요청이 비활성화되어 있습니다.');
-        return res.status(400).json({
-          success: false,
-          error: '전략상품 저장 기능이 임시로 비활성화되어 있습니다. 추가 버튼을 사용해주세요.'
-        });
+        // 전략상품 리스트 저장
+        console.log('=== 전략상품 저장 디버깅 ===');
+        console.log('원본 데이터:', data);
+        
+        sheetData = [
+          ['소분류', '부가서비스 코드', '부가서비스명', '포인트']
+        ];
+        
+        if (data && Array.isArray(data) && data.length > 0) {
+          data.forEach(item => {
+            sheetData.push([
+              item.subCategory || '',
+              item.serviceCode || '',
+              item.serviceName || '',
+              item.points || 0
+            ]);
+          });
+        } else {
+          console.log('전략상품 데이터가 비어있습니다.');
+        }
+        
+        console.log('전략상품 데이터:', sheetData);
         break;
       case 'company_mapping':
         // 업체 매핑 저장
@@ -1502,7 +1547,7 @@ async function saveMonthlyAwardSettings(req, res) {
           ['개통데이터업체명', '폰클출고처업체명', '매핑상태', '비고']
         ];
         
-        if (data && Array.isArray(data)) {
+        if (data && Array.isArray(data) && data.length > 0) {
           data.forEach(item => {
             sheetData.push([
               item.sourceCompany || '',
@@ -1511,6 +1556,8 @@ async function saveMonthlyAwardSettings(req, res) {
               '인터넷비중계산용'
             ]);
           });
+        } else {
+          console.log('업체 매핑 데이터가 비어있습니다.');
         }
         
         console.log('업체 매핑 데이터:', sheetData);
@@ -1524,7 +1571,7 @@ async function saveMonthlyAwardSettings(req, res) {
           ['요금제명', '요금제군', '기본료', '매핑상태']
         ];
         
-        if (data && Array.isArray(data)) {
+        if (data && Array.isArray(data) && data.length > 0) {
           data.forEach(item => {
             sheetData.push([
               item.planName || '',
@@ -1533,6 +1580,8 @@ async function saveMonthlyAwardSettings(req, res) {
               '매핑완료'
             ]);
           });
+        } else {
+          console.log('요금제 매핑 데이터가 비어있습니다.');
         }
         
         console.log('요금제 매핑 데이터:', sheetData);
@@ -1546,7 +1595,7 @@ async function saveMonthlyAwardSettings(req, res) {
           ['담당자명', '활성화상태', '목표달성률', '비고']
         ];
         
-        if (data && Array.isArray(data)) {
+        if (data && Array.isArray(data) && data.length > 0) {
           data.forEach(item => {
             sheetData.push([
               item.managerName || '',
@@ -1555,6 +1604,8 @@ async function saveMonthlyAwardSettings(req, res) {
               item.note || ''
             ]);
           });
+        } else {
+          console.log('담당자 관리 데이터가 비어있습니다.');
         }
         
         console.log('담당자 관리 데이터:', sheetData);
