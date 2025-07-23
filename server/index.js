@@ -2521,6 +2521,24 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
     
     console.log(`📊 [배정저장 디버깅] 기존 배정된 일련번호 ${assignedSerials.size}개 확인`);
     
+    // 1단계: 모든 고객에 대해 개통완료 체크 (배정 대상 여부와 관계없이)
+    for (let i = 1; i < reservationSiteValues.length; i++) {
+      const row = reservationSiteValues[i];
+      if (row.length < 22) continue;
+      
+      const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+      const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+      const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
+      
+      // 개통완료된 고객은 새로운 배정에서만 제외 (기존 일련번호는 유지)
+      if (activationStatus === '개통완료') {
+        console.log(`⚠️ [배정저장 디버깅] 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
+        skippedCount++;
+        continue; // 새로운 배정만 건너뜀, 기존 일련번호는 그대로 유지
+      }
+    }
+    
+    // 2단계: 배정 대상 고객들에 대해 배정 로직 실행
     for (let i = 1; i < reservationSiteValues.length; i++) {
       const row = reservationSiteValues[i];
       if (row.length < 22) continue;
@@ -3515,6 +3533,27 @@ const server = app.listen(port, '0.0.0.0', async () => {
       
       // 사전예약사이트 데이터 처리 시작
       
+      // 1단계: 모든 고객에 대해 개통완료 체크 (필수 데이터 여부와 관계없이)
+      reservationSiteValues.slice(1).forEach((row, index) => {
+        if (row.length < 22) {
+          console.log(`⚠️ [서버시작] 행 ${index + 2}: 컬럼 수 부족 (${row.length})`);
+          return;
+        }
+        
+        const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+        const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
+        
+        // 개통완료된 고객은 새로운 배정에서만 제외 (기존 일련번호는 유지)
+        if (activationStatus === '개통완료') {
+          if (index < 5) {
+            console.log(`⚠️ [서버시작] 행 ${index + 2}: 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
+          }
+          skippedCount++;
+          return; // 새로운 배정만 건너뜀, 기존 일련번호는 그대로 유지
+        }
+      });
+      
+      // 2단계: 필수 데이터가 있는 고객들에 대해 배정 로직 실행
       reservationSiteValues.slice(1).forEach((row, index) => {
         if (row.length < 22) {
           console.log(`⚠️ [서버시작] 행 ${index + 2}: 컬럼 수 부족 (${row.length})`);
