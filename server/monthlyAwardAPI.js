@@ -745,7 +745,7 @@ async function getMonthlyAwardData(req, res) {
         matchedHomeRows++;
         
         // 자수 조건 확인
-        if (product === '인터넷') {
+        if (product.includes('인터넷')) {
           internetRows++;
           // 동판 문구가 없는 경우에만 추가 조건 확인
           if (!product.includes('동판')) {
@@ -1135,7 +1135,7 @@ async function getMonthlyAwardData(req, res) {
       }
       
       // 자수 조건 확인
-      if (product === '인터넷') {
+      if (product.includes('인터넷')) {
         internetCount++;
         // 동판 문구가 없는 경우에만 추가 조건 확인
         if (!product.includes('동판')) {
