@@ -641,6 +641,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         '모델/용량/색상',
         '유형',
         '대리점',
+        '담당자',
         'POS명',
         '재고배정',
         '개통완료',
@@ -664,6 +665,7 @@ function AllCustomerListScreen({ loggedInStore }) {
           customer.modelCapacityColor || '',
           customer.type || '',
           customer.storeCode || '',
+          customer.manager || '',
           customer.posName || '',
           status?.assignmentStatus || '로딩중...',
           status?.activationStatus || '로딩중...',
@@ -689,6 +691,7 @@ function AllCustomerListScreen({ loggedInStore }) {
         { wch: 25 },  // 모델/용량/색상
         { wch: 10 },  // 유형
         { wch: 12 },  // 대리점
+        { wch: 15 },  // 담당자
         { wch: 15 },  // POS명
         { wch: 12 },  // 재고배정
         { wch: 12 },  // 개통완료
