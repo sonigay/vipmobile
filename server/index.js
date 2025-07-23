@@ -9497,10 +9497,12 @@ app.post('/api/cancel-check/save', async (req, res) => {
 
   } catch (error) {
     console.error('❌ [취소체크] 저장 오류:', error);
+    console.error('❌ [취소체크] 에러 스택:', error.stack);
     res.status(500).json({
       success: false,
       error: '취소 체크 데이터 저장 실패',
-      message: error.message
+      message: error.message,
+      stack: error.stack
     });
   }
 });
@@ -9628,6 +9630,7 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
     console.log(`🗑️ [취소체크] 삭제 전 데이터: ${dataRows.length}건, 삭제 후 데이터: ${filteredData.length}건`);
     console.log(`🗑️ [취소체크] 새 데이터 구조:`, newData);
     
+    let sheetResponse;
     try {
       // 먼저 시트를 완전히 비우고 새 데이터로 업데이트
       console.log('🗑️ [취소체크] 시트 초기화 시작...');
@@ -9638,7 +9641,7 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
       console.log('🗑️ [취소체크] 시트 초기화 완료');
       
       console.log('🗑️ [취소체크] 새 데이터 쓰기 시작...');
-      const response = await sheets.spreadsheets.values.update({
+      sheetResponse = await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: '사전예약사이트취소데이터!A:C',
         valueInputOption: 'RAW',
@@ -9646,7 +9649,7 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
           values: newData
         }
       });
-      console.log('🗑️ [취소체크] 새 데이터 쓰기 완료:', response.data);
+      console.log('🗑️ [취소체크] 새 데이터 쓰기 완료:', sheetResponse.data);
 
       console.log(`🗑️ [취소체크] 취소 데이터 삭제 완료: ${deletedCount}건`);
     } catch (sheetError) {
@@ -9658,15 +9661,17 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
       success: true,
       message: '취소 체크 데이터가 삭제되었습니다.',
       deletedCount,
-      data: response.data
+      data: sheetResponse.data
     });
 
   } catch (error) {
     console.error('❌ [취소체크] 삭제 오류:', error);
+    console.error('❌ [취소체크] 에러 스택:', error.stack);
     res.status(500).json({
       success: false,
       error: '취소 체크 데이터 삭제 실패',
-      message: error.message
+      message: error.message,
+      stack: error.stack
     });
   }
 });

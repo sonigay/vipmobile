@@ -1010,6 +1010,13 @@ function AllCustomerListScreen({ loggedInStore }) {
           })
         });
         
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ 취소 체크 해제 실패:', response.status, errorText);
+          setError(`취소 체크 해제 실패 (${response.status}): ${errorText}`);
+          return;
+        }
+        
         const result = await response.json();
         
         if (result.success) {
@@ -1032,6 +1039,13 @@ function AllCustomerListScreen({ loggedInStore }) {
             reservationNumbers: [reservationNumber]
           })
         });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ 취소 체크 저장 실패:', response.status, errorText);
+          setError(`취소 체크 저장 실패 (${response.status}): ${errorText}`);
+          return;
+        }
         
         const result = await response.json();
         
