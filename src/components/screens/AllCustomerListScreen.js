@@ -129,17 +129,17 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       }}
     >
       {/* 순번 */}
-      <Box sx={{ width: isMobile ? '40px' : '60px', p: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ width: isMobile ? '40px' : '60px', p: isMobile ? 0.5 : 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Typography variant="body2" sx={{ 
-          fontSize: isMobile ? '0.75rem' : '0.85rem', 
+          fontSize: isMobile ? '0.7rem' : '0.85rem', 
           fontWeight: 600, 
           color: '#1976d2',
           backgroundColor: '#e3f2fd',
           borderRadius: 1,
-          px: 1,
-          py: 0.5,
+          px: isMobile ? 0.5 : 1,
+          py: isMobile ? 0.25 : 0.5,
           display: 'inline-block',
-          minWidth: '24px',
+          minWidth: isMobile ? '20px' : '24px',
           textAlign: 'center'
         }}>
           {index + 1}
@@ -147,11 +147,12 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       </Box>
       
       {/* 고객명 */}
-      <Box sx={{ width: isMobile ? '80px' : '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ width: isMobile ? '80px' : '120px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ 
           fontWeight: 600, 
           color: '#2c3e50',
-          fontSize: isMobile ? '0.75rem' : '0.85rem'
+          fontSize: isMobile ? '0.7rem' : '0.85rem',
+          lineHeight: isMobile ? 1.2 : 1.4
         }}>
           {customer.customerName}
         </Typography>
@@ -192,20 +193,21 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
         </>
       )}
       {/* 모델/용량/색상 */}
-      <Box sx={{ width: isMobile ? '100px' : '150px', p: 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ width: isMobile ? '100px' : '150px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
         <Chip
           label={customer.modelCapacityColor || '-'}
           color="primary"
           size="small"
           sx={{ 
-            fontSize: isMobile ? '0.65rem' : '0.75rem',
+            fontSize: isMobile ? '0.6rem' : '0.75rem',
             fontWeight: 500,
             backgroundColor: '#3f51b5',
             color: 'white',
             '&:hover': {
               backgroundColor: '#303f9f'
             },
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            height: isMobile ? '20px' : '24px'
           }}
         />
       </Box>
@@ -224,15 +226,15 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       )}
       
       {/* 대리점 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ 
-          fontSize: isMobile ? '0.7rem' : '0.8rem',
+          fontSize: isMobile ? '0.65rem' : '0.8rem',
           fontWeight: 500,
           color: '#495057',
           backgroundColor: '#e9ecef',
           borderRadius: 1,
-          px: 1,
-          py: 0.5,
+          px: isMobile ? 0.5 : 1,
+          py: isMobile ? 0.25 : 0.5,
           display: 'inline-block'
         }}>
           {customer.storeCode || '-'}
@@ -240,15 +242,15 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       </Box>
       
       {/* 담당자 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ 
-          fontSize: isMobile ? '0.7rem' : '0.8rem',
+          fontSize: isMobile ? '0.65rem' : '0.8rem',
           fontWeight: 600,
           color: '#28a745',
           backgroundColor: '#d4edda',
           borderRadius: 1,
-          px: 1,
-          py: 0.5,
+          px: isMobile ? 0.5 : 1,
+          py: isMobile ? 0.25 : 0.5,
           display: 'inline-block'
         }}>
           {customer.manager || '-'}
@@ -256,13 +258,16 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       </Box>
       
       {/* POS명 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ 
+          fontSize: isMobile ? '0.65rem' : '0.8rem',
+          lineHeight: isMobile ? 1.2 : 1.4
+        }}>
           {customer.posName || '-'}
         </Typography>
       </Box>
       {/* 재고배정 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {loadingAssignment ? (
           <CircularProgress size={16} />
         ) : (
@@ -281,11 +286,12 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
                   size="small"
                   color="success"
                   sx={{
-                    fontSize: isMobile ? '0.65rem' : '0.75rem',
+                    fontSize: isMobile ? '0.6rem' : '0.75rem',
                     fontWeight: 600,
                     backgroundColor: '#2196f3',
                     color: 'white',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    height: isMobile ? '20px' : '24px',
                     '&:hover': {
                       backgroundColor: '#1976d2'
                     }
@@ -304,11 +310,12 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
                 size="small"
                 color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
                 sx={{
-                  fontSize: isMobile ? '0.65rem' : '0.75rem',
+                  fontSize: isMobile ? '0.6rem' : '0.75rem',
                   fontWeight: 600,
                   backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
                   color: isAssigned || isWaiting ? 'white' : '#6c757d',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  height: isMobile ? '20px' : '24px',
                   '&:hover': {
                     backgroundColor: isAssigned ? '#45a049' : isWaiting ? '#e68900' : '#e9ecef'
                   }
@@ -320,7 +327,7 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       </Box>
       
       {/* 개통완료 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {loadingAssignment ? (
           <CircularProgress size={16} />
         ) : (
@@ -337,11 +344,12 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
                 size="small"
                 color={isActivated ? 'success' : 'default'}
                 sx={{
-                  fontSize: isMobile ? '0.65rem' : '0.75rem',
+                  fontSize: isMobile ? '0.6rem' : '0.75rem',
                   fontWeight: 600,
                   backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
                   color: isActivated ? 'white' : '#6c757d',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  height: isMobile ? '20px' : '24px',
                   '&:hover': {
                     backgroundColor: isActivated ? '#1976d2' : '#e9ecef'
                   }
@@ -374,7 +382,7 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       )}
       
       {/* 취소체크 */}
-      <Box sx={{ width: isMobile ? '50px' : '60px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ width: isMobile ? '50px' : '60px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {processingCancelCheck.has(customer.reservationNumber) ? (
           <CircularProgress size={16} />
         ) : (
@@ -512,31 +520,37 @@ function AllCustomerListScreen({ loggedInStore }) {
     let filtered = customerList;
 
     // 모바일에서 담당자별 필터링 (본인 담당 고객만 표시)
-    if (isMobileRealTime() && loggedInStore && loggedInStore.manager) {
-      console.log('📱 [모바일필터] 담당자별 필터링 적용:', {
+    if (isMobileRealTime() && loggedInStore) {
+      console.log('📱 [모바일필터] 담당자별 필터링 시도:', {
+        loggedInStore: loggedInStore,
         loggedInManager: loggedInStore.manager,
+        loggedInName: loggedInStore.name,
         totalCustomers: filtered.length,
         isMobile: isMobileRealTime(),
         windowWidth: windowWidth
       });
       
-      const beforeFilter = filtered.length;
-      filtered = filtered.filter(customer => {
-        return customer.manager === loggedInStore.manager;
-      });
-      
-      console.log('📱 [모바일필터] 필터링 결과:', {
-        beforeFilter,
-        afterFilter: filtered.length,
-        filteredCustomers: filtered.map(c => ({ name: c.customerName, manager: c.manager }))
-      });
+      // 담당자 정보가 있으면 필터링 적용
+      if (loggedInStore.manager) {
+        const beforeFilter = filtered.length;
+        filtered = filtered.filter(customer => {
+          return customer.manager === loggedInStore.manager;
+        });
+        
+        console.log('📱 [모바일필터] 담당자별 필터링 적용됨:', {
+          beforeFilter,
+          afterFilter: filtered.length,
+          filteredCustomers: filtered.map(c => ({ name: c.customerName, manager: c.manager }))
+        });
+      } else {
+        console.log('📱 [모바일필터] 담당자 정보 없음 - 전체 표시');
+      }
     } else {
       console.log('📱 [모바일필터] 필터링 조건 미충족:', {
         isMobile: isMobileRealTime(),
         windowWidth: windowWidth,
         hasLoggedInStore: !!loggedInStore,
-        hasManager: !!(loggedInStore && loggedInStore.manager),
-        loggedInManager: loggedInStore?.manager
+        loggedInStore: loggedInStore
       });
     }
 
@@ -1827,23 +1841,42 @@ function AllCustomerListScreen({ loggedInStore }) {
                 top: 0,
                 zIndex: 1
               }}>
-                <Box sx={{ width: '60px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>순번</Box>
-                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>고객명</Box>
-                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>예약번호</Box>
-                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트예약</Box>
-                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당접수일</Box>
-                <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>온세일접수일</Box>
-                <Box sx={{ width: '150px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>모델/용량/색상</Box>
-                <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>유형</Box>
-                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>대리점</Box>
-                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>담당자</Box>
-                <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>POS명</Box>
-                <Box sx={{ width: '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>재고배정</Box>
-                <Box sx={{ width: '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>개통완료</Box>
-                <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트메모</Box>
-                <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당메모</Box>
-                <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>접수자</Box>
-                <Box sx={{ width: '60px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>취소체크</Box>
+                <Box sx={{ width: isMobileRealTime() ? '40px' : '60px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem', textAlign: 'center' }}>순번</Box>
+                <Box sx={{ width: isMobileRealTime() ? '80px' : '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>고객명</Box>
+                
+                {/* 모바일이 아닐 때만 예약번호, 사이트예약, 마당접수일, 온세일접수일 표시 */}
+                {!isMobileRealTime() && (
+                  <>
+                    <Box sx={{ width: '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>예약번호</Box>
+                    <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트예약</Box>
+                    <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당접수일</Box>
+                    <Box sx={{ width: '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>온세일접수일</Box>
+                  </>
+                )}
+                
+                <Box sx={{ width: isMobileRealTime() ? '100px' : '150px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>모델/용량/색상</Box>
+                
+                {/* 모바일이 아닐 때만 유형 표시 */}
+                {!isMobileRealTime() && (
+                  <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>유형</Box>
+                )}
+                
+                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>대리점</Box>
+                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>담당자</Box>
+                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>POS명</Box>
+                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>재고배정</Box>
+                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>개통완료</Box>
+                
+                {/* 모바일이 아닐 때만 메모들과 접수자 표시 */}
+                {!isMobileRealTime() && (
+                  <>
+                    <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>사이트메모</Box>
+                    <Box sx={{ width: '200px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>마당메모</Box>
+                    <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>접수자</Box>
+                  </>
+                )}
+                
+                <Box sx={{ width: isMobileRealTime() ? '50px' : '60px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>취소체크</Box>
               </Box>
               {/* 가상화된 테이블 바디 */}
               <List
