@@ -2235,6 +2235,7 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       const yardReceivedDate = (row[11] || '').toString().trim(); // L열: 마당접수일 (임시)
       const onSaleReceivedDate = (row[12] || '').toString().trim(); // M열: 온세일접수일 (임시)
       const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+      const activationStatusFromSheet = (row[5] || '').toString().trim(); // F열: 개통완료 상태
       
       if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) {
         skippedCount++;
@@ -2273,14 +2274,19 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       let assignedSerial = '';
       let waitingOrder = 0;
       
+      // 사전예약사이트 F열에서 개통완료 상태 확인 (우선순위 1)
+      if (activationStatusFromSheet === '개통완료') {
+        activationStatus = '개통완료';
+      }
+      
       // 이미 배정된 일련번호가 있는 경우
       if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
         assignedSerial = assignedSerialNumber;
         assignmentStatus = '배정완료';
         successfulAssignmentCount++;
         
-        // 개통 상태 확인
-        if (activatedSerialNumbers.has(assignedSerialNumber)) {
+        // 사전예약사이트 F열에 개통완료가 없으면 폰클개통데이터에서 확인 (우선순위 2)
+        if (activationStatus !== '개통완료' && activatedSerialNumbers.has(assignedSerialNumber)) {
           activationStatus = '개통완료';
         }
         
@@ -2295,10 +2301,8 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
           assignedSerialNumbers.add(assignedSerial);
           successfulAssignmentCount++;
           
-
-          
-          // 개통 상태 확인
-          if (activatedSerialNumbers.has(assignedSerial)) {
+          // 사전예약사이트 F열에 개통완료가 없으면 폰클개통데이터에서 확인 (우선순위 2)
+          if (activationStatus !== '개통완료' && activatedSerialNumbers.has(assignedSerial)) {
             activationStatus = '개통완료';
           }
           
@@ -2352,11 +2356,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
             (r[8] || '').toString().trim() === reservationNumber
           );
           
-                      if (currentIndex !== -1) {
-              waitingOrder = currentIndex + 1;
-              assignmentStatus = '미배정';
-              waitingAssignmentCount++;
-            }
+          if (currentIndex !== -1) {
+            waitingOrder = currentIndex + 1;
+            assignmentStatus = '미배정';
+            waitingAssignmentCount++;
+          }
         }
       }
       
@@ -2398,6 +2402,13 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     // 결과 캐싱 (30분 TTL)
     cacheUtils.set(cacheKey, result, 30 * 60);
     console.log('✅ [서버 디버깅] 결과 캐싱 완료');
+    
+    // 디버깅 로그 추가
+    const activatedFromSheetCount = assignmentResults.filter(item => {
+      const row = reservationSiteRows.find(r => (r[8] || '').toString().trim() === item.reservationNumber);
+      return row && (row[5] || '').toString().trim() === '개통완료';
+    }).length;
+    console.log(`📊 [개통완료 매핑] 사전예약사이트 F열에서 개통완료 확인: ${activatedFromSheetCount}건`);
     
     console.log('🎉 [서버 디버깅] API 응답 전송 완료');
     res.json(result);
