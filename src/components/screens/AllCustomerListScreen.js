@@ -249,6 +249,28 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
               return '-';
             }
             
+            // 개통완료 상태가 있으면 우선 표시
+            if (status.activationStatus === '개통완료') {
+              return (
+                <Chip
+                  label="개통완료"
+                  size="small"
+                  color="success"
+                  sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor: '#2196f3',
+                    color: 'white',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    '&:hover': {
+                      backgroundColor: '#1976d2'
+                    }
+                  }}
+                />
+              );
+            }
+            
+            // 개통완료가 아니면 기존 배정 상태 표시
             const isAssigned = status.assignmentStatus === '배정완료';
             const isWaiting = status.assignmentStatus.startsWith('미배정');
             
