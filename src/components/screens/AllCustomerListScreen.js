@@ -470,6 +470,8 @@ function AllCustomerListScreen({ loggedInStore }) {
           return status.assignmentStatus === '배정완료';
         } else if (assignmentFilter === 'unassigned') {
           return status.assignmentStatus.startsWith('미배정');
+        } else if (assignmentFilter === 'activated') {
+          return status.activationStatus === '개통완료';
         }
         return true;
       });
@@ -1529,6 +1531,7 @@ function AllCustomerListScreen({ loggedInStore }) {
                   <MenuItem value="all">전체</MenuItem>
                   <MenuItem value="assigned">배정완료</MenuItem>
                   <MenuItem value="unassigned">미배정</MenuItem>
+                  <MenuItem value="activated">개통완료</MenuItem>
                 </Select>
               </FormControl>
 
