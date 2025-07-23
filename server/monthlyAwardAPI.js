@@ -703,7 +703,7 @@ async function getMonthlyAwardData(req, res) {
       activationRows.forEach(row => {
         if (row.length < 8) return;
         
-        const activation = (row[37] || '').toString().trim(); // AL열: 개통
+        const activation = (row[11] || '').toString().trim(); // L열: 개통
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
         const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
         const planName = (row[21] || '').toString().trim(); // V열: 요금제
@@ -1006,7 +1006,7 @@ async function getMonthlyAwardData(req, res) {
       console.log('G열(6) - 업체명:', firstActivationRow[6]);
       console.log('N열(13) - 모델명:', firstActivationRow[13]);
       console.log('V열(21) - 요금제:', firstActivationRow[21]);
-      console.log('AL열(37) - 개통:', firstActivationRow[37]);
+      console.log('L열(11) - 개통:', firstActivationRow[11]);
       console.log('================================');
     }
     
@@ -1071,9 +1071,9 @@ async function getMonthlyAwardData(req, res) {
     let activationMatchedCount = 0;
     
     activationRows.forEach(row => {
-      if (row.length < 38) return;
+      if (row.length < 12) return;
       
-      const activation = (row[37] || '').toString().trim(); // AL열: 개통
+      const activation = (row[11] || '').toString().trim(); // L열: 개통
       const modelName = (row[13] || '').toString().trim(); // N열: 모델명
       const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
       const planName = (row[21] || '').toString().trim(); // V열: 요금제
@@ -1432,35 +1432,39 @@ async function saveMonthlyAwardSettings(req, res) {
     
     switch (type) {
       case 'matrix_criteria':
-        // Matrix 기준값 저장 (만점 기준 반영)
+        // Matrix 기준값 저장
         console.log('=== Matrix 기준값 저장 디버깅 ===');
         console.log('원본 데이터:', data);
         
-        // 항상 기본값 사용 (프론트엔드 데이터 수집 문제로 인해)
-        console.log('Matrix 기준값을 기본값으로 설정합니다.');
-        data = [
-          { score: 6, indicator: 'upsell', percentage: 92.0 },
-          { score: 5, indicator: 'upsell', percentage: 88.0 },
-          { score: 4, indicator: 'upsell', percentage: 84.0 },
-          { score: 3, indicator: 'upsell', percentage: 80.0 },
-          { score: 2, indicator: 'upsell', percentage: 76.0 },
-          { score: 1, indicator: 'upsell', percentage: 75.0 },
-          { score: 6, indicator: 'change105', percentage: 88.0 },
-          { score: 5, indicator: 'change105', percentage: 84.0 },
-          { score: 4, indicator: 'change105', percentage: 80.0 },
-          { score: 3, indicator: 'change105', percentage: 76.0 },
-          { score: 2, indicator: 'change105', percentage: 72.0 },
-          { score: 1, indicator: 'change105', percentage: 71.0 },
-          { score: 6, indicator: 'strategic', percentage: 90.0 },
-          { score: 5, indicator: 'strategic', percentage: 80.0 },
-          { score: 4, indicator: 'strategic', percentage: 70.0 },
-          { score: 3, indicator: 'strategic', percentage: 60.0 },
-          { score: 2, indicator: 'strategic', percentage: 50.0 },
-          { score: 1, indicator: 'strategic', percentage: 49.0 },
-          { score: 3, indicator: 'internet', percentage: 7.0 },
-          { score: 2, indicator: 'internet', percentage: 6.0 },
-          { score: 1, indicator: 'internet', percentage: 5.0 }
-        ];
+        // 프론트엔드에서 전송된 실제 데이터 사용
+        if (!data || data.length === 0) {
+          console.log('데이터가 없어서 기본값을 사용합니다.');
+          data = [
+            { score: 6, indicator: 'upsell', percentage: 92.0 },
+            { score: 5, indicator: 'upsell', percentage: 88.0 },
+            { score: 4, indicator: 'upsell', percentage: 84.0 },
+            { score: 3, indicator: 'upsell', percentage: 80.0 },
+            { score: 2, indicator: 'upsell', percentage: 76.0 },
+            { score: 1, indicator: 'upsell', percentage: 75.0 },
+            { score: 6, indicator: 'change105', percentage: 88.0 },
+            { score: 5, indicator: 'change105', percentage: 84.0 },
+            { score: 4, indicator: 'change105', percentage: 80.0 },
+            { score: 3, indicator: 'change105', percentage: 76.0 },
+            { score: 2, indicator: 'change105', percentage: 72.0 },
+            { score: 1, indicator: 'change105', percentage: 71.0 },
+            { score: 6, indicator: 'strategic', percentage: 90.0 },
+            { score: 5, indicator: 'strategic', percentage: 80.0 },
+            { score: 4, indicator: 'strategic', percentage: 70.0 },
+            { score: 3, indicator: 'strategic', percentage: 60.0 },
+            { score: 2, indicator: 'strategic', percentage: 50.0 },
+            { score: 1, indicator: 'strategic', percentage: 49.0 },
+            { score: 3, indicator: 'internet', percentage: 7.0 },
+            { score: 2, indicator: 'internet', percentage: 6.0 },
+            { score: 1, indicator: 'internet', percentage: 5.0 }
+          ];
+        } else {
+          console.log('프론트엔드에서 전송된 데이터를 사용합니다.');
+        }
         
         // 각 지표별 최대 점수 설정
         const maxScores = {

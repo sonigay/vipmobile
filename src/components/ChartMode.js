@@ -839,6 +839,9 @@ function MonthlyAwardTab() {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState(0); // 셋팅 다이얼로그에서 현재 탭 상태 관리
   
+  // Matrix 기준값 상태
+  const [matrixValues, setMatrixValues] = useState({});
+  
   // 추가 전략상품 상태
   const [newStrategicProduct, setNewStrategicProduct] = useState({
     subCategory: '',
@@ -1491,7 +1494,12 @@ function MonthlyAwardTab() {
                       fullWidth
                       label={`${score}점 기준 (%)`}
                       type="number"
-                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0}
+                      name={`upsell-${score}`}
+                      value={matrixValues[`upsell-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0)}
+                      onChange={(e) => setMatrixValues(prev => ({
+                        ...prev,
+                        [`upsell-${score}`]: parseFloat(e.target.value) || 0
+                      }))}
                       inputProps={{ min: 0, max: 100, step: 0.1 }}
                       sx={{ mb: 1 }}
                     />
@@ -1508,7 +1516,12 @@ function MonthlyAwardTab() {
                       fullWidth
                       label={`${score}점 기준 (%)`}
                       type="number"
-                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0}
+                      name={`change105-${score}`}
+                      value={matrixValues[`change105-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0)}
+                      onChange={(e) => setMatrixValues(prev => ({
+                        ...prev,
+                        [`change105-${score}`]: parseFloat(e.target.value) || 0
+                      }))}
                       inputProps={{ min: 0, max: 100, step: 0.1 }}
                       sx={{ mb: 1 }}
                     />
@@ -1525,7 +1538,12 @@ function MonthlyAwardTab() {
                       fullWidth
                       label={`${score}점 기준 (%)`}
                       type="number"
-                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0}
+                      name={`strategic-${score}`}
+                      value={matrixValues[`strategic-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0)}
+                      onChange={(e) => setMatrixValues(prev => ({
+                        ...prev,
+                        [`strategic-${score}`]: parseFloat(e.target.value) || 0
+                      }))}
                       inputProps={{ min: 0, max: 100, step: 0.1 }}
                       sx={{ mb: 1 }}
                     />
@@ -1536,13 +1554,18 @@ function MonthlyAwardTab() {
               {/* 인터넷 비중 기준값 */}
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#c2185b' }}>인터넷 비중 기준값</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                {[6, 5, 4, 3, 2, 1].map((score) => (
+                {[3, 2, 1].map((score) => (
                   <Grid item xs={12} md={4} key={`internet-${score}`}>
                     <TextField
                       fullWidth
                       label={`${score}점 기준 (%)`}
                       type="number"
-                      defaultValue={data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0}
+                      name={`internet-${score}`}
+                      value={matrixValues[`internet-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0)}
+                      onChange={(e) => setMatrixValues(prev => ({
+                        ...prev,
+                        [`internet-${score}`]: parseFloat(e.target.value) || 0
+                      }))}
                       inputProps={{ min: 0, max: 100, step: 0.1 }}
                       sx={{ mb: 1 }}
                     />
@@ -1973,18 +1996,30 @@ function MonthlyAwardTab() {
               if (settingsTab === 0) {
                 // Matrix 기준값 저장
                 const matrixCriteria = [];
-                ['upsell', 'change105', 'strategic', 'internet'].forEach(indicator => {
+                ['upsell', 'change105', 'strategic'].forEach(indicator => {
                   [6, 5, 4, 3, 2, 1].forEach(score => {
-                    const input = document.querySelector(`input[type="number"][key*="${indicator}-${score}"]`);
-                    if (input) {
+                    const value = matrixValues[`${indicator}-${score}`];
+                    if (value !== undefined) {
                       matrixCriteria.push({
                         score,
                         indicator,
-                        percentage: parseFloat(input.value || 0)
+                        percentage: value
                       });
                     }
                   });
                 });
+                // 인터넷 비중은 3점까지만
+                [3, 2, 1].forEach(score => {
+                  const value = matrixValues[`internet-${score}`];
+                  if (value !== undefined) {
+                    matrixCriteria.push({
+                      score,
+                      indicator: 'internet',
+                      percentage: value
+                    });
+                  }
+                });
+                console.log('저장할 Matrix 기준값:', matrixCriteria);
                 await api.saveMonthlyAwardSettings('matrix_criteria', matrixCriteria);
               } else if (settingsTab === 1) {
                 // 전략상품 포인트 저장

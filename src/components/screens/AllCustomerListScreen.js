@@ -147,7 +147,18 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       </Box>
       
       {/* 고객명 */}
-      <Box sx={{ width: isMobile ? '80px' : '120px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ 
+        width: isMobile ? '80px' : '120px', 
+        p: isMobile ? 0.5 : 1, 
+        display: 'flex', 
+        alignItems: 'center',
+        ...(isMobile && {
+          writingMode: 'vertical-rl',
+          textOrientation: 'upright',
+          height: '80px',
+          justifyContent: 'center'
+        })
+      }}>
         <Typography variant="body2" sx={{ 
           fontWeight: 600, 
           color: '#2c3e50',
@@ -194,22 +205,46 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       )}
       {/* 모델/용량/색상 */}
       <Box sx={{ width: isMobile ? '100px' : '150px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
-        <Chip
-          label={customer.modelCapacityColor || '-'}
-          color="primary"
-          size="small"
-          sx={{ 
-            fontSize: isMobile ? '0.6rem' : '0.75rem',
-            fontWeight: 500,
-            backgroundColor: '#3f51b5',
-            color: 'white',
-            '&:hover': {
-              backgroundColor: '#303f9f'
-            },
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            height: isMobile ? '20px' : '24px'
-          }}
-        />
+        {isMobile ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+            {(customer.modelCapacityColor || '-').split('/').map((part, index) => (
+              <Typography
+                key={index}
+                variant="body2"
+                sx={{
+                  fontSize: '0.6rem',
+                  fontWeight: 500,
+                  color: '#3f51b5',
+                  backgroundColor: '#e3f2fd',
+                  borderRadius: 1,
+                  px: 0.5,
+                  py: 0.25,
+                  textAlign: 'center',
+                  minWidth: '60px'
+                }}
+              >
+                {part.trim()}
+              </Typography>
+            ))}
+          </Box>
+        ) : (
+          <Chip
+            label={customer.modelCapacityColor || '-'}
+            color="primary"
+            size="small"
+            sx={{ 
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              backgroundColor: '#3f51b5',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: '#303f9f'
+              },
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              height: '24px'
+            }}
+          />
+        )}
       </Box>
       
       {/* 모바일이 아닐 때만 유형 표시 */}
@@ -226,7 +261,7 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       )}
       
       {/* 대리점 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Typography variant="body2" sx={{ 
           fontSize: isMobile ? '0.65rem' : '0.8rem',
           fontWeight: 500,
@@ -235,14 +270,36 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           borderRadius: 1,
           px: isMobile ? 0.5 : 1,
           py: isMobile ? 0.25 : 0.5,
-          display: 'inline-block'
+          display: 'inline-block',
+          textAlign: 'center'
         }}>
-          {customer.storeCode || '-'}
+          {isMobile ? (
+            (() => {
+              const storeCode = customer.storeCode;
+              if (storeCode === '306891') return '경수';
+              if (storeCode === '315835') return '경인';
+              if (storeCode === '314942') return '호남';
+              return storeCode || '-';
+            })()
+          ) : (
+            customer.storeCode || '-'
+          )}
         </Typography>
       </Box>
       
       {/* 담당자 */}
-      <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ 
+        width: isMobile ? '70px' : '100px', 
+        p: isMobile ? 0.5 : 1, 
+        display: 'flex', 
+        alignItems: 'center',
+        ...(isMobile && {
+          writingMode: 'vertical-rl',
+          textOrientation: 'upright',
+          height: '80px',
+          justifyContent: 'center'
+        })
+      }}>
         <Typography variant="body2" sx={{ 
           fontSize: isMobile ? '0.65rem' : '0.8rem',
           fontWeight: 600,
@@ -259,12 +316,44 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
       
       {/* POS명 */}
       <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ 
-          fontSize: isMobile ? '0.65rem' : '0.8rem',
-          lineHeight: isMobile ? 1.2 : 1.4
-        }}>
-          {customer.posName || '-'}
-        </Typography>
+        {isMobile ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+            {(() => {
+              const posName = customer.posName || '-';
+              if (posName === '-') return [posName];
+              
+              const length = posName.length;
+              const partLength = Math.ceil(length / 3);
+              const parts = [];
+              
+              for (let i = 0; i < length; i += partLength) {
+                parts.push(posName.slice(i, i + partLength));
+              }
+              
+              return parts;
+            })().map((part, index) => (
+              <Typography
+                key={index}
+                variant="body2"
+                sx={{
+                  fontSize: '0.6rem',
+                  lineHeight: 1.2,
+                  textAlign: 'center',
+                  minWidth: '50px'
+                }}
+              >
+                {part}
+              </Typography>
+            ))}
+          </Box>
+        ) : (
+          <Typography variant="body2" sx={{ 
+            fontSize: '0.8rem',
+            lineHeight: 1.4
+          }}>
+            {customer.posName || '-'}
+          </Typography>
+        )}
       </Box>
       {/* 재고배정 */}
       <Box sx={{ width: isMobile ? '70px' : '100px', p: isMobile ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -304,24 +393,81 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
             const isAssigned = status.assignmentStatus === '배정완료';
             const isWaiting = status.assignmentStatus.startsWith('미배정');
             
-            return (
-              <Chip
-                label={status.assignmentStatus}
-                size="small"
-                color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
-                sx={{
-                  fontSize: isMobile ? '0.6rem' : '0.75rem',
-                  fontWeight: 600,
-                  backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
-                  color: isAssigned || isWaiting ? 'white' : '#6c757d',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  height: isMobile ? '20px' : '24px',
-                  '&:hover': {
-                    backgroundColor: isAssigned ? '#45a049' : isWaiting ? '#e68900' : '#e9ecef'
-                  }
-                }}
-              />
-            );
+            if (isMobile) {
+              if (isAssigned) {
+                return (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: '0.6rem', fontWeight: 600, color: 'white', backgroundColor: '#4caf50', px: 0.5, py: 0.25, borderRadius: 1 }}>배정</Typography>
+                    <Typography sx={{ fontSize: '0.6rem', fontWeight: 600, color: 'white', backgroundColor: '#4caf50', px: 0.5, py: 0.25, borderRadius: 1 }}>완료</Typography>
+                  </Box>
+                );
+              } else if (isWaiting) {
+                return (
+                  <Box sx={{ 
+                    writingMode: 'vertical-rl', 
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Typography sx={{ 
+                      fontSize: '0.6rem', 
+                      fontWeight: 600, 
+                      color: 'white', 
+                      backgroundColor: '#ff9800', 
+                      px: 0.5, 
+                      py: 0.25, 
+                      borderRadius: 1 
+                    }}>
+                      {status.assignmentStatus}
+                    </Typography>
+                  </Box>
+                );
+              } else {
+                return (
+                  <Box sx={{ 
+                    writingMode: 'vertical-rl', 
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Typography sx={{ 
+                      fontSize: '0.6rem', 
+                      fontWeight: 600, 
+                      color: '#6c757d', 
+                      backgroundColor: '#f5f5f5', 
+                      px: 0.5, 
+                      py: 0.25, 
+                      borderRadius: 1 
+                    }}>
+                      {status.assignmentStatus}
+                    </Typography>
+                  </Box>
+                );
+              }
+            } else {
+              return (
+                <Chip
+                  label={status.assignmentStatus}
+                  size="small"
+                  color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
+                  sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
+                    color: isAssigned || isWaiting ? 'white' : '#6c757d',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    height: '24px',
+                    '&:hover': {
+                      backgroundColor: isAssigned ? '#45a049' : isWaiting ? '#e68900' : '#e9ecef'
+                    }
+                  }}
+                />
+              );
+            }
           })()
         )}
       </Box>
@@ -338,24 +484,58 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
             
             const isActivated = status.activationStatus === '개통완료';
             
-            return (
-              <Chip
-                label={status.activationStatus}
-                size="small"
-                color={isActivated ? 'success' : 'default'}
-                sx={{
-                  fontSize: isMobile ? '0.6rem' : '0.75rem',
-                  fontWeight: 600,
-                  backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
-                  color: isActivated ? 'white' : '#6c757d',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  height: isMobile ? '20px' : '24px',
-                  '&:hover': {
-                    backgroundColor: isActivated ? '#1976d2' : '#e9ecef'
-                  }
-                }}
-              />
-            );
+            if (isMobile) {
+              if (isActivated) {
+                return (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: '0.6rem', fontWeight: 600, color: 'white', backgroundColor: '#2196f3', px: 0.5, py: 0.25, borderRadius: 1 }}>개통</Typography>
+                    <Typography sx={{ fontSize: '0.6rem', fontWeight: 600, color: 'white', backgroundColor: '#2196f3', px: 0.5, py: 0.25, borderRadius: 1 }}>완료</Typography>
+                  </Box>
+                );
+              } else {
+                return (
+                  <Box sx={{ 
+                    writingMode: 'vertical-rl', 
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Typography sx={{ 
+                      fontSize: '0.6rem', 
+                      fontWeight: 600, 
+                      color: '#6c757d', 
+                      backgroundColor: '#f5f5f5', 
+                      px: 0.5, 
+                      py: 0.25, 
+                      borderRadius: 1 
+                    }}>
+                      {status.activationStatus}
+                    </Typography>
+                  </Box>
+                );
+              }
+            } else {
+              return (
+                <Chip
+                  label={status.activationStatus}
+                  size="small"
+                  color={isActivated ? 'success' : 'default'}
+                  sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
+                    color: isActivated ? 'white' : '#6c757d',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    height: '24px',
+                    '&:hover': {
+                      backgroundColor: isActivated ? '#1976d2' : '#e9ecef'
+                    }
+                  }}
+                />
+              );
+            }
           })()
         )}
       </Box>
@@ -530,11 +710,28 @@ function AllCustomerListScreen({ loggedInStore }) {
         windowWidth: windowWidth
       });
       
-      // 담당자 정보가 있으면 필터링 적용
+      // 담당자 정보가 있으면 필터링 적용 (관리자모드와 동일한 로직 사용)
       if (loggedInStore.manager) {
         const beforeFilter = filtered.length;
         filtered = filtered.filter(customer => {
-          return customer.manager === loggedInStore.manager;
+          if (!customer.manager) return false;
+          
+          // 담당자명 앞 3글자 비교 (관리자모드와 동일한 로직)
+          const managerPrefix = customer.manager.toString().substring(0, 3);
+          const loggedInPrefix = loggedInStore.manager.toString().substring(0, 3);
+          
+          const isMatch = managerPrefix === loggedInPrefix;
+          
+          console.log(`📱 [모바일필터] 담당자 매칭 확인:`, {
+            customerName: customer.customerName,
+            customerManager: customer.manager,
+            customerPrefix: managerPrefix,
+            loggedInManager: loggedInStore.manager,
+            loggedInPrefix: loggedInPrefix,
+            isMatch: isMatch
+          });
+          
+          return isMatch;
         });
         
         console.log('📱 [모바일필터] 담당자별 필터링 적용됨:', {
@@ -1841,8 +2038,37 @@ function AllCustomerListScreen({ loggedInStore }) {
                 top: 0,
                 zIndex: 1
               }}>
-                <Box sx={{ width: isMobileRealTime() ? '40px' : '60px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem', textAlign: 'center' }}>순번</Box>
-                <Box sx={{ width: isMobileRealTime() ? '80px' : '120px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>고객명</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '40px' : '60px', 
+                  p: 1.5, 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem', 
+                  textAlign: 'center',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>순번</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '80px' : '120px', 
+                  p: 1.5, 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>고객명</Box>
                 
                 {/* 모바일이 아닐 때만 예약번호, 사이트예약, 마당접수일, 온세일접수일 표시 */}
                 {!isMobileRealTime() && (
@@ -1854,18 +2080,97 @@ function AllCustomerListScreen({ loggedInStore }) {
                   </>
                 )}
                 
-                <Box sx={{ width: isMobileRealTime() ? '100px' : '150px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>모델/용량/색상</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '100px' : '150px', 
+                  p: 1.5, 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>모델/용량/색상</Box>
                 
                 {/* 모바일이 아닐 때만 유형 표시 */}
                 {!isMobileRealTime() && (
                   <Box sx={{ width: '80px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: '0.85rem' }}>유형</Box>
                 )}
                 
-                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>대리점</Box>
-                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>담당자</Box>
-                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>POS명</Box>
-                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>재고배정</Box>
-                <Box sx={{ width: isMobileRealTime() ? '70px' : '100px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>개통완료</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '70px' : '100px', 
+                  p: 1.5, 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  textAlign: 'center'
+                }}>대리점</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '70px' : '100px', 
+                  p: 1.5, 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>담당자</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '70px' : '100px', 
+                  p: 1.5, 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>POS명</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '70px' : '100px', 
+                  p: 1.5, 
+                  textAlign: 'center', 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>재고배정</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '70px' : '100px', 
+                  p: 1.5, 
+                  textAlign: 'center', 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>개통완료</Box>
                 
                 {/* 모바일이 아닐 때만 메모들과 접수자 표시 */}
                 {!isMobileRealTime() && (
@@ -1876,7 +2181,22 @@ function AllCustomerListScreen({ loggedInStore }) {
                   </>
                 )}
                 
-                <Box sx={{ width: isMobileRealTime() ? '50px' : '60px', p: 1.5, textAlign: 'center', fontWeight: 700, color: '#1a237e', fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem' }}>취소체크</Box>
+                <Box sx={{ 
+                  width: isMobileRealTime() ? '50px' : '60px', 
+                  p: 1.5, 
+                  textAlign: 'center', 
+                  fontWeight: 700, 
+                  color: '#1a237e', 
+                  fontSize: isMobileRealTime() ? '0.7rem' : '0.85rem',
+                  ...(isMobileRealTime() && {
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'upright',
+                    height: '80px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  })
+                }}>취소체크</Box>
               </Box>
               {/* 가상화된 테이블 바디 */}
               <List
