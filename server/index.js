@@ -9512,16 +9512,31 @@ app.post('/api/cancel-check/save', async (req, res) => {
       console.log('📝 [취소체크] 헤더 추가 완료');
     }
 
-    // Google Sheets에 데이터 추가
-    const response = await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트취소데이터!A:C',
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      resource: {
-        values: uniqueNewData
-      }
-    });
+    // Google Sheets에 데이터 추가 (헤더가 있으면 append, 없으면 update)
+    let response;
+    if (hasHeader) {
+      // 헤더가 있으면 append 사용
+      response = await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트취소데이터!A:C',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: uniqueNewData
+        }
+      });
+    } else {
+      // 헤더가 없었으면 헤더와 데이터를 함께 update
+      const allData = [['예약번호', '등록일시', '상태'], ...uniqueNewData];
+      response = await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트취소데이터!A:C',
+        valueInputOption: 'RAW',
+        resource: {
+          values: allData
+        }
+      });
+    }
 
     console.log(`📝 [취소체크] 취소 데이터 저장 완료: ${uniqueNewData.length}건`);
 
