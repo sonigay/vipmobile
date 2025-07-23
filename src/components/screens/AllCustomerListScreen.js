@@ -996,6 +996,10 @@ function AllCustomerListScreen({ loggedInStore }) {
     setProcessingCancelCheck(prev => new Set(prev).add(reservationNumber));
     
     try {
+      // 먼저 서버에서 최신 취소체크 데이터를 가져옴
+      await loadCancelCheckData();
+      
+      // 최신 데이터로 현재 상태 확인
       const isCurrentlyChecked = cancelCheckedItems.includes(reservationNumber);
       
       if (isCurrentlyChecked) {
@@ -1020,8 +1024,8 @@ function AllCustomerListScreen({ loggedInStore }) {
         const result = await response.json();
         
         if (result.success) {
-          // 성공 시에만 상태 업데이트
-          setCancelCheckedItems(prev => prev.filter(item => item !== reservationNumber));
+          // 성공 시 서버에서 최신 데이터 다시 로드
+          await loadCancelCheckData();
           setError('');
           console.log(`✅ 취소 체크 해제 완료: ${reservationNumber} (삭제된 건수: ${result.deletedCount})`);
         } else {
@@ -1050,8 +1054,8 @@ function AllCustomerListScreen({ loggedInStore }) {
         const result = await response.json();
         
         if (result.success) {
-          // 성공 시에만 상태 업데이트
-          setCancelCheckedItems(prev => [...prev, reservationNumber]);
+          // 성공 시 서버에서 최신 데이터 다시 로드
+          await loadCancelCheckData();
           setError('');
           console.log(`✅ 취소 체크 저장 완료: ${reservationNumber}`);
         } else {

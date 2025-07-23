@@ -9447,10 +9447,24 @@ app.post('/api/cancel-check/save', async (req, res) => {
 
     // 기존 취소 데이터 로드
     let existingData = [];
+    let hasHeader = false;
     try {
       const currentData = await getSheetValues('사전예약사이트취소데이터');
-      if (currentData && currentData.length > 1) {
-        existingData = currentData.slice(1); // 헤더 제외
+      if (currentData && currentData.length > 0) {
+        // 헤더 확인 (예약번호, 등록일시, 상태)
+        const firstRow = currentData[0];
+        if (firstRow && firstRow.length >= 3 && 
+            firstRow[0] === '예약번호' && 
+            firstRow[1] === '등록일시' && 
+            firstRow[2] === '상태') {
+          hasHeader = true;
+          if (currentData.length > 1) {
+            existingData = currentData.slice(1); // 헤더 제외
+          }
+        } else {
+          // 헤더가 없으면 모든 데이터를 기존 데이터로 처리
+          existingData = currentData;
+        }
       }
     } catch (error) {
       console.log('기존 취소 데이터가 없습니다. 새로 생성합니다.');
@@ -9473,6 +9487,29 @@ app.post('/api/cancel-check/save', async (req, res) => {
         message: '이미 체크된 예약번호들입니다.',
         savedCount: 0
       });
+    }
+
+    // 헤더가 없으면 먼저 헤더 추가
+    if (!hasHeader) {
+      console.log('📝 [취소체크] 헤더가 없습니다. 헤더를 추가합니다.');
+      const headerRow = [['예약번호', '등록일시', '상태']];
+      
+      // 시트를 완전히 비우고 헤더 추가
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트취소데이터'
+      });
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '사전예약사이트취소데이터!A1:C1',
+        valueInputOption: 'RAW',
+        resource: {
+          values: headerRow
+        }
+      });
+      
+      console.log('📝 [취소체크] 헤더 추가 완료');
     }
 
     // Google Sheets에 데이터 추가
@@ -9584,7 +9621,7 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
     // 현재 취소 데이터 로드
     const currentData = await getSheetValues('사전예약사이트취소데이터');
     
-    if (!currentData || currentData.length < 2) {
+    if (!currentData || currentData.length === 0) {
       console.log('🗑️ [취소체크] 삭제할 데이터가 없습니다 (시트가 비어있음)');
       return res.json({
         success: true,
@@ -9595,9 +9632,22 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
 
     console.log(`🗑️ [취소체크] 현재 시트 데이터: ${currentData.length}행`);
 
-    // 헤더와 삭제할 예약번호가 아닌 데이터만 필터링
-    const header = currentData[0];
-    const dataRows = currentData.slice(1);
+    // 헤더 확인 및 처리
+    let header, dataRows;
+    const firstRow = currentData[0];
+    
+    if (firstRow && firstRow.length >= 3 && 
+        firstRow[0] === '예약번호' && 
+        firstRow[1] === '등록일시' && 
+        firstRow[2] === '상태') {
+      // 헤더가 있음
+      header = firstRow;
+      dataRows = currentData.slice(1);
+    } else {
+      // 헤더가 없음 - 헤더 추가
+      header = ['예약번호', '등록일시', '상태'];
+      dataRows = currentData;
+    }
     
     console.log(`🗑️ [취소체크] 기존 데이터 행: ${dataRows.length}개`);
     console.log(`🗑️ [취소체크] 기존 예약번호들: ${dataRows.map(row => row[0]).join(', ')}`);
