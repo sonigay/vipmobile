@@ -2270,25 +2270,15 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       
       // 배정 상태 계산
       let assignmentStatus = '미배정';
-      let activationStatus = '미개통';
+      let activationStatus = activationStatusFromSheet || '미개통'; // 사전예약사이트 F열 값을 그대로 사용
       let assignedSerial = '';
       let waitingOrder = 0;
-      
-      // 사전예약사이트 F열에서 개통완료 상태 확인 (우선순위 1)
-      if (activationStatusFromSheet === '개통완료') {
-        activationStatus = '개통완료';
-      }
       
       // 이미 배정된 일련번호가 있는 경우
       if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
         assignedSerial = assignedSerialNumber;
         assignmentStatus = '배정완료';
         successfulAssignmentCount++;
-        
-        // 사전예약사이트 F열에 개통완료가 없으면 폰클개통데이터에서 확인 (우선순위 2)
-        if (activationStatus !== '개통완료' && activatedSerialNumbers.has(assignedSerialNumber)) {
-          activationStatus = '개통완료';
-        }
         
       } else {
         // 새로운 배정이 필요한 경우
@@ -2300,11 +2290,6 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
           assignmentStatus = '배정완료';
           assignedSerialNumbers.add(assignedSerial);
           successfulAssignmentCount++;
-          
-          // 사전예약사이트 F열에 개통완료가 없으면 폰클개통데이터에서 확인 (우선순위 2)
-          if (activationStatus !== '개통완료' && activatedSerialNumbers.has(assignedSerial)) {
-            activationStatus = '개통완료';
-          }
           
         } else {
           // 배정 대기 중 - 순번 계산
@@ -2404,11 +2389,8 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     console.log('✅ [서버 디버깅] 결과 캐싱 완료');
     
     // 디버깅 로그 추가
-    const activatedFromSheetCount = assignmentResults.filter(item => {
-      const row = reservationSiteRows.find(r => (r[8] || '').toString().trim() === item.reservationNumber);
-      return row && (row[5] || '').toString().trim() === '개통완료';
-    }).length;
-    console.log(`📊 [개통완료 매핑] 사전예약사이트 F열에서 개통완료 확인: ${activatedFromSheetCount}건`);
+    const activatedFromSheetCount = assignmentResults.filter(item => item.activationStatus === '개통완료').length;
+    console.log(`📊 [개통완료 표시] 사전예약사이트 F열 값 그대로 표시: ${activatedFromSheetCount}건`);
     
     console.log('🎉 [서버 디버깅] API 응답 전송 완료');
     res.json(result);
