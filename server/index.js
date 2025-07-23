@@ -511,9 +511,6 @@ async function fetchSheetValuesDirectly(sheetName) {
     
     const data = response.data.values || [];
     
-    // 캐시에 저장 (5분 TTL)
-    cacheUtils.set(cacheKey, data);
-    
     return data;
   } catch (error) {
     console.error(`Error fetching sheet ${sheetName}:`, error);
@@ -540,7 +537,6 @@ async function fetchSheetValuesDirectly(sheetName) {
         });
         
         const data = retryResponse.data.values || [];
-        cacheUtils.set(cacheKey, data);
         return data;
       } else {
         console.error(`❌ [시트조회] 시트 '${sheetName}'을 찾을 수 없습니다.`);
