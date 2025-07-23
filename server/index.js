@@ -2532,16 +2532,11 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
       if (assignmentMap.has(reservationNumber)) {
         const newSerial = assignmentMap.get(reservationNumber);
         
-        // 개통완료된 고객은 기존 일련번호도 제거 (다른 고객에게 배정 가능하도록)
+        // 개통완료된 고객은 새로운 배정에서만 제외 (기존 일련번호는 유지)
         if (activationStatus === '개통완료') {
-          if (existingSerial && existingSerial.trim() !== '') {
-            console.log(` [배정저장 디버깅] 개통완료 고객 기존 일련번호 제거: ${reservationNumber} (${existingSerial})`);
-            row[6] = ''; // G열 일련번호 제거
-            updatedCount++;
-          }
           console.log(`⚠️ [배정저장 디버깅] 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
           skippedCount++;
-          continue;
+          continue; // 새로운 배정만 건너뜀, 기존 일련번호는 그대로 유지
         }
         
         // 기존 배정된 일련번호가 있으면 유지
@@ -3535,20 +3530,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
         const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
         const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
         
-        // 개통완료된 고객은 기존 일련번호도 제거 (다른 고객에게 배정 가능하도록)
+        // 개통완료된 고객은 새로운 배정에서만 제외 (기존 일련번호는 유지)
         if (activationStatus === '개통완료') {
-          if (currentSerialNumber && currentSerialNumber.trim() !== '') {
-            if (index < 5) {
-              console.log(` [서버시작] 행 ${index + 2}: 개통완료 고객 기존 일련번호 제거: ${reservationNumber} (${currentSerialNumber})`);
-            }
-            row[6] = ''; // G열 일련번호 제거
-            updatedCount++;
-          }
           if (index < 5) {
             console.log(`⚠️ [서버시작] 행 ${index + 2}: 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
           }
           skippedCount++;
-          return;
+          return; // 새로운 배정만 건너뜀, 기존 일련번호는 그대로 유지
         }
         
         if (reservationNumber && customerName && model && color && capacity && posCode) {
