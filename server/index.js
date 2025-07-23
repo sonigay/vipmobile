@@ -475,6 +475,31 @@ async function getSheetValues(sheetName) {
     return cachedData;
   }
   
+  return await fetchSheetValuesDirectly(sheetName);
+}
+
+// 캐시를 무시하고 직접 시트에서 데이터를 가져오는 함수
+async function getSheetValuesWithoutCache(sheetName) {
+  try {
+    // 시트 이름을 안전하게 처리
+    const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: safeSheetName
+    });
+    
+    const data = response.data.values || [];
+    return data;
+  } catch (error) {
+    console.error(`Error fetching sheet ${sheetName} without cache:`, error);
+    throw error;
+  }
+}
+
+// 시트에서 직접 데이터를 가져오는 공통 함수
+async function fetchSheetValuesDirectly(sheetName) {
+  
   try {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
@@ -9445,11 +9470,12 @@ app.post('/api/cancel-check/save', async (req, res) => {
       });
     }
 
-    // 기존 취소 데이터 로드
+    // 기존 취소 데이터 로드 (캐시 무시)
     let existingData = [];
     let hasHeader = false;
     try {
-      const currentData = await getSheetValues('사전예약사이트취소데이터');
+      const currentData = await getSheetValuesWithoutCache('사전예약사이트취소데이터');
+      console.log(`📝 [취소체크] 시트에서 직접 로드한 데이터: ${currentData ? currentData.length : 0}행`);
       if (currentData && currentData.length > 0) {
         // 헤더 확인 (예약번호, 등록일시, 상태)
         const firstRow = currentData[0];
@@ -9569,7 +9595,8 @@ app.get('/api/cancel-check/list', async (req, res) => {
   try {
     console.log('📋 [취소체크] 취소 체크 데이터 조회 요청');
     
-    const cancelData = await getSheetValues('사전예약사이트취소데이터');
+    const cancelData = await getSheetValuesWithoutCache('사전예약사이트취소데이터');
+    console.log(`📋 [취소체크] 시트에서 직접 로드한 데이터: ${cancelData ? cancelData.length : 0}행`);
     
     if (!cancelData || cancelData.length <= 1) {
       return res.json({
@@ -9651,8 +9678,9 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
 
     console.log(`🗑️ [취소체크] 삭제 대상 예약번호: ${reservationNumbers.join(', ')}`);
 
-    // 현재 취소 데이터 로드
-    const currentData = await getSheetValues('사전예약사이트취소데이터');
+    // 현재 취소 데이터 로드 (캐시 무시)
+    const currentData = await getSheetValuesWithoutCache('사전예약사이트취소데이터');
+    console.log(`🗑️ [취소체크] 시트에서 직접 로드한 데이터: ${currentData ? currentData.length : 0}행`);
     
     if (!currentData || currentData.length === 0) {
       console.log('🗑️ [취소체크] 삭제할 데이터가 없습니다 (시트가 비어있음)');
