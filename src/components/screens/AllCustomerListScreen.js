@@ -464,7 +464,9 @@ function AllCustomerListScreen({ loggedInStore }) {
     if (assignmentFilter !== 'all') {
       filtered = filtered.filter(customer => {
         const status = assignmentStatus[customer.reservationNumber];
-        if (!status) return false;
+        
+        // 상태 정보가 없으면 필터링에서 제외 (전체에 포함)
+        if (!status) return assignmentFilter === 'all';
         
         if (assignmentFilter === 'assigned') {
           return status.assignmentStatus === '배정완료';
