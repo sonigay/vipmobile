@@ -3027,40 +3027,49 @@ app.get('/api/inventory/activation-status', async (req, res) => {
       return res.json(cachedData);
     }
     
-    // 폰클개통데이터에서 개통 완료된 일련번호 수집
+    // 고객명 정규화 함수
+    const cleanCustomerName = (name) => {
+      return name.replace(/\([^)]*\)/g, '').trim(); // 괄호 제거
+    };
+    
+    // 폰클개통데이터에서 개통 완료된 고객 수집 (고객명 + 개통번호 끝 4자리)
     const phoneklActivationValues = await getSheetValues('폰클개통데이터');
     
     if (!phoneklActivationValues || phoneklActivationValues.length < 2) {
       throw new Error('폰클개통데이터를 가져올 수 없습니다.');
     }
     
-    const activatedSerialNumbers = new Set();
+    const activatedCustomers = new Set();
     let activationCount = 0;
     
     phoneklActivationValues.slice(1).forEach((row, index) => {
-      if (row.length >= 16) {
-        const serialNumber = (row[15] || '').toString().trim(); // P열: 일련번호
-        const storeName = (row[6] || '').toString().trim(); // G열: 출고처
+      if (row.length >= 10) {
+        const customerName = cleanCustomerName((row[8] || '').toString().trim()); // I열: 고객명
+        const activationNumber = (row[9] || '').toString().trim(); // J열: 개통번호
         
-        // 테스트용 디버깅: 일련번호 1005552 확인
-        if (serialNumber === '1005552') {
-          console.log(`🎯 [개통상태 디버깅] 테스트 일련번호 발견! 행 ${index + 2}:`, {
-            serialNumber,
-            storeName,
-            rowLength: row.length
-          });
-        }
-        
-        if (serialNumber && storeName) {
-          activatedSerialNumbers.add(serialNumber);
+        if (customerName && activationNumber && activationNumber.length >= 4) {
+          const lastFourDigits = activationNumber.slice(-4); // 끝 4자리
+          const activationKey = `${customerName}_${lastFourDigits}`;
+          
+          activatedCustomers.add(activationKey);
           activationCount++;
+          
+          // 디버깅: 처음 5개만 로그
+          if (index < 5) {
+            console.log(`📱 [개통상태 디버깅] 개통 고객 발견! 행 ${index + 2}:`, {
+              customerName,
+              activationNumber,
+              lastFourDigits,
+              activationKey
+            });
+          }
         }
       }
     });
     
-    console.log(`📱 [개통상태 디버깅] 개통 데이터 처리 완료: ${activationCount}개 개통된 일련번호`);
+    console.log(`📱 [개통상태 디버깅] 개통 데이터 처리 완료: ${activationCount}개 개통된 고객`);
     
-    // 사전예약사이트에서 배정된 일련번호와 매칭
+    // 사전예약사이트에서 고객명 + 전화번호 끝 4자리로 매칭
     const reservationSiteValues = await getSheetValues('사전예약사이트');
     
     if (!reservationSiteValues || reservationSiteValues.length < 2) {
@@ -3071,29 +3080,33 @@ app.get('/api/inventory/activation-status', async (req, res) => {
     let matchedCount = 0;
     
     reservationSiteValues.slice(1).forEach((row, index) => {
-      if (row.length < 22) return;
+      if (row.length < 10) return;
       
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
-      const customerName = (row[7] || '').toString().trim(); // H열: 고객명
-      const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+      const customerName = cleanCustomerName((row[7] || '').toString().trim()); // H열: 고객명
+      const phoneNumber = (row[9] || '').toString().trim(); // J열: 고객전화번호
       
-      // 테스트용 디버깅: 일련번호 1005552가 배정된 고객 확인
-      if (assignedSerialNumber === '1005552') {
-        console.log(`🎯 [개통상태 디버깅] 테스트 일련번호 배정 고객 발견! 행 ${index + 2}:`, {
-          reservationNumber,
-          customerName,
-          assignedSerialNumber,
-          isActivated: activatedSerialNumbers.has(assignedSerialNumber)
-        });
-      }
-      
-      if (reservationNumber && customerName && assignedSerialNumber) {
-        const isActivated = activatedSerialNumbers.has(assignedSerialNumber);
+      if (reservationNumber && customerName && phoneNumber && phoneNumber.length >= 4) {
+        const lastFourDigits = phoneNumber.slice(-4); // 끝 4자리
+        const reservationKey = `${customerName}_${lastFourDigits}`;
+        const isActivated = activatedCustomers.has(reservationKey);
+        
+        // 디버깅: 처음 5개만 로그
+        if (index < 5) {
+          console.log(`📱 [개통상태 디버깅] 사전예약 고객 확인! 행 ${index + 2}:`, {
+            reservationNumber,
+            customerName,
+            phoneNumber,
+            lastFourDigits,
+            reservationKey,
+            isActivated
+          });
+        }
         
         activationResults.push({
           reservationNumber,
           customerName,
-          assignedSerialNumber,
+          phoneNumber: lastFourDigits, // 끝 4자리만 저장
           activationStatus: isActivated ? '개통완료' : '미개통'
         });
         
@@ -3104,6 +3117,67 @@ app.get('/api/inventory/activation-status', async (req, res) => {
     });
     
     console.log(`📈 [개통상태 디버깅] 개통 상태 매칭 완료: ${matchedCount}개 개통완료, ${activationResults.length - matchedCount}개 미개통`);
+    
+    // 사전예약사이트 시트에 개통 상태 저장 (F열)
+    try {
+      console.log('💾 [개통상태 디버깅] 사전예약사이트 시트에 개통 상태 저장 시작');
+      
+      // 예약번호를 키로 하는 개통 상태 맵 생성
+      const activationStatusMap = new Map();
+      activationResults.forEach(item => {
+        activationStatusMap.set(item.reservationNumber, item.activationStatus);
+      });
+      
+      // 사전예약사이트 데이터 업데이트
+      let updatedCount = 0;
+      const updatedRows = reservationSiteValues.map((row, index) => {
+        if (index === 0) return row; // 헤더는 그대로 유지
+        
+        if (row.length < 10) return row;
+        
+        const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+        const activationStatus = activationStatusMap.get(reservationNumber);
+        
+        if (activationStatus) {
+          // F열(5번째)에 개통 상태 저장
+          const newRow = [...row];
+          newRow[5] = activationStatus; // F열: 개통완료 또는 미개통
+          updatedCount++;
+          return newRow;
+        }
+        
+        return row;
+      });
+      
+      // Google Sheets에 업데이트된 데이터 저장
+      if (updatedCount > 0) {
+        const sheets = google.sheets({ version: 'v4', auth });
+        const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+        
+        if (!spreadsheetId) {
+          throw new Error('GOOGLE_SHEET_ID 또는 SHEET_ID 환경변수가 설정되지 않았습니다.');
+        }
+        
+        // F열만 업데이트 (개통상태)
+        const range = '사전예약사이트!F2:F' + (updatedRows.length);
+        const values = updatedRows.slice(1).map(row => [row[5] || '']); // F열 데이터만 추출
+        
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'RAW',
+          resource: { values }
+        });
+        
+        console.log(`💾 [개통상태 디버깅] 사전예약사이트 시트 업데이트 완료: ${updatedCount}개 고객의 개통 상태 저장`);
+      } else {
+        console.log('💾 [개통상태 디버깅] 업데이트할 개통 상태가 없습니다.');
+      }
+      
+    } catch (error) {
+      console.error('❌ [개통상태 디버깅] 사전예약사이트 시트 업데이트 실패:', error.message);
+      // 시트 업데이트 실패해도 API 응답은 정상 반환
+    }
     
     const result = {
       success: true,
