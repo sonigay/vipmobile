@@ -496,8 +496,28 @@ function AllCustomerListScreen({ loggedInStore }) {
 
     // 모바일에서 담당자별 필터링 (본인 담당 고객만 표시)
     if (isMobile() && loggedInStore && loggedInStore.manager) {
+      console.log('📱 [모바일필터] 담당자별 필터링 적용:', {
+        loggedInManager: loggedInStore.manager,
+        totalCustomers: filtered.length,
+        isMobile: isMobile()
+      });
+      
+      const beforeFilter = filtered.length;
       filtered = filtered.filter(customer => {
         return customer.manager === loggedInStore.manager;
+      });
+      
+      console.log('📱 [모바일필터] 필터링 결과:', {
+        beforeFilter,
+        afterFilter: filtered.length,
+        filteredCustomers: filtered.map(c => ({ name: c.customerName, manager: c.manager }))
+      });
+    } else {
+      console.log('📱 [모바일필터] 필터링 조건 미충족:', {
+        isMobile: isMobile(),
+        hasLoggedInStore: !!loggedInStore,
+        hasManager: !!(loggedInStore && loggedInStore.manager),
+        loggedInManager: loggedInStore?.manager
       });
     }
 
