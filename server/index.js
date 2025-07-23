@@ -9425,6 +9425,17 @@ app.post('/api/cancel-check/save', async (req, res) => {
   try {
     console.log('📝 [취소체크] 취소 체크 데이터 저장 요청:', req.body);
     
+    // Google Sheets API 인증 및 sheets 객체 생성
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
     const { reservationNumbers } = req.body;
     
     if (!Array.isArray(reservationNumbers)) {
@@ -9537,6 +9548,17 @@ app.delete('/api/cancel-check/delete', async (req, res) => {
     console.log('🗑️ [취소체크] 취소 체크 데이터 삭제 요청 시작');
     console.log('🗑️ [취소체크] 요청 body:', req.body);
     console.log('🗑️ [취소체크] 요청 headers:', req.headers);
+    
+    // Google Sheets API 인증 및 sheets 객체 생성
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    
+    const sheets = google.sheets({ version: 'v4', auth });
     
     const { reservationNumbers } = req.body || {};
     
