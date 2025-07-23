@@ -894,60 +894,7 @@ async function getMonthlyAwardData(req, res) {
           }
         }
         
-        // 전략상품 계산 (모든 행에 대해 계산)
-        agent.strategicProducts.denominator++;
-        
-        // 전략상품 디버깅 로그 (첫 번째 담당자만)
-        if (manager === Array.from(agentMap.keys())[0] && manualRows.indexOf(row) < 5) {
-          console.log(`=== ${manager} 전략상품 계산 디버깅 (${manualRows.indexOf(row) + 1}번째 행) ===`);
-          console.log('기본조건 확인:', {
-            subscriptionNumber: (row[0] || '').toString().trim(),
-            finalPolicy: (row[39] || '').toString().trim(),
-            modelType: (row[67] || '').toString().trim()
-          });
-        }
-        
-        const insurance = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
-        const uflix = (row[118] || '').toString().trim(); // DO열: 유플릭스
-        const callTone = (row[122] || '').toString().trim(); // DS열: 통화연결음
-        const music = (row[110] || '').toString().trim(); // DG열: 뮤직류
-        
-        // 첫 번째 담당자의 첫 번째 행에서만 전체 컬럼 정보 출력
-        if (manager === Array.from(agentMap.keys())[0] && manualRows.indexOf(row) === 0) {
-          console.log('=== 전략상품 컬럼 디버깅 ===');
-          console.log('전체 행 길이:', row.length);
-          console.log('DL열(115):', row[115], '타입:', typeof row[115]);
-          console.log('DO열(118):', row[118], '타입:', typeof row[118]);
-          console.log('DS열(122):', row[122], '타입:', typeof row[122]);
-          console.log('DG열(110):', row[110], '타입:', typeof row[110]);
-          console.log('========================');
-        }
-        
-        let totalPoints = 0;
-        [insurance, uflix, callTone, music].forEach(service => {
-          if (service) {
-            // 첫 번째 담당자만 로그 출력 (너무 많은 로그 방지)
-            if (manager === Array.from(agentMap.keys())[0]) {
-              console.log(`${manager} 전략상품 확인: "${service}"`);
-            }
-            // 부가서비스명으로만 매칭 (소분류 매칭 제거)
-            const product = finalStrategicProducts.find(p => p.serviceName === service);
-            
-            if (product) {
-              totalPoints += product.points;
-              if (manager === Array.from(agentMap.keys())[0]) {
-                console.log(`${manager} 전략상품 매칭: ${service} -> ${product.points}점`);
-              }
-            } else {
-              unmatchedStrategicProducts.add(service);
-              if (manager === Array.from(agentMap.keys())[0]) {
-                console.log(`${manager} 전략상품 매칭 실패: "${service}"`);
-              }
-            }
-          }
-        });
-        
-        agent.strategicProducts.numerator += totalPoints;
+        // 전략상품 계산은 별도 함수에서 처리 (중복 제거)
       } else {
         unmatchedStores.add(posCode);
       }
@@ -1139,6 +1086,14 @@ async function getMonthlyAwardData(req, res) {
       unmatchedCompanies: Array.from(unmatchedCompanies).slice(0, 10) // 처음 10개만 표시
     });
 
+    // 담당자별 전략상품 계산 (별도 함수 사용)
+    console.log('=== 전략상품 계산 시작 ===');
+    agentMap.forEach(agent => {
+      const strategicResult = calculateStrategicProducts(agent.name);
+      agent.strategicProducts.numerator = strategicResult.numerator;
+      agent.strategicProducts.denominator = strategicResult.denominator;
+    });
+    
     // 담당자별 percentage 계산
     agentMap.forEach(agent => {
       // 업셀기변 percentage 계산
