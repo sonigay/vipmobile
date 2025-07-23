@@ -1409,7 +1409,8 @@ async function getMonthlyAwardData(req, res) {
 // 월간시상 셋팅 저장 API
 async function saveMonthlyAwardSettings(req, res) {
   try {
-    const { type, data } = req.body;
+    const { type } = req.body;
+    let { data } = req.body;
     
     if (!type) {
       return res.status(400).json({
@@ -1644,6 +1645,15 @@ async function saveMonthlyAwardSettings(req, res) {
     }
     
     console.log(`저장 위치: ${targetRange}`);
+    
+    // Google Sheets API가 설정되지 않은 경우 처리
+    if (!sheets || !SPREADSHEET_ID) {
+      console.warn('Google Sheets API가 설정되지 않아 저장을 건너뜁니다.');
+      return res.json({
+        success: true,
+        message: 'Google Sheets API가 설정되지 않아 로컬에서만 처리되었습니다.'
+      });
+    }
     
     // 기존 데이터를 지우고 새로운 데이터로 교체
     await sheets.spreadsheets.values.update({
