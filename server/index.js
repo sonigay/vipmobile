@@ -118,12 +118,32 @@ setInterval(() => {
   cacheUtils.cleanup();
 }, 5 * 60 * 1000);
 
-// 주기적 배정 저장 (10분마다)
+// 주기적 배정 저장 (10분마다) - 개통완료 확인 후 배정 저장
 setInterval(async () => {
   try {
     console.log('🔄 [자동배정저장] 주기적 배정 저장 시작');
     
-    // 폰클재고데이터 기준으로 현재 배정 상태 가져오기
+    // 1. 먼저 개통완료 상태 확인 및 F열 업데이트
+    console.log('📋 [자동배정저장] 1단계: 개통완료 상태 확인 시작');
+    const activationResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
+    
+    if (activationResponse.ok) {
+      const activationResult = await activationResponse.json();
+      if (activationResult.success) {
+        console.log(`✅ [자동배정저장] 개통완료 상태 확인 완료: ${activationResult.data?.length || 0}개 고객 처리`);
+      } else {
+        console.error('❌ [자동배정저장] 개통완료 상태 확인 실패:', activationResult.error);
+      }
+    } else {
+      console.error('❌ [자동배정저장] 개통완료 상태 확인 API 호출 실패:', activationResponse.status);
+    }
+    
+    // 2. 개통완료 데이터 저장 완료를 위한 대기 (2초)
+    console.log('⏳ [자동배정저장] 2단계: 개통완료 데이터 저장 완료 대기 (2초)');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 3. 폰클재고데이터 기준으로 현재 배정 상태 가져오기
+    console.log('📊 [자동배정저장] 3단계: 배정 상태 확인 시작');
     const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/assignment-status`);
     
     if (response.ok) {
@@ -139,7 +159,8 @@ setInterval(async () => {
           }));
         
         if (assignments.length > 0) {
-          // 배정 저장 API 호출
+          // 배정 저장 API 호출 (개통완료 고객 제외 로직 포함)
+          console.log('💾 [자동배정저장] 4단계: 배정 저장 시작');
           const saveResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/save-assignment`, {
             method: 'POST',
             headers: {
@@ -2504,6 +2525,7 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
       
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+      const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
       
       if (assignmentMap.has(reservationNumber)) {
         const newSerial = assignmentMap.get(reservationNumber);
@@ -2511,6 +2533,13 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
         // 기존 배정된 일련번호가 있으면 유지
         if (existingSerial && existingSerial.trim() !== '') {
           console.log(`⚠️ [배정저장 디버깅] 기존 배정 유지: ${reservationNumber} (${existingSerial})`);
+          skippedCount++;
+          continue;
+        }
+        
+        // 개통완료된 고객은 배정 건너뜀
+        if (activationStatus === '개통완료') {
+          console.log(`⚠️ [배정저장 디버깅] 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
           skippedCount++;
           continue;
         }
