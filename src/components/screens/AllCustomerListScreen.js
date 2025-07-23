@@ -95,6 +95,9 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
 
   if (!customer) return null;
 
+  // 모바일 환경 감지
+  const isMobile = window.innerWidth <= 768;
+
   // 배경색 결정
   let rowBg = undefined;
   const status = assignmentStatus[customer.reservationNumber];
@@ -125,9 +128,10 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
         }
       }}
     >
-      <Box sx={{ width: '60px', p: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* 순번 */}
+      <Box sx={{ width: isMobile ? '40px' : '60px', p: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Typography variant="body2" sx={{ 
-          fontSize: '0.85rem', 
+          fontSize: isMobile ? '0.75rem' : '0.85rem', 
           fontWeight: 600, 
           color: '#1976d2',
           backgroundColor: '#e3f2fd',
@@ -141,51 +145,60 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           {index + 1}
         </Typography>
       </Box>
-      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+      
+      {/* 고객명 */}
+      <Box sx={{ width: isMobile ? '80px' : '120px', p: 1, display: 'flex', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ 
           fontWeight: 600, 
           color: '#2c3e50',
-          fontSize: '0.85rem'
+          fontSize: isMobile ? '0.75rem' : '0.85rem'
         }}>
           {customer.customerName}
         </Typography>
       </Box>
-      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ 
-          fontSize: '0.8rem',
-          fontFamily: 'monospace',
-          color: '#6c757d',
-          backgroundColor: '#f8f9fa',
-          borderRadius: 1,
-          px: 1,
-          py: 0.5,
-          display: 'inline-block'
-        }}>
-          {customer.reservationNumber}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-          {customer.reservationDateTime}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-          {customer.yardReceivedDate || '-'}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-          {customer.onSaleReceivedDate || '-'}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '150px', p: 1, display: 'flex', alignItems: 'center' }}>
+      
+      {/* 모바일이 아닐 때만 예약번호, 사이트예약, 마당접수일, 온세일접수일 표시 */}
+      {!isMobile && (
+        <>
+          <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ 
+              fontSize: '0.8rem',
+              fontFamily: 'monospace',
+              color: '#6c757d',
+              backgroundColor: '#f8f9fa',
+              borderRadius: 1,
+              px: 1,
+              py: 0.5,
+              display: 'inline-block'
+            }}>
+              {customer.reservationNumber}
+            </Typography>
+          </Box>
+          <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {customer.reservationDateTime}
+            </Typography>
+          </Box>
+          <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {customer.yardReceivedDate || '-'}
+            </Typography>
+          </Box>
+          <Box sx={{ width: '120px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {customer.onSaleReceivedDate || '-'}
+            </Typography>
+          </Box>
+        </>
+      )}
+      {/* 모델/용량/색상 */}
+      <Box sx={{ width: isMobile ? '100px' : '150px', p: 1, display: 'flex', alignItems: 'center' }}>
         <Chip
           label={customer.modelCapacityColor || '-'}
           color="primary"
           size="small"
           sx={{ 
-            fontSize: '0.75rem',
+            fontSize: isMobile ? '0.65rem' : '0.75rem',
             fontWeight: 500,
             backgroundColor: '#3f51b5',
             color: 'white',
@@ -196,18 +209,24 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           }}
         />
       </Box>
-      <Box sx={{ width: '80px', p: 1, display: 'flex', alignItems: 'center' }}>
+      
+      {/* 모바일이 아닐 때만 유형 표시 */}
+      {!isMobile && (
+        <Box sx={{ width: '80px', p: 1, display: 'flex', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ 
+            fontSize: '0.8rem',
+            color: '#6c757d',
+            fontStyle: 'italic'
+          }}>
+            {customer.type || '-'}
+          </Typography>
+        </Box>
+      )}
+      
+      {/* 대리점 */}
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ 
-          fontSize: '0.8rem',
-          color: '#6c757d',
-          fontStyle: 'italic'
-        }}>
-          {customer.type || '-'}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ 
-          fontSize: '0.8rem',
+          fontSize: isMobile ? '0.7rem' : '0.8rem',
           fontWeight: 500,
           color: '#495057',
           backgroundColor: '#e9ecef',
@@ -219,9 +238,11 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           {customer.storeCode || '-'}
         </Typography>
       </Box>
-      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+      
+      {/* 담당자 */}
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ 
-          fontSize: '0.8rem',
+          fontSize: isMobile ? '0.7rem' : '0.8rem',
           fontWeight: 600,
           color: '#28a745',
           backgroundColor: '#d4edda',
@@ -233,12 +254,15 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           {customer.manager || '-'}
         </Typography>
       </Box>
-      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+      
+      {/* POS명 */}
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center' }}>
+        <Typography variant="body2" sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
           {customer.posName || '-'}
         </Typography>
       </Box>
-      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* 재고배정 */}
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {loadingAssignment ? (
           <CircularProgress size={16} />
         ) : (
@@ -257,7 +281,7 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
                   size="small"
                   color="success"
                   sx={{
-                    fontSize: '0.75rem',
+                    fontSize: isMobile ? '0.65rem' : '0.75rem',
                     fontWeight: 600,
                     backgroundColor: '#2196f3',
                     color: 'white',
@@ -280,7 +304,7 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
                 size="small"
                 color={isAssigned ? 'success' : isWaiting ? 'warning' : 'default'}
                 sx={{
-                  fontSize: '0.75rem',
+                  fontSize: isMobile ? '0.65rem' : '0.75rem',
                   fontWeight: 600,
                   backgroundColor: isAssigned ? '#4caf50' : isWaiting ? '#ff9800' : '#f5f5f5',
                   color: isAssigned || isWaiting ? 'white' : '#6c757d',
@@ -294,7 +318,9 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           })()
         )}
       </Box>
-      <Box sx={{ width: '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      
+      {/* 개통완료 */}
+      <Box sx={{ width: isMobile ? '70px' : '100px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {loadingAssignment ? (
           <CircularProgress size={16} />
         ) : (
@@ -311,7 +337,7 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
                 size="small"
                 color={isActivated ? 'success' : 'default'}
                 sx={{
-                  fontSize: '0.75rem',
+                  fontSize: isMobile ? '0.65rem' : '0.75rem',
                   fontWeight: 600,
                   backgroundColor: isActivated ? '#2196f3' : '#f5f5f5',
                   color: isActivated ? 'white' : '#6c757d',
@@ -325,22 +351,30 @@ const VirtualizedTableRow = React.memo(({ index, style, data }) => {
           })()
         )}
       </Box>
-      <Box sx={{ width: '200px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-          {customer.reservationMemo || '-'}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '200px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-          {customer.yardReceivedMemo || '-'}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '80px', p: 1, display: 'flex', alignItems: 'center' }}>
-        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-          {customer.receiver || '-'}
-        </Typography>
-      </Box>
-      <Box sx={{ width: '60px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      
+      {/* 모바일이 아닐 때만 메모들과 접수자 표시 */}
+      {!isMobile && (
+        <>
+          <Box sx={{ width: '200px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {customer.reservationMemo || '-'}
+            </Typography>
+          </Box>
+          <Box sx={{ width: '200px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {customer.yardReceivedMemo || '-'}
+            </Typography>
+          </Box>
+          <Box sx={{ width: '80px', p: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+              {customer.receiver || '-'}
+            </Typography>
+          </Box>
+        </>
+      )}
+      
+      {/* 취소체크 */}
+      <Box sx={{ width: isMobile ? '50px' : '60px', p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {processingCancelCheck.has(customer.reservationNumber) ? (
           <CircularProgress size={16} />
         ) : (
@@ -451,9 +485,21 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
   }, []);
 
+  // 모바일 환경 감지
+  const isMobile = useCallback(() => {
+    return window.innerWidth <= 768;
+  }, []);
+
   // 필터링 및 검색 적용 (최적화)
   const applyFilters = useCallback(() => {
     let filtered = customerList;
+
+    // 모바일에서 담당자별 필터링 (본인 담당 고객만 표시)
+    if (isMobile() && loggedInStore && loggedInStore.manager) {
+      filtered = filtered.filter(customer => {
+        return customer.manager === loggedInStore.manager;
+      });
+    }
 
     // 검색 필터 적용 (디바운스된 검색어 사용)
     if (debouncedSearchQuery.trim()) {
@@ -546,7 +592,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
 
     setFilteredCustomerList(filtered);
-  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData]);
+  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, isMobile, loggedInStore]);
 
   // 검색 기능 (최적화)
   const handleSearch = useCallback((query) => {
