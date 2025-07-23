@@ -485,21 +485,39 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
   }, []);
 
-  // 모바일 환경 감지
+  // 모바일 환경 감지 (실시간 감지)
   const isMobile = useCallback(() => {
     return window.innerWidth <= 768;
   }, []);
+  
+  // 화면 크기 변화 감지를 위한 상태
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // 실시간 모바일 감지
+  const isMobileRealTime = useCallback(() => {
+    return windowWidth <= 768;
+  }, [windowWidth]);
 
   // 필터링 및 검색 적용 (최적화)
   const applyFilters = useCallback(() => {
     let filtered = customerList;
 
     // 모바일에서 담당자별 필터링 (본인 담당 고객만 표시)
-    if (isMobile() && loggedInStore && loggedInStore.manager) {
+    if (isMobileRealTime() && loggedInStore && loggedInStore.manager) {
       console.log('📱 [모바일필터] 담당자별 필터링 적용:', {
         loggedInManager: loggedInStore.manager,
         totalCustomers: filtered.length,
-        isMobile: isMobile()
+        isMobile: isMobileRealTime(),
+        windowWidth: windowWidth
       });
       
       const beforeFilter = filtered.length;
@@ -514,7 +532,8 @@ function AllCustomerListScreen({ loggedInStore }) {
       });
     } else {
       console.log('📱 [모바일필터] 필터링 조건 미충족:', {
-        isMobile: isMobile(),
+        isMobile: isMobileRealTime(),
+        windowWidth: windowWidth,
         hasLoggedInStore: !!loggedInStore,
         hasManager: !!(loggedInStore && loggedInStore.manager),
         loggedInManager: loggedInStore?.manager
@@ -612,7 +631,7 @@ function AllCustomerListScreen({ loggedInStore }) {
     }
 
     setFilteredCustomerList(filtered);
-  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, isMobile, loggedInStore]);
+  }, [customerList, debouncedSearchQuery, assignmentFilter, activationFilter, receptionFilter, yardDateFilter, onsaleDateFilter, officeFilter, departmentFilter, agentOfficeData, isMobileRealTime, loggedInStore, windowWidth]);
 
   // 검색 기능 (최적화)
   const handleSearch = useCallback((query) => {
