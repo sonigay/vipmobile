@@ -2237,6 +2237,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       const assignedSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
       const activationStatusFromSheet = (row[5] || '').toString().trim(); // F열: 개통완료 상태
       
+      // 디버깅: 처음 몇 개 행의 개통완료 상태 확인
+      if (index < 5) {
+        console.log(`🔍 [개통완료 디버깅] 행 ${index + 1}: 예약번호=${reservationNumber}, F열값="${activationStatusFromSheet}"`);
+      }
+      
       if (!reservationNumber || !customerName || !model || !capacity || !color || !posCode) {
         skippedCount++;
         return;
@@ -2248,8 +2253,29 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       
 
       
+      // 배정 상태 계산 (정규화 규칙과 관계없이 개통완료 상태는 먼저 설정)
+      let assignmentStatus = '미배정';
+      let activationStatus = activationStatusFromSheet || '미개통'; // 사전예약사이트 F열 값을 그대로 사용
+      let assignedSerial = '';
+      let waitingOrder = 0;
+      
       if (!normalizedRule) {
         normalizationFailedCount++;
+        // 정규화 규칙이 없어도 개통완료 상태는 표시
+        assignmentResults.push({
+          reservationNumber,
+          customerName,
+          reservationDateTime,
+          model: reservationSiteModel,
+          posCode,
+          yardReceivedDate,
+          onSaleReceivedDate,
+          assignmentStatus,
+          activationStatus,
+          assignedSerialNumber: assignedSerial,
+          waitingOrder
+        });
+        processedCount++;
         return;
       }
       
@@ -2259,20 +2285,8 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
       // 재고 키 생성
       const inventoryKey = `${phoneklModel}_${posCode}`;
       
-
-      
       // 해당 재고 확인
       const availableSerials = availableInventory.get(inventoryKey) || [];
-      
-
-      
-
-      
-      // 배정 상태 계산
-      let assignmentStatus = '미배정';
-      let activationStatus = activationStatusFromSheet || '미개통'; // 사전예약사이트 F열 값을 그대로 사용
-      let assignedSerial = '';
-      let waitingOrder = 0;
       
       // 이미 배정된 일련번호가 있는 경우
       if (assignedSerialNumber && assignedSerialNumber.trim() !== '') {
