@@ -305,41 +305,29 @@ async function getMonthlyAwardData(req, res) {
     console.log('매칭되지 않은 요금제명 목록:', Array.from(unmatchedPlansForDebug));
     console.log('================================');
 
-    // 전략상품 코드 매핑 테이블 생성 (숫자 코드 -> 부가서비스명)
-    const strategicProductCodeMapping = new Map();
+    // 전략상품 부가서비스명 수집 (디버깅용)
+    const manualRowsForServiceMapping = manualData.slice(1);
+    const uniqueServices = new Set();
     
-    // 매뉴얼데이터에서 실제 전략상품 코드와 부가서비스명 매핑 수집
-    const manualRowsForCodeMapping = manualData.slice(1);
-    const uniqueCodes = new Set();
-    
-    manualRowsForCodeMapping.forEach(row => {
+    manualRowsForServiceMapping.forEach(row => {
       if (row.length >= 123) {
         // 전략상품 관련 컬럼들 확인
-        const musicCode = (row[110] || '').toString().trim(); // DG열: 뮤직류
-        const insuranceCode = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
-        const uflixCode = (row[118] || '').toString().trim(); // DO열: 유플릭스
-        const callToneCode = (row[122] || '').toString().trim(); // DS열: 통화연결음
+        const musicService = (row[110] || '').toString().trim(); // DG열: 뮤직류
+        const insuranceService = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
+        const uflixService = (row[118] || '').toString().trim(); // DO열: 유플릭스
+        const callToneService = (row[122] || '').toString().trim(); // DS열: 통화연결음
         
-        // 고유한 코드들 수집
-        if (musicCode) uniqueCodes.add(musicCode);
-        if (insuranceCode) uniqueCodes.add(insuranceCode);
-        if (uflixCode) uniqueCodes.add(uflixCode);
-        if (callToneCode) uniqueCodes.add(callToneCode);
+        // 고유한 부가서비스명들 수집
+        if (musicService) uniqueServices.add(musicService);
+        if (insuranceService) uniqueServices.add(insuranceService);
+        if (uflixService) uniqueServices.add(uflixService);
+        if (callToneService) uniqueServices.add(callToneService);
       }
     });
     
-    console.log('=== 전략상품 코드 매핑 정보 ===');
-    console.log('발견된 고유 전략상품 코드 수:', uniqueCodes.size);
-    console.log('전략상품 코드 목록:', Array.from(uniqueCodes));
-    
-    // 기본 매핑 규칙 (실제 데이터에 맞게 조정 필요)
-    strategicProductCodeMapping.set('1900030850', '통화연결음');
-    strategicProductCodeMapping.set('1900032727', '통화연결음');
-    strategicProductCodeMapping.set('1900032118', '통화연결음');
-    strategicProductCodeMapping.set('1411727779', '뮤직류');
-    strategicProductCodeMapping.set('674704', '뮤직류');
-    
-    console.log('전략상품 코드 매핑 테이블:', Object.fromEntries(strategicProductCodeMapping));
+    console.log('=== 전략상품 부가서비스명 정보 ===');
+    console.log('발견된 고유 전략상품 부가서비스명 수:', uniqueServices.size);
+    console.log('전략상품 부가서비스명 목록:', Array.from(uniqueServices));
     console.log('================================');
 
     // 전략상품 리스트 로드 (F1:I50 영역에서)
@@ -652,26 +640,16 @@ async function getMonthlyAwardData(req, res) {
         
         let totalPoints = 0;
         
-        // 각 항목별 포인트 계산 (코드 매핑 적용)
+        // 각 항목별 포인트 계산 (부가서비스명 직접 매칭)
         [insurance, uflix, callTone, music].forEach(service => {
           if (service) {
-            // 1. 코드 매핑 테이블에서 부가서비스명 찾기
-            const mappedServiceName = strategicProductCodeMapping.get(service);
+            // 장표모드셋팅메뉴의 H열(부가서비스명)과 정확히 일치하는지 확인
+            const product = finalStrategicProducts.find(p => p.serviceName === service);
             
-            if (mappedServiceName) {
-              // 2. 부가서비스명으로 포인트 찾기
-              let product = finalStrategicProducts.find(p => p.serviceName === mappedServiceName);
-              
-              // 3. 부가서비스명 매칭이 안되면 소분류로 매칭
-              if (!product) {
-                product = finalStrategicProducts.find(p => p.subCategory === mappedServiceName);
-              }
-              
-              if (product) {
-                totalPoints += product.points;
-              }
+            if (product) {
+              totalPoints += product.points;
             } else {
-              // 매핑되지 않은 코드는 디버깅용으로 수집
+              // 매칭되지 않은 부가서비스명은 디버깅용으로 수집
               unmatchedStrategicProducts.add(service);
             }
           }
