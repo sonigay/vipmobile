@@ -2447,15 +2447,17 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
     const serialToReservations = new Map(); // 일련번호별 예약번호 매핑
     const reservationToSerial = new Map(); // 예약번호별 일련번호 매핑
     
-    // 기존 배정 데이터 수집
+    // 기존 배정 데이터 수집 (개통완료 고객 제외 - 일련번호를 다른 고객에게 배정하기 위해)
     for (let i = 1; i < reservationSiteValues.length; i++) {
       const row = reservationSiteValues[i];
       if (row.length < 22) continue;
       
       const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
       const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+      const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
       
-      if (existingSerial && existingSerial.trim() !== '') {
+      // 개통완료된 고객은 중복 정리에서 제외 (일련번호를 다른 고객에게 배정하기 위해)
+      if (existingSerial && existingSerial.trim() !== '' && activationStatus !== '개통완료') {
         if (!serialToReservations.has(existingSerial)) {
           serialToReservations.set(existingSerial, []);
         }
@@ -2530,8 +2532,13 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
       if (assignmentMap.has(reservationNumber)) {
         const newSerial = assignmentMap.get(reservationNumber);
         
-        // 개통완료된 고객은 배정 건너뜀 (가장 먼저 체크)
+        // 개통완료된 고객은 기존 일련번호도 제거 (다른 고객에게 배정 가능하도록)
         if (activationStatus === '개통완료') {
+          if (existingSerial && existingSerial.trim() !== '') {
+            console.log(` [배정저장 디버깅] 개통완료 고객 기존 일련번호 제거: ${reservationNumber} (${existingSerial})`);
+            row[6] = ''; // G열 일련번호 제거
+            updatedCount++;
+          }
           console.log(`⚠️ [배정저장 디버깅] 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
           skippedCount++;
           continue;
@@ -3466,14 +3473,16 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('🧹 [서버시작] 중복 배정 데이터 자동 정리 시작');
       const serialToReservations = new Map(); // 일련번호별 예약번호 매핑
       
-      // 기존 배정 데이터 수집
+      // 기존 배정 데이터 수집 (개통완료 고객 제외 - 일련번호를 다른 고객에게 배정하기 위해)
       reservationSiteValues.slice(1).forEach((row, index) => {
         if (row.length < 22) return;
         
         const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
         const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+        const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
         
-        if (existingSerial && existingSerial.trim() !== '') {
+        // 개통완료된 고객은 중복 정리에서 제외 (일련번호를 다른 고객에게 배정하기 위해)
+        if (existingSerial && existingSerial.trim() !== '' && activationStatus !== '개통완료') {
           if (!serialToReservations.has(existingSerial)) {
             serialToReservations.set(existingSerial, []);
           }
@@ -3526,8 +3535,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
         const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
         const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
         
-        // 개통완료된 고객은 배정하지 않음
+        // 개통완료된 고객은 기존 일련번호도 제거 (다른 고객에게 배정 가능하도록)
         if (activationStatus === '개통완료') {
+          if (currentSerialNumber && currentSerialNumber.trim() !== '') {
+            if (index < 5) {
+              console.log(` [서버시작] 행 ${index + 2}: 개통완료 고객 기존 일련번호 제거: ${reservationNumber} (${currentSerialNumber})`);
+            }
+            row[6] = ''; // G열 일련번호 제거
+            updatedCount++;
+          }
           if (index < 5) {
             console.log(`⚠️ [서버시작] 행 ${index + 2}: 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
           }
