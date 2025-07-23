@@ -9481,7 +9481,12 @@ app.post('/api/cancel-check/save', async (req, res) => {
     const existingReservationNumbers = new Set(existingData.map(row => row[0]));
     const uniqueNewData = newCancelData.filter(row => !existingReservationNumbers.has(row[0]));
 
+    console.log(`📝 [취소체크] 기존 예약번호: ${Array.from(existingReservationNumbers).join(', ')}`);
+    console.log(`📝 [취소체크] 새 예약번호: ${reservationNumbers.join(', ')}`);
+    console.log(`📝 [취소체크] 중복 제거 후 저장할 데이터: ${uniqueNewData.length}건`);
+
     if (uniqueNewData.length === 0) {
+      console.log('📝 [취소체크] 이미 체크된 예약번호들입니다.');
       return res.json({
         success: true,
         message: '이미 체크된 예약번호들입니다.',
@@ -9566,7 +9571,7 @@ app.get('/api/cancel-check/list', async (req, res) => {
     
     const cancelData = await getSheetValues('사전예약사이트취소데이터');
     
-    if (!cancelData || cancelData.length < 2) {
+    if (!cancelData || cancelData.length <= 1) {
       return res.json({
         success: true,
         data: [],
@@ -9574,8 +9579,21 @@ app.get('/api/cancel-check/list', async (req, res) => {
       });
     }
 
-    // 헤더 제외하고 데이터만 반환
-    const dataRows = cancelData.slice(1);
+    // 헤더 확인 및 데이터 추출
+    const firstRow = cancelData[0];
+    let dataRows;
+    
+    if (firstRow && firstRow.length >= 3 && 
+        firstRow[0] === '예약번호' && 
+        firstRow[1] === '등록일시' && 
+        firstRow[2] === '상태') {
+      // 헤더가 있으면 헤더 제외
+      dataRows = cancelData.slice(1);
+    } else {
+      // 헤더가 없으면 모든 데이터 사용
+      dataRows = cancelData;
+    }
+    
     const cancelReservationNumbers = dataRows.map(row => row[0]); // 예약번호만 추출
 
     console.log(`📋 [취소체크] 취소 체크 데이터 조회 완료: ${cancelReservationNumbers.length}건`);
