@@ -2530,16 +2530,16 @@ app.post('/api/inventory/save-assignment', async (req, res) => {
       if (assignmentMap.has(reservationNumber)) {
         const newSerial = assignmentMap.get(reservationNumber);
         
-        // 기존 배정된 일련번호가 있으면 유지
-        if (existingSerial && existingSerial.trim() !== '') {
-          console.log(`⚠️ [배정저장 디버깅] 기존 배정 유지: ${reservationNumber} (${existingSerial})`);
+        // 개통완료된 고객은 배정 건너뜀 (가장 먼저 체크)
+        if (activationStatus === '개통완료') {
+          console.log(`⚠️ [배정저장 디버깅] 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
           skippedCount++;
           continue;
         }
         
-        // 개통완료된 고객은 배정 건너뜀
-        if (activationStatus === '개통완료') {
-          console.log(`⚠️ [배정저장 디버깅] 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
+        // 기존 배정된 일련번호가 있으면 유지
+        if (existingSerial && existingSerial.trim() !== '') {
+          console.log(`⚠️ [배정저장 디버깅] 기존 배정 유지: ${reservationNumber} (${existingSerial})`);
           skippedCount++;
           continue;
         }
@@ -3362,6 +3362,28 @@ const server = app.listen(port, '0.0.0.0', async () => {
       const reservationSiteValues = await getSheetValues('사전예약사이트');
       // 사전예약사이트 로드 완료
       
+      // 1단계: 먼저 개통완료 상태 확인 및 F열 업데이트
+      console.log('📋 [서버시작] 1-1단계: 개통완료 상태 확인 시작');
+      try {
+        const activationResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
+        if (activationResponse.ok) {
+          const activationResult = await activationResponse.json();
+          if (activationResult.success) {
+            console.log(`✅ [서버시작] 개통완료 상태 확인 완료: ${activationResult.data?.length || 0}개 고객 처리`);
+          } else {
+            console.error('❌ [서버시작] 개통완료 상태 확인 실패:', activationResult.error);
+          }
+        } else {
+          console.error('❌ [서버시작] 개통완료 상태 확인 API 호출 실패:', activationResponse.status);
+        }
+      } catch (error) {
+        console.error('❌ [서버시작] 개통완료 상태 확인 오류:', error.message);
+      }
+      
+      // 2단계: 개통완료 데이터 저장 완료를 위한 대기 (3초)
+      console.log('⏳ [서버시작] 1-2단계: 개통완료 데이터 저장 완료 대기 (3초)');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
       // 폰클출고처데이터 로드 (POS점 매핑용)
       const phoneklStoreValues = await getSheetValues('폰클출고처데이터');
       console.log(`🔍 [서버시작] 폰클출고처데이터 로드 완료: ${phoneklStoreValues ? phoneklStoreValues.length : 0}개 행`);
@@ -3502,6 +3524,16 @@ const server = app.listen(port, '0.0.0.0', async () => {
         const color = (row[17] || '').toString().trim(); // R열: 색상
         const posCode = (row[21] || '').toString().trim(); // V열: POS코드
         const currentSerialNumber = (row[6] || '').toString().trim(); // G열: 배정일련번호
+        const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
+        
+        // 개통완료된 고객은 배정하지 않음
+        if (activationStatus === '개통완료') {
+          if (index < 5) {
+            console.log(`⚠️ [서버시작] 행 ${index + 2}: 개통완료 고객 배정 건너뜀: ${reservationNumber}`);
+          }
+          skippedCount++;
+          return;
+        }
         
         if (reservationNumber && customerName && model && color && capacity && posCode) {
           // 정규화 규칙 적용
