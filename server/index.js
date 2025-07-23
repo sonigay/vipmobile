@@ -9534,9 +9534,11 @@ app.get('/api/cancel-check/list', async (req, res) => {
 // 취소 체크 데이터 삭제 API
 app.delete('/api/cancel-check/delete', async (req, res) => {
   try {
-    console.log('🗑️ [취소체크] 취소 체크 데이터 삭제 요청:', req.body);
+    console.log('🗑️ [취소체크] 취소 체크 데이터 삭제 요청 시작');
+    console.log('🗑️ [취소체크] 요청 body:', req.body);
+    console.log('🗑️ [취소체크] 요청 headers:', req.headers);
     
-    const { reservationNumbers } = req.body;
+    const { reservationNumbers } = req.body || {};
     
     if (!Array.isArray(reservationNumbers)) {
       return res.status(400).json({
