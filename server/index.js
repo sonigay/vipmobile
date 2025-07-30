@@ -6982,12 +6982,12 @@ const COLUMN_MATCHING_CONFIG = [
     description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 79 }, // DO열
+    manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 118 }, // DO열 (119번째 컬럼)
     systemField: { name: '유플레이 유치검수', key: 'uplay_check', column: 22 }, // W열
     description: '유플레이 유치검수 (단어 포함 여부 비교)'
   },
   {
-    manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 79 }, // DO열
+    manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 118 }, // DO열 (119번째 컬럼)
     systemField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 23 }, // X열
     description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)'
   }
@@ -7429,8 +7429,8 @@ function normalizePreInstallment(manualRow, systemRow) {
 function normalizeUplayCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
   let manualValue = '';
-  if (manualRow.length > 78) { // 최소 DO열(78)은 있어야 함
-    const uplayValue = (manualRow[79] || '').toString().trim(); // DO열: 유플레이
+  if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
+    const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
     
     // "유플레이" 단어가 포함된 경우만 검수 대상으로 설정
     if (uplayValue && uplayValue.includes('유플레이')) {
@@ -7455,8 +7455,8 @@ function normalizeUplayCheck(manualRow, systemRow) {
 function normalizeUplayNoCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
   let manualValue = '';
-  if (manualRow.length > 78) { // 최소 DO열(78)은 있어야 함
-    const uplayValue = (manualRow[79] || '').toString().trim(); // DO열: 유플레이
+  if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
+    const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
     
     // "유플레이" 단어가 포함되지 않은 경우만 검수 대상으로 설정
     if (uplayValue && !uplayValue.includes('유플레이')) {
