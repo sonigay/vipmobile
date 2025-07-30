@@ -7432,12 +7432,11 @@ function normalizeUplayCheck(manualRow, systemRow) {
   if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
     const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
     
-    // "유플레이" 단어가 포함된 경우만 검수 대상으로 설정
+    // "유플레이" 단어 포함 여부로 정규화
     if (uplayValue && uplayValue.includes('유플레이')) {
-      manualValue = uplayValue;
+      manualValue = '유플레이 포함';
     } else {
-      // "유플레이"가 포함되지 않은 경우 빈 문자열로 처리하여 검수 대상에서 제외
-      return { manualValue: '', systemValue: '' };
+      manualValue = '유플레이 미포함';
     }
   }
   
@@ -7445,7 +7444,13 @@ function normalizeUplayCheck(manualRow, systemRow) {
   let systemValue = '';
   if (systemRow.length > 21) { // 최소 W열(21)은 있어야 함
     const uplayValue = (systemRow[22] || '').toString().trim(); // W열: 유플레이
-    systemValue = uplayValue;
+    
+    // "유플레이" 단어 포함 여부로 정규화
+    if (uplayValue && uplayValue.includes('유플레이')) {
+      systemValue = '유플레이 포함';
+    } else {
+      systemValue = '유플레이 미포함';
+    }
   }
   
   return { manualValue, systemValue };
@@ -7458,12 +7463,11 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
     const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
     
-    // "유플레이" 단어가 포함되지 않은 경우만 검수 대상으로 설정
-    if (uplayValue && !uplayValue.includes('유플레이')) {
-      manualValue = uplayValue;
+    // "유플레이" 단어 포함 여부로 정규화 (미유치 검수용)
+    if (uplayValue && uplayValue.includes('유플레이')) {
+      manualValue = '유플레이 포함';
     } else {
-      // "유플레이"가 포함된 경우 빈 문자열로 처리하여 검수 대상에서 제외
-      return { manualValue: '', systemValue: '' };
+      manualValue = '유플레이 미포함';
     }
   }
   
@@ -7471,7 +7475,13 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   let systemValue = '';
   if (systemRow.length > 22) { // 최소 X열(22)은 있어야 함
     const uplayNoValue = (systemRow[23] || '').toString().trim(); // X열: 유플레이 미유치
-    systemValue = uplayNoValue;
+    
+    // "유플레이" 단어 포함 여부로 정규화 (미유치 검수용)
+    if (uplayNoValue && uplayNoValue.includes('유플레이')) {
+      systemValue = '유플레이 포함';
+    } else {
+      systemValue = '유플레이 미포함';
+    }
   }
   
   return { manualValue, systemValue };
