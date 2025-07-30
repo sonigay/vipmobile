@@ -7879,10 +7879,10 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       
       // 이제 빈 값이 없으므로 이 조건 제거
       
-      // 값이 다르면 차이점으로 기록
-      if (manualValue.trim() !== systemValue.trim()) {
+      // 유플레이 미유치 검수는 반대 로직: 값이 같으면 불일치, 다르면 일치
+      if (manualValue.trim() === systemValue.trim()) {
         
-        console.log(`[유플레이 미유치 검수] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
+        console.log(`[유플레이 미유치 검수] 불일치 발견: manualValue="${manualValue}" === systemValue="${systemValue}" (둘 다 같음)`);
 
         differences.push({
           key,
@@ -7891,13 +7891,13 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'uplay_no_check',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)',
+          description: '유플레이 미유치 검수 (반대 로직: 둘 다 같으면 불일치)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
       } else {
-        console.log(`[유플레이 미유치 검수] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
+        console.log(`[유플레이 미유치 검수] 일치: manualValue="${manualValue}" !== systemValue="${systemValue}" (서로 다름)`);
       }
       return;
     }
