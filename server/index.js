@@ -7428,7 +7428,7 @@ function normalizePreInstallment(manualRow, systemRow) {
 // 유플레이 유치검수 정규화 함수
 function normalizeUplayCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
-  let manualValue = '';
+  let manualValue = '유플레이 미포함'; // 기본값 설정
   if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
     const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
     
@@ -7441,7 +7441,7 @@ function normalizeUplayCheck(manualRow, systemRow) {
   }
   
   // 폰클 데이터 정규화 (W열)
-  let systemValue = '';
+  let systemValue = '유플레이 미포함'; // 기본값 설정
   if (systemRow.length > 21) { // 최소 W열(21)은 있어야 함
     const uplayValue = (systemRow[22] || '').toString().trim(); // W열: 유플레이
     
@@ -7459,7 +7459,7 @@ function normalizeUplayCheck(manualRow, systemRow) {
 // 유플레이 미유치 검수 정규화 함수
 function normalizeUplayNoCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
-  let manualValue = '';
+  let manualValue = '유플레이 미포함'; // 기본값 설정
   if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
     const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
     
@@ -7472,7 +7472,7 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   }
   
   // 폰클 데이터 정규화 (X열)
-  let systemValue = '';
+  let systemValue = '유플레이 미포함'; // 기본값 설정
   if (systemRow.length > 22) { // 최소 X열(22)은 있어야 함
     const uplayNoValue = (systemRow[23] || '').toString().trim(); // X열: 유플레이 미유치
     
@@ -7844,15 +7844,10 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 디버깅 로그 추가
       console.log(`[유플레이 유치검수] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
       
-      // 조건에 맞지 않아 빈 값이 반환된 경우 비교 제외
-      if (!manualValue && !systemValue) {
-        console.log(`[유플레이 유치검수] 둘 다 빈 값이므로 비교 제외`);
-        return;
-      }
+      // 이제 빈 값이 없으므로 이 조건 제거
       
-      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
-      if (manualValue.trim() !== systemValue.trim() && 
-          (manualValue.trim() || systemValue.trim())) {
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
         
         console.log(`[유플레이 유치검수] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
 
@@ -7861,8 +7856,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           type: 'mismatch',
           field: '유플레이 유치검수',
           fieldKey: 'uplay_check',
-          correctValue: manualValue || '유플레이 미포함',
-          incorrectValue: systemValue || '유플레이 미포함',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
           description: '유플레이 유치검수 (단어 포함 여부 비교)',
           manualRow: null,
           systemRow: null,
@@ -7882,15 +7877,10 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 디버깅 로그 추가
       console.log(`[유플레이 미유치 검수] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
       
-      // 조건에 맞지 않아 빈 값이 반환된 경우 비교 제외
-      if (!manualValue && !systemValue) {
-        console.log(`[유플레이 미유치 검수] 둘 다 빈 값이므로 비교 제외`);
-        return;
-      }
+      // 이제 빈 값이 없으므로 이 조건 제거
       
-      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
-      if (manualValue.trim() !== systemValue.trim() && 
-          (manualValue.trim() || systemValue.trim())) {
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
         
         console.log(`[유플레이 미유치 검수] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
 
@@ -7899,8 +7889,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           type: 'mismatch',
           field: '유플레이 미유치 검수',
           fieldKey: 'uplay_no_check',
-          correctValue: manualValue || '유플레이 미포함',
-          incorrectValue: systemValue || '유플레이 미포함',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
           description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)',
           manualRow: null,
           systemRow: null,
