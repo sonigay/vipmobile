@@ -6980,6 +6980,16 @@ const COLUMN_MATCHING_CONFIG = [
     manualField: { name: '프리할부상이', key: 'pre_installment', column: 47 }, // AV열
     systemField: { name: '프리할부상이', key: 'pre_installment', column: 27 }, // AB열
     description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)'
+  },
+  {
+    manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 79 }, // DO열
+    systemField: { name: '유플레이 유치검수', key: 'uplay_check', column: 22 }, // W열
+    description: '유플레이 유치검수 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 79 }, // DO열
+    systemField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 23 }, // X열
+    description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)'
   }
 ];
 
