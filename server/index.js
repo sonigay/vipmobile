@@ -7841,14 +7841,20 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 유플레이 유치검수 정규화
       const { manualValue, systemValue } = normalizeUplayCheck(manualRow, systemRow);
       
+      // 디버깅 로그 추가
+      console.log(`[유플레이 유치검수] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
+      
       // 조건에 맞지 않아 빈 값이 반환된 경우 비교 제외
       if (!manualValue && !systemValue) {
+        console.log(`[유플레이 유치검수] 둘 다 빈 값이므로 비교 제외`);
         return;
       }
       
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
-      if (manualValue !== systemValue && 
-          (manualValue || systemValue)) {
+      if (manualValue.trim() !== systemValue.trim() && 
+          (manualValue.trim() || systemValue.trim())) {
+        
+        console.log(`[유플레이 유치검수] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
 
         differences.push({
           key,
@@ -7862,6 +7868,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
+      } else {
+        console.log(`[유플레이 유치검수] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
       }
       return;
     }
@@ -7871,14 +7879,20 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 유플레이 미유치 검수 정규화
       const { manualValue, systemValue } = normalizeUplayNoCheck(manualRow, systemRow);
       
+      // 디버깅 로그 추가
+      console.log(`[유플레이 미유치 검수] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
+      
       // 조건에 맞지 않아 빈 값이 반환된 경우 비교 제외
       if (!manualValue && !systemValue) {
+        console.log(`[유플레이 미유치 검수] 둘 다 빈 값이므로 비교 제외`);
         return;
       }
       
       // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
-      if (manualValue !== systemValue && 
-          (manualValue || systemValue)) {
+      if (manualValue.trim() !== systemValue.trim() && 
+          (manualValue.trim() || systemValue.trim())) {
+        
+        console.log(`[유플레이 미유치 검수] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
 
         differences.push({
           key,
@@ -7892,6 +7906,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
         });
+      } else {
+        console.log(`[유플레이 미유치 검수] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
       }
       return;
     }
