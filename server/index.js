@@ -7425,6 +7425,58 @@ function normalizePreInstallment(manualRow, systemRow) {
   return { manualPreInstallment, systemPreInstallment };
 }
 
+// 유플레이 유치검수 정규화 함수
+function normalizeUplayCheck(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DO열)
+  let manualValue = '';
+  if (manualRow.length > 78) { // 최소 DO열(78)은 있어야 함
+    const uplayValue = (manualRow[79] || '').toString().trim(); // DO열: 유플레이
+    
+    // "유플레이" 단어가 포함된 경우만 검수 대상으로 설정
+    if (uplayValue && uplayValue.includes('유플레이')) {
+      manualValue = uplayValue;
+    } else {
+      // "유플레이"가 포함되지 않은 경우 빈 문자열로 처리하여 검수 대상에서 제외
+      return { manualValue: '', systemValue: '' };
+    }
+  }
+  
+  // 폰클 데이터 정규화 (W열)
+  let systemValue = '';
+  if (systemRow.length > 21) { // 최소 W열(21)은 있어야 함
+    const uplayValue = (systemRow[22] || '').toString().trim(); // W열: 유플레이
+    systemValue = uplayValue;
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 유플레이 미유치 검수 정규화 함수
+function normalizeUplayNoCheck(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DO열)
+  let manualValue = '';
+  if (manualRow.length > 78) { // 최소 DO열(78)은 있어야 함
+    const uplayValue = (manualRow[79] || '').toString().trim(); // DO열: 유플레이
+    
+    // "유플레이" 단어가 포함되지 않은 경우만 검수 대상으로 설정
+    if (uplayValue && !uplayValue.includes('유플레이')) {
+      manualValue = uplayValue;
+    } else {
+      // "유플레이"가 포함된 경우 빈 문자열로 처리하여 검수 대상에서 제외
+      return { manualValue: '', systemValue: '' };
+    }
+  }
+  
+  // 폰클 데이터 정규화 (X열)
+  let systemValue = '';
+  if (systemRow.length > 22) { // 최소 X열(22)은 있어야 함
+    const uplayNoValue = (systemRow[23] || '').toString().trim(); // X열: 유플레이 미유치
+    systemValue = uplayNoValue;
+  }
+  
+  return { manualValue, systemValue };
+}
+
 // 동적 컬럼 비교 함수
 function compareDynamicColumns(manualRow, systemRow, key, targetField = null, storeData = null, planData = null) {
   const differences = [];
@@ -7766,6 +7818,66 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           correctValue: manualPreInstallment || '정규화 불가',
           incorrectValue: systemPreInstallment || '정규화 불가',
           description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 유플레이 유치검수 비교 로직
+    if (manualField.key === 'uplay_check') {
+      // 유플레이 유치검수 정규화
+      const { manualValue, systemValue } = normalizeUplayCheck(manualRow, systemRow);
+      
+      // 조건에 맞지 않아 빈 값이 반환된 경우 비교 제외
+      if (!manualValue && !systemValue) {
+        return;
+      }
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualValue !== systemValue && 
+          (manualValue || systemValue)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '유플레이 유치검수',
+          fieldKey: 'uplay_check',
+          correctValue: manualValue || '정규화 불가',
+          incorrectValue: systemValue || '정규화 불가',
+          description: '유플레이 유치검수 (단어 포함 여부 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        });
+      }
+      return;
+    }
+    
+    // 유플레이 미유치 검수 비교 로직
+    if (manualField.key === 'uplay_no_check') {
+      // 유플레이 미유치 검수 정규화
+      const { manualValue, systemValue } = normalizeUplayNoCheck(manualRow, systemRow);
+      
+      // 조건에 맞지 않아 빈 값이 반환된 경우 비교 제외
+      if (!manualValue && !systemValue) {
+        return;
+      }
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualValue !== systemValue && 
+          (manualValue || systemValue)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '유플레이 미유치 검수',
+          fieldKey: 'uplay_no_check',
+          correctValue: manualValue || '정규화 불가',
+          incorrectValue: systemValue || '정규화 불가',
+          description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[69] || '' // BR열: 등록직원
