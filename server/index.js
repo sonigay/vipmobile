@@ -12846,6 +12846,9 @@ app.put('/api/policies/:policyId/cancel', async (req, res) => {
     // 취소 알림 생성
     await createPolicyNotification(policyId, userId, 'policy_cancelled', { cancelReason });
     
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
+    
     console.log('정책 취소 완료:', response.data);
     
     res.json({
@@ -12958,6 +12961,9 @@ app.put('/api/policies/:policyId/approval-cancel', async (req, res) => {
       cancelReason 
     });
     
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
+    
     console.log('승인 취소 완료:', response.data);
     
     res.json({
@@ -13031,6 +13037,9 @@ app.put('/api/policies/:policyId/settlement-reflect', async (req, res) => {
       userName 
     });
     
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
+    
     console.log('정산 반영 완료:', response.data);
     
     res.json({
@@ -13051,8 +13060,8 @@ app.get('/api/policies', async (req, res) => {
     
     const { yearMonth, policyType, category, userId, approvalStatus } = req.query;
     
-    // 정책_기본정보 시트에서 데이터 가져오기 (끝에 공백 포함)
-    const values = await getSheetValues('정책_기본정보 ');
+    // 정책_기본정보 시트에서 데이터 가져오기 (캐시 무시하고 직접 조회)
+    const values = await getSheetValuesWithoutCache('정책_기본정보 ');
     
     if (!values || values.length <= 1) {
       console.log('정책 데이터가 없습니다.');
@@ -13233,6 +13242,9 @@ app.post('/api/policies', async (req, res) => {
     
     // 알림 생성
     await createPolicyNotification(policyId, inputUserId, 'new_policy');
+    
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
     
     console.log('정책 생성 완료:', response.data);
     
