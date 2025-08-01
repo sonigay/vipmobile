@@ -12779,3 +12779,201 @@ app.post('/api/app-updates', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// 정책 관련 API 라우트
+app.get('/api/policies', async (req, res) => {
+  try {
+    console.log('정책 목록 조회 요청:', req.query);
+    
+    const { yearMonth, policyType, category, userId, approvalStatus } = req.query;
+    
+    // 정책_기본정보 시트에서 데이터 가져오기
+    const values = await getSheetValues('정책_기본정보');
+    
+    if (!values || values.length <= 1) {
+      console.log('정책 데이터가 없습니다.');
+      return res.json({ success: true, policies: [] });
+    }
+    
+    // 헤더 제거하고 데이터 처리
+    const dataRows = values.slice(1);
+    
+    // 필터링 적용
+    let filteredPolicies = dataRows.filter(row => {
+      if (row.length < 15) return false; // 최소 컬럼 수 확인
+      
+      const policyYearMonth = row[11]; // L열: 입력일시에서 년월 추출
+      const policyTypeData = row[6];   // G열: 정책유형
+      const categoryData = row[7];     // H열: 무선/유선
+      const subCategory = row[8];      // I열: 하위카테고리
+      const inputUserId = row[9];      // J열: 입력자ID
+      const totalApproval = row[12];   // M열: 승인상태_총괄
+      const settlementApproval = row[13]; // N열: 승인상태_정산팀
+      const teamApproval = row[14];    // O열: 승인상태_소속팀
+      
+      // 년월 필터
+      if (yearMonth && policyYearMonth && !policyYearMonth.includes(yearMonth)) {
+        return false;
+      }
+      
+      // 정책유형 필터
+      if (policyType && policyTypeData !== policyType) {
+        return false;
+      }
+      
+      // 카테고리 필터
+      if (category && subCategory !== category) {
+        return false;
+      }
+      
+      // 사용자 필터
+      if (userId && inputUserId !== userId) {
+        return false;
+      }
+      
+      // 승인상태 필터
+      if (approvalStatus) {
+        const hasApprovalStatus = [totalApproval, settlementApproval, teamApproval].includes(approvalStatus);
+        if (!hasApprovalStatus) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    // 정책 데이터 변환
+    const policies = filteredPolicies.map(row => ({
+      id: row[0],                    // A열: 정책ID
+      policyName: row[1],            // B열: 정책명
+      policyDate: row[2],            // C열: 정책적용일
+      policyStore: row[3],           // D열: 정책적용점
+      policyContent: row[4],         // E열: 정책내용
+      policyAmount: parseFloat(row[5]) || 0, // F열: 금액
+      policyType: row[6],            // G열: 정책유형
+      wirelessWired: row[7],         // H열: 무선/유선
+      category: row[8],              // I열: 하위카테고리
+      inputUserId: row[9],           // J열: 입력자ID
+      inputUserName: row[10],        // K열: 입력자명
+      inputDateTime: row[11],        // L열: 입력일시
+      approvalStatus: {
+        total: row[12] || '대기',     // M열: 승인상태_총괄
+        settlement: row[13] || '대기', // N열: 승인상태_정산팀
+        team: row[14] || '대기'       // O열: 승인상태_소속팀
+      }
+    }));
+    
+    console.log(`정책 목록 조회 완료: ${policies.length}건`);
+    
+    res.json({ success: true, policies });
+    
+  } catch (error) {
+    console.error('정책 목록 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/policies', async (req, res) => {
+  try {
+    console.log('새 정책 생성 요청:', req.body);
+    
+    const {
+      policyName,
+      policyDate,
+      policyStore,
+      policyContent,
+      policyAmount,
+      policyType,
+      category,
+      yearMonth,
+      inputUserId,
+      inputUserName
+    } = req.body;
+    
+    // 필수 필드 검증
+    if (!policyName || !policyDate || !policyStore || !policyContent || !policyAmount) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 필드가 누락되었습니다.'
+      });
+    }
+    
+    // 정책 ID 생성
+    const policyId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // 새 정책 데이터 생성
+    const newPolicyRow = [
+      policyId,                    // A열: 정책ID
+      policyName,                  // B열: 정책명
+      policyDate,                  // C열: 정책적용일
+      policyStore,                 // D열: 정책적용점
+      policyContent,               // E열: 정책내용
+      policyAmount,                // F열: 금액
+      policyType,                  // G열: 정책유형
+      category.startsWith('wireless') ? '무선' : '유선', // H열: 무선/유선
+      category,                    // I열: 하위카테고리
+      inputUserId,                 // J열: 입력자ID
+      inputUserName,               // K열: 입력자명
+      new Date().toISOString(),    // L열: 입력일시
+      '대기',                      // M열: 승인상태_총괄
+      '대기',                      // N열: 승인상태_정산팀
+      '대기'                       // O열: 승인상태_소속팀
+    ];
+    
+    // Google Sheets에 새 정책 추가
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '정책_기본정보!A:O',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newPolicyRow]
+      }
+    });
+    
+    // 알림 생성
+    await createPolicyNotification(policyId, inputUserId, 'new_policy');
+    
+    console.log('정책 생성 완료:', response.data);
+    
+    res.json({
+      success: true,
+      message: '정책이 성공적으로 생성되었습니다.',
+      policyId: policyId
+    });
+    
+  } catch (error) {
+    console.error('정책 생성 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 정책 알림 생성 함수
+async function createPolicyNotification(policyId, userId, notificationType, approvalStatus = null) {
+  try {
+    const notificationId = `NOTI_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const notificationRow = [
+      notificationId,           // A열: 알림ID
+      policyId,                 // B열: 정책ID
+      notificationType,         // C열: 알림유형
+      userId,                   // D열: 대상자ID
+      '읽지않음',               // E열: 읽음상태
+      new Date().toISOString()  // F열: 생성일시
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '정책_알림관리!A:F',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [notificationRow]
+      }
+    });
+    
+    console.log('정책 알림 생성 완료:', notificationId);
+  } catch (error) {
+    console.error('정책 알림 생성 실패:', error);
+  }
+}
