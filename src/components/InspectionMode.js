@@ -680,7 +680,15 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       {/* 메인 콘텐츠 */}
       <Container maxWidth="xl" sx={{ flex: 1, py: 2, overflow: 'auto' }}>
         {/* 업데이트 팝업 */}
-        <UpdatePopup />
+        <AppUpdatePopup
+          open={showUpdatePopup}
+          onClose={() => setShowUpdatePopup(false)}
+          mode="inspection"
+          loggedInStore={loggedInStore}
+          onUpdateAdded={() => {
+            console.log('검수모드 새 업데이트가 추가되었습니다.');
+          }}
+        />
         
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
