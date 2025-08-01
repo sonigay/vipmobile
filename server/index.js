@@ -1124,14 +1124,14 @@ app.get('/api/stores', async (req, res) => {
     let excludedCount = 0; // 제외된 재고 카운터
     
     inventoryRows.forEach((row, index) => {
-      if (!row || row.length < 15) return; // 최소 O열까지 데이터가 있어야 함
+      if (!row || row.length < 23) return; // 최소 O열까지 데이터가 있어야 함 (15+8)
       
-      const storeName = (row[13] || '').toString().trim();  // N열: 매장명
-      const model = (row[5] || '').toString().trim();      // F열: 모델
-      const color = (row[6] || '').toString().trim();      // G열: 색상
-      const status = (row[7] || '').toString().trim();     // H열: 상태 (정상, 이력, 불량)
-      const type = (row[4] || '').toString().trim();       // E열: 종류 (단말기, 웨어러블, 스마트기기, 유심)
-      const shippingDate = row[14] ? new Date(row[14]) : null;  // O열: 출고일
+      const storeName = (row[21] || '').toString().trim();  // N열: 매장명 (13+8)
+      const model = (row[13] || '').toString().trim();      // F열: 모델 (5+8)
+      const color = (row[14] || '').toString().trim();      // G열: 색상 (6+8)
+      const status = (row[15] || '').toString().trim();     // H열: 상태 (7+8)
+      const type = (row[12] || '').toString().trim();       // E열: 종류 (4+8)
+      const shippingDate = row[22] ? new Date(row[22]) : null;  // O열: 출고일 (14+8)
       
       if (!storeName || !model || !color) return;
 
@@ -1189,19 +1189,19 @@ app.get('/api/stores', async (req, res) => {
     // 매장 정보와 재고 정보 결합
     const stores = storeRows
       .filter(row => {
-        const name = (row[6] || '').toString().trim();  // G열: 업체명
-        const status = row[4];                          // E열: 거래상태
+        const name = (row[14] || '').toString().trim();  // G열: 업체명 (6+8)
+        const status = row[12];                          // E열: 거래상태 (4+8)
         return name && status === "사용";
       })
       .map(row => {
-        const latitude = parseFloat(row[0] || '0');    // A열: 위도
-        const longitude = parseFloat(row[1] || '0');   // B열: 경도
-        const status = row[4];                         // E열: 거래상태
-        const name = row[6].toString().trim();         // G열: 업체명
-        const storeId = row[7];                        // H열: 매장 ID
-        const phone = row[9] || '';                    // J열: 연락처
-        const manager = row[13] || '';                 // N열: 담당자
-        const address = (row[3] || '').toString();    // D열: 주소
+        const latitude = parseFloat(row[8] || '0');    // A열: 위도 (0+8)
+        const longitude = parseFloat(row[9] || '0');   // B열: 경도 (1+8)
+        const status = row[12];                         // E열: 거래상태 (4+8)
+        const name = row[14].toString().trim();        // G열: 업체명 (6+8)
+        const storeId = row[15];                        // H열: 매장 ID (7+8)
+        const phone = row[17] || '';                    // J열: 연락처 (9+8)
+        const manager = row[21] || '';                  // N열: 담당자 (13+8)
+        const address = (row[11] || '').toString();    // D열: 주소 (3+8)
         
         // 빈 매장 ID 제외
         if (!storeId || storeId.toString().trim() === '') {
@@ -1263,12 +1263,12 @@ app.get('/api/models', async (req, res) => {
     const modelColorMap = {};
     
     inventoryRows.forEach(row => {
-      if (row.length < 8) return;
+      if (row.length < 16) return;
       
-      const model = (row[5] || '').toString().trim();    // F열: 모델
-      const color = (row[6] || '').toString().trim();    // G열: 색상
-      const status = (row[7] || '').toString().trim();   // H열: 상태
-      const type = (row[4] || '').toString().trim();     // E열: 종류
+      const model = (row[13] || '').toString().trim();    // F열: 모델 (5+8)
+      const color = (row[14] || '').toString().trim();    // G열: 색상 (6+8)
+      const status = (row[15] || '').toString().trim();   // H열: 상태 (7+8)
+      const type = (row[12] || '').toString().trim();     // E열: 종류 (4+8)
       
       if (!model || !color) return;
       
