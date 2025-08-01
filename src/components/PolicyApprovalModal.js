@@ -146,7 +146,7 @@ const PolicyApprovalModal = ({
               </Grid>
             )}
             
-            {(userRole === 'AA' || userRole === 'BB' || userRole === 'CC' || 
+            {(userRole === 'SS' || userRole === 'AA' || userRole === 'BB' || userRole === 'CC' || 
               userRole === 'DD' || userRole === 'EE' || userRole === 'FF') && (
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>

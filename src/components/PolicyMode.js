@@ -236,10 +236,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       // 사용자 권한에 따른 승인 유형 결정
       let approvalType = '';
-      if (userRole === 'SS' || userRole === 'S') {
+      if (userRole === 'SS') {
+        // 총괄: 총괄, 정산팀, 소속팀 승인 모두 가능
+        if (approval.total === '승인') approvalType = 'total';
+        else if (approval.settlement === '승인') approvalType = 'settlement';
+        else if (approval.team === '승인') approvalType = 'team';
+      } else if (userRole === 'S') {
+        // 정산팀: 총괄, 정산팀 승인 가능
         if (approval.total === '승인') approvalType = 'total';
         else if (approval.settlement === '승인') approvalType = 'settlement';
       } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+        // 소속정책팀: 소속팀 승인만 가능
         if (approval.team === '승인') approvalType = 'team';
       }
       
@@ -638,27 +645,51 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               </Button>
                             )}
                             
-                            {/* 승인 버튼 */}
-                            <Button
-                              size="small"
-                              onClick={() => handleApprovalClick(policy)}
-                              disabled={!loggedInStore?.modePermissions?.policy || policy.policyStatus === '취소됨'}
-                            >
-                              승인
-                            </Button>
+                            {/* 승인 버튼 - 권한별 표시 */}
+                            {(() => {
+                              const userRole = loggedInStore?.agentInfo?.qualification;
+                              const canApprove = 
+                                // 총괄(SS): 모든 승인 가능
+                                userRole === 'SS' ||
+                                // 정산팀(S): 총괄, 정산팀 승인 가능
+                                userRole === 'S' ||
+                                // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
+                                ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
+                              
+                              return canApprove ? (
+                                <Button
+                                  size="small"
+                                  onClick={() => handleApprovalClick(policy)}
+                                  disabled={policy.policyStatus === '취소됨'}
+                                >
+                                  승인
+                                </Button>
+                              ) : null;
+                            })()}
                             
-                            {/* 승인 취소 버튼 (승인자만 보임) */}
-                            {loggedInStore?.modePermissions?.policy && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="warning"
-                                onClick={() => handleCancelClick(policy, 'approval')}
-                                disabled={policy.policyStatus === '취소됨'}
-                              >
-                                승인취소
-                              </Button>
-                            )}
+                            {/* 승인 취소 버튼 - 권한별 표시 */}
+                            {(() => {
+                              const userRole = loggedInStore?.agentInfo?.qualification;
+                              const canCancelApproval = 
+                                // 총괄(SS): 모든 승인 취소 가능
+                                userRole === 'SS' ||
+                                // 정산팀(S): 총괄, 정산팀 승인 취소 가능
+                                userRole === 'S' ||
+                                // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인 취소만 가능
+                                ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
+                              
+                              return canCancelApproval ? (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="warning"
+                                  onClick={() => handleCancelClick(policy, 'approval')}
+                                  disabled={policy.policyStatus === '취소됨'}
+                                >
+                                  승인취소
+                                </Button>
+                              ) : null;
+                            })()}
                             
                             {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
                             {(loggedInStore?.agentInfo?.qualification === 'S' || loggedInStore?.agentInfo?.qualification === 'SS') && (
@@ -706,17 +737,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         loggedInUser={loggedInStore}
       />
 
-             {/* 정책 승인 모달 */}
-       <PolicyApprovalModal
-         open={showApprovalModal}
-         onClose={() => {
-           setShowApprovalModal(false);
-           setSelectedPolicyForApproval(null);
-         }}
-         policy={selectedPolicyForApproval}
-         onApprovalSubmit={handleApprovalSubmit}
-         userRole={loggedInStore?.agentInfo?.qualification || loggedInStore?.modePermissions?.policy ? 'SS' : 'A'}
-       />
+                           {/* 정책 승인 모달 */}
+        <PolicyApprovalModal
+          open={showApprovalModal}
+          onClose={() => {
+            setShowApprovalModal(false);
+            setSelectedPolicyForApproval(null);
+          }}
+          policy={selectedPolicyForApproval}
+          onApprovalSubmit={handleApprovalSubmit}
+          userRole={loggedInStore?.agentInfo?.qualification}
+        />
 
                {/* 정책 취소 모달 */}
         <PolicyCancelModal
