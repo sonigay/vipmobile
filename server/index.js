@@ -13066,7 +13066,7 @@ app.get('/api/policies', async (req, res) => {
     let filteredPolicies = dataRows.filter(row => {
       if (row.length < 15) return false; // 최소 컬럼 수 확인
       
-      const policyYearMonth = row[11]; // L열: 입력일시에서 년월 추출
+      const policyYearMonth = row[23] || ''; // X열: 대상년월
       const policyTypeData = row[6];   // G열: 정책유형
       const categoryData = row[7];     // H열: 무선/유선
       const subCategory = row[8];      // I열: 하위카테고리
@@ -13076,7 +13076,7 @@ app.get('/api/policies', async (req, res) => {
       const teamApproval = row[14];    // O열: 승인상태_소속팀
       
       // 년월 필터
-      if (yearMonth && policyYearMonth && !policyYearMonth.includes(yearMonth)) {
+      if (yearMonth && policyYearMonth && policyYearMonth !== yearMonth) {
         return false;
       }
       
@@ -13139,7 +13139,8 @@ app.get('/api/policies', async (req, res) => {
       settlementStatus: row[19] || '미반영', // T열: 정산반영상태
       settlementUserName: row[20] || '',     // U열: 정산반영자명
       settlementDateTime: row[21] || '',     // V열: 정산반영일시
-      settlementUserId: row[22] || ''        // W열: 정산반영자ID
+      settlementUserId: row[22] || '',       // W열: 정산반영자ID
+      yearMonth: row[23] || ''               // X열: 대상년월
     }));
     
     console.log(`정책 목록 조회 완료: ${policies.length}건`);
@@ -13207,13 +13208,22 @@ app.post('/api/policies', async (req, res) => {
       new Date().toISOString(),    // L열: 입력일시
       '대기',                      // M열: 승인상태_총괄
       '대기',                      // N열: 승인상태_정산팀
-      '대기'                       // O열: 승인상태_소속팀
+      '대기',                      // O열: 승인상태_소속팀
+      '활성',                      // P열: 정책상태
+      '',                          // Q열: 취소사유
+      '',                          // R열: 취소일시
+      '',                          // S열: 취소자명
+      '미반영',                    // T열: 정산반영상태
+      '',                          // U열: 정산반영자명
+      '',                          // V열: 정산반영일시
+      '',                          // W열: 정산반영자ID
+      yearMonth                    // X열: 대상년월
     ];
     
     // Google Sheets에 새 정책 추가 (끝에 공백 포함)
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: '정책_기본정보 !A:O',
+      range: '정책_기본정보 !A:X',
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
