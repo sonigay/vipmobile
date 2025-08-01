@@ -12837,7 +12837,7 @@ app.put('/api/policies/:policyId/cancel', async (req, res) => {
     // Google Sheets 업데이트
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `정책_기본정보 !A${policyRowIndex + 2}:S${policyRowIndex + 2}`,
+      range: `정책_기본정보 !A${policyRowIndex + 2}:X${policyRowIndex + 2}`,
       valueInputOption: 'RAW',
       resource: {
         values: [updatedRow]
@@ -12949,7 +12949,7 @@ app.put('/api/policies/:policyId/approval-cancel', async (req, res) => {
     // Google Sheets 업데이트
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `정책_기본정보 !A${policyRowIndex + 2}:O${policyRowIndex + 2}`,
+      range: `정책_기본정보 !A${policyRowIndex + 2}:X${policyRowIndex + 2}`,
       valueInputOption: 'RAW',
       resource: {
         values: [updatedRow]
