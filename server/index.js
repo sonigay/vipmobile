@@ -13063,6 +13063,12 @@ app.get('/api/policies', async (req, res) => {
     // 정책_기본정보 시트에서 데이터 가져오기 (캐시 무시하고 직접 조회)
     const values = await getSheetValuesWithoutCache('정책_기본정보 ');
     
+    console.log(`📊 [정책조회] 시트에서 가져온 데이터:`, {
+      totalRows: values ? values.length : 0,
+      firstRow: values && values.length > 0 ? values[0] : null,
+      lastRow: values && values.length > 1 ? values[values.length - 1] : null
+    });
+    
     if (!values || values.length <= 1) {
       console.log('정책 데이터가 없습니다.');
       return res.json({ success: true, policies: [] });
@@ -13073,7 +13079,7 @@ app.get('/api/policies', async (req, res) => {
     
     // 필터링 적용
     let filteredPolicies = dataRows.filter(row => {
-      if (row.length < 15) return false; // 최소 컬럼 수 확인
+      if (row.length < 24) return false; // 최소 컬럼 수 확인 (A~X열)
       
       const policyYearMonth = row[23] || ''; // X열: 대상년월
       const policyTypeData = row[6];   // G열: 정책유형
@@ -13084,8 +13090,19 @@ app.get('/api/policies', async (req, res) => {
       const settlementApproval = row[13]; // N열: 승인상태_정산팀
       const teamApproval = row[14];    // O열: 승인상태_소속팀
       
+      console.log(`🔍 [정책필터] 정책 필터링:`, {
+        rowId: row[0], // A열: 정책ID
+        policyYearMonth,
+        policyTypeData,
+        categoryData,
+        subCategory,
+        inputUserId,
+        filters: { yearMonth, policyType, category, userId, approvalStatus }
+      });
+      
       // 년월 필터
       if (yearMonth && policyYearMonth && policyYearMonth !== yearMonth) {
+        console.log(`❌ [정책필터] yearMonth 불일치: ${policyYearMonth} !== ${yearMonth}`);
         return false;
       }
       
@@ -13095,17 +13112,20 @@ app.get('/api/policies', async (req, res) => {
         // "무선:1" 형태에서 "무선" 부분만 추출
         const cleanPolicyType = decodedPolicyType.split(':')[0];
         if (policyTypeData !== cleanPolicyType) {
+          console.log(`❌ [정책필터] policyType 불일치: ${policyTypeData} !== ${cleanPolicyType}`);
           return false;
         }
       }
       
       // 카테고리 필터
       if (category && subCategory !== category) {
+        console.log(`❌ [정책필터] category 불일치: ${subCategory} !== ${category}`);
         return false;
       }
       
       // 사용자 필터
       if (userId && inputUserId !== userId) {
+        console.log(`❌ [정책필터] userId 불일치: ${inputUserId} !== ${userId}`);
         return false;
       }
       
@@ -13113,10 +13133,12 @@ app.get('/api/policies', async (req, res) => {
       if (approvalStatus) {
         const hasApprovalStatus = [totalApproval, settlementApproval, teamApproval].includes(approvalStatus);
         if (!hasApprovalStatus) {
+          console.log(`❌ [정책필터] approvalStatus 불일치`);
           return false;
         }
       }
       
+      console.log(`✅ [정책필터] 정책 통과: ${row[0]}`);
       return true;
     });
     
@@ -13124,10 +13146,10 @@ app.get('/api/policies', async (req, res) => {
     const policies = filteredPolicies.map(row => ({
       id: row[0],                    // A열: 정책ID
       policyName: row[1],            // B열: 정책명
-      policyDate: row[2],            // C열: 정책적용일
+      policyDate: row[2],            // C열: 정책적용일 (시작일~종료일)
       policyStore: row[3],           // D열: 정책적용점
       policyContent: row[4],         // E열: 정책내용
-      policyAmount: parseFloat(row[5]) || 0, // F열: 금액
+      policyAmount: row[5],          // F열: 금액 (금액 + 유형)
       policyType: row[6],            // G열: 정책유형
       wirelessWired: row[7],         // H열: 무선/유선
       category: row[8],              // I열: 하위카테고리
