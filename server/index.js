@@ -12787,8 +12787,8 @@ app.get('/api/policies', async (req, res) => {
     
     const { yearMonth, policyType, category, userId, approvalStatus } = req.query;
     
-    // 정책_기본정보 시트에서 데이터 가져오기
-    const values = await getSheetValues('정책_기본정보');
+    // 정책_기본정보 시트에서 데이터 가져오기 (끝에 공백 포함)
+    const values = await getSheetValues('정책_기본정보 ');
     
     if (!values || values.length <= 1) {
       console.log('정책 데이터가 없습니다.');
@@ -12936,10 +12936,10 @@ app.post('/api/policies', async (req, res) => {
       '대기'                       // O열: 승인상태_소속팀
     ];
     
-    // Google Sheets에 새 정책 추가
+    // Google Sheets에 새 정책 추가 (끝에 공백 포함)
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: '정책_기본정보!A:O',
+      range: '정책_기본정보 !A:O',
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
