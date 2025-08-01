@@ -1845,6 +1845,10 @@ app.post('/api/log-activity', async (req, res) => {
   });
 });
 
+// 로그인 전용 캐시 (성능 최적화)
+const loginCache = new Map();
+const LOGIN_CACHE_TTL = 5 * 60 * 1000; // 5분
+
 // 로그인 검증 API 추가
 app.post('/api/login', async (req, res) => {
   try {
@@ -1857,14 +1861,26 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
+    // 로그인 캐시 확인 (성능 최적화)
+    const cacheKey = `login_${storeId}`;
+    const cachedLogin = loginCache.get(cacheKey);
+    if (cachedLogin && Date.now() < cachedLogin.ttl) {
+      console.log(`🚀 [로그인 최적화] 캐시된 로그인 정보 사용: ${storeId}`);
+      return res.json(cachedLogin.data);
+    }
+    
     // console.log(`Login attempt with ID: ${storeId}`);
     // console.log('Step 1: Starting login process...');
     
-    // 1. 먼저 대리점 관리자 ID인지 확인 (구글시트 기반)
-    // console.log('Step 2: Checking if ID is agent...');
-    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
-    // console.log('Step 3: Agent sheet data fetched, rows:', agentValues ? agentValues.length : 0);
+    // 1. 대리점 관리자와 일반 매장 데이터를 병렬로 가져오기 (성능 최적화)
+    // console.log('Step 2: Fetching agent and store data in parallel...');
+    const [agentValues, storeValues] = await Promise.all([
+      getSheetValues(AGENT_SHEET_NAME),
+      getSheetValues(STORE_SHEET_NAME)
+    ]);
+    // console.log('Step 3: Data fetched, agent rows:', agentValues ? agentValues.length : 0, 'store rows:', storeValues ? storeValues.length : 0);
     
+    // 2. 먼저 대리점 관리자 ID인지 확인
     if (agentValues) {
       const agentRows = agentValues.slice(1);
       // console.log('Step 4: Agent rows (excluding header):', agentRows.length);
@@ -1911,37 +1927,35 @@ app.post('/api/login', async (req, res) => {
           reservation: hasReservationPermission
         };
         
-        // 디스코드로 로그인 로그 전송
+        // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
         if (DISCORD_LOGGING_ENABLED) {
-          try {
-            const embedData = {
-              title: '관리자 로그인',
-              color: 15844367, // 보라색
-              timestamp: new Date().toISOString(),
-              userType: 'agent', // 관리자 타입 지정
-                              fields: [
-                  {
-                    name: '관리자 정보',
-                    value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}`
-                  },
-                {
-                  name: '접속 정보',
-                  value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
-                }
-              ],
-              footer: {
-                text: '(주)브이아이피플러스 관리자 로그인'
+          const embedData = {
+            title: '관리자 로그인',
+            color: 15844367, // 보라색
+            timestamp: new Date().toISOString(),
+            userType: 'agent', // 관리자 타입 지정
+            fields: [
+              {
+                name: '관리자 정보',
+                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}`
+              },
+              {
+                name: '접속 정보',
+                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
               }
-            };
-            
-            await sendLogToDiscord(embedData);
-          } catch (logError) {
+            ],
+            footer: {
+              text: '(주)브이아이피플러스 관리자 로그인'
+            }
+          };
+          
+          // 비동기로 로그 전송 (응답 지연 방지)
+          sendLogToDiscord(embedData).catch(logError => {
             console.error('로그인 로그 전송 실패:', logError.message);
-            // 로그 전송 실패해도 로그인은 허용
-          }
+          });
         }
         
-        return res.json({
+        const loginResult = {
           success: true,
           isAgent: true,
           modePermissions: modePermissions,
@@ -1952,12 +1966,19 @@ app.post('/api/login', async (req, res) => {
             office: agent[3] || '',        // D열: 사무실
             department: agent[4] || ''     // E열: 소속
           }
+        };
+        
+        // 로그인 결과 캐시 저장 (성능 최적화)
+        loginCache.set(cacheKey, {
+          data: loginResult,
+          ttl: Date.now() + LOGIN_CACHE_TTL
         });
+        
+        return res.json(loginResult);
       }
     }
     
-    // 2. 대리점 관리자가 아닌 경우 일반 매장으로 검색
-    const storeValues = await getSheetValues(STORE_SHEET_NAME);
+    // 3. 대리점 관리자가 아닌 경우 일반 매장으로 검색 (이미 가져온 데이터 사용)
     
     if (!storeValues) {
       throw new Error('Failed to fetch data from store sheet');
@@ -1981,41 +2002,47 @@ app.post('/api/login', async (req, res) => {
         phone: foundStoreRow[19] || ''              // L열: 연락처 추가 (11+8)
       };
       
-      // 디스코드로 로그인 로그 전송
+      // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
       if (DISCORD_LOGGING_ENABLED) {
-        try {
-          const embedData = {
-            title: '매장 로그인',
-            color: 5763719, // 초록색
-            timestamp: new Date().toISOString(),
-            userType: 'store', // 일반 매장 타입 지정
-            fields: [
-              {
-                name: '매장 정보',
-                value: `ID: ${store.id}\n매장명: ${store.name}\n담당자: ${store.manager || '없음'}`
-              },
-              {
-                name: '접속 정보',
-                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
-              }
-            ],
-            footer: {
-              text: '(주)브이아이피플러스 매장 로그인'
+        const embedData = {
+          title: '매장 로그인',
+          color: 5763719, // 초록색
+          timestamp: new Date().toISOString(),
+          userType: 'store', // 일반 매장 타입 지정
+          fields: [
+            {
+              name: '매장 정보',
+              value: `ID: ${store.id}\n매장명: ${store.name}\n담당자: ${store.manager || '없음'}`
+            },
+            {
+              name: '접속 정보',
+              value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
             }
-          };
-          
-          await sendLogToDiscord(embedData);
-        } catch (logError) {
+          ],
+          footer: {
+            text: '(주)브이아이피플러스 매장 로그인'
+          }
+        };
+        
+        // 비동기로 로그 전송 (응답 지연 방지)
+        sendLogToDiscord(embedData).catch(logError => {
           console.error('로그인 로그 전송 실패:', logError.message);
-          // 로그 전송 실패해도 로그인은 허용
-        }
+        });
       }
       
-      return res.json({
+      const loginResult = {
         success: true,
         isAgent: false,
         storeInfo: store
+      };
+      
+      // 로그인 결과 캐시 저장 (성능 최적화)
+      loginCache.set(cacheKey, {
+        data: loginResult,
+        ttl: Date.now() + LOGIN_CACHE_TTL
       });
+      
+      return res.json(loginResult);
     }
     
     // 3. 매장 ID도 아닌 경우
@@ -3398,47 +3425,47 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
     }
     
-    // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리
-    console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작');
-    try {
-      console.log('🔍 [서버시작] 1단계: 시트 데이터 가져오기 시작');
-      
-      // 폰클재고데이터를 기준으로 배정 상태 데이터 가져오기
-      const phoneklInventoryValues = await getSheetValues('폰클재고데이터');
-      console.log(`🔍 [서버시작] 폰클재고데이터 로드 완료: ${phoneklInventoryValues ? phoneklInventoryValues.length : 0}개 행`);
-      
-      const reservationSiteValues = await getSheetValues('사전예약사이트');
-      // 사전예약사이트 로드 완료
-      
-      // 1단계: 먼저 개통완료 상태 확인 및 F열 업데이트
-      console.log('📋 [서버시작] 1-1단계: 개통완료 상태 확인 시작');
+    // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리 (지연 로딩으로 성능 최적화)
+    console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작 (백그라운드에서 실행)');
+    
+    // 백그라운드에서 데이터 로드 (서버 시작 지연 방지)
+    setTimeout(async () => {
       try {
-        const activationResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`);
-        if (activationResponse.ok) {
-          const activationResult = await activationResponse.json();
-          if (activationResult.success) {
-            console.log(`✅ [서버시작] 개통완료 상태 확인 완료: ${activationResult.data?.length || 0}개 고객 처리`);
-          } else {
-            console.error('❌ [서버시작] 개통완료 상태 확인 실패:', activationResult.error);
-          }
-        } else {
-          console.error('❌ [서버시작] 개통완료 상태 확인 API 호출 실패:', activationResponse.status);
-        }
-      } catch (error) {
-        console.error('❌ [서버시작] 개통완료 상태 확인 오류:', error.message);
-      }
-      
-      // 2단계: 개통완료 데이터 저장 완료를 위한 대기 (3초)
-      console.log('⏳ [서버시작] 1-2단계: 개통완료 데이터 저장 완료 대기 (3초)');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // 폰클출고처데이터 로드 (POS점 매핑용)
-      const phoneklStoreValues = await getSheetValues('폰클출고처데이터');
-      console.log(`🔍 [서버시작] 폰클출고처데이터 로드 완료: ${phoneklStoreValues ? phoneklStoreValues.length : 0}개 행`);
-      
-      // 정규화 규칙 로드
-      const normalizationValues = await getSheetValues('정규화작업');
-      console.log(`🔍 [서버시작] 정규화작업 로드 완료: ${normalizationValues ? normalizationValues.length : 0}개 행`);
+        console.log('🔍 [서버시작] 1단계: 시트 데이터 가져오기 시작 (백그라운드)');
+        
+        // 폰클재고데이터를 기준으로 배정 상태 데이터 가져오기
+        const phoneklInventoryValues = await getSheetValues('폰클재고데이터');
+        console.log(`🔍 [서버시작] 폰클재고데이터 로드 완료: ${phoneklInventoryValues ? phoneklInventoryValues.length : 0}개 행`);
+        
+        const reservationSiteValues = await getSheetValues('사전예약사이트');
+        // 사전예약사이트 로드 완료
+        
+        // 1단계: 먼저 개통완료 상태 확인 및 F열 업데이트 (비동기 처리)
+        console.log('📋 [서버시작] 1-1단계: 개통완료 상태 확인 시작 (비동기)');
+        fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/inventory/activation-status`)
+          .then(async (activationResponse) => {
+            if (activationResponse.ok) {
+              const activationResult = await activationResponse.json();
+              if (activationResult.success) {
+                console.log(`✅ [서버시작] 개통완료 상태 확인 완료: ${activationResult.data?.length || 0}개 고객 처리`);
+              } else {
+                console.error('❌ [서버시작] 개통완료 상태 확인 실패:', activationResult.error);
+              }
+            } else {
+              console.error('❌ [서버시작] 개통완료 상태 확인 API 호출 실패:', activationResponse.status);
+            }
+          })
+          .catch(error => {
+            console.error('❌ [서버시작] 개통완료 상태 확인 오류:', error.message);
+          });
+        
+        // 폰클출고처데이터 로드 (POS점 매핑용)
+        const phoneklStoreValues = await getSheetValues('폰클출고처데이터');
+        console.log(`🔍 [서버시작] 폰클출고처데이터 로드 완료: ${phoneklStoreValues ? phoneklStoreValues.length : 0}개 행`);
+        
+        // 정규화 규칙 로드
+        const normalizationValues = await getSheetValues('정규화작업');
+        console.log(`🔍 [서버시작] 정규화작업 로드 완료: ${normalizationValues ? normalizationValues.length : 0}개 행`);
       
       // 정규화 규칙 생성
       const normalizationRules = new Map();
