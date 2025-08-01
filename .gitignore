@@ -28,3 +28,6 @@ yarn-error.log*
 
 # Local Netlify folder
 .netlify
+
+# npm cache
+.npm-cache/
