@@ -12816,9 +12816,14 @@ app.get('/api/policies', async (req, res) => {
         return false;
       }
       
-      // 정책유형 필터
-      if (policyType && policyTypeData !== policyType) {
-        return false;
+      // 정책유형 필터 (URL 디코딩 및 처리)
+      if (policyType) {
+        const decodedPolicyType = decodeURIComponent(policyType);
+        // "무선:1" 형태에서 "무선" 부분만 추출
+        const cleanPolicyType = decodedPolicyType.split(':')[0];
+        if (policyTypeData !== cleanPolicyType) {
+          return false;
+        }
       }
       
       // 카테고리 필터
@@ -12879,10 +12884,12 @@ app.post('/api/policies', async (req, res) => {
     
     const {
       policyName,
-      policyDate,
+      policyStartDate,
+      policyEndDate,
       policyStore,
       policyContent,
       policyAmount,
+      amountType,
       policyType,
       category,
       yearMonth,
@@ -12891,24 +12898,33 @@ app.post('/api/policies', async (req, res) => {
     } = req.body;
     
     // 필수 필드 검증
-    if (!policyName || !policyDate || !policyStore || !policyContent || !policyAmount) {
+    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || !policyAmount || !amountType) {
       return res.status(400).json({
         success: false,
-        error: '필수 필드가 누락되었습니다.'
+        error: '필수 필드가 누락되었습니다.',
+        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, policyAmount, amountType }
       });
     }
     
     // 정책 ID 생성
     const policyId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // 정책 적용일을 시작일~종료일 형태로 변환
+    const startDate = new Date(policyStartDate).toLocaleDateString('ko-KR');
+    const endDate = new Date(policyEndDate).toLocaleDateString('ko-KR');
+    const policyDateRange = `${startDate} ~ ${endDate}`;
+    
+    // 금액 정보에 유형 추가
+    const amountWithType = `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
+    
     // 새 정책 데이터 생성
     const newPolicyRow = [
       policyId,                    // A열: 정책ID
       policyName,                  // B열: 정책명
-      policyDate,                  // C열: 정책적용일
+      policyDateRange,             // C열: 정책적용일 (시작일~종료일)
       policyStore,                 // D열: 정책적용점
       policyContent,               // E열: 정책내용
-      policyAmount,                // F열: 금액
+      amountWithType,              // F열: 금액 (금액 + 유형)
       policyType,                  // G열: 정책유형
       category.startsWith('wireless') ? '무선' : '유선', // H열: 무선/유선
       category,                    // I열: 하위카테고리
