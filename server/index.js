@@ -1972,13 +1972,13 @@ app.post('/api/login', async (req, res) => {
     
     if (foundStoreRow) {
       const store = {
-        id: foundStoreRow[7],                      // H열: 매장 ID
-        name: foundStoreRow[6],                    // G열: 업체명
-        manager: foundStoreRow[13] || '',          // N열: 담당자
-        address: foundStoreRow[3] || '',          // D열: 주소
-        latitude: parseFloat(foundStoreRow[0] || '0'),  // A열: 위도
-        longitude: parseFloat(foundStoreRow[1] || '0'),  // B열: 경도
-        phone: foundStoreRow[11] || ''              // L열: 연락처 추가
+        id: foundStoreRow[15],                      // H열: 매장 ID (7+8)
+        name: foundStoreRow[14],                    // G열: 업체명 (6+8)
+        manager: foundStoreRow[21] || '',          // N열: 담당자 (13+8)
+        address: foundStoreRow[11] || '',          // D열: 주소 (3+8)
+        latitude: parseFloat(foundStoreRow[8] || '0'),  // A열: 위도 (0+8)
+        longitude: parseFloat(foundStoreRow[9] || '0'),  // B열: 경도 (1+8)
+        phone: foundStoreRow[19] || ''              // L열: 연락처 추가 (11+8)
       };
       
       // 디스코드로 로그인 로그 전송
@@ -3650,10 +3650,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
           const availableSerials = [];
           phoneklInventoryValues.slice(1).forEach(inventoryRow => {
             if (inventoryRow.length >= 15) {
-              const inventorySerialNumber = (inventoryRow[3] || '').toString().trim(); // D열: 일련번호
-              const inventoryModelCapacity = (inventoryRow[5] || '').toString().trim(); // F열: 모델명&용량
-              const inventoryColor = (inventoryRow[6] || '').toString().trim(); // G열: 색상
-              const inventoryStoreName = (inventoryRow[13] || '').toString().trim(); // N열: 출고처
+                      const inventorySerialNumber = (inventoryRow[11] || '').toString().trim(); // D열: 일련번호 (3+8)
+        const inventoryModelCapacity = (inventoryRow[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
+        const inventoryColor = (inventoryRow[14] || '').toString().trim(); // G열: 색상 (6+8)
+        const inventoryStoreName = (inventoryRow[21] || '').toString().trim(); // N열: 출고처 (13+8)
               
               // 해당 출고처에 배정된 재고이고, 모델이 일치하는 경우
               if (inventorySerialNumber && inventoryModelCapacity && inventoryColor && 
@@ -7105,10 +7105,10 @@ function normalizeActivationType(manualRow, systemRow) {
   // 수기초 데이터 정규화 (K열, AO열, CC열 조합)
   let manualType = '';
   if (manualRow.length > 80) { // 최소 CC열(80)은 있어야 함
-    const joinType = (manualRow[10] || '').toString().trim(); // K열: 가입구분
-    const prevOperator = (manualRow[40] || '').toString().trim(); // AO열: 이전사업자
-    const changeTarget = (manualRow[80] || '').toString().trim(); // CC열: 기변타겟구분
-    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+            const joinType = (manualRow[19] || '').toString().trim(); // K열: 가입구분 (10+9)
+        const prevOperator = (manualRow[49] || '').toString().trim(); // AO열: 이전사업자 (40+9)
+        const changeTarget = (manualRow[89] || '').toString().trim(); // CC열: 기변타겟구분 (80+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // 수기초 정규화 로직
     if (joinType === '신규') {
@@ -7140,10 +7140,10 @@ function normalizeActivationType(manualRow, systemRow) {
   // 폰클 데이터 정규화 (L열, X열 조합)
   let systemType = '';
   if (systemRow.length > 23) { // 최소 X열(23)은 있어야 함
-    const activationType = (systemRow[11] || '').toString().trim(); // L열: 개통
-    const returnService = (systemRow[23] || '').toString().trim(); // X열: 환수서비스
-    const columnI = (systemRow[8] || '').toString().trim(); // I열
-    const columnE = (systemRow[4] || '').toString().trim(); // E열
+    const activationType = (systemRow[19] || '').toString().trim(); // L열: 개통 (11+8)
+    const returnService = (systemRow[31] || '').toString().trim(); // X열: 환수서비스 (23+8)
+    const columnI = (systemRow[16] || '').toString().trim(); // I열 (8+8)
+    const columnE = (systemRow[12] || '').toString().trim(); // E열 (4+8)
     
     // 선불개통 조건 먼저 확인
     if (activationType && activationType.includes('선불개통')) {
@@ -7188,8 +7188,8 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
   // 수기초 데이터 정규화 (H열)
   let manualPos = '';
   if (manualRow.length > 7) { // 최소 H열(7)은 있어야 함
-    const salesPos = (manualRow[7] || '').toString().trim(); // H열: 실판매POS
-    const strategyOnline = (manualRow[8] || '').toString().trim(); // I열: 전략온라인 체크
+            const salesPos = (manualRow[16] || '').toString().trim(); // H열: 실판매POS (7+9)
+        const strategyOnline = (manualRow[17] || '').toString().trim(); // I열: 전략온라인 체크 (8+9)
     
     // 전략온라인 제외 조건
     if (strategyOnline && strategyOnline.includes('전략온라인')) {
@@ -7208,7 +7208,7 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
   // 폰클 데이터 정규화 (G열)
   let systemPos = '';
   if (systemRow.length > 6) { // 최소 G열(6)은 있어야 함
-    const storeCode = (systemRow[6] || '').toString().trim(); // G열: 출고처
+    const storeCode = (systemRow[14] || '').toString().trim(); // G열: 출고처 (6+8)
     
     // 폰클 정규화: VLOOKUP 결과 & G열
     if (storeCode && storeData) {
@@ -7228,8 +7228,8 @@ function normalizePlan(manualRow, systemRow, planData = null) {
   let manualPlan = '';
   let manualPlanType = '';
   if (manualRow.length > 37) { // 최소 AL열(37)은 있어야 함
-    const planName = (manualRow[37] || '').toString().trim(); // AL열: 최종요금제
-    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+            const planName = (manualRow[46] || '').toString().trim(); // AL열: 최종요금제 (37+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 문구 포함건은 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
@@ -7256,7 +7256,7 @@ function normalizePlan(manualRow, systemRow, planData = null) {
   let systemPlan = '';
   let systemPlanType = '';
   if (systemRow.length > 21) { // 최소 V열(21)은 있어야 함
-    const planCode = (systemRow[21] || '').toString().trim(); // V열: 요금제
+    const planCode = (systemRow[29] || '').toString().trim(); // V열: 요금제 (21+8)
     
     // 폰클 정규화: VLOOKUP1 & (V열) & (VLOOKUP2)
     if (planCode && planData) {
@@ -7283,14 +7283,14 @@ function normalizeShippingVirtual(manualRow, systemRow) {
   // 수기초 데이터 정규화 (AV열+AZ열+AW열+BK열+BM열+BN열+BL열)
   let manualShipping = '';
   if (manualRow.length > 65) { // 최소 BN열(65)은 있어야 함
-    const avValue = (manualRow[47] || '').toString().trim(); // AV열
-    const azValue = (manualRow[51] || '').toString().trim(); // AZ열
-    const awValue = (manualRow[48] || '').toString().trim(); // AW열
-    const bkValue = (manualRow[62] || '').toString().trim(); // BK열
-    const bmValue = (manualRow[64] || '').toString().trim(); // BM열
-    const bnValue = (manualRow[65] || '').toString().trim(); // BN열
-    const blValue = (manualRow[66] || '').toString().trim(); // BL열
-    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+            const avValue = (manualRow[56] || '').toString().trim(); // AV열 (47+9)
+        const azValue = (manualRow[60] || '').toString().trim(); // AZ열 (51+9)
+        const awValue = (manualRow[57] || '').toString().trim(); // AW열 (48+9)
+        const bkValue = (manualRow[71] || '').toString().trim(); // BK열 (62+9)
+        const bmValue = (manualRow[73] || '').toString().trim(); // BM열 (64+9)
+        const bnValue = (manualRow[74] || '').toString().trim(); // BN열 (65+9)
+        const blValue = (manualRow[75] || '').toString().trim(); // BL열 (66+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
@@ -7306,7 +7306,7 @@ function normalizeShippingVirtual(manualRow, systemRow) {
   // 폰클 데이터 정규화 (AB열)
   let systemShipping = '';
   if (systemRow.length > 27) { // 최소 AB열(27)은 있어야 함
-    const abValue = (systemRow[27] || '').toString().trim(); // AB열: 출고가상이
+    const abValue = (systemRow[35] || '').toString().trim(); // AB열: 출고가상이 (27+8)
     systemShipping = normalizeNumberFormat(abValue);
   }
   
@@ -7318,9 +7318,9 @@ function normalizeSupportContract(manualRow, systemRow) {
   // 수기초 데이터 정규화 (BH열 또는 BK열)
   let manualSupport = '';
   if (manualRow.length > 62) { // 최소 BK열(62)은 있어야 함
-    const bhValue = (manualRow[59] || '').toString().trim(); // BH열
-    const bkValue = (manualRow[62] || '').toString().trim(); // BK열
-    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+            const bhValue = (manualRow[68] || '').toString().trim(); // BH열 (59+9)
+        const bkValue = (manualRow[71] || '').toString().trim(); // BK열 (62+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
@@ -7341,7 +7341,7 @@ function normalizeSupportContract(manualRow, systemRow) {
   // 폰클 데이터 정규화 (AC열)
   let systemSupport = '';
   if (systemRow.length > 28) { // 최소 AC열(28)은 있어야 함
-    const acValue = (systemRow[28] || '').toString().trim(); // AC열: 지원금 및 약정상이
+    const acValue = (systemRow[36] || '').toString().trim(); // AC열: 지원금 및 약정상이 (28+8)
     
     // 선택방식 정규화: AC열에 "선택" 포함 시 "선택약정할인", 아니면 숫자 형식
     console.log(`AC열 값: "${acValue}"`);
@@ -7362,9 +7362,9 @@ function normalizeConversionSupport(manualRow, systemRow) {
   // 수기초 데이터 정규화 (BM열+BN열)
   let manualConversion = '';
   if (manualRow.length > 65) { // 최소 BN열(65)은 있어야 함
-    const bmValue = (manualRow[64] || '').toString().trim(); // BM열
-    const bnValue = (manualRow[65] || '').toString().trim(); // BN열
-    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+            const bmValue = (manualRow[73] || '').toString().trim(); // BM열 (64+9)
+        const bnValue = (manualRow[74] || '').toString().trim(); // BN열 (65+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
@@ -7380,7 +7380,7 @@ function normalizeConversionSupport(manualRow, systemRow) {
   // 폰클 데이터 정규화 (AE열)
   let systemConversion = '';
   if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
-    const aeValue = (systemRow[30] || '').toString().trim(); // AE열: 전환지원금상이
+    const aeValue = (systemRow[38] || '').toString().trim(); // AE열: 전환지원금상이 (30+8)
     systemConversion = normalizeNumberFormat(aeValue);
   }
   
@@ -7392,9 +7392,9 @@ function normalizePreInstallment(manualRow, systemRow) {
   // 수기초 데이터 정규화 (AV열+BL열)
   let manualPreInstallment = '';
   if (manualRow.length > 63) { // 최소 BL열(63)은 있어야 함
-    const avValue = (manualRow[47] || '').toString().trim(); // AV열: 프리할부상이
-    const blValue = (manualRow[63] || '').toString().trim(); // BL열
-    const finalPolicy = (manualRow[39] || '').toString().trim(); // AN열: 최종영업정책
+            const avValue = (manualRow[56] || '').toString().trim(); // AV열: 프리할부상이 (47+9)
+        const blValue = (manualRow[72] || '').toString().trim(); // BL열 (63+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
@@ -7410,10 +7410,10 @@ function normalizePreInstallment(manualRow, systemRow) {
   // 폰클 데이터 정규화 (AB열-AS열-AC열-AE열)
   let systemPreInstallment = '';
   if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
-    const abValue = (systemRow[27] || '').toString().trim(); // AB열
-    const asValue = (systemRow[44] || '').toString().trim(); // AS열
-    const acValue = (systemRow[28] || '').toString().trim(); // AC열
-    const aeValue = (systemRow[30] || '').toString().trim(); // AE열
+    const abValue = (systemRow[35] || '').toString().trim(); // AB열 (27+8)
+    const asValue = (systemRow[52] || '').toString().trim(); // AS열 (44+8)
+    const acValue = (systemRow[36] || '').toString().trim(); // AC열 (28+8)
+    const aeValue = (systemRow[38] || '').toString().trim(); // AE열 (30+8)
     
     // 숫자 빼기 연산으로 정규화: AB - AS - AC - AE
     let result = subtractNumbers(abValue, asValue);
@@ -7429,8 +7429,8 @@ function normalizePreInstallment(manualRow, systemRow) {
 function normalizeUplayCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
   let manualValue = '유플레이 미포함'; // 기본값 설정
-  if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
-    const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
+  if (manualRow.length > 127) { // 최소 DO열(127)은 있어야 함 (118+9)
+    const uplayValue = (manualRow[127] || '').toString().trim(); // DO열: 유플레이 (118+9)
     
     // "유플레이" 단어 포함 여부로 정규화
     if (uplayValue && uplayValue.includes('유플레이')) {
@@ -7443,7 +7443,7 @@ function normalizeUplayCheck(manualRow, systemRow) {
   // 폰클 데이터 정규화 (W열)
   let systemValue = '유플레이 미포함'; // 기본값 설정
   if (systemRow.length > 21) { // 최소 W열(21)은 있어야 함
-    const uplayValue = (systemRow[22] || '').toString().trim(); // W열: 유플레이
+    const uplayValue = (systemRow[30] || '').toString().trim(); // W열: 유플레이 (22+8)
     
     // "유플레이" 단어 포함 여부로 정규화
     if (uplayValue && uplayValue.includes('유플레이')) {
@@ -7460,8 +7460,8 @@ function normalizeUplayCheck(manualRow, systemRow) {
 function normalizeUplayNoCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
   let manualValue = '유플레이 미포함'; // 기본값 설정
-  if (manualRow.length > 118) { // 최소 DO열(118)은 있어야 함
-    const uplayValue = (manualRow[118] || '').toString().trim(); // DO열: 유플레이
+  if (manualRow.length > 127) { // 최소 DO열(127)은 있어야 함 (118+9)
+    const uplayValue = (manualRow[127] || '').toString().trim(); // DO열: 유플레이 (118+9)
     
     // "유플레이" 단어 포함 여부로 정규화 (미유치 검수용)
     if (uplayValue && uplayValue.includes('유플레이')) {
@@ -7474,7 +7474,7 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   // 폰클 데이터 정규화 (X열)
   let systemValue = '유플레이 미포함'; // 기본값 설정
   if (systemRow.length > 22) { // 최소 X열(22)은 있어야 함
-    const uplayNoValue = (systemRow[23] || '').toString().trim(); // X열: 유플레이 미유치
+    const uplayNoValue = (systemRow[31] || '').toString().trim(); // X열: 유플레이 미유치 (23+8)
     
     // "유플레이" 단어 포함 여부로 정규화 (미유치 검수용)
     if (uplayNoValue && uplayNoValue.includes('유플레이')) {
@@ -7506,11 +7506,11 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
         return;
       }
       
-      const manualDate = manualRow[20] || ''; // U열: 가입일자
-      const manualTime = manualRow[21] || ''; // V열: 개통시간
-      const systemDate = systemRow[1] || '';  // B열: 개통일
-      const systemHour = systemRow[2] || '';  // C열: 개통시
-      const systemMinute = systemRow[3] || ''; // D열: 개통분
+      const manualDate = manualRow[29] || ''; // U열: 가입일자 (20+9)
+      const manualTime = manualRow[30] || ''; // V열: 개통시간 (21+9)
+      const systemDate = systemRow[9] || '';  // B열: 개통일 (1+8)
+      const systemHour = systemRow[10] || '';  // C열: 개통시 (2+8)
+      const systemMinute = systemRow[11] || ''; // D열: 개통분 (3+8)
       
       // 개통일시분 정규화
       const { manualDateTime, systemDateTime } = normalizeActivationDateTime(
@@ -7529,7 +7529,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '개통일시분 비교 (초 제외, 24시간 형식)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7544,15 +7544,15 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       }
       
       // AN열 최종영업정책이 "BLANK"인 경우 비교 제외
-      const finalPolicy = manualRow[39] || ''; // AN열: 최종영업정책
+              const finalPolicy = manualRow[48] || ''; // AN열: 최종영업정책 (39+9)
       if (finalPolicy.toString().trim().toUpperCase() === 'BLANK') {
         return;
       }
       
-      const manualModel = manualRow[29] || ''; // AD열: 개통모델
-      const manualSerial = manualRow[30] || ''; // AE열: 개통모델일련번호
-      const systemModel = systemRow[13] || '';  // N열: 모델명
-      const systemSerial = systemRow[15] || ''; // P열: 일련번호
+              const manualModel = manualRow[38] || ''; // AD열: 개통모델 (29+9)
+        const manualSerial = manualRow[39] || ''; // AE열: 개통모델일련번호 (30+9)
+      const systemModel = systemRow[21] || '';  // N열: 모델명 (13+8)
+      const systemSerial = systemRow[23] || ''; // P열: 일련번호 (15+8)
       
       // 디버깅 대상 시리얼번호인지 확인 (필요시에만 사용)
       const isDebugTarget = DEBUG_SERIAL_NUMBERS.includes(manualSerial) || DEBUG_SERIAL_NUMBERS.includes(systemSerial);
@@ -7585,7 +7585,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7615,7 +7615,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '개통유형 및 C타겟차감대상 비교 (가입구분+이전사업자+기변타겟구분 정규화)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7650,7 +7650,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7690,7 +7690,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
         description: '요금제 비교 (VLOOKUP 방식 정규화, AN열 BLANK 제외, U열 일치 시 제외)',
         manualRow: null,
         systemRow: null,
-        assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
       });
     }
       return;
@@ -7725,7 +7725,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '출고가상이 비교 (더하기 방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7760,7 +7760,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7795,7 +7795,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '전환지원금상이 비교 (더하기 방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7830,7 +7830,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       }
       return;
@@ -7861,7 +7861,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '유플레이 유치검수 (단어 포함 여부 비교)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       } else {
         console.log(`[유플레이 유치검수] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
@@ -7894,7 +7894,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           description: '유플레이 미유치 검수 (반대 로직: 둘 다 같으면 불일치)',
           manualRow: null,
           systemRow: null,
-          assignedAgent: systemRow[69] || '' // BR열: 등록직원
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       } else {
         console.log(`[유플레이 미유치 검수] 일치: manualValue="${manualValue}" !== systemValue="${systemValue}" (서로 다름)`);
@@ -7945,7 +7945,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
         description,
         manualRow: null,
         systemRow: null,
-        assignedAgent: systemRow[69] || '' // BR열: 등록직원
+        assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
       });
     }
   });

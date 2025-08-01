@@ -939,8 +939,8 @@ async function getMonthlyAwardData(req, res) {
       const firstHomeRow = homeRows[0];
       console.log('=== 홈데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstHomeRow.length);
-      console.log('C열(2) - 업체명:', firstHomeRow[2]); // 수정됨
-      console.log('J열(9) - 가입상품:', firstHomeRow[9]);
+              console.log('C열(10) - 업체명:', firstHomeRow[10]); // 2+8
+        console.log('J열(17) - 가입상품:', firstHomeRow[17]); // 9+8
       console.log('================================');
     }
     
@@ -949,11 +949,11 @@ async function getMonthlyAwardData(req, res) {
       const firstStoreRow = storeRows[0];
       console.log('=== 폰클출고처데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstStoreRow.length);
-      console.log('C열(2) - 출고처:', firstStoreRow[2]);
-      console.log('G열(6) - 업체명:', firstStoreRow[6]); // 수정됨
-      console.log('E열(4) - 상태:', firstStoreRow[4]);
-      console.log('H열(7) - 실판매POS 코드:', firstStoreRow[7]);
-      console.log('N열(13) - 담당자:', firstStoreRow[13]);
+              console.log('C열(10) - 출고처:', firstStoreRow[10]); // 2+8
+        console.log('G열(14) - 업체명:', firstStoreRow[14]); // 6+8
+        console.log('E열(12) - 상태:', firstStoreRow[12]); // 4+8
+        console.log('H열(15) - 실판매POS 코드:', firstStoreRow[15]); // 7+8
+        console.log('N열(21) - 담당자:', firstStoreRow[21]); // 13+8
       console.log('================================');
       
       // 폰클출고처데이터의 실제 업체명들 확인 (처음 10개)
