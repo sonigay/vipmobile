@@ -13230,6 +13230,37 @@ app.post('/api/policies', async (req, res) => {
     // 금액 정보에 유형 추가
     const amountWithType = `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
     
+    // 먼저 시트에 데이터가 있는지 확인
+    const existingData = await getSheetValuesWithoutCache('정책_기본정보 ');
+    
+    // 헤더 정의
+    const headerRow = [
+      '정책ID',           // A열
+      '정책명',           // B열
+      '정책적용일',       // C열
+      '정책적용점',       // D열
+      '정책내용',         // E열
+      '금액',             // F열
+      '정책유형',         // G열
+      '무선/유선',        // H열
+      '하위카테고리',     // I열
+      '입력자ID',         // J열
+      '입력자명',         // K열
+      '입력일시',         // L열
+      '승인상태_총괄',     // M열
+      '승인상태_정산팀',   // N열
+      '승인상태_소속팀',   // O열
+      '정책상태',         // P열
+      '취소사유',         // Q열
+      '취소일시',         // R열
+      '취소자명',         // S열
+      '정산반영상태',     // T열
+      '정산반영자명',     // U열
+      '정산반영일시',     // V열
+      '정산반영자ID',     // W열
+      '대상년월'          // X열
+    ];
+    
     // 새 정책 데이터 생성
     const newPolicyRow = [
       policyId,                    // A열: 정책ID
@@ -13258,16 +13289,33 @@ app.post('/api/policies', async (req, res) => {
       yearMonth                    // X열: 대상년월
     ];
     
-    // Google Sheets에 새 정책 추가 (끝에 공백 포함)
-    const response = await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '정책_기본정보 !A:X',
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      resource: {
-        values: [newPolicyRow]
-      }
-    });
+    let response;
+    
+    // 시트가 비어있으면 헤더와 함께 데이터 추가
+    if (!existingData || existingData.length === 0) {
+      console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
+      response = await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정책_기본정보 !A:X',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [headerRow, newPolicyRow]
+        }
+      });
+    } else {
+      // 기존 데이터가 있으면 정책만 추가
+      console.log('📝 [정책생성] 기존 데이터에 정책 추가');
+      response = await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '정책_기본정보 !A:X',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [newPolicyRow]
+        }
+      });
+    }
     
     // 알림 생성
     await createPolicyNotification(policyId, inputUserId, 'new_policy');
