@@ -658,6 +658,13 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             {/* 승인 버튼 - 권한별 표시 */}
                             {(() => {
                               const userRole = loggedInStore?.agentInfo?.qualification;
+                              console.log('🔍 [승인버튼] 사용자 권한 정보:', {
+                                userRole,
+                                loggedInStore: loggedInStore,
+                                agentInfo: loggedInStore?.agentInfo,
+                                qualification: loggedInStore?.agentInfo?.qualification
+                              });
+                              
                               const canApprove = 
                                 // 총괄(SS): 모든 승인 가능
                                 userRole === 'SS' ||
@@ -666,15 +673,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                 // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
                                 ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                               
-                                                             return canApprove ? (
-                                 <Button
-                                   size="small"
-                                   onClick={() => handleApprovalClick(policy)}
-                                   disabled={policy.policyStatus === '취소됨' || approvalProcessing}
-                                 >
-                                   {approvalProcessing ? '처리중...' : '승인'}
-                                 </Button>
-                               ) : null;
+                              console.log('🔍 [승인버튼] 승인 가능 여부:', canApprove);
+                              
+                              return canApprove ? (
+                                <Button
+                                  size="small"
+                                  onClick={() => handleApprovalClick(policy)}
+                                  disabled={policy.policyStatus === '취소됨' || approvalProcessing}
+                                >
+                                  {approvalProcessing ? '처리중...' : '승인'}
+                                </Button>
+                              ) : null;
                             })()}
                             
                             {/* 승인 취소 버튼 - 권한별 표시 */}
