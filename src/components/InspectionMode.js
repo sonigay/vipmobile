@@ -1317,22 +1317,18 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       </Dialog>
 
       {/* 업데이트 진행 팝업 */}
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="inspection"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          console.log('검수모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
       
     </Box>
   );
 }
-
-// 업데이트 팝업 컴포넌트
-const UpdatePopup = () => (
-  <AppUpdatePopup
-    open={showUpdatePopup}
-    onClose={() => setShowUpdatePopup(false)}
-    mode="inspection"
-    loggedInStore={loggedInStore}
-    onUpdateAdded={() => {
-      console.log('검수모드 새 업데이트가 추가되었습니다.');
-    }}
-  />
-);
 
 export default InspectionMode; 

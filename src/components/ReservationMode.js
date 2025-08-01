@@ -99,7 +99,11 @@ import {
   ViewCarousel as ViewCarouselIcon,
   ViewTimeline as ViewTimelineIcon,
   ViewKanban as ViewKanbanIcon,
-  ViewSidebar as ViewSidebarIcon
+  ViewSidebar as ViewSidebarIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  People as PeopleIcon,
+  Business as BusinessIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';

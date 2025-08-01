@@ -207,26 +207,21 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       {/* 탭 컨텐츠 */}
       <Container maxWidth="lg" sx={{ flex: 1, py: 3, overflow: 'auto' }}>
         {/* 업데이트 팝업 */}
-        <UpdatePopup />
+        <AppUpdatePopup
+          open={showUpdatePopup}
+          onClose={() => setShowUpdatePopup(false)}
+          mode="chart"
+          loggedInStore={loggedInStore}
+          onUpdateAdded={() => {
+            console.log('장표모드 새 업데이트가 추가되었습니다.');
+          }}
+        />
         
         {availableTabs[activeTab].component}
       </Container>
     </Box>
   );
 }
-
-// 업데이트 팝업 컴포넌트
-const UpdatePopup = () => (
-  <AppUpdatePopup
-    open={showUpdatePopup}
-    onClose={() => setShowUpdatePopup(false)}
-    mode="chart"
-    loggedInStore={loggedInStore}
-    onUpdateAdded={() => {
-      console.log('장표모드 새 업데이트가 추가되었습니다.');
-    }}
-  />
-);
 
 // 채권장표 탭 컴포넌트
 function BondChartTab() {

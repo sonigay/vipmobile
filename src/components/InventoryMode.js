@@ -638,7 +638,15 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
         {/* 메인 콘텐츠 */}
         <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
           {/* 업데이트 팝업 */}
-          <UpdatePopup />
+          <AppUpdatePopup
+            open={showUpdatePopup}
+            onClose={() => setShowUpdatePopup(false)}
+            mode="inventory"
+            loggedInStore={loggedInStore}
+            onUpdateAdded={() => {
+              console.log('재고모드 새 업데이트가 추가되었습니다.');
+            }}
+          />
           
           {/* 검색 및 필터 */}
           <Paper sx={{ p: 2, mb: 3 }}>
@@ -1208,23 +1216,18 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
       </Box>
       
       {/* 업데이트 팝업 */}
-      <UpdatePopup />
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="inventory"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          console.log('재고모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
       
     </Box>
   );
 }
-
-// 업데이트 팝업 컴포넌트
-const UpdatePopup = () => (
-  <AppUpdatePopup
-    open={showUpdatePopup}
-    onClose={() => setShowUpdatePopup(false)}
-    mode="inventory"
-    loggedInStore={loggedInStore}
-    onUpdateAdded={() => {
-      console.log('재고모드 새 업데이트가 추가되었습니다.');
-    }}
-  />
-);
 
 export default InventoryMode; 
