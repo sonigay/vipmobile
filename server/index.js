@@ -1966,9 +1966,9 @@ app.post('/api/login', async (req, res) => {
     const storeRows = storeValues.slice(1);
     
     const foundStoreRow = storeRows.find(row => {
-      const rowId = row[7];
+      const rowId = row[15]; // H열: 매장 ID (7+8)
       return rowId === storeId;
-    }); // G열: 매장 ID로 수정
+    });
     
     if (foundStoreRow) {
       const store = {
@@ -2156,9 +2156,9 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     // 3. 폰클출고처데이터에서 POS코드 매핑 생성
     const storePosCodeMapping = new Map();
     phoneklStoreValues.slice(1).forEach(row => {
-      if (row.length >= 8) {
-        const storeName = (row[6] || '').toString().trim(); // G열: 출고처명
-        const posCode = (row[7] || '').toString().trim(); // H열: POS코드
+      if (row.length >= 16) {
+        const storeName = (row[14] || '').toString().trim(); // G열: 출고처명 (6+8)
+        const posCode = (row[15] || '').toString().trim(); // H열: POS코드 (7+8)
         
         if (storeName && posCode) {
           storePosCodeMapping.set(storeName, posCode);
@@ -2171,11 +2171,11 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     const serialNumberToStore = new Map(); // key: 일련번호, value: 출고처명
     
     phoneklInventoryValues.slice(1).forEach(row => {
-      if (row.length >= 15) {
-        const serialNumber = (row[3] || '').toString().trim(); // D열: 일련번호
-        const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
-        const color = (row[6] || '').toString().trim(); // G열: 색상
-        const storeName = (row[13] || '').toString().trim(); // N열: 출고처
+      if (row.length >= 22) {
+        const serialNumber = (row[11] || '').toString().trim(); // D열: 일련번호 (3+8)
+        const modelCapacity = (row[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
+        const color = (row[14] || '').toString().trim(); // G열: 색상 (6+8)
+        const storeName = (row[21] || '').toString().trim(); // N열: 출고처 (13+8)
         
         if (serialNumber && modelCapacity && color && storeName) {
           const posCode = storePosCodeMapping.get(storeName);
@@ -2202,9 +2202,9 @@ app.get('/api/inventory/assignment-status', async (req, res) => {
     const activatedSerialNumbers = new Set();
     if (phoneklActivationValues && phoneklActivationValues.length > 1) {
       phoneklActivationValues.slice(1).forEach(row => {
-        if (row.length >= 16) {
-          const serialNumber = (row[15] || '').toString().trim(); // P열: 일련번호
-          const storeName = (row[6] || '').toString().trim(); // G열: 출고처
+        if (row.length >= 24) {
+          const serialNumber = (row[23] || '').toString().trim(); // P열: 일련번호 (15+8)
+          const storeName = (row[14] || '').toString().trim(); // G열: 출고처 (6+8)
           
           if (serialNumber && storeName) {
             activatedSerialNumbers.add(serialNumber);
@@ -2803,10 +2803,10 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
     let matchedModels = 0;
     
     phoneklInventoryValues.slice(1).forEach(row => {
-      if (row.length >= 15) {
-        const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
-        const color = (row[6] || '').toString().trim(); // G열: 색상
-        const storeName = (row[13] || '').toString().trim(); // N열: 출고처
+      if (row.length >= 22) {
+        const modelCapacity = (row[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
+        const color = (row[14] || '').toString().trim(); // G열: 색상 (6+8)
+        const storeName = (row[21] || '').toString().trim(); // N열: 출고처 (13+8)
         
         if (modelCapacity && color && storeName) {
           processedRows++;
@@ -2953,11 +2953,11 @@ app.post('/api/inventory/manual-assignment', async (req, res) => {
     const serialNumberToStore = new Map(); // key: 일련번호, value: 출고처명
     
     phoneklInventoryValues.slice(1).forEach(row => {
-      if (row.length >= 15) {
-        const serialNumber = (row[3] || '').toString().trim(); // D열: 일련번호
-        const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
-        const color = (row[6] || '').toString().trim(); // G열: 색상
-        const storeName = (row[13] || '').toString().trim(); // N열: 출고처
+      if (row.length >= 22) {
+        const serialNumber = (row[11] || '').toString().trim(); // D열: 일련번호 (3+8)
+        const modelCapacity = (row[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
+        const color = (row[14] || '').toString().trim(); // G열: 색상 (6+8)
+        const storeName = (row[21] || '').toString().trim(); // N열: 출고처 (13+8)
         
         if (serialNumber && modelCapacity && color && storeName) {
           const posCode = storePosCodeMapping.get(storeName);
@@ -3482,11 +3482,11 @@ const server = app.listen(port, '0.0.0.0', async () => {
       // 폰클재고데이터 처리 (배정완료된 재고만 - N열 출고처에 값이 있는 재고)
       const inventoryMap = new Map(); // 모델별 일련번호 배열 저장
       phoneklInventoryValues.slice(1).forEach(row => {
-        if (row.length >= 15) {
-          const serialNumber = (row[3] || '').toString().trim(); // D열: 일련번호
-          const modelCapacity = (row[5] || '').toString().trim(); // F열: 모델명&용량
-          const color = (row[6] || '').toString().trim(); // G열: 색상
-          const storeName = (row[13] || '').toString().trim(); // N열: 출고처
+        if (row.length >= 22) {
+          const serialNumber = (row[11] || '').toString().trim(); // D열: 일련번호 (3+8)
+          const modelCapacity = (row[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
+          const color = (row[14] || '').toString().trim(); // G열: 색상 (6+8)
+          const storeName = (row[21] || '').toString().trim(); // N열: 출고처 (13+8)
           
           // N열 출고처가 비어있는 재고만 사용 가능한 재고로 간주 (아직 배정되지 않은 재고)
           if (serialNumber && modelCapacity && color && (!storeName || storeName.trim() === '')) {
