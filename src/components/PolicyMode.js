@@ -242,21 +242,21 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       const { policyId, approvalData: approval, userRole } = approvalData;
       
-      // 사용자 권한에 따른 승인 유형 결정
-      let approvalType = '';
-      if (userRole === 'SS') {
-        // 총괄: 총괄, 정산팀, 소속팀 승인 모두 가능
-        if (approval.total === '승인') approvalType = 'total';
-        else if (approval.settlement === '승인') approvalType = 'settlement';
-        else if (approval.team === '승인') approvalType = 'team';
-      } else if (userRole === 'S') {
-        // 정산팀: 총괄, 정산팀 승인 가능
-        if (approval.total === '승인') approvalType = 'total';
-        else if (approval.settlement === '승인') approvalType = 'settlement';
-      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-        // 소속정책팀: 소속팀 승인만 가능
-        if (approval.team === '승인') approvalType = 'team';
-      }
+             // 사용자 권한에 따른 승인 유형 결정
+       let approvalType = '';
+       if (userRole === 'SS' || userRole === '이사') {
+         // 총괄/이사: 총괄, 정산팀, 소속팀 승인 모두 가능
+         if (approval.total === '승인') approvalType = 'total';
+         else if (approval.settlement === '승인') approvalType = 'settlement';
+         else if (approval.team === '승인') approvalType = 'team';
+       } else if (userRole === 'S') {
+         // 정산팀: 총괄, 정산팀 승인 가능
+         if (approval.total === '승인') approvalType = 'total';
+         else if (approval.settlement === '승인') approvalType = 'settlement';
+       } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+         // 소속정책팀: 소속팀 승인만 가능
+         if (approval.team === '승인') approvalType = 'team';
+       }
       
       if (!approvalType) {
         alert('승인 상태를 선택해주세요.');
@@ -664,13 +664,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                 qualification: loggedInStore?.qualification
                               });
                               
-                              const canApprove = 
-                                // 총괄(SS): 모든 승인 가능
-                                userRole === 'SS' ||
-                                // 정산팀(S): 총괄, 정산팀 승인 가능
-                                userRole === 'S' ||
-                                // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
-                                ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
+                                                             const canApprove = 
+                                 // 총괄(SS): 모든 승인 가능
+                                 userRole === 'SS' ||
+                                 // 정산팀(S): 총괄, 정산팀 승인 가능
+                                 userRole === 'S' ||
+                                 // 이사: 모든 승인 가능 (총괄과 동일)
+                                 userRole === '이사' ||
+                                 // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
+                                 ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                               
                               console.log('🔍 [승인버튼] 승인 가능 여부:', canApprove);
                               
@@ -688,13 +690,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             {/* 승인 취소 버튼 - 권한별 표시 */}
                             {(() => {
                               const userRole = loggedInStore?.qualification;
-                              const canCancelApproval = 
-                                // 총괄(SS): 모든 승인 취소 가능
-                                userRole === 'SS' ||
-                                // 정산팀(S): 총괄, 정산팀 승인 취소 가능
-                                userRole === 'S' ||
-                                // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인 취소만 가능
-                                ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
+                                                             const canCancelApproval = 
+                                 // 총괄(SS): 모든 승인 취소 가능
+                                 userRole === 'SS' ||
+                                 // 정산팀(S): 총괄, 정산팀 승인 취소 가능
+                                 userRole === 'S' ||
+                                 // 이사: 모든 승인 취소 가능 (총괄과 동일)
+                                 userRole === '이사' ||
+                                 // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인 취소만 가능
+                                 ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                               
                               return canCancelApproval ? (
                                 <Button
@@ -709,8 +713,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               ) : null;
                             })()}
                             
-                            {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
-                            {(loggedInStore?.qualification === 'S' || loggedInStore?.qualification === 'SS') && (
+                                                         {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
+                             {(loggedInStore?.qualification === 'S' || loggedInStore?.qualification === 'SS' || loggedInStore?.qualification === '이사') && (
                               <Button
                                 size="small"
                                 variant="outlined"

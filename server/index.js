@@ -4242,7 +4242,7 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
       agents = agentData.slice(3).map((row, index) => {
         const agent = {
           target: row[0], // A열: 담당자명
-          qualification: row[1], // B열: 자격
+          qualification: row[15], // P열: 권한 (정책모드 권한)
           contactId: row[2], // C열: 연락처(아이디)
           office: row[3], // D열: 사무실
           department: row[4], // E열: 소속
