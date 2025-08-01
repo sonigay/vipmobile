@@ -3466,87 +3466,87 @@ const server = app.listen(port, '0.0.0.0', async () => {
         // 정규화 규칙 로드
         const normalizationValues = await getSheetValues('정규화작업');
         console.log(`🔍 [서버시작] 정규화작업 로드 완료: ${normalizationValues ? normalizationValues.length : 0}개 행`);
-      
-      // 정규화 규칙 생성
-      const normalizationRules = new Map();
-      if (normalizationValues && normalizationValues.length > 1) {
-        normalizationValues.slice(1).forEach(row => {
-          if (row.length >= 4) {
-            const reservationSite = (row[1] || '').toString().trim(); // B열: 사전예약사이트 형식
-            const phoneklFormat = (row[2] || '').toString().trim(); // C열: 폰클형식
-            const combinedFormat = (row[3] || '').toString().trim(); // D열: 사전예약사이트&폰클형식
-            
-            if (reservationSite && phoneklFormat) {
-              // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
-              const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
-              normalizationRules.set(key, { phoneklFormat });
-            }
-          }
-        });
-        console.log(`🔧 [서버시작] 정규화 규칙 로드 완료: ${normalizationRules.size}개 규칙`);
-      }
-      
-      if (!phoneklInventoryValues || !reservationSiteValues) {
-        throw new Error('시트 데이터를 가져올 수 없습니다.');
-      }
-      
-      // 폰클출고처데이터에서 출고처별 P코드 매핑 생성
-      const storeToPosCodeMap = new Map();
-      if (phoneklStoreValues && phoneklStoreValues.length > 1) {
-        phoneklStoreValues.slice(1).forEach(row => {
-          if (row.length >= 8) {
-            const storeName = (row[6] || '').toString().trim(); // G열: 출고처명
-            const posCode = (row[7] || '').toString().trim(); // H열: P코드
-            
-            if (storeName && posCode) {
-              storeToPosCodeMap.set(storeName, posCode);
-            }
-          }
-        });
-        console.log(`🔧 [서버시작] 출고처-P코드 매핑 생성 완료: ${storeToPosCodeMap.size}개`);
-      }
-      
-      // 폰클재고데이터 처리 (배정완료된 재고만 - N열 출고처에 값이 있는 재고)
-      const inventoryMap = new Map(); // 모델별 일련번호 배열 저장
-      phoneklInventoryValues.slice(1).forEach(row => {
-        if (row.length >= 22) {
-          const serialNumber = (row[11] || '').toString().trim(); // D열: 일련번호 (3+8)
-          const modelCapacity = (row[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
-          const color = (row[14] || '').toString().trim(); // G열: 색상 (6+8)
-          const storeName = (row[21] || '').toString().trim(); // N열: 출고처 (13+8)
-          
-          // N열 출고처가 비어있는 재고만 사용 가능한 재고로 간주 (아직 배정되지 않은 재고)
-          if (serialNumber && modelCapacity && color && (!storeName || storeName.trim() === '')) {
-            const inventoryKey = `${modelCapacity} | ${color}`;
-            
-            // 같은 모델의 재고를 배열로 저장
-            if (!inventoryMap.has(inventoryKey)) {
-              inventoryMap.set(inventoryKey, []);
-            }
-            inventoryMap.get(inventoryKey).push(serialNumber);
-          }
-        }
-      });
-      
-      console.log(`💾 [서버시작] 재고 데이터 처리 완료: ${inventoryMap.size}개 배정완료 재고`);
-      console.log(`🔍 [서버시작] 재고 데이터 샘플:`, Array.from(inventoryMap.entries()).slice(0, 5));
-      
-      // 사전예약사이트 데이터와 매칭
-      const assignments = [];
-      let updatedCount = 0;
-      let skippedCount = 0;
-      let noMatchCount = 0;
-      
-      // 서버 시작 시 중복 배정 자동 정리
-      console.log('🧹 [서버시작] 중복 배정 데이터 자동 정리 시작');
-      const serialToReservations = new Map(); // 일련번호별 예약번호 매핑
-      
-      // 기존 배정 데이터 수집 (개통완료 고객 제외 - 일련번호를 다른 고객에게 배정하기 위해)
-      reservationSiteValues.slice(1).forEach((row, index) => {
-        if (row.length < 22) return;
         
-        const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
-        const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
+        // 정규화 규칙 생성
+        const normalizationRules = new Map();
+        if (normalizationValues && normalizationValues.length > 1) {
+          normalizationValues.slice(1).forEach(row => {
+            if (row.length >= 4) {
+              const reservationSite = (row[1] || '').toString().trim(); // B열: 사전예약사이트 형식
+              const phoneklFormat = (row[2] || '').toString().trim(); // C열: 폰클형식
+              const combinedFormat = (row[3] || '').toString().trim(); // D열: 사전예약사이트&폰클형식
+              
+              if (reservationSite && phoneklFormat) {
+                // 정규화 규칙의 키를 사전예약사이트 형식으로 생성 (파이프 제거)
+                const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
+                normalizationRules.set(key, { phoneklFormat });
+              }
+            }
+          });
+          console.log(`🔧 [서버시작] 정규화 규칙 로드 완료: ${normalizationRules.size}개 규칙`);
+        }
+        
+        if (!phoneklInventoryValues || !reservationSiteValues) {
+          throw new Error('시트 데이터를 가져올 수 없습니다.');
+        }
+        
+        // 폰클출고처데이터에서 출고처별 P코드 매핑 생성
+        const storeToPosCodeMap = new Map();
+        if (phoneklStoreValues && phoneklStoreValues.length > 1) {
+          phoneklStoreValues.slice(1).forEach(row => {
+            if (row.length >= 8) {
+              const storeName = (row[6] || '').toString().trim(); // G열: 출고처명
+              const posCode = (row[7] || '').toString().trim(); // H열: P코드
+              
+              if (storeName && posCode) {
+                storeToPosCodeMap.set(storeName, posCode);
+              }
+            }
+          });
+          console.log(`🔧 [서버시작] 출고처-P코드 매핑 생성 완료: ${storeToPosCodeMap.size}개`);
+        }
+        
+        // 폰클재고데이터 처리 (배정완료된 재고만 - N열 출고처에 값이 있는 재고)
+        const inventoryMap = new Map(); // 모델별 일련번호 배열 저장
+        phoneklInventoryValues.slice(1).forEach(row => {
+          if (row.length >= 22) {
+            const serialNumber = (row[11] || '').toString().trim(); // D열: 일련번호 (3+8)
+            const modelCapacity = (row[13] || '').toString().trim(); // F열: 모델명&용량 (5+8)
+            const color = (row[14] || '').toString().trim(); // G열: 색상 (6+8)
+            const storeName = (row[21] || '').toString().trim(); // N열: 출고처 (13+8)
+            
+            // N열 출고처가 비어있는 재고만 사용 가능한 재고로 간주 (아직 배정되지 않은 재고)
+            if (serialNumber && modelCapacity && color && (!storeName || storeName.trim() === '')) {
+              const inventoryKey = `${modelCapacity} | ${color}`;
+              
+              // 같은 모델의 재고를 배열로 저장
+              if (!inventoryMap.has(inventoryKey)) {
+                inventoryMap.set(inventoryKey, []);
+              }
+              inventoryMap.get(inventoryKey).push(serialNumber);
+            }
+          }
+        });
+        
+        console.log(`💾 [서버시작] 재고 데이터 처리 완료: ${inventoryMap.size}개 배정완료 재고`);
+        console.log(`🔍 [서버시작] 재고 데이터 샘플:`, Array.from(inventoryMap.entries()).slice(0, 5));
+        
+        // 사전예약사이트 데이터와 매칭
+        const assignments = [];
+        let updatedCount = 0;
+        let skippedCount = 0;
+        let noMatchCount = 0;
+        
+        // 서버 시작 시 중복 배정 자동 정리
+        console.log('🧹 [서버시작] 중복 배정 데이터 자동 정리 시작');
+        const serialToReservations = new Map(); // 일련번호별 예약번호 매핑
+        
+        // 기존 배정 데이터 수집 (개통완료 고객 제외 - 일련번호를 다른 고객에게 배정하기 위해)
+        reservationSiteValues.slice(1).forEach((row, index) => {
+          if (row.length < 22) return;
+          
+          const reservationNumber = (row[8] || '').toString().trim(); // I열: 예약번호
+          const existingSerial = (row[6] || '').toString().trim(); // G열: 기존 배정일련번호
         const activationStatus = (row[5] || '').toString().trim(); // F열: 개통상태
         
         // 개통완료된 고객은 중복 정리에서 제외 (일련번호를 다른 고객에게 배정하기 위해)
@@ -3864,6 +3864,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.error('❌ [서버시작] 오류 상세:', error.message);
       console.error('❌ [서버시작] 오류 스택:', error.stack);
     }
+  }, 1000); // setTimeout 함수 닫기 (1초 후 실행)
+  
   } catch (error) {
     console.error('서버 시작 중 오류:', error);
   }
