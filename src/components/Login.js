@@ -182,6 +182,7 @@ function Login({ onLogin }) {
             target: data.agentInfo.target,
             qualification: data.agentInfo.qualification,
             contactId: data.agentInfo.contactId,
+            userRole: data.agentInfo.userRole,
             modePermissions: data.modePermissions // 다중 권한 정보 추가
           });
         } else if (data.isInventory) {

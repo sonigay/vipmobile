@@ -1959,12 +1959,14 @@ app.post('/api/login', async (req, res) => {
           success: true,
           isAgent: true,
           modePermissions: modePermissions,
-          target: agent[0] || '',       // A열: 대상
-          qualification: agent[1] || '', // B열: 자격
-          contactId: agent[2] || '',     // C열: 연락처(아이디)
-          office: agent[3] || '',        // D열: 사무실
-          department: agent[4] || '',    // E열: 소속
-          userRole: agent[15] || ''      // P열: 권한 (정책모드 권한)
+          agentInfo: {
+            target: agent[0] || '',       // A열: 대상
+            qualification: agent[1] || '', // B열: 자격
+            contactId: agent[2] || '',     // C열: 연락처(아이디)
+            office: agent[3] || '',        // D열: 사무실
+            department: agent[4] || '',    // E열: 소속
+            userRole: agent[15] || ''      // P열: 권한 (정책모드 권한)
+          }
         };
         
         // 로그인 결과 캐시 저장 (성능 최적화)
