@@ -6931,64 +6931,64 @@ app.get('/api/inspection/completion-status', async (req, res) => {
 // 컬럼 매칭 설정 (수기초 컬럼 ↔ 폰클개통데이터 컬럼)
 const COLUMN_MATCHING_CONFIG = [
   {
-    manualField: { name: '대리점코드', key: 'store_code', column: 5 }, // F열
-    systemField: { name: '메모2', key: 'memo2', column: 67 }, // BP열
+    manualField: { name: '대리점코드', key: 'store_code', column: 14 }, // O열 (기존 F열에서 +9)
+    systemField: { name: '메모2', key: 'memo2', column: 75 }, // BX열 (기존 BP열에서 +8)
     regex: '\\d+', // 숫자 추출 (6자리 제한 제거)
     description: '대리점코드 비교 (메모2에서 숫자 추출)'
   },
   {
-    manualField: { name: '개통일시분', key: 'activation_datetime', column: 20 }, // U열
-    systemField: { name: '개통일시분', key: 'activation_datetime', column: 1 }, // B열
+    manualField: { name: '개통일시분', key: 'activation_datetime', column: 29 }, // AD열 (기존 U열에서 +9)
+    systemField: { name: '개통일시분', key: 'activation_datetime', column: 9 }, // J열 (기존 B열에서 +8)
     description: '개통일시분 비교 (초 제외, 24시간 형식)'
   },
   {
-    manualField: { name: '모델명(일련번호)', key: 'model_serial', column: 29 }, // AD열
-    systemField: { name: '모델명(일련번호)', key: 'model_serial', column: 13 }, // N열
+    manualField: { name: '모델명(일련번호)', key: 'model_serial', column: 38 }, // AM열 (기존 AD열에서 +9)
+    systemField: { name: '모델명(일련번호)', key: 'model_serial', column: 21 }, // V열 (기존 N열에서 +8)
     description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)'
   },
   {
-    manualField: { name: '개통유형', key: 'activation_type', column: 10 }, // K열
-    systemField: { name: '개통유형', key: 'activation_type', column: 11 }, // L열
+    manualField: { name: '개통유형', key: 'activation_type', column: 19 }, // T열 (기존 K열에서 +9)
+    systemField: { name: '개통유형', key: 'activation_type', column: 19 }, // T열 (기존 L열에서 +8)
     description: '개통유형 및 C타겟차감대상 비교 (가입구분+이전사업자+기변타겟구분 정규화)'
   },
   {
-    manualField: { name: '실판매POS', key: 'sales_pos', column: 7 }, // H열
-    systemField: { name: '실판매POS', key: 'sales_pos', column: 6 }, // G열
+    manualField: { name: '실판매POS', key: 'sales_pos', column: 16 }, // Q열 (기존 H열에서 +9)
+    systemField: { name: '실판매POS', key: 'sales_pos', column: 14 }, // O열 (기존 G열에서 +8)
     description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)'
   },
   {
-    manualField: { name: '요금제', key: 'plan', column: 37 }, // AL열
-    systemField: { name: '요금제', key: 'plan', column: 21 }, // V열
+    manualField: { name: '요금제', key: 'plan', column: 46 }, // AU열 (기존 AL열에서 +9)
+    systemField: { name: '요금제', key: 'plan', column: 29 }, // AD열 (기존 V열에서 +8)
     description: '요금제 비교 (VLOOKUP 방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '출고가상이', key: 'shipping_virtual', column: 47 }, // AV열
-    systemField: { name: '출고가상이', key: 'shipping_virtual', column: 27 }, // AB열
+    manualField: { name: '출고가상이', key: 'shipping_virtual', column: 56 }, // BD열 (기존 AV열에서 +9)
+    systemField: { name: '출고가상이', key: 'shipping_virtual', column: 35 }, // AJ열 (기존 AB열에서 +8)
     description: '출고가상이 비교 (더하기 방식 정규화)'
   },
   {
-    manualField: { name: '지원금 및 약정상이', key: 'support_contract', column: 85 }, // DH열
-    systemField: { name: '지원금 및 약정상이', key: 'support_contract', column: 28 }, // AC열
+    manualField: { name: '지원금 및 약정상이', key: 'support_contract', column: 94 }, // DQ열 (기존 DH열에서 +9)
+    systemField: { name: '지원금 및 약정상이', key: 'support_contract', column: 36 }, // AK열 (기존 AC열에서 +8)
     description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '전환지원금상이', key: 'conversion_support', column: 64 }, // BM열
-    systemField: { name: '전환지원금상이', key: 'conversion_support', column: 30 }, // AE열
+    manualField: { name: '전환지원금상이', key: 'conversion_support', column: 73 }, // BV열 (기존 BM열에서 +9)
+    systemField: { name: '전환지원금상이', key: 'conversion_support', column: 38 }, // AM열 (기존 AE열에서 +8)
     description: '전환지원금상이 비교 (더하기 방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '프리할부상이', key: 'pre_installment', column: 47 }, // AV열
-    systemField: { name: '프리할부상이', key: 'pre_installment', column: 27 }, // AB열
+    manualField: { name: '프리할부상이', key: 'pre_installment', column: 56 }, // BD열 (기존 AV열에서 +9)
+    systemField: { name: '프리할부상이', key: 'pre_installment', column: 35 }, // AJ열 (기존 AB열에서 +8)
     description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 118 }, // DO열 (119번째 컬럼)
-    systemField: { name: '유플레이 유치검수', key: 'uplay_check', column: 22 }, // W열
+    manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 127 }, // DX열 (기존 DO열에서 +9)
+    systemField: { name: '유플레이 유치검수', key: 'uplay_check', column: 30 }, // AE열 (기존 W열에서 +8)
     description: '유플레이 유치검수 (단어 포함 여부 비교)'
   },
   {
-    manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 118 }, // DO열 (119번째 컬럼)
-    systemField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 23 }, // X열
+    manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 127 }, // DX열 (기존 DO열에서 +9)
+    systemField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 31 }, // AF열 (기존 X열에서 +8)
     description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)'
   }
 ];
