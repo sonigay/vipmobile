@@ -48,17 +48,24 @@ import {
   TrendingUp as TrendingUpIcon,
   Assessment as AssessmentIcon,
   ShowChart as ShowChartIcon,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
 
-
+import AppUpdatePopup from './AppUpdatePopup';
 
 function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = useState(0);
-
-
-
+  
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 장표모드 진입 시 업데이트 팝업 표시
+  useEffect(() => {
+    // 모드 진입 시 자동으로 업데이트 팝업 표시
+    setShowUpdatePopup(true);
+  }, []);
 
   const handleBackToMain = () => {
     // 메인 화면으로 돌아가기 (모드 선택 팝업 표시)
@@ -133,6 +140,22 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Button>
           )}
           
+          {/* 업데이트 확인 버튼 */}
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
+            sx={{ 
+              mr: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }
+            }}
+          >
+            업데이트 확인
+          </Button>
+          
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
@@ -183,14 +206,27 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       {/* 탭 컨텐츠 */}
       <Container maxWidth="lg" sx={{ flex: 1, py: 3, overflow: 'auto' }}>
+        {/* 업데이트 팝업 */}
+        <UpdatePopup />
+        
         {availableTabs[activeTab].component}
       </Container>
-
-      {/* 업데이트 진행 팝업 */}
-      
     </Box>
   );
 }
+
+// 업데이트 팝업 컴포넌트
+const UpdatePopup = () => (
+  <AppUpdatePopup
+    open={showUpdatePopup}
+    onClose={() => setShowUpdatePopup(false)}
+    mode="chart"
+    loggedInStore={loggedInStore}
+    onUpdateAdded={() => {
+      console.log('장표모드 새 업데이트가 추가되었습니다.');
+    }}
+  />
+);
 
 // 채권장표 탭 컴포넌트
 function BondChartTab() {

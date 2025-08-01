@@ -50,7 +50,8 @@ import {
   TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 import {
   fetchInspectionData,
@@ -70,6 +71,7 @@ import {
   updateModificationNotes
 } from '../utils/inspectionUtils';
 
+import AppUpdatePopup from './AppUpdatePopup';
 
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -102,6 +104,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
   // 완료된 항목 추적 (해시화된 ID 사용)
   const [completedItems, setCompletedItems] = useState(new Set());
   
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+
 
   
   // 완료 상태 로드
@@ -228,6 +233,12 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     loadCompletionStatus();
     loadModificationCompletionStatus();
   }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
+
+  // 검수모드 진입 시 업데이트 팝업 표시
+  useEffect(() => {
+    // 모드 진입 시 자동으로 업데이트 팝업 표시
+    setShowUpdatePopup(true);
+  }, []);
 
   // 뷰 변경 시 수정완료 상태 재로딩
   useEffect(() => {
@@ -638,6 +649,16 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
             <RefreshIcon />
           </IconButton>
           
+          {/* 업데이트 확인 버튼 */}
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
+            sx={{ mr: 2 }}
+          >
+            업데이트 확인
+          </Button>
+          
           {/* 모드 전환 버튼 */}
           {onModeChange && availableModes && availableModes.length > 1 && (
             <Button
@@ -658,6 +679,9 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
 
       {/* 메인 콘텐츠 */}
       <Container maxWidth="xl" sx={{ flex: 1, py: 2, overflow: 'auto' }}>
+        {/* 업데이트 팝업 */}
+        <UpdatePopup />
+        
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -1297,5 +1321,18 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     </Box>
   );
 }
+
+// 업데이트 팝업 컴포넌트
+const UpdatePopup = () => (
+  <AppUpdatePopup
+    open={showUpdatePopup}
+    onClose={() => setShowUpdatePopup(false)}
+    mode="inspection"
+    loggedInStore={loggedInStore}
+    onUpdateAdded={() => {
+      console.log('검수모드 새 업데이트가 추가되었습니다.');
+    }}
+  />
+);
 
 export default InspectionMode; 

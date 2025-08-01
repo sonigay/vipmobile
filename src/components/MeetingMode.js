@@ -10,14 +10,22 @@ import {
 } from '@mui/material';
 import {
   MeetingRoom as MeetingRoomIcon,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 
+import AppUpdatePopup from './AppUpdatePopup';
 
 
 function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
-
-
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 회의모드 진입 시 업데이트 팝업 표시
+  useEffect(() => {
+    // 모드 진입 시 자동으로 업데이트 팝업 표시
+    setShowUpdatePopup(true);
+  }, []);
 
 
   const handleBackToMain = () => {
@@ -59,37 +67,50 @@ function MeetingMode({ onLogout, loggedInStore, onModeChange, availableModes }) 
             </Button>
           )}
           
+          {/* 업데이트 확인 버튼 */}
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
+            sx={{ 
+              mr: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }
+            }}
+          >
+            업데이트 확인
+          </Button>
+          
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
         </Toolbar>
       </AppBar>
       
-      <Container maxWidth="lg" sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 4, 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            borderRadius: 3
-          }}
-        >
-          <MeetingRoomIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8 }} />
-          <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
+      <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <MeetingRoomIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h4" component="h1" gutterBottom>
             회의 모드
           </Typography>
-          <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
-            준비 중입니다
-          </Typography>
-          <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
-            회의 및 일정 관리 기능이 개발 중입니다.<br />
-            빠른 시일 내에 서비스를 제공하겠습니다.
+          <Typography variant="body1" color="text.secondary">
+            회의 관련 기능이 준비 중입니다.
           </Typography>
         </Paper>
       </Container>
       
+      {/* 업데이트 팝업 */}
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="meeting"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          console.log('회의모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
     </Box>
   );
 }

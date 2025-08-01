@@ -17,8 +17,10 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import UpdateIcon from '@mui/icons-material/Update';
 import * as XLSX from 'xlsx';
 
+import AppUpdatePopup from './AppUpdatePopup';
 
 
 function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeChange, availableModes }) {
@@ -26,9 +28,15 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
   const [originalFileName, setOriginalFileName] = useState(''); // 원본 파일명 저장
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
-
-
+  // 정산모드 진입 시 업데이트 팝업 표시
+  useEffect(() => {
+    // 모드 진입 시 자동으로 업데이트 팝업 표시
+    setShowUpdatePopup(true);
+  }, []);
 
   // 엑셀 파일 업로드 처리
   const handleFileUpload = (event) => {
@@ -139,6 +147,23 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
                 모드 변경
               </Button>
             )}
+            
+            {/* 업데이트 확인 버튼 */}
+            <Button
+              variant="outlined"
+              startIcon={<UpdateIcon />}
+              onClick={() => setShowUpdatePopup(true)}
+              sx={{ 
+                borderColor: '#d32f2f',
+                color: '#d32f2f',
+                '&:hover': { 
+                  borderColor: '#c62828',
+                  backgroundColor: 'rgba(211, 47, 47, 0.04)'
+                }
+              }}
+            >
+              업데이트 확인
+            </Button>
             
             <Button 
               variant="outlined" 
@@ -273,6 +298,16 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
         )}
       </Box>
       
+      {/* 업데이트 팝업 */}
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="settlement"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          console.log('정산모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
     </Container>
   );
 }

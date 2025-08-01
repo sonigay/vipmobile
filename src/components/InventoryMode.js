@@ -57,13 +57,15 @@ import {
   Tablet as TabletIcon,
   Settings as SettingsIcon,
   AccountTree as AccountTreeIcon,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 import { fetchData } from '../api';
 
 
 import NotificationButton from './NotificationButton';
 import AnnouncementBanner from './AnnouncementBanner';
+import AppUpdatePopup from './AppUpdatePopup';
 import { notificationManager } from '../utils/notificationUtils';
 import { 
   mobileOptimizationManager, 
@@ -122,7 +124,9 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
   
   // 탭 상태
   const [tabValue, setTabValue] = useState(0);
-  // 업데이트 진행 팝업 상태
+  
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // 알림 시스템 및 모바일 최적화 초기화 상태
   const [notificationInitialized, setNotificationInitialized] = useState(false);
@@ -171,6 +175,12 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // 재고모드 진입 시 업데이트 팝업 표시
+  useEffect(() => {
+    // 모드 진입 시 자동으로 업데이트 팝업 표시
+    setShowUpdatePopup(true);
+  }, []);
 
   // 검색 필터링 (메모이제이션 적용)
   const filteredDataMemo = useMemo(() => {
@@ -519,6 +529,21 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
               >
                 재고배정
               </Button>
+              
+              {/* 업데이트 확인 버튼 */}
+              <Button
+                color="inherit"
+                startIcon={<UpdateIcon />}
+                onClick={() => setShowUpdatePopup(true)}
+                sx={{
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)'
+                  }
+                }}
+              >
+                업데이트 확인
+              </Button>
             </Box>
             
             {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
@@ -609,9 +634,12 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
         {/* 알림 시스템 */}
         <NotificationButton />
         <AnnouncementBanner />
-
+        
         {/* 메인 콘텐츠 */}
         <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+          {/* 업데이트 팝업 */}
+          <UpdatePopup />
+          
           {/* 검색 및 필터 */}
           <Paper sx={{ p: 2, mb: 3 }}>
             <Grid container spacing={2} alignItems="center">
@@ -1141,8 +1169,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
     );
   }
 
-
-
   if (currentScreen === 'realtime_dashboard') {
     return (
       <Suspense fallback={<LoadingSkeleton />}>
@@ -1181,10 +1207,24 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
         </Typography>
       </Box>
       
-      {/* 업데이트 진행 팝업 */}
+      {/* 업데이트 팝업 */}
+      <UpdatePopup />
       
     </Box>
   );
 }
+
+// 업데이트 팝업 컴포넌트
+const UpdatePopup = () => (
+  <AppUpdatePopup
+    open={showUpdatePopup}
+    onClose={() => setShowUpdatePopup(false)}
+    mode="inventory"
+    loggedInStore={loggedInStore}
+    onUpdateAdded={() => {
+      console.log('재고모드 새 업데이트가 추가되었습니다.');
+    }}
+  />
+);
 
 export default InventoryMode; 

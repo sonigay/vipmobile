@@ -7,34 +7,102 @@ import {
   Button,
   Container,
   Paper,
-  Tabs,
-  Tab,
   Grid,
   Card,
   CardContent,
-  CardActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Chip,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Alert,
   CircularProgress,
-  Divider,
+  Tabs,
+  Tab,
+  LinearProgress,
+  Tooltip,
+  Switch,
+  FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  Divider,
+  Badge,
+  ListItemIcon,
+  ListItemSecondaryAction
 } from '@mui/material';
 import {
   Event as EventIcon,
   SwapHoriz as SwapHorizIcon,
+  Update as UpdateIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  Refresh as RefreshIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  Sort as SortIcon,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
   Settings as SettingsIcon,
+  Notifications as NotificationsIcon,
+  NotificationsOff as NotificationsOffIcon,
+  History as HistoryIcon,
   TrendingUp as TrendingUpIcon,
-  Assignment as AssignmentIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Schedule as ScheduleIcon,
-  People as PeopleIcon,
-  Business as BusinessIcon,
-  Refresh as RefreshIcon
+  TrendingDown as TrendingDownIcon,
+  Equal as EqualIcon,
+  Error as ErrorIcon,
+  Help as HelpIcon,
+  AutoFixHigh as AutoFixHighIcon,
+  ContentCopy as ContentCopyIcon,
+  ContentPaste as ContentPasteIcon,
+  Compare as CompareIcon,
+  Merge as MergeIcon,
+  Split as SplitIcon,
+  Transform as TransformIcon,
+  DataUsage as DataUsageIcon,
+  Analytics as AnalyticsIcon,
+  Assessment as AssessmentIcon,
+  BarChart as BarChartIcon,
+  PieChart as PieChartIcon,
+  ShowChart as ShowChartIcon,
+  TableChart as TableChartIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon,
+  ViewQuilt as ViewQuiltIcon,
+  ViewWeek as ViewWeekIcon,
+  ViewDay as ViewDayIcon,
+  ViewAgenda as ViewAgendaIcon,
+  ViewHeadline as ViewHeadlineIcon,
+  ViewStream as ViewStreamIcon,
+  ViewComfy as ViewComfyIcon,
+  ViewCompact as ViewCompactIcon,
+  ViewArray as ViewArrayIcon,
+  ViewColumn as ViewColumnIcon,
+  ViewCarousel as ViewCarouselIcon,
+  ViewTimeline as ViewTimelineIcon,
+  ViewKanban as ViewKanbanIcon,
+  ViewSidebar as ViewSidebarIcon
 } from '@mui/icons-material';
+
+import AppUpdatePopup from './AppUpdatePopup';
 import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 // SalesByStoreScreen import 제거됨
 // ReservationAssignmentSettingsScreen import 제거됨
@@ -44,6 +112,15 @@ import AllCustomerListScreen from './screens/AllCustomerListScreen';
 
 function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [currentTab, setCurrentTab] = useState(0);
+  
+  // 업데이트 팝업 상태
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 사전예약모드 진입 시 업데이트 팝업 표시
+  useEffect(() => {
+    // 모드 진입 시 자동으로 업데이트 팝업 표시
+    setShowUpdatePopup(true);
+  }, []);
 
   const [dashboardData, setDashboardData] = useState({
     totalReservations: 0,
@@ -586,6 +663,22 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
             </Button>
           )}
           
+          {/* 업데이트 확인 버튼 */}
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
+            sx={{ 
+              mr: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }
+            }}
+          >
+            업데이트 확인
+          </Button>
+          
           <Button color="inherit" onClick={onLogout}>
             로그아웃
           </Button>
@@ -650,6 +743,16 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
         {renderTabContent()}
       </Box>
 
+      {/* 업데이트 팝업 */}
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="reservation"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          console.log('사전예약모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
       
     </Box>
   );
