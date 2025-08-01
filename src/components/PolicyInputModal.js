@@ -205,15 +205,14 @@ function PolicyInputModal({
                 label="정책적용일"
                 value={formData.policyDate}
                 onChange={(date) => handleInputChange('policyDate', date)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    fullWidth
-                    error={!!errors.policyDate}
-                    helperText={errors.policyDate}
-                    required
-                  />
-                )}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!errors.policyDate,
+                    helperText: errors.policyDate,
+                    required: true
+                  }
+                }}
               />
             </LocalizationProvider>
           </Grid>
