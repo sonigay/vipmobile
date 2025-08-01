@@ -14,12 +14,16 @@ import {
   Typography,
   Box,
   Chip,
-  Alert
+  Alert,
+  FormControlLabel,
+  Radio,
+  RadioGroup
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ko } from 'date-fns/locale';
+import { Autocomplete } from '@mui/material';
 
 // 정책 카테고리 매핑
 const CATEGORY_NAMES = {
@@ -50,10 +54,12 @@ function PolicyInputModal({
 }) {
   const [formData, setFormData] = useState({
     policyName: '',
-    policyDate: new Date(),
+    policyStartDate: new Date(),
+    policyEndDate: new Date(),
     policyStore: '',
     policyContent: '',
-    policyAmount: ''
+    policyAmount: '',
+    amountType: 'total' // 'total' 또는 'per_case'
   });
   
   const [errors, setErrors] = useState({});
@@ -68,10 +74,12 @@ function PolicyInputModal({
       // 모달이 열릴 때 폼 초기화
       setFormData({
         policyName: '',
-        policyDate: new Date(),
+        policyStartDate: new Date(),
+        policyEndDate: new Date(),
         policyStore: '',
         policyContent: '',
-        policyAmount: ''
+        policyAmount: '',
+        amountType: 'total'
       });
       setErrors({});
     }
@@ -84,8 +92,17 @@ function PolicyInputModal({
       newErrors.policyName = '정책명을 입력해주세요.';
     }
     
-    if (!formData.policyDate) {
-      newErrors.policyDate = '정책적용일을 선택해주세요.';
+    if (!formData.policyStartDate) {
+      newErrors.policyStartDate = '정책 시작일을 선택해주세요.';
+    }
+    
+    if (!formData.policyEndDate) {
+      newErrors.policyEndDate = '정책 종료일을 선택해주세요.';
+    }
+    
+    if (formData.policyStartDate && formData.policyEndDate && 
+        formData.policyStartDate > formData.policyEndDate) {
+      newErrors.policyEndDate = '종료일은 시작일보다 늦어야 합니다.';
     }
     
     if (!formData.policyStore) {
@@ -100,6 +117,10 @@ function PolicyInputModal({
       newErrors.policyAmount = '금액을 입력해주세요.';
     } else if (isNaN(Number(formData.policyAmount))) {
       newErrors.policyAmount = '올바른 금액을 입력해주세요.';
+    }
+    
+    if (!formData.amountType) {
+      newErrors.amountType = '금액 유형을 선택해주세요.';
     }
     
     setErrors(newErrors);
@@ -117,10 +138,12 @@ function PolicyInputModal({
       const policyData = {
         id: `POL_${Date.now()}`, // 임시 ID 생성
         policyName: formData.policyName.trim(),
-        policyDate: formData.policyDate,
+        policyStartDate: formData.policyStartDate,
+        policyEndDate: formData.policyEndDate,
         policyStore: formData.policyStore,
         policyContent: formData.policyContent.trim(),
         policyAmount: Number(formData.policyAmount),
+        amountType: formData.amountType,
         policyType: isWireless ? '무선' : '유선',
         category: categoryId,
         yearMonth: yearMonth,
@@ -202,14 +225,14 @@ function PolicyInputModal({
           <Grid item xs={12} sm={6}>
             <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
               <DatePicker
-                label="정책적용일"
-                value={formData.policyDate}
-                onChange={(date) => handleInputChange('policyDate', date)}
+                label="정책 시작일"
+                value={formData.policyStartDate}
+                onChange={(date) => handleInputChange('policyStartDate', date)}
                 slotProps={{
                   textField: {
                     fullWidth: true,
-                    error: !!errors.policyDate,
-                    helperText: errors.policyDate,
+                    error: !!errors.policyStartDate,
+                    helperText: errors.policyStartDate,
                     required: true
                   }
                 }}
@@ -218,25 +241,46 @@ function PolicyInputModal({
           </Grid>
           
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth error={!!errors.policyStore} required>
-              <InputLabel>정책적용점</InputLabel>
-              <Select
-                value={formData.policyStore}
-                label="정책적용점"
-                onChange={(e) => handleInputChange('policyStore', e.target.value)}
-              >
-                {stores.map((store) => (
-                  <MenuItem key={store.id} value={store.id}>
-                    {store.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.policyStore && (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
-                  {errors.policyStore}
-                </Typography>
+            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+              <DatePicker
+                label="정책 종료일"
+                value={formData.policyEndDate}
+                onChange={(date) => handleInputChange('policyEndDate', date)}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!errors.policyEndDate,
+                    helperText: errors.policyEndDate,
+                    required: true
+                  }
+                }}
+              />
+            </LocalizationProvider>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Autocomplete
+              options={stores}
+              getOptionLabel={(option) => option.name}
+              value={stores.find(store => store.id === formData.policyStore) || null}
+              onChange={(event, newValue) => {
+                handleInputChange('policyStore', newValue ? newValue.id : '');
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="정책적용점"
+                  error={!!errors.policyStore}
+                  helperText={errors.policyStore}
+                  required
+                />
               )}
-            </FormControl>
+              filterOptions={(options, { inputValue }) => {
+                return options.filter((option) =>
+                  option.name.toLowerCase().includes(inputValue.toLowerCase())
+                );
+              }}
+            />
           </Grid>
           
           <Grid item xs={12}>
@@ -265,6 +309,35 @@ function PolicyInputModal({
               inputProps={{ min: 0 }}
               required
             />
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <FormControl component="fieldset" error={!!errors.amountType}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                금액 유형 *
+              </Typography>
+              <RadioGroup
+                row
+                value={formData.amountType}
+                onChange={(e) => handleInputChange('amountType', e.target.value)}
+              >
+                <FormControlLabel
+                  value="total"
+                  control={<Radio />}
+                  label="총금액"
+                />
+                <FormControlLabel
+                  value="per_case"
+                  control={<Radio />}
+                  label="건당금액"
+                />
+              </RadioGroup>
+              {errors.amountType && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                  {errors.amountType}
+                </Typography>
+              )}
+            </FormControl>
           </Grid>
           
           <Grid item xs={12} sm={6}>
