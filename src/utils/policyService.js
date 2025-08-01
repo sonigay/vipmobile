@@ -171,10 +171,6 @@ export class PolicyService {
       throw error;
     }
   }
-      console.error('정책 삭제 실패:', error);
-      throw error;
-    }
-  }
 
   // 정책 승인
   static async approvePolicy(policyId, approvalData) {
