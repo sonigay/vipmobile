@@ -116,6 +116,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 승인 모달 상태
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [selectedPolicyForApproval, setSelectedPolicyForApproval] = useState(null);
+  const [approvalProcessing, setApprovalProcessing] = useState(false);
   
   // 취소 모달 상태
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -231,6 +232,13 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const handleApprovalSubmit = async (approvalData) => {
+    // 중복 처리 방지
+    if (approvalProcessing) {
+      return;
+    }
+    
+    setApprovalProcessing(true);
+    
     try {
       const { policyId, approvalData: approval, userRole } = approvalData;
       
@@ -271,6 +279,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('승인 실패:', error);
       alert('승인에 실패했습니다: ' + error.message);
+    } finally {
+      setApprovalProcessing(false);
     }
   };
 
@@ -656,15 +666,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                 // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
                                 ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                               
-                              return canApprove ? (
-                                <Button
-                                  size="small"
-                                  onClick={() => handleApprovalClick(policy)}
-                                  disabled={policy.policyStatus === '취소됨'}
-                                >
-                                  승인
-                                </Button>
-                              ) : null;
+                                                             return canApprove ? (
+                                 <Button
+                                   size="small"
+                                   onClick={() => handleApprovalClick(policy)}
+                                   disabled={policy.policyStatus === '취소됨' || approvalProcessing}
+                                 >
+                                   {approvalProcessing ? '처리중...' : '승인'}
+                                 </Button>
+                               ) : null;
                             })()}
                             
                             {/* 승인 취소 버튼 - 권한별 표시 */}
@@ -737,17 +747,18 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         loggedInUser={loggedInStore}
       />
 
-                           {/* 정책 승인 모달 */}
-        <PolicyApprovalModal
-          open={showApprovalModal}
-          onClose={() => {
-            setShowApprovalModal(false);
-            setSelectedPolicyForApproval(null);
-          }}
-          policy={selectedPolicyForApproval}
-          onApprovalSubmit={handleApprovalSubmit}
-          userRole={loggedInStore?.agentInfo?.qualification}
-        />
+                                                       {/* 정책 승인 모달 */}
+         <PolicyApprovalModal
+           open={showApprovalModal}
+           onClose={() => {
+             setShowApprovalModal(false);
+             setSelectedPolicyForApproval(null);
+           }}
+           policy={selectedPolicyForApproval}
+           onApprovalSubmit={handleApprovalSubmit}
+           userRole={loggedInStore?.agentInfo?.qualification}
+           processing={approvalProcessing}
+         />
 
                {/* 정책 취소 모달 */}
         <PolicyCancelModal

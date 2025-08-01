@@ -13416,9 +13416,10 @@ app.put('/api/policies/:policyId/approve', async (req, res) => {
       '승인일시'          // H열
     ];
     
-    // 시트가 비어있으면 헤더와 함께 데이터 추가
-    if (!existingHistoryData || existingHistoryData.length === 0) {
-      console.log('📝 [승인이력] 시트가 비어있어 헤더와 함께 데이터 추가');
+    // 시트가 비어있거나 헤더가 없으면 헤더와 함께 데이터 추가
+    if (!existingHistoryData || existingHistoryData.length === 0 || 
+        !existingHistoryData[0] || existingHistoryData[0][0] !== '이력ID') {
+      console.log('📝 [승인이력] 시트가 비어있거나 헤더가 없어 헤더와 함께 데이터 추가');
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: '정책_승인이력!A:H',
@@ -13558,9 +13559,10 @@ app.post('/api/policy-categories', async (req, res) => {
     
     let response;
     
-    // 시트가 비어있으면 헤더와 함께 데이터 추가
-    if (!existingData || existingData.length === 0) {
-      console.log('📝 [카테고리생성] 시트가 비어있어 헤더와 함께 데이터 추가');
+    // 시트가 비어있거나 헤더가 없으면 헤더와 함께 데이터 추가
+    if (!existingData || existingData.length === 0 || 
+        !existingData[0] || existingData[0][0] !== '카테고리ID') {
+      console.log('📝 [카테고리생성] 시트가 비어있거나 헤더가 없어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: '정책_카테고리!A:H',
@@ -13671,9 +13673,10 @@ async function createPolicyNotification(policyId, userId, notificationType, appr
       '생성일시'          // F열
     ];
     
-    // 시트가 비어있으면 헤더와 함께 데이터 추가
-    if (!existingNotificationData || existingNotificationData.length === 0) {
-      console.log('📝 [알림관리] 시트가 비어있어 헤더와 함께 데이터 추가');
+    // 시트가 비어있거나 헤더가 없으면 헤더와 함께 데이터 추가
+    if (!existingNotificationData || existingNotificationData.length === 0 || 
+        !existingNotificationData[0] || existingNotificationData[0][0] !== '알림ID') {
+      console.log('📝 [알림관리] 시트가 비어있거나 헤더가 없어 헤더와 함께 데이터 추가');
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: '정책_알림관리!A:F',

@@ -21,7 +21,8 @@ const PolicyApprovalModal = ({
   onClose, 
   policy, 
   onApprovalSubmit,
-  userRole 
+  userRole,
+  processing = false
 }) => {
   const [approvalData, setApprovalData] = useState({
     total: '대기',
@@ -178,12 +179,12 @@ const PolicyApprovalModal = ({
           </Grid>
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>취소</Button>
-        <Button onClick={handleSubmit} variant="contained" color="primary">
-          승인 처리
-        </Button>
-      </DialogActions>
+             <DialogActions>
+         <Button onClick={onClose} disabled={processing}>취소</Button>
+         <Button onClick={handleSubmit} variant="contained" color="primary" disabled={processing}>
+           {processing ? '처리중...' : '승인 처리'}
+         </Button>
+       </DialogActions>
     </Dialog>
   );
 };
