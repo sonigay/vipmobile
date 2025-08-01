@@ -12984,13 +12984,6 @@ app.put('/api/policies/:policyId/settlement-reflect', async (req, res) => {
     const { policyId } = req.params;
     const { userId, userName, isReflected } = req.body;
     
-    // Google Sheets API 인증
-    const auth = new google.auth.GoogleAuth({
-      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets']
-    });
-    const sheets = google.sheets({ version: 'v4', auth });
-    
     console.log('정산 반영 요청:', { policyId, userId, userName, isReflected });
     
     if (!userId || !userName) {
