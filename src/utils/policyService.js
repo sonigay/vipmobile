@@ -175,8 +175,8 @@ export class PolicyService {
   // 정책 승인
   static async approvePolicy(policyId, approvalData) {
     try {
-      const response = await fetch(`${API_URL}${POLICY_ENDPOINTS.APPROVE_POLICY}/${policyId}`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/api/policies/${policyId}/approve`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -184,7 +184,8 @@ export class PolicyService {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
@@ -300,7 +301,48 @@ export class PolicyService {
     return policyType === 'wireless' ? '무선' : '유선';
   }
 
-  // 카테고리별 이름 반환
+  // 카테고리 목록 조회
+  static async getCategories() {
+    try {
+      const response = await fetch(`${API_URL}/api/policy-categories`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.categories || [];
+    } catch (error) {
+      console.error('카테고리 목록 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  // 카테고리 추가
+  static async createCategory(categoryData) {
+    try {
+      const response = await fetch(`${API_URL}/api/policy-categories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(categoryData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('카테고리 생성 실패:', error);
+      throw error;
+    }
+  }
+
+  // 카테고리별 이름 반환 (기존 방식 - 하위 호환성 유지)
   static getCategoryName(categoryId) {
     const categoryNames = {
       'wireless_shoe': '구두정책',

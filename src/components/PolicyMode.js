@@ -43,8 +43,8 @@ import PolicyCancelModal from './PolicyCancelModal';
 import SettlementReflectModal from './SettlementReflectModal';
 import PolicyService from '../utils/policyService';
 
-// 정책 카테고리 데이터
-const POLICY_CATEGORIES = {
+// 기본 정책 카테고리 데이터 (폴백용)
+const DEFAULT_POLICY_CATEGORIES = {
   wireless: [
     { id: 'wireless_shoe', name: '구두정책', icon: '👞' },
     { id: 'wireless_union', name: '연합정책', icon: '🤝' },
@@ -100,6 +100,10 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(false);
   
+  // 카테고리 데이터
+  const [categories, setCategories] = useState(DEFAULT_POLICY_CATEGORIES);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  
   // 정책 입력 모달 상태
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -130,6 +134,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // 매장 데이터 로드
     loadStores();
     
+    // 카테고리 데이터 로드
+    loadCategories();
+    
     // 정책 데이터 로드
     loadPolicyData();
   }, [policyType, selectedYearMonth]);
@@ -144,6 +151,27 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
     } catch (error) {
       console.error('매장 데이터 로드 실패:', error);
+    }
+  };
+
+  const loadCategories = async () => {
+    setCategoriesLoading(true);
+    try {
+      const categoriesData = await PolicyService.getCategories();
+      
+      // 정책 타입별로 카테고리 그룹화
+      const groupedCategories = {
+        wireless: categoriesData.filter(cat => cat.policyType === 'wireless' && cat.isActive).sort((a, b) => a.sortOrder - b.sortOrder),
+        wired: categoriesData.filter(cat => cat.policyType === 'wired' && cat.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
+      };
+      
+      setCategories(groupedCategories);
+    } catch (error) {
+      console.error('카테고리 데이터 로드 실패:', error);
+      // 실패 시 기본 카테고리 사용
+      setCategories(DEFAULT_POLICY_CATEGORIES);
+    } finally {
+      setCategoriesLoading(false);
     }
   };
 
@@ -204,8 +232,30 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   const handleApprovalSubmit = async (approvalData) => {
     try {
-      // TODO: 승인 API 호출
-      console.log('승인 데이터:', approvalData);
+      const { policyId, approvalData: approval, userRole } = approvalData;
+      
+      // 사용자 권한에 따른 승인 유형 결정
+      let approvalType = '';
+      if (userRole === 'SS' || userRole === 'S') {
+        if (approval.total === '승인') approvalType = 'total';
+        else if (approval.settlement === '승인') approvalType = 'settlement';
+      } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+        if (approval.team === '승인') approvalType = 'team';
+      }
+      
+      if (!approvalType) {
+        alert('승인 상태를 선택해주세요.');
+        return;
+      }
+      
+      // 승인 API 호출
+      await PolicyService.approvePolicy(policyId, {
+        approvalType,
+        comment: approval.comment,
+        userId: loggedInStore?.agentInfo?.contactId || loggedInStore?.id,
+        userName: loggedInStore?.agentInfo?.target || loggedInStore?.name
+      });
+      
       alert('승인이 완료되었습니다.');
       setShowApprovalModal(false);
       setSelectedPolicyForApproval(null);
@@ -213,7 +263,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       await loadPolicyData();
     } catch (error) {
       console.error('승인 실패:', error);
-      alert('승인에 실패했습니다.');
+      alert('승인에 실패했습니다: ' + error.message);
     }
   };
 
@@ -407,9 +457,16 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </Paper>
 
                 {/* 정책 카테고리 목록 또는 정책 목록 */}
-        {currentView === 'categories' ? (
-          <Grid container spacing={3}>
-            {POLICY_CATEGORIES[policyType].map((category) => (
+                 {currentView === 'categories' ? (
+           <Grid container spacing={3}>
+             {categoriesLoading ? (
+               <Grid item xs={12}>
+                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                   <CircularProgress />
+                 </Box>
+               </Grid>
+             ) : (
+               categories[policyType]?.map((category) => (
               <Grid item xs={12} sm={6} md={4} key={category.id}>
                 <Card 
                   sx={{ 
@@ -453,10 +510,10 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       </Button>
                     </Box>
                   </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                                 </Card>
+               </Grid>
+             )))}
+           </Grid>
         ) : (
           /* 정책 목록 화면 */
           <Box>
@@ -469,10 +526,10 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               카테고리로 돌아가기
             </Button>
             
-            {/* 카테고리 제목 */}
-            <Typography variant="h5" sx={{ mb: 3 }}>
-              {POLICY_CATEGORIES[policyType].find(cat => cat.id === selectedCategoryForList)?.name} 정책 목록
-            </Typography>
+                         {/* 카테고리 제목 */}
+             <Typography variant="h5" sx={{ mb: 3 }}>
+               {categories[policyType]?.find(cat => cat.id === selectedCategoryForList)?.name} 정책 목록
+             </Typography>
             
             {/* 정책 목록 테이블 */}
             {loading ? (
