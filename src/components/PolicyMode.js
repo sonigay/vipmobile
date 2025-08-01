@@ -656,13 +656,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             )}
                             
                             {/* 승인 버튼 - 권한별 표시 */}
-                            {(() => {
-                              const userRole = loggedInStore?.agentInfo?.userRole;
-                              console.log('🔍 [승인버튼] 사용자 권한 정보:', {
-                                userRole,
-                                loggedInStore: loggedInStore,
-                                agentInfo: loggedInStore?.agentInfo
-                              });
+                                                         {(() => {
+                               const userRole = loggedInStore?.userRole;
+                               console.log('🔍 [승인버튼] 사용자 권한 정보:', {
+                                 userRole,
+                                 loggedInStore: loggedInStore
+                               });
                               
                                                              const canApprove = 
                                  // 총괄(SS): 모든 승인 가능
@@ -687,7 +686,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             
                             {/* 승인 취소 버튼 - 권한별 표시 */}
                             {(() => {
-                              const userRole = loggedInStore?.agentInfo?.userRole;
+                              const userRole = loggedInStore?.userRole;
                                                              const canCancelApproval = 
                                  // 총괄(SS): 모든 승인 취소 가능
                                  userRole === 'SS' ||
@@ -710,7 +709,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             })()}
                             
                                                          {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
-                             {(loggedInStore?.agentInfo?.userRole === 'S' || loggedInStore?.agentInfo?.userRole === 'SS') && (
+                             {(loggedInStore?.userRole === 'S' || loggedInStore?.userRole === 'SS') && (
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -756,42 +755,42 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       />
 
                                                        {/* 정책 승인 모달 */}
-         <PolicyApprovalModal
-           open={showApprovalModal}
-           onClose={() => {
-             setShowApprovalModal(false);
-             setSelectedPolicyForApproval(null);
-           }}
-           policy={selectedPolicyForApproval}
-           onApprovalSubmit={handleApprovalSubmit}
-                       userRole={loggedInStore?.agentInfo?.userRole}
-           processing={approvalProcessing}
-         />
+                   <PolicyApprovalModal
+            open={showApprovalModal}
+            onClose={() => {
+              setShowApprovalModal(false);
+              setSelectedPolicyForApproval(null);
+            }}
+            policy={selectedPolicyForApproval}
+            onApprovalSubmit={handleApprovalSubmit}
+                        userRole={loggedInStore?.userRole}
+            processing={approvalProcessing}
+          />
 
                {/* 정책 취소 모달 */}
-                 <PolicyCancelModal
-           open={showCancelModal}
-           onClose={() => {
-             setShowCancelModal(false);
-             setSelectedPolicyForCancel(null);
-           }}
-           policy={selectedPolicyForCancel}
-           onCancelSubmit={handleCancelSubmit}
-           cancelType={cancelType}
-           userRole={loggedInStore?.agentInfo?.userRole}
-         />
+                                   <PolicyCancelModal
+            open={showCancelModal}
+            onClose={() => {
+              setShowCancelModal(false);
+              setSelectedPolicyForCancel(null);
+            }}
+            policy={selectedPolicyForCancel}
+            onCancelSubmit={handleCancelSubmit}
+            cancelType={cancelType}
+            userRole={loggedInStore?.userRole}
+          />
 
-        {/* 정산 반영 모달 */}
-                 <SettlementReflectModal
-           open={showSettlementModal}
-           onClose={() => {
-             setShowSettlementModal(false);
-             setSelectedPolicyForSettlement(null);
-           }}
-           policy={selectedPolicyForSettlement}
-           onReflectSubmit={handleSettlementSubmit}
-           userRole={loggedInStore?.agentInfo?.userRole}
-         />
+                 {/* 정산 반영 모달 */}
+                  <SettlementReflectModal
+            open={showSettlementModal}
+            onClose={() => {
+              setShowSettlementModal(false);
+              setSelectedPolicyForSettlement(null);
+            }}
+            policy={selectedPolicyForSettlement}
+            onReflectSubmit={handleSettlementSubmit}
+            userRole={loggedInStore?.userRole}
+          />
                     </Box>
   );
 }
