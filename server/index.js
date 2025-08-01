@@ -13069,13 +13069,20 @@ app.get('/api/policies', async (req, res) => {
       lastRow: values && values.length > 1 ? values[values.length - 1] : null
     });
     
-    if (!values || values.length <= 1) {
+    if (!values || values.length === 0) {
       console.log('정책 데이터가 없습니다.');
       return res.json({ success: true, policies: [] });
     }
     
-    // 헤더 제거하고 데이터 처리
-    const dataRows = values.slice(1);
+    // 헤더가 있는 경우 헤더 제거
+    const dataRows = values.length > 1 ? values.slice(1) : values;
+    
+    if (dataRows.length === 0) {
+      console.log('정책 데이터가 없습니다.');
+      return res.json({ success: true, policies: [] });
+    }
+    
+
     
     // 필터링 적용
     let filteredPolicies = dataRows.filter(row => {
