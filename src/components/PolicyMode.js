@@ -657,11 +657,11 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             
                             {/* 승인 버튼 - 권한별 표시 */}
                             {(() => {
-                              const userRole = loggedInStore?.qualification;
+                              const userRole = loggedInStore?.agentInfo?.userRole;
                               console.log('🔍 [승인버튼] 사용자 권한 정보:', {
                                 userRole,
                                 loggedInStore: loggedInStore,
-                                qualification: loggedInStore?.qualification
+                                agentInfo: loggedInStore?.agentInfo
                               });
                               
                                                              const canApprove = 
@@ -669,8 +669,6 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                  userRole === 'SS' ||
                                  // 정산팀(S): 총괄, 정산팀 승인 가능
                                  userRole === 'S' ||
-                                 // 이사: 모든 승인 가능 (총괄과 동일)
-                                 userRole === '이사' ||
                                  // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
                                  ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                               
@@ -689,14 +687,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             
                             {/* 승인 취소 버튼 - 권한별 표시 */}
                             {(() => {
-                              const userRole = loggedInStore?.qualification;
+                              const userRole = loggedInStore?.agentInfo?.userRole;
                                                              const canCancelApproval = 
                                  // 총괄(SS): 모든 승인 취소 가능
                                  userRole === 'SS' ||
                                  // 정산팀(S): 총괄, 정산팀 승인 취소 가능
                                  userRole === 'S' ||
-                                 // 이사: 모든 승인 취소 가능 (총괄과 동일)
-                                 userRole === '이사' ||
                                  // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인 취소만 가능
                                  ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                               
@@ -714,7 +710,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             })()}
                             
                                                          {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
-                             {(loggedInStore?.qualification === 'S' || loggedInStore?.qualification === 'SS' || loggedInStore?.qualification === '이사') && (
+                             {(loggedInStore?.agentInfo?.userRole === 'S' || loggedInStore?.agentInfo?.userRole === 'SS') && (
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -768,7 +764,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            }}
            policy={selectedPolicyForApproval}
            onApprovalSubmit={handleApprovalSubmit}
-                       userRole={loggedInStore?.qualification}
+                       userRole={loggedInStore?.agentInfo?.userRole}
            processing={approvalProcessing}
          />
 
@@ -782,7 +778,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            policy={selectedPolicyForCancel}
            onCancelSubmit={handleCancelSubmit}
            cancelType={cancelType}
-           userRole={loggedInStore?.qualification || loggedInStore?.modePermissions?.policy ? 'SS' : 'A'}
+           userRole={loggedInStore?.agentInfo?.userRole}
          />
 
         {/* 정산 반영 모달 */}
@@ -794,7 +790,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            }}
            policy={selectedPolicyForSettlement}
            onReflectSubmit={handleSettlementSubmit}
-           userRole={loggedInStore?.qualification || loggedInStore?.modePermissions?.policy ? 'SS' : 'A'}
+           userRole={loggedInStore?.agentInfo?.userRole}
          />
                     </Box>
   );
