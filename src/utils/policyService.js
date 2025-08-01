@@ -103,6 +103,79 @@ export class PolicyService {
     }
   }
 
+  // 정책 취소
+  static async cancelPolicy(policyId, cancelData) {
+    try {
+      const response = await fetch(`${API_URL}/api/policies/${policyId}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cancelData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('정책 취소 실패:', error);
+      throw error;
+    }
+  }
+
+  // 승인 취소
+  static async cancelApproval(policyId, cancelData) {
+    try {
+      const response = await fetch(`${API_URL}/api/policies/${policyId}/approval-cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cancelData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('승인 취소 실패:', error);
+      throw error;
+    }
+  }
+
+  // 정산 반영
+  static async reflectSettlement(policyId, settlementData) {
+    try {
+      const response = await fetch(`${API_URL}/api/policies/${policyId}/settlement-reflect`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settlementData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('정산 반영 실패:', error);
+      throw error;
+    }
+  }
+      console.error('정책 삭제 실패:', error);
+      throw error;
+    }
+  }
+
   // 정책 승인
   static async approvePolicy(policyId, approvalData) {
     try {

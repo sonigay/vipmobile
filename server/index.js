@@ -12780,6 +12780,270 @@ app.post('/api/app-updates', async (req, res) => {
   }
 });
 
+// 정책 취소 API
+app.put('/api/policies/:policyId/cancel', async (req, res) => {
+  try {
+    const { policyId } = req.params;
+    const { cancelReason, userId, userName } = req.body;
+    
+    console.log('정책 취소 요청:', { policyId, cancelReason, userId, userName });
+    
+    if (!cancelReason || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: '취소 사유와 사용자 정보가 필요합니다.'
+      });
+    }
+    
+    // 정책_기본정보 시트에서 해당 정책 찾기
+    const values = await getSheetValues('정책_기본정보 ');
+    
+    if (!values || values.length <= 1) {
+      return res.status(404).json({
+        success: false,
+        error: '정책을 찾을 수 없습니다.'
+      });
+    }
+    
+    const dataRows = values.slice(1);
+    const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
+    
+    if (policyRowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '정책을 찾을 수 없습니다.'
+      });
+    }
+    
+    const policyRow = dataRows[policyRowIndex];
+    const inputUserId = policyRow[9]; // J열: 입력자ID
+    
+    // 본인이 입력한 정책인지 확인
+    if (inputUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: '본인이 입력한 정책만 취소할 수 있습니다.'
+      });
+    }
+    
+    // 정책 상태를 취소로 변경
+    const updatedRow = [...policyRow];
+    updatedRow[15] = '취소됨'; // P열: 정책상태
+    updatedRow[16] = cancelReason; // Q열: 취소사유
+    updatedRow[17] = new Date().toISOString(); // R열: 취소일시
+    updatedRow[18] = userName; // S열: 취소자명
+    
+    // Google Sheets 업데이트
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `정책_기본정보 !A${policyRowIndex + 2}:S${policyRowIndex + 2}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+    
+    // 취소 알림 생성
+    await createPolicyNotification(policyId, userId, 'policy_cancelled', { cancelReason });
+    
+    console.log('정책 취소 완료:', response.data);
+    
+    res.json({
+      success: true,
+      message: '정책이 성공적으로 취소되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('정책 취소 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 승인 취소 API
+app.put('/api/policies/:policyId/approval-cancel', async (req, res) => {
+  try {
+    const { policyId } = req.params;
+    const { cancelReason, userId, userName, approvalType } = req.body;
+    
+    console.log('승인 취소 요청:', { policyId, cancelReason, userId, userName, approvalType });
+    
+    if (!cancelReason || !userId || !approvalType) {
+      return res.status(400).json({
+        success: false,
+        error: '취소 사유, 사용자 정보, 승인 유형이 필요합니다.'
+      });
+    }
+    
+    // 정책_기본정보 시트에서 해당 정책 찾기
+    const values = await getSheetValues('정책_기본정보 ');
+    
+    if (!values || values.length <= 1) {
+      return res.status(404).json({
+        success: false,
+        error: '정책을 찾을 수 없습니다.'
+      });
+    }
+    
+    const dataRows = values.slice(1);
+    const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
+    
+    if (policyRowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '정책을 찾을 수 없습니다.'
+      });
+    }
+    
+    const policyRow = dataRows[policyRowIndex];
+    
+    // 승인 상태 확인 및 업데이트
+    const updatedRow = [...policyRow];
+    let approvalColumn = '';
+    
+    switch (approvalType) {
+      case 'total':
+        approvalColumn = 'M'; // M열: 승인상태_총괄
+        break;
+      case 'settlement':
+        approvalColumn = 'N'; // N열: 승인상태_정산팀
+        break;
+      case 'team':
+        approvalColumn = 'O'; // O열: 승인상태_소속팀
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          error: '잘못된 승인 유형입니다.'
+        });
+    }
+    
+    // 승인 상태를 대기로 변경
+    const columnIndex = approvalColumn === 'M' ? 12 : approvalColumn === 'N' ? 13 : 14;
+    updatedRow[columnIndex] = '대기';
+    
+    // 취소 이력을 정책_승인이력 시트에 기록
+    const approvalHistoryRow = [
+      policyId,                    // A열: 정책ID
+      approvalType,                // B열: 승인유형
+      '취소',                      // C열: 승인상태
+      cancelReason,                // D열: 사유
+      new Date().toISOString(),    // E열: 처리일시
+      userName,                    // F열: 처리자명
+      userId                       // G열: 처리자ID
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '정책_승인이력 !A:G',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [approvalHistoryRow]
+      }
+    });
+    
+    // Google Sheets 업데이트
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `정책_기본정보 !A${policyRowIndex + 2}:O${policyRowIndex + 2}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+    
+    // 승인 취소 알림 생성
+    await createPolicyNotification(policyId, userId, 'approval_cancelled', { 
+      approvalType, 
+      cancelReason 
+    });
+    
+    console.log('승인 취소 완료:', response.data);
+    
+    res.json({
+      success: true,
+      message: '승인이 성공적으로 취소되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('승인 취소 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 정산 반영 API
+app.put('/api/policies/:policyId/settlement-reflect', async (req, res) => {
+  try {
+    const { policyId } = req.params;
+    const { userId, userName, isReflected } = req.body;
+    
+    console.log('정산 반영 요청:', { policyId, userId, userName, isReflected });
+    
+    if (!userId || !userName) {
+      return res.status(400).json({
+        success: false,
+        error: '사용자 정보가 필요합니다.'
+      });
+    }
+    
+    // 정책_기본정보 시트에서 해당 정책 찾기
+    const values = await getSheetValues('정책_기본정보 ');
+    
+    if (!values || values.length <= 1) {
+      return res.status(404).json({
+        success: false,
+        error: '정책을 찾을 수 없습니다.'
+      });
+    }
+    
+    const dataRows = values.slice(1);
+    const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
+    
+    if (policyRowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '정책을 찾을 수 없습니다.'
+      });
+    }
+    
+    const policyRow = dataRows[policyRowIndex];
+    
+    // 정산 반영 상태 업데이트
+    const updatedRow = [...policyRow];
+    updatedRow[19] = isReflected ? '반영됨' : '미반영'; // T열: 정산반영상태
+    updatedRow[20] = isReflected ? userName : ''; // U열: 정산반영자명
+    updatedRow[21] = isReflected ? new Date().toISOString() : ''; // V열: 정산반영일시
+    updatedRow[22] = isReflected ? userId : ''; // W열: 정산반영자ID
+    
+    // Google Sheets 업데이트
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `정책_기본정보 !A${policyRowIndex + 2}:W${policyRowIndex + 2}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+    
+    // 정산 반영 알림 생성
+    await createPolicyNotification(policyId, userId, 'settlement_reflected', { 
+      isReflected,
+      userName 
+    });
+    
+    console.log('정산 반영 완료:', response.data);
+    
+    res.json({
+      success: true,
+      message: `정책이 정산에 ${isReflected ? '반영' : '미반영'} 처리되었습니다.`
+    });
+    
+  } catch (error) {
+    console.error('정산 반영 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 정책 관련 API 라우트
 app.get('/api/policies', async (req, res) => {
   try {
@@ -12865,7 +13129,17 @@ app.get('/api/policies', async (req, res) => {
         total: row[12] || '대기',     // M열: 승인상태_총괄
         settlement: row[13] || '대기', // N열: 승인상태_정산팀
         team: row[14] || '대기'       // O열: 승인상태_소속팀
-      }
+      },
+      // 취소 관련 정보 추가
+      policyStatus: row[15] || '활성', // P열: 정책상태
+      cancelReason: row[16] || '',    // Q열: 취소사유
+      cancelDateTime: row[17] || '',  // R열: 취소일시
+      cancelUserName: row[18] || '',  // S열: 취소자명
+      // 정산 반영 관련 정보 추가
+      settlementStatus: row[19] || '미반영', // T열: 정산반영상태
+      settlementUserName: row[20] || '',     // U열: 정산반영자명
+      settlementDateTime: row[21] || '',     // V열: 정산반영일시
+      settlementUserId: row[22] || ''        // W열: 정산반영자ID
     }));
     
     console.log(`정책 목록 조회 완료: ${policies.length}건`);

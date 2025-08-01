@@ -18,18 +18,29 @@ import {
   CardContent,
   CardActions,
   Chip,
-  IconButton
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress
 } from '@mui/material';
 import {
   Policy as PolicyIcon,
   SwapHoriz as SwapHorizIcon,
   Update as UpdateIcon,
   Add as AddIcon,
-  Notifications as NotificationsIcon
+  Notifications as NotificationsIcon,
+  ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';
 import PolicyInputModal from './PolicyInputModal';
+import PolicyApprovalModal from './PolicyApprovalModal';
+import PolicyCancelModal from './PolicyCancelModal';
+import SettlementReflectModal from './SettlementReflectModal';
 import PolicyService from '../utils/policyService';
 
 // 정책 카테고리 데이터
@@ -93,6 +104,24 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   
+  // 화면 상태 관리
+  const [currentView, setCurrentView] = useState('categories'); // 'categories' 또는 'policies'
+  const [selectedCategoryForList, setSelectedCategoryForList] = useState(null);
+  const [policies, setPolicies] = useState([]); // 전체 정책 목록
+  
+  // 승인 모달 상태
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [selectedPolicyForApproval, setSelectedPolicyForApproval] = useState(null);
+  
+  // 취소 모달 상태
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedPolicyForCancel, setSelectedPolicyForCancel] = useState(null);
+  const [cancelType, setCancelType] = useState('policy'); // 'policy' 또는 'approval'
+  
+  // 정산 반영 모달 상태
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [selectedPolicyForSettlement, setSelectedPolicyForSettlement] = useState(null);
+  
   // 정책모드 진입 시 업데이트 팝업 표시
   useEffect(() => {
     // 모드 진입 시 자동으로 업데이트 팝업 표시
@@ -127,6 +156,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         policyType: policyTypeLabel
       });
       
+      // 전체 정책 목록 저장
+      setPolicies(policies);
+      
       // 카테고리별 개수 계산
       const counts = {};
       policies.forEach(policy => {
@@ -138,6 +170,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('정책 데이터 로드 실패:', error);
       setPolicyData({});
+      setPolicies([]);
     } finally {
       setLoading(false);
     }
@@ -154,8 +187,95 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const handleCategoryClick = (categoryId) => {
-    // TODO: 해당 카테고리의 정책 목록 화면으로 이동
-    console.log('카테고리 클릭:', categoryId);
+    // 해당 카테고리의 정책 목록 화면으로 이동
+    setSelectedCategoryForList(categoryId);
+    setCurrentView('policies');
+  };
+
+  const handleBackToCategories = () => {
+    setCurrentView('categories');
+    setSelectedCategoryForList(null);
+  };
+
+  const handleApprovalClick = (policy) => {
+    setSelectedPolicyForApproval(policy);
+    setShowApprovalModal(true);
+  };
+
+  const handleApprovalSubmit = async (approvalData) => {
+    try {
+      // TODO: 승인 API 호출
+      console.log('승인 데이터:', approvalData);
+      alert('승인이 완료되었습니다.');
+      setShowApprovalModal(false);
+      setSelectedPolicyForApproval(null);
+      // 정책 데이터 다시 로드
+      await loadPolicyData();
+    } catch (error) {
+      console.error('승인 실패:', error);
+      alert('승인에 실패했습니다.');
+    }
+  };
+
+  const handleCancelClick = (policy, type) => {
+    setSelectedPolicyForCancel(policy);
+    setCancelType(type);
+    setShowCancelModal(true);
+  };
+
+  const handleCancelSubmit = async (cancelData) => {
+    try {
+      if (cancelData.cancelType === 'policy') {
+        // 정책 취소
+        await PolicyService.cancelPolicy(cancelData.policyId, {
+          cancelReason: cancelData.cancelReason,
+          userId: loggedInStore?.agentInfo?.contactId || loggedInStore?.id,
+          userName: loggedInStore?.agentInfo?.target || loggedInStore?.name
+        });
+        alert('정책이 성공적으로 취소되었습니다.');
+      } else {
+        // 승인 취소
+        await PolicyService.cancelApproval(cancelData.policyId, {
+          cancelReason: cancelData.cancelReason,
+          approvalType: cancelData.approvalType,
+          userId: loggedInStore?.agentInfo?.contactId || loggedInStore?.id,
+          userName: loggedInStore?.agentInfo?.target || loggedInStore?.name
+        });
+        alert('승인이 성공적으로 취소되었습니다.');
+      }
+      
+      setShowCancelModal(false);
+      setSelectedPolicyForCancel(null);
+      // 정책 데이터 다시 로드
+      await loadPolicyData();
+    } catch (error) {
+      console.error('취소 실패:', error);
+      alert('취소에 실패했습니다.');
+    }
+  };
+
+  const handleSettlementClick = (policy) => {
+    setSelectedPolicyForSettlement(policy);
+    setShowSettlementModal(true);
+  };
+
+  const handleSettlementSubmit = async (settlementData) => {
+    try {
+      await PolicyService.reflectSettlement(settlementData.policyId, {
+        isReflected: settlementData.isReflected,
+        userId: loggedInStore?.agentInfo?.contactId || loggedInStore?.id,
+        userName: loggedInStore?.agentInfo?.target || loggedInStore?.name
+      });
+      
+      alert(`정책이 정산에 ${settlementData.isReflected ? '반영' : '미반영'} 처리되었습니다.`);
+      setShowSettlementModal(false);
+      setSelectedPolicyForSettlement(null);
+      // 정책 데이터 다시 로드
+      await loadPolicyData();
+    } catch (error) {
+      console.error('정산 반영 실패:', error);
+      alert('정산 반영에 실패했습니다.');
+    }
   };
 
   const handleSavePolicy = async (policyData) => {
@@ -286,56 +406,225 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           </Grid>
         </Paper>
 
-        {/* 정책 카테고리 목록 */}
-        <Grid container spacing={3}>
-          {POLICY_CATEGORIES[policyType].map((category) => (
-            <Grid item xs={12} sm={6} md={4} key={category.id}>
-              <Card 
-                sx={{ 
-                  height: '100%',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    boxShadow: 4,
-                    transform: 'translateY(-2px)',
-                    transition: 'all 0.2s'
-                  }
-                }}
-                onClick={() => handleCategoryClick(category.id)}
-              >
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h4" sx={{ mr: 1 }}>
-                      {category.icon}
-                    </Typography>
-                    <Typography variant="h6" component="div">
-                      {category.name}
-                    </Typography>
-                  </Box>
-                  
-                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <Chip 
-                       label={`${policyData[category.id] || 0}건`}
-                       color="primary" 
-                       variant="outlined"
-                       size="small"
-                     />
-                     <Button
-                       size="small"
-                       startIcon={<AddIcon />}
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         handleAddPolicy(category.id);
-                       }}
-                       sx={{ minWidth: 'auto' }}
-                     >
-                       추가
-                     </Button>
-                   </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                {/* 정책 카테고리 목록 또는 정책 목록 */}
+        {currentView === 'categories' ? (
+          <Grid container spacing={3}>
+            {POLICY_CATEGORIES[policyType].map((category) => (
+              <Grid item xs={12} sm={6} md={4} key={category.id}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      boxShadow: 4,
+                      transform: 'translateY(-2px)',
+                      transition: 'all 0.2s'
+                    }
+                  }}
+                  onClick={() => handleCategoryClick(category.id)}
+                >
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h4" sx={{ mr: 1 }}>
+                        {category.icon}
+                      </Typography>
+                      <Typography variant="h6" component="div">
+                        {category.name}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip 
+                        label={`${policyData[category.id] || 0}건`}
+                        color="primary" 
+                        variant="outlined"
+                        size="small"
+                      />
+                      <Button
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddPolicy(category.id);
+                        }}
+                        sx={{ minWidth: 'auto' }}
+                      >
+                        추가
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          /* 정책 목록 화면 */
+          <Box>
+            {/* 뒤로가기 버튼 */}
+            <Button 
+              onClick={handleBackToCategories}
+              startIcon={<ArrowBackIcon />}
+              sx={{ mb: 2 }}
+            >
+              카테고리로 돌아가기
+            </Button>
+            
+            {/* 카테고리 제목 */}
+            <Typography variant="h5" sx={{ mb: 3 }}>
+              {POLICY_CATEGORIES[policyType].find(cat => cat.id === selectedCategoryForList)?.name} 정책 목록
+            </Typography>
+            
+            {/* 정책 목록 테이블 */}
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer component={Paper}>
+                <Table>
+                                     <TableHead>
+                     <TableRow>
+                       <TableCell>정책명</TableCell>
+                       <TableCell>적용일</TableCell>
+                       <TableCell>적용점</TableCell>
+                       <TableCell>내용</TableCell>
+                       <TableCell>금액</TableCell>
+                       <TableCell>입력자</TableCell>
+                       <TableCell>승인상태</TableCell>
+                       <TableCell>정산반영</TableCell>
+                       <TableCell>작업</TableCell>
+                     </TableRow>
+                   </TableHead>
+                  <TableBody>
+                    {policies
+                      .filter(policy => policy.category === selectedCategoryForList)
+                      .map((policy) => (
+                                             <TableRow key={policy.id}>
+                       <TableCell>
+                         <Box>
+                           <Typography variant="body2">{policy.policyName}</Typography>
+                           {policy.policyStatus === '취소됨' && (
+                             <Chip 
+                               label="취소됨" 
+                               size="small" 
+                               color="error" 
+                               variant="outlined"
+                             />
+                           )}
+                         </Box>
+                       </TableCell>
+                       <TableCell>{policy.policyDate}</TableCell>
+                       <TableCell>{policy.policyStore}</TableCell>
+                       <TableCell>
+                         <Box>
+                           <Typography variant="body2">{policy.policyContent}</Typography>
+                           {policy.cancelReason && (
+                             <Typography variant="caption" color="error" display="block">
+                               취소사유: {policy.cancelReason}
+                             </Typography>
+                           )}
+                         </Box>
+                       </TableCell>
+                       <TableCell>{policy.policyAmount}</TableCell>
+                       <TableCell>{policy.inputUserName}</TableCell>
+                                               <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Chip 
+                              label={`총괄: ${policy.approvalStatus?.total || '대기'}`}
+                              size="small"
+                              color={policy.approvalStatus?.total === '승인' ? 'success' : 'default'}
+                            />
+                            <Chip 
+                              label={`정산팀: ${policy.approvalStatus?.settlement || '대기'}`}
+                              size="small"
+                              color={policy.approvalStatus?.settlement === '승인' ? 'success' : 'default'}
+                            />
+                            <Chip 
+                              label={`소속팀: ${policy.approvalStatus?.team || '대기'}`}
+                              size="small"
+                              color={policy.approvalStatus?.team === '승인' ? 'success' : 'default'}
+                            />
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Chip 
+                              label={policy.settlementStatus || '미반영'}
+                              size="small"
+                              color={policy.settlementStatus === '반영됨' ? 'success' : 'default'}
+                              variant="outlined"
+                            />
+                            {policy.settlementUserName && (
+                              <Typography variant="caption" color="text.secondary">
+                                {policy.settlementUserName}
+                              </Typography>
+                            )}
+                            {policy.settlementDateTime && (
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(policy.settlementDateTime).toLocaleDateString()}
+                              </Typography>
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {/* 정책 취소 버튼 (입력자만 보임) */}
+                            {policy.inputUserId === (loggedInStore?.agentInfo?.contactId || loggedInStore?.id) && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => handleCancelClick(policy, 'policy')}
+                                disabled={policy.policyStatus === '취소됨'}
+                              >
+                                정책취소
+                              </Button>
+                            )}
+                            
+                            {/* 승인 버튼 */}
+                            <Button
+                              size="small"
+                              onClick={() => handleApprovalClick(policy)}
+                              disabled={!loggedInStore?.modePermissions?.policy || policy.policyStatus === '취소됨'}
+                            >
+                              승인
+                            </Button>
+                            
+                            {/* 승인 취소 버튼 (승인자만 보임) */}
+                            {loggedInStore?.modePermissions?.policy && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="warning"
+                                onClick={() => handleCancelClick(policy, 'approval')}
+                                disabled={policy.policyStatus === '취소됨'}
+                              >
+                                승인취소
+                              </Button>
+                            )}
+                            
+                            {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
+                            {(loggedInStore?.agentInfo?.qualification === 'S' || loggedInStore?.agentInfo?.qualification === 'SS') && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="info"
+                                onClick={() => handleSettlementClick(policy)}
+                                disabled={policy.policyStatus === '취소됨'}
+                              >
+                                정산반영
+                              </Button>
+                            )}
+                          </Box>
+                        </TableCell>
+                     </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        )}
       </Container>
       
       {/* 업데이트 팝업 */}
@@ -349,7 +638,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         }}
       />
 
-      {/* 정책 입력 모달 */}
+            {/* 정책 입력 모달 */}
       <PolicyInputModal
         open={showPolicyModal}
         onClose={() => setShowPolicyModal(false)}
@@ -359,7 +648,44 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         onSave={handleSavePolicy}
         loggedInUser={loggedInStore}
       />
-    </Box>
+
+             {/* 정책 승인 모달 */}
+       <PolicyApprovalModal
+         open={showApprovalModal}
+         onClose={() => {
+           setShowApprovalModal(false);
+           setSelectedPolicyForApproval(null);
+         }}
+         policy={selectedPolicyForApproval}
+         onApprovalSubmit={handleApprovalSubmit}
+         userRole={loggedInStore?.agentInfo?.qualification || loggedInStore?.modePermissions?.policy ? 'SS' : 'A'}
+       />
+
+               {/* 정책 취소 모달 */}
+        <PolicyCancelModal
+          open={showCancelModal}
+          onClose={() => {
+            setShowCancelModal(false);
+            setSelectedPolicyForCancel(null);
+          }}
+          policy={selectedPolicyForCancel}
+          onCancelSubmit={handleCancelSubmit}
+          cancelType={cancelType}
+          userRole={loggedInStore?.agentInfo?.qualification || loggedInStore?.modePermissions?.policy ? 'SS' : 'A'}
+        />
+
+        {/* 정산 반영 모달 */}
+        <SettlementReflectModal
+          open={showSettlementModal}
+          onClose={() => {
+            setShowSettlementModal(false);
+            setSelectedPolicyForSettlement(null);
+          }}
+          policy={selectedPolicyForSettlement}
+          onReflectSubmit={handleSettlementSubmit}
+          userRole={loggedInStore?.agentInfo?.qualification || loggedInStore?.modePermissions?.policy ? 'SS' : 'A'}
+        />
+                    </Box>
   );
 }
 
