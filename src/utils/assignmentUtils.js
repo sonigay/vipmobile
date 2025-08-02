@@ -30,8 +30,37 @@ const setCache = (key, data) => {
 
 // 배정 설정 가져오기
 export const getAssignmentSettings = () => {
-  const savedSettings = localStorage.getItem('assignmentSettings');
-  return savedSettings ? JSON.parse(savedSettings) : {
+  // 현재 로그인한 사용자 ID 가져오기
+  const loginState = JSON.parse(localStorage.getItem('loginState') || '{}');
+  const currentUserId = loginState.inventoryUserName || 'unknown';
+  
+  // 사용자별 저장된 설정 가져오기
+  const savedData = localStorage.getItem(`assignmentSettingsData_${currentUserId}`);
+  
+  if (savedData) {
+    try {
+      const parsedData = JSON.parse(savedData);
+      return parsedData.assignmentSettings || {
+        ratios: {
+          turnoverRate: 30,
+          storeCount: 25,
+          remainingInventory: 25,
+          salesVolume: 20
+        },
+        models: {},
+        targets: {
+          offices: {},
+          departments: {},
+          agents: {}
+        }
+      };
+    } catch (error) {
+      console.error('사용자별 배정 설정 파싱 실패:', error);
+    }
+  }
+  
+  // 기본 설정 반환
+  return {
     ratios: {
       turnoverRate: 30,
       storeCount: 25,
