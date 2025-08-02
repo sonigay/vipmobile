@@ -13836,9 +13836,9 @@ app.get('/api/inventory/status', async (req, res) => {
         
         if (modelName) {
           // 필터링 적용
-          if (req.query.agent && req.query.agent !== agent) continue;
-          if (req.query.office && req.query.office !== office) continue;
-          if (req.query.department && req.query.department !== department) continue;
+          if (req.query.agent && req.query.agent !== agent) return;
+          if (req.query.office && req.query.office !== office) return;
+          if (req.query.department && req.query.department !== department) return;
           
           if (!inventoryMap.has(modelName)) {
             inventoryMap.set(modelName, {
@@ -13970,9 +13970,9 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
         
         if (modelName && color) {
           // 필터링 적용
-          if (req.query.agent && req.query.agent !== agent) continue;
-          if (req.query.office && req.query.office !== office) continue;
-          if (req.query.department && req.query.department !== department) continue;
+          if (req.query.agent && req.query.agent !== agent) return;
+          if (req.query.office && req.query.office !== office) return;
+          if (req.query.department && req.query.department !== department) return;
           
           const key = `${modelName}|${color}`;
           
