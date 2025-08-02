@@ -50,7 +50,8 @@ function PolicyInputModal({
   yearMonth, 
   stores = [], 
   onSave,
-  loggedInUser 
+  loggedInUser,
+  teams = [] // 소속정책팀 목록 추가
 }) {
   const [formData, setFormData] = useState({
     policyName: '',
@@ -59,7 +60,8 @@ function PolicyInputModal({
     policyStore: '',
     policyContent: '',
     policyAmount: '',
-    amountType: 'total' // 'total' 또는 'per_case'
+    amountType: 'total', // 'total', 'per_case', 'in_content'
+    team: '' // 소속정책팀 추가
   });
   
   const [errors, setErrors] = useState({});
@@ -79,11 +81,12 @@ function PolicyInputModal({
         policyStore: '',
         policyContent: '',
         policyAmount: '',
-        amountType: 'total'
+        amountType: 'total',
+        team: loggedInUser?.userRole || '' // 현재 사용자의 소속팀으로 기본 설정
       });
       setErrors({});
     }
-  }, [open]);
+  }, [open, loggedInUser]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -113,14 +116,21 @@ function PolicyInputModal({
       newErrors.policyContent = '정책내용을 입력해주세요.';
     }
     
-    if (!formData.policyAmount.trim()) {
-      newErrors.policyAmount = '금액을 입력해주세요.';
-    } else if (isNaN(Number(formData.policyAmount))) {
-      newErrors.policyAmount = '올바른 금액을 입력해주세요.';
+    // 금액 입력 방식에 따른 검증
+    if (formData.amountType !== 'in_content') {
+      if (!formData.policyAmount.trim()) {
+        newErrors.policyAmount = '금액을 입력해주세요.';
+      } else if (isNaN(Number(formData.policyAmount))) {
+        newErrors.policyAmount = '올바른 금액을 입력해주세요.';
+      }
     }
     
     if (!formData.amountType) {
       newErrors.amountType = '금액 유형을 선택해주세요.';
+    }
+    
+    if (!formData.team) {
+      newErrors.team = '소속정책팀을 선택해주세요.';
     }
     
     setErrors(newErrors);
@@ -129,6 +139,22 @@ function PolicyInputModal({
 
   const handleSubmit = async () => {
     if (!validateForm()) {
+      // 구체적인 에러 메시지 표시
+      const errorFields = Object.keys(errors);
+      if (errorFields.length > 0) {
+        const fieldNames = {
+          policyName: '정책명',
+          policyStartDate: '정책 시작일',
+          policyEndDate: '정책 종료일',
+          policyStore: '정책적용점',
+          policyContent: '정책내용',
+          policyAmount: '금액',
+          amountType: '금액 유형',
+          team: '소속정책팀'
+        };
+        const errorFieldNames = errorFields.map(field => fieldNames[field] || field).join(', ');
+        setErrors({ submit: `다음 필수 입력란을 확인해주세요: [${errorFieldNames}]` });
+      }
       return;
     }
 
@@ -142,7 +168,7 @@ function PolicyInputModal({
         policyEndDate: formData.policyEndDate,
         policyStore: formData.policyStore,
         policyContent: formData.policyContent.trim(),
-        policyAmount: Number(formData.policyAmount),
+        policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
         amountType: formData.amountType,
         policyType: isWireless ? '무선' : '유선',
         category: categoryId,
@@ -154,7 +180,8 @@ function PolicyInputModal({
           total: '대기',
           settlement: '대기',
           team: '대기'
-        }
+        },
+        team: formData.team // 소속정책팀 추가
       };
 
       await onSave(policyData);
@@ -307,7 +334,8 @@ function PolicyInputModal({
               helperText={errors.policyAmount}
               type="number"
               inputProps={{ min: 0 }}
-              required
+              disabled={formData.amountType === 'in_content'}
+              required={formData.amountType !== 'in_content'}
             />
           </Grid>
           
@@ -331,6 +359,11 @@ function PolicyInputModal({
                   control={<Radio />}
                   label="건당금액"
                 />
+                <FormControlLabel
+                  value="in_content"
+                  control={<Radio />}
+                  label="내용에 직접입력"
+                />
               </RadioGroup>
               {errors.amountType && (
                 <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
@@ -338,6 +371,32 @@ function PolicyInputModal({
                 </Typography>
               )}
             </FormControl>
+          </Grid>
+
+          {/* 소속정책팀 선택 */}
+          <Grid item xs={12} sm={6}>
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(option) => option.name}
+              value={teams.find(team => team.code === formData.team) || null}
+              onChange={(event, newValue) => {
+                handleInputChange('team', newValue ? newValue.code : '');
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="소속정책팀 *"
+                  error={!!errors.team}
+                  helperText={errors.team}
+                  required
+                />
+              )}
+              filterOptions={(options, { inputValue }) => {
+                return options.filter((option) =>
+                  option.name.toLowerCase().includes(inputValue.toLowerCase())
+                );
+              }}
+            />
           </Grid>
           
           <Grid item xs={12} sm={6}>
