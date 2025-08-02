@@ -13834,7 +13834,7 @@ app.get('/api/inventory/status', async (req, res) => {
         const agent = (row[8] || '').toString().trim(); // I열: 담당자
         const store = (row[21] || '').toString().trim(); // V열: 출고처
         
-        if (modelName) {
+        if (modelName && category !== '#N/A') {
           // 필터링 적용
           if (req.query.agent && req.query.agent !== agent) return;
           if (req.query.office && req.query.office !== office) return;
@@ -13968,7 +13968,7 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
         const agent = (row[8] || '').toString().trim(); // I열: 담당자
         const store = (row[21] || '').toString().trim(); // V열: 출고처
         
-        if (modelName && color) {
+        if (modelName && color && category !== '#N/A') {
           // 필터링 적용
           if (req.query.agent && req.query.agent !== agent) return;
           if (req.query.office && req.query.office !== office) return;
