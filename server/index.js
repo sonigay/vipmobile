@@ -1377,18 +1377,18 @@ app.get('/api/activation-data/current-month', async (req, res) => {
     
     // 개통실적 데이터 구성 (선불개통 제외)
     const activationData = activationRows
-      .filter(row => row[6] !== '선불개통') // L열: 개통 (선불개통 제외)
+      .filter(row => row[14] !== '선불개통') // O열: 개통 (선불개통 제외)
       .map(row => {
         return {
-          '담당자': row[0] || '',        // A열: 담당자
-          '개통일': row[1] || '',        // B열: 개통일
-          '개통시': row[2] || '',        // C열: 개통시
-          '개통분': row[3] || '',        // D열: 개통분
-          '출고처': row[6] || '',        // G열: 출고처
-          '개통': row[11] || '',         // L열: 개통
-          '모델명': row[13] || '',       // N열: 모델명
-          '색상': row[14] || '',         // O열: 색상
-          '일련번호': row[15] || ''      // P열: 일련번호
+          '담당자': row[8] || '',        // I열: 담당자
+          '개통일': row[9] || '',        // J열: 개통일
+          '개통시': row[10] || '',       // K열: 개통시
+          '개통분': row[11] || '',       // L열: 개통분
+          '출고처': row[14] || '',       // O열: 출고처
+          '개통': row[19] || '',         // T열: 개통
+          '모델명': row[21] || '',       // V열: 모델명
+          '색상': row[22] || '',         // W열: 색상
+          '일련번호': row[23] || ''      // X열: 일련번호
         };
       });
     
@@ -1431,18 +1431,18 @@ app.get('/api/activation-data/previous-month', async (req, res) => {
     
     // 개통실적 데이터 구성 (선불개통 제외)
     const activationData = activationRows
-      .filter(row => row[6] !== '선불개통') // L열: 개통 (선불개통 제외)
+      .filter(row => row[14] !== '선불개통') // O열: 개통 (선불개통 제외)
       .map(row => {
         return {
-          '담당자': row[0] || '',        // A열: 담당자
-          '개통일': row[1] || '',        // B열: 개통일
-          '개통시': row[2] || '',        // C열: 개통시
-          '개통분': row[3] || '',        // D열: 개통분
-          '출고처': row[6] || '',        // G열: 출고처
-          '개통': row[11] || '',         // L열: 개통
-          '모델명': row[13] || '',       // N열: 모델명
-          '색상': row[14] || '',         // O열: 색상
-          '일련번호': row[15] || ''      // P열: 일련번호
+          '담당자': row[8] || '',        // I열: 담당자
+          '개통일': row[9] || '',        // J열: 개통일
+          '개통시': row[10] || '',       // K열: 개통시
+          '개통분': row[11] || '',       // L열: 개통분
+          '출고처': row[14] || '',       // O열: 출고처
+          '개통': row[19] || '',         // T열: 개통
+          '모델명': row[21] || '',       // V열: 모델명
+          '색상': row[22] || '',         // W열: 색상
+          '일련번호': row[23] || ''      // X열: 일련번호
         };
       });
     
@@ -1487,13 +1487,13 @@ app.get('/api/activation-data/by-date', async (req, res) => {
     const dateStats = {};
     
     activationRows.forEach(row => {
-      if (row[6] === '선불개통') return; // 선불개통 제외
+      if (row[14] === '선불개통') return; // O열: 개통 (선불개통 제외)
       
-      const store = row[6] || '미지정'; // G열: 출고처
-      const agent = row[0] || '미지정'; // A열: 담당자
-      const activationDate = row[1] || ''; // B열: 개통일
-      const model = row[13] || '미지정'; // N열: 모델명
-      const color = row[14] || '미지정'; // O열: 색상
+      const store = row[14] || '미지정'; // O열: 출고처
+      const agent = row[8] || '미지정'; // I열: 담당자
+      const activationDate = row[9] || ''; // J열: 개통일
+      const model = row[21] || '미지정'; // V열: 모델명
+      const color = row[22] || '미지정'; // W열: 색상
       
       if (!activationDate) return;
       
@@ -1593,13 +1593,13 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
     
     // 당월 데이터 처리
     currentMonthRows.forEach(row => {
-      if (row[6] === '선불개통') return; // 선불개통 제외
+      if (row[14] === '선불개통') return; // O열: 개통 (선불개통 제외)
       
-      const store = row[6] || '미지정'; // G열: 출고처
-      const agent = row[0] || '미지정'; // A열: 담당자
-      const activationDate = row[1] || ''; // B열: 개통일
-      const model = row[13] || '미지정'; // N열: 모델명
-      const color = row[14] || '미지정'; // O열: 색상
+      const store = row[14] || '미지정'; // O열: 출고처
+      const agent = row[8] || '미지정'; // I열: 담당자
+      const activationDate = row[9] || ''; // J열: 개통일
+      const model = row[21] || '미지정'; // V열: 모델명
+      const color = row[22] || '미지정'; // W열: 색상
       
       if (!activationDate) return;
       
@@ -1656,13 +1656,13 @@ app.get('/api/activation-data/date-comparison/:date', async (req, res) => {
     let processedPreviousCount = 0;
     
     previousMonthRows.forEach((row, index) => {
-      if (row[6] === '선불개통') return; // 선불개통 제외
+      if (row[14] === '선불개통') return; // O열: 개통 (선불개통 제외)
       
-      const store = row[6] || '미지정'; // G열: 출고처
-      const agent = row[0] || '미지정'; // A열: 담당자
-      const activationDate = row[1] || ''; // B열: 개통일
-      const model = row[13] || '미지정'; // N열: 모델명
-      const color = row[14] || '미지정'; // O열: 색상
+      const store = row[14] || '미지정'; // O열: 출고처
+      const agent = row[8] || '미지정'; // I열: 담당자
+      const activationDate = row[9] || ''; // J열: 개통일
+      const model = row[21] || '미지정'; // V열: 모델명
+      const color = row[22] || '미지정'; // W열: 색상
       
       if (!activationDate) return;
       
