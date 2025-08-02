@@ -69,7 +69,7 @@ const InventoryStatusScreen = () => {
              if (data.success) {
          let processedData = data.data;
          
-                   // 색상별 탭에서 동일 모델명 셀 병합 처리
+                   // 색상별 탭에서 동일 모델명 그룹화 처리
           if (activeTab === 1) {
             const modelGroups = new Map();
             processedData.forEach(item => {
@@ -79,14 +79,15 @@ const InventoryStatusScreen = () => {
               modelGroups.get(item.modelName).push(item);
             });
             
-            // 병합된 데이터 생성
+            // 그룹화된 데이터 생성
             processedData = [];
             modelGroups.forEach((items, modelName) => {
               items.forEach((item, index) => {
                 processedData.push({
                   ...item,
                   isFirstInGroup: index === 0, // 그룹의 첫 번째 항목인지 표시
-                  groupSize: items.length // 그룹 크기
+                  groupSize: items.length, // 그룹 크기
+                  groupIndex: index // 그룹 내 인덱스
                 });
               });
             });
@@ -825,23 +826,22 @@ const InventoryStatusScreen = () => {
                              }}
                            />
                          </TableCell>
-                                                                                                                                                                                                     <TableCell sx={{ 
-                             minWidth: 80, 
-                             fontWeight: 'medium',
-                             borderRight: '2px solid #ffffff',
-                             color: '#333333',
-                             p: 0.25,
-                             fontSize: '0.7rem',
-                             verticalAlign: 'top',
-                             ...(activeTab === 1 && item.isFirstInGroup && {
-                               rowSpan: item.groupSize
-                             }),
-                             ...(activeTab === 1 && !item.isFirstInGroup && {
-                               display: 'none'
-                             })
-                           }}>
-                             {item.modelName}
-                           </TableCell>
+                                                                                                                                                                                                                                                                                                                                                                                                           <TableCell sx={{ 
+                              minWidth: 80, 
+                              fontWeight: 'medium',
+                              borderRight: '2px solid #ffffff',
+                              color: '#333333',
+                              p: 0.25,
+                              fontSize: '0.7rem',
+                              verticalAlign: 'top',
+                              ...(activeTab === 1 && !item.isFirstInGroup && {
+                                borderTop: 'none',
+                                paddingTop: 0,
+                                paddingBottom: 0
+                              })
+                            }}>
+                              {activeTab === 1 && !item.isFirstInGroup ? '' : item.modelName}
+                            </TableCell>
                       {activeTab === 1 && (
                         <TableCell sx={{ 
                           minWidth: 80,
