@@ -503,15 +503,44 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       const originalPolicy = selectedPolicyForCopy;
       
+      // 정책 적용일에서 시작일과 종료일 추출
+      let policyStartDate, policyEndDate;
+      if (originalPolicy.policyDate) {
+        // "2025. 6. 1. ~ 2025. 12. 31." 형태에서 날짜 추출
+        const dateMatch = originalPolicy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+        if (dateMatch) {
+          const [, startYear, startMonth, startDay, endYear, endMonth, endDay] = dateMatch;
+          policyStartDate = new Date(parseInt(startYear), parseInt(startMonth) - 1, parseInt(startDay)).toISOString();
+          policyEndDate = new Date(parseInt(endYear), parseInt(endMonth) - 1, parseInt(endDay)).toISOString();
+        }
+      }
+      
+      // 금액에서 실제 금액과 유형 추출
+      let policyAmount = '';
+      let amountType = 'total';
+      if (originalPolicy.policyAmount) {
+        if (originalPolicy.policyAmount.includes('내용에 직접입력')) {
+          amountType = 'in_content';
+        } else {
+          const amountMatch = originalPolicy.policyAmount.match(/(\d+)원/);
+          if (amountMatch) {
+            policyAmount = amountMatch[1];
+            if (originalPolicy.policyAmount.includes('건당금액')) {
+              amountType = 'per_case';
+            }
+          }
+        }
+      }
+      
       // 복사할 정책 데이터 생성
       const copyData = {
         policyName: originalPolicy.policyName,
-        policyStartDate: originalPolicy.policyStartDate,
-        policyEndDate: originalPolicy.policyEndDate,
+        policyStartDate: policyStartDate || new Date().toISOString(),
+        policyEndDate: policyEndDate || new Date().toISOString(),
         policyStore: originalPolicy.policyStore,
         policyContent: originalPolicy.policyContent,
-        policyAmount: originalPolicy.policyAmount,
-        amountType: originalPolicy.amountType,
+        policyAmount: policyAmount,
+        amountType: amountType,
         policyType: originalPolicy.policyType,
         category: originalPolicy.category,
         yearMonth: targetYearMonth,
