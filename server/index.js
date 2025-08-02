@@ -13365,11 +13365,20 @@ app.put('/api/policies/:policyId', async (req, res) => {
     } = req.body;
     
     // 필수 필드 검증
-    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || !policyAmount || !amountType) {
+    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || !amountType) {
       return res.status(400).json({
         success: false,
         error: '필수 필드가 누락되었습니다.',
-        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, policyAmount, amountType }
+        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, amountType }
+      });
+    }
+    
+    // amountType이 'in_content'가 아닐 때만 policyAmount 필수
+    if (amountType !== 'in_content' && !policyAmount) {
+      return res.status(400).json({
+        success: false,
+        error: '금액이 입력되지 않았습니다.',
+        received: { policyAmount, amountType }
       });
     }
     
@@ -13397,7 +13406,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
     const policyDateRange = `${startDate} ~ ${endDate}`;
     
     // 금액 정보에 유형 추가
-    const amountWithType = `${policyAmount}원 (${amountType === 'total' ? '총금액' : amountType === 'per_case' ? '건당금액' : '내용에 직접입력'})`;
+    const amountWithType = amountType === 'in_content' 
+      ? '내용에 직접입력' 
+      : `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
     
     // 수정할 데이터 준비
     const updateData = [

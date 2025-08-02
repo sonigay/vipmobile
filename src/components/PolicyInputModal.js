@@ -224,7 +224,29 @@ function PolicyInputModal({
       onClose();
     } catch (error) {
       console.error('정책 저장 실패:', error);
-      setErrors({ submit: '정책 저장에 실패했습니다. 다시 시도해주세요.' });
+      
+      // 서버에서 받은 에러 메시지가 있으면 사용, 없으면 기본 메시지
+      let errorMessage = '정책 저장에 실패했습니다. 다시 시도해주세요.';
+      
+      if (error.message) {
+        // HTTP 에러 응답에서 메시지 추출
+        try {
+          if (error.message.includes('HTTP error! status: 400')) {
+            errorMessage = '입력 정보를 확인해주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.';
+          } else if (error.message.includes('HTTP error! status: 404')) {
+            errorMessage = '정책을 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도해주세요.';
+          } else if (error.message.includes('HTTP error! status: 500')) {
+            errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+          } else {
+            errorMessage = error.message;
+          }
+        } catch (parseError) {
+          // 파싱 실패 시 기본 메시지 사용
+          errorMessage = '정책 저장에 실패했습니다. 다시 시도해주세요.';
+        }
+      }
+      
+      setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
