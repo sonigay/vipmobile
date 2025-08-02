@@ -186,7 +186,12 @@ function PolicyInputModal({
           policyContent: formData.policyContent.trim(),
           policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
           amountType: formData.amountType,
+          policyType: isWireless ? '무선' : '유선',
+          category: categoryId,
+          yearMonth: yearMonth,
           team: formData.team,
+          inputUserId: loggedInUser?.contactId || loggedInUser?.id,
+          inputUserName: loggedInUser?.target || loggedInUser?.name,
           modifiedBy: loggedInUser?.contactId || loggedInUser?.id,
           modifiedByName: loggedInUser?.target || loggedInUser?.name,
           modifiedAt: new Date().toISOString()
