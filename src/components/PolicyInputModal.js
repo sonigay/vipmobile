@@ -231,6 +231,15 @@ function PolicyInputModal({
   };
 
   const handleInputChange = (field, value) => {
+    // 숫자 필드에 대한 유효성 검사
+    if (field === 'policyAmount' && value !== '') {
+      // 숫자가 아닌 문자 제거 (소수점과 음수 부호는 허용)
+      const numericValue = value.toString().replace(/[^\d.-]/g, '');
+      if (numericValue !== value) {
+        value = numericValue;
+      }
+    }
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
