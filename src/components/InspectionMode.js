@@ -234,10 +234,16 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     loadModificationCompletionStatus();
   }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
 
-  // 검수모드 진입 시 업데이트 팝업 표시
+  // 검수모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
-    // 모드 진입 시 자동으로 업데이트 팝업 표시
-    setShowUpdatePopup(true);
+    // 오늘 하루 보지 않기 설정 확인
+    const hideUntil = localStorage.getItem('hideUpdate_inspection');
+    const shouldShowPopup = !(hideUntil && new Date() < new Date(hideUntil));
+    
+    if (shouldShowPopup) {
+      // 숨김 설정이 없거나 만료된 경우에만 팝업 표시
+      setShowUpdatePopup(true);
+    }
   }, []);
 
   // 뷰 변경 시 수정완료 상태 재로딩

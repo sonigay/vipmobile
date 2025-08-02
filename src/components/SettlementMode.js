@@ -32,10 +32,16 @@ function SettlementMode({ onLogout, loggedInStore, settlementUserName, onModeCha
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
-  // 정산모드 진입 시 업데이트 팝업 표시
+  // 정산모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
-    // 모드 진입 시 자동으로 업데이트 팝업 표시
-    setShowUpdatePopup(true);
+    // 오늘 하루 보지 않기 설정 확인
+    const hideUntil = localStorage.getItem('hideUpdate_settlement');
+    const shouldShowPopup = !(hideUntil && new Date() < new Date(hideUntil));
+    
+    if (shouldShowPopup) {
+      // 숨김 설정이 없거나 만료된 경우에만 팝업 표시
+      setShowUpdatePopup(true);
+    }
   }, []);
 
   // 엑셀 파일 업로드 처리

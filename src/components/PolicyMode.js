@@ -127,10 +127,16 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [selectedPolicyForSettlement, setSelectedPolicyForSettlement] = useState(null);
   
-  // 정책모드 진입 시 업데이트 팝업 표시
+  // 정책모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
-    // 모드 진입 시 자동으로 업데이트 팝업 표시
-    setShowUpdatePopup(true);
+    // 오늘 하루 보지 않기 설정 확인
+    const hideUntil = localStorage.getItem('hideUpdate_policy');
+    const shouldShowPopup = !(hideUntil && new Date() < new Date(hideUntil));
+    
+    if (shouldShowPopup) {
+      // 숨김 설정이 없거나 만료된 경우에만 팝업 표시
+      setShowUpdatePopup(true);
+    }
     
     // 매장 데이터 로드
     loadStores();
