@@ -338,6 +338,63 @@ export const fetchAgentData = async () => {
   }
 };
 
+// 재고장표 API 함수들
+export const inventoryAPI = {
+  // 모델별 재고 현황 가져오기
+  getInventoryStatus: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.agent) params.append('agent', filters.agent);
+      if (filters.office) params.append('office', filters.office);
+      if (filters.department) params.append('department', filters.department);
+      
+      const response = await fetch(`${API_BASE_URL}/api/inventory/status?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('재고 현황 로드 오류:', error);
+      throw error;
+    }
+  },
+
+  // 색상별 재고 현황 가져오기
+  getInventoryStatusByColor: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.agent) params.append('agent', filters.agent);
+      if (filters.office) params.append('office', filters.office);
+      if (filters.department) params.append('department', filters.department);
+      
+      const response = await fetch(`${API_BASE_URL}/api/inventory/status-by-color?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('색상별 재고 현황 로드 오류:', error);
+      throw error;
+    }
+  }
+};
+
 // 캐시 관리 함수들
 export const cacheManager = {
   // 캐시 상태 확인

@@ -49,11 +49,13 @@ import {
   Assessment as AssessmentIcon,
   ShowChart as ShowChartIcon,
   PieChart as PieChartIcon,
-  Update as UpdateIcon
+  Update as UpdateIcon,
+  Inventory as InventoryIcon
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
 
 import AppUpdatePopup from './AppUpdatePopup';
+import InventoryStatusScreen from './screens/InventoryStatusScreen';
 
 function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = useState(0);
@@ -102,10 +104,10 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       hasPermission: true // 지표장표 탭은 모든 사용자에게 표시
     },
     {
-      label: '준비 중',
-      icon: <TableChartIcon />,
-      component: <ComingSoonTab />,
-      hasPermission: true // 준비 중 탭은 모든 사용자에게 표시
+      label: '재고장표',
+      icon: <InventoryIcon />,
+      component: <InventoryStatusScreen />,
+      hasPermission: true // 재고장표 탭은 모든 사용자에게 표시
     }
   ];
 
