@@ -6,6 +6,7 @@ const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
 const ExcelJS = require('exceljs');
 const monthlyAwardAPI = require('./monthlyAwardAPI');
+const setupTeamRoutes = require('./teamRoutes');
 
 // 기본 설정
 const app = express();
@@ -3307,6 +3308,9 @@ app.get('/api/inventory/activation-status', async (req, res) => {
     });
   }
 });
+
+// 팀 라우트 설정
+setupTeamRoutes(app, getSheetValuesWithoutCache);
 
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
