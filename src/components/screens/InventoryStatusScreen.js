@@ -69,7 +69,7 @@ const InventoryStatusScreen = () => {
              if (data.success) {
          let processedData = data.data;
          
-                   // 색상별 탭에서 중복 모델명 처리 - 첫 번째 색상만 유지하고 나머지는 모델명을 빈 문자열로
+                   // 색상별 탭에서 중복 모델명 처리 - 첫 번째 색상만 모델명 유지하고 나머지는 빈칸으로
           if (activeTab === 1) {
             const modelGroups = new Map();
             processedData.forEach(item => {
@@ -835,16 +835,17 @@ const InventoryStatusScreen = () => {
                              }}
                            />
                          </TableCell>
-                                                                        <TableCell sx={{ 
-                           minWidth: 80, 
-                           fontWeight: 'medium',
-                           borderRight: '2px solid #ffffff',
-                           color: '#333333',
-                           p: 0.25,
-                           fontSize: '0.7rem'
-                         }}>
-                           {item.modelName}
-                         </TableCell>
+                                                                                                  <TableCell sx={{ 
+                            minWidth: 80, 
+                            fontWeight: 'medium',
+                            borderRight: '2px solid #ffffff',
+                            color: '#333333',
+                            p: 0.25,
+                            fontSize: '0.7rem',
+                            verticalAlign: 'top'
+                          }}>
+                            {item.modelName}
+                          </TableCell>
                       {activeTab === 1 && (
                         <TableCell sx={{ 
                           minWidth: 80,
