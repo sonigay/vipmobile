@@ -107,16 +107,21 @@ const InventoryStatusScreen = () => {
             if (aOrder !== bOrder) {
               return aOrder - bOrder;
             }
+            
             // 2순위: 모델명 (색상별 탭에서는 원본 모델명 사용)
             const aModelName = activeTab === 1 ? (a.originalModelName || a.modelName) : a.modelName;
             const bModelName = activeTab === 1 ? (b.originalModelName || b.modelName) : b.modelName;
-            if (aModelName !== bModelName) {
+            
+            // 모델명이 비어있지 않은 경우에만 비교
+            if (aModelName && bModelName && aModelName !== bModelName) {
               return aModelName.localeCompare(bModelName);
             }
+            
             // 3순위: 색상 (색상별 탭에서만)
             if (activeTab === 1 && a.color !== b.color) {
               return a.color.localeCompare(b.color);
             }
+            
             return 0;
           });
          
@@ -534,28 +539,28 @@ const InventoryStatusScreen = () => {
                                <TableHead>
                                      {/* 총 수량 요약 행 (맨 위) */}
                    <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
-                                           <TableCell sx={{ 
-                        backgroundColor: '#f8f9fa', 
-                        fontWeight: 'bold',
-                        minWidth: 45,
-                        borderBottom: '2px solid #1976d2',
-                        fontSize: '0.8rem',
-                        p: 0.5,
-                        textAlign: 'center'
-                      }}>
-                        총계
-                      </TableCell>
-                                           <TableCell sx={{ 
-                        backgroundColor: '#f8f9fa', 
-                        fontWeight: 'bold',
-                        minWidth: 120,
-                        borderBottom: '2px solid #1976d2',
-                        fontSize: '0.8rem',
-                        p: 0.5,
-                        textAlign: 'center'
-                      }}>
-                        전체 모델
-                      </TableCell>
+                                                                  <TableCell sx={{ 
+                         backgroundColor: '#f8f9fa', 
+                         fontWeight: 'bold',
+                         minWidth: 35,
+                         borderBottom: '2px solid #1976d2',
+                         fontSize: '0.7rem',
+                         p: 0.25,
+                         textAlign: 'center'
+                       }}>
+                         총계
+                       </TableCell>
+                                                                  <TableCell sx={{ 
+                         backgroundColor: '#f8f9fa', 
+                         fontWeight: 'bold',
+                         minWidth: 80,
+                         borderBottom: '2px solid #1976d2',
+                         fontSize: '0.7rem',
+                         p: 0.25,
+                         textAlign: 'center'
+                       }}>
+                         전체 모델
+                       </TableCell>
                                            {activeTab === 1 && (
                         <TableCell sx={{ 
                           backgroundColor: '#f8f9fa', 
@@ -569,17 +574,18 @@ const InventoryStatusScreen = () => {
                           전체 색상
                         </TableCell>
                       )}
-                      <TableCell sx={{ 
-                        backgroundColor: '#f8f9fa', 
-                        fontWeight: 'bold',
-                        minWidth: 50,
-                        borderBottom: '2px solid #1976d2',
-                        textAlign: 'center',
-                        fontSize: '0.8rem',
-                        p: 0.5
-                      }}>
-                        {inventoryData.reduce((sum, item) => sum + item.inventoryCount, 0)}
-                      </TableCell>
+                                             <TableCell sx={{ 
+                         backgroundColor: '#f8f9fa', 
+                         fontWeight: 'bold',
+                         minWidth: 50,
+                         borderBottom: '2px solid #1976d2',
+                         textAlign: 'center',
+                         fontSize: '0.7rem',
+                         p: 0.5,
+                         borderLeft: '2px solid #ffffff'
+                       }}>
+                         {inventoryData.reduce((sum, item) => sum + item.inventoryCount, 0)}
+                       </TableCell>
                       <TableCell sx={{ 
                         backgroundColor: '#f8f9fa', 
                         fontWeight: 'bold',
@@ -614,26 +620,26 @@ const InventoryStatusScreen = () => {
                   
                                      {/* 요일 행 (중간) */}
                    <TableRow sx={{ backgroundColor: '#ffffff' }}>
-                                           <TableCell sx={{ 
-                        backgroundColor: '#ffffff', 
-                        fontWeight: 'bold',
-                        minWidth: 45,
-                        borderBottom: '1px solid #e0e0e0',
-                        fontSize: '0.8rem',
-                        p: 0.5
-                      }}>
-                        
-                      </TableCell>
-                     <TableCell sx={{ 
-                       backgroundColor: '#ffffff', 
-                       fontWeight: 'bold',
-                       minWidth: 120,
-                       borderBottom: '1px solid #e0e0e0',
-                       fontSize: '0.8rem',
-                       p: 0.5
-                     }}>
-                       
-                     </TableCell>
+                                                                  <TableCell sx={{ 
+                         backgroundColor: '#ffffff', 
+                         fontWeight: 'bold',
+                         minWidth: 35,
+                         borderBottom: '1px solid #e0e0e0',
+                         fontSize: '0.7rem',
+                         p: 0.25
+                       }}>
+                         
+                       </TableCell>
+                                                                  <TableCell sx={{ 
+                         backgroundColor: '#ffffff', 
+                         fontWeight: 'bold',
+                         minWidth: 80,
+                         borderBottom: '1px solid #e0e0e0',
+                         fontSize: '0.7rem',
+                         p: 0.25
+                       }}>
+                         
+                       </TableCell>
                     {activeTab === 1 && (
                       <TableCell sx={{ 
                         backgroundColor: '#ffffff', 
@@ -651,8 +657,9 @@ const InventoryStatusScreen = () => {
                        fontWeight: 'bold',
                        minWidth: 50,
                        borderBottom: '1px solid #e0e0e0',
-                       fontSize: '0.8rem',
-                       p: 0.5
+                       fontSize: '0.7rem',
+                       p: 0.5,
+                       borderLeft: '2px solid #ffffff'
                      }}>
                        
                      </TableCell>
@@ -661,7 +668,7 @@ const InventoryStatusScreen = () => {
                        fontWeight: 'bold',
                        minWidth: 50,
                        borderBottom: '1px solid #e0e0e0',
-                       fontSize: '0.8rem',
+                       fontSize: '0.7rem',
                        p: 0.5
                      }}>
                        
@@ -701,30 +708,30 @@ const InventoryStatusScreen = () => {
                   
                                      {/* 컬럼 헤더 행 (맨 아래) */}
                    <TableRow sx={{ backgroundColor: '#1976d2' }}>
-                                           <TableCell sx={{ 
-                        backgroundColor: '#1976d2', 
-                        color: 'white', 
-                        fontWeight: 'bold',
-                        minWidth: 45,
-                        borderRight: '1px solid #1565c0',
-                        fontSize: '0.8rem',
-                        p: 0.5,
-                        textAlign: 'center'
-                      }}>
-                        구분
-                      </TableCell>
-                                           <TableCell sx={{ 
-                        backgroundColor: '#1976d2', 
-                        color: 'white', 
-                        fontWeight: 'bold',
-                        minWidth: 120,
-                        borderRight: '1px solid #1565c0',
-                        fontSize: '0.8rem',
-                        p: 0.5,
-                        textAlign: 'center'
-                      }}>
-                        모델명
-                      </TableCell>
+                                                                  <TableCell sx={{ 
+                         backgroundColor: '#1976d2', 
+                         color: 'white', 
+                         fontWeight: 'bold',
+                         minWidth: 35,
+                         borderRight: '1px solid #1565c0',
+                         fontSize: '0.7rem',
+                         p: 0.25,
+                         textAlign: 'center'
+                       }}>
+                         구분
+                       </TableCell>
+                                                                                           <TableCell sx={{ 
+                           backgroundColor: '#1976d2', 
+                           color: 'white', 
+                           fontWeight: 'bold',
+                           minWidth: 80,
+                           borderRight: '2px solid #ffffff',
+                           fontSize: '0.7rem',
+                           p: 0.25,
+                           textAlign: 'center'
+                         }}>
+                           모델명
+                         </TableCell>
                                            {activeTab === 1 && (
                         <TableCell sx={{ 
                           backgroundColor: '#1976d2', 
@@ -739,18 +746,19 @@ const InventoryStatusScreen = () => {
                           색상
                         </TableCell>
                       )}
-                     <TableCell sx={{ 
-                       backgroundColor: '#1976d2', 
-                       color: 'white', 
-                       fontWeight: 'bold',
-                       minWidth: 50,
-                       borderRight: '1px solid #1565c0',
-                       textAlign: 'center',
-                       fontSize: '0.7rem',
-                       p: 0.5
-                     }}>
-                       잔여<br/>재고
-                     </TableCell>
+                                           <TableCell sx={{ 
+                        backgroundColor: '#1976d2', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        minWidth: 50,
+                        borderRight: '1px solid #1565c0',
+                        textAlign: 'center',
+                        fontSize: '0.7rem',
+                        p: 0.5,
+                        borderLeft: '2px solid #ffffff'
+                      }}>
+                        잔여<br/>재고
+                      </TableCell>
                                            <TableCell sx={{ 
                         backgroundColor: '#1976d2', 
                         color: 'white', 
@@ -804,39 +812,39 @@ const InventoryStatusScreen = () => {
                            }
                          }}
                        >
-                                                                    <TableCell sx={{ 
-                          minWidth: 45,
-                          borderRight: '1px solid #f0f0f0',
-                          p: 0.5,
-                          fontSize: '0.8rem'
-                        }}>
-                                                  <Chip 
-                            label={item.category || '기타'} 
-                            size="small"
-                            sx={{
-                              backgroundColor: item.category === '삼성' ? '#bbdefb' : 
-                                              item.category === '애플' ? '#c8e6c9' :
-                                              item.category === '2ND' ? '#fff59d' :
-                                              item.category === '기타' ? '#e1bee7' : '#f5f5f5',
-                              color: item.category === '삼성' ? '#1565c0' : 
-                                     item.category === '애플' ? '#2e7d32' :
-                                     item.category === '2ND' ? '#f57f17' :
-                                     item.category === '기타' ? '#7b1fa2' : '#666666',
-                              fontWeight: 'bold',
-                              fontSize: '0.7rem'
-                            }}
-                          />
-                       </TableCell>
-                       <TableCell sx={{ 
-                         minWidth: 120, 
-                         fontWeight: 'medium',
-                         borderRight: '1px solid #f0f0f0',
-                         color: '#333333',
-                         p: 0.5,
-                         fontSize: '0.8rem'
-                       }}>
-                         {item.modelName}
-                       </TableCell>
+                                                                                             <TableCell sx={{ 
+                           minWidth: 35,
+                           borderRight: '1px solid #f0f0f0',
+                           p: 0.25,
+                           fontSize: '0.7rem'
+                         }}>
+                           <Chip 
+                             label={item.category || '기타'} 
+                             size="small"
+                             sx={{
+                               backgroundColor: item.category === '삼성' ? '#bbdefb' : 
+                                               item.category === '애플' ? '#c8e6c9' :
+                                               item.category === '2ND' ? '#fff59d' :
+                                               item.category === '기타' ? '#e1bee7' : '#f5f5f5',
+                               color: item.category === '삼성' ? '#1565c0' : 
+                                      item.category === '애플' ? '#2e7d32' :
+                                      item.category === '2ND' ? '#f57f17' :
+                                      item.category === '기타' ? '#7b1fa2' : '#666666',
+                               fontWeight: 'bold',
+                               fontSize: '0.6rem'
+                             }}
+                           />
+                         </TableCell>
+                                                                        <TableCell sx={{ 
+                           minWidth: 80, 
+                           fontWeight: 'medium',
+                           borderRight: '2px solid #ffffff',
+                           color: '#333333',
+                           p: 0.25,
+                           fontSize: '0.7rem'
+                         }}>
+                           {item.modelName}
+                         </TableCell>
                       {activeTab === 1 && (
                         <TableCell sx={{ 
                           minWidth: 80,
@@ -848,17 +856,18 @@ const InventoryStatusScreen = () => {
                           {item.color}
                         </TableCell>
                       )}
-                                                                                      <TableCell sx={{ 
-                          minWidth: 50, 
-                          fontWeight: 'bold',
-                          textAlign: 'center',
-                          borderRight: '1px solid #f0f0f0',
-                          p: 0.5,
-                          fontSize: '0.8rem',
-                          ...getQuantityColor(item.inventoryCount, 'inventory')
-                        }}>
-                          {item.inventoryCount}
-                        </TableCell>
+                                                                                                               <TableCell sx={{ 
+                           minWidth: 50, 
+                           fontWeight: 'bold',
+                           textAlign: 'center',
+                           borderRight: '1px solid #f0f0f0',
+                           p: 0.5,
+                           fontSize: '0.7rem',
+                           borderLeft: '2px solid #ffffff',
+                           ...getQuantityColor(item.inventoryCount, 'inventory')
+                         }}>
+                           {item.inventoryCount}
+                         </TableCell>
                                                  <TableCell sx={{ 
                            minWidth: 50,
                            fontWeight: item.monthlyActivation > 0 ? 'bold' : 'normal',
