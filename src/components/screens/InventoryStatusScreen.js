@@ -66,57 +66,59 @@ const InventoryStatusScreen = () => {
         data = await inventoryAPI.getInventoryStatusByColor(filters);
       }
       
-             if (data.success) {
-         let processedData = data.data;
-         
-                   // 색상별 탭에서 동일 모델명 그룹화 처리
-          if (activeTab === 1) {
-            const modelGroups = new Map();
-            processedData.forEach(item => {
-              if (!modelGroups.has(item.modelName)) {
-                modelGroups.set(item.modelName, []);
+                       if (data.success) {
+            let processedData = data.data;
+            
+            // 다중 정렬: 구분별 → 모델명 → 색상별
+            const sortedData = processedData.sort((a, b) => {
+              // 1순위: 구분 (삼성 → 애플 → 기타 → 2ND)
+              const categoryOrder = { '삼성': 1, '애플': 2, '기타': 3, '2ND': 4 };
+              const aOrder = categoryOrder[a.category] || 5;
+              const bOrder = categoryOrder[b.category] || 5;
+              if (aOrder !== bOrder) {
+                return aOrder - bOrder;
               }
-              modelGroups.get(item.modelName).push(item);
+              
+              // 2순위: 모델명
+              if (a.modelName !== b.modelName) {
+                return a.modelName.localeCompare(b.modelName);
+              }
+              
+              // 3순위: 색상 (색상별 탭에서만)
+              if (activeTab === 1 && a.color !== b.color) {
+                return a.color.localeCompare(b.color);
+              }
+              
+              return 0;
             });
             
-            // 그룹화된 데이터 생성
-            processedData = [];
-            modelGroups.forEach((items, modelName) => {
-              items.forEach((item, index) => {
-                processedData.push({
-                  ...item,
-                  isFirstInGroup: index === 0, // 그룹의 첫 번째 항목인지 표시
-                  groupSize: items.length, // 그룹 크기
-                  groupIndex: index // 그룹 내 인덱스
+            // 색상별 탭에서 동일 모델명 그룹화 처리 (정렬 후)
+            if (activeTab === 1) {
+              const modelGroups = new Map();
+              sortedData.forEach(item => {
+                if (!modelGroups.has(item.modelName)) {
+                  modelGroups.set(item.modelName, []);
+                }
+                modelGroups.get(item.modelName).push(item);
+              });
+              
+              // 그룹화된 데이터 생성
+              const groupedData = [];
+              modelGroups.forEach((items, modelName) => {
+                items.forEach((item, index) => {
+                  groupedData.push({
+                    ...item,
+                    isFirstInGroup: index === 0, // 그룹의 첫 번째 항목인지 표시
+                    groupSize: items.length, // 그룹 크기
+                    groupIndex: index // 그룹 내 인덱스
+                  });
                 });
               });
-            });
-          }
-         
-                   // 다중 정렬: 구분별 → 모델명 → 색상별
-          const sortedData = processedData.sort((a, b) => {
-            // 1순위: 구분 (삼성 → 애플 → 기타 → 2ND)
-            const categoryOrder = { '삼성': 1, '애플': 2, '기타': 3, '2ND': 4 };
-            const aOrder = categoryOrder[a.category] || 5;
-            const bOrder = categoryOrder[b.category] || 5;
-            if (aOrder !== bOrder) {
-              return aOrder - bOrder;
+              
+              setInventoryData(groupedData);
+            } else {
+              setInventoryData(sortedData);
             }
-            
-            // 2순위: 모델명
-            if (a.modelName !== b.modelName) {
-              return a.modelName.localeCompare(b.modelName);
-            }
-            
-            // 3순위: 색상 (색상별 탭에서만)
-            if (activeTab === 1 && a.color !== b.color) {
-              return a.color.localeCompare(b.color);
-            }
-            
-            return 0;
-          });
-         
-         setInventoryData(sortedData);
       } else {
         setError('데이터를 불러오는데 실패했습니다.');
       }
