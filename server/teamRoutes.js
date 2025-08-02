@@ -19,6 +19,12 @@ function setupTeamRoutes(app, getSheetValuesWithoutCache) {
         }))
         .filter(team => ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(team.code)); // 정책팀만 필터링
       
+      // 홍남옥 하드코딩 추가
+      teams.push({
+        code: '홍남옥',
+        name: '홍남옥'
+      });
+      
       console.log(`팀 정보 조회 완료: ${teams.length}건`);
       res.json({ success: true, teams });
       

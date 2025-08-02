@@ -13342,6 +13342,126 @@ app.post('/api/policies', async (req, res) => {
   }
 });
 
+// 정책 수정 API
+app.put('/api/policies/:policyId', async (req, res) => {
+  try {
+    const { policyId } = req.params;
+    console.log('정책 수정 요청:', { policyId, body: req.body });
+    
+    const {
+      policyName,
+      policyStartDate,
+      policyEndDate,
+      policyStore,
+      policyContent,
+      policyAmount,
+      amountType,
+      policyType,
+      category,
+      yearMonth,
+      team,
+      inputUserId,
+      inputUserName
+    } = req.body;
+    
+    // 필수 필드 검증
+    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || !policyAmount || !amountType) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 필드가 누락되었습니다.',
+        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, policyAmount, amountType }
+      });
+    }
+    
+    // 정책_기본정보 시트에서 해당 정책 찾기
+    const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+    
+    if (!values || values.length <= 1) {
+      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+    }
+    
+    // 정책 찾기 (헤더 제외)
+    const dataRows = values.slice(1);
+    const policyIndex = dataRows.findIndex(row => row[0] === policyId);
+    
+    if (policyIndex === -1) {
+      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+    }
+    
+    const policyRow = dataRows[policyIndex];
+    const rowNumber = policyIndex + 2; // 헤더 + 1부터 시작하므로 +2
+    
+    // 정책 적용일을 시작일~종료일 형태로 변환
+    const startDate = new Date(policyStartDate).toLocaleDateString('ko-KR');
+    const endDate = new Date(policyEndDate).toLocaleDateString('ko-KR');
+    const policyDateRange = `${startDate} ~ ${endDate}`;
+    
+    // 금액 정보에 유형 추가
+    const amountWithType = `${policyAmount}원 (${amountType === 'total' ? '총금액' : amountType === 'per_case' ? '건당금액' : '내용에 직접입력'})`;
+    
+    // 수정할 데이터 준비
+    const updateData = [
+      policyName,                  // B열: 정책명
+      policyDateRange,             // C열: 정책적용일 (시작일~종료일)
+      policyStore,                 // D열: 정책적용점
+      policyContent,               // E열: 정책내용
+      amountWithType,              // F열: 금액 (금액 + 유형)
+      policyType,                  // G열: 정책유형
+      category.startsWith('wireless') ? '무선' : '유선', // H열: 무선/유선
+      category,                    // I열: 하위카테고리
+      inputUserId,                 // J열: 입력자ID
+      inputUserName,               // K열: 입력자명
+      new Date().toISOString(),    // L열: 입력일시 (수정일시로 업데이트)
+      yearMonth                    // X열: 대상년월
+    ];
+    
+    // 각 필드를 개별적으로 업데이트
+    const updateRanges = [
+      `'정책_기본정보 '!B${rowNumber}`,  // 정책명
+      `'정책_기본정보 '!C${rowNumber}`,  // 정책적용일
+      `'정책_기본정보 '!D${rowNumber}`,  // 정책적용점
+      `'정책_기본정보 '!E${rowNumber}`,  // 정책내용
+      `'정책_기본정보 '!F${rowNumber}`,  // 금액
+      `'정책_기본정보 '!G${rowNumber}`,  // 정책유형
+      `'정책_기본정보 '!H${rowNumber}`,  // 무선/유선
+      `'정책_기본정보 '!I${rowNumber}`,  // 하위카테고리
+      `'정책_기본정보 '!J${rowNumber}`,  // 입력자ID
+      `'정책_기본정보 '!K${rowNumber}`,  // 입력자명
+      `'정책_기본정보 '!L${rowNumber}`,  // 입력일시
+      `'정책_기본정보 '!X${rowNumber}`   // 대상년월
+    ];
+    
+    // 배치 업데이트 실행
+    const batchUpdateRequests = updateRanges.map((range, index) => ({
+      range: range,
+      values: [[updateData[index]]]
+    }));
+    
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        valueInputOption: 'RAW',
+        data: batchUpdateRequests
+      }
+    });
+    
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
+    
+    console.log('정책 수정 완료:', policyId);
+    
+    res.json({
+      success: true,
+      message: '정책이 성공적으로 수정되었습니다.',
+      policyId: policyId
+    });
+    
+  } catch (error) {
+    console.error('정책 수정 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 정책 승인 API
 app.put('/api/policies/:policyId/approve', async (req, res) => {
   try {
