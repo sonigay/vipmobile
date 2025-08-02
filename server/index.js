@@ -13418,8 +13418,8 @@ app.put('/api/policies/:policyId', async (req, res) => {
       policyContent,               // E열: 정책내용
       amountWithType,              // F열: 금액 (금액 + 유형)
       policyType,                  // G열: 정책유형
-      category.startsWith('wireless') ? '무선' : '유선', // H열: 무선/유선
-      category,                    // I열: 하위카테고리
+      (category && category.startsWith('wireless')) ? '무선' : '유선', // H열: 무선/유선
+      category || '',              // I열: 하위카테고리
       inputUserId,                 // J열: 입력자ID
       inputUserName,               // K열: 입력자명
       new Date().toISOString(),    // L열: 입력일시 (수정일시로 업데이트)

@@ -34,7 +34,12 @@ import {
   Update as UpdateIcon,
   Add as AddIcon,
   Notifications as NotificationsIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  Cancel as CancelIcon,
+  CheckCircle as CheckCircleIcon,
+  CancelOutlined as CancelOutlinedIcon,
+  AccountBalance as AccountBalanceIcon,
+  ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';
@@ -1026,7 +1031,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer component={Paper}>
+              <TableContainer 
+                component={Paper} 
+                sx={{ 
+                  borderRadius: 2,
+                  boxShadow: 2,
+                  '& .MuiTable-root': {
+                    borderCollapse: 'separate',
+                    borderSpacing: 0
+                  }
+                }}
+              >
                 {(() => {
                   // 필터링된 정책 목록 생성
                   const filteredPolicies = policies
@@ -1050,43 +1065,86 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   return (
                     <Table>
                       <TableHead>
-                        <TableRow>
-                          <TableCell padding="checkbox">
+                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                          <TableCell 
+                            padding="checkbox"
+                            sx={{ 
+                              color: 'white',
+                              fontWeight: 'bold',
+                              borderBottom: '2px solid white'
+                            }}
+                          >
                             <Checkbox
                               indeterminate={selectedPolicies.length > 0 && selectedPolicies.length < filteredPolicies.length}
                               checked={selectedPolicies.length > 0 && selectedPolicies.length === filteredPolicies.length}
                               onChange={handleSelectAll}
+                              sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                             />
                           </TableCell>
-                          <TableCell>정책명</TableCell>
-                          <TableCell>정책일자</TableCell>
-                          <TableCell>적용점</TableCell>
-                          <TableCell>소속정책팀</TableCell>
-                          <TableCell>내용</TableCell>
-                          <TableCell>금액</TableCell>
-                          <TableCell>입력자</TableCell>
-                          <TableCell>승인상태</TableCell>
-                          <TableCell>정산반영</TableCell>
-                          <TableCell>작업</TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            정책명
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            정책일자
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            적용점
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            소속정책팀
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            내용
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            금액
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            입력자
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            승인상태
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            정산반영
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            작업
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {filteredPolicies.map((policy) => (
-                          <TableRow key={policy.id}>
+                        {filteredPolicies.map((policy, index) => (
+                          <TableRow 
+                            key={policy.id}
+                            sx={{ 
+                              backgroundColor: index % 2 === 0 ? 'background.paper' : 'grey.50',
+                              '&:hover': { 
+                                backgroundColor: 'primary.light',
+                                '& .MuiTableCell-root': { color: 'white' }
+                              },
+                              transition: 'background-color 0.2s ease'
+                            }}
+                          >
                             <TableCell padding="checkbox">
                               <Checkbox
                                 checked={selectedPolicies.some(p => p.id === policy.id)}
                                 onChange={() => handlePolicySelect(policy)}
                               />
                             </TableCell>
-                            <TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
                               <Box>
                                 <Typography 
                                   variant="body2" 
                                   sx={{ 
                                     cursor: canEditPolicy(policy) ? 'pointer' : 'default',
                                     textDecoration: canEditPolicy(policy) ? 'underline' : 'none',
-                                    '&:hover': canEditPolicy(policy) ? { color: 'primary.main' } : {}
+                                    fontWeight: canEditPolicy(policy) ? 'bold' : 'normal',
+                                    '&:hover': canEditPolicy(policy) ? { 
+                                      color: 'primary.main',
+                                      transform: 'scale(1.02)'
+                                    } : {},
+                                    transition: 'all 0.2s ease'
                                   }}
                                   onClick={() => handlePolicyClick(policy)}
                                 >
@@ -1098,6 +1156,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                     size="small" 
                                     color="error" 
                                     variant="outlined"
+                                    sx={{ mt: 0.5, fontSize: '0.7rem' }}
                                   />
                                 )}
                               </Box>
@@ -1117,58 +1176,89 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             </TableCell>
                             <TableCell>{policy.policyAmount}</TableCell>
                             <TableCell>{policy.inputUserName}</TableCell>
-                            <TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                 <Chip 
                                   label={`총괄: ${policy.approvalStatus?.total || '대기'}`}
                                   size="small"
                                   color={policy.approvalStatus?.total === '승인' ? 'success' : 'default'}
+                                  sx={{ 
+                                    fontSize: '0.7rem',
+                                    height: '20px',
+                                    '& .MuiChip-label': { px: 1 }
+                                  }}
                                 />
                                 <Chip 
                                   label={`정산팀: ${policy.approvalStatus?.settlement || '대기'}`}
                                   size="small"
                                   color={policy.approvalStatus?.settlement === '승인' ? 'success' : 'default'}
+                                  sx={{ 
+                                    fontSize: '0.7rem',
+                                    height: '20px',
+                                    '& .MuiChip-label': { px: 1 }
+                                  }}
                                 />
                                 <Chip 
                                   label={`소속팀: ${policy.approvalStatus?.team || '대기'}`}
                                   size="small"
                                   color={policy.approvalStatus?.team === '승인' ? 'success' : 'default'}
+                                  sx={{ 
+                                    fontSize: '0.7rem',
+                                    height: '20px',
+                                    '& .MuiChip-label': { px: 1 }
+                                  }}
                                 />
                               </Box>
                             </TableCell>
-                            <TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                 <Chip 
                                   label={policy.settlementStatus || '미반영'}
                                   size="small"
                                   color={policy.settlementStatus === '반영됨' ? 'success' : 'default'}
                                   variant="outlined"
+                                  sx={{ 
+                                    fontSize: '0.7rem',
+                                    height: '20px',
+                                    '& .MuiChip-label': { px: 1 }
+                                  }}
                                 />
                                 {policy.settlementUserName && (
-                                  <Typography variant="caption" color="text.secondary">
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                                     {policy.settlementUserName}
                                   </Typography>
                                 )}
                                 {policy.settlementDateTime && (
-                                  <Typography variant="caption" color="text.secondary">
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                                     {new Date(policy.settlementDateTime).toLocaleDateString()}
                                   </Typography>
                                 )}
                               </Box>
                             </TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Box sx={{ 
+                                display: 'flex', 
+                                flexDirection: 'row', 
+                                gap: 0.5, 
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
                                 {/* 정책 취소 버튼 (입력자만 보임) */}
                                 {policy.inputUserId === (loggedInStore?.contactId || loggedInStore?.id) && (
-                                  <Button
+                                  <IconButton
                                     size="small"
-                                    variant="outlined"
                                     color="error"
                                     onClick={() => handleCancelClick(policy, 'policy')}
                                     disabled={policy.policyStatus === '취소됨'}
+                                    title="정책취소"
+                                    sx={{ 
+                                      p: 0.5,
+                                      '&:hover': { backgroundColor: 'error.light', color: 'white' }
+                                    }}
                                   >
-                                    정책취소
-                                  </Button>
+                                    <CancelIcon fontSize="small" />
+                                  </IconButton>
                                 )}
                                 
                                 {/* 승인 버튼 - 권한별 표시 */}
@@ -1183,13 +1273,19 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                     ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                                   
                                   return canApprove ? (
-                                    <Button
+                                    <IconButton
                                       size="small"
+                                      color="success"
                                       onClick={() => handleApprovalClick(policy)}
                                       disabled={policy.policyStatus === '취소됨' || approvalProcessing}
+                                      title="승인"
+                                      sx={{ 
+                                        p: 0.5,
+                                        '&:hover': { backgroundColor: 'success.light', color: 'white' }
+                                      }}
                                     >
-                                      {approvalProcessing ? '처리중...' : '승인'}
-                                    </Button>
+                                      <CheckCircleIcon fontSize="small" />
+                                    </IconButton>
                                   ) : null;
                                 })()}
                                 
@@ -1205,41 +1301,53 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                     ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
                                   
                                   return canCancelApproval ? (
-                                    <Button
+                                    <IconButton
                                       size="small"
-                                      variant="outlined"
                                       color="warning"
                                       onClick={() => handleCancelClick(policy, 'approval')}
                                       disabled={policy.policyStatus === '취소됨'}
+                                      title="승인취소"
+                                      sx={{ 
+                                        p: 0.5,
+                                        '&:hover': { backgroundColor: 'warning.light', color: 'white' }
+                                      }}
                                     >
-                                      승인취소
-                                    </Button>
+                                      <CancelOutlinedIcon fontSize="small" />
+                                    </IconButton>
                                   ) : null;
                                 })()}
                                 
                                 {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
                                 {(loggedInStore?.userRole === 'S' || loggedInStore?.userRole === 'SS') && (
-                                  <Button
+                                  <IconButton
                                     size="small"
-                                    variant="outlined"
                                     color="info"
                                     onClick={() => handleSettlementClick(policy)}
                                     disabled={policy.policyStatus === '취소됨'}
+                                    title="정산반영"
+                                    sx={{ 
+                                      p: 0.5,
+                                      '&:hover': { backgroundColor: 'info.light', color: 'white' }
+                                    }}
                                   >
-                                    정산반영
-                                  </Button>
+                                    <AccountBalanceIcon fontSize="small" />
+                                  </IconButton>
                                 )}
                                 
                                 {/* 정책 복사 버튼 - 누구나 복사 가능 */}
-                                <Button
+                                <IconButton
                                   size="small"
-                                  variant="outlined"
                                   color="secondary"
                                   onClick={() => handleCopyPolicy(policy)}
                                   disabled={policy.policyStatus === '취소됨'}
+                                  title="정책복사"
+                                  sx={{ 
+                                    p: 0.5,
+                                    '&:hover': { backgroundColor: 'secondary.light', color: 'white' }
+                                  }}
                                 >
-                                  정책복사
-                                </Button>
+                                  <ContentCopyIcon fontSize="small" />
+                                </IconButton>
                               </Box>
                             </TableCell>
                           </TableRow>
