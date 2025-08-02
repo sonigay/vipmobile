@@ -1027,225 +1027,227 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               </Box>
             ) : (
               <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          indeterminate={selectedPolicies.length > 0 && selectedPolicies.length < filteredPolicies.length}
-                          checked={selectedPolicies.length > 0 && selectedPolicies.length === filteredPolicies.length}
-                          onChange={handleSelectAll}
-                        />
-                      </TableCell>
-                      <TableCell>정책명</TableCell>
-                      <TableCell>정책일자</TableCell>
-                      <TableCell>적용점</TableCell>
-                      <TableCell>소속정책팀</TableCell>
-                      <TableCell>내용</TableCell>
-                      <TableCell>금액</TableCell>
-                      <TableCell>입력자</TableCell>
-                      <TableCell>승인상태</TableCell>
-                      <TableCell>정산반영</TableCell>
-                      <TableCell>작업</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(() => {
-                      // 필터링된 정책 목록 생성
-                      const filteredPolicies = policies
-                        .filter(policy => policy.category === selectedCategoryForList)
-                        .filter(policy => {
-                          // 소속정책팀 필터
-                          if (selectedTeamFilter !== 'all' && policy.team !== selectedTeamFilter) {
-                            return false;
-                          }
-                          // 상태 필터
-                          if (selectedStatusFilter === 'active') {
-                            // 진행중: 취소되지 않은 정책
-                            return policy.policyStatus !== '취소됨';
-                          } else if (selectedStatusFilter === 'cancelled') {
-                            // 취소됨: 취소된 정책
-                            return policy.policyStatus === '취소됨';
-                          }
-                          return true;
-                        });
+                {(() => {
+                  // 필터링된 정책 목록 생성
+                  const filteredPolicies = policies
+                    .filter(policy => policy.category === selectedCategoryForList)
+                    .filter(policy => {
+                      // 소속정책팀 필터
+                      if (selectedTeamFilter !== 'all' && policy.team !== selectedTeamFilter) {
+                        return false;
+                      }
+                      // 상태 필터
+                      if (selectedStatusFilter === 'active') {
+                        // 진행중: 취소되지 않은 정책
+                        return policy.policyStatus !== '취소됨';
+                      } else if (selectedStatusFilter === 'cancelled') {
+                        // 취소됨: 취소된 정책
+                        return policy.policyStatus === '취소됨';
+                      }
+                      return true;
+                    });
 
-                      return filteredPolicies.map((policy) => (
-                        <TableRow key={policy.id}>
+                  return (
+                    <Table>
+                      <TableHead>
+                        <TableRow>
                           <TableCell padding="checkbox">
                             <Checkbox
-                              checked={selectedPolicies.some(p => p.id === policy.id)}
-                              onChange={() => handlePolicySelect(policy)}
+                              indeterminate={selectedPolicies.length > 0 && selectedPolicies.length < filteredPolicies.length}
+                              checked={selectedPolicies.length > 0 && selectedPolicies.length === filteredPolicies.length}
+                              onChange={handleSelectAll}
                             />
                           </TableCell>
-                          <TableCell>
-                            <Box>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  cursor: canEditPolicy(policy) ? 'pointer' : 'default',
-                                  textDecoration: canEditPolicy(policy) ? 'underline' : 'none',
-                                  '&:hover': canEditPolicy(policy) ? { color: 'primary.main' } : {}
-                                }}
-                                onClick={() => handlePolicyClick(policy)}
-                              >
-                                {policy.policyName}
-                              </Typography>
-                              {policy.policyStatus === '취소됨' && (
+                          <TableCell>정책명</TableCell>
+                          <TableCell>정책일자</TableCell>
+                          <TableCell>적용점</TableCell>
+                          <TableCell>소속정책팀</TableCell>
+                          <TableCell>내용</TableCell>
+                          <TableCell>금액</TableCell>
+                          <TableCell>입력자</TableCell>
+                          <TableCell>승인상태</TableCell>
+                          <TableCell>정산반영</TableCell>
+                          <TableCell>작업</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {filteredPolicies.map((policy) => (
+                          <TableRow key={policy.id}>
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={selectedPolicies.some(p => p.id === policy.id)}
+                                onChange={() => handlePolicySelect(policy)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    cursor: canEditPolicy(policy) ? 'pointer' : 'default',
+                                    textDecoration: canEditPolicy(policy) ? 'underline' : 'none',
+                                    '&:hover': canEditPolicy(policy) ? { color: 'primary.main' } : {}
+                                  }}
+                                  onClick={() => handlePolicyClick(policy)}
+                                >
+                                  {policy.policyName}
+                                </Typography>
+                                {policy.policyStatus === '취소됨' && (
+                                  <Chip 
+                                    label="취소됨" 
+                                    size="small" 
+                                    color="error" 
+                                    variant="outlined"
+                                  />
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>{policy.policyDate}</TableCell>
+                            <TableCell>{policy.policyStore}</TableCell>
+                            <TableCell>{policy.teamName}</TableCell>
+                            <TableCell>
+                              <Box>
+                                <Typography variant="body2">{policy.policyContent}</Typography>
+                                {policy.cancelReason && (
+                                  <Typography variant="caption" color="error" display="block">
+                                    취소사유: {policy.cancelReason}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>{policy.policyAmount}</TableCell>
+                            <TableCell>{policy.inputUserName}</TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                 <Chip 
-                                  label="취소됨" 
-                                  size="small" 
-                                  color="error" 
+                                  label={`총괄: ${policy.approvalStatus?.total || '대기'}`}
+                                  size="small"
+                                  color={policy.approvalStatus?.total === '승인' ? 'success' : 'default'}
+                                />
+                                <Chip 
+                                  label={`정산팀: ${policy.approvalStatus?.settlement || '대기'}`}
+                                  size="small"
+                                  color={policy.approvalStatus?.settlement === '승인' ? 'success' : 'default'}
+                                />
+                                <Chip 
+                                  label={`소속팀: ${policy.approvalStatus?.team || '대기'}`}
+                                  size="small"
+                                  color={policy.approvalStatus?.team === '승인' ? 'success' : 'default'}
+                                />
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Chip 
+                                  label={policy.settlementStatus || '미반영'}
+                                  size="small"
+                                  color={policy.settlementStatus === '반영됨' ? 'success' : 'default'}
                                   variant="outlined"
                                 />
-                              )}
-                            </Box>
-                          </TableCell>
-                          <TableCell>{policy.policyDate}</TableCell>
-                          <TableCell>{policy.policyStore}</TableCell>
-                          <TableCell>{policy.teamName}</TableCell>
-                          <TableCell>
-                            <Box>
-                              <Typography variant="body2">{policy.policyContent}</Typography>
-                              {policy.cancelReason && (
-                                <Typography variant="caption" color="error" display="block">
-                                  취소사유: {policy.cancelReason}
-                                </Typography>
-                              )}
-                            </Box>
-                          </TableCell>
-                          <TableCell>{policy.policyAmount}</TableCell>
-                          <TableCell>{policy.inputUserName}</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              <Chip 
-                                label={`총괄: ${policy.approvalStatus?.total || '대기'}`}
-                                size="small"
-                                color={policy.approvalStatus?.total === '승인' ? 'success' : 'default'}
-                              />
-                              <Chip 
-                                label={`정산팀: ${policy.approvalStatus?.settlement || '대기'}`}
-                                size="small"
-                                color={policy.approvalStatus?.settlement === '승인' ? 'success' : 'default'}
-                              />
-                              <Chip 
-                                label={`소속팀: ${policy.approvalStatus?.team || '대기'}`}
-                                size="small"
-                                color={policy.approvalStatus?.team === '승인' ? 'success' : 'default'}
-                              />
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              <Chip 
-                                label={policy.settlementStatus || '미반영'}
-                                size="small"
-                                color={policy.settlementStatus === '반영됨' ? 'success' : 'default'}
-                                variant="outlined"
-                              />
-                              {policy.settlementUserName && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {policy.settlementUserName}
-                                </Typography>
-                              )}
-                              {policy.settlementDateTime && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {new Date(policy.settlementDateTime).toLocaleDateString()}
-                                </Typography>
-                              )}
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              {/* 정책 취소 버튼 (입력자만 보임) */}
-                              {policy.inputUserId === (loggedInStore?.contactId || loggedInStore?.id) && (
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="error"
-                                  onClick={() => handleCancelClick(policy, 'policy')}
-                                  disabled={policy.policyStatus === '취소됨'}
-                                >
-                                  정책취소
-                                </Button>
-                              )}
-                              
-                              {/* 승인 버튼 - 권한별 표시 */}
-                              {(() => {
-                                const userRole = loggedInStore?.userRole;
-                                const canApprove = 
-                                  // 총괄(SS): 모든 승인 가능
-                                  userRole === 'SS' ||
-                                  // 정산팀(S): 총괄, 정산팀 승인 가능
-                                  userRole === 'S' ||
-                                  // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
-                                  ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
-                                
-                                return canApprove ? (
-                                  <Button
-                                    size="small"
-                                    onClick={() => handleApprovalClick(policy)}
-                                    disabled={policy.policyStatus === '취소됨' || approvalProcessing}
-                                  >
-                                    {approvalProcessing ? '처리중...' : '승인'}
-                                  </Button>
-                                ) : null;
-                              })()}
-                              
-                              {/* 승인 취소 버튼 - 권한별 표시 */}
-                              {(() => {
-                                const userRole = loggedInStore?.userRole;
-                                const canCancelApproval = 
-                                  // 총괄(SS): 모든 승인 취소 가능
-                                  userRole === 'SS' ||
-                                  // 정산팀(S): 총괄, 정산팀 승인 취소 가능
-                                  userRole === 'S' ||
-                                  // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인 취소만 가능
-                                  ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
-                                
-                                return canCancelApproval ? (
+                                {policy.settlementUserName && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {policy.settlementUserName}
+                                  </Typography>
+                                )}
+                                {policy.settlementDateTime && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {new Date(policy.settlementDateTime).toLocaleDateString()}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {/* 정책 취소 버튼 (입력자만 보임) */}
+                                {policy.inputUserId === (loggedInStore?.contactId || loggedInStore?.id) && (
                                   <Button
                                     size="small"
                                     variant="outlined"
-                                    color="warning"
-                                    onClick={() => handleCancelClick(policy, 'approval')}
+                                    color="error"
+                                    onClick={() => handleCancelClick(policy, 'policy')}
                                     disabled={policy.policyStatus === '취소됨'}
                                   >
-                                    승인취소
+                                    정책취소
                                   </Button>
-                                ) : null;
-                              })()}
-                              
-                              {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
-                              {(loggedInStore?.userRole === 'S' || loggedInStore?.userRole === 'SS') && (
+                                )}
+                                
+                                {/* 승인 버튼 - 권한별 표시 */}
+                                {(() => {
+                                  const userRole = loggedInStore?.userRole;
+                                  const canApprove = 
+                                    // 총괄(SS): 모든 승인 가능
+                                    userRole === 'SS' ||
+                                    // 정산팀(S): 총괄, 정산팀 승인 가능
+                                    userRole === 'S' ||
+                                    // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인만 가능
+                                    ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
+                                  
+                                  return canApprove ? (
+                                    <Button
+                                      size="small"
+                                      onClick={() => handleApprovalClick(policy)}
+                                      disabled={policy.policyStatus === '취소됨' || approvalProcessing}
+                                    >
+                                      {approvalProcessing ? '처리중...' : '승인'}
+                                    </Button>
+                                  ) : null;
+                                })()}
+                                
+                                {/* 승인 취소 버튼 - 권한별 표시 */}
+                                {(() => {
+                                  const userRole = loggedInStore?.userRole;
+                                  const canCancelApproval = 
+                                    // 총괄(SS): 모든 승인 취소 가능
+                                    userRole === 'SS' ||
+                                    // 정산팀(S): 총괄, 정산팀 승인 취소 가능
+                                    userRole === 'S' ||
+                                    // 소속정책팀(AA, BB, CC, DD, EE, FF): 소속팀 승인 취소만 가능
+                                    ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole);
+                                  
+                                  return canCancelApproval ? (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      color="warning"
+                                      onClick={() => handleCancelClick(policy, 'approval')}
+                                      disabled={policy.policyStatus === '취소됨'}
+                                    >
+                                      승인취소
+                                    </Button>
+                                  ) : null;
+                                })()}
+                                
+                                {/* 정산 반영 버튼 (정산팀 권한만 보임) */}
+                                {(loggedInStore?.userRole === 'S' || loggedInStore?.userRole === 'SS') && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="info"
+                                    onClick={() => handleSettlementClick(policy)}
+                                    disabled={policy.policyStatus === '취소됨'}
+                                  >
+                                    정산반영
+                                  </Button>
+                                )}
+                                
+                                {/* 정책 복사 버튼 - 누구나 복사 가능 */}
                                 <Button
                                   size="small"
                                   variant="outlined"
-                                  color="info"
-                                  onClick={() => handleSettlementClick(policy)}
+                                  color="secondary"
+                                  onClick={() => handleCopyPolicy(policy)}
                                   disabled={policy.policyStatus === '취소됨'}
                                 >
-                                  정산반영
+                                  정책복사
                                 </Button>
-                              )}
-                              
-                              {/* 정책 복사 버튼 - 누구나 복사 가능 */}
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="secondary"
-                                onClick={() => handleCopyPolicy(policy)}
-                                disabled={policy.policyStatus === '취소됨'}
-                              >
-                                정책복사
-                              </Button>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ));
-                    })()}
-                  </TableBody>
-                </Table>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  );
+                })()}
               </TableContainer>
             )}
           </Box>
