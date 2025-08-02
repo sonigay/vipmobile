@@ -51,7 +51,8 @@ function PolicyInputModal({
   stores = [], 
   onSave,
   loggedInUser,
-  teams = [] // 소속정책팀 목록 추가
+  teams = [], // 소속정책팀 목록 추가
+  policy // 수정할 정책 데이터 추가
 }) {
   const [formData, setFormData] = useState({
     policyName: '',
@@ -73,20 +74,34 @@ function PolicyInputModal({
 
   useEffect(() => {
     if (open) {
-      // 모달이 열릴 때 폼 초기화
-      setFormData({
-        policyName: '',
-        policyStartDate: new Date(),
-        policyEndDate: new Date(),
-        policyStore: '',
-        policyContent: '',
-        policyAmount: '',
-        amountType: 'total',
-        team: loggedInUser?.userRole || '' // 현재 사용자의 소속팀으로 기본 설정
-      });
+      if (policy) {
+        // 수정 모드: 기존 정책 데이터로 폼 초기화
+        setFormData({
+          policyName: policy.policyName || '',
+          policyStartDate: policy.policyStartDate ? new Date(policy.policyStartDate) : new Date(),
+          policyEndDate: policy.policyEndDate ? new Date(policy.policyEndDate) : new Date(),
+          policyStore: policy.policyStore || '',
+          policyContent: policy.policyContent || '',
+          policyAmount: policy.policyAmount ? String(policy.policyAmount) : '',
+          amountType: policy.amountType || 'total',
+          team: policy.team || loggedInUser?.userRole || ''
+        });
+      } else {
+        // 새 정책 생성 모드: 빈 폼으로 초기화
+        setFormData({
+          policyName: '',
+          policyStartDate: new Date(),
+          policyEndDate: new Date(),
+          policyStore: '',
+          policyContent: '',
+          policyAmount: '',
+          amountType: 'total',
+          team: loggedInUser?.userRole || '' // 현재 사용자의 소속팀으로 기본 설정
+        });
+      }
       setErrors({});
     }
-  }, [open, loggedInUser]);
+  }, [open, loggedInUser, policy]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -161,30 +176,51 @@ function PolicyInputModal({
     setIsSubmitting(true);
     
     try {
-      const policyData = {
-        id: `POL_${Date.now()}`, // 임시 ID 생성
-        policyName: formData.policyName.trim(),
-        policyStartDate: formData.policyStartDate,
-        policyEndDate: formData.policyEndDate,
-        policyStore: formData.policyStore,
-        policyContent: formData.policyContent.trim(),
-        policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
-        amountType: formData.amountType,
-        policyType: isWireless ? '무선' : '유선',
-        category: categoryId,
-        yearMonth: yearMonth,
-        inputUserId: loggedInUser?.id || '',
-        inputUserName: loggedInUser?.name || '',
-        inputDateTime: new Date().toISOString(),
-        approvalStatus: {
-          total: '대기',
-          settlement: '대기',
-          team: '대기'
-        },
-        team: formData.team // 소속정책팀 추가
-      };
+      if (policy) {
+        // 수정 모드
+        const updateData = {
+          policyName: formData.policyName.trim(),
+          policyStartDate: formData.policyStartDate,
+          policyEndDate: formData.policyEndDate,
+          policyStore: formData.policyStore,
+          policyContent: formData.policyContent.trim(),
+          policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
+          amountType: formData.amountType,
+          team: formData.team,
+          modifiedBy: loggedInUser?.contactId || loggedInUser?.id,
+          modifiedByName: loggedInUser?.target || loggedInUser?.name,
+          modifiedAt: new Date().toISOString()
+        };
 
-      await onSave(policyData);
+        await onSave(policy.id, updateData);
+      } else {
+        // 새 정책 생성 모드
+        const policyData = {
+          id: `POL_${Date.now()}`, // 임시 ID 생성
+          policyName: formData.policyName.trim(),
+          policyStartDate: formData.policyStartDate,
+          policyEndDate: formData.policyEndDate,
+          policyStore: formData.policyStore,
+          policyContent: formData.policyContent.trim(),
+          policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
+          amountType: formData.amountType,
+          policyType: isWireless ? '무선' : '유선',
+          category: categoryId,
+          yearMonth: yearMonth,
+          inputUserId: loggedInUser?.contactId || loggedInUser?.id,
+          inputUserName: loggedInUser?.target || loggedInUser?.name,
+          inputDateTime: new Date().toISOString(),
+          approvalStatus: {
+            total: '대기',
+            settlement: '대기',
+            team: '대기'
+          },
+          team: formData.team // 소속정책팀 추가
+        };
+
+        await onSave(policyData);
+      }
+      
       onClose();
     } catch (error) {
       console.error('정책 저장 실패:', error);
@@ -219,7 +255,7 @@ function PolicyInputModal({
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="h6">
-            {categoryName} 추가
+            {policy ? `${categoryName} 수정` : `${categoryName} 추가`}
           </Typography>
           <Chip 
             label={isWireless ? '무선' : '유선'} 
@@ -233,6 +269,19 @@ function PolicyInputModal({
         {errors.submit && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {errors.submit}
+          </Alert>
+        )}
+        
+        {/* 수정 모드일 때 현재 승인 상태 표시 */}
+        {policy && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>현재 승인 상태:</strong><br />
+              총괄: {policy.approvalStatus?.total || '대기'} | 
+              정산팀: {policy.approvalStatus?.settlement || '대기'} | 
+              소속팀: {policy.approvalStatus?.team || '대기'}<br />
+              <em>참고: 정책 수정 후 승인 상태는 변경되지 않습니다.</em>
+            </Typography>
           </Alert>
         )}
         
@@ -420,7 +469,7 @@ function PolicyInputModal({
           onClick={handleSubmit}
           disabled={isSubmitting}
         >
-          {isSubmitting ? '저장 중...' : '저장'}
+          {isSubmitting ? (policy ? '수정 중...' : '저장 중...') : (policy ? '수정' : '저장')}
         </Button>
       </DialogActions>
     </Dialog>
