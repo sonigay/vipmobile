@@ -87,35 +87,38 @@ const InventoryStatusScreen = () => {
                   // 첫 번째 색상은 모델명 유지
                   processedData.push(item);
                 } else {
-                  // 나머지 색상들은 모델명을 빈 문자열로
+                  // 나머지 색상들은 모델명을 빈 문자열로, 하지만 정렬을 위해 원본 모델명을 별도 필드로 저장
                   processedData.push({
                     ...item,
-                    modelName: ''
+                    modelName: '',
+                    originalModelName: modelName // 정렬용 원본 모델명
                   });
                 }
               });
             });
           }
          
-         // 다중 정렬: 구분별 → 모델명 → 색상별
-         const sortedData = processedData.sort((a, b) => {
-           // 1순위: 구분 (삼성 → 애플 → 기타 → 2ND)
-           const categoryOrder = { '삼성': 1, '애플': 2, '기타': 3, '2ND': 4 };
-           const aOrder = categoryOrder[a.category] || 5;
-           const bOrder = categoryOrder[b.category] || 5;
-           if (aOrder !== bOrder) {
-             return aOrder - bOrder;
-           }
-           // 2순위: 모델명
-           if (a.modelName !== b.modelName) {
-             return a.modelName.localeCompare(b.modelName);
-           }
-           // 3순위: 색상 (색상별 탭에서만)
-           if (activeTab === 1 && a.color !== b.color) {
-             return a.color.localeCompare(b.color);
-           }
-           return 0;
-         });
+                   // 다중 정렬: 구분별 → 모델명 → 색상별
+          const sortedData = processedData.sort((a, b) => {
+            // 1순위: 구분 (삼성 → 애플 → 기타 → 2ND)
+            const categoryOrder = { '삼성': 1, '애플': 2, '기타': 3, '2ND': 4 };
+            const aOrder = categoryOrder[a.category] || 5;
+            const bOrder = categoryOrder[b.category] || 5;
+            if (aOrder !== bOrder) {
+              return aOrder - bOrder;
+            }
+            // 2순위: 모델명 (색상별 탭에서는 원본 모델명 사용)
+            const aModelName = activeTab === 1 ? (a.originalModelName || a.modelName) : a.modelName;
+            const bModelName = activeTab === 1 ? (b.originalModelName || b.modelName) : b.modelName;
+            if (aModelName !== bModelName) {
+              return aModelName.localeCompare(bModelName);
+            }
+            // 3순위: 색상 (색상별 탭에서만)
+            if (activeTab === 1 && a.color !== b.color) {
+              return a.color.localeCompare(b.color);
+            }
+            return 0;
+          });
          
          setInventoryData(sortedData);
       } else {
@@ -185,54 +188,55 @@ const InventoryStatusScreen = () => {
     loadData();
   };
 
-     // 수량별 색상 결정 함수
-   const getQuantityColor = (count, type = 'daily') => {
-     if (count === 0) return { color: 'text.secondary', backgroundColor: 'transparent' };
-     
-     if (type === 'inventory') {
-       // 잔여재고: 1~/5~/10~/20~/40~
-       if (count >= 40) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
-       if (count >= 20) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황
-       if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑
-       if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
-       return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
-     } else if (type === 'monthly') {
-       // 당월개통: 1~/5~/10~/20~/40~
-       if (count >= 40) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
-       if (count >= 20) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황
-       if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑
-       if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
-       return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
-     } else {
-       // 일별 개통: 1~/2~/3~/5~/10~
-       if (count >= 10) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
-       if (count >= 5) return { color: '#f57c00', backgroundColor: '#fff3e0' };  // 주황
-       if (count >= 3) return { color: '#f57f17', backgroundColor: '#fff8e1' };  // 노랑
-       if (count >= 2) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
-       return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
-     }
-   };
+           // 수량별 색상 결정 함수
+    const getQuantityColor = (count, type = 'daily') => {
+      if (count === 0) return { color: 'text.secondary', backgroundColor: '#ffffff' }; // 0값은 하얀색 배경
+      
+      if (type === 'inventory') {
+        // 잔여재고: 1~/5~/10~/20~/40~
+        if (count >= 40) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
+        if (count >= 20) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황
+        if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑
+        if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
+        return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
+      } else if (type === 'monthly') {
+        // 당월개통: 1~/5~/10~/20~/40~
+        if (count >= 40) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
+        if (count >= 20) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황
+        if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑
+        if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
+        return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
+      } else {
+        // 일별 개통: 1~/2~/3~/5~/10~
+        if (count >= 10) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
+        if (count >= 5) return { color: '#f57c00', backgroundColor: '#fff3e0' };  // 주황
+        if (count >= 3) return { color: '#f57f17', backgroundColor: '#fff8e1' };  // 노랑
+        if (count >= 2) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
+        return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
+      }
+    };
 
-     // 일별 개통 현황 렌더링
-   const renderDailyActivation = (dailyData) => {
-     return dailyData.map((day, index) => {
-       const colorStyle = getQuantityColor(day.count, 'daily');
-       return (
-         <TableCell key={index} align="center" sx={{ 
-           minWidth: 25, 
-           p: 0.25,
-           fontSize: '0.7rem',
-           color: colorStyle.color,
-           backgroundColor: colorStyle.backgroundColor,
-           fontWeight: day.count > 0 ? 'bold' : 'normal',
-           borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
-           borderRadius: day.count > 0 ? '2px' : '0'
-         }}>
-           {day.count}
-         </TableCell>
-       );
-     });
-   };
+           // 일별 개통 현황 렌더링
+    const renderDailyActivation = (dailyData) => {
+      return dailyData.map((day, index) => {
+        const colorStyle = getQuantityColor(day.count, 'daily');
+        return (
+          <TableCell key={index} align="center" sx={{ 
+            minWidth: 25, 
+            p: 0.25,
+            fontSize: '0.7rem',
+            color: colorStyle.color,
+            backgroundColor: colorStyle.backgroundColor,
+            fontWeight: day.count > 0 ? 'bold' : 'normal',
+            borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
+            borderRadius: day.count > 0 ? '2px' : '0',
+            borderLeft: index === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+          }}>
+            {day.count}
+          </TableCell>
+        );
+      });
+    };
 
     return (
     <Box sx={{ 
@@ -533,10 +537,11 @@ const InventoryStatusScreen = () => {
                                            <TableCell sx={{ 
                         backgroundColor: '#f8f9fa', 
                         fontWeight: 'bold',
-                        minWidth: 60,
+                        minWidth: 45,
                         borderBottom: '2px solid #1976d2',
                         fontSize: '0.8rem',
-                        p: 0.5
+                        p: 0.5,
+                        textAlign: 'center'
                       }}>
                         총계
                       </TableCell>
@@ -546,22 +551,24 @@ const InventoryStatusScreen = () => {
                         minWidth: 120,
                         borderBottom: '2px solid #1976d2',
                         fontSize: '0.8rem',
-                        p: 0.5
+                        p: 0.5,
+                        textAlign: 'center'
                       }}>
                         전체 모델
                       </TableCell>
-                     {activeTab === 1 && (
-                       <TableCell sx={{ 
-                         backgroundColor: '#f8f9fa', 
-                         fontWeight: 'bold',
-                         minWidth: 80,
-                         borderBottom: '2px solid #1976d2',
-                         fontSize: '0.8rem',
-                         p: 0.5
-                       }}>
-                         전체 색상
-                       </TableCell>
-                     )}
+                                           {activeTab === 1 && (
+                        <TableCell sx={{ 
+                          backgroundColor: '#f8f9fa', 
+                          fontWeight: 'bold',
+                          minWidth: 80,
+                          borderBottom: '2px solid #1976d2',
+                          fontSize: '0.8rem',
+                          p: 0.5,
+                          textAlign: 'center'
+                        }}>
+                          전체 색상
+                        </TableCell>
+                      )}
                       <TableCell sx={{ 
                         backgroundColor: '#f8f9fa', 
                         fontWeight: 'bold',
@@ -585,37 +592,38 @@ const InventoryStatusScreen = () => {
                         {inventoryData.reduce((sum, item) => sum + item.monthlyActivation, 0)}
                       </TableCell>
                     
-                     {/* 일별 총 개통 수량 */}
-                     {Array.from({ length: 31 }, (_, i) => {
-                       const dayTotal = inventoryData.reduce((sum, item) => sum + (item.dailyActivation[i]?.count || 0), 0);
-                       return (
-                         <TableCell key={i} align="center" sx={{ 
-                           backgroundColor: '#f8f9fa', 
-                           fontWeight: 'bold',
-                           minWidth: 25,
-                           p: 0.25,
-                           fontSize: '0.7rem',
-                           borderBottom: '2px solid #1976d2',
-                           color: dayTotal > 0 ? '#1976d2' : '#666666'
-                         }}>
-                           {dayTotal}
-                         </TableCell>
-                       );
-                     })}
+                                           {/* 일별 총 개통 수량 */}
+                      {Array.from({ length: 31 }, (_, i) => {
+                        const dayTotal = inventoryData.reduce((sum, item) => sum + (item.dailyActivation[i]?.count || 0), 0);
+                        return (
+                          <TableCell key={i} align="center" sx={{ 
+                            backgroundColor: '#f8f9fa', 
+                            fontWeight: 'bold',
+                            minWidth: 25,
+                            p: 0.25,
+                            fontSize: '0.7rem',
+                            borderBottom: '2px solid #1976d2',
+                            color: dayTotal > 0 ? '#1976d2' : '#666666',
+                            borderLeft: i === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+                          }}>
+                            {dayTotal}
+                          </TableCell>
+                        );
+                      })}
                    </TableRow>
                   
                                      {/* 요일 행 (중간) */}
                    <TableRow sx={{ backgroundColor: '#ffffff' }}>
-                     <TableCell sx={{ 
-                       backgroundColor: '#ffffff', 
-                       fontWeight: 'bold',
-                       minWidth: 60,
-                       borderBottom: '1px solid #e0e0e0',
-                       fontSize: '0.8rem',
-                       p: 0.5
-                     }}>
-                       
-                     </TableCell>
+                                           <TableCell sx={{ 
+                        backgroundColor: '#ffffff', 
+                        fontWeight: 'bold',
+                        minWidth: 45,
+                        borderBottom: '1px solid #e0e0e0',
+                        fontSize: '0.8rem',
+                        p: 0.5
+                      }}>
+                        
+                      </TableCell>
                      <TableCell sx={{ 
                        backgroundColor: '#ffffff', 
                        fontWeight: 'bold',
@@ -659,74 +667,78 @@ const InventoryStatusScreen = () => {
                        
                      </TableCell>
                     
-                                         {/* 일별 요일 표시 */}
-                     {Array.from({ length: 31 }, (_, i) => {
-                       // 당월 1일의 요일을 기준으로 계산
-                       const currentDate = new Date();
-                       const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-                       const firstDayOfWeek = firstDayOfMonth.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
-                       
-                       const dayOfWeek = (firstDayOfWeek + i) % 7; // 1일부터 시작하는 요일 계산
-                       const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-                       const dayName = dayNames[dayOfWeek];
-                       
-                       let dayColor = '#666666'; // 기본 회색
-                       if (dayName === '토') dayColor = '#1976d2'; // 토요일 파랑
-                       if (dayName === '일') dayColor = '#d32f2f'; // 일요일 빨강
-                       
-                       return (
-                         <TableCell key={i} align="center" sx={{ 
-                           backgroundColor: '#ffffff', 
-                           fontWeight: 'bold',
-                           minWidth: 25,
-                           p: 0.25,
-                           fontSize: '0.7rem',
-                           borderBottom: '1px solid #e0e0e0',
-                           color: dayColor
-                         }}>
-                           {dayName}
-                         </TableCell>
-                       );
-                     })}
+                                                               {/* 일별 요일 표시 */}
+                      {Array.from({ length: 31 }, (_, i) => {
+                        // 당월 1일의 요일을 기준으로 계산
+                        const currentDate = new Date();
+                        const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                        const firstDayOfWeek = firstDayOfMonth.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
+                        
+                        const dayOfWeek = (firstDayOfWeek + i) % 7; // 1일부터 시작하는 요일 계산
+                        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                        const dayName = dayNames[dayOfWeek];
+                        
+                        let dayColor = '#666666'; // 기본 회색
+                        if (dayName === '토') dayColor = '#1976d2'; // 토요일 파랑
+                        if (dayName === '일') dayColor = '#d32f2f'; // 일요일 빨강
+                        
+                        return (
+                          <TableCell key={i} align="center" sx={{ 
+                            backgroundColor: '#ffffff', 
+                            fontWeight: 'bold',
+                            minWidth: 25,
+                            p: 0.25,
+                            fontSize: '0.7rem',
+                            borderBottom: '1px solid #e0e0e0',
+                            color: dayColor,
+                            borderLeft: i === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+                          }}>
+                            {dayName}
+                          </TableCell>
+                        );
+                      })}
                    </TableRow>
                   
                                      {/* 컬럼 헤더 행 (맨 아래) */}
                    <TableRow sx={{ backgroundColor: '#1976d2' }}>
-                     <TableCell sx={{ 
-                       backgroundColor: '#1976d2', 
-                       color: 'white', 
-                       fontWeight: 'bold',
-                       minWidth: 60,
-                       borderRight: '1px solid #1565c0',
-                       fontSize: '0.8rem',
-                       p: 0.5
-                     }}>
-                       구분
-                     </TableCell>
-                     <TableCell sx={{ 
-                       backgroundColor: '#1976d2', 
-                       color: 'white', 
-                       fontWeight: 'bold',
-                       minWidth: 120,
-                       borderRight: '1px solid #1565c0',
-                       fontSize: '0.8rem',
-                       p: 0.5
-                     }}>
-                       모델명
-                     </TableCell>
-                     {activeTab === 1 && (
-                       <TableCell sx={{ 
-                         backgroundColor: '#1976d2', 
-                         color: 'white', 
-                         fontWeight: 'bold',
-                         minWidth: 80,
-                         borderRight: '1px solid #1565c0',
-                         fontSize: '0.8rem',
-                         p: 0.5
-                       }}>
-                         색상
-                       </TableCell>
-                     )}
+                                           <TableCell sx={{ 
+                        backgroundColor: '#1976d2', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        minWidth: 45,
+                        borderRight: '1px solid #1565c0',
+                        fontSize: '0.8rem',
+                        p: 0.5,
+                        textAlign: 'center'
+                      }}>
+                        구분
+                      </TableCell>
+                                           <TableCell sx={{ 
+                        backgroundColor: '#1976d2', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        minWidth: 120,
+                        borderRight: '1px solid #1565c0',
+                        fontSize: '0.8rem',
+                        p: 0.5,
+                        textAlign: 'center'
+                      }}>
+                        모델명
+                      </TableCell>
+                                           {activeTab === 1 && (
+                        <TableCell sx={{ 
+                          backgroundColor: '#1976d2', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          minWidth: 80,
+                          borderRight: '1px solid #1565c0',
+                          fontSize: '0.8rem',
+                          p: 0.5,
+                          textAlign: 'center'
+                        }}>
+                          색상
+                        </TableCell>
+                      )}
                      <TableCell sx={{ 
                        backgroundColor: '#1976d2', 
                        color: 'white', 
@@ -739,33 +751,34 @@ const InventoryStatusScreen = () => {
                      }}>
                        잔여<br/>재고
                      </TableCell>
-                     <TableCell sx={{ 
-                       backgroundColor: '#1976d2', 
-                       color: 'white', 
-                       fontWeight: 'bold',
-                       minWidth: 50,
-                       borderRight: '1px solid #1565c0',
-                       textAlign: 'center',
-                       fontSize: '0.7rem',
-                       p: 0.5
-                     }}>
-                       당월<br/>개통
-                     </TableCell>
+                                           <TableCell sx={{ 
+                        backgroundColor: '#1976d2', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        minWidth: 50,
+                        borderRight: '2px solid #ffffff',
+                        textAlign: 'center',
+                        fontSize: '0.7rem',
+                        p: 0.5
+                      }}>
+                        당월<br/>개통
+                      </TableCell>
                      
-                     {/* 일별 컬럼 헤더 */}
-                     {Array.from({ length: 31 }, (_, i) => (
-                       <TableCell key={i} align="center" sx={{ 
-                         backgroundColor: '#1976d2', 
-                         color: 'white', 
-                         fontWeight: 'bold',
-                         minWidth: 25,
-                         p: 0.25,
-                         fontSize: '0.7rem',
-                         borderRight: i < 30 ? '1px solid #1565c0' : 'none'
-                       }}>
-                         {String(i + 1).padStart(2, '0')}
-                       </TableCell>
-                     ))}
+                                           {/* 일별 컬럼 헤더 */}
+                      {Array.from({ length: 31 }, (_, i) => (
+                        <TableCell key={i} align="center" sx={{ 
+                          backgroundColor: '#1976d2', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          minWidth: 25,
+                          p: 0.25,
+                          fontSize: '0.7rem',
+                          borderRight: i < 30 ? '1px solid #1565c0' : 'none',
+                          borderLeft: i === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+                        }}>
+                          {String(i + 1).padStart(2, '0')}
+                        </TableCell>
+                      ))}
                    </TableRow>
                 </TableHead>
                               <TableBody>
@@ -791,12 +804,12 @@ const InventoryStatusScreen = () => {
                            }
                          }}
                        >
-                                            <TableCell sx={{ 
-                         minWidth: 60,
-                         borderRight: '1px solid #f0f0f0',
-                         p: 0.5,
-                         fontSize: '0.8rem'
-                       }}>
+                                                                    <TableCell sx={{ 
+                          minWidth: 45,
+                          borderRight: '1px solid #f0f0f0',
+                          p: 0.5,
+                          fontSize: '0.8rem'
+                        }}>
                                                   <Chip 
                             label={item.category || '기타'} 
                             size="small"
@@ -846,17 +859,17 @@ const InventoryStatusScreen = () => {
                         }}>
                           {item.inventoryCount}
                         </TableCell>
-                        <TableCell sx={{ 
-                          minWidth: 50,
-                          fontWeight: item.monthlyActivation > 0 ? 'bold' : 'normal',
-                          borderRight: '1px solid #f0f0f0',
-                          textAlign: 'center',
-                          p: 0.5,
-                          fontSize: '0.8rem',
-                          ...getQuantityColor(item.monthlyActivation, 'monthly')
-                        }}>
-                          {item.monthlyActivation}
-                        </TableCell>
+                                                 <TableCell sx={{ 
+                           minWidth: 50,
+                           fontWeight: item.monthlyActivation > 0 ? 'bold' : 'normal',
+                           borderRight: '2px solid #ffffff',
+                           textAlign: 'center',
+                           p: 0.5,
+                           fontSize: '0.8rem',
+                           ...getQuantityColor(item.monthlyActivation, 'monthly')
+                         }}>
+                           {item.monthlyActivation}
+                         </TableCell>
                      
                                           {/* 일별 개통 현황 */}
                       {renderDailyActivation(item.dailyActivation)}
