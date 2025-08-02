@@ -117,6 +117,11 @@ const InventoryStatusScreen = () => {
               return aModelName.localeCompare(bModelName);
             }
             
+            // 모델명이 같은 경우 색상으로 정렬
+            if (activeTab === 1 && aModelName === bModelName && a.color !== b.color) {
+              return a.color.localeCompare(b.color);
+            }
+            
             // 3순위: 색상 (색상별 탭에서만)
             if (activeTab === 1 && a.color !== b.color) {
               return a.color.localeCompare(b.color);

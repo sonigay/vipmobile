@@ -13958,6 +13958,8 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
     // 재고 데이터 처리 (모델명+색상별 집계)
     const inventoryMap = new Map(); // key: "모델명|색상", value: { 모델명, 색상, 재고수량, 담당자, 사무실, 소속, 구분 }
     
+    // 먼저 모델명이 있는 행들만 수집
+    const validRows = [];
     inventoryValues.slice(1).forEach(row => {
       if (row.length >= 23) {
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
@@ -13968,32 +13970,57 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
         const agent = (row[8] || '').toString().trim(); // I열: 담당자
         const store = (row[21] || '').toString().trim(); // V열: 출고처
         
+        // 모델명이 있고, 색상이 있고, 구분이 #N/A가 아닌 경우만 처리
         if (modelName && color && category !== '#N/A') {
           // 필터링 적용
           if (req.query.agent && req.query.agent !== agent) return;
           if (req.query.office && req.query.office !== office) return;
           if (req.query.department && req.query.department !== department) return;
           
-          const key = `${modelName}|${color}`;
-          
-          if (!inventoryMap.has(key)) {
-            inventoryMap.set(key, {
-              modelName,
-              color,
-              category,
-              store,
-              agent,
-              office,
-              department,
-              inventoryCount: 0,
-              monthlyActivation: 0,
-              dailyActivation: Array(31).fill(0)
-            });
-          }
-          
-          inventoryMap.get(key).inventoryCount++;
+          validRows.push({
+            modelName,
+            color,
+            category,
+            store,
+            agent,
+            office,
+            department
+          });
         }
       }
+    });
+    
+    // 모델명별로 그룹화하여 처리
+    const modelGroups = new Map();
+    validRows.forEach(row => {
+      if (!modelGroups.has(row.modelName)) {
+        modelGroups.set(row.modelName, []);
+      }
+      modelGroups.get(row.modelName).push(row);
+    });
+    
+    // 각 모델 그룹에서 색상별로 처리
+    modelGroups.forEach((rows, modelName) => {
+      rows.forEach((row, index) => {
+        const key = `${modelName}|${row.color}`;
+        
+        if (!inventoryMap.has(key)) {
+          inventoryMap.set(key, {
+            modelName: modelName, // 모든 행에 모델명 표시 (프론트엔드에서 처리)
+            color: row.color,
+            category: row.category,
+            store: row.store,
+            agent: row.agent,
+            office: row.office,
+            department: row.department,
+            inventoryCount: 0,
+            monthlyActivation: 0,
+            dailyActivation: Array(31).fill(0)
+          });
+        }
+        
+        inventoryMap.get(key).inventoryCount++;
+      });
     });
     
     // 개통 데이터 처리
