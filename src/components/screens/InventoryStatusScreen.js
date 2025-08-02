@@ -69,7 +69,7 @@ const InventoryStatusScreen = () => {
              if (data.success) {
          let processedData = data.data;
          
-                   // 색상별 탭에서 중복 모델명 처리 - 첫 번째 색상만 모델명 유지하고 나머지는 빈칸으로
+                   // 색상별 탭에서 동일 모델명 셀 병합 처리
           if (activeTab === 1) {
             const modelGroups = new Map();
             processedData.forEach(item => {
@@ -79,21 +79,15 @@ const InventoryStatusScreen = () => {
               modelGroups.get(item.modelName).push(item);
             });
             
-            // 각 모델 그룹에서 첫 번째는 모델명 유지, 나머지는 모델명을 빈 문자열로
+            // 병합된 데이터 생성
             processedData = [];
             modelGroups.forEach((items, modelName) => {
               items.forEach((item, index) => {
-                if (index === 0) {
-                  // 첫 번째 색상은 모델명 유지
-                  processedData.push(item);
-                } else {
-                  // 나머지 색상들은 모델명을 빈 문자열로, 하지만 정렬을 위해 원본 모델명을 별도 필드로 저장
-                  processedData.push({
-                    ...item,
-                    modelName: '',
-                    originalModelName: modelName // 정렬용 원본 모델명
-                  });
-                }
+                processedData.push({
+                  ...item,
+                  isFirstInGroup: index === 0, // 그룹의 첫 번째 항목인지 표시
+                  groupSize: items.length // 그룹 크기
+                });
               });
             });
           }
@@ -108,18 +102,9 @@ const InventoryStatusScreen = () => {
               return aOrder - bOrder;
             }
             
-            // 2순위: 모델명 (색상별 탭에서는 원본 모델명 사용)
-            const aModelName = activeTab === 1 ? (a.originalModelName || a.modelName) : a.modelName;
-            const bModelName = activeTab === 1 ? (b.originalModelName || b.modelName) : b.modelName;
-            
-            // 모델명이 비어있지 않은 경우에만 비교
-            if (aModelName && bModelName && aModelName !== bModelName) {
-              return aModelName.localeCompare(bModelName);
-            }
-            
-            // 모델명이 같은 경우 색상으로 정렬
-            if (activeTab === 1 && aModelName === bModelName && a.color !== b.color) {
-              return a.color.localeCompare(b.color);
+            // 2순위: 모델명
+            if (a.modelName !== b.modelName) {
+              return a.modelName.localeCompare(b.modelName);
             }
             
             // 3순위: 색상 (색상별 탭에서만)
@@ -840,17 +825,23 @@ const InventoryStatusScreen = () => {
                              }}
                            />
                          </TableCell>
-                                                                                                  <TableCell sx={{ 
-                            minWidth: 80, 
-                            fontWeight: 'medium',
-                            borderRight: '2px solid #ffffff',
-                            color: '#333333',
-                            p: 0.25,
-                            fontSize: '0.7rem',
-                            verticalAlign: 'top'
-                          }}>
-                            {item.modelName}
-                          </TableCell>
+                                                                                                                                                                                                     <TableCell sx={{ 
+                             minWidth: 80, 
+                             fontWeight: 'medium',
+                             borderRight: '2px solid #ffffff',
+                             color: '#333333',
+                             p: 0.25,
+                             fontSize: '0.7rem',
+                             verticalAlign: 'top',
+                             ...(activeTab === 1 && item.isFirstInGroup && {
+                               rowSpan: item.groupSize
+                             }),
+                             ...(activeTab === 1 && !item.isFirstInGroup && {
+                               display: 'none'
+                             })
+                           }}>
+                             {item.modelName}
+                           </TableCell>
                       {activeTab === 1 && (
                         <TableCell sx={{ 
                           minWidth: 80,
