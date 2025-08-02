@@ -232,7 +232,38 @@ function PolicyInputModal({
         // HTTP 에러 응답에서 메시지 추출
         try {
           if (error.message.includes('HTTP error! status: 400')) {
-            errorMessage = '입력 정보를 확인해주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.';
+            // 서버 응답에서 누락된 필드 정보 추출 시도
+            if (error.response && error.response.data && error.response.data.received) {
+              const received = error.response.data.received;
+              const missingFields = [];
+              
+              // 필드명 매핑
+              const fieldNames = {
+                policyName: '정책명',
+                policyStartDate: '정책 시작일',
+                policyEndDate: '정책 종료일',
+                policyStore: '정책적용점',
+                policyContent: '정책내용',
+                policyAmount: '금액',
+                amountType: '금액 유형',
+                team: '소속정책팀'
+              };
+              
+              // 누락된 필드 확인
+              Object.keys(fieldNames).forEach(field => {
+                if (!received[field] || received[field] === '') {
+                  missingFields.push(fieldNames[field]);
+                }
+              });
+              
+              if (missingFields.length > 0) {
+                errorMessage = `다음 필수 입력란을 확인해주세요: [${missingFields.join(', ')}]`;
+              } else {
+                errorMessage = '입력 정보를 확인해주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.';
+              }
+            } else {
+              errorMessage = '입력 정보를 확인해주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.';
+            }
           } else if (error.message.includes('HTTP error! status: 404')) {
             errorMessage = '정책을 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도해주세요.';
           } else if (error.message.includes('HTTP error! status: 500')) {
