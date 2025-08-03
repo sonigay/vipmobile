@@ -496,9 +496,12 @@ export const budgetMonthSheetAPI = {
 };
 
 export const budgetUserSheetAPI = {
-  // 사용자별 시트 목록 조회
-  getUserSheets: async (userId) => {
-    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets?userId=${userId}`);
+  // 사용자별 시트 목록 조회 (대상월 필터링 추가)
+  getUserSheets: async (userId, targetMonth) => {
+    const url = targetMonth 
+      ? `${API_BASE_URL}/api/budget/user-sheets?userId=${userId}&targetMonth=${encodeURIComponent(targetMonth)}`
+      : `${API_BASE_URL}/api/budget/user-sheets?userId=${userId}`;
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('사용자 시트 조회에 실패했습니다.');
     }
@@ -520,14 +523,14 @@ export const budgetUserSheetAPI = {
     return response.json();
   },
 
-  // 예산 데이터 저장
-  saveBudgetData: async (sheetId, data, dateRange, userName) => {
+  // 예산 데이터 저장 (userLevel 파라미터 추가)
+  saveBudgetData: async (sheetId, data, dateRange, userName, userLevel) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ data, dateRange, userName }),
+      body: JSON.stringify({ data, dateRange, userName, userLevel }),
     });
     if (!response.ok) {
       throw new Error('예산 데이터 저장에 실패했습니다.');

@@ -14300,23 +14300,23 @@ async function getSheetIdByName(sheetName) {
 // 사용자별 예산 시트 관리 API
 app.get('/api/budget/user-sheets', async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId, targetMonth } = req.query;
     const sheets = google.sheets({ version: 'v4', auth });
     
     // 사용자별 시트 목록 조회 (예산_사용자시트관리 시트에서)
     const sheetsData = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '예산_사용자시트관리!A:E',
+      range: '예산_사용자시트관리!A:F', // 대상월 컬럼 추가
     });
 
     const rows = sheetsData.data.values || [];
     
     // 시트가 비어있거나 헤더가 없으면 헤더 생성
     if (rows.length === 0 || !rows[0] || rows[0][0] !== '사용자ID') {
-      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자'];
+      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월'];
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A1:E1',
+        range: '예산_사용자시트관리!A1:F1',
         valueInputOption: 'RAW',
         resource: {
           values: [headerRow]
@@ -14333,11 +14333,13 @@ app.get('/api/budget/user-sheets', async (req, res) => {
     const userSheets = [];
     
     for (const row of rows.slice(1)) {
-      if (row[0] === userId) {
+      // 대상월이 지정된 경우 해당 월의 시트만 필터링
+      if (row[0] === userId && (!targetMonth || row[5] === targetMonth)) {
         const sheetId = row[1] || '';
         const sheetName = row[2] || '';
         const createdAt = row[3] || '';
         const createdBy = row[4] || '';
+        const month = row[5] || '';
         
         // 각 시트의 예산 데이터 요약 정보 가져오기
         let summary = {
@@ -14345,7 +14347,9 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           totalUsedBudget: 0,
           totalRemainingBudget: 0,
           itemCount: 0,
-          lastUpdated: ''
+          lastUpdated: '',
+          dateRange: '',
+          applyReceiptDate: false
         };
         
         try {
@@ -14371,16 +14375,18 @@ app.get('/api/budget/user-sheets', async (req, res) => {
             }
           });
           
-          // 메타데이터에서 마지막 업데이트 시간 가져오기
+          // 메타데이터에서 마지막 업데이트 시간과 날짜 범위 가져오기
           try {
             const metadataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: `${sheetName}!K1:N1`
+              range: `${sheetName}!K1:N2`
             });
             
             const metadata = metadataResponse.data.values || [];
-            if (metadata.length >= 2 && metadata[1].length >= 1) {
+            if (metadata.length >= 2 && metadata[1].length >= 4) {
               summary.lastUpdated = metadata[1][0] || '';
+              summary.dateRange = metadata[1][2] || ''; // 개통일 범위
+              summary.applyReceiptDate = metadata[1][3] === '적용'; // 접수일 적용 여부
             }
           } catch (metadataError) {
             console.log('메타데이터 조회 실패:', metadataError.message);
@@ -14395,6 +14401,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           name: sheetName,
           createdAt,
           createdBy,
+          month,
           summary
         });
       }
@@ -14462,10 +14469,10 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     // 헤더 추가
     await sheets.spreadsheets.values.update({
       spreadsheetId: targetSheetId,
-      range: `${userSheetName}!A1:H1`,
+      range: `${userSheetName}!A1:I1`,
       valueInputOption: 'RAW',
       resource: {
-        values: [['적용일', '입력자(권한레벨)', '모델명', '군/유형', '확보된 예산', '사용된 예산', '예산 잔액', '상태']]
+        values: [['적용일', '입력자(권한레벨)', '모델명', '군', '유형', '확보된 예산', '사용된 예산', '예산 잔액', '상태']]
       }
     });
 
@@ -14473,11 +14480,11 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     try {
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A:E',
+        range: '예산_사용자시트관리!A:F',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
-          values: [[userId, targetSheetId, userSheetName, currentTime, userName]]
+          values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth]]
         }
       });
     } catch (appendError) {
@@ -14503,11 +14510,11 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       });
       
       // 헤더와 데이터 추가
-      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자'];
-      const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName];
+      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월'];
+      const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth];
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A1:E2',
+        range: '예산_사용자시트관리!A1:F2',
         valueInputOption: 'RAW',
         resource: {
           values: [headerRow, dataRow]
@@ -14535,7 +14542,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
 app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
     const { sheetId } = req.params;
-    const { data, dateRange, userName } = req.body;
+    const { data, dateRange, userName, userLevel } = req.body;
     
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ error: '저장할 데이터가 없습니다.' });
@@ -14560,15 +14567,18 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
             const armyType = getArmyType(index + 1);
             const categoryType = getCategoryType(index + 1);
             
+            // 금액을 1만원 단위에서 원 단위로 변환 (예: 2 -> 20000)
+            const budgetAmount = budgetValue * 10000;
+            
             rowsToSave.push([
               `${item.appliedDate}`, // 적용일
-              `${userName}(레벨${item.userLevel || 1})`, // 입력자(권한레벨)
+              `${userName}(레벨${userLevel || 'SS'})`, // 입력자(권한레벨) - 실제 권한 레벨 사용
               item.modelName, // 모델명
               armyType, // 군
               categoryType, // 유형
-              budgetValue, // 확보된 예산
+              budgetAmount, // 확보된 예산 (원 단위)
               0, // 사용된 예산 (초기값)
-              budgetValue, // 예산 잔액 (초기값)
+              budgetAmount, // 예산 잔액 (초기값)
               '정상' // 상태
             ]);
           }

@@ -140,7 +140,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const loadUserSheets = async () => {
     try {
       const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
-      const data = await budgetUserSheetAPI.getUserSheets(userId);
+      const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth);
       setUserSheets(data);
     } catch (error) {
       console.error('사용자 시트 목록 로드 실패:', error);
@@ -158,6 +158,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setSheetId(monthSheetMappings[month]);
     } else {
       setSheetId(''); // 새로운 월이면 빈 값으로 초기화
+    }
+    
+    // 대상월이 변경되면 저장된 데이터 목록도 새로고침
+    if (showSheetList) {
+      loadUserSheets();
     }
   };
 
@@ -348,6 +353,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
       const userName = loggedInStore?.name || 'Unknown';
+      const userLevel = loggedInStore?.userRole || loggedInStore?.agentInfo?.userRole || loggedInStore?.level || 'SS';
       
       // 대상월이 선택되어 있는지 확인
       if (!targetMonth) {
@@ -369,7 +375,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          applyReceiptDate: applyReceiptDate // 접수일 적용 여부도 함께 저장
        };
       
-      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName);
+      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel);
       
     } catch (error) {
       console.error('자동 저장 실패:', error);
@@ -925,78 +931,77 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            {showSheetList && (
              <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                <Table size="small">
-                 <TableHead>
-                   <TableRow>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       시트명
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       확보예산
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       사용예산
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       예산잔액
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       항목수
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       마지막수정
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       작업
-                     </TableCell>
-                   </TableRow>
-                 </TableHead>
+                                   <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        예산적용일
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        확보예산
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        사용예산
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        예산잔액
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        마지막수정
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        작업
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
                  <TableBody>
-                   {userSheets.length === 0 ? (
-                     <TableRow>
-                       <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
-                         저장된 데이터가 없습니다.
-                       </TableCell>
-                     </TableRow>
-                   ) : (
-                     userSheets.map((sheet, index) => (
-                       <TableRow key={index} hover>
-                         <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                           {sheet.name}
-                         </TableCell>
-                         <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
-                           {sheet.summary?.totalSecuredBudget?.toLocaleString() || '0'}
-                         </TableCell>
-                         <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-                           {sheet.summary?.totalUsedBudget?.toLocaleString() || '0'}
-                         </TableCell>
-                         <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
-                           {sheet.summary?.totalRemainingBudget?.toLocaleString() || '0'}
-                         </TableCell>
-                         <TableCell sx={{ fontSize: '0.8rem' }}>
-                           {sheet.summary?.itemCount || '0'}
-                         </TableCell>
-                         <TableCell sx={{ fontSize: '0.8rem' }}>
-                           {sheet.summary?.lastUpdated ? 
-                             new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
-                             new Date(sheet.createdAt).toLocaleString('ko-KR')
-                           }
-                         </TableCell>
-                         <TableCell>
-                           <Button
-                             size="small"
-                             variant="outlined"
-                             onClick={() => {
-                               // TODO: 데이터 불러오기 기능 구현
-                               setSnackbar({ open: true, message: '데이터 불러오기 기능은 준비중입니다.', severity: 'info' });
-                             }}
-                             sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
-                           >
-                             불러오기
-                           </Button>
-                         </TableCell>
-                       </TableRow>
-                     ))
-                   )}
+                                       {userSheets.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
+                          저장된 데이터가 없습니다.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      userSheets.map((sheet, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                            {sheet.summary?.dateRange || '날짜 미설정'}
+                            {sheet.summary?.applyReceiptDate && (
+                              <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
+                                (접수일 적용)
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
+                            {(sheet.summary?.totalSecuredBudget || 0).toLocaleString()}원
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
+                            {(sheet.summary?.totalUsedBudget || 0).toLocaleString()}원
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
+                            {(sheet.summary?.totalRemainingBudget || 0).toLocaleString()}원
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem' }}>
+                            {sheet.summary?.lastUpdated ? 
+                              new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
+                              new Date(sheet.createdAt).toLocaleString('ko-KR')
+                            }
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                // TODO: 데이터 불러오기 기능 구현
+                                setSnackbar({ open: true, message: '데이터 불러오기 기능은 준비중입니다.', severity: 'info' });
+                              }}
+                              sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
+                            >
+                              불러오기
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                  </TableBody>
                </Table>
              </TableContainer>
