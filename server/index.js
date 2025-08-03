@@ -14545,6 +14545,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       message: '사용자별 시트가 생성되었습니다.',
       sheet: newSheet
     });
+  }
   } catch (error) {
     console.error('사용자별 시트 생성 오류:', error);
     res.status(500).json({ error: '사용자별 시트 생성 중 오류가 발생했습니다.' });
@@ -14588,10 +14589,10 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
             // 예산 잔액 계산
             const remainingBudget = securedBudget - usedBudget;
             
-            // 적용일 설정 - 접수일 적용 시 접수일, 미적용 시 개통일 사용
+            // 적용일 설정 - 시작일과 종료일 모두 포함
             const appliedDate = dateRange.applyReceiptDate 
-              ? dateRange.receiptStartDate.split(' ')[0] 
-              : dateRange.activationStartDate.split(' ')[0];
+              ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` 
+              : `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`;
             
             rowsToSave.push([
               appliedDate, // 적용일
