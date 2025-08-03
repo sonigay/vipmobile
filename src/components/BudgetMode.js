@@ -286,7 +286,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setIsProcessing(true);
       const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
       
-      const result = await budgetUserSheetAPI.loadBudgetData(sheet.sheetId, userName);
+      const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName);
       
       // 데이터를 화면에 설정
       setBudgetData(result.data || []);
@@ -323,10 +323,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
       
       // 시트 ID 설정
-      setSheetId(sheet.sheetId);
+      setSheetId(sheet.id);
       
       // 대상월 설정 (시트 이름에서 추출)
-      const monthMatch = sheet.sheetName?.match(/액면_(.+)/);
+      const monthMatch = sheet.name?.match(/액면_(.+)/);
       if (monthMatch) {
         setTargetMonth(monthMatch[1]);
       }
