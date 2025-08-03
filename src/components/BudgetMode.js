@@ -69,14 +69,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
     receiptStartDate: '',
-    receiptStartTime: '00:00',
+    receiptStartTime: '10:00',
     receiptEndDate: '',
     receiptEndTime: '23:59',
     activationStartDate: '',
-    activationStartTime: '00:00',
+    activationStartTime: '10:00',
     activationEndDate: '',
     activationEndTime: '23:59'
   });
+  
+  // 접수일 적용 여부
+  const [applyReceiptDate, setApplyReceiptDate] = useState(false);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -357,13 +360,14 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const targetSheetId = result.sheet.id;
       setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다.`, severity: 'success' });
       
-      // 데이터 저장
-      const saveDateRange = {
-        receiptStartDate: `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}`,
-        receiptEndDate: `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}`,
-        activationStartDate: `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
-        activationEndDate: `${dateRange.activationEndDate} ${dateRange.activationEndTime}`
-      };
+             // 데이터 저장 - 접수일 적용 여부에 따라 설정
+       const saveDateRange = {
+         receiptStartDate: applyReceiptDate ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` : '',
+         receiptEndDate: applyReceiptDate ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` : '',
+         activationStartDate: `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
+         activationEndDate: `${dateRange.activationEndDate} ${dateRange.activationEndTime}`,
+         applyReceiptDate: applyReceiptDate // 접수일 적용 여부도 함께 저장
+       };
       
       await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName);
       
@@ -517,135 +521,163 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </CardContent>
       </Card>
 
-      {/* 날짜/시간 입력 영역 */}
-      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            📅 접수일 및 개통일 범위 설정
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                📅 접수일 범위
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="시작일"
-                    type="date"
-                    value={dateRange.receiptStartDate}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      receiptStartDate: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="시작시간"
-                    type="time"
-                    value={dateRange.receiptStartTime}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      receiptStartTime: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="종료일"
-                    type="date"
-                    value={dateRange.receiptEndDate}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      receiptEndDate: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="종료시간"
-                    type="time"
-                    value={dateRange.receiptEndTime}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      receiptEndTime: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </Grid>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                📅 개통일 범위
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="시작일"
-                    type="date"
-                    value={dateRange.activationStartDate}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      activationStartDate: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="시작시간"
-                    type="time"
-                    value={dateRange.activationStartTime}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      activationStartTime: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="종료일"
-                    type="date"
-                    value={dateRange.activationEndDate}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      activationEndDate: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="종료시간"
-                    type="time"
-                    value={dateRange.activationEndTime}
-                    onChange={(e) => setDateRange({
-                      ...dateRange,
-                      activationEndTime: e.target.value
-                    })}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </Grid>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+             {/* 날짜/시간 입력 영역 */}
+       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+         <CardContent>
+           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+             📅 접수일 및 개통일 범위 설정
+           </Typography>
+           
+           {/* 접수일 적용 여부 체크박스 */}
+           <Box sx={{ mb: 3 }}>
+             <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+               ⚙️ 접수일 적용 설정
+             </Typography>
+             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+               <input
+                 type="checkbox"
+                 id="applyReceiptDate"
+                 checked={applyReceiptDate}
+                 onChange={(e) => setApplyReceiptDate(e.target.checked)}
+                 style={{ width: '18px', height: '18px' }}
+               />
+               <label htmlFor="applyReceiptDate" style={{ fontSize: '0.9rem', color: '#666' }}>
+                 접수일 기준으로 예산 계산 (미체크 시 개통일 기준으로 자동 계산)
+               </label>
+             </Box>
+           </Box>
+           
+           <Grid container spacing={3}>
+             {/* 접수일 범위 - 체크 시에만 표시 */}
+             {applyReceiptDate && (
+               <Grid item xs={12} sm={6}>
+                 <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+                   📅 접수일 범위
+                 </Typography>
+                 <Grid container spacing={2}>
+                   <Grid item xs={6}>
+                     <TextField
+                       fullWidth
+                       label="시작일"
+                       type="date"
+                       value={dateRange.receiptStartDate}
+                       onChange={(e) => setDateRange({
+                         ...dateRange,
+                         receiptStartDate: e.target.value
+                       })}
+                       InputLabelProps={{ shrink: true }}
+                     />
+                   </Grid>
+                   <Grid item xs={6}>
+                     <TextField
+                       fullWidth
+                       label="시작시간"
+                       type="time"
+                       value={dateRange.receiptStartTime}
+                       onChange={(e) => setDateRange({
+                         ...dateRange,
+                         receiptStartTime: e.target.value
+                       })}
+                       InputLabelProps={{ shrink: true }}
+                     />
+                   </Grid>
+                   <Grid item xs={6}>
+                     <TextField
+                       fullWidth
+                       label="종료일"
+                       type="date"
+                       value={dateRange.receiptEndDate}
+                       onChange={(e) => setDateRange({
+                         ...dateRange,
+                         receiptEndDate: e.target.value
+                       })}
+                       InputLabelProps={{ shrink: true }}
+                     />
+                   </Grid>
+                   <Grid item xs={6}>
+                     <TextField
+                       fullWidth
+                       label="종료시간"
+                       type="time"
+                       value={dateRange.receiptEndTime}
+                       onChange={(e) => setDateRange({
+                         ...dateRange,
+                         receiptEndTime: e.target.value
+                       })}
+                       InputLabelProps={{ shrink: true }}
+                     />
+                   </Grid>
+                 </Grid>
+               </Grid>
+             )}
+             
+             <Grid item xs={12} sm={applyReceiptDate ? 6 : 12}>
+               <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+                 📅 개통일 범위 {!applyReceiptDate && '(기준)'}
+               </Typography>
+               <Grid container spacing={2}>
+                 <Grid item xs={6}>
+                   <TextField
+                     fullWidth
+                     label="시작일"
+                     type="date"
+                     value={dateRange.activationStartDate}
+                     onChange={(e) => setDateRange({
+                       ...dateRange,
+                       activationStartDate: e.target.value
+                     })}
+                     InputLabelProps={{ shrink: true }}
+                   />
+                 </Grid>
+                 <Grid item xs={6}>
+                   <TextField
+                     fullWidth
+                     label="시작시간"
+                     type="time"
+                     value={dateRange.activationStartTime}
+                     onChange={(e) => setDateRange({
+                       ...dateRange,
+                       activationStartTime: e.target.value
+                     })}
+                     InputLabelProps={{ shrink: true }}
+                   />
+                 </Grid>
+                 <Grid item xs={6}>
+                   <TextField
+                     fullWidth
+                     label="종료일"
+                     type="date"
+                     value={dateRange.activationEndDate}
+                     onChange={(e) => setDateRange({
+                       ...dateRange,
+                       activationEndDate: e.target.value
+                     })}
+                     InputLabelProps={{ shrink: true }}
+                   />
+                 </Grid>
+                 <Grid item xs={6}>
+                   <TextField
+                     fullWidth
+                     label="종료시간"
+                     type="time"
+                     value={dateRange.activationEndTime}
+                     onChange={(e) => setDateRange({
+                       ...dateRange,
+                       activationEndTime: e.target.value
+                     })}
+                     InputLabelProps={{ shrink: true }}
+                   />
+                 </Grid>
+               </Grid>
+               {!applyReceiptDate && (
+                 <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
+                   💡 접수일 미적용 시 개통일 기준으로 자동 계산됩니다.
+                 </Typography>
+               )}
+             </Grid>
+           </Grid>
+         </CardContent>
+       </Card>
 
              {/* 엑셀형 예산 데이터 테이블 */}
        <Card sx={{ mb: 3, border: '2px solid #795548' }}>

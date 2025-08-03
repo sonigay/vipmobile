@@ -14375,7 +14375,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           try {
             const metadataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: `${sheetName}!K1:M1`
+              range: `${sheetName}!K1:N1`
             });
             
             const metadata = metadataResponse.data.values || [];
@@ -14595,13 +14595,14 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     }
 
     // 메타데이터 시트에 저장 정보 추가
-    const metadataRange = `${userSheetName}!K1:M1`;
+    const metadataRange = `${userSheetName}!K1:N1`;
     const metadata = [
-      ['저장일시', '접수일범위', '개통일범위'],
+      ['저장일시', '접수일범위', '개통일범위', '접수일적용여부'],
       [
         new Date().toISOString(),
-        `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}`,
-        `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`
+        dateRange.applyReceiptDate ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` : '미적용',
+        `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`,
+        dateRange.applyReceiptDate ? '적용' : '미적용'
       ]
     ];
 
@@ -14652,10 +14653,10 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       range: `${userSheetName}!A2:I`
     });
     
-    // 메타데이터 불러오기 (K1:M1) - 메타데이터 위치 변경
+    // 메타데이터 불러오기 (K1:N1) - 메타데이터 위치 변경
     const metadataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!K1:M1`
+      range: `${userSheetName}!K1:N1`
     });
     
     const data = dataResponse.data.values || [];
