@@ -15202,7 +15202,7 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     let selectedPolicyGroups = [];
     try {
       const userSheetManagementResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        spreadsheetId: SPREADSHEET_ID,
         range: '예산_사용자시트관리!A:G'
       });
       
