@@ -200,7 +200,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         userLevel: loggedInStore?.level || 1,
         armyType: '',
         categoryType: '',
-        budgetValue: 0
+        budgetValues: Array(18).fill(0) // 18개 컬럼의 개별 값 저장
       };
     }
 
@@ -209,8 +209,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       newData[rowIndex].modelName = value;
     } else {
       // 예산 값 (1-18번 컬럼)
-      newData[rowIndex].budgetValue = parseFloat(value) || 0;
-      newData[rowIndex].securedBudget = parseFloat(value) || 0;
+      const budgetValue = parseFloat(value) || 0;
+      newData[rowIndex].budgetValues[colIndex - 1] = budgetValue;
+      newData[rowIndex].securedBudget = budgetValue;
       
       // 군/유형 매핑
       const armyType = getArmyType(colIndex);
@@ -250,7 +251,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             userLevel: loggedInStore?.level || 1,
             armyType: '',
             categoryType: '',
-            budgetValue: 0
+            budgetValues: Array(18).fill(0) // 18개 컬럼의 개별 값 저장
           };
         }
         
@@ -264,7 +265,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           } else if (currentColIndex >= 1 && currentColIndex <= 18) {
             // 예산 값 (1-18번 컬럼)
             const numValue = parseFloat(value) || 0;
-            newData[currentRowIndex].budgetValue = numValue;
+            newData[currentRowIndex].budgetValues[currentColIndex - 1] = numValue;
             newData[currentRowIndex].securedBudget = numValue;
             
             // 군/유형 매핑
@@ -772,9 +773,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 </TableRow>
               </TableHead>
               
-              <TableBody>
-                {/* 데이터 행들 (최대 30행) */}
-                {Array.from({ length: 30 }, (_, rowIndex) => (
+                             <TableBody>
+                 {/* 데이터 행들 (최대 40행) */}
+                 {Array.from({ length: 40 }, (_, rowIndex) => (
                   <TableRow key={rowIndex}>
                     {/* 모델명 셀 */}
                     <TableCell 
@@ -800,33 +801,33 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       />
                     </TableCell>
                     
-                    {/* 예산 값 셀들 (18개) */}
-                    {Array.from({ length: 18 }, (_, colIndex) => (
-                      <TableCell 
-                        key={colIndex}
-                        sx={{ 
-                          border: '1px solid #ddd',
-                          padding: '4px'
-                        }}
-                      >
-                        <TextField
-                          fullWidth
-                          size="small"
-                          type="number"
-                          value={budgetData[rowIndex]?.budgetValue || ''}
-                          onChange={(e) => handleTableDataChange(rowIndex, colIndex + 1, e.target.value)}
-                          placeholder="0"
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              fontSize: '0.8rem',
-                              '& fieldset': {
-                                border: 'none'
-                              }
-                            }
-                          }}
-                        />
-                      </TableCell>
-                    ))}
+                                         {/* 예산 값 셀들 (18개) */}
+                     {Array.from({ length: 18 }, (_, colIndex) => (
+                       <TableCell 
+                         key={colIndex}
+                         sx={{ 
+                           border: '1px solid #ddd',
+                           padding: '4px'
+                         }}
+                       >
+                         <TextField
+                           fullWidth
+                           size="small"
+                           type="number"
+                           value={budgetData[rowIndex]?.budgetValues?.[colIndex] || ''}
+                           onChange={(e) => handleTableDataChange(rowIndex, colIndex + 1, e.target.value)}
+                           placeholder="0"
+                           sx={{
+                             '& .MuiOutlinedInput-root': {
+                               fontSize: '0.8rem',
+                               '& fieldset': {
+                                 border: 'none'
+                               }
+                             }
+                           }}
+                         />
+                       </TableCell>
+                     ))}
                   </TableRow>
                 ))}
               </TableBody>
