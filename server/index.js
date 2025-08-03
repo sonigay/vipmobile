@@ -14146,7 +14146,7 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
 // 예산 대상월 관리 API
 app.get('/api/budget/month-sheets', async (req, res) => {
   try {
-    const sheets = await googleSheets.spreadsheets.values.get({
+    const sheets = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_대상월관리!A:D',
     });
@@ -14156,7 +14156,7 @@ app.get('/api/budget/month-sheets', async (req, res) => {
     // 시트가 비어있거나 헤더가 없으면 헤더 생성
     if (rows.length === 0 || !rows[0] || rows[0][0] !== '대상월') {
       const headerRow = ['대상월', '시트ID', '수정일시', '수정자'];
-      await googleSheets.spreadsheets.values.update({
+      await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: '예산_대상월관리!A1:D1',
         valueInputOption: 'RAW',
@@ -14197,7 +14197,7 @@ app.post('/api/budget/month-sheets', async (req, res) => {
     const currentTime = new Date().toISOString();
     
     // 기존 데이터 확인
-    const existingSheets = await googleSheets.spreadsheets.values.get({
+    const existingSheets = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_대상월관리!A:D',
     });
@@ -14207,7 +14207,7 @@ app.post('/api/budget/month-sheets', async (req, res) => {
     
     if (existingRowIndex > 0) { // 0은 헤더
       // 기존 데이터 업데이트
-      await googleSheets.spreadsheets.values.update({
+      await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: `예산_대상월관리!B${existingRowIndex + 1}:D${existingRowIndex + 1}`,
         valueInputOption: 'RAW',
@@ -14217,7 +14217,7 @@ app.post('/api/budget/month-sheets', async (req, res) => {
       });
     } else {
       // 새 데이터 추가
-      await googleSheets.spreadsheets.values.append({
+      await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: '예산_대상월관리!A:D',
         valueInputOption: 'RAW',
@@ -14240,7 +14240,7 @@ app.delete('/api/budget/month-sheets/:month', async (req, res) => {
     const { month } = req.params;
     
     // 기존 데이터 확인
-    const existingSheets = await googleSheets.spreadsheets.values.get({
+    const existingSheets = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_대상월관리!A:D',
     });
@@ -14253,7 +14253,7 @@ app.delete('/api/budget/month-sheets/:month', async (req, res) => {
     }
 
     // 행 삭제
-    await googleSheets.spreadsheets.batchUpdate({
+    await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
       resource: {
         requests: [
@@ -14281,7 +14281,7 @@ app.delete('/api/budget/month-sheets/:month', async (req, res) => {
 // 시트 이름으로 시트 ID를 가져오는 헬퍼 함수
 async function getSheetIdByName(sheetName) {
   try {
-    const response = await googleSheets.spreadsheets.get({
+    const response = await sheets.spreadsheets.get({
       spreadsheetId: SPREADSHEET_ID
     });
     

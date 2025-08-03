@@ -65,14 +65,27 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   useEffect(() => {
     setShowUpdatePopup(true);
     
-    // 권한 레벨 확인 - R열의 권한 레벨 확인
-    const userRole = loggedInStore?.agentInfo?.userRole || '';
-    console.log('예산모드 권한 확인:', { userRole, loggedInStore });
+    // 권한 레벨 확인 - 다양한 필드에서 SS 레벨 확인
+    const userRole = loggedInStore?.userRole || loggedInStore?.agentInfo?.userRole || loggedInStore?.level || '';
+    console.log('예산모드 권한 확인:', { 
+      userRole, 
+      loggedInStore,
+      userRole_direct: loggedInStore?.userRole,
+      agentInfo: loggedInStore?.agentInfo,
+      level: loggedInStore?.level
+    });
     setCanEditSheetId(userRole === 'SS');
     
     // 구글시트에서 월별 시트 ID 매핑 불러오기
     loadMonthSheetMappings();
   }, [loggedInStore]);
+
+  // 업데이트 팝업 강제 열기
+  const handleForceShowUpdatePopup = () => {
+    // "오늘 하루 보지 않기" 설정을 임시로 제거
+    localStorage.removeItem(`hideUpdate_budget`);
+    setShowUpdatePopup(true);
+  };
 
   // 구글시트에서 월별 시트 ID 매핑 불러오기
   const loadMonthSheetMappings = async () => {
@@ -251,7 +264,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
             ⚙️ 월별 시트 설정
           </Typography>
-          <Grid container spacing={2} alignItems="center">
+          <Grid container spacing={2} alignItems="flex-end">
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
@@ -352,7 +365,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           
           {!canEditSheetId && (
             <Alert severity="info" sx={{ mt: 1 }}>
-              현재 사용자 권한: {loggedInStore?.agentInfo?.userRole || 'Unknown'} - 시트 ID 수정 권한이 없습니다.
+              현재 사용자 권한: {loggedInStore?.userRole || loggedInStore?.agentInfo?.userRole || loggedInStore?.level || 'Unknown'} - 시트 ID 수정 권한이 없습니다.
             </Alert>
           )}
         </CardContent>
@@ -519,21 +532,21 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Button>
           )}
           
-          {/* 업데이트 확인 버튼 */}
-          <Button
-            color="inherit"
-            startIcon={<UpdateIcon />}
-            onClick={() => setShowUpdatePopup(true)}
-            sx={{ 
-              mr: 2,
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.2)'
-              }
-            }}
-          >
-            업데이트 확인
-          </Button>
+                     {/* 업데이트 확인 버튼 */}
+           <Button
+             color="inherit"
+             startIcon={<UpdateIcon />}
+             onClick={handleForceShowUpdatePopup}
+             sx={{ 
+               mr: 2,
+               backgroundColor: 'rgba(255,255,255,0.1)',
+               '&:hover': {
+                 backgroundColor: 'rgba(255,255,255,0.2)'
+               }
+             }}
+           >
+             업데이트 확인
+           </Button>
           
           <Button color="inherit" onClick={onLogout}>
             로그아웃
