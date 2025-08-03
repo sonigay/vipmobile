@@ -493,4 +493,45 @@ export const budgetMonthSheetAPI = {
     }
     return response.json();
   },
+};
+
+export const budgetUserSheetAPI = {
+  // 사용자별 시트 목록 조회
+  getUserSheets: async (userId) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets?userId=${userId}`);
+    if (!response.ok) {
+      throw new Error('사용자 시트 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 사용자별 시트 생성
+  createUserSheet: async (userId, userName) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, userName }),
+    });
+    if (!response.ok) {
+      throw new Error('사용자 시트 생성에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 예산 데이터 저장
+  saveBudgetData: async (sheetId, data, dateRange) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data, dateRange }),
+    });
+    if (!response.ok) {
+      throw new Error('예산 데이터 저장에 실패했습니다.');
+    }
+    return response.json();
+  },
 }; 

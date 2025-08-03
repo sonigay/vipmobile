@@ -14146,12 +14146,13 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
 // 예산 대상월 관리 API
 app.get('/api/budget/month-sheets', async (req, res) => {
   try {
-    const sheets = await sheets.spreadsheets.values.get({
+    const sheets = google.sheets({ version: 'v4', auth });
+    const sheetsData = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_대상월관리!A:D',
     });
 
-    const rows = sheets.data.values || [];
+    const rows = sheetsData.data.values || [];
     
     // 시트가 비어있거나 헤더가 없으면 헤더 생성
     if (rows.length === 0 || !rows[0] || rows[0][0] !== '대상월') {
@@ -14197,6 +14198,7 @@ app.post('/api/budget/month-sheets', async (req, res) => {
     const currentTime = new Date().toISOString();
     
     // 기존 데이터 확인
+    const sheets = google.sheets({ version: 'v4', auth });
     const existingSheets = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_대상월관리!A:D',
@@ -14240,6 +14242,7 @@ app.delete('/api/budget/month-sheets/:month', async (req, res) => {
     const { month } = req.params;
     
     // 기존 데이터 확인
+    const sheets = google.sheets({ version: 'v4', auth });
     const existingSheets = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_대상월관리!A:D',
@@ -14281,6 +14284,7 @@ app.delete('/api/budget/month-sheets/:month', async (req, res) => {
 // 시트 이름으로 시트 ID를 가져오는 헬퍼 함수
 async function getSheetIdByName(sheetName) {
   try {
+    const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.get({
       spreadsheetId: SPREADSHEET_ID
     });
@@ -14292,6 +14296,193 @@ async function getSheetIdByName(sheetName) {
     return null;
   }
 }
+
+// 사용자별 예산 시트 관리 API
+app.get('/api/budget/user-sheets', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 사용자별 시트 목록 조회 (예산_사용자시트관리 시트에서)
+    const sheetsData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_사용자시트관리!A:E',
+    });
+
+    const rows = sheetsData.data.values || [];
+    
+    // 시트가 비어있거나 헤더가 없으면 헤더 생성
+    if (rows.length === 0 || !rows[0] || rows[0][0] !== '사용자ID') {
+      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자'];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_사용자시트관리!A1:E1',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [headerRow]
+        }
+      });
+      return res.json([]);
+    }
+
+    if (rows.length <= 1) {
+      return res.json([]);
+    }
+
+    // 해당 사용자의 시트만 필터링
+    const userSheets = rows.slice(1)
+      .filter(row => row[0] === userId)
+      .map(row => ({
+        id: row[1] || '',
+        name: row[2] || '',
+        createdAt: row[3] || '',
+        createdBy: row[4] || ''
+      }));
+
+    res.json(userSheets);
+  } catch (error) {
+    console.error('사용자별 시트 조회 오류:', error);
+    res.status(500).json({ error: '사용자별 시트 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+app.post('/api/budget/user-sheets', async (req, res) => {
+  try {
+    const { userId, userName } = req.body;
+    
+    if (!userId || !userName) {
+      return res.status(400).json({ error: '사용자 ID와 이름은 필수입니다.' });
+    }
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    const currentTime = new Date().toISOString();
+    const sheetName = `${userName}_예산데이터_${currentTime.split('T')[0]}`;
+    
+    // 새 Google Sheets 문서 생성
+    const newSpreadsheet = await sheets.spreadsheets.create({
+      resource: {
+        properties: {
+          title: sheetName
+        },
+        sheets: [
+          {
+            properties: {
+              title: '예산데이터',
+              gridProperties: {
+                rowCount: 1000,
+                columnCount: 20
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    const newSheetId = newSpreadsheet.data.spreadsheetId;
+    
+    // 헤더 추가
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: newSheetId,
+      range: '예산데이터!A1:H1',
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['적용일', '입력자(권한레벨)', '모델명', '군/유형', '확보된 예산', '사용된 예산', '예산 잔액', '상태']]
+      }
+    });
+
+    // 사용자별 시트 관리 시트에 정보 추가
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_사용자시트관리!A:E',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [[userId, newSheetId, sheetName, currentTime, userName]]
+      }
+    });
+
+    const newSheet = {
+      id: newSheetId,
+      name: sheetName,
+      createdAt: currentTime,
+      createdBy: userName
+    };
+
+    res.json({ 
+      message: '사용자별 시트가 생성되었습니다.',
+      sheet: newSheet
+    });
+  } catch (error) {
+    console.error('사용자별 시트 생성 오류:', error);
+    res.status(500).json({ error: '사용자별 시트 생성 중 오류가 발생했습니다.' });
+  }
+});
+
+app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
+  try {
+    const { sheetId } = req.params;
+    const { data, dateRange } = req.body;
+    
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({ error: '저장할 데이터가 없습니다.' });
+    }
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 데이터를 시트에 저장할 형식으로 변환
+    const rowsToSave = data.map(item => [
+      item.appliedDate,
+      `${item.inputUser}(레벨${item.userLevel})`,
+      item.modelName,
+      `${item.armyType} ${item.categoryType}`,
+      item.securedBudget,
+      item.usedBudget,
+      item.remainingBudget,
+      item.status
+    ]);
+
+    // 기존 데이터 지우기 (헤더 제외)
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: sheetId,
+      range: '예산데이터!A2:H'
+    });
+
+    // 새 데이터 추가
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: '예산데이터!A2',
+      valueInputOption: 'RAW',
+      resource: {
+        values: rowsToSave
+      }
+    });
+
+    // 메타데이터 시트에 저장 정보 추가
+    const metadataRange = '예산데이터!J1:L1';
+    const metadata = [
+      ['저장일시', '접수일범위', '개통일범위'],
+      [
+        new Date().toISOString(),
+        `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}`,
+        `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`
+      ]
+    ];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: metadataRange,
+      valueInputOption: 'RAW',
+      resource: {
+        values: metadata
+      }
+    });
+
+    res.json({ message: '예산 데이터가 저장되었습니다.' });
+  } catch (error) {
+    console.error('예산 데이터 저장 오류:', error);
+    res.status(500).json({ error: '예산 데이터 저장 중 오류가 발생했습니다.' });
+  }
+});
 
 // 정책 알림 생성 함수
 async function createPolicyNotification(policyId, userId, notificationType, approvalStatus = null) {
