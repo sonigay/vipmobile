@@ -3538,6 +3538,113 @@ function isDateInRange(date, startDate, endDate) {
   return targetDate >= start && targetDate <= end;
 }
 
+// 사용예산 계산 함수
+async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName) {
+  const sheets = google.sheets({ version: 'v4', auth });
+  
+  // 폰클개통데이터 시트에서 데이터 가져오기
+  const activationData = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: '폰클개통데이터!A:Z', // 충분한 컬럼 범위
+  });
+  
+  const activationRows = activationData.data.values || [];
+  
+  // 사용예산 계산 및 C열 업데이트
+  let totalUsedBudget = 0;
+  const calculatedData = [];
+  const updateRequests = [];
+  
+  activationRows.slice(1).forEach((row, index) => { // 헤더 제외
+    if (row.length >= 20) { // 최소 20개 컬럼 필요
+      const policyGroup = row[4]; // E열: 정책그룹
+      const armyType = row[3]; // D열: 정책군
+      const categoryType = row[19]; // T열: 유형
+      const currentBudgetValue = parseFloat(row[2]) || 0; // C열: 현재 예산값
+      
+      // 날짜 데이터 정규화
+      const receptionDate = normalizeReceptionDate(row[5]); // F열: 접수일
+      const activationDate = normalizeActivationDate(row[9], row[10], row[11]); // J, K, L열: 개통일
+      
+      // 정책그룹 매칭
+      if (selectedPolicyGroups.includes(policyGroup)) {
+        // 날짜 범위 필터링
+        let isInDateRange = true;
+        if (dateRange && dateRange.startDate && dateRange.endDate) {
+          // 접수일 또는 개통일이 범위에 있는지 확인
+          const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.startDate, dateRange.endDate) : false;
+          const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.startDate, dateRange.endDate) : false;
+          isInDateRange = receptionInRange || activationInRange;
+        }
+        
+        if (isInDateRange) {
+          // 정책군 매핑 (S군="S", A군="A")
+          let mappedArmyType = '';
+          if (armyType === 'S') mappedArmyType = 'S군';
+          else if (armyType === 'A') mappedArmyType = 'A군';
+          else mappedArmyType = armyType; // 기타 경우 그대로 사용
+          
+          // 유형 매핑 (기변 -> 보상)
+          let mappedCategoryType = categoryType;
+          if (categoryType === '기변') mappedCategoryType = '보상';
+          
+          // 기본 예산값 설정 (정책그룹별로 다를 수 있음)
+          let calculatedBudgetValue = 40000; // 기본값 4만원
+          
+          // 매핑된 데이터 저장
+          calculatedData.push({
+            rowIndex: index + 2, // 실제 행 번호 (헤더 제외)
+            policyGroup,
+            armyType: mappedArmyType,
+            categoryType: mappedCategoryType,
+            budgetValue: calculatedBudgetValue,
+            receptionDate: receptionDate ? receptionDate.toISOString() : null,
+            activationDate: activationDate ? activationDate.toISOString() : null
+          });
+          
+          totalUsedBudget += calculatedBudgetValue;
+          
+          // C열 업데이트 요청 추가
+          updateRequests.push({
+            range: `폰클개통데이터!C${index + 2}`,
+            values: [[calculatedBudgetValue]]
+          });
+        } else {
+          // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정
+          updateRequests.push({
+            range: `폰클개통데이터!C${index + 2}`,
+            values: [[0]]
+          });
+        }
+      } else {
+        // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정
+        updateRequests.push({
+          range: `폰클개통데이터!C${index + 2}`,
+          values: [[0]]
+        });
+      }
+    }
+  });
+  
+  // 폰클개통데이터 시트의 C열 일괄 업데이트
+  if (updateRequests.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId,
+      resource: {
+        valueInputOption: 'RAW',
+        data: updateRequests
+      }
+    });
+  }
+  
+  return {
+    totalUsedBudget,
+    calculatedData,
+    updatedRows: updateRequests.length,
+    message: '사용예산 계산이 완료되었습니다.'
+  };
+}
+
 // 사용예산 계산 API
 app.post('/api/budget/calculate-usage', async (req, res) => {
   try {
@@ -3547,109 +3654,8 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
       return res.status(400).json({ error: '필수 파라미터가 누락되었습니다.' });
     }
     
-    const sheets = google.sheets({ version: 'v4', auth });
-    
-    // 폰클개통데이터 시트에서 데이터 가져오기
-    const activationData = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: '폰클개통데이터!A:Z', // 충분한 컬럼 범위
-    });
-    
-    const activationRows = activationData.data.values || [];
-    
-    // 사용예산 계산 및 C열 업데이트
-    let totalUsedBudget = 0;
-    const calculatedData = [];
-    const updateRequests = [];
-    
-    activationRows.slice(1).forEach((row, index) => { // 헤더 제외
-      if (row.length >= 20) { // 최소 20개 컬럼 필요
-        const policyGroup = row[4]; // E열: 정책그룹
-        const armyType = row[3]; // D열: 정책군
-        const categoryType = row[19]; // T열: 유형
-        const currentBudgetValue = parseFloat(row[2]) || 0; // C열: 현재 예산값
-        
-        // 날짜 데이터 정규화
-        const receptionDate = normalizeReceptionDate(row[5]); // F열: 접수일
-        const activationDate = normalizeActivationDate(row[9], row[10], row[11]); // J, K, L열: 개통일
-        
-        // 정책그룹 매칭
-        if (selectedPolicyGroups.includes(policyGroup)) {
-          // 날짜 범위 필터링
-          let isInDateRange = true;
-          if (dateRange && dateRange.startDate && dateRange.endDate) {
-            // 접수일 또는 개통일이 범위에 있는지 확인
-            const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.startDate, dateRange.endDate) : false;
-            const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.startDate, dateRange.endDate) : false;
-            isInDateRange = receptionInRange || activationInRange;
-          }
-          
-          if (isInDateRange) {
-            // 정책군 매핑 (S군="S", A군="A")
-            let mappedArmyType = '';
-            if (armyType === 'S') mappedArmyType = 'S군';
-            else if (armyType === 'A') mappedArmyType = 'A군';
-            else mappedArmyType = armyType; // 기타 경우 그대로 사용
-            
-            // 유형 매핑 (기변 -> 보상)
-            let mappedCategoryType = categoryType;
-            if (categoryType === '기변') mappedCategoryType = '보상';
-            
-            // 기본 예산값 설정 (정책그룹별로 다를 수 있음)
-            let calculatedBudgetValue = 40000; // 기본값 4만원
-            
-            // 매핑된 데이터 저장
-            calculatedData.push({
-              rowIndex: index + 2, // 실제 행 번호 (헤더 제외)
-              policyGroup,
-              armyType: mappedArmyType,
-              categoryType: mappedCategoryType,
-              budgetValue: calculatedBudgetValue,
-              receptionDate: receptionDate ? receptionDate.toISOString() : null,
-              activationDate: activationDate ? activationDate.toISOString() : null
-            });
-            
-            totalUsedBudget += calculatedBudgetValue;
-            
-            // C열 업데이트 요청 추가
-            updateRequests.push({
-              range: `폰클개통데이터!C${index + 2}`,
-              values: [[calculatedBudgetValue]]
-            });
-          } else {
-            // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정
-            updateRequests.push({
-              range: `폰클개통데이터!C${index + 2}`,
-              values: [[0]]
-            });
-          }
-        } else {
-          // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정
-          updateRequests.push({
-            range: `폰클개통데이터!C${index + 2}`,
-            values: [[0]]
-          });
-        }
-      }
-    });
-    
-    // 폰클개통데이터 시트의 C열 일괄 업데이트
-    if (updateRequests.length > 0) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: sheetId,
-        resource: {
-          valueInputOption: 'RAW',
-          data: updateRequests
-        }
-      });
-    }
-    
-    res.json({
-      totalUsedBudget,
-      calculatedData,
-      updatedRows: updateRequests.length,
-      message: '사용예산 계산 및 C열 업데이트가 완료되었습니다.'
-    });
+    const result = await calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName);
+    res.json(result);
     
   } catch (error) {
     console.error('사용예산 계산 오류:', error);
@@ -14653,19 +14659,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     
     // 먼저 폰클개통데이터 C열 업데이트
-    const calculateResponse = await fetch(`${req.protocol}://${req.get('host')}/api/budget/calculate-usage`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ sheetId, selectedPolicyGroups, dateRange, userName }),
-    });
-    
-    if (!calculateResponse.ok) {
-      throw new Error('사용예산 계산에 실패했습니다.');
-    }
-    
-    const calculateResult = await calculateResponse.json();
+    const calculateResult = await calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName);
     
     // 사용자 시트에서 데이터 가져오기
     const userSheetData = await sheets.spreadsheets.values.get({
