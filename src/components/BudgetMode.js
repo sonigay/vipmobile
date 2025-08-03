@@ -171,10 +171,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setSheetId(''); // 새로운 월이면 빈 값으로 초기화
     }
     
-    // 대상월이 변경되면 저장된 데이터 목록도 새로고침
-    if (showSheetList) {
-      loadUserSheets();
-    }
+    // 대상월이 변경되면 저장된 데이터 목록도 새로고침 (목록이 보이는 상태가 아니어도 새로고침)
+    loadUserSheets();
   };
 
   // 시트 ID 저장
