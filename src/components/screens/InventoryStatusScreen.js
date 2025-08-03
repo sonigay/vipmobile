@@ -179,7 +179,7 @@ const InventoryStatusScreen = () => {
 
   useEffect(() => {
     loadData();
-  }, [activeTab, filters]);
+  }, [activeTab, filters, operationModelOrder]);
 
   // 필터 변경 핸들러
   const handleFilterChange = (field, value) => {
