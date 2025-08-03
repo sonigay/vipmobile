@@ -62,6 +62,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [monthSheetMappings, setMonthSheetMappings] = useState({}); // 월별 시트 ID 매핑
   const [detailedMonthData, setDetailedMonthData] = useState({}); // 상세 데이터 (수정일시, 수정자 포함)
   
+  // 저장된 데이터 목록 관련 상태
+  const [userSheets, setUserSheets] = useState([]);
+  const [showSheetList, setShowSheetList] = useState(false);
+  
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
     receiptStartDate: '',
@@ -95,6 +99,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     
     // 구글시트에서 월별 시트 ID 매핑 불러오기
     loadMonthSheetMappings();
+    
+    // 사용자 시트 목록 불러오기
+    loadUserSheets();
   }, [loggedInStore]);
 
   // 업데이트 팝업 강제 열기
@@ -123,6 +130,18 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('월별 시트 ID 로드 실패:', error);
       setSnackbar({ open: true, message: '월별 시트 ID 로드에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 사용자 시트 목록 불러오기
+  const loadUserSheets = async () => {
+    try {
+      const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
+      const data = await budgetUserSheetAPI.getUserSheets(userId);
+      setUserSheets(data);
+    } catch (error) {
+      console.error('사용자 시트 목록 로드 실패:', error);
+      setSnackbar({ open: true, message: '저장된 데이터 목록 로드에 실패했습니다.', severity: 'error' });
     }
   };
 
@@ -311,6 +330,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       await autoSaveToUserSheet(budgetData);
       setSnackbar({ open: true, message: '데이터가 성공적으로 저장되었습니다.', severity: 'success' });
+      
+      // 저장 후 사용자 시트 목록 새로고침
+      await loadUserSheets();
     } catch (error) {
       setSnackbar({ open: true, message: '저장에 실패했습니다.', severity: 'error' });
     } finally {
@@ -846,12 +868,116 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </CardContent>
       </Card>
 
-      {/* 로딩 상태 */}
-      {isProcessing && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress sx={{ color: '#795548' }} />
-        </Box>
-      )}
+             {/* 저장된 데이터 목록 */}
+       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+         <CardContent>
+           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+             <Typography variant="h6" sx={{ color: '#795548' }}>
+               📋 저장된 데이터 목록
+             </Typography>
+             <Button
+               variant="outlined"
+               size="small"
+               onClick={() => {
+                 setShowSheetList(!showSheetList);
+                 if (!showSheetList) {
+                   loadUserSheets();
+                 }
+               }}
+               sx={{ borderColor: '#795548', color: '#795548' }}
+             >
+               {showSheetList ? '숨기기' : '보기'}
+             </Button>
+           </Box>
+           
+           {showSheetList && (
+             <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+               <Table size="small">
+                 <TableHead>
+                   <TableRow>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       시트명
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       확보예산
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       사용예산
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       예산잔액
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       항목수
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       마지막수정
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       작업
+                     </TableCell>
+                   </TableRow>
+                 </TableHead>
+                 <TableBody>
+                   {userSheets.length === 0 ? (
+                     <TableRow>
+                       <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
+                         저장된 데이터가 없습니다.
+                       </TableCell>
+                     </TableRow>
+                   ) : (
+                     userSheets.map((sheet, index) => (
+                       <TableRow key={index} hover>
+                         <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                           {sheet.name}
+                         </TableCell>
+                         <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
+                           {sheet.summary?.totalSecuredBudget?.toLocaleString() || '0'}
+                         </TableCell>
+                         <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
+                           {sheet.summary?.totalUsedBudget?.toLocaleString() || '0'}
+                         </TableCell>
+                         <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
+                           {sheet.summary?.totalRemainingBudget?.toLocaleString() || '0'}
+                         </TableCell>
+                         <TableCell sx={{ fontSize: '0.8rem' }}>
+                           {sheet.summary?.itemCount || '0'}
+                         </TableCell>
+                         <TableCell sx={{ fontSize: '0.8rem' }}>
+                           {sheet.summary?.lastUpdated ? 
+                             new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
+                             new Date(sheet.createdAt).toLocaleString('ko-KR')
+                           }
+                         </TableCell>
+                         <TableCell>
+                           <Button
+                             size="small"
+                             variant="outlined"
+                             onClick={() => {
+                               // TODO: 데이터 불러오기 기능 구현
+                               setSnackbar({ open: true, message: '데이터 불러오기 기능은 준비중입니다.', severity: 'info' });
+                             }}
+                             sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
+                           >
+                             불러오기
+                           </Button>
+                         </TableCell>
+                       </TableRow>
+                     ))
+                   )}
+                 </TableBody>
+               </Table>
+             </TableContainer>
+           )}
+         </CardContent>
+       </Card>
+
+       {/* 로딩 상태 */}
+       {isProcessing && (
+         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+           <CircularProgress sx={{ color: '#795548' }} />
+         </Box>
+       )}
     </Box>
   );
 

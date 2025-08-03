@@ -14329,15 +14329,76 @@ app.get('/api/budget/user-sheets', async (req, res) => {
       return res.json([]);
     }
 
-    // 해당 사용자의 시트만 필터링
-    const userSheets = rows.slice(1)
-      .filter(row => row[0] === userId)
-      .map(row => ({
-        id: row[1] || '',
-        name: row[2] || '',
-        createdAt: row[3] || '',
-        createdBy: row[4] || ''
-      }));
+    // 해당 사용자의 시트만 필터링하고 예산 데이터 요약 정보 추가
+    const userSheets = [];
+    
+    for (const row of rows.slice(1)) {
+      if (row[0] === userId) {
+        const sheetId = row[1] || '';
+        const sheetName = row[2] || '';
+        const createdAt = row[3] || '';
+        const createdBy = row[4] || '';
+        
+        // 각 시트의 예산 데이터 요약 정보 가져오기
+        let summary = {
+          totalSecuredBudget: 0,
+          totalUsedBudget: 0,
+          totalRemainingBudget: 0,
+          itemCount: 0,
+          lastUpdated: ''
+        };
+        
+        try {
+          // 시트에서 데이터 불러오기 (A2:I)
+          const dataResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: `${sheetName}!A2:I`
+          });
+          
+          const data = dataResponse.data.values || [];
+          
+          // 요약 정보 계산
+          data.forEach(row => {
+            if (row.length >= 9) {
+              const securedBudget = parseFloat(row[5]) || 0;
+              const usedBudget = parseFloat(row[6]) || 0;
+              const remainingBudget = parseFloat(row[7]) || 0;
+              
+              summary.totalSecuredBudget += securedBudget;
+              summary.totalUsedBudget += usedBudget;
+              summary.totalRemainingBudget += remainingBudget;
+              summary.itemCount++;
+            }
+          });
+          
+          // 메타데이터에서 마지막 업데이트 시간 가져오기
+          try {
+            const metadataResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: `${sheetName}!K1:M1`
+            });
+            
+            const metadata = metadataResponse.data.values || [];
+            if (metadata.length >= 2 && metadata[1].length >= 1) {
+              summary.lastUpdated = metadata[1][0] || '';
+            }
+          } catch (metadataError) {
+            console.log('메타데이터 조회 실패:', metadataError.message);
+          }
+          
+        } catch (dataError) {
+          console.log(`시트 ${sheetName} 데이터 조회 실패:`, dataError.message);
+        }
+        
+        userSheets.push({
+          id: sheetId,
+          name: sheetName,
+          createdAt,
+          createdBy,
+          summary
+        });
+      }
+    }
 
     res.json(userSheets);
   } catch (error) {
@@ -14487,36 +14548,54 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     const userSheetName = `액면_${userName}`;
     
-    // 데이터를 시트에 저장할 형식으로 변환
-    const rowsToSave = data.map(item => [
-      item.appliedDate,
-      `${item.inputUser}(레벨${item.userLevel})`,
-      item.modelName,
-      `${item.armyType} ${item.categoryType}`,
-      item.securedBudget,
-      item.usedBudget,
-      item.remainingBudget,
-      item.status
-    ]);
+    // 데이터를 사용자가 원하는 형식으로 변환
+    // 각 모델별로 군/유형별 데이터를 개별 행으로 분리
+    const rowsToSave = [];
+    
+    data.forEach(item => {
+      if (item.modelName && item.budgetValues) {
+        // 18개 컬럼의 예산 값을 각각 개별 행으로 저장
+        item.budgetValues.forEach((budgetValue, index) => {
+          if (budgetValue > 0) { // 값이 있는 경우만 저장
+            const armyType = getArmyType(index + 1);
+            const categoryType = getCategoryType(index + 1);
+            
+            rowsToSave.push([
+              `${item.appliedDate}`, // 적용일
+              `${userName}(레벨${item.userLevel || 1})`, // 입력자(권한레벨)
+              item.modelName, // 모델명
+              armyType, // 군
+              categoryType, // 유형
+              budgetValue, // 확보된 예산
+              0, // 사용된 예산 (초기값)
+              budgetValue, // 예산 잔액 (초기값)
+              '정상' // 상태
+            ]);
+          }
+        });
+      }
+    });
 
     // 기존 데이터 지우기 (헤더 제외)
     await sheets.spreadsheets.values.clear({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!A2:H`
+      range: `${userSheetName}!A2:I`
     });
 
     // 새 데이터 추가
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: `${userSheetName}!A2`,
-      valueInputOption: 'RAW',
-      resource: {
-        values: rowsToSave
-      }
-    });
+    if (rowsToSave.length > 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!A2`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: rowsToSave
+        }
+      });
+    }
 
     // 메타데이터 시트에 저장 정보 추가
-    const metadataRange = `${userSheetName}!J1:L1`;
+    const metadataRange = `${userSheetName}!K1:M1`;
     const metadata = [
       ['저장일시', '접수일범위', '개통일범위'],
       [
@@ -14542,6 +14621,18 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   }
 });
 
+// 군별 타입 매핑 함수
+function getArmyType(columnIndex) {
+  const armyTypes = ['S군', 'S군', 'S군', 'A군', 'A군', 'A군', 'B군', 'B군', 'B군', 'C군', 'C군', 'C군', 'D군', 'D군', 'D군', 'E군', 'E군', 'E군'];
+  return armyTypes[columnIndex - 1] || 'Unknown';
+}
+
+// 카테고리 타입 매핑 함수
+function getCategoryType(columnIndex) {
+  const categoryTypes = ['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상'];
+  return categoryTypes[columnIndex - 1] || 'Unknown';
+}
+
 // 예산 데이터 불러오기 API
 app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
@@ -14555,35 +14646,30 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     
     const userSheetName = `액면_${userName}`;
     
-    // 데이터 불러오기 (A2:H)
+    // 데이터 불러오기 (A2:I) - 새로운 형식에 맞춰 9개 컬럼
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!A2:H`
+      range: `${userSheetName}!A2:I`
     });
     
-    // 메타데이터 불러오기 (J1:L1)
+    // 메타데이터 불러오기 (K1:M1) - 메타데이터 위치 변경
     const metadataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!J1:L1`
+      range: `${userSheetName}!K1:M1`
     });
     
     const data = dataResponse.data.values || [];
     const metadata = metadataResponse.data.values || [];
     
-    // 데이터 파싱
+    // 데이터 파싱 - 새로운 형식에 맞춰 수정
     const parsedData = data.map((row, index) => {
-      if (row.length >= 8) {
-        const [appliedDate, inputUserInfo, modelName, armyCategoryType, securedBudget, usedBudget, remainingBudget, status] = row;
+      if (row.length >= 9) {
+        const [appliedDate, inputUserInfo, modelName, armyType, categoryType, securedBudget, usedBudget, remainingBudget, status] = row;
         
         // 입력자 정보 파싱 (예: "홍길동(레벨3)" -> "홍길동", "3")
         const userMatch = inputUserInfo.match(/^(.+?)\(레벨(\d+)\)$/);
         const inputUser = userMatch ? userMatch[1] : inputUserInfo;
         const userLevel = userMatch ? parseInt(userMatch[2]) : 1;
-        
-        // 군/유형 파싱 (예: "A군 신규" -> "A군", "신규")
-        const typeMatch = armyCategoryType.match(/^(.+?)\s+(.+)$/);
-        const armyType = typeMatch ? typeMatch[1] : armyCategoryType;
-        const categoryType = typeMatch ? typeMatch[2] : '';
         
         return {
           id: `loaded-${index}`,
