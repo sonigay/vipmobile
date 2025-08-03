@@ -290,6 +290,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       console.log('Loaded budget data result:', result);
       console.log('Parsed data:', result.data);
+      console.log('First few items with budget values:', result.data?.slice(0, 3).map(item => ({
+        id: item.id,
+        modelName: item.modelName,
+        securedBudget: { value: item.securedBudget, type: typeof item.securedBudget },
+        usedBudget: { value: item.usedBudget, type: typeof item.usedBudget },
+        remainingBudget: { value: item.remainingBudget, type: typeof item.remainingBudget }
+      })));
       
       // 데이터를 화면에 설정
       setBudgetData(result.data || []);

@@ -15160,6 +15160,13 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
           return isNaN(parsed) ? 0 : parsed;
         };
 
+        // 디버깅을 위한 로그 추가
+        console.log(`Row ${index + 2} parsing:`, {
+          securedBudget: { original: securedBudget, parsed: parseBudgetValue(securedBudget) },
+          usedBudget: { original: usedBudget, parsed: parseBudgetValue(usedBudget) },
+          remainingBudget: { original: remainingBudget, parsed: parseBudgetValue(remainingBudget) }
+        });
+
         return {
           id: `loaded-${index}`,
           appliedDate,
