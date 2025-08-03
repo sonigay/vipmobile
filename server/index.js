@@ -15204,9 +15204,38 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       }
     }
     
+    // 정책그룹 정보 가져오기 - "예산_사용자시트관리" 시트에서
+    let selectedPolicyGroups = [];
+    try {
+      const userSheetManagementResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: '예산_사용자시트관리!A:G'
+      });
+      
+      const userSheetManagementData = userSheetManagementResponse.data.values || [];
+      if (userSheetManagementData.length > 1) {
+        // 헤더 제외하고 데이터 검색
+        for (let i = 1; i < userSheetManagementData.length; i++) {
+          const row = userSheetManagementData[i];
+          if (row.length >= 7 && row[1] === userName && row[0] === sheetId) {
+            // G열에 정책그룹 정보가 저장되어 있음
+            const policyGroupsStr = row[6] || '';
+            if (policyGroupsStr) {
+              selectedPolicyGroups = policyGroupsStr.split(',').map(group => group.trim()).filter(group => group);
+            }
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('정책그룹 정보 불러오기 실패:', error);
+      // 정책그룹 정보 불러오기 실패는 전체 API 실패로 처리하지 않음
+    }
+    
     res.json({ 
       data: parsedData, 
       dateRange,
+      selectedPolicyGroups,
       metadata: metadata.length >= 2 ? metadata[1] : []
     });
   } catch (error) {

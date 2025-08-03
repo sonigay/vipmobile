@@ -251,38 +251,65 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   };
 
-  // 사용예산 계산
-  const handleCalculateUsage = async () => {
-    if (!sheetId || selectedPolicyGroups.length === 0) {
-      setSnackbar({ open: true, message: '시트 ID와 정책그룹을 선택해주세요.', severity: 'warning' });
-      return;
-    }
 
+
+  // 저장된 사용자 시트 데이터 불러오기
+  const handleLoadUserSheet = async (sheet) => {
     try {
+      setIsProcessing(true);
       const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
       
-      // 날짜 범위를 서버가 기대하는 형식으로 변환
-      const serverDateRange = {
-        startDate: applyReceiptDate && dateRange.receiptStartDate 
-          ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` 
-          : `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
-        endDate: applyReceiptDate && dateRange.receiptEndDate 
-          ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` 
-          : `${dateRange.activationEndDate} ${dateRange.activationEndTime}`
-      };
+      const result = await budgetUserSheetAPI.loadBudgetData(sheet.sheetId, userName);
       
-      const result = await budgetPolicyGroupAPI.calculateUsage(sheetId, selectedPolicyGroups, serverDateRange, userName);
+      // 데이터를 화면에 설정
+      setBudgetData(result.data || []);
       
-      setSnackbar({ 
-        open: true, 
-        message: `사용예산 계산 완료: ${result.totalUsedBudget.toLocaleString()}원`, 
-        severity: 'success' 
-      });
+      // 날짜 범위 설정
+      if (result.dateRange) {
+        const { receiptStartDate, receiptEndDate, activationStartDate, activationEndDate } = result.dateRange;
+        
+        // 날짜와 시간 분리
+        const receiptStartMatch = receiptStartDate?.match(/^(.+?)\s+(.+)$/);
+        const receiptEndMatch = receiptEndDate?.match(/^(.+?)\s+(.+)$/);
+        const activationStartMatch = activationStartDate?.match(/^(.+?)\s+(.+)$/);
+        const activationEndMatch = activationEndDate?.match(/^(.+?)\s+(.+)$/);
+        
+        setDateRange({
+          receiptStartDate: receiptStartMatch ? receiptStartMatch[1] : '',
+          receiptStartTime: receiptStartMatch ? receiptStartMatch[2] : '10:00',
+          receiptEndDate: receiptEndMatch ? receiptEndMatch[1] : '',
+          receiptEndTime: receiptEndMatch ? receiptEndMatch[2] : '23:59',
+          activationStartDate: activationStartMatch ? activationStartMatch[1] : '',
+          activationStartTime: activationStartMatch ? activationStartMatch[2] : '10:00',
+          activationEndDate: activationEndMatch ? activationEndMatch[1] : '',
+          activationEndTime: activationEndMatch ? activationEndMatch[2] : '23:59'
+        });
+      }
       
-      console.log('계산 결과:', result);
+      // 정책그룹 설정
+      if (result.selectedPolicyGroups) {
+        console.log('Loading selected policy groups:', result.selectedPolicyGroups);
+        setSelectedPolicyGroups(result.selectedPolicyGroups);
+      } else {
+        console.log('No selected policy groups found in result');
+        setSelectedPolicyGroups([]);
+      }
+      
+      // 시트 ID 설정
+      setSheetId(sheet.sheetId);
+      
+      // 대상월 설정 (시트 이름에서 추출)
+      const monthMatch = sheet.sheetName?.match(/액면_(.+)/);
+      if (monthMatch) {
+        setTargetMonth(monthMatch[1]);
+      }
+      
+      setSnackbar({ open: true, message: '데이터를 성공적으로 불러왔습니다.', severity: 'success' });
     } catch (error) {
-      console.error('사용예산 계산 실패:', error);
-      setSnackbar({ open: true, message: '사용예산 계산에 실패했습니다.', severity: 'error' });
+      console.error('사용자 시트 데이터 불러오기 실패:', error);
+      setSnackbar({ open: true, message: '데이터 불러오기에 실패했습니다.', severity: 'error' });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1211,10 +1238,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <Button
                               size="small"
                               variant="outlined"
-                              onClick={() => {
-                                // TODO: 데이터 불러오기 기능 구현
-                                setSnackbar({ open: true, message: '데이터 불러오기 기능은 준비중입니다.', severity: 'info' });
-                              }}
+                              onClick={() => handleLoadUserSheet(sheet)}
                               sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
                             >
                               불러오기
@@ -1276,17 +1300,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                onChange={(e) => setSearchTerm(e.target.value)}
                sx={{ mb: 2 }}
              />
-             <Button
-               variant="contained"
-               onClick={handleCalculateUsage}
-               disabled={selectedPolicyGroups.length === 0}
-               sx={{ mb: 2 }}
-             >
-               사용예산 계산
-             </Button>
            </Box>
            
            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1 }}>
+             {console.log('Current selectedPolicyGroups in dialog:', selectedPolicyGroups)}
              {policyGroups
                .filter(group => group.toLowerCase().includes(searchTerm.toLowerCase()))
                .map((group) => (
