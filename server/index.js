@@ -3496,15 +3496,19 @@ app.delete('/api/budget/policy-group-settings/:name', async (req, res) => {
 
 // 날짜 정규화 함수들
 function normalizeReceptionDate(receptionDateStr) {
-  if (!receptionDateStr) return null;
+  if (!receptionDateStr || receptionDateStr === '#N/A' || receptionDateStr.trim() === '') return null;
   
   // "2025. 6. 30 오후 2:45:00" 형식을 Date 객체로 변환
   try {
-    // 한국어 시간 형식을 영어로 변환
-    const normalizedStr = receptionDateStr
+    // 한국어 시간 형식을 영어로 변환하고 공백 정리
+    let normalizedStr = receptionDateStr.trim()
       .replace(/오전/g, 'AM')
       .replace(/오후/g, 'PM')
-      .replace(/\./g, '/');
+      .replace(/\./g, '/')
+      .replace(/\s+/g, ' '); // 여러 공백을 하나로
+    
+    // "2025/ 6/ 13 PM 12:48:00" -> "2025/6/13 PM 12:48:00" 형태로 정리
+    normalizedStr = normalizedStr.replace(/\s*\//g, '/').replace(/\/\s*/g, '/');
     
     const date = new Date(normalizedStr);
     
@@ -3630,9 +3634,9 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
           
-          // 헤더 제외하고 예산 데이터에서 매칭 (4행까지 헤더이므로 5행부터 시작)
-          if (budgetData.length > 4) {
-            for (let i = 4; i < budgetData.length; i++) {
+          // 헤더 제외하고 예산 데이터에서 매칭
+          if (budgetData.length > 1) {
+            for (let i = 1; i < budgetData.length; i++) {
               const budgetRow = budgetData[i];
               if (budgetRow.length >= 8) {
                 const budgetModelName = budgetRow[2]; // C열: 모델명
