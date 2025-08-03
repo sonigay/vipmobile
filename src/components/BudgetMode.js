@@ -237,19 +237,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         return;
       }
       
-      // 기존 시트가 있는지 확인
-      let targetSheetId = null;
-      const existingSheet = userSheets?.find(sheet => sheet.name === `액면_${userName}`);
-      
-      if (existingSheet) {
-        targetSheetId = existingSheet.id;
-        setSnackbar({ open: true, message: `기존 시트 "액면_${userName}"에 데이터가 추가되었습니다.`, severity: 'info' });
-      } else {
-        // 새 시트 생성
-        const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
-        targetSheetId = result.sheet.id;
-        setSnackbar({ open: true, message: `새 시트 "액면_${userName}"가 생성되고 데이터가 저장되었습니다.`, severity: 'success' });
-      }
+      // 항상 새 시트 생성 (기존 시트 확인 로직 제거)
+      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
+      const targetSheetId = result.sheet.id;
+      setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다.`, severity: 'success' });
       
       // 데이터 저장
       const saveDateRange = {
