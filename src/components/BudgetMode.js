@@ -757,45 +757,44 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                      예산금액
                    </TableCell>
                    {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
-                     Array.from({ length: 3 }, (_, i) => (
-                       <TableCell 
-                         key={`${army}-${i}`}
-                         sx={{ 
-                           backgroundColor: '#8D6E63', 
-                           color: 'white', 
-                           fontWeight: 'bold',
-                           textAlign: 'center',
-                           border: '1px solid #ddd',
-                           minWidth: 80
+                     <TableCell 
+                       key={army}
+                       colSpan={3}
+                       sx={{ 
+                         backgroundColor: '#8D6E63', 
+                         color: 'white', 
+                         fontWeight: 'bold',
+                         textAlign: 'center',
+                         border: '1px solid #ddd',
+                         minWidth: 80
+                       }}
+                     >
+                       <TextField
+                         size="small"
+                         type="number"
+                         value={budgetAmounts[army]}
+                         onChange={(e) => {
+                           const newAmounts = { ...budgetAmounts };
+                           newAmounts[army] = parseFloat(e.target.value) || 0;
+                           setBudgetAmounts(newAmounts);
                          }}
-                       >
-                         <TextField
-                           size="small"
-                           type="number"
-                           value={budgetAmounts[army]}
-                           onChange={(e) => {
-                             const newAmounts = { ...budgetAmounts };
-                             newAmounts[army] = parseFloat(e.target.value) || 0;
-                             setBudgetAmounts(newAmounts);
-                           }}
-                           sx={{
-                             '& .MuiOutlinedInput-root': {
-                               fontSize: '0.8rem',
-                               backgroundColor: 'white',
-                               '& fieldset': {
-                                 border: 'none'
-                               },
-                               '& input': {
-                                 textAlign: 'center',
-                                 color: '#8D6E63',
-                                 fontWeight: 'bold'
-                               }
+                         sx={{
+                           '& .MuiOutlinedInput-root': {
+                             fontSize: '0.8rem',
+                             backgroundColor: 'white',
+                             '& fieldset': {
+                               border: 'none'
+                             },
+                             '& input': {
+                               textAlign: 'center',
+                               color: '#8D6E63',
+                               fontWeight: 'bold'
                              }
-                           }}
-                         />
-                       </TableCell>
-                     ))
-                   )).flat()}
+                           }
+                         }}
+                       />
+                     </TableCell>
+                   ))}
                  </TableRow>
                  
                  {/* 두 번째 헤더 행: 정책군 헤더 */}
@@ -812,21 +811,20 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                      정책군
                    </TableCell>
                    {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
-                     Array.from({ length: 3 }, (_, i) => (
-                       <TableCell 
-                         key={`${army}-${i}`}
-                         sx={{ 
-                           backgroundColor: '#8D6E63', 
-                           color: 'white', 
-                           fontWeight: 'bold',
-                           textAlign: 'center',
-                           border: '1px solid #ddd'
-                         }}
-                       >
-                         {army}
-                       </TableCell>
-                     ))
-                   )).flat()}
+                     <TableCell 
+                       key={army}
+                       colSpan={3}
+                       sx={{ 
+                         backgroundColor: '#8D6E63', 
+                         color: 'white', 
+                         fontWeight: 'bold',
+                         textAlign: 'center',
+                         border: '1px solid #ddd'
+                       }}
+                     >
+                       {army}
+                     </TableCell>
+                   ))}
                  </TableRow>
                  
                  {/* 세 번째 헤더 행: 카테고리 헤더 */}
