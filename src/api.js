@@ -456,3 +456,41 @@ export const cacheManager = {
     console.log('전체 캐시 삭제 완료');
   }
 }; 
+
+// 예산 대상월 관리 API
+export const budgetMonthSheetAPI = {
+  // 월별 시트 ID 목록 조회
+  getMonthSheets: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/month-sheets`);
+    if (!response.ok) {
+      throw new Error('월별 시트 ID 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 월별 시트 ID 저장/수정
+  saveMonthSheet: async (month, sheetId, updatedBy) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/month-sheets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ month, sheetId, updatedBy }),
+    });
+    if (!response.ok) {
+      throw new Error('월별 시트 ID 저장에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 월별 시트 ID 삭제
+  deleteMonthSheet: async (month) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/month-sheets/${month}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('월별 시트 ID 삭제에 실패했습니다.');
+    }
+    return response.json();
+  },
+}; 

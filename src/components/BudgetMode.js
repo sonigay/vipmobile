@@ -38,6 +38,7 @@ import {
   Calculate as CalculateIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
+import { budgetMonthSheetAPI } from '../api';
 
 function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
@@ -53,6 +54,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [targetMonth, setTargetMonth] = useState('');
   const [sheetId, setSheetId] = useState('');
   const [canEditSheetId, setCanEditSheetId] = useState(false);
+  const [monthSheetMappings, setMonthSheetMappings] = useState({}); // 월별 시트 ID 매핑
+  const [detailedMonthData, setDetailedMonthData] = useState({}); // 상세 데이터 (수정일시, 수정자 포함)
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -62,20 +65,92 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   useEffect(() => {
     setShowUpdatePopup(true);
     
-    // 권한 레벨 확인
-    const userLevel = loggedInStore?.level || '';
-    setCanEditSheetId(userLevel === 'SS');
+    // 권한 레벨 확인 - R열의 권한 레벨 확인
+    const userRole = loggedInStore?.agentInfo?.userRole || '';
+    console.log('예산모드 권한 확인:', { userRole, loggedInStore });
+    setCanEditSheetId(userRole === 'SS');
+    
+    // 구글시트에서 월별 시트 ID 매핑 불러오기
+    loadMonthSheetMappings();
   }, [loggedInStore]);
 
-  // 대상월 변경 시 시트 ID 자동 업데이트 (예시)
+  // 구글시트에서 월별 시트 ID 매핑 불러오기
+  const loadMonthSheetMappings = async () => {
+    try {
+      const data = await budgetMonthSheetAPI.getMonthSheets();
+      const mappings = {};
+      const detailedData = {};
+      data.forEach(item => {
+        mappings[item.month] = item.sheetId;
+        detailedData[item.month] = {
+          sheetId: item.sheetId,
+          updatedAt: item.updatedAt,
+          updatedBy: item.updatedBy
+        };
+      });
+      setMonthSheetMappings(mappings);
+      setDetailedMonthData(detailedData);
+    } catch (error) {
+      console.error('월별 시트 ID 로드 실패:', error);
+      setSnackbar({ open: true, message: '월별 시트 ID 로드에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 대상월 변경 시 해당 월의 시트 ID 표시
   const handleMonthChange = (event) => {
     const month = event.target.value;
     setTargetMonth(month);
     
-    // TODO: 실제로는 월별 시트 ID 매핑 로직 구현
-    if (month && canEditSheetId) {
-      // 예시: 2025-06 -> 특정 시트 ID로 매핑
-      setSheetId(`sheet_${month.replace('-', '_')}`);
+    // 해당 월의 저장된 시트 ID가 있으면 표시
+    if (month && monthSheetMappings[month]) {
+      setSheetId(monthSheetMappings[month]);
+    } else {
+      setSheetId(''); // 새로운 월이면 빈 값으로 초기화
+    }
+  };
+
+  // 시트 ID 저장
+  const handleSheetIdSave = async () => {
+    if (!targetMonth || !sheetId.trim()) {
+      setSnackbar({ open: true, message: '대상월과 시트 ID를 모두 입력해주세요.', severity: 'warning' });
+      return;
+    }
+    
+    try {
+      await budgetMonthSheetAPI.saveMonthSheet(
+        targetMonth, 
+        sheetId.trim(), 
+        loggedInStore?.name || 'Unknown'
+      );
+      
+      // 성공 시 목록 다시 로드
+      await loadMonthSheetMappings();
+      
+      setSnackbar({ open: true, message: `${targetMonth} 시트 ID가 저장되었습니다.`, severity: 'success' });
+    } catch (error) {
+      console.error('시트 ID 저장 실패:', error);
+      setSnackbar({ open: true, message: '시트 ID 저장에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 시트 ID 삭제
+  const handleSheetIdDelete = async () => {
+    if (!targetMonth) {
+      setSnackbar({ open: true, message: '삭제할 대상월을 선택해주세요.', severity: 'warning' });
+      return;
+    }
+    
+    try {
+      await budgetMonthSheetAPI.deleteMonthSheet(targetMonth);
+      
+      // 성공 시 목록 다시 로드
+      await loadMonthSheetMappings();
+      
+      setSheetId('');
+      setSnackbar({ open: true, message: `${targetMonth} 시트 ID가 삭제되었습니다.`, severity: 'info' });
+    } catch (error) {
+      console.error('시트 ID 삭제 실패:', error);
+      setSnackbar({ open: true, message: '시트 ID 삭제에 실패했습니다.', severity: 'error' });
     }
   };
 
@@ -174,10 +249,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            ⚙️ 설정
+            ⚙️ 월별 시트 설정
           </Typography>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
                 label="대상월"
@@ -199,10 +274,85 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 sx={{ mb: 2 }}
               />
             </Grid>
+            <Grid item xs={12} sm={2}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSheetIdSave}
+                  disabled={!canEditSheetId || !targetMonth || !sheetId.trim()}
+                  sx={{ backgroundColor: '#795548', minWidth: '60px' }}
+                >
+                  저장
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleSheetIdDelete}
+                  disabled={!canEditSheetId || !targetMonth}
+                  sx={{ borderColor: '#795548', color: '#795548', minWidth: '60px' }}
+                >
+                  삭제
+                </Button>
+              </Box>
+            </Grid>
           </Grid>
+          
+          {/* 저장된 월별 시트 ID 목록 */}
+          {Object.keys(monthSheetMappings).length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+                📋 저장된 월별 시트 ID
+              </Typography>
+              <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        대상월
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        시트 ID
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        수정일시
+                      </TableCell>
+                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        수정자
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(monthSheetMappings).map(([month, id]) => {
+                      const detail = detailedMonthData[month];
+                      return (
+                        <TableRow 
+                          key={month} 
+                          hover
+                          onClick={() => {
+                            setTargetMonth(month);
+                            setSheetId(id);
+                          }}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem' }}>
+                            {detail?.updatedAt ? new Date(detail.updatedAt).toLocaleString('ko-KR') : '-'}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.8rem' }}>{detail?.updatedBy || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+          
           {!canEditSheetId && (
             <Alert severity="info" sx={{ mt: 1 }}>
-              현재 사용자 권한: {loggedInStore?.level || 'Unknown'} - 시트 ID 수정 권한이 없습니다.
+              현재 사용자 권한: {loggedInStore?.agentInfo?.userRole || 'Unknown'} - 시트 ID 수정 권한이 없습니다.
             </Alert>
           )}
         </CardContent>

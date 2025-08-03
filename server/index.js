@@ -14143,6 +14143,156 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
   }
 });
 
+// 예산 대상월 관리 API
+app.get('/api/budget/month-sheets', async (req, res) => {
+  try {
+    const sheets = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
+    });
+
+    const rows = sheets.data.values || [];
+    
+    // 시트가 비어있거나 헤더가 없으면 헤더 생성
+    if (rows.length === 0 || !rows[0] || rows[0][0] !== '대상월') {
+      const headerRow = ['대상월', '시트ID', '수정일시', '수정자'];
+      await googleSheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_대상월관리!A1:D1',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [headerRow]
+        }
+      });
+      return res.json([]);
+    }
+
+    if (rows.length <= 1) {
+      return res.json([]);
+    }
+
+    // 헤더 제외하고 데이터만 반환
+    const data = rows.slice(1).map(row => ({
+      month: row[0] || '',
+      sheetId: row[1] || '',
+      updatedAt: row[2] || '',
+      updatedBy: row[3] || ''
+    }));
+
+    res.json(data);
+  } catch (error) {
+    console.error('예산 대상월 관리 데이터 조회 오류:', error);
+    res.status(500).json({ error: '데이터 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+app.post('/api/budget/month-sheets', async (req, res) => {
+  try {
+    const { month, sheetId, updatedBy } = req.body;
+    
+    if (!month || !sheetId) {
+      return res.status(400).json({ error: '대상월과 시트 ID는 필수입니다.' });
+    }
+
+    const currentTime = new Date().toISOString();
+    
+    // 기존 데이터 확인
+    const existingSheets = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
+    });
+
+    const rows = existingSheets.data.values || [];
+    const existingRowIndex = rows.findIndex(row => row[0] === month);
+    
+    if (existingRowIndex > 0) { // 0은 헤더
+      // 기존 데이터 업데이트
+      await googleSheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `예산_대상월관리!B${existingRowIndex + 1}:D${existingRowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[sheetId, currentTime, updatedBy]]
+        }
+      });
+    } else {
+      // 새 데이터 추가
+      await googleSheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_대상월관리!A:D',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [[month, sheetId, currentTime, updatedBy]]
+        }
+      });
+    }
+
+    res.json({ message: '월별 시트 ID가 저장되었습니다.' });
+  } catch (error) {
+    console.error('예산 대상월 관리 데이터 저장 오류:', error);
+    res.status(500).json({ error: '데이터 저장 중 오류가 발생했습니다.' });
+  }
+});
+
+app.delete('/api/budget/month-sheets/:month', async (req, res) => {
+  try {
+    const { month } = req.params;
+    
+    // 기존 데이터 확인
+    const existingSheets = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
+    });
+
+    const rows = existingSheets.data.values || [];
+    const existingRowIndex = rows.findIndex(row => row[0] === month);
+    
+    if (existingRowIndex <= 0) { // 0은 헤더, -1은 찾지 못함
+      return res.status(404).json({ error: '해당 월의 데이터를 찾을 수 없습니다.' });
+    }
+
+    // 행 삭제
+    await googleSheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: await getSheetIdByName('예산_대상월관리'),
+                dimension: 'ROWS',
+                startIndex: existingRowIndex,
+                endIndex: existingRowIndex + 1
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    res.json({ message: '월별 시트 ID가 삭제되었습니다.' });
+  } catch (error) {
+    console.error('예산 대상월 관리 데이터 삭제 오류:', error);
+    res.status(500).json({ error: '데이터 삭제 중 오류가 발생했습니다.' });
+  }
+});
+
+// 시트 이름으로 시트 ID를 가져오는 헬퍼 함수
+async function getSheetIdByName(sheetName) {
+  try {
+    const response = await googleSheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    
+    const sheet = response.data.sheets.find(s => s.properties.title === sheetName);
+    return sheet ? sheet.properties.sheetId : null;
+  } catch (error) {
+    console.error('시트 ID 조회 오류:', error);
+    return null;
+  }
+}
+
 // 정책 알림 생성 함수
 async function createPolicyNotification(policyId, userId, notificationType, approvalStatus = null) {
   try {
