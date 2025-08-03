@@ -260,36 +260,38 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
       const userName = loggedInStore?.name || 'Unknown';
       
-      // 현재 날짜로 시트명 생성
-      const currentDate = new Date().toISOString().split('T')[0];
-      const sheetName = `${userName}_예산데이터_${currentDate}`;
+      // 대상월이 선택되어 있는지 확인
+      if (!targetMonth) {
+        setSnackbar({ open: true, message: '대상월을 먼저 선택해주세요.', severity: 'warning' });
+        return;
+      }
       
       // 기존 시트가 있는지 확인
       let targetSheetId = null;
-      const existingSheet = userSheets.find(sheet => sheet.name === sheetName);
+      const existingSheet = userSheets.find(sheet => sheet.name === `액면_${userName}`);
       
       if (existingSheet) {
         targetSheetId = existingSheet.id;
-        setSnackbar({ open: true, message: `기존 시트 "${sheetName}"에 데이터가 추가되었습니다.`, severity: 'info' });
+        setSnackbar({ open: true, message: `기존 시트 "액면_${userName}"에 데이터가 추가되었습니다.`, severity: 'info' });
       } else {
         // 새 시트 생성
-        const result = await budgetUserSheetAPI.createUserSheet(userId, userName);
+        const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
         targetSheetId = result.sheet.id;
         
         // 로컬 상태 업데이트
         setUserSheets([...userSheets, result.sheet]);
-        setSnackbar({ open: true, message: `새 시트 "${sheetName}"가 생성되고 데이터가 저장되었습니다.`, severity: 'success' });
+        setSnackbar({ open: true, message: `새 시트 "액면_${userName}"가 생성되고 데이터가 저장되었습니다.`, severity: 'success' });
       }
       
       // 데이터 저장
       const dateRange = {
-        receiptStartDate: currentDate,
-        receiptEndDate: currentDate,
-        activationStartDate: currentDate,
-        activationEndDate: currentDate
+        receiptStartDate: new Date().toISOString().split('T')[0],
+        receiptEndDate: new Date().toISOString().split('T')[0],
+        activationStartDate: new Date().toISOString().split('T')[0],
+        activationEndDate: new Date().toISOString().split('T')[0]
       };
       
-      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, dateRange);
+      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, dateRange, userName);
       
     } catch (error) {
       console.error('자동 저장 실패:', error);
@@ -337,7 +339,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
       const userName = loggedInStore?.name || 'Unknown';
       
-      const result = await budgetUserSheetAPI.createUserSheet(userId, userName);
+      // 대상월이 선택되어 있는지 확인
+      if (!targetMonth) {
+        setSnackbar({ open: true, message: '대상월을 먼저 선택해주세요.', severity: 'warning' });
+        return;
+      }
+      
+      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
       
       setUserSheets([...userSheets, result.sheet]);
       setSelectedUserSheet(result.sheet.id);
@@ -367,7 +375,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const loadDataFromSheet = async (sheetId) => {
     try {
       setIsProcessing(true);
-      const result = await budgetUserSheetAPI.loadBudgetData(sheetId);
+      const userName = loggedInStore?.name || 'Unknown';
+      const result = await budgetUserSheetAPI.loadBudgetData(sheetId, userName);
       
       setBudgetData(result.data);
       setSaveDateRange(result.dateRange);
@@ -397,7 +406,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
     
     try {
-      await budgetUserSheetAPI.saveBudgetData(selectedUserSheet, budgetData, saveDateRange);
+      const userName = loggedInStore?.name || 'Unknown';
+      await budgetUserSheetAPI.saveBudgetData(selectedUserSheet, budgetData, saveDateRange, userName);
       setSnackbar({ open: true, message: '데이터가 저장되었습니다.', severity: 'success' });
       setShowSaveModal(false);
     } catch (error) {

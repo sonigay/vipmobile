@@ -14348,42 +14348,60 @@ app.get('/api/budget/user-sheets', async (req, res) => {
 
 app.post('/api/budget/user-sheets', async (req, res) => {
   try {
-    const { userId, userName } = req.body;
+    const { userId, userName, targetMonth } = req.body;
     
-    if (!userId || !userName) {
-      return res.status(400).json({ error: '사용자 ID와 이름은 필수입니다.' });
+    if (!userId || !userName || !targetMonth) {
+      return res.status(400).json({ error: '사용자 ID, 이름, 대상월은 필수입니다.' });
     }
 
     const sheets = google.sheets({ version: 'v4', auth });
     const currentTime = new Date().toISOString();
-    const sheetName = `${userName}_예산데이터_${currentTime.split('T')[0]}`;
     
-    // 새 Google Sheets 문서 생성
-    const newSpreadsheet = await sheets.spreadsheets.create({
-      resource: {
-        properties: {
-          title: sheetName
-        },
-        sheets: [
-          {
-            properties: {
-              title: '예산데이터',
-              gridProperties: {
-                rowCount: 1000,
-                columnCount: 20
-              }
-            }
-          }
-        ]
-      }
+    // 대상월의 시트 ID 조회
+    const monthSheetsData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
     });
 
-    const newSheetId = newSpreadsheet.data.spreadsheetId;
+    const monthRows = monthSheetsData.data.values || [];
+    const targetMonthRow = monthRows.find(row => row[0] === targetMonth);
+    
+    if (!targetMonthRow || !targetMonthRow[1]) {
+      return res.status(400).json({ error: '해당 월의 시트 ID를 찾을 수 없습니다.' });
+    }
+
+    const targetSheetId = targetMonthRow[1];
+    const userSheetName = `액면_${userName}`;
+    
+    // 기존 시트에 새로운 시트 추가
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: targetSheetId,
+        resource: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: userSheetName,
+                  gridProperties: {
+                    rowCount: 1000,
+                    columnCount: 20
+                  }
+                }
+              }
+            }
+          ]
+        }
+      });
+    } catch (addSheetError) {
+      // 시트가 이미 존재하는 경우 무시
+      console.log(`시트 "${userSheetName}"이 이미 존재합니다.`);
+    }
     
     // 헤더 추가
     await sheets.spreadsheets.values.update({
-      spreadsheetId: newSheetId,
-      range: '예산데이터!A1:H1',
+      spreadsheetId: targetSheetId,
+      range: `${userSheetName}!A1:H1`,
       valueInputOption: 'RAW',
       resource: {
         values: [['적용일', '입력자(권한레벨)', '모델명', '군/유형', '확보된 예산', '사용된 예산', '예산 잔액', '상태']]
@@ -14391,19 +14409,54 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     });
 
     // 사용자별 시트 관리 시트에 정보 추가
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '예산_사용자시트관리!A:E',
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      resource: {
-        values: [[userId, newSheetId, sheetName, currentTime, userName]]
-      }
-    });
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_사용자시트관리!A:E',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [[userId, targetSheetId, userSheetName, currentTime, userName]]
+        }
+      });
+    } catch (appendError) {
+      // 시트가 존재하지 않으면 새로 생성하고 데이터 추가
+      console.log('예산_사용자시트관리 시트가 존재하지 않아 새로 생성합니다.');
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: '예산_사용자시트관리',
+                  gridProperties: {
+                    rowCount: 1000,
+                    columnCount: 10
+                  }
+                }
+              }
+            }
+          ]
+        }
+      });
+      
+      // 헤더와 데이터 추가
+      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자'];
+      const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_사용자시트관리!A1:E2',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [headerRow, dataRow]
+        }
+      });
+    }
 
     const newSheet = {
-      id: newSheetId,
-      name: sheetName,
+      id: targetSheetId,
+      name: userSheetName,
       createdAt: currentTime,
       createdBy: userName
     };
@@ -14421,13 +14474,18 @@ app.post('/api/budget/user-sheets', async (req, res) => {
 app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
     const { sheetId } = req.params;
-    const { data, dateRange } = req.body;
+    const { data, dateRange, userName } = req.body;
     
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ error: '저장할 데이터가 없습니다.' });
     }
 
+    if (!userName) {
+      return res.status(400).json({ error: '사용자 이름이 필요합니다.' });
+    }
+
     const sheets = google.sheets({ version: 'v4', auth });
+    const userSheetName = `액면_${userName}`;
     
     // 데이터를 시트에 저장할 형식으로 변환
     const rowsToSave = data.map(item => [
@@ -14444,13 +14502,13 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 기존 데이터 지우기 (헤더 제외)
     await sheets.spreadsheets.values.clear({
       spreadsheetId: sheetId,
-      range: '예산데이터!A2:H'
+      range: `${userSheetName}!A2:H`
     });
 
     // 새 데이터 추가
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: '예산데이터!A2',
+      range: `${userSheetName}!A2`,
       valueInputOption: 'RAW',
       resource: {
         values: rowsToSave
@@ -14458,7 +14516,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     });
 
     // 메타데이터 시트에 저장 정보 추가
-    const metadataRange = '예산데이터!J1:L1';
+    const metadataRange = `${userSheetName}!J1:L1`;
     const metadata = [
       ['저장일시', '접수일범위', '개통일범위'],
       [
@@ -14488,18 +14546,25 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
 app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
     const { sheetId } = req.params;
+    const { userName } = req.query;
     const sheets = google.sheets({ version: 'v4', auth });
+    
+    if (!userName) {
+      return res.status(400).json({ error: '사용자 이름이 필요합니다.' });
+    }
+    
+    const userSheetName = `액면_${userName}`;
     
     // 데이터 불러오기 (A2:H)
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: '예산데이터!A2:H'
+      range: `${userSheetName}!A2:H`
     });
     
     // 메타데이터 불러오기 (J1:L1)
     const metadataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: '예산데이터!J1:L1'
+      range: `${userSheetName}!J1:L1`
     });
     
     const data = dataResponse.data.values || [];

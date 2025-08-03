@@ -506,13 +506,13 @@ export const budgetUserSheetAPI = {
   },
 
   // 사용자별 시트 생성
-  createUserSheet: async (userId, userName) => {
+  createUserSheet: async (userId, userName, targetMonth) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, userName }),
+      body: JSON.stringify({ userId, userName, targetMonth }),
     });
     if (!response.ok) {
       throw new Error('사용자 시트 생성에 실패했습니다.');
@@ -521,13 +521,13 @@ export const budgetUserSheetAPI = {
   },
 
   // 예산 데이터 저장
-  saveBudgetData: async (sheetId, data, dateRange) => {
+  saveBudgetData: async (sheetId, data, dateRange, userName) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ data, dateRange }),
+      body: JSON.stringify({ data, dateRange, userName }),
     });
     if (!response.ok) {
       throw new Error('예산 데이터 저장에 실패했습니다.');
@@ -536,8 +536,8 @@ export const budgetUserSheetAPI = {
   },
 
   // 예산 데이터 불러오기
-  loadBudgetData: async (sheetId) => {
-    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data`);
+  loadBudgetData: async (sheetId, userName) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data?userName=${encodeURIComponent(userName)}`);
     if (!response.ok) {
       throw new Error('예산 데이터 불러오기에 실패했습니다.');
     }
