@@ -769,30 +769,31 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                          minWidth: 80
                        }}
                      >
-                       <TextField
-                         size="small"
-                         type="number"
-                         value={budgetAmounts[army]}
-                         onChange={(e) => {
-                           const newAmounts = { ...budgetAmounts };
-                           newAmounts[army] = parseFloat(e.target.value) || 0;
-                           setBudgetAmounts(newAmounts);
-                         }}
-                         sx={{
-                           '& .MuiOutlinedInput-root': {
-                             fontSize: '0.8rem',
-                             backgroundColor: 'white',
-                             '& fieldset': {
-                               border: 'none'
-                             },
-                             '& input': {
-                               textAlign: 'center',
-                               color: '#8D6E63',
-                               fontWeight: 'bold'
-                             }
-                           }
-                         }}
-                       />
+                                               <TextField
+                          size="small"
+                          type="number"
+                          value={budgetAmounts[army]}
+                          onChange={(e) => {
+                            const newAmounts = { ...budgetAmounts };
+                            newAmounts[army] = parseFloat(e.target.value) || 0;
+                            setBudgetAmounts(newAmounts);
+                          }}
+                          placeholder="40000"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              fontSize: '0.8rem',
+                              backgroundColor: 'white',
+                              '& fieldset': {
+                                border: 'none'
+                              },
+                              '& input': {
+                                textAlign: 'center',
+                                color: '#8D6E63',
+                                fontWeight: 'bold'
+                              }
+                            }
+                          }}
+                        />
                      </TableCell>
                    ))}
                  </TableRow>
