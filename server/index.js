@@ -3368,8 +3368,21 @@ app.post('/api/budget/policy-group-settings', async (req, res) => {
     
     const existingRows = existingData.data.values || [];
     
-    // 중복 이름 체크
-    const isDuplicate = existingRows.some(row => row[0] === name);
+    // 시트가 비어있거나 헤더가 없는 경우 헤더 추가
+    if (existingRows.length === 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_정책그룹관리!A1:B1',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [['저장이름', '선택된정책그룹']]
+        }
+      });
+      existingRows.push(['저장이름', '선택된정책그룹']);
+    }
+    
+    // 중복 이름 체크 (헤더 제외)
+    const isDuplicate = existingRows.slice(1).some(row => row[0] === name);
     if (isDuplicate) {
       return res.status(400).json({ error: '이미 존재하는 저장이름입니다.' });
     }
@@ -3381,7 +3394,6 @@ app.post('/api/budget/policy-group-settings', async (req, res) => {
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_정책그룹관리!A:B',
       valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
       resource: {
         values: [newRow]
       }
@@ -3406,11 +3418,16 @@ app.get('/api/budget/policy-group-settings', async (req, res) => {
     
     const rows = response.data.values || [];
     
+    // 시트가 비어있거나 헤더만 있는 경우 빈 배열 반환
+    if (rows.length <= 1) {
+      return res.json({ settings: [] });
+    }
+    
     // 헤더 제외하고 데이터만 반환
     const settings = rows.slice(1).map(row => ({
       name: row[0] || '',
-      groups: row[1] ? row[1].split(',') : []
-    }));
+      groups: row[1] ? row[1].split(',').filter(group => group.trim()) : []
+    })).filter(setting => setting.name.trim()); // 빈 이름 제거
     
     res.json({ settings });
   } catch (error) {
@@ -3540,16 +3557,17 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
     
     const activationRows = activationData.data.values || [];
     
-    // 사용예산 계산
+    // 사용예산 계산 및 C열 업데이트
     let totalUsedBudget = 0;
     const calculatedData = [];
+    const updateRequests = [];
     
     activationRows.slice(1).forEach((row, index) => { // 헤더 제외
       if (row.length >= 20) { // 최소 20개 컬럼 필요
         const policyGroup = row[4]; // E열: 정책그룹
         const armyType = row[3]; // D열: 정책군
         const categoryType = row[19]; // T열: 유형
-        const budgetValue = parseFloat(row[2]) || 0; // C열: 예산값
+        const currentBudgetValue = parseFloat(row[2]) || 0; // C열: 현재 예산값
         
         // 날짜 데이터 정규화
         const receptionDate = normalizeReceptionDate(row[5]); // F열: 접수일
@@ -3577,27 +3595,60 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
             let mappedCategoryType = categoryType;
             if (categoryType === '기변') mappedCategoryType = '보상';
             
+            // 기본 예산값 설정 (정책그룹별로 다를 수 있음)
+            let calculatedBudgetValue = 40000; // 기본값 4만원
+            
             // 매핑된 데이터 저장
             calculatedData.push({
               rowIndex: index + 2, // 실제 행 번호 (헤더 제외)
               policyGroup,
               armyType: mappedArmyType,
               categoryType: mappedCategoryType,
-              budgetValue,
+              budgetValue: calculatedBudgetValue,
               receptionDate: receptionDate ? receptionDate.toISOString() : null,
               activationDate: activationDate ? activationDate.toISOString() : null
             });
             
-            totalUsedBudget += budgetValue;
+            totalUsedBudget += calculatedBudgetValue;
+            
+            // C열 업데이트 요청 추가
+            updateRequests.push({
+              range: `폰클개통데이터!C${index + 2}`,
+              values: [[calculatedBudgetValue]]
+            });
+          } else {
+            // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정
+            updateRequests.push({
+              range: `폰클개통데이터!C${index + 2}`,
+              values: [[0]]
+            });
           }
+        } else {
+          // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정
+          updateRequests.push({
+            range: `폰클개통데이터!C${index + 2}`,
+            values: [[0]]
+          });
         }
       }
     });
     
+    // 폰클개통데이터 시트의 C열 일괄 업데이트
+    if (updateRequests.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: sheetId,
+        resource: {
+          valueInputOption: 'RAW',
+          data: updateRequests
+        }
+      });
+    }
+    
     res.json({
       totalUsedBudget,
       calculatedData,
-      message: '사용예산 계산이 완료되었습니다.'
+      updatedRows: updateRequests.length,
+      message: '사용예산 계산 및 C열 업데이트가 완료되었습니다.'
     });
     
   } catch (error) {
@@ -14589,6 +14640,95 @@ async function getSheetIdByName(sheetName) {
   }
 }
 
+// 사용자별 예산 시트의 사용예산을 폰클개통데이터 C열에서 업데이트하는 API
+app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
+  try {
+    const { sheetId } = req.params;
+    const { selectedPolicyGroups, dateRange, userName } = req.body;
+    
+    if (!selectedPolicyGroups || !Array.isArray(selectedPolicyGroups)) {
+      return res.status(400).json({ error: '선택된 정책그룹이 필요합니다.' });
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 먼저 폰클개통데이터 C열 업데이트
+    const calculateResponse = await fetch(`${req.protocol}://${req.get('host')}/api/budget/calculate-usage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sheetId, selectedPolicyGroups, dateRange, userName }),
+    });
+    
+    if (!calculateResponse.ok) {
+      throw new Error('사용예산 계산에 실패했습니다.');
+    }
+    
+    const calculateResult = await calculateResponse.json();
+    
+    // 사용자 시트에서 데이터 가져오기
+    const userSheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: 'A2:I', // 사용자 시트 데이터 범위
+    });
+    
+    const userSheetRows = userSheetData.data.values || [];
+    
+    // 폰클개통데이터에서 계산된 데이터를 사용자 시트의 사용예산에 반영
+    const updateRequests = [];
+    
+    userSheetRows.forEach((row, index) => {
+      if (row.length >= 8) {
+        const armyType = row[3]; // 군 (D열)
+        const categoryType = row[4]; // 유형 (E열)
+        
+        // 폰클개통데이터에서 해당 군/유형에 맞는 사용예산 찾기
+        const matchingData = calculateResult.calculatedData.find(data => 
+          data.armyType === armyType && data.categoryType === categoryType
+        );
+        
+        if (matchingData) {
+          // 사용예산 업데이트 (F열)
+          updateRequests.push({
+            range: `F${index + 2}`,
+            values: [[matchingData.budgetValue]]
+          });
+          
+          // 잔액 업데이트 (G열) - 확보예산(40000) - 사용예산
+          const securedBudget = 40000;
+          const remainingBudget = securedBudget - matchingData.budgetValue;
+          updateRequests.push({
+            range: `G${index + 2}`,
+            values: [[remainingBudget]]
+          });
+        }
+      }
+    });
+    
+    // 사용자 시트 업데이트
+    if (updateRequests.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: sheetId,
+        resource: {
+          valueInputOption: 'RAW',
+          data: updateRequests
+        }
+      });
+    }
+    
+    res.json({
+      message: '사용자 시트의 사용예산이 업데이트되었습니다.',
+      updatedRows: updateRequests.length,
+      totalUsedBudget: calculateResult.totalUsedBudget
+    });
+    
+  } catch (error) {
+    console.error('사용자 시트 사용예산 업데이트 오류:', error);
+    res.status(500).json({ error: '사용자 시트 사용예산 업데이트 중 오류가 발생했습니다.' });
+  }
+});
+
 // 사용자별 예산 시트 관리 API
 app.get('/api/budget/user-sheets', async (req, res) => {
   try {
@@ -14645,7 +14785,23 @@ app.get('/api/budget/user-sheets', async (req, res) => {
         };
         
         try {
-          // 시트에서 데이터 불러오기 (A2:I)
+          // 폰클개통데이터에서 실제 계산된 사용예산 가져오기
+          const activationDataResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: '폰클개통데이터!C:C'
+          });
+          
+          const activationData = activationDataResponse.data.values || [];
+          
+          // C열의 계산된 사용예산 합계 계산 (헤더 제외)
+          let totalCalculatedUsage = 0;
+          activationData.slice(1).forEach(row => {
+            if (row[0]) {
+              totalCalculatedUsage += parseFloat(row[0]) || 0;
+            }
+          });
+          
+          // 사용자 시트에서 데이터 불러오기 (A2:I)
           const dataResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: `${sheetName}!A2:I`
@@ -14653,10 +14809,11 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           
           const data = dataResponse.data.values || [];
           
-          // 요약 정보 계산
+          // 요약 정보 계산 (폰클개통데이터 C열의 계산된 값 사용)
           data.forEach(row => {
             if (row.length >= 9) {
               const securedBudget = parseFloat(row[5]) || 0;
+              // 사용예산은 폰클개통데이터 C열에서 계산된 값 사용
               const usedBudget = parseFloat(row[6]) || 0;
               const remainingBudget = parseFloat(row[7]) || 0;
               
@@ -14666,6 +14823,10 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               summary.itemCount++;
             }
           });
+          
+          // 폰클개통데이터에서 계산된 총 사용예산으로 업데이트
+          summary.totalUsedBudget = totalCalculatedUsage;
+          summary.totalRemainingBudget = summary.totalSecuredBudget - totalCalculatedUsage;
           
           // 메타데이터에서 마지막 업데이트 시간과 날짜 범위 가져오기
           try {

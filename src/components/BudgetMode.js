@@ -474,12 +474,36 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     
     setIsProcessing(true);
     try {
-      await autoSaveToUserSheet(budgetData);
+      const result = await autoSaveToUserSheet(budgetData);
+      
+      // 저장 후 사용자 시트의 사용예산을 폰클개통데이터 C열에서 업데이트
+      if (result && result.sheet && result.sheet.id && selectedPolicyGroups.length > 0) {
+        const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
+        
+        // 날짜 범위를 서버가 기대하는 형식으로 변환
+        const serverDateRange = {
+          startDate: applyReceiptDate && dateRange.receiptStartDate 
+            ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` 
+            : `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
+          endDate: applyReceiptDate && dateRange.receiptEndDate 
+            ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` 
+            : `${dateRange.activationEndDate} ${dateRange.activationEndTime}`
+        };
+        
+        await budgetUserSheetAPI.updateUserSheetUsage(
+          result.sheet.id, 
+          selectedPolicyGroups, 
+          serverDateRange, 
+          userName
+        );
+      }
+      
       setSnackbar({ open: true, message: '데이터가 성공적으로 저장되었습니다.', severity: 'success' });
       
       // 저장 후 사용자 시트 목록 새로고침
       await loadUserSheets();
     } catch (error) {
+      console.error('저장 실패:', error);
       setSnackbar({ open: true, message: '저장에 실패했습니다.', severity: 'error' });
     } finally {
       setIsProcessing(false);
@@ -516,9 +540,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 예산금액 설정도 함께 전달
       await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel, budgetAmounts);
       
+      // 생성된 시트 정보 반환
+      return result;
+      
     } catch (error) {
       console.error('자동 저장 실패:', error);
       setSnackbar({ open: true, message: '자동 저장에 실패했습니다.', severity: 'warning' });
+      throw error;
     }
   };
 

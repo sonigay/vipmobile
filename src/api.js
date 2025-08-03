@@ -546,6 +546,21 @@ export const budgetUserSheetAPI = {
     }
     return response.json();
   },
+
+  // 사용자 시트의 사용예산을 폰클개통데이터 C열에서 업데이트
+  updateUserSheetUsage: async (sheetId, selectedPolicyGroups, dateRange, userName) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/update-usage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ selectedPolicyGroups, dateRange, userName }),
+    });
+    if (!response.ok) {
+      throw new Error('사용자 시트 사용예산 업데이트에 실패했습니다.');
+    }
+    return response.json();
+  },
 }; 
 
 // 정책그룹 관련 API
