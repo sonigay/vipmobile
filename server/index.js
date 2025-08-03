@@ -3314,6 +3314,298 @@ app.get('/api/inventory/activation-status', async (req, res) => {
 // 팀 라우트 설정
 setupTeamRoutes(app, getSheetValuesWithoutCache);
 
+// 정책그룹 목록 가져오기 API
+app.get('/api/budget/policy-groups', async (req, res) => {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 폰클출고처데이터 시트에서 S열 데이터 가져오기
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '폰클출고처데이터!S:S',
+    });
+    
+    const values = response.data.values || [];
+    
+    // S열에서 정책그룹 데이터 추출 및 정리
+    const policyGroups = new Set();
+    values.forEach(row => {
+      if (row[0] && row[0].trim()) {
+        // 괄호와 괄호 안 내용 제거 (예: "홍기현(2/2)" -> "홍기현")
+        const cleanGroup = row[0].replace(/\([^)]*\)/g, '').trim();
+        if (cleanGroup) {
+          policyGroups.add(cleanGroup);
+        }
+      }
+    });
+    
+    // Set을 배열로 변환하고 정렬
+    const sortedPolicyGroups = Array.from(policyGroups).sort();
+    
+    res.json({ policyGroups: sortedPolicyGroups });
+  } catch (error) {
+    console.error('정책그룹 목록 가져오기 오류:', error);
+    res.status(500).json({ error: '정책그룹 목록을 가져오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 정책그룹 설정 저장 API
+app.post('/api/budget/policy-group-settings', async (req, res) => {
+  try {
+    const { name, selectedGroups } = req.body;
+    
+    if (!name || !selectedGroups || !Array.isArray(selectedGroups)) {
+      return res.status(400).json({ error: '저장이름과 선택된 정책그룹이 필요합니다.' });
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 기존 설정 목록 가져오기
+    const existingData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_정책그룹관리!A:B',
+    });
+    
+    const existingRows = existingData.data.values || [];
+    
+    // 중복 이름 체크
+    const isDuplicate = existingRows.some(row => row[0] === name);
+    if (isDuplicate) {
+      return res.status(400).json({ error: '이미 존재하는 저장이름입니다.' });
+    }
+    
+    // 새 설정 추가
+    const newRow = [name, selectedGroups.join(',')];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_정책그룹관리!A:B',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    res.json({ message: '정책그룹 설정이 저장되었습니다.' });
+  } catch (error) {
+    console.error('정책그룹 설정 저장 오류:', error);
+    res.status(500).json({ error: '정책그룹 설정 저장 중 오류가 발생했습니다.' });
+  }
+});
+
+// 정책그룹 설정 목록 가져오기 API
+app.get('/api/budget/policy-group-settings', async (req, res) => {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_정책그룹관리!A:B',
+    });
+    
+    const rows = response.data.values || [];
+    
+    // 헤더 제외하고 데이터만 반환
+    const settings = rows.slice(1).map(row => ({
+      name: row[0] || '',
+      groups: row[1] ? row[1].split(',') : []
+    }));
+    
+    res.json({ settings });
+  } catch (error) {
+    console.error('정책그룹 설정 목록 가져오기 오류:', error);
+    res.status(500).json({ error: '정책그룹 설정 목록을 가져오는 중 오류가 발생했습니다.' });
+  }
+});
+
+// 정책그룹 설정 삭제 API
+app.delete('/api/budget/policy-group-settings/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 기존 설정 목록 가져오기
+    const existingData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_정책그룹관리!A:B',
+    });
+    
+    const existingRows = existingData.data.values || [];
+    
+    // 삭제할 행 찾기
+    const rowIndex = existingRows.findIndex(row => row[0] === name);
+    if (rowIndex === -1) {
+      return res.status(404).json({ error: '해당 설정을 찾을 수 없습니다.' });
+    }
+    
+    // 행 삭제 (헤더 제외하고 실제 데이터 행 번호 계산)
+    const actualRowNumber = rowIndex + 1;
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: await getSheetIdByName('예산_정책그룹관리'),
+                dimension: 'ROWS',
+                startIndex: actualRowNumber,
+                endIndex: actualRowNumber + 1
+              }
+            }
+          }
+        ]
+      }
+    });
+    
+    res.json({ message: '정책그룹 설정이 삭제되었습니다.' });
+  } catch (error) {
+    console.error('정책그룹 설정 삭제 오류:', error);
+    res.status(500).json({ error: '정책그룹 설정 삭제 중 오류가 발생했습니다.' });
+  }
+});
+
+// 날짜 정규화 함수들
+function normalizeReceptionDate(receptionDateStr) {
+  if (!receptionDateStr) return null;
+  
+  // "2025. 6. 30 오후 2:45:00" 형식을 Date 객체로 변환
+  try {
+    // 한국어 시간 형식을 영어로 변환
+    const normalizedStr = receptionDateStr
+      .replace(/오전/g, 'AM')
+      .replace(/오후/g, 'PM')
+      .replace(/\./g, '/');
+    
+    return new Date(normalizedStr);
+  } catch (error) {
+    console.error('접수일 정규화 오류:', error);
+    return null;
+  }
+}
+
+function normalizeActivationDate(dateStr, hourStr, minuteStr) {
+  if (!dateStr) return null;
+  
+  try {
+    // "2025-06-30" 형식의 날짜
+    const date = new Date(dateStr);
+    
+    // 시간과 분이 있으면 추가
+    if (hourStr && minuteStr) {
+      const hour = parseInt(hourStr.replace(/시/g, '')) || 0;
+      const minute = parseInt(minuteStr.replace(/분/g, '')) || 0;
+      date.setHours(hour, minute, 0, 0);
+    }
+    
+    return date;
+  } catch (error) {
+    console.error('개통일 정규화 오류:', error);
+    return null;
+  }
+}
+
+function isDateInRange(date, startDate, endDate) {
+  if (!date || !startDate || !endDate) return false;
+  
+  const targetDate = new Date(date);
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // 시간을 00:00:00으로 설정하여 날짜만 비교
+  targetDate.setHours(0, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999); // 종료일은 23:59:59로 설정
+  
+  return targetDate >= start && targetDate <= end;
+}
+
+// 사용예산 계산 API
+app.post('/api/budget/calculate-usage', async (req, res) => {
+  try {
+    const { sheetId, selectedPolicyGroups, dateRange, userName } = req.body;
+    
+    if (!sheetId || !selectedPolicyGroups || !Array.isArray(selectedPolicyGroups)) {
+      return res.status(400).json({ error: '필수 파라미터가 누락되었습니다.' });
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 폰클개통데이터 시트에서 데이터 가져오기
+    const activationData = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: '폰클개통데이터!A:Z', // 충분한 컬럼 범위
+    });
+    
+    const activationRows = activationData.data.values || [];
+    
+    // 사용예산 계산
+    let totalUsedBudget = 0;
+    const calculatedData = [];
+    
+    activationRows.slice(1).forEach((row, index) => { // 헤더 제외
+      if (row.length >= 20) { // 최소 20개 컬럼 필요
+        const policyGroup = row[4]; // E열: 정책그룹
+        const armyType = row[3]; // D열: 정책군
+        const categoryType = row[19]; // T열: 유형
+        const budgetValue = parseFloat(row[2]) || 0; // C열: 예산값
+        
+        // 날짜 데이터 정규화
+        const receptionDate = normalizeReceptionDate(row[5]); // F열: 접수일
+        const activationDate = normalizeActivationDate(row[9], row[10], row[11]); // J, K, L열: 개통일
+        
+        // 정책그룹 매칭
+        if (selectedPolicyGroups.includes(policyGroup)) {
+          // 날짜 범위 필터링
+          let isInDateRange = true;
+          if (dateRange && dateRange.startDate && dateRange.endDate) {
+            // 접수일 또는 개통일이 범위에 있는지 확인
+            const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.startDate, dateRange.endDate) : false;
+            const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.startDate, dateRange.endDate) : false;
+            isInDateRange = receptionInRange || activationInRange;
+          }
+          
+          if (isInDateRange) {
+            // 정책군 매핑 (S군="S", A군="A")
+            let mappedArmyType = '';
+            if (armyType === 'S') mappedArmyType = 'S군';
+            else if (armyType === 'A') mappedArmyType = 'A군';
+            else mappedArmyType = armyType; // 기타 경우 그대로 사용
+            
+            // 유형 매핑 (기변 -> 보상)
+            let mappedCategoryType = categoryType;
+            if (categoryType === '기변') mappedCategoryType = '보상';
+            
+            // 매핑된 데이터 저장
+            calculatedData.push({
+              rowIndex: index + 2, // 실제 행 번호 (헤더 제외)
+              policyGroup,
+              armyType: mappedArmyType,
+              categoryType: mappedCategoryType,
+              budgetValue,
+              receptionDate: receptionDate ? receptionDate.toISOString() : null,
+              activationDate: activationDate ? activationDate.toISOString() : null
+            });
+            
+            totalUsedBudget += budgetValue;
+          }
+        }
+      }
+    });
+    
+    res.json({
+      totalUsedBudget,
+      calculatedData,
+      message: '사용예산 계산이 완료되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('사용예산 계산 오류:', error);
+    res.status(500).json({ error: '사용예산 계산 중 오류가 발생했습니다.' });
+  }
+});
+
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
@@ -14416,7 +14708,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
 
 app.post('/api/budget/user-sheets', async (req, res) => {
   try {
-    const { userId, userName, targetMonth } = req.body;
+    const { userId, userName, targetMonth, selectedPolicyGroups } = req.body;
     
     if (!userId || !userName || !targetMonth) {
       return res.status(400).json({ error: '사용자 ID, 이름, 대상월은 필수입니다.' });
@@ -14479,7 +14771,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     // 기존 사용자 시트가 있는지 확인
     const existingSheetsData = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '예산_사용자시트관리!A:F',
+      range: '예산_사용자시트관리!A:G',
     });
     
     const existingRows = existingSheetsData.data.values || [];
@@ -14492,11 +14784,11 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       try {
         await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: '예산_사용자시트관리!A:F',
+          range: '예산_사용자시트관리!A:G',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           resource: {
-            values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth]]
+            values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : '']]
           }
         });
       } catch (appendError) {
@@ -14522,11 +14814,11 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       });
       
       // 헤더와 데이터 추가
-      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월'];
-      const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth];
+      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월', '선택된정책그룹'];
+      const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : ''];
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A1:F2',
+        range: '예산_사용자시트관리!A1:G2',
         valueInputOption: 'RAW',
         resource: {
           values: [headerRow, dataRow]

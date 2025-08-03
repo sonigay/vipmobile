@@ -509,13 +509,13 @@ export const budgetUserSheetAPI = {
   },
 
   // 사용자별 시트 생성
-  createUserSheet: async (userId, userName, targetMonth) => {
+  createUserSheet: async (userId, userName, targetMonth, selectedPolicyGroups) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, userName, targetMonth }),
+      body: JSON.stringify({ userId, userName, targetMonth, selectedPolicyGroups }),
     });
     if (!response.ok) {
       throw new Error('사용자 시트 생성에 실패했습니다.');
@@ -543,6 +543,68 @@ export const budgetUserSheetAPI = {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data?userName=${encodeURIComponent(userName)}`);
     if (!response.ok) {
       throw new Error('예산 데이터 불러오기에 실패했습니다.');
+    }
+    return response.json();
+  },
+}; 
+
+// 정책그룹 관련 API
+export const budgetPolicyGroupAPI = {
+  // 정책그룹 목록 가져오기
+  getPolicyGroups: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/policy-groups`);
+    if (!response.ok) {
+      throw new Error('정책그룹 목록 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 정책그룹 설정 저장
+  savePolicyGroupSettings: async (name, selectedGroups) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/policy-group-settings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, selectedGroups }),
+    });
+    if (!response.ok) {
+      throw new Error('정책그룹 설정 저장에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 정책그룹 설정 목록 가져오기
+  getPolicyGroupSettings: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/policy-group-settings`);
+    if (!response.ok) {
+      throw new Error('정책그룹 설정 목록 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 정책그룹 설정 삭제
+  deletePolicyGroupSettings: async (name) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/policy-group-settings/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('정책그룹 설정 삭제에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 사용예산 계산
+  calculateUsage: async (sheetId, selectedPolicyGroups, dateRange, userName) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/calculate-usage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sheetId, selectedPolicyGroups, dateRange, userName }),
+    });
+    if (!response.ok) {
+      throw new Error('사용예산 계산에 실패했습니다.');
     }
     return response.json();
   },

@@ -44,7 +44,7 @@ import {
   Add as AddIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
-import { budgetMonthSheetAPI, budgetUserSheetAPI } from '../api';
+import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI } from '../api';
 
 function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
@@ -92,6 +92,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 접수일 적용 여부
   const [applyReceiptDate, setApplyReceiptDate] = useState(false);
 
+  // 정책그룹 관련 상태
+  const [policyGroups, setPolicyGroups] = useState([]);
+  const [selectedPolicyGroups, setSelectedPolicyGroups] = useState([]);
+  const [policyGroupSettings, setPolicyGroupSettings] = useState([]);
+  const [showPolicyGroupModal, setShowPolicyGroupModal] = useState(false);
+  const [showSaveSettingsModal, setShowSaveSettingsModal] = useState(false);
+  const [showLoadSettingsModal, setShowLoadSettingsModal] = useState(false);
+  const [settingsName, setSettingsName] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
@@ -116,6 +126,12 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     
     // 사용자 시트 목록 불러오기
     loadUserSheets();
+    
+    // 정책그룹 목록 불러오기
+    loadPolicyGroups();
+    
+    // 정책그룹 설정 목록 불러오기
+    loadPolicyGroupSettings();
   }, [loggedInStore]);
 
   // 업데이트 팝업 강제 열기
@@ -156,6 +172,117 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('사용자 시트 목록 로드 실패:', error);
       setSnackbar({ open: true, message: '저장된 데이터 목록 로드에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 정책그룹 목록 불러오기
+  const loadPolicyGroups = async () => {
+    try {
+      const data = await budgetPolicyGroupAPI.getPolicyGroups();
+      setPolicyGroups(data.policyGroups || []);
+    } catch (error) {
+      console.error('정책그룹 목록 로드 실패:', error);
+      setSnackbar({ open: true, message: '정책그룹 목록 로드에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 정책그룹 설정 목록 불러오기
+  const loadPolicyGroupSettings = async () => {
+    try {
+      const data = await budgetPolicyGroupAPI.getPolicyGroupSettings();
+      setPolicyGroupSettings(data.settings || []);
+    } catch (error) {
+      console.error('정책그룹 설정 목록 로드 실패:', error);
+      setSnackbar({ open: true, message: '정책그룹 설정 목록 로드에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 정책그룹 선택/해제
+  const handlePolicyGroupToggle = (group) => {
+    setSelectedPolicyGroups(prev => {
+      if (prev.includes(group)) {
+        return prev.filter(g => g !== group);
+      } else {
+        return [...prev, group];
+      }
+    });
+  };
+
+  // 정책그룹 설정 저장
+  const handleSavePolicyGroupSettings = async () => {
+    if (!settingsName.trim()) {
+      setSnackbar({ open: true, message: '저장이름을 입력해주세요.', severity: 'warning' });
+      return;
+    }
+
+    try {
+      await budgetPolicyGroupAPI.savePolicyGroupSettings(settingsName.trim(), selectedPolicyGroups);
+      setSnackbar({ open: true, message: '정책그룹 설정이 저장되었습니다.', severity: 'success' });
+      setShowSaveSettingsModal(false);
+      setSettingsName('');
+      loadPolicyGroupSettings(); // 목록 새로고침
+    } catch (error) {
+      console.error('정책그룹 설정 저장 실패:', error);
+      setSnackbar({ open: true, message: '정책그룹 설정 저장에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 정책그룹 설정 불러오기
+  const handleLoadPolicyGroupSettings = async (setting) => {
+    try {
+      setSelectedPolicyGroups(setting.groups);
+      setShowLoadSettingsModal(false);
+      setSnackbar({ open: true, message: '정책그룹 설정을 불러왔습니다.', severity: 'success' });
+    } catch (error) {
+      console.error('정책그룹 설정 불러오기 실패:', error);
+      setSnackbar({ open: true, message: '정책그룹 설정 불러오기에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 정책그룹 설정 삭제
+  const handleDeletePolicyGroupSettings = async (settingName) => {
+    try {
+      await budgetPolicyGroupAPI.deletePolicyGroupSettings(settingName);
+      setSnackbar({ open: true, message: '정책그룹 설정이 삭제되었습니다.', severity: 'success' });
+      loadPolicyGroupSettings(); // 목록 새로고침
+    } catch (error) {
+      console.error('정책그룹 설정 삭제 실패:', error);
+      setSnackbar({ open: true, message: '정책그룹 설정 삭제에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 사용예산 계산
+  const handleCalculateUsage = async () => {
+    if (!sheetId || selectedPolicyGroups.length === 0) {
+      setSnackbar({ open: true, message: '시트 ID와 정책그룹을 선택해주세요.', severity: 'warning' });
+      return;
+    }
+
+    try {
+      const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
+      
+      // 날짜 범위를 서버가 기대하는 형식으로 변환
+      const serverDateRange = {
+        startDate: applyReceiptDate && dateRange.receiptStartDate 
+          ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` 
+          : `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
+        endDate: applyReceiptDate && dateRange.receiptEndDate 
+          ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` 
+          : `${dateRange.activationEndDate} ${dateRange.activationEndTime}`
+      };
+      
+      const result = await budgetPolicyGroupAPI.calculateUsage(sheetId, selectedPolicyGroups, serverDateRange, userName);
+      
+      setSnackbar({ 
+        open: true, 
+        message: `사용예산 계산 완료: ${result.totalUsedBudget.toLocaleString()}원`, 
+        severity: 'success' 
+      });
+      
+      console.log('계산 결과:', result);
+    } catch (error) {
+      console.error('사용예산 계산 실패:', error);
+      setSnackbar({ open: true, message: '사용예산 계산에 실패했습니다.', severity: 'error' });
     }
   };
 
@@ -373,7 +500,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
       
       // 항상 새 시트 생성 (기존 시트 확인 로직 제거)
-      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
+      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth, selectedPolicyGroups);
       const targetSheetId = result.sheet.id;
       setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다.`, severity: 'success' });
       
@@ -559,6 +686,46 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
              📅 접수일 및 개통일 범위 설정
            </Typography>
+           
+           {/* 정책그룹 선택 버튼 */}
+           <Box sx={{ mb: 3 }}>
+             <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+               📊 정책그룹 선택
+             </Typography>
+             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+               <Button
+                 variant="outlined"
+                 onClick={() => setShowPolicyGroupModal(true)}
+                 sx={{ borderColor: '#795548', color: '#795548' }}
+               >
+                 정책그룹 선택
+               </Button>
+               {selectedPolicyGroups.length > 0 && (
+                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                   <Typography variant="body2" sx={{ color: '#666' }}>
+                     선택됨:
+                   </Typography>
+                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                     {selectedPolicyGroups.slice(0, 3).map((group) => (
+                       <Chip
+                         key={group}
+                         label={group}
+                         size="small"
+                         sx={{ backgroundColor: '#e3f2fd', fontSize: '0.7rem' }}
+                       />
+                     ))}
+                     {selectedPolicyGroups.length > 3 && (
+                       <Chip
+                         label={`+${selectedPolicyGroups.length - 3}개`}
+                         size="small"
+                         sx={{ backgroundColor: '#f5f5f5', fontSize: '0.7rem' }}
+                       />
+                     )}
+                   </Box>
+                 </Box>
+               )}
+             </Box>
+           </Box>
            
            {/* 접수일 적용 여부 체크박스 */}
            <Box sx={{ mb: 3 }}>
@@ -1041,6 +1208,196 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            <CircularProgress sx={{ color: '#795548' }} />
          </Box>
        )}
+
+       {/* 정책그룹 선택 모달 */}
+       <Dialog 
+         open={showPolicyGroupModal} 
+         onClose={() => setShowPolicyGroupModal(false)}
+         maxWidth="md"
+         fullWidth
+       >
+         <DialogTitle>
+           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <Typography variant="h6">정책그룹 선택</Typography>
+             <Box>
+               <Button
+                 size="small"
+                 variant="outlined"
+                 onClick={() => setShowSaveSettingsModal(true)}
+                 sx={{ mr: 1 }}
+               >
+                 저장
+               </Button>
+               <Button
+                 size="small"
+                 variant="outlined"
+                 onClick={() => setShowLoadSettingsModal(true)}
+               >
+                 불러오기
+               </Button>
+             </Box>
+           </Box>
+         </DialogTitle>
+         <DialogContent>
+           <Box sx={{ mb: 2 }}>
+             <TextField
+               fullWidth
+               size="small"
+               placeholder="정책그룹 검색..."
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+               sx={{ mb: 2 }}
+             />
+             <Button
+               variant="contained"
+               onClick={handleCalculateUsage}
+               disabled={selectedPolicyGroups.length === 0}
+               sx={{ mb: 2 }}
+             >
+               사용예산 계산
+             </Button>
+           </Box>
+           
+           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1 }}>
+             {policyGroups
+               .filter(group => group.toLowerCase().includes(searchTerm.toLowerCase()))
+               .map((group) => (
+                 <Box
+                   key={group}
+                   sx={{
+                     p: 1,
+                     border: '1px solid #ddd',
+                     borderRadius: 1,
+                     cursor: 'pointer',
+                     backgroundColor: selectedPolicyGroups.includes(group) ? '#e3f2fd' : 'white',
+                     '&:hover': {
+                       backgroundColor: selectedPolicyGroups.includes(group) ? '#bbdefb' : '#f5f5f5'
+                     }
+                   }}
+                   onClick={() => handlePolicyGroupToggle(group)}
+                 >
+                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                     <input
+                       type="checkbox"
+                       checked={selectedPolicyGroups.includes(group)}
+                       onChange={() => handlePolicyGroupToggle(group)}
+                       style={{ marginRight: 8 }}
+                     />
+                     <Typography variant="body2">{group}</Typography>
+                   </Box>
+                 </Box>
+               ))}
+           </Box>
+           
+           {selectedPolicyGroups.length > 0 && (
+             <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+               <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                 선택된 정책그룹 ({selectedPolicyGroups.length}개):
+               </Typography>
+               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                 {selectedPolicyGroups.map((group) => (
+                   <Chip
+                     key={group}
+                     label={group}
+                     size="small"
+                     onDelete={() => handlePolicyGroupToggle(group)}
+                     sx={{ backgroundColor: '#e3f2fd' }}
+                   />
+                 ))}
+               </Box>
+             </Box>
+           )}
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={() => setShowPolicyGroupModal(false)}>닫기</Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* 정책그룹 설정 저장 모달 */}
+       <Dialog 
+         open={showSaveSettingsModal} 
+         onClose={() => setShowSaveSettingsModal(false)}
+         maxWidth="sm"
+         fullWidth
+       >
+         <DialogTitle>정책그룹 설정 저장</DialogTitle>
+         <DialogContent>
+           <TextField
+             fullWidth
+             label="저장이름"
+             value={settingsName}
+             onChange={(e) => setSettingsName(e.target.value)}
+             placeholder="예: VIP고객, 일반고객 등"
+             sx={{ mt: 1 }}
+           />
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={() => setShowSaveSettingsModal(false)}>취소</Button>
+           <Button onClick={handleSavePolicyGroupSettings} variant="contained">
+             저장
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* 정책그룹 설정 불러오기 모달 */}
+       <Dialog 
+         open={showLoadSettingsModal} 
+         onClose={() => setShowLoadSettingsModal(false)}
+         maxWidth="sm"
+         fullWidth
+       >
+         <DialogTitle>정책그룹 설정 불러오기</DialogTitle>
+         <DialogContent>
+           {policyGroupSettings.length === 0 ? (
+             <Typography sx={{ py: 2, textAlign: 'center', color: '#666' }}>
+               저장된 설정이 없습니다.
+             </Typography>
+           ) : (
+             <Box sx={{ mt: 1 }}>
+               {policyGroupSettings.map((setting, index) => (
+                 <Box
+                   key={index}
+                   sx={{
+                     p: 2,
+                     border: '1px solid #ddd',
+                     borderRadius: 1,
+                     mb: 1,
+                     cursor: 'pointer',
+                     '&:hover': {
+                       backgroundColor: '#f5f5f5'
+                     }
+                   }}
+                   onClick={() => handleLoadPolicyGroupSettings(setting)}
+                 >
+                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <Box>
+                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                         {setting.name}
+                       </Typography>
+                       <Typography variant="body2" sx={{ color: '#666', mt: 0.5 }}>
+                         {setting.groups.join(', ')}
+                       </Typography>
+                     </Box>
+                     <Button
+                       size="small"
+                       color="error"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         handleDeletePolicyGroupSettings(setting.name);
+                       }}
+                     >
+                       삭제
+                     </Button>
+                   </Box>
+                 </Box>
+               ))}
+             </Box>
+           )}
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={() => setShowLoadSettingsModal(false)}>닫기</Button>
+         </DialogActions>
+       </Dialog>
     </Box>
   );
 
