@@ -15153,6 +15153,13 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
         const inputUser = userMatch ? userMatch[1] : inputUserInfo;
         const userLevel = userMatch ? parseInt(userMatch[2]) : 1;
         
+        // 숫자 값 파싱 개선
+        const parseBudgetValue = (value) => {
+          if (!value || value === '') return 0;
+          const parsed = parseFloat(value.toString().replace(/[^\d.-]/g, ''));
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
         return {
           id: `loaded-${index}`,
           appliedDate,
@@ -15161,11 +15168,11 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
           modelName,
           armyType,
           categoryType,
-          securedBudget: parseFloat(securedBudget) || 0,
-          usedBudget: parseFloat(usedBudget) || 0,
-          remainingBudget: parseFloat(remainingBudget) || 0,
+          securedBudget: parseBudgetValue(securedBudget),
+          usedBudget: parseBudgetValue(usedBudget),
+          remainingBudget: parseBudgetValue(remainingBudget),
           status,
-          budgetValue: parseFloat(securedBudget) || 0 // 원본 예산 값
+          budgetValue: parseBudgetValue(securedBudget) // 원본 예산 값
         };
       }
       return null;

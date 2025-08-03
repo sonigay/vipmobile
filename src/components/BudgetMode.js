@@ -288,6 +288,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName);
       
+      console.log('Loaded budget data result:', result);
+      console.log('Parsed data:', result.data);
+      
       // 데이터를 화면에 설정
       setBudgetData(result.data || []);
       
