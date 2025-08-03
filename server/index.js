@@ -6234,8 +6234,8 @@ app.get('/api/inspection-data', async (req, res) => {
     }
 
     // 헤더 제거
-    const manualRows = manualValues.slice(1);
-    const systemRows = systemValues.slice(1);
+    const manualRows = manualValues.slice(3);
+    const systemRows = systemValues.slice(3);
 
     // 데이터 비교 및 차이점 찾기
     const differences = [];
@@ -6246,7 +6246,7 @@ app.get('/api/inspection-data', async (req, res) => {
     manualRows.forEach((row, index) => {
       if (row.length > 0 && row[0]) {
         const key = row[0].toString().trim();
-        manualMap.set(key, { row, index: index + 2 }); // +2는 헤더와 1-based 인덱스 때문
+        manualMap.set(key, { row, index: index + 4 }); // +4는 헤더와 1-based 인덱스 때문
       }
     });
 
@@ -6350,7 +6350,7 @@ app.get('/api/inspection-data', async (req, res) => {
         allRows.push({
           key,
           row,
-          index: index + 2,
+          index: index + 4,
           source: 'manual'
         });
       }
@@ -6363,7 +6363,7 @@ app.get('/api/inspection-data', async (req, res) => {
         allRows.push({
           key,
           row,
-          index: index + 2,
+          index: index + 4,
           source: 'system'
         });
       }
@@ -9123,7 +9123,7 @@ app.get('/api/reservation-inventory-status', async (req, res) => {
     // 폰클재고데이터에서 재고 정보 수집
     const inventoryValues = await getSheetValues('폰클재고데이터');
     
-    if (!inventoryValues || inventoryValues.length < 2) {
+    if (!inventoryValues || inventoryValues.length < 4) {
       throw new Error('폰클재고데이터를 가져올 수 없습니다.');
     }
     
@@ -9140,8 +9140,8 @@ app.get('/api/reservation-inventory-status', async (req, res) => {
     let processedCount = 0;
     let totalCount = 0;
     
-    // 헤더 제거하고 데이터 처리 (2행부터 시작)
-    inventoryValues.slice(1).forEach((row, index) => {
+    // 3행 헤더를 제외하고 데이터 처리 (4행부터 시작)
+    inventoryValues.slice(3).forEach((row, index) => {
       if (row.length >= 14) {
         totalCount++;
         const model = (row[5] || '').toString().trim(); // F열: 모델명
@@ -13793,6 +13793,54 @@ async function initializeDefaultCategories() {
   console.log('기본 카테고리 초기화 완료');
 }
 
+// 운영모델 시트에서 모델 순서 가져오기 API
+app.get('/api/operation-models', async (req, res) => {
+  try {
+    const cacheKey = 'operation_models_order';
+    
+    // 캐시에서 먼저 확인 (1시간 TTL)
+    const cachedData = cacheUtils.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+    
+    const operationModelValues = await getSheetValues('운영모델');
+    
+    if (!operationModelValues || operationModelValues.length < 4) {
+      throw new Error('운영모델 시트를 가져올 수 없습니다.');
+    }
+    
+    // 3행 헤더를 제외하고 4행부터 데이터 처리
+    const modelOrder = {};
+    operationModelValues.slice(3).forEach((row, index) => {
+      if (row.length >= 3) {
+        const modelName = (row[2] || '').toString().trim(); // C열: 모델명
+        if (modelName && modelName !== '모델명') {
+          modelOrder[modelName] = index;
+        }
+      }
+    });
+    
+    const result = {
+      success: true,
+      data: modelOrder,
+      count: Object.keys(modelOrder).length
+    };
+    
+    // 캐시에 저장 (1시간 TTL)
+    cacheUtils.set(cacheKey, result, 60 * 60 * 1000);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching operation models:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch operation models', 
+      message: error.message 
+    });
+  }
+});
+
 // 재고장표 API - 모델별 재고 현황
 app.get('/api/inventory/status', async (req, res) => {
   try {
@@ -13813,18 +13861,18 @@ app.get('/api/inventory/status', async (req, res) => {
       getSheetValues('폰클개통데이터')
     ]);
     
-    if (!inventoryValues || inventoryValues.length < 2) {
+    if (!inventoryValues || inventoryValues.length < 4) {
       throw new Error('폰클재고데이터를 가져올 수 없습니다.');
     }
     
-    if (!activationValues || activationValues.length < 2) {
+    if (!activationValues || activationValues.length < 4) {
       throw new Error('폰클개통데이터를 가져올 수 없습니다.');
     }
     
     // 재고 데이터 처리 (모델별 집계)
     const inventoryMap = new Map(); // key: "모델명", value: { 재고수량, 담당자, 사무실, 소속, 구분 }
     
-    inventoryValues.slice(1).forEach(row => {
+    inventoryValues.slice(3).forEach(row => {
       if (row.length >= 23) {
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
         const color = (row[14] || '').toString().trim(); // O열: 색상
@@ -13863,7 +13911,7 @@ app.get('/api/inventory/status', async (req, res) => {
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     
-    activationValues.slice(1).forEach(row => {
+    activationValues.slice(3).forEach(row => {
       if (row.length >= 23) {
         const activationDate = (row[9] || '').toString().trim(); // J열: 개통일
         const modelName = (row[21] || '').toString().trim(); // V열: 모델명
@@ -13947,11 +13995,11 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
       getSheetValues('폰클개통데이터')
     ]);
     
-    if (!inventoryValues || inventoryValues.length < 2) {
+    if (!inventoryValues || inventoryValues.length < 4) {
       throw new Error('폰클재고데이터를 가져올 수 없습니다.');
     }
     
-    if (!activationValues || activationValues.length < 2) {
+    if (!activationValues || activationValues.length < 4) {
       throw new Error('폰클개통데이터를 가져올 수 없습니다.');
     }
     
@@ -13960,7 +14008,7 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
     
     // 먼저 모델명이 있는 행들만 수집
     const validRows = [];
-    inventoryValues.slice(1).forEach(row => {
+    inventoryValues.slice(3).forEach(row => {
       if (row.length >= 23) {
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
         const color = (row[14] || '').toString().trim(); // O열: 색상
@@ -14027,7 +14075,7 @@ app.get('/api/inventory/status-by-color', async (req, res) => {
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     
-    activationValues.slice(1).forEach(row => {
+    activationValues.slice(3).forEach(row => {
       if (row.length >= 23) {
         const activationDate = (row[9] || '').toString().trim(); // J열: 개통일
         const modelName = (row[21] || '').toString().trim(); // V열: 모델명

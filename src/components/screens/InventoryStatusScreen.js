@@ -50,6 +50,9 @@ const InventoryStatusScreen = () => {
     offices: [],
     departments: []
   });
+  
+  // 운영모델 순서 상태
+  const [operationModelOrder, setOperationModelOrder] = useState({});
 
   // 데이터 로드
   const loadData = async () => {
@@ -69,7 +72,7 @@ const InventoryStatusScreen = () => {
                        if (data.success) {
             let processedData = data.data;
             
-            // 다중 정렬: 구분별 → 모델명 → 색상별
+            // 다중 정렬: 구분별 → 모델명(운영모델 순서) → 색상별
             const sortedData = processedData.sort((a, b) => {
               // 1순위: 구분 (삼성 → 애플 → 기타 → 2ND)
               const categoryOrder = { '삼성': 1, '애플': 2, '기타': 3, '2ND': 4 };
@@ -79,8 +82,14 @@ const InventoryStatusScreen = () => {
                 return aOrder - bOrder;
               }
               
-              // 2순위: 모델명
+              // 2순위: 모델명 (운영모델 시트 C열 순서)
               if (a.modelName !== b.modelName) {
+                const aModelOrder = operationModelOrder[a.modelName] ?? 999;
+                const bModelOrder = operationModelOrder[b.modelName] ?? 999;
+                if (aModelOrder !== bModelOrder) {
+                  return aModelOrder - bModelOrder;
+                }
+                // 운영모델에 없는 모델은 알파벳 순으로 정렬
                 return a.modelName.localeCompare(b.modelName);
               }
               
@@ -149,10 +158,23 @@ const InventoryStatusScreen = () => {
       console.error('담당자 데이터 로드 실패:', error);
     }
   };
+  
+  // 운영모델 순서 로드
+  const loadOperationModelOrder = async () => {
+    try {
+      const response = await inventoryAPI.getOperationModels();
+      if (response.success) {
+        setOperationModelOrder(response.data);
+      }
+    } catch (error) {
+      console.error('운영모델 순서 로드 실패:', error);
+    }
+  };
 
   // 초기 로드
   useEffect(() => {
     loadAgentData();
+    loadOperationModelOrder();
   }, []);
 
   useEffect(() => {
@@ -191,26 +213,26 @@ const InventoryStatusScreen = () => {
       if (count === 0) return { color: 'text.secondary', backgroundColor: '#ffffff' }; // 0값은 하얀색 배경
       
       if (type === 'inventory') {
-        // 잔여재고: 1~/5~/10~/20~/40~
-        if (count >= 40) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
-        if (count >= 20) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황
-        if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑
-        if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
-        return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
+        // 잔여재고: 1~/5~/10~/20~/40~ (낮은 숫자 = 빨강, 높은 숫자 = 파랑)
+        if (count >= 40) return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑 (안정)
+        if (count >= 20) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록 (양호)
+        if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑 (보통)
+        if (count >= 5) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황 (경계)
+        return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강 (주의)
       } else if (type === 'monthly') {
-        // 당월개통: 1~/5~/10~/20~/40~
-        if (count >= 40) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
-        if (count >= 20) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황
-        if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑
-        if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
-        return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
+        // 당월개통: 1~/5~/10~/20~/40~ (낮은 숫자 = 빨강, 높은 숫자 = 파랑)
+        if (count >= 40) return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑 (안정)
+        if (count >= 20) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록 (양호)
+        if (count >= 10) return { color: '#f57f17', backgroundColor: '#fff8e1' }; // 노랑 (보통)
+        if (count >= 5) return { color: '#f57c00', backgroundColor: '#fff3e0' }; // 주황 (경계)
+        return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강 (주의)
       } else {
-        // 일별 개통: 1~/2~/3~/5~/10~
-        if (count >= 10) return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강
-        if (count >= 5) return { color: '#f57c00', backgroundColor: '#fff3e0' };  // 주황
-        if (count >= 3) return { color: '#f57f17', backgroundColor: '#fff8e1' };  // 노랑
-        if (count >= 2) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록
-        return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑
+        // 일별 개통: 1~/2~/3~/5~/10~ (낮은 숫자 = 빨강, 높은 숫자 = 파랑)
+        if (count >= 10) return { color: '#1976d2', backgroundColor: '#e3f2fd' }; // 파랑 (안정)
+        if (count >= 5) return { color: '#388e3c', backgroundColor: '#e8f5e8' };  // 초록 (양호)
+        if (count >= 3) return { color: '#f57f17', backgroundColor: '#fff8e1' };  // 노랑 (보통)
+        if (count >= 2) return { color: '#f57c00', backgroundColor: '#fff3e0' };  // 주황 (경계)
+        return { color: '#d32f2f', backgroundColor: '#ffebee' }; // 빨강 (주의)
       }
     };
 

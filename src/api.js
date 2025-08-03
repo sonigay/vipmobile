@@ -338,60 +338,64 @@ export const fetchAgentData = async () => {
   }
 };
 
-// 재고장표 API 함수들
+// 재고장표 API
 export const inventoryAPI = {
-  // 모델별 재고 현황 가져오기
+  // 모델별 재고 현황
   getInventoryStatus: async (filters = {}) => {
-    try {
-      const params = new URLSearchParams();
-      if (filters.agent) params.append('agent', filters.agent);
-      if (filters.office) params.append('office', filters.office);
-      if (filters.department) params.append('department', filters.department);
-      
-      const response = await fetch(`${API_BASE_URL}/api/inventory/status?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('재고 현황 로드 오류:', error);
-      throw error;
+    const params = new URLSearchParams();
+    if (filters.agent) params.append('agent', filters.agent);
+    if (filters.office) params.append('office', filters.office);
+    if (filters.department) params.append('department', filters.department);
+    
+    const response = await fetch(`${API_BASE_URL}/api/inventory/status?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    return await response.json();
   },
-
-  // 색상별 재고 현황 가져오기
+  
+  // 색상별 재고 현황
   getInventoryStatusByColor: async (filters = {}) => {
-    try {
-      const params = new URLSearchParams();
-      if (filters.agent) params.append('agent', filters.agent);
-      if (filters.office) params.append('office', filters.office);
-      if (filters.department) params.append('department', filters.department);
-      
-      const response = await fetch(`${API_BASE_URL}/api/inventory/status-by-color?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('색상별 재고 현황 로드 오류:', error);
-      throw error;
+    const params = new URLSearchParams();
+    if (filters.agent) params.append('agent', filters.agent);
+    if (filters.office) params.append('office', filters.office);
+    if (filters.department) params.append('department', filters.department);
+    
+    const response = await fetch(`${API_BASE_URL}/api/inventory/status-by-color?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    return await response.json();
+  },
+  
+  // 운영모델 순서 가져오기
+  getOperationModels: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/operation-models`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
   }
 };
 
