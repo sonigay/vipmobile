@@ -220,9 +220,101 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
 
     setBudgetData(newData);
+  };
+
+  // 클립보드 붙여넣기 처리
+  const handlePaste = async (event, startRowIndex, startColIndex) => {
+    event.preventDefault();
     
-    // 자동 저장
-    autoSaveToUserSheet(newData);
+    try {
+      const clipboardData = await navigator.clipboard.readText();
+      const rows = clipboardData.trim().split('\n');
+      
+      const newData = [...budgetData];
+      
+      rows.forEach((row, rowOffset) => {
+        const cells = row.split('\t');
+        const currentRowIndex = startRowIndex + rowOffset;
+        
+        // 행 데이터 초기화
+        if (!newData[currentRowIndex]) {
+          newData[currentRowIndex] = {
+            id: `row-${currentRowIndex}`,
+            modelName: '',
+            securedBudget: 0,
+            usedBudget: 0,
+            remainingBudget: 0,
+            status: '정상',
+            appliedDate: new Date().toISOString().split('T')[0],
+            inputUser: loggedInStore?.name || 'Unknown',
+            userLevel: loggedInStore?.level || 1,
+            armyType: '',
+            categoryType: '',
+            budgetValue: 0
+          };
+        }
+        
+        cells.forEach((cell, colOffset) => {
+          const currentColIndex = startColIndex + colOffset;
+          const value = cell.trim();
+          
+          if (currentColIndex === 0) {
+            // 모델명
+            newData[currentRowIndex].modelName = value;
+          } else if (currentColIndex >= 1 && currentColIndex <= 18) {
+            // 예산 값 (1-18번 컬럼)
+            const numValue = parseFloat(value) || 0;
+            newData[currentRowIndex].budgetValue = numValue;
+            newData[currentRowIndex].securedBudget = numValue;
+            
+            // 군/유형 매핑
+            const armyType = getArmyType(currentColIndex);
+            const categoryType = getCategoryType(currentColIndex);
+            newData[currentRowIndex].armyType = armyType;
+            newData[currentRowIndex].categoryType = categoryType;
+          }
+        });
+      });
+      
+      setBudgetData(newData);
+      
+      setSnackbar({ 
+        open: true, 
+        message: `${rows.length}행의 데이터가 붙여넣기되었습니다. 저장 버튼을 클릭하여 저장하세요.`, 
+        severity: 'success' 
+      });
+      
+    } catch (error) {
+      console.error('붙여넣기 실패:', error);
+      setSnackbar({ 
+        open: true, 
+        message: '붙여넣기에 실패했습니다. 클립보드 접근 권한을 확인해주세요.', 
+        severity: 'error' 
+      });
+    }
+  };
+
+  // 수동 저장 함수
+  const handleManualSave = async () => {
+    if (!targetMonth) {
+      setSnackbar({ open: true, message: '대상월을 먼저 선택해주세요.', severity: 'warning' });
+      return;
+    }
+    
+    if (budgetData.length === 0 || budgetData.every(row => !row || (!row.modelName && !row.budgetValue))) {
+      setSnackbar({ open: true, message: '저장할 데이터가 없습니다.', severity: 'warning' });
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      await autoSaveToUserSheet(budgetData);
+      setSnackbar({ open: true, message: '데이터가 성공적으로 저장되었습니다.', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ open: true, message: '저장에 실패했습니다.', severity: 'error' });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // 자동 저장 함수
@@ -532,14 +624,33 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </CardContent>
       </Card>
 
-      {/* 엑셀형 예산 데이터 테이블 */}
-      <Card sx={{ mb: 3, border: '2px solid #795548' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            📊 예산 데이터 입력 (엑셀 형식)
-          </Typography>
-          
-          <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+             {/* 엑셀형 예산 데이터 테이블 */}
+       <Card sx={{ mb: 3, border: '2px solid #795548' }}>
+         <CardContent>
+           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+             <Typography variant="h6" sx={{ color: '#795548' }}>
+               📊 예산 데이터 입력 (엑셀 형식)
+             </Typography>
+             <Button
+               variant="contained"
+               startIcon={<SaveIcon />}
+               onClick={handleManualSave}
+               disabled={isProcessing || !targetMonth || budgetData.length === 0}
+               sx={{ 
+                 backgroundColor: '#795548',
+                 '&:hover': { backgroundColor: '#5D4037' }
+               }}
+             >
+               {isProcessing ? '저장 중...' : '저장'}
+             </Button>
+           </Box>
+           
+           <TableContainer 
+             component={Paper} 
+             sx={{ maxHeight: 600 }}
+             onPaste={(e) => handlePaste(e, 0, 0)}
+             tabIndex={0}
+           >
             <Table stickyHeader size="small">
               <TableHead>
                 {/* 첫 번째 헤더 행: 군별 헤더 */}
@@ -722,11 +833,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Table>
           </TableContainer>
           
-          <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
-            <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
-              💡 <strong>사용법:</strong> 모델명과 예산 값을 직접 입력하면 자동으로 저장됩니다. 각 셀을 클릭하여 편집할 수 있습니다.
-            </Typography>
-          </Box>
+                     <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+             <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+               💡 <strong>사용법:</strong> 
+               <br/>• <strong>직접 입력:</strong> 각 셀을 클릭하여 모델명과 예산 값을 직접 입력할 수 있습니다.
+               <br/>• <strong>엑셀 붙여넣기:</strong> 엑셀에서 데이터를 복사한 후 테이블 영역을 클릭하고 Ctrl+V로 붙여넣기하면 한 번에 여러 행의 데이터가 입력됩니다.
+               <br/>• <strong>저장:</strong> 데이터 입력 후 상단의 "저장" 버튼을 클릭하여 Google Sheet에 저장합니다.
+               <br/>• <strong>데이터 형식:</strong> 첫 번째 열은 모델명, 나머지 18개 열은 각 군별(신규/MNP/보상) 예산 값입니다.
+             </Typography>
+           </Box>
         </CardContent>
       </Card>
 
