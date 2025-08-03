@@ -12,6 +12,13 @@ const setupTeamRoutes = require('./teamRoutes');
 const app = express();
 const port = process.env.PORT || 4000;
 
+// 서버 타임아웃 설정 (5분)
+app.use((req, res, next) => {
+  req.setTimeout(300000); // 5분
+  res.setTimeout(300000); // 5분
+  next();
+});
+
 // CORS 설정 - 모든 도메인 허용
 app.use(cors({
   origin: ['https://vipmobile.netlify.app', 'http://localhost:3000', 'http://localhost:3001'],
@@ -463,8 +470,12 @@ const auth = new google.auth.JWT({
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
-// Google Sheets API 초기화
-const sheets = google.sheets({ version: 'v4', auth });
+// Google Sheets API 초기화 (타임아웃 설정 포함)
+const sheets = google.sheets({ 
+  version: 'v4', 
+  auth,
+  timeout: 60000 // 60초 타임아웃
+});
 
 // 데이터 시트에서 값 가져오기 (캐싱 적용)
 async function getSheetValues(sheetName) {
@@ -14719,7 +14730,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
     
   } catch (error) {
     console.error('사용자 시트 사용예산 업데이트 오류:', error);
-    res.status(500).json({ error: '사용자 시트 사용예산 업데이트 중 오류가 발생했습니다.' });
+    res.status(500).json({ error: '사용자 시트 사용예산 업데이트에 실패했습니다.' });
   }
 });
 
@@ -14908,9 +14919,15 @@ app.post('/api/budget/user-sheets', async (req, res) => {
           ]
         }
       });
+      console.log(`시트 "${userSheetName}"이 성공적으로 생성되었습니다.`);
     } catch (addSheetError) {
-      // 시트가 이미 존재하는 경우 무시
-      console.log(`시트 "${userSheetName}"이 이미 존재합니다.`);
+      // 시트가 이미 존재하는 경우 무시하고 계속 진행
+      if (addSheetError.code === 400 && addSheetError.message.includes('already exists')) {
+        console.log(`시트 "${userSheetName}"이 이미 존재합니다. 기존 시트를 사용합니다.`);
+      } else {
+        console.error('시트 생성 중 오류:', addSheetError);
+        throw addSheetError;
+      }
     }
     
     // 헤더 추가
@@ -14949,7 +14966,8 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       } catch (appendError) {
         // 시트가 존재하지 않으면 새로 생성하고 데이터 추가
         console.log('예산_사용자시트관리 시트가 존재하지 않아 새로 생성합니다.');
-        await sheets.spreadsheets.batchUpdate({
+        try {
+          await sheets.spreadsheets.batchUpdate({
           spreadsheetId: SPREADSHEET_ID,
           resource: {
             requests: [
@@ -14967,19 +14985,24 @@ app.post('/api/budget/user-sheets', async (req, res) => {
           ]
         }
       });
-      
-      // 헤더와 데이터 추가
-      const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월', '선택된정책그룹'];
-      const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : ''];
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A1:G2',
-        valueInputOption: 'RAW',
-        resource: {
-          values: [headerRow, dataRow]
-        }
-      });
+    } catch (batchUpdateError) {
+      console.error('시트 생성 중 오류:', batchUpdateError);
+      throw batchUpdateError;
     }
+  }
+  
+  // 헤더와 데이터 추가
+  const headerRow = ['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월', '선택된정책그룹'];
+  const dataRow = [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : ''];
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: '예산_사용자시트관리!A1:G2',
+    valueInputOption: 'RAW',
+    resource: {
+      values: [headerRow, dataRow]
+    }
+  });
+}
 
     const newSheet = {
       id: targetSheetId,
@@ -14992,10 +15015,27 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       message: '사용자별 시트가 생성되었습니다.',
       sheet: newSheet
     });
-  }
   } catch (error) {
     console.error('사용자별 시트 생성 오류:', error);
-    res.status(500).json({ error: '사용자별 시트 생성 중 오류가 발생했습니다.' });
+    
+    // 더 구체적인 오류 메시지 제공
+    let errorMessage = '사용자별 시트 생성 중 오류가 발생했습니다.';
+    
+    if (error.code === 400) {
+      if (error.message.includes('already exists')) {
+        errorMessage = '시트가 이미 존재합니다.';
+      } else if (error.message.includes('Invalid value')) {
+        errorMessage = '잘못된 값이 입력되었습니다.';
+      }
+    } else if (error.code === 403) {
+      errorMessage = 'Google Sheets 접근 권한이 없습니다.';
+    } else if (error.code === 404) {
+      errorMessage = '대상 시트를 찾을 수 없습니다.';
+    } else if (error.message.includes('timeout')) {
+      errorMessage = '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.';
+    }
+    
+    res.status(500).json({ error: errorMessage });
   }
 });
 
