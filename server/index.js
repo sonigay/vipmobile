@@ -14476,27 +14476,39 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       }
     });
 
-    // 사용자별 시트 관리 시트에 정보 추가
-    try {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A:F',
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        resource: {
-          values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth]]
-        }
-      });
-    } catch (appendError) {
-      // 시트가 존재하지 않으면 새로 생성하고 데이터 추가
-      console.log('예산_사용자시트관리 시트가 존재하지 않아 새로 생성합니다.');
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        resource: {
-          requests: [
-            {
-              addSheet: {
-                properties: {
+    // 기존 사용자 시트가 있는지 확인
+    const existingSheetsData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_사용자시트관리!A:F',
+    });
+    
+    const existingRows = existingSheetsData.data.values || [];
+    const existingSheet = existingRows.find(row => 
+      row[0] === userId && row[5] === targetMonth && row[2] === userSheetName
+    );
+    
+    // 기존 시트가 없을 때만 새로 추가
+    if (!existingSheet) {
+      try {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '예산_사용자시트관리!A:F',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth]]
+          }
+        });
+      } catch (appendError) {
+        // 시트가 존재하지 않으면 새로 생성하고 데이터 추가
+        console.log('예산_사용자시트관리 시트가 존재하지 않아 새로 생성합니다.');
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            requests: [
+              {
+                addSheet: {
+                  properties: {
                   title: '예산_사용자시트관리',
                   gridProperties: {
                     rowCount: 1000,
