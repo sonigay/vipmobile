@@ -134,6 +134,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     loadPolicyGroupSettings();
   }, [loggedInStore]);
 
+  // selectedPolicyGroups 상태 변화 모니터링
+  useEffect(() => {
+    console.log('selectedPolicyGroups state changed:', selectedPolicyGroups);
+  }, [selectedPolicyGroups]);
+
   // 업데이트 팝업 강제 열기
   const handleForceShowUpdatePopup = () => {
     // "오늘 하루 보지 않기" 설정을 임시로 제거
@@ -199,12 +204,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   // 정책그룹 선택/해제
   const handlePolicyGroupToggle = (group) => {
+    console.log('Toggling policy group:', group, 'Current selectedPolicyGroups:', selectedPolicyGroups);
     setSelectedPolicyGroups(prev => {
-      if (prev.includes(group)) {
-        return prev.filter(g => g !== group);
-      } else {
-        return [...prev, group];
-      }
+      const newState = prev.includes(group) 
+        ? prev.filter(g => g !== group)
+        : [...prev, group];
+      console.log('New selectedPolicyGroups state:', newState);
+      return newState;
     });
   };
 
@@ -750,7 +756,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                <Button
                  variant="outlined"
-                 onClick={() => setShowPolicyGroupModal(true)}
+                 onClick={() => {
+                   console.log('Opening policy group modal, selectedPolicyGroups:', selectedPolicyGroups);
+                   setShowPolicyGroupModal(true);
+                 }}
                  sx={{ borderColor: '#795548', color: '#795548' }}
                >
                  정책그룹 선택
@@ -1267,6 +1276,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          onClose={() => setShowPolicyGroupModal(false)}
          maxWidth="md"
          fullWidth
+         key={`policy-group-modal-${selectedPolicyGroups.join(',')}`}
        >
          <DialogTitle>
            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
