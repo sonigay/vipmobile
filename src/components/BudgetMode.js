@@ -52,7 +52,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   
   // 액면예산 관련 상태
   const [budgetData, setBudgetData] = useState([]);
-  const [pastedData, setPastedData] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   
@@ -63,19 +62,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [monthSheetMappings, setMonthSheetMappings] = useState({}); // 월별 시트 ID 매핑
   const [detailedMonthData, setDetailedMonthData] = useState({}); // 상세 데이터 (수정일시, 수정자 포함)
   
-  // 저장 관련 상태
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveDateRange, setSaveDateRange] = useState({
+  // 날짜/시간 입력 상태
+  const [dateRange, setDateRange] = useState({
     receiptStartDate: '',
+    receiptStartTime: '00:00',
     receiptEndDate: '',
+    receiptEndTime: '23:59',
     activationStartDate: '',
-    activationEndDate: ''
+    activationStartTime: '00:00',
+    activationEndDate: '',
+    activationEndTime: '23:59'
   });
-  
-  // 사용자별 시트 관리 상태
-  const [userSheets, setUserSheets] = useState([]);
-  const [selectedUserSheet, setSelectedUserSheet] = useState('');
-  const [isCreatingSheet, setIsCreatingSheet] = useState(false);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -96,11 +93,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     });
     setCanEditSheetId(userRole === 'SS');
     
-         // 구글시트에서 월별 시트 ID 매핑 불러오기
-     loadMonthSheetMappings();
-     
-     // 사용자별 시트 목록 불러오기
-     loadUserSheets();
+    // 구글시트에서 월별 시트 ID 매핑 불러오기
+    loadMonthSheetMappings();
   }, [loggedInStore]);
 
   // 업데이트 팝업 강제 열기
@@ -190,68 +184,45 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   };
 
-  // 복사 붙여넣기 데이터 처리
-  const handlePasteData = (event) => {
-    const pastedText = event.clipboardData.getData('text');
-    setPastedData(pastedText);
-    processPastedData(pastedText);
-  };
-
-  // 붙여넣은 데이터 파싱 및 자동 저장
-  const processPastedData = async (data) => {
-    setIsProcessing(true);
-    try {
-      const rows = data.split('\n').filter(row => row.trim());
-      const processedData = [];
-      
-      // 헤더 정보 파싱 (6-7행)
-      const headers = rows.slice(0, 2);
-      
-      // 데이터 행 파싱 (8행부터)
-      const dataRows = rows.slice(2);
-      
-      dataRows.forEach((row, index) => {
-        const columns = row.split('\t');
-        if (columns.length >= 19) { // T:AL = 19개 컬럼
-          const modelName = columns[0]; // T열: 모델명
-          
-          // 각 군별/유형별 데이터 처리
-          for (let i = 1; i < columns.length; i++) {
-            const value = columns[i];
-            if (value && value.trim() !== '') {
-              const armyType = getArmyType(i);
-              const categoryType = getCategoryType(i);
-              
-              processedData.push({
-                id: `${index}-${i}`,
-                modelName,
-                armyType,
-                categoryType,
-                budgetValue: parseFloat(value) || 0,
-                appliedDate: new Date().toISOString().split('T')[0],
-                inputUser: loggedInStore?.name || 'Unknown',
-                userLevel: loggedInStore?.level || 1,
-                securedBudget: 0,
-                usedBudget: 0,
-                remainingBudget: 0,
-                status: '정상'
-              });
-            }
-          }
-        }
-      });
-      
-      setBudgetData(processedData);
-      
-      // 자동으로 사용자별 시트에 저장
-      await autoSaveToUserSheet(processedData);
-      
-    } catch (error) {
-      console.error('데이터 처리 실패:', error);
-      setSnackbar({ open: true, message: '데이터 처리 중 오류가 발생했습니다.', severity: 'error' });
-    } finally {
-      setIsProcessing(false);
+  // 엑셀 테이블 데이터 처리
+  const handleTableDataChange = (rowIndex, colIndex, value) => {
+    const newData = [...budgetData];
+    if (!newData[rowIndex]) {
+      newData[rowIndex] = {
+        id: `row-${rowIndex}`,
+        modelName: '',
+        securedBudget: 0,
+        usedBudget: 0,
+        remainingBudget: 0,
+        status: '정상',
+        appliedDate: new Date().toISOString().split('T')[0],
+        inputUser: loggedInStore?.name || 'Unknown',
+        userLevel: loggedInStore?.level || 1,
+        armyType: '',
+        categoryType: '',
+        budgetValue: 0
+      };
     }
+
+    if (colIndex === 0) {
+      // 모델명
+      newData[rowIndex].modelName = value;
+    } else {
+      // 예산 값 (1-18번 컬럼)
+      newData[rowIndex].budgetValue = parseFloat(value) || 0;
+      newData[rowIndex].securedBudget = parseFloat(value) || 0;
+      
+      // 군/유형 매핑
+      const armyType = getArmyType(colIndex);
+      const categoryType = getCategoryType(colIndex);
+      newData[rowIndex].armyType = armyType;
+      newData[rowIndex].categoryType = categoryType;
+    }
+
+    setBudgetData(newData);
+    
+    // 자동 저장
+    autoSaveToUserSheet(newData);
   };
 
   // 자동 저장 함수
@@ -268,7 +239,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       // 기존 시트가 있는지 확인
       let targetSheetId = null;
-      const existingSheet = userSheets.find(sheet => sheet.name === `액면_${userName}`);
+      const existingSheet = userSheets?.find(sheet => sheet.name === `액면_${userName}`);
       
       if (existingSheet) {
         targetSheetId = existingSheet.id;
@@ -277,37 +248,34 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         // 새 시트 생성
         const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
         targetSheetId = result.sheet.id;
-        
-        // 로컬 상태 업데이트
-        setUserSheets([...userSheets, result.sheet]);
         setSnackbar({ open: true, message: `새 시트 "액면_${userName}"가 생성되고 데이터가 저장되었습니다.`, severity: 'success' });
       }
       
       // 데이터 저장
-      const dateRange = {
-        receiptStartDate: new Date().toISOString().split('T')[0],
-        receiptEndDate: new Date().toISOString().split('T')[0],
-        activationStartDate: new Date().toISOString().split('T')[0],
-        activationEndDate: new Date().toISOString().split('T')[0]
+      const saveDateRange = {
+        receiptStartDate: `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}`,
+        receiptEndDate: `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}`,
+        activationStartDate: `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
+        activationEndDate: `${dateRange.activationEndDate} ${dateRange.activationEndTime}`
       };
       
-      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, dateRange, userName);
+      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName);
       
     } catch (error) {
       console.error('자동 저장 실패:', error);
-      setSnackbar({ open: true, message: '자동 저장에 실패했습니다. 수동으로 저장해주세요.', severity: 'warning' });
+      setSnackbar({ open: true, message: '자동 저장에 실패했습니다.', severity: 'warning' });
     }
   };
 
   // 군별 타입 매핑
   const getArmyType = (columnIndex) => {
-    const armyTypes = ['A군', 'A군', 'A군', 'B군', 'B군', 'B군', 'C군', 'C군', 'C군', 'D군', 'D군', 'D군', 'E군', 'E군', 'E군', 'F군'];
+    const armyTypes = ['S군', 'S군', 'S군', 'A군', 'A군', 'A군', 'B군', 'B군', 'B군', 'C군', 'C군', 'C군', 'D군', 'D군', 'D군', 'E군', 'E군', 'E군'];
     return armyTypes[columnIndex - 1] || 'Unknown';
   };
 
   // 카테고리 타입 매핑
   const getCategoryType = (columnIndex) => {
-    const categoryTypes = ['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규'];
+    const categoryTypes = ['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상'];
     return categoryTypes[columnIndex - 1] || 'Unknown';
   };
 
@@ -321,99 +289,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setSnackbar({ open: true, message: '전체 예산 계산이 완료되었습니다.', severity: 'success' });
     }
     // TODO: 실제 예산 계산 로직 구현
-  };
-
-  // 저장 모달 열기
-  const handleSaveClick = () => {
-    if (budgetData.length === 0) {
-      setSnackbar({ open: true, message: '저장할 데이터가 없습니다.', severity: 'warning' });
-      return;
-    }
-    setShowSaveModal(true);
-  };
-
-  // 사용자별 시트 생성
-  const createUserSheet = async () => {
-    setIsCreatingSheet(true);
-    try {
-      const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
-      const userName = loggedInStore?.name || 'Unknown';
-      
-      // 대상월이 선택되어 있는지 확인
-      if (!targetMonth) {
-        setSnackbar({ open: true, message: '대상월을 먼저 선택해주세요.', severity: 'warning' });
-        return;
-      }
-      
-      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth);
-      
-      setUserSheets([...userSheets, result.sheet]);
-      setSelectedUserSheet(result.sheet.id);
-      
-      setSnackbar({ open: true, message: '새 시트가 생성되었습니다.', severity: 'success' });
-    } catch (error) {
-      console.error('시트 생성 실패:', error);
-      setSnackbar({ open: true, message: '시트 생성에 실패했습니다.', severity: 'error' });
-    } finally {
-      setIsCreatingSheet(false);
-    }
-  };
-
-  // 사용자별 시트 목록 로드
-  const loadUserSheets = async () => {
-    try {
-      const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
-      const sheets = await budgetUserSheetAPI.getUserSheets(userId);
-      setUserSheets(sheets);
-    } catch (error) {
-      console.error('사용자 시트 로드 실패:', error);
-      setSnackbar({ open: true, message: '사용자 시트 로드에 실패했습니다.', severity: 'error' });
-    }
-  };
-
-  // 시트에서 데이터 불러오기
-  const loadDataFromSheet = async (sheetId) => {
-    try {
-      setIsProcessing(true);
-      const userName = loggedInStore?.name || 'Unknown';
-      const result = await budgetUserSheetAPI.loadBudgetData(sheetId, userName);
-      
-      setBudgetData(result.data);
-      setSaveDateRange(result.dateRange);
-      
-      setSnackbar({ 
-        open: true, 
-        message: `${result.data.length}개의 예산 데이터를 불러왔습니다.`, 
-        severity: 'success' 
-      });
-    } catch (error) {
-      console.error('시트 데이터 불러오기 실패:', error);
-      setSnackbar({ 
-        open: true, 
-        message: '시트 데이터 불러오기에 실패했습니다.', 
-        severity: 'error' 
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // 데이터 저장
-  const saveData = async () => {
-    if (!selectedUserSheet) {
-      setSnackbar({ open: true, message: '저장할 시트를 선택해주세요.', severity: 'warning' });
-      return;
-    }
-    
-    try {
-      const userName = loggedInStore?.name || 'Unknown';
-      await budgetUserSheetAPI.saveBudgetData(selectedUserSheet, budgetData, saveDateRange, userName);
-      setSnackbar({ open: true, message: '데이터가 저장되었습니다.', severity: 'success' });
-      setShowSaveModal(false);
-    } catch (error) {
-      console.error('데이터 저장 실패:', error);
-      setSnackbar({ open: true, message: '데이터 저장에 실패했습니다.', severity: 'error' });
-    }
   };
 
   // 액면예산 탭 렌더링
@@ -535,260 +410,334 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           )}
         </CardContent>
       </Card>
-      
-      {/* 복사 붙여넣기 영역 */}
-      <Card sx={{ mb: 3, border: '2px dashed #795548' }}>
+
+      {/* 날짜/시간 입력 영역 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            📋 데이터 붙여넣기
+            📅 접수일 및 개통일 범위 설정
           </Typography>
-          
-          {/* 엑셀 형식 가이드 */}
-          <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: 1 }}>
-                         <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-               📊 구글시트 복사 영역
-             </Typography>
-            <TableContainer component={Paper} sx={{ maxHeight: 200, mb: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', textAlign: 'center' }}>
-                      모델명
-                    </TableCell>
-                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', textAlign: 'center' }}>
-                      A군 신규
-                    </TableCell>
-                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', textAlign: 'center' }}>
-                      A군 MNP
-                    </TableCell>
-                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', textAlign: 'center' }}>
-                      A군 보상
-                    </TableCell>
-                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', textAlign: 'center' }}>
-                      B군 신규
-                    </TableCell>
-                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.7rem', textAlign: 'center' }}>
-                      ...
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow>
-                    <TableCell sx={{ fontSize: '0.7rem', fontStyle: 'italic', color: '#666' }}>
-                      갤럭시 S24
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem', color: '#666' }}>
-                      50000
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem', color: '#666' }}>
-                      45000
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem', color: '#666' }}>
-                      40000
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem', color: '#666' }}>
-                      48000
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.7rem', color: '#666' }}>
-                      ...
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-                         <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
-               💡 <strong>사용법:</strong> 구글시트에서 복사한 데이터를 아래 입력창에 붙여넣으면 자동으로 사용자별 시트에 저장됩니다.
-             </Typography>
-          </Box>
-          
-          <TextField
-            fullWidth
-            multiline
-            rows={8}
-            placeholder="여기에 복사한 데이터를 붙여넣기 하세요..."
-            value={pastedData}
-            onChange={(e) => setPastedData(e.target.value)}
-            onPaste={handlePasteData}
-            sx={{ mb: 2 }}
-          />
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={<PasteIcon />}
-              onClick={() => navigator.clipboard.readText().then(setPastedData)}
-              sx={{ backgroundColor: '#795548' }}
-            >
-              클립보드에서 가져오기
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => setPastedData('')}
-              sx={{ borderColor: '#795548', color: '#795548' }}
-            >
-              초기화
-            </Button>
-          </Box>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+                📅 접수일 범위
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="시작일"
+                    type="date"
+                    value={dateRange.receiptStartDate}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      receiptStartDate: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="시작시간"
+                    type="time"
+                    value={dateRange.receiptStartTime}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      receiptStartTime: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="종료일"
+                    type="date"
+                    value={dateRange.receiptEndDate}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      receiptEndDate: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="종료시간"
+                    type="time"
+                    value={dateRange.receiptEndTime}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      receiptEndTime: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+                📅 개통일 범위
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="시작일"
+                    type="date"
+                    value={dateRange.activationStartDate}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      activationStartDate: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="시작시간"
+                    type="time"
+                    value={dateRange.activationStartTime}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      activationStartTime: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="종료일"
+                    type="date"
+                    value={dateRange.activationEndDate}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      activationEndDate: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="종료시간"
+                    type="time"
+                    value={dateRange.activationEndTime}
+                    onChange={(e) => setDateRange({
+                      ...dateRange,
+                      activationEndTime: e.target.value
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
         </CardContent>
       </Card>
 
-             {/* 사용자별 시트 관리 */}
-       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-         <CardContent>
-           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-             📋 내 시트 관리
-           </Typography>
-           
-           {userSheets.length > 0 ? (
-             <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
-               <Table size="small">
-                 <TableHead>
-                   <TableRow>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       시트명
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       생성일
-                     </TableCell>
-                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                       액션
-                     </TableCell>
-                   </TableRow>
-                 </TableHead>
-                 <TableBody>
-                                       {userSheets.map((sheet) => (
-                      <TableRow 
-                        key={sheet.id} 
-                        hover
-                        onClick={() => loadDataFromSheet(sheet.id)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell sx={{ fontSize: '0.8rem' }}>{sheet.name}</TableCell>
-                        <TableCell sx={{ fontSize: '0.8rem' }}>
-                          {new Date(sheet.createdAt).toLocaleDateString('ko-KR')}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation(); // 행 클릭 이벤트 방지
-                              window.open(`https://docs.google.com/spreadsheets/d/${sheet.id}`, '_blank');
-                            }}
-                            sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
-                          >
-                            열기
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                 </TableBody>
-               </Table>
-             </TableContainer>
-                       ) : (
-              <Box sx={{ textAlign: 'center', py: 3 }}>
-                <Typography variant="body2" sx={{ color: '#666' }}>
-                  아직 생성된 시트가 없습니다. 데이터를 붙여넣으면 자동으로 시트가 생성됩니다.
-                </Typography>
-              </Box>
-            )}
-            
-            <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
-              <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
-                💡 <strong>사용법:</strong> 시트명을 클릭하면 해당 시트에 저장된 데이터가 자동으로 테이블에 표시됩니다.
-              </Typography>
-            </Box>
-         </CardContent>
-       </Card>
-
-       {/* 액션 버튼 */}
-       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-         <Button
-           variant="contained"
-           startIcon={<SaveIcon />}
-           onClick={handleSaveClick}
-           disabled={budgetData.length === 0}
-           sx={{ backgroundColor: '#795548' }}
-         >
-           수동 저장
-         </Button>
-       </Box>
-
-      {/* 데이터 테이블 */}
-      {budgetData.length > 0 && (
-        <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  적용일
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  입력자(권한레벨)
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  모델명
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  군/유형
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  확보된 예산
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  사용된 예산
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  예산 잔액
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  상태
-                </TableCell>
-                <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
-                  액션
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {budgetData.map((row) => (
-                <TableRow key={row.id} hover>
-                  <TableCell>{row.appliedDate}</TableCell>
-                  <TableCell>{row.inputUser}(레벨{row.userLevel})</TableCell>
-                  <TableCell>{row.modelName}</TableCell>
-                  <TableCell>{row.armyType} {row.categoryType}</TableCell>
-                  <TableCell>{row.securedBudget.toLocaleString()}</TableCell>
-                  <TableCell>{row.usedBudget.toLocaleString()}</TableCell>
+      {/* 엑셀형 예산 데이터 테이블 */}
+      <Card sx={{ mb: 3, border: '2px solid #795548' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📊 예산 데이터 입력 (엑셀 형식)
+          </Typography>
+          
+          <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                {/* 첫 번째 헤더 행: 군별 헤더 */}
+                <TableRow>
                   <TableCell 
                     sx={{ 
-                      color: row.remainingBudget < 0 ? 'red' : 'inherit',
-                      fontWeight: row.remainingBudget < 0 ? 'bold' : 'normal'
+                      backgroundColor: '#795548', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      minWidth: 120
                     }}
                   >
-                    {row.remainingBudget.toLocaleString()}
+                    ㅡ정책모델ㅡ
                   </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={row.status} 
-                      color={row.status === '정상' ? 'success' : 'error'}
-                      size="small"
-                    />
+                  <TableCell 
+                    colSpan={3}
+                    sx={{ 
+                      backgroundColor: '#8D6E63', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    S군
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<CalculateIcon />}
-                      onClick={() => calculateBudget(row.id)}
-                      sx={{ borderColor: '#795548', color: '#795548' }}
-                    >
-                      예산 계산
-                    </Button>
+                  <TableCell 
+                    colSpan={3}
+                    sx={{ 
+                      backgroundColor: '#8D6E63', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    A군
+                  </TableCell>
+                  <TableCell 
+                    colSpan={3}
+                    sx={{ 
+                      backgroundColor: '#8D6E63', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    B군
+                  </TableCell>
+                  <TableCell 
+                    colSpan={3}
+                    sx={{ 
+                      backgroundColor: '#8D6E63', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    C군
+                  </TableCell>
+                  <TableCell 
+                    colSpan={3}
+                    sx={{ 
+                      backgroundColor: '#8D6E63', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    D군
+                  </TableCell>
+                  <TableCell 
+                    colSpan={3}
+                    sx={{ 
+                      backgroundColor: '#8D6E63', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    E군
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+                
+                {/* 두 번째 헤더 행: 카테고리 헤더 */}
+                <TableRow>
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#795548', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    모델명
+                  </TableCell>
+                  {['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상'].map((category, index) => (
+                    <TableCell 
+                      key={index}
+                      sx={{ 
+                        backgroundColor: '#A1887F', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        border: '1px solid #ddd',
+                        minWidth: 80
+                      }}
+                    >
+                      {category}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              
+              <TableBody>
+                {/* 데이터 행들 (최대 30행) */}
+                {Array.from({ length: 30 }, (_, rowIndex) => (
+                  <TableRow key={rowIndex}>
+                    {/* 모델명 셀 */}
+                    <TableCell 
+                      sx={{ 
+                        border: '1px solid #ddd',
+                        padding: '4px'
+                      }}
+                    >
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={budgetData[rowIndex]?.modelName || ''}
+                        onChange={(e) => handleTableDataChange(rowIndex, 0, e.target.value)}
+                        placeholder="모델명"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: '0.8rem',
+                            '& fieldset': {
+                              border: 'none'
+                            }
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    
+                    {/* 예산 값 셀들 (18개) */}
+                    {Array.from({ length: 18 }, (_, colIndex) => (
+                      <TableCell 
+                        key={colIndex}
+                        sx={{ 
+                          border: '1px solid #ddd',
+                          padding: '4px'
+                        }}
+                      >
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          value={budgetData[rowIndex]?.budgetValue || ''}
+                          onChange={(e) => handleTableDataChange(rowIndex, colIndex + 1, e.target.value)}
+                          placeholder="0"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              fontSize: '0.8rem',
+                              '& fieldset': {
+                                border: 'none'
+                              }
+                            }
+                          }}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+            <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+              💡 <strong>사용법:</strong> 모델명과 예산 값을 직접 입력하면 자동으로 저장됩니다. 각 셀을 클릭하여 편집할 수 있습니다.
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* 로딩 상태 */}
       {isProcessing && (
@@ -827,21 +776,21 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Button>
           )}
           
-                     {/* 업데이트 확인 버튼 */}
-           <Button
-             color="inherit"
-             startIcon={<UpdateIcon />}
-             onClick={handleForceShowUpdatePopup}
-             sx={{ 
-               mr: 2,
-               backgroundColor: 'rgba(255,255,255,0.1)',
-               '&:hover': {
-                 backgroundColor: 'rgba(255,255,255,0.2)'
-               }
-             }}
-           >
-             업데이트 확인
-           </Button>
+          {/* 업데이트 확인 버튼 */}
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={handleForceShowUpdatePopup}
+            sx={{ 
+              mr: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }
+            }}
+          >
+            업데이트 확인
+          </Button>
           
           <Button color="inherit" onClick={onLogout}>
             로그아웃
@@ -918,138 +867,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             console.log('예산모드 새 업데이트가 추가되었습니다.');
           }}
         />
-
-                 {/* 저장 모달 */}
-         <Dialog open={showSaveModal} onClose={() => setShowSaveModal(false)} maxWidth="md" fullWidth>
-           <DialogTitle sx={{ backgroundColor: '#795548', color: 'white' }}>
-             💾 예산 데이터 저장
-           </DialogTitle>
-           <DialogContent sx={{ pt: 3 }}>
-             <Typography variant="body1" sx={{ mb: 3 }}>
-               저장할 시트를 선택하고 접수일 및 개통일 범위를 설정해주세요.
-             </Typography>
-             
-             {/* 사용자별 시트 선택 */}
-             <Box sx={{ mb: 3 }}>
-               <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                 📋 저장할 시트 선택
-               </Typography>
-               <Grid container spacing={2} alignItems="center">
-                 <Grid item xs={12} sm={8}>
-                   <TextField
-                     select
-                     fullWidth
-                     label="시트 선택"
-                     value={selectedUserSheet}
-                     onChange={(e) => setSelectedUserSheet(e.target.value)}
-                     disabled={userSheets.length === 0}
-                     helperText={userSheets.length === 0 ? "생성된 시트가 없습니다" : "저장할 시트를 선택하세요"}
-                   >
-                     {userSheets.map((sheet) => (
-                       <MenuItem key={sheet.id} value={sheet.id}>
-                         {sheet.name} (생성일: {new Date(sheet.createdAt).toLocaleDateString()})
-                       </MenuItem>
-                     ))}
-                   </TextField>
-                 </Grid>
-                 <Grid item xs={12} sm={4}>
-                   <Button
-                     variant="outlined"
-                     onClick={createUserSheet}
-                     disabled={isCreatingSheet}
-                     startIcon={isCreatingSheet ? <CircularProgress size={16} /> : <AddIcon />}
-                     sx={{ borderColor: '#795548', color: '#795548' }}
-                   >
-                     새 시트 생성
-                   </Button>
-                 </Grid>
-               </Grid>
-             </Box>
-            
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                  📅 접수일 범위
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="시작일"
-                  type="date"
-                  value={saveDateRange.receiptStartDate}
-                  onChange={(e) => setSaveDateRange({
-                    ...saveDateRange,
-                    receiptStartDate: e.target.value
-                  })}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="종료일"
-                  type="date"
-                  value={saveDateRange.receiptEndDate}
-                  onChange={(e) => setSaveDateRange({
-                    ...saveDateRange,
-                    receiptEndDate: e.target.value
-                  })}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                  📅 개통일 범위
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="시작일"
-                  type="date"
-                  value={saveDateRange.activationStartDate}
-                  onChange={(e) => setSaveDateRange({
-                    ...saveDateRange,
-                    activationStartDate: e.target.value
-                  })}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="종료일"
-                  type="date"
-                  value={saveDateRange.activationEndDate}
-                  onChange={(e) => setSaveDateRange({
-                    ...saveDateRange,
-                    activationEndDate: e.target.value
-                  })}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-            </Grid>
-            
-            <Box sx={{ mt: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
-              <Typography variant="body2" sx={{ color: '#666' }}>
-                💡 <strong>저장 정보:</strong> 총 {budgetData.length}개의 예산 데이터가 저장됩니다.
-              </Typography>
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ p: 3 }}>
-            <Button 
-              onClick={() => setShowSaveModal(false)}
-              sx={{ color: '#666' }}
-            >
-              취소
-            </Button>
-                         <Button 
-               onClick={saveData}
-               variant="contained"
-               disabled={!selectedUserSheet || !saveDateRange.receiptStartDate || !saveDateRange.receiptEndDate || 
-                        !saveDateRange.activationStartDate || !saveDateRange.activationEndDate}
-               sx={{ backgroundColor: '#795548' }}
-             >
-               저장
-             </Button>
-          </DialogActions>
-        </Dialog>
 
         {/* 스낵바 */}
         <Snackbar
