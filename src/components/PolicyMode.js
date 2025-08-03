@@ -1149,8 +1149,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             sx={{ 
                               backgroundColor: index % 2 === 0 ? 'background.paper' : 'grey.50',
                               '&:hover': { 
-                                backgroundColor: 'primary.light',
-                                '& .MuiTableCell-root': { color: 'white' }
+                                backgroundColor: '#fff3e0',
+                                '& .MuiTableCell-root': { color: '#f57c00' }
                               },
                               transition: 'background-color 0.2s ease'
                             }}
