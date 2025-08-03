@@ -3369,7 +3369,7 @@ app.post('/api/budget/policy-group-settings', async (req, res) => {
     const existingRows = existingData.data.values || [];
     
     // 시트가 비어있거나 헤더가 없는 경우 헤더 추가
-    if (existingRows.length === 0) {
+    if (existingRows.length === 0 || !existingRows[0] || existingRows[0][0] !== '저장이름') {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: '예산_정책그룹관리!A1:B1',
@@ -3378,7 +3378,7 @@ app.post('/api/budget/policy-group-settings', async (req, res) => {
           values: [['저장이름', '선택된정책그룹']]
         }
       });
-      existingRows.push(['저장이름', '선택된정책그룹']);
+      existingRows = [['저장이름', '선택된정책그룹']];
     }
     
     // 중복 이름 체크 (헤더 제외)
@@ -3418,8 +3418,8 @@ app.get('/api/budget/policy-group-settings', async (req, res) => {
     
     const rows = response.data.values || [];
     
-    // 시트가 비어있거나 헤더만 있는 경우 빈 배열 반환
-    if (rows.length <= 1) {
+    // 시트가 비어있거나 헤더가 없거나 헤더만 있는 경우 빈 배열 반환
+    if (rows.length === 0 || rows.length === 1 || !rows[0] || rows[0][0] !== '저장이름') {
       return res.json({ settings: [] });
     }
     

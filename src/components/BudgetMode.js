@@ -139,6 +139,21 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     console.log('selectedPolicyGroups state changed:', selectedPolicyGroups);
   }, [selectedPolicyGroups]);
 
+  // 정책그룹 설정 불러오기 모달이 열릴 때 데이터 로드
+  useEffect(() => {
+    if (showLoadSettingsModal) {
+      console.log('정책그룹 설정 불러오기 모달이 열림, 데이터 로드 시작');
+      loadPolicyGroupSettings();
+    }
+  }, [showLoadSettingsModal]);
+
+  // 정책그룹 선택 모달이 열릴 때 상태 확인
+  useEffect(() => {
+    if (showPolicyGroupModal) {
+      console.log('정책그룹 선택 모달이 열림, 현재 selectedPolicyGroups:', selectedPolicyGroups);
+    }
+  }, [showPolicyGroupModal, selectedPolicyGroups]);
+
   // 업데이트 팝업 강제 열기
   const handleForceShowUpdatePopup = () => {
     // "오늘 하루 보지 않기" 설정을 임시로 제거
@@ -194,8 +209,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 정책그룹 설정 목록 불러오기
   const loadPolicyGroupSettings = async () => {
     try {
+      console.log('loadPolicyGroupSettings 호출됨');
       const data = await budgetPolicyGroupAPI.getPolicyGroupSettings();
+      console.log('정책그룹 설정 데이터:', data);
       setPolicyGroupSettings(data.settings || []);
+      console.log('policyGroupSettings 상태 설정됨:', data.settings || []);
     } catch (error) {
       console.error('정책그룹 설정 목록 로드 실패:', error);
       setSnackbar({ open: true, message: '정책그룹 설정 목록 로드에 실패했습니다.', severity: 'error' });
@@ -206,9 +224,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handlePolicyGroupToggle = (group) => {
     console.log('Toggling policy group:', group, 'Current selectedPolicyGroups:', selectedPolicyGroups);
     setSelectedPolicyGroups(prev => {
-      const newState = prev.includes(group) 
-        ? prev.filter(g => g !== group)
-        : [...prev, group];
+      const currentGroups = prev || [];
+      const newState = currentGroups.includes(group) 
+        ? currentGroups.filter(g => g !== group)
+        : [...currentGroups, group];
       console.log('New selectedPolicyGroups state:', newState);
       return newState;
     });
@@ -236,6 +255,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 정책그룹 설정 불러오기
   const handleLoadPolicyGroupSettings = async (setting) => {
     try {
+      console.log('Loading policy group setting:', setting);
+      console.log('Setting selectedPolicyGroups to:', setting.groups);
       setSelectedPolicyGroups(setting.groups);
       setShowLoadSettingsModal(false);
       setSnackbar({ open: true, message: '정책그룹 설정을 불러왔습니다.', severity: 'success' });
@@ -1276,7 +1297,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          onClose={() => setShowPolicyGroupModal(false)}
          maxWidth="md"
          fullWidth
-         key={`policy-group-modal-${selectedPolicyGroups.join(',')}`}
        >
          <DialogTitle>
            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1293,7 +1313,12 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                <Button
                  size="small"
                  variant="outlined"
-                 onClick={() => setShowLoadSettingsModal(true)}
+                 onClick={() => {
+                   console.log('불러오기 버튼 클릭됨');
+                   setShowLoadSettingsModal(true);
+                   // 모달이 열릴 때 정책그룹 설정 목록을 로드
+                   loadPolicyGroupSettings();
+                 }}
                >
                  불러오기
                </Button>
@@ -1316,35 +1341,38 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
              {console.log('Current selectedPolicyGroups in dialog:', selectedPolicyGroups)}
              {policyGroups
                .filter(group => group.toLowerCase().includes(searchTerm.toLowerCase()))
-               .map((group) => (
-                 <Box
-                   key={group}
-                   sx={{
-                     p: 1,
-                     border: '1px solid #ddd',
-                     borderRadius: 1,
-                     cursor: 'pointer',
-                     backgroundColor: selectedPolicyGroups.includes(group) ? '#e3f2fd' : 'white',
-                     '&:hover': {
-                       backgroundColor: selectedPolicyGroups.includes(group) ? '#bbdefb' : '#f5f5f5'
-                     }
-                   }}
-                   onClick={() => handlePolicyGroupToggle(group)}
-                 >
-                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                     <input
-                       type="checkbox"
-                       checked={selectedPolicyGroups.includes(group)}
-                       onChange={() => handlePolicyGroupToggle(group)}
-                       style={{ marginRight: 8 }}
-                     />
-                     <Typography variant="body2">{group}</Typography>
+               .map((group) => {
+                 const isSelected = selectedPolicyGroups && selectedPolicyGroups.includes(group);
+                 return (
+                   <Box
+                     key={group}
+                     sx={{
+                       p: 1,
+                       border: '1px solid #ddd',
+                       borderRadius: 1,
+                       cursor: 'pointer',
+                       backgroundColor: isSelected ? '#e3f2fd' : 'white',
+                       '&:hover': {
+                         backgroundColor: isSelected ? '#bbdefb' : '#f5f5f5'
+                       }
+                     }}
+                     onClick={() => handlePolicyGroupToggle(group)}
+                   >
+                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                       <input
+                         type="checkbox"
+                         checked={isSelected}
+                         onChange={() => handlePolicyGroupToggle(group)}
+                         style={{ marginRight: 8 }}
+                       />
+                       <Typography variant="body2">{group}</Typography>
+                     </Box>
                    </Box>
-                 </Box>
-               ))}
+                 );
+               })}
            </Box>
            
-           {selectedPolicyGroups.length > 0 && (
+           {selectedPolicyGroups && selectedPolicyGroups.length > 0 && (
              <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
                <Typography variant="subtitle2" sx={{ mb: 1 }}>
                  선택된 정책그룹 ({selectedPolicyGroups.length}개):
