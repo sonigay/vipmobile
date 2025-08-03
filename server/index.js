@@ -3506,9 +3506,17 @@ function normalizeReceptionDate(receptionDateStr) {
       .replace(/오후/g, 'PM')
       .replace(/\./g, '/');
     
-    return new Date(normalizedStr);
+    const date = new Date(normalizedStr);
+    
+    // 유효한 날짜인지 확인
+    if (isNaN(date.getTime())) {
+      console.warn('유효하지 않은 접수일 형식:', receptionDateStr);
+      return null;
+    }
+    
+    return date;
   } catch (error) {
-    console.error('접수일 정규화 오류:', error);
+    console.error('접수일 정규화 오류:', error, '원본값:', receptionDateStr);
     return null;
   }
 }
@@ -3520,6 +3528,12 @@ function normalizeActivationDate(dateStr, hourStr, minuteStr) {
     // "2025-06-30" 형식의 날짜
     const date = new Date(dateStr);
     
+    // 유효한 날짜인지 확인
+    if (isNaN(date.getTime())) {
+      console.warn('유효하지 않은 개통일 형식:', dateStr);
+      return null;
+    }
+    
     // 시간과 분이 있으면 추가
     if (hourStr && minuteStr) {
       const hour = parseInt(hourStr.replace(/시/g, '')) || 0;
@@ -3529,7 +3543,7 @@ function normalizeActivationDate(dateStr, hourStr, minuteStr) {
     
     return date;
   } catch (error) {
-    console.error('개통일 정규화 오류:', error);
+    console.error('개통일 정규화 오류:', error, '원본값:', dateStr, hourStr, minuteStr);
     return null;
   }
 }
@@ -3609,8 +3623,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
             armyType: mappedArmyType,
             categoryType: mappedCategoryType,
             budgetValue: calculatedBudgetValue,
-            receptionDate: receptionDate ? receptionDate.toISOString() : null,
-            activationDate: activationDate ? activationDate.toISOString() : null
+            receptionDate: receptionDate && !isNaN(receptionDate.getTime()) ? receptionDate.toISOString() : null,
+            activationDate: activationDate && !isNaN(activationDate.getTime()) ? activationDate.toISOString() : null
           });
           
           totalUsedBudget += calculatedBudgetValue;
