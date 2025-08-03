@@ -3567,6 +3567,20 @@ function isDateInRange(date, startDate, endDate) {
 async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName) {
   const sheets = google.sheets({ version: 'v4', auth });
   
+  // 사용자별 예산 데이터 가져오기 (액면_홍남옥 (이사) 시트)
+  const userSheetName = `액면_${userName}`;
+  let budgetData = [];
+  
+  try {
+    const budgetResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${userSheetName}!A:I`, // A열부터 I열까지
+    });
+    budgetData = budgetResponse.data.values || [];
+  } catch (error) {
+    console.warn(`사용자 시트 ${userSheetName}에서 예산 데이터를 가져올 수 없습니다:`, error.message);
+  }
+  
   // 폰클개통데이터 시트에서 데이터 가져오기
   const activationData = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
@@ -3613,8 +3627,29 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           let mappedCategoryType = categoryType;
           if (categoryType === '기변') mappedCategoryType = '보상';
           
-          // 기본 예산값 설정 (정책그룹별로 다를 수 있음)
-          let calculatedBudgetValue = 40000; // 기본값 4만원
+          // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
+          let calculatedBudgetValue = 0; // 기본값 0원
+          
+          // 헤더 제외하고 예산 데이터에서 매칭 (4행까지 헤더이므로 5행부터 시작)
+          if (budgetData.length > 4) {
+            for (let i = 4; i < budgetData.length; i++) {
+              const budgetRow = budgetData[i];
+              if (budgetRow.length >= 8) {
+                const budgetModelName = budgetRow[2]; // C열: 모델명
+                const budgetArmyType = budgetRow[3]; // D열: 군
+                const budgetCategoryType = budgetRow[4]; // E열: 유형
+                const budgetUsedAmount = parseFloat(budgetRow[6]) || 0; // G열: 사용 예산
+                
+                // 모델명, 군, 유형이 모두 일치하는 경우
+                if (budgetModelName === policyGroup && 
+                    budgetArmyType === mappedArmyType && 
+                    budgetCategoryType === mappedCategoryType) {
+                  calculatedBudgetValue = budgetUsedAmount;
+                  break;
+                }
+              }
+            }
+          }
           
           // 매핑된 데이터 저장
           calculatedData.push({
@@ -3629,22 +3664,22 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           totalUsedBudget += calculatedBudgetValue;
           
-          // C열 업데이트 요청 추가
+          // C열 업데이트 요청 추가 (5행부터 시작)
           updateRequests.push({
-            range: `폰클개통데이터!C${index + 2}`,
+            range: `폰클개통데이터!C${index + 5}`,
             values: [[calculatedBudgetValue]]
           });
         } else {
-          // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정
+          // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정 (5행부터 시작)
           updateRequests.push({
-            range: `폰클개통데이터!C${index + 2}`,
+            range: `폰클개통데이터!C${index + 5}`,
             values: [[0]]
           });
         }
       } else {
-        // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정
+        // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정 (5행부터 시작)
         updateRequests.push({
-          range: `폰클개통데이터!C${index + 2}`,
+          range: `폰클개통데이터!C${index + 5}`,
           values: [[0]]
         });
       }
