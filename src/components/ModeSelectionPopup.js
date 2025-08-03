@@ -21,7 +21,8 @@ import {
   Policy as PolicyIcon,
   MeetingRoom as MeetingRoomIcon,
   Event as EventIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  AccountBalance as BudgetIcon
 } from '@mui/icons-material';
 
 const ModeSelectionPopup = ({ 
@@ -128,6 +129,18 @@ const ModeSelectionPopup = ({
         '일정 조율',
         '알림 시스템',
         '예약 현황 확인'
+      ]
+    },
+    budget: {
+      title: '예산 모드',
+      description: '예산 관리 및 분석 시스템',
+      icon: <BudgetIcon sx={{ fontSize: 40, color: '#795548' }} />,
+      color: '#795548',
+      features: [
+        '액면예산 관리',
+        '별도추가 관리',
+        '부가추가지원 관리',
+        '부가차감지원 관리'
       ]
     }
   };
