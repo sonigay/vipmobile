@@ -12736,15 +12736,16 @@ app.post('/api/app-updates', async (req, res) => {
     
     // 모드별 컬럼 매핑
     const modeColumnMap = {
-      'general': 1,    // B열: 일반모드
-      'agent': 2,      // C열: 관리자모드
-      'inventory': 3,  // D열: 재고관리모드
-      'settlement': 4, // E열: 정산모드
-      'inspection': 5, // F열: 검수모드
-      'policy': 6,     // G열: 정책모드
-      'meeting': 7,    // H열: 회의모드
-      'reservation': 8, // I열: 사전예약모드
-      'chart': 9       // J열: 장표모드
+      'general': 2,    // C열: 일반모드
+      'agent': 3,      // D열: 관리자모드
+      'inventory': 4,  // E열: 재고관리모드
+      'settlement': 5, // F열: 정산모드
+      'inspection': 6, // G열: 검수모드
+      'policy': 7,     // H열: 정책모드
+      'meeting': 8,    // I열: 회의모드
+      'reservation': 9, // J열: 사전예약모드
+      'chart': 10,     // K열: 장표모드
+      'budget': 11     // L열: 예산모드
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -12756,14 +12757,14 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(11).fill(''); // A~K열 (11개 컬럼)
+    const newRow = new Array(13).fill(''); // A~M열 (13개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:K`,
+      range: `${UPDATE_SHEET_NAME}!A:M`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {

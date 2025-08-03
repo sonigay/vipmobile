@@ -29,6 +29,7 @@ import ChartMode from './components/ChartMode';
 import PolicyMode from './components/PolicyMode';
 import MeetingMode from './components/MeetingMode';
 import ReservationMode from './components/ReservationMode';
+import BudgetMode from './components/BudgetMode';
 
 
 
@@ -132,6 +133,8 @@ function AppContent() {
   const [isMeetingMode, setIsMeetingMode] = useState(false);
   // 사전예약모드 관련 상태 추가
   const [isReservationMode, setIsReservationMode] = useState(false);
+  // 예산모드 관련 상태 추가
+  const [isBudgetMode, setIsBudgetMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1479,6 +1482,9 @@ function AppContent() {
       case 'reservation':
         modifiedStore.isReservation = true;
         break;
+      case 'budget':
+        modifiedStore.isBudget = true;
+        break;
       default:
         break;
     }
@@ -1520,6 +1526,7 @@ function AppContent() {
     setIsPolicyMode(false);
     setIsMeetingMode(false);
     setIsReservationMode(false);
+    setIsBudgetMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1562,6 +1569,10 @@ function AppContent() {
       case 'reservation':
         // console.log('사전예약 모드로 전환');
         setIsReservationMode(true);
+        break;
+      case 'budget':
+        // console.log('예산 모드로 전환');
+        setIsBudgetMode(true);
         break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
@@ -2167,6 +2178,30 @@ function AppContent() {
             setIsReservationMode(false);
             setShowModeSelection(true);
             // console.log('ReservationMode 모드 선택 팝업 열기 완료');
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 예산모드일 때는 별도 화면 렌더링
+  if (isBudgetMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <BudgetMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            // console.log('App.js BudgetMode onModeChange 호출됨');
+            const currentModes = getCurrentUserAvailableModes();
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsBudgetMode(false);
+            setShowModeSelection(true);
+            // console.log('BudgetMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />

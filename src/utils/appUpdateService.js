@@ -3,16 +3,17 @@
 // 시트 컬럼 매핑
 const UPDATE_SHEET_COLUMNS = {
   DATE: 0,           // A열: 날짜
-  GENERAL: 1,        // B열: 일반모드 업데이트내용
-  AGENT: 2,          // C열: 관리자모드 업데이트내용
-  INVENTORY: 3,      // D열: 재고관리모드 업데이트내용
-  SETTLEMENT: 4,     // E열: 정산모드 업데이트내용
-  INSPECTION: 5,     // F열: 검수모드 업데이트내용
-  POLICY: 6,         // G열: 정책모드 업데이트내용
-  MEETING: 7,        // H열: 회의모드 업데이트내용
-  RESERVATION: 8,    // I열: 사전예약모드 업데이트내용
-  CHART: 9,          // J열: 장표모드 업데이트내용
-  ADMIN_IDS: 10      // K열: 관리자아이디
+  ADMIN_IDS: 1,      // B열: 관리자아이디 (수정 권한)
+  GENERAL: 2,        // C열: 일반모드 업데이트내용
+  AGENT: 3,          // D열: 관리자모드 업데이트내용
+  INVENTORY: 4,      // E열: 재고관리모드 업데이트내용
+  SETTLEMENT: 5,     // F열: 정산모드 업데이트내용
+  INSPECTION: 6,     // G열: 검수모드 업데이트내용
+  POLICY: 7,         // H열: 정책모드 업데이트내용
+  MEETING: 8,        // I열: 회의모드 업데이트내용
+  RESERVATION: 9,    // J열: 사전예약모드 업데이트내용
+  CHART: 10,         // K열: 장표모드 업데이트내용
+  BUDGET: 11         // L열: 예산모드 업데이트내용
 };
 
 // 모드별 컬럼 매핑
@@ -25,7 +26,8 @@ const MODE_COLUMN_MAP = {
   'policy': UPDATE_SHEET_COLUMNS.POLICY,
   'meeting': UPDATE_SHEET_COLUMNS.MEETING,
   'reservation': UPDATE_SHEET_COLUMNS.RESERVATION,
-  'chart': UPDATE_SHEET_COLUMNS.CHART
+  'chart': UPDATE_SHEET_COLUMNS.CHART,
+  'budget': UPDATE_SHEET_COLUMNS.BUDGET
 };
 
 // 캐시 설정
