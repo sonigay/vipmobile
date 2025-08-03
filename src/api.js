@@ -523,14 +523,14 @@ export const budgetUserSheetAPI = {
     return response.json();
   },
 
-  // 예산 데이터 저장 (userLevel 파라미터 추가)
-  saveBudgetData: async (sheetId, data, dateRange, userName, userLevel) => {
+  // 예산 데이터 저장 (userLevel, budgetAmounts 파라미터 추가)
+  saveBudgetData: async (sheetId, data, dateRange, userName, userLevel, budgetAmounts) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ data, dateRange, userName, userLevel }),
+      body: JSON.stringify({ data, dateRange, userName, userLevel, budgetAmounts }),
     });
     if (!response.ok) {
       throw new Error('예산 데이터 저장에 실패했습니다.');

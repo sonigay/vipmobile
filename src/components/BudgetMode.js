@@ -55,6 +55,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   
+  // 예산금액 설정 상태
+  const [budgetAmounts, setBudgetAmounts] = useState({
+    S군: 40000,
+    A군: 40000,
+    B군: 40000,
+    C군: 40000,
+    D군: 40000,
+    E군: 40000
+  });
+  
   // 시트 설정 관련 상태
   const [targetMonth, setTargetMonth] = useState('');
   const [sheetId, setSheetId] = useState('');
@@ -65,6 +75,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 저장된 데이터 목록 관련 상태
   const [userSheets, setUserSheets] = useState([]);
   const [showSheetList, setShowSheetList] = useState(false);
+  const [showMonthSheetList, setShowMonthSheetList] = useState(false);
   
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
@@ -227,7 +238,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         userLevel: loggedInStore?.level || 1,
         armyType: '',
         categoryType: '',
-        budgetValues: Array(18).fill(0) // 18개 컬럼의 개별 값 저장
+        budgetValues: Array(18).fill(0), // 18개 컬럼의 개별 값 저장 (지출예산)
+        expenditureValues: Array(18).fill(0) // 18개 컬럼의 지출예산 값 저장
       };
     }
 
@@ -235,10 +247,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 모델명
       newData[rowIndex].modelName = value;
     } else {
-      // 예산 값 (1-18번 컬럼)
-      const budgetValue = parseFloat(value) || 0;
-      newData[rowIndex].budgetValues[colIndex - 1] = budgetValue;
-      newData[rowIndex].securedBudget = budgetValue;
+      // 지출예산 값 (1-18번 컬럼) - 복사 붙여넣기한 숫자들
+      const expenditureValue = parseFloat(value) || 0;
+      newData[rowIndex].expenditureValues[colIndex - 1] = expenditureValue;
+      newData[rowIndex].usedBudget = expenditureValue;
       
       // 군/유형 매핑
       const armyType = getArmyType(colIndex);
@@ -278,7 +290,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             userLevel: loggedInStore?.level || 1,
             armyType: '',
             categoryType: '',
-            budgetValues: Array(18).fill(0) // 18개 컬럼의 개별 값 저장
+            budgetValues: Array(18).fill(0), // 18개 컬럼의 개별 값 저장 (예산금액)
+            expenditureValues: Array(18).fill(0) // 18개 컬럼의 지출예산 값 저장
           };
         }
         
@@ -290,10 +303,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             // 모델명
             newData[currentRowIndex].modelName = value;
           } else if (currentColIndex >= 1 && currentColIndex <= 18) {
-            // 예산 값 (1-18번 컬럼)
+            // 지출예산 값 (1-18번 컬럼) - 복사 붙여넣기한 숫자들
             const numValue = parseFloat(value) || 0;
-            newData[currentRowIndex].budgetValues[currentColIndex - 1] = numValue;
-            newData[currentRowIndex].securedBudget = numValue;
+            newData[currentRowIndex].expenditureValues[currentColIndex - 1] = numValue;
+            newData[currentRowIndex].usedBudget = numValue;
             
             // 군/유형 매핑
             const armyType = getArmyType(currentColIndex);
@@ -366,16 +379,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const targetSheetId = result.sheet.id;
       setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다.`, severity: 'success' });
       
-             // 데이터 저장 - 접수일 적용 여부에 따라 설정
-       const saveDateRange = {
-         receiptStartDate: applyReceiptDate ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` : '',
-         receiptEndDate: applyReceiptDate ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` : '',
-         activationStartDate: `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
-         activationEndDate: `${dateRange.activationEndDate} ${dateRange.activationEndTime}`,
-         applyReceiptDate: applyReceiptDate // 접수일 적용 여부도 함께 저장
-       };
+      // 데이터 저장 - 접수일 적용 여부에 따라 설정
+      const saveDateRange = {
+        receiptStartDate: applyReceiptDate ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` : '',
+        receiptEndDate: applyReceiptDate ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` : '',
+        activationStartDate: `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
+        activationEndDate: `${dateRange.activationEndDate} ${dateRange.activationEndTime}`,
+        applyReceiptDate: applyReceiptDate // 접수일 적용 여부도 함께 저장
+      };
       
-      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel);
+      // 예산금액 설정도 함께 전달
+      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel, budgetAmounts);
       
     } catch (error) {
       console.error('자동 저장 실패:', error);
@@ -467,57 +481,71 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Grid>
           </Grid>
           
-          {/* 저장된 월별 시트 ID 목록 */}
-          {Object.keys(monthSheetMappings).length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                📋 저장된 월별 시트 ID
-              </Typography>
-              <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        대상월
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        시트 ID
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        수정일시
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        수정자
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.entries(monthSheetMappings).map(([month, id]) => {
-                      const detail = detailedMonthData[month];
-                      return (
-                        <TableRow 
-                          key={month} 
-                          hover
-                          onClick={() => {
-                            setTargetMonth(month);
-                            setSheetId(id);
-                          }}
-                          sx={{ cursor: 'pointer' }}
-                        >
-                          <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem' }}>
-                            {detail?.updatedAt ? new Date(detail.updatedAt).toLocaleString('ko-KR') : '-'}
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem' }}>{detail?.updatedBy || '-'}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          )}
+                     {/* 저장된 월별 시트 ID 목록 */}
+           {Object.keys(monthSheetMappings).length > 0 && (
+             <Box sx={{ mt: 2 }}>
+               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                 <Typography variant="subtitle2" sx={{ color: '#795548', fontWeight: 'bold' }}>
+                   📋 저장된 월별 시트 ID
+                 </Typography>
+                 <Button
+                   variant="outlined"
+                   size="small"
+                   onClick={() => setShowMonthSheetList(!showMonthSheetList)}
+                   sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
+                 >
+                   {showMonthSheetList ? '숨기기' : '보기'}
+                 </Button>
+               </Box>
+               {showMonthSheetList && (
+                 <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
+                   <Table size="small">
+                     <TableHead>
+                       <TableRow>
+                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                           대상월
+                         </TableCell>
+                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                           시트 ID
+                         </TableCell>
+                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                           수정일시
+                         </TableCell>
+                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                           수정자
+                         </TableCell>
+                       </TableRow>
+                     </TableHead>
+                     <TableBody>
+                       {Object.entries(monthSheetMappings)
+                         .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 월부터 정렬
+                         .map(([month, id]) => {
+                         const detail = detailedMonthData[month];
+                         return (
+                           <TableRow 
+                             key={month} 
+                             hover
+                             onClick={() => {
+                               setTargetMonth(month);
+                               setSheetId(id);
+                             }}
+                             sx={{ cursor: 'pointer' }}
+                           >
+                             <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
+                             <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
+                             <TableCell sx={{ fontSize: '0.8rem' }}>
+                               {detail?.updatedAt ? new Date(detail.updatedAt).toLocaleString('ko-KR') : '-'}
+                             </TableCell>
+                             <TableCell sx={{ fontSize: '0.8rem' }}>{detail?.updatedBy || '-'}</TableCell>
+                           </TableRow>
+                         );
+                       })}
+                     </TableBody>
+                   </Table>
+                 </TableContainer>
+               )}
+             </Box>
+           )}
           
           {!canEditSheetId && (
             <Alert severity="info" sx={{ mt: 1 }}>
@@ -712,126 +740,125 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
              onPaste={(e) => handlePaste(e, 0, 0)}
              tabIndex={0}
            >
-            <Table stickyHeader size="small">
-              <TableHead>
-                {/* 첫 번째 헤더 행: 군별 헤더 */}
-                <TableRow>
-                  <TableCell 
-                    sx={{ 
-                      backgroundColor: '#795548', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd',
-                      minWidth: 120
-                    }}
-                  >
-                    ㅡ정책모델ㅡ
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    sx={{ 
-                      backgroundColor: '#8D6E63', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    S군
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    sx={{ 
-                      backgroundColor: '#8D6E63', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    A군
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    sx={{ 
-                      backgroundColor: '#8D6E63', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    B군
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    sx={{ 
-                      backgroundColor: '#8D6E63', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    C군
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    sx={{ 
-                      backgroundColor: '#8D6E63', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    D군
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    sx={{ 
-                      backgroundColor: '#8D6E63', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    E군
-                  </TableCell>
-                </TableRow>
-                
-                {/* 두 번째 헤더 행: 카테고리 헤더 */}
-                <TableRow>
-                  <TableCell 
-                    sx={{ 
-                      backgroundColor: '#795548', 
-                      color: 'white', 
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      border: '1px solid #ddd'
-                    }}
-                  >
-                    모델명
-                  </TableCell>
-                  {['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상'].map((category, index) => (
-                    <TableCell 
-                      key={index}
-                      sx={{ 
-                        backgroundColor: '#A1887F', 
-                        color: 'white', 
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        border: '1px solid #ddd',
-                        minWidth: 80
-                      }}
-                    >
-                      {category}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
+                        <Table stickyHeader size="small">
+               <TableHead>
+                 {/* 첫 번째 헤더 행: 예산금액 헤더 */}
+                 <TableRow>
+                   <TableCell 
+                     sx={{ 
+                       backgroundColor: '#795548', 
+                       color: 'white', 
+                       fontWeight: 'bold',
+                       textAlign: 'center',
+                       border: '1px solid #ddd',
+                       minWidth: 120
+                     }}
+                   >
+                     예산금액
+                   </TableCell>
+                   {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
+                     Array.from({ length: 3 }, (_, i) => (
+                       <TableCell 
+                         key={`${army}-${i}`}
+                         sx={{ 
+                           backgroundColor: '#8D6E63', 
+                           color: 'white', 
+                           fontWeight: 'bold',
+                           textAlign: 'center',
+                           border: '1px solid #ddd',
+                           minWidth: 80
+                         }}
+                       >
+                         <TextField
+                           size="small"
+                           type="number"
+                           value={budgetAmounts[army]}
+                           onChange={(e) => {
+                             const newAmounts = { ...budgetAmounts };
+                             newAmounts[army] = parseFloat(e.target.value) || 0;
+                             setBudgetAmounts(newAmounts);
+                           }}
+                           sx={{
+                             '& .MuiOutlinedInput-root': {
+                               fontSize: '0.8rem',
+                               backgroundColor: 'white',
+                               '& fieldset': {
+                                 border: 'none'
+                               },
+                               '& input': {
+                                 textAlign: 'center',
+                                 color: '#8D6E63',
+                                 fontWeight: 'bold'
+                               }
+                             }
+                           }}
+                         />
+                       </TableCell>
+                     ))
+                   )).flat()}
+                 </TableRow>
+                 
+                 {/* 두 번째 헤더 행: 정책군 헤더 */}
+                 <TableRow>
+                   <TableCell 
+                     sx={{ 
+                       backgroundColor: '#795548', 
+                       color: 'white', 
+                       fontWeight: 'bold',
+                       textAlign: 'center',
+                       border: '1px solid #ddd'
+                     }}
+                   >
+                     정책군
+                   </TableCell>
+                   {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
+                     Array.from({ length: 3 }, (_, i) => (
+                       <TableCell 
+                         key={`${army}-${i}`}
+                         sx={{ 
+                           backgroundColor: '#8D6E63', 
+                           color: 'white', 
+                           fontWeight: 'bold',
+                           textAlign: 'center',
+                           border: '1px solid #ddd'
+                         }}
+                       >
+                         {army}
+                       </TableCell>
+                     ))
+                   )).flat()}
+                 </TableRow>
+                 
+                 {/* 세 번째 헤더 행: 카테고리 헤더 */}
+                 <TableRow>
+                   <TableCell 
+                     sx={{ 
+                       backgroundColor: '#795548', 
+                       color: 'white', 
+                       fontWeight: 'bold',
+                       textAlign: 'center',
+                       border: '1px solid #ddd'
+                     }}
+                   >
+                     모델명
+                   </TableCell>
+                   {['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상'].map((category, index) => (
+                     <TableCell 
+                       key={index}
+                       sx={{ 
+                         backgroundColor: '#A1887F', 
+                         color: 'white', 
+                         fontWeight: 'bold',
+                         textAlign: 'center',
+                         border: '1px solid #ddd',
+                         minWidth: 80
+                       }}
+                     >
+                       {category}
+                     </TableCell>
+                   ))}
+                 </TableRow>
+               </TableHead>
               
                              <TableBody>
                  {/* 데이터 행들 (최대 40행) */}
@@ -861,7 +888,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       />
                     </TableCell>
                     
-                                         {/* 예산 값 셀들 (18개) */}
+                                         {/* 지출예산 값 셀들 (18개) */}
                      {Array.from({ length: 18 }, (_, colIndex) => (
                        <TableCell 
                          key={colIndex}
@@ -874,7 +901,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                            fullWidth
                            size="small"
                            type="number"
-                           value={budgetData[rowIndex]?.budgetValues?.[colIndex] || ''}
+                           value={budgetData[rowIndex]?.expenditureValues?.[colIndex] || ''}
                            onChange={(e) => handleTableDataChange(rowIndex, colIndex + 1, e.target.value)}
                            placeholder="0"
                            sx={{
@@ -894,15 +921,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Table>
           </TableContainer>
           
-                     <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
-             <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
-               💡 <strong>사용법:</strong> 
-               <br/>• <strong>직접 입력:</strong> 각 셀을 클릭하여 모델명과 예산 값을 직접 입력할 수 있습니다.
-               <br/>• <strong>엑셀 붙여넣기:</strong> 엑셀에서 데이터를 복사한 후 테이블 영역을 클릭하고 Ctrl+V로 붙여넣기하면 한 번에 여러 행의 데이터가 입력됩니다.
-               <br/>• <strong>저장:</strong> 데이터 입력 후 상단의 "저장" 버튼을 클릭하여 Google Sheet에 저장합니다.
-               <br/>• <strong>데이터 형식:</strong> 첫 번째 열은 모델명, 나머지 18개 열은 각 군별(신규/MNP/보상) 예산 값입니다.
-             </Typography>
-           </Box>
+                                 <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+                💡 <strong>사용법:</strong> 
+                <br/>• <strong>예산금액 설정:</strong> 상단 헤더에서 각 군별 예산금액을 설정할 수 있습니다 (기본값: 40,000원).
+                <br/>• <strong>직접 입력:</strong> 각 셀을 클릭하여 모델명과 지출예산 값을 직접 입력할 수 있습니다.
+                <br/>• <strong>엑셀 붙여넣기:</strong> 엑셀에서 데이터를 복사한 후 테이블 영역을 클릭하고 Ctrl+V로 붙여넣기하면 한 번에 여러 행의 데이터가 입력됩니다.
+                <br/>• <strong>저장:</strong> 데이터 입력 후 상단의 "저장" 버튼을 클릭하여 Google Sheet에 저장합니다.
+                <br/>• <strong>데이터 형식:</strong> 첫 번째 열은 모델명, 나머지 18개 열은 각 군별(신규/MNP/보상) 지출예산 값입니다.
+                <br/>• <strong>계산 방식:</strong> 예산잔액 = 설정된 예산금액 - 지출예산
+              </Typography>
+            </Box>
         </CardContent>
       </Card>
 

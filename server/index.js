@@ -14542,7 +14542,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
 app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
     const { sheetId } = req.params;
-    const { data, dateRange, userName, userLevel } = req.body;
+    const { data, dateRange, userName, userLevel, budgetAmounts } = req.body; // Added budgetAmounts
     
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ error: '저장할 데이터가 없습니다.' });
@@ -14560,25 +14560,36 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     const rowsToSave = [];
     
     data.forEach(item => {
-      if (item.modelName && item.budgetValues) {
-        // 18개 컬럼의 예산 값을 각각 개별 행으로 저장
-        item.budgetValues.forEach((budgetValue, index) => {
-          if (budgetValue > 0) { // 값이 있는 경우만 저장
+      if (item.modelName && item.expenditureValues) {
+        // 18개 컬럼의 지출예산 값을 각각 개별 행으로 저장
+        item.expenditureValues.forEach((expenditureValue, index) => {
+          if (expenditureValue > 0) { // 값이 있는 경우만 저장
             const armyType = getArmyType(index + 1);
             const categoryType = getCategoryType(index + 1);
             
-            // 금액을 1만원 단위에서 원 단위로 변환 (예: 2 -> 20000)
-            const budgetAmount = budgetValue * 10000;
+            // 해당 군의 예산금액 가져오기
+            const securedBudget = budgetAmounts?.[armyType] || 40000;
+            
+            // 지출예산을 1만원 단위에서 원 단위로 변환 (예: 2 -> 20000)
+            const usedBudget = expenditureValue * 10000; // Multiplied by 10000
+            
+            // 예산 잔액 계산
+            const remainingBudget = securedBudget - usedBudget;
+            
+            // 적용일 설정 - 접수일 적용 시 접수일, 미적용 시 개통일 사용
+            const appliedDate = dateRange.applyReceiptDate 
+              ? dateRange.receiptStartDate.split(' ')[0] 
+              : dateRange.activationStartDate.split(' ')[0];
             
             rowsToSave.push([
-              `${item.appliedDate}`, // 적용일
+              appliedDate, // 적용일
               `${userName}(레벨${userLevel || 'SS'})`, // 입력자(권한레벨) - 실제 권한 레벨 사용
               item.modelName, // 모델명
               armyType, // 군
               categoryType, // 유형
-              budgetAmount, // 확보된 예산 (원 단위)
-              0, // 사용된 예산 (초기값)
-              budgetAmount, // 예산 잔액 (초기값)
+              securedBudget, // 확보된 예산 (원 단위)
+              usedBudget, // 사용된 예산 (원 단위)
+              remainingBudget, // 예산 잔액 (원 단위)
               '정상' // 상태
             ]);
           }
@@ -14605,7 +14616,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     }
 
     // 메타데이터 시트에 저장 정보 추가
-    const metadataRange = `${userSheetName}!K1:N1`;
+    const metadataRange = `${userSheetName}!K1:N2`;
     const metadata = [
       ['저장일시', '접수일범위', '개통일범위', '접수일적용여부'],
       [
