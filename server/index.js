@@ -1893,7 +1893,7 @@ app.post('/api/login', async (req, res) => {
         // console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
         // console.log('Step 6: Processing agent login...');
         
-        // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 채권장표 메뉴 권한, J열: 정책모드 권한, K열: 검수전체현황 권한, L열: 회의모드 권한, M열: 사전예약모드 권한, N열: 장표모드 권한, O열: 예산모드 권한 확인
+        // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 채권장표 메뉴 권한, J열: 정책모드 권한, K열: 검수전체현황 권한, L열: 회의모드 권한, M열: 사전예약모드 권한, N열: 장표모드 권한, Q열: 예산모드 권한 확인
         const hasInventoryPermission = agent[5] === 'O'; // F열
         const hasSettlementPermission = agent[6] === 'O'; // G열
         const hasInspectionPermission = agent[7] === 'O'; // H열
@@ -1903,7 +1903,7 @@ app.post('/api/login', async (req, res) => {
         const hasMeetingPermission = agent[11] === 'O'; // L열
         const hasReservationPermission = agent[12] === 'O'; // M열
         const hasChartPermission = agent[13] === 'O'; // N열: 장표모드 권한
-        const hasBudgetPermission = agent[14] === 'O'; // O열: 예산모드 권한
+        const hasBudgetPermission = agent[16] === 'O'; // Q열: 예산모드 권한
         
         // console.log('Step 6.5: Permission check:', {
         //   inventory: hasInventoryPermission,
