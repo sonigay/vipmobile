@@ -534,4 +534,13 @@ export const budgetUserSheetAPI = {
     }
     return response.json();
   },
+
+  // 예산 데이터 불러오기
+  loadBudgetData: async (sheetId) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data`);
+    if (!response.ok) {
+      throw new Error('예산 데이터 불러오기에 실패했습니다.');
+    }
+    return response.json();
+  },
 }; 

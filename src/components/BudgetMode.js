@@ -197,8 +197,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     processPastedData(pastedText);
   };
 
-  // 붙여넣은 데이터 파싱
-  const processPastedData = (data) => {
+  // 붙여넣은 데이터 파싱 및 자동 저장
+  const processPastedData = async (data) => {
     setIsProcessing(true);
     try {
       const rows = data.split('\n').filter(row => row.trim());
@@ -242,11 +242,58 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       });
       
       setBudgetData(processedData);
-      setSnackbar({ open: true, message: `${processedData.length}개의 예산 데이터가 처리되었습니다.`, severity: 'success' });
+      
+      // 자동으로 사용자별 시트에 저장
+      await autoSaveToUserSheet(processedData);
+      
     } catch (error) {
+      console.error('데이터 처리 실패:', error);
       setSnackbar({ open: true, message: '데이터 처리 중 오류가 발생했습니다.', severity: 'error' });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // 자동 저장 함수
+  const autoSaveToUserSheet = async (data) => {
+    try {
+      const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
+      const userName = loggedInStore?.name || 'Unknown';
+      
+      // 현재 날짜로 시트명 생성
+      const currentDate = new Date().toISOString().split('T')[0];
+      const sheetName = `${userName}_예산데이터_${currentDate}`;
+      
+      // 기존 시트가 있는지 확인
+      let targetSheetId = null;
+      const existingSheet = userSheets.find(sheet => sheet.name === sheetName);
+      
+      if (existingSheet) {
+        targetSheetId = existingSheet.id;
+        setSnackbar({ open: true, message: `기존 시트 "${sheetName}"에 데이터가 추가되었습니다.`, severity: 'info' });
+      } else {
+        // 새 시트 생성
+        const result = await budgetUserSheetAPI.createUserSheet(userId, userName);
+        targetSheetId = result.sheet.id;
+        
+        // 로컬 상태 업데이트
+        setUserSheets([...userSheets, result.sheet]);
+        setSnackbar({ open: true, message: `새 시트 "${sheetName}"가 생성되고 데이터가 저장되었습니다.`, severity: 'success' });
+      }
+      
+      // 데이터 저장
+      const dateRange = {
+        receiptStartDate: currentDate,
+        receiptEndDate: currentDate,
+        activationStartDate: currentDate,
+        activationEndDate: currentDate
+      };
+      
+      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, dateRange);
+      
+    } catch (error) {
+      console.error('자동 저장 실패:', error);
+      setSnackbar({ open: true, message: '자동 저장에 실패했습니다. 수동으로 저장해주세요.', severity: 'warning' });
     }
   };
 
@@ -313,6 +360,32 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('사용자 시트 로드 실패:', error);
       setSnackbar({ open: true, message: '사용자 시트 로드에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 시트에서 데이터 불러오기
+  const loadDataFromSheet = async (sheetId) => {
+    try {
+      setIsProcessing(true);
+      const result = await budgetUserSheetAPI.loadBudgetData(sheetId);
+      
+      setBudgetData(result.data);
+      setSaveDateRange(result.dateRange);
+      
+      setSnackbar({ 
+        open: true, 
+        message: `${result.data.length}개의 예산 데이터를 불러왔습니다.`, 
+        severity: 'success' 
+      });
+    } catch (error) {
+      console.error('시트 데이터 불러오기 실패:', error);
+      setSnackbar({ 
+        open: true, 
+        message: '시트 데이터 불러오기에 실패했습니다.', 
+        severity: 'error' 
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -513,9 +586,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 </TableBody>
               </Table>
             </TableContainer>
-            <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
-              💡 <strong>사용법:</strong> 구글시트에서 T6:AL37 영역을 선택하여 복사한 후, 아래 입력창에 붙여넣기 하세요.
-            </Typography>
+                         <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+               💡 <strong>사용법:</strong> 구글시트에서 복사한 데이터를 아래 입력창에 붙여넣으면 자동으로 사용자별 시트에 저장됩니다.
+             </Typography>
           </Box>
           
           <TextField
@@ -548,18 +621,87 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </CardContent>
       </Card>
 
-      {/* 액션 버튼 */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <Button
-          variant="contained"
-          startIcon={<SaveIcon />}
-          onClick={handleSaveClick}
-          disabled={budgetData.length === 0}
-          sx={{ backgroundColor: '#795548' }}
-        >
-          저장
-        </Button>
-      </Box>
+             {/* 사용자별 시트 관리 */}
+       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+         <CardContent>
+           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+             📋 내 시트 관리
+           </Typography>
+           
+           {userSheets.length > 0 ? (
+             <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+               <Table size="small">
+                 <TableHead>
+                   <TableRow>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       시트명
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       생성일
+                     </TableCell>
+                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                       액션
+                     </TableCell>
+                   </TableRow>
+                 </TableHead>
+                 <TableBody>
+                                       {userSheets.map((sheet) => (
+                      <TableRow 
+                        key={sheet.id} 
+                        hover
+                        onClick={() => loadDataFromSheet(sheet.id)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell sx={{ fontSize: '0.8rem' }}>{sheet.name}</TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem' }}>
+                          {new Date(sheet.createdAt).toLocaleDateString('ko-KR')}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation(); // 행 클릭 이벤트 방지
+                              window.open(`https://docs.google.com/spreadsheets/d/${sheet.id}`, '_blank');
+                            }}
+                            sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
+                          >
+                            열기
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                 </TableBody>
+               </Table>
+             </TableContainer>
+                       ) : (
+              <Box sx={{ textAlign: 'center', py: 3 }}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  아직 생성된 시트가 없습니다. 데이터를 붙여넣으면 자동으로 시트가 생성됩니다.
+                </Typography>
+              </Box>
+            )}
+            
+            <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+              <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
+                💡 <strong>사용법:</strong> 시트명을 클릭하면 해당 시트에 저장된 데이터가 자동으로 테이블에 표시됩니다.
+              </Typography>
+            </Box>
+         </CardContent>
+       </Card>
+
+       {/* 액션 버튼 */}
+       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+         <Button
+           variant="contained"
+           startIcon={<SaveIcon />}
+           onClick={handleSaveClick}
+           disabled={budgetData.length === 0}
+           sx={{ backgroundColor: '#795548' }}
+         >
+           수동 저장
+         </Button>
+       </Box>
 
       {/* 데이터 테이블 */}
       {budgetData.length > 0 && (

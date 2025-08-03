@@ -14484,6 +14484,98 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   }
 });
 
+// 예산 데이터 불러오기 API
+app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
+  try {
+    const { sheetId } = req.params;
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 데이터 불러오기 (A2:H)
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: '예산데이터!A2:H'
+    });
+    
+    // 메타데이터 불러오기 (J1:L1)
+    const metadataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: '예산데이터!J1:L1'
+    });
+    
+    const data = dataResponse.data.values || [];
+    const metadata = metadataResponse.data.values || [];
+    
+    // 데이터 파싱
+    const parsedData = data.map((row, index) => {
+      if (row.length >= 8) {
+        const [appliedDate, inputUserInfo, modelName, armyCategoryType, securedBudget, usedBudget, remainingBudget, status] = row;
+        
+        // 입력자 정보 파싱 (예: "홍길동(레벨3)" -> "홍길동", "3")
+        const userMatch = inputUserInfo.match(/^(.+?)\(레벨(\d+)\)$/);
+        const inputUser = userMatch ? userMatch[1] : inputUserInfo;
+        const userLevel = userMatch ? parseInt(userMatch[2]) : 1;
+        
+        // 군/유형 파싱 (예: "A군 신규" -> "A군", "신규")
+        const typeMatch = armyCategoryType.match(/^(.+?)\s+(.+)$/);
+        const armyType = typeMatch ? typeMatch[1] : armyCategoryType;
+        const categoryType = typeMatch ? typeMatch[2] : '';
+        
+        return {
+          id: `loaded-${index}`,
+          appliedDate,
+          inputUser,
+          userLevel,
+          modelName,
+          armyType,
+          categoryType,
+          securedBudget: parseFloat(securedBudget) || 0,
+          usedBudget: parseFloat(usedBudget) || 0,
+          remainingBudget: parseFloat(remainingBudget) || 0,
+          status,
+          budgetValue: parseFloat(securedBudget) || 0 // 원본 예산 값
+        };
+      }
+      return null;
+    }).filter(item => item !== null);
+    
+    // 메타데이터 파싱
+    let dateRange = {
+      receiptStartDate: '',
+      receiptEndDate: '',
+      activationStartDate: '',
+      activationEndDate: ''
+    };
+    
+    if (metadata.length >= 2 && metadata[1].length >= 3) {
+      const receiptRange = metadata[1][1] || '';
+      const activationRange = metadata[1][2] || '';
+      
+      // "2024-01-01 ~ 2024-01-31" 형식 파싱
+      const receiptMatch = receiptRange.match(/^(.+?)\s*~\s*(.+)$/);
+      const activationMatch = activationRange.match(/^(.+?)\s*~\s*(.+)$/);
+      
+      if (receiptMatch) {
+        dateRange.receiptStartDate = receiptMatch[1].trim();
+        dateRange.receiptEndDate = receiptMatch[2].trim();
+      }
+      
+      if (activationMatch) {
+        dateRange.activationStartDate = activationMatch[1].trim();
+        dateRange.activationEndDate = activationMatch[2].trim();
+      }
+    }
+    
+    res.json({ 
+      data: parsedData, 
+      dateRange,
+      metadata: metadata.length >= 2 ? metadata[1] : []
+    });
+  } catch (error) {
+    console.error('예산 데이터 불러오기 실패:', error);
+    res.status(500).json({ error: '예산 데이터 불러오기에 실패했습니다.' });
+  }
+});
+
 // 정책 알림 생성 함수
 async function createPolicyNotification(policyId, userId, notificationType, approvalStatus = null) {
   try {
