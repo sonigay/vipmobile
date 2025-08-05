@@ -139,21 +139,32 @@ const InventoryStatusScreen = () => {
     }
   };
 
-  // 담당자 데이터 로드
+  // 담당자 데이터 로드 (실제 재고가 있는 담당자만)
   const loadAgentData = async () => {
     try {
-      const agentData = await fetchAgentData();
-      setAgents(agentData);
+      const agentData = await inventoryAPI.getAgentFilters();
       
-      // 필터 옵션 생성
-      const offices = [...new Set(agentData.map(agent => agent.office).filter(Boolean))].sort();
-      const departments = [...new Set(agentData.map(agent => agent.department).filter(Boolean))].sort();
-      
-      setFilterOptions({
-        agents: agentData,
-        offices,
-        departments
-      });
+      if (agentData.success) {
+        setAgents(agentData.data);
+        
+        // 필터 옵션 생성
+        const offices = [...new Set(agentData.data.map(agent => agent.office).filter(Boolean))].sort();
+        const departments = [...new Set(agentData.data.map(agent => agent.department).filter(Boolean))].sort();
+        
+        setFilterOptions({
+          agents: agentData.data,
+          offices,
+          departments
+        });
+        
+        console.log('재고장표 담당자 필터 로드 완료:', {
+          totalAgents: agentData.data.length,
+          agentsWithInventory: agentData.data.filter(a => a.hasInventory).length,
+          agentsWithActivation: agentData.data.filter(a => a.hasActivation).length
+        });
+      } else {
+        console.error('담당자 필터 데이터 로드 실패:', agentData.error);
+      }
     } catch (error) {
       console.error('담당자 데이터 로드 실패:', error);
     }
@@ -385,7 +396,35 @@ const InventoryStatusScreen = () => {
                  <MenuItem value="">전체 담당자</MenuItem>
                  {filterOptions.agents.map((agent) => (
                    <MenuItem key={agent.contactId} value={agent.target}>
-                     {agent.target}
+                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                       <span>{agent.target}</span>
+                       <Box sx={{ display: 'flex', gap: 0.5 }}>
+                         {agent.hasInventory && (
+                           <Chip 
+                             label="재고" 
+                             size="small" 
+                             sx={{ 
+                               height: 16, 
+                               fontSize: '0.7rem',
+                               backgroundColor: '#e3f2fd',
+                               color: '#1976d2'
+                             }} 
+                           />
+                         )}
+                         {agent.hasActivation && (
+                           <Chip 
+                             label="개통" 
+                             size="small" 
+                             sx={{ 
+                               height: 16, 
+                               fontSize: '0.7rem',
+                               backgroundColor: '#e8f5e8',
+                               color: '#388e3c'
+                             }} 
+                           />
+                         )}
+                       </Box>
+                     </Box>
                    </MenuItem>
                  ))}
                </Select>

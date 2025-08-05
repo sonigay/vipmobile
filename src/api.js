@@ -396,6 +396,22 @@ export const inventoryAPI = {
     }
     
     return await response.json();
+  },
+  
+  // 재고장표 담당자 필터 옵션 가져오기 (실제 재고가 있는 담당자만)
+  getAgentFilters: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/inventory/agent-filters`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
   }
 };
 
