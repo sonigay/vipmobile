@@ -298,8 +298,39 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         remainingBudget: { value: item.remainingBudget, type: typeof item.remainingBudget }
       })));
       
-      // 데이터를 화면에 설정
-      setBudgetData(result.data || []);
+      // 서버 데이터를 프론트엔드 테이블 형식으로 변환
+      const transformedData = [];
+      if (result.data && Array.isArray(result.data)) {
+        // 모델별로 그룹화
+        const modelGroups = {};
+        
+        result.data.forEach(item => {
+          if (!modelGroups[item.modelName]) {
+            modelGroups[item.modelName] = {
+              modelName: item.modelName,
+              expenditureValues: new Array(18).fill(0) // 18개 컬럼 초기화
+            };
+          }
+          
+          // 군과 유형에 따라 해당 컬럼 인덱스 찾기
+          const armyIndex = ['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].indexOf(item.armyType);
+          const categoryIndex = ['신규', 'MNP', '보상'].indexOf(item.categoryType);
+          
+          if (armyIndex !== -1 && categoryIndex !== -1) {
+            const columnIndex = armyIndex * 3 + categoryIndex;
+            // 사용된 예산을 1만원 단위로 변환 (원 단위 -> 1만원 단위)
+            modelGroups[item.modelName].expenditureValues[columnIndex] = Math.round(item.usedBudget / 10000);
+          }
+        });
+        
+        // 그룹화된 데이터를 배열로 변환
+        transformedData.push(...Object.values(modelGroups));
+      }
+      
+      console.log('Transformed data for table:', transformedData);
+      
+      // 변환된 데이터를 화면에 설정
+      setBudgetData(transformedData);
       
       // 날짜 범위 설정
       if (result.dateRange) {
