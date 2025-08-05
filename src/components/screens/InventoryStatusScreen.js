@@ -768,47 +768,47 @@ const InventoryStatusScreen = () => {
                       })}
                    </TableRow>
                   
-                                     {/* 컬럼 헤더 행 (맨 아래) */}
-                                       <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '80px', zIndex: 3, height: '32px' }}>
-                                                                                                                   <TableCell sx={{ 
-                           backgroundColor: '#1976d2', 
-                           color: 'white', 
-                           fontWeight: 'bold',
-                           minWidth: 35,
-                           height: '32px',
-                           lineHeight: '32px',
-                           borderRight: '1px solid #1565c0',
-                           fontSize: '0.7rem',
-                           p: 0.25,
-                           textAlign: 'center'
-                         }}>
+                                                         {/* 컬럼 헤더 행 (맨 아래) */}
+                      <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '75px', zIndex: 3, height: '28px' }}>
+                                                                                                                                           <TableCell sx={{ 
+                          backgroundColor: '#1976d2', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          minWidth: 35,
+                          height: '28px',
+                          lineHeight: '28px',
+                          borderRight: '1px solid #1565c0',
+                          fontSize: '0.7rem',
+                          p: 0.25,
+                          textAlign: 'center'
+                        }}>
                          구분
                        </TableCell>
-                                                                                                                                                <TableCell sx={{ 
-                             backgroundColor: '#1976d2', 
-                             color: 'white', 
-                             fontWeight: 'bold',
-                             minWidth: 80,
-                             height: '32px',
-                             lineHeight: '32px',
-                             borderRight: '2px solid #ffffff',
-                             fontSize: '0.7rem',
-                             p: 0.25,
-                             textAlign: 'center'
-                           }}>
-                           모델명
-                         </TableCell>
-                                           {activeTab === 1 && (
-                                                                           <TableCell sx={{ 
+                                                                                                                                                                          <TableCell sx={{ 
                             backgroundColor: '#1976d2', 
                             color: 'white', 
                             fontWeight: 'bold',
                             minWidth: 80,
-                            height: '32px',
-                            lineHeight: '32px',
+                            height: '28px',
+                            lineHeight: '28px',
+                            borderRight: '2px solid #ffffff',
+                            fontSize: '0.7rem',
+                            p: 0.25,
+                            textAlign: 'center'
+                          }}>
+                           모델명
+                         </TableCell>
+                                                                   {activeTab === 1 && (
+                          <TableCell sx={{ 
+                            backgroundColor: '#1976d2', 
+                            color: 'white', 
+                            fontWeight: 'bold',
+                            minWidth: 80,
+                            height: '28px',
+                            lineHeight: '28px',
                             borderRight: '1px solid #1565c0',
                             fontSize: '0.8rem',
-                            p: 0.5,
+                            p: 0.25,
                             textAlign: 'center'
                           }}>
                           색상
@@ -819,12 +819,12 @@ const InventoryStatusScreen = () => {
                           color: 'white', 
                           fontWeight: 'bold',
                           minWidth: 50,
-                          height: '32px',
-                          lineHeight: '32px',
+                          height: '28px',
+                          lineHeight: '28px',
                           borderRight: '1px solid #1565c0',
                           textAlign: 'center',
                           fontSize: '0.7rem',
-                          p: 0.5,
+                          p: 0.25,
                           borderLeft: '2px solid #ffffff'
                         }}>
                         잔여<br/>재고
@@ -834,30 +834,30 @@ const InventoryStatusScreen = () => {
                           color: 'white', 
                           fontWeight: 'bold',
                           minWidth: 50,
-                          height: '32px',
-                          lineHeight: '32px',
+                          height: '28px',
+                          lineHeight: '28px',
                           borderRight: '2px solid #ffffff',
                           textAlign: 'center',
                           fontSize: '0.7rem',
-                          p: 0.5
+                          p: 0.25
                         }}>
                         당월<br/>개통
                       </TableCell>
                      
-                                           {/* 일별 컬럼 헤더 */}
+                                                                   {/* 일별 컬럼 헤더 */}
                       {Array.from({ length: 31 }, (_, i) => (
-                                                                           <TableCell key={i} align="center" sx={{ 
-                            backgroundColor: '#1976d2', 
-                            color: 'white', 
-                            fontWeight: 'bold',
-                            minWidth: 25,
-                            height: '32px',
-                            lineHeight: '32px',
-                            p: 0.25,
-                            fontSize: '0.7rem',
-                            borderRight: i < 30 ? '1px solid #1565c0' : 'none',
-                            borderLeft: i === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
-                          }}>
+                        <TableCell key={i} align="center" sx={{ 
+                          backgroundColor: '#1976d2', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          minWidth: 25,
+                          height: '28px',
+                          lineHeight: '28px',
+                          p: 0.25,
+                          fontSize: '0.7rem',
+                          borderRight: i < 30 ? '1px solid #1565c0' : 'none',
+                          borderLeft: i === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+                        }}>
                           {String(i + 1).padStart(2, '0')}
                         </TableCell>
                       ))}
