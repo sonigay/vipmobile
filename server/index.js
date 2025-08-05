@@ -1020,14 +1020,14 @@ app.post('/api/update-coordinates', async (req, res) => {
 
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[3];  // D열: 주소
-      const status = row[4];    // E열: 거래상태
+      const address = row[11];  // L열: 주소 (8칸 밀림)
+      const status = row[12];    // M열: 거래상태 (8칸 밀림)
       
       if (status === "사용") {
         if (!address || address.toString().trim() === '') {
           // 사용 상태이지만 주소가 없는 경우 좌표 삭제
           updates.push({
-            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+            range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
             values: [["", ""]]
           });
           // console.log(`Cleared coordinates for store without address at row ${i + 2}`);
@@ -1041,7 +1041,7 @@ app.post('/api/update-coordinates', async (req, res) => {
           if (result) {
             const { latitude, longitude } = result;
             updates.push({
-              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+              range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
               values: [[latitude, longitude]]
             });
                           // console.log(`✅ 좌표 업데이트 성공: ${address}`);
@@ -1059,7 +1059,7 @@ app.post('/api/update-coordinates', async (req, res) => {
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
         updates.push({
-          range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+          range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
           values: [["", ""]]
         });
         // console.log(`Cleared coordinates for unused store at row ${i + 2}`);
@@ -1202,18 +1202,18 @@ app.get('/api/stores', async (req, res) => {
     const stores = storeRows
       .filter(row => {
         const name = (row[14] || '').toString().trim();  // G열: 업체명 (6+8)
-        const status = row[12];                          // E열: 거래상태 (4+8)
+        const status = row[12];                          // M열: 거래상태 (12번째 컬럼)
         return name && status === "사용";
       })
       .map(row => {
-        const latitude = parseFloat(row[8] || '0');    // A열: 위도 (0+8)
-        const longitude = parseFloat(row[9] || '0');   // B열: 경도 (1+8)
-        const status = row[12];                         // E열: 거래상태 (4+8)
+        const latitude = parseFloat(row[8] || '0');    // I열: 위도 (8번째 컬럼)
+        const longitude = parseFloat(row[9] || '0');   // J열: 경도 (9번째 컬럼)
+        const status = row[12];                         // M열: 거래상태 (12번째 컬럼)
         const name = row[14].toString().trim();        // G열: 업체명 (6+8)
         const storeId = row[15];                        // H열: 매장 ID (7+8)
         const phone = row[17] || '';                    // J열: 연락처 (9+8)
         const manager = row[21] || '';                  // N열: 담당자 (13+8)
-        const address = (row[11] || '').toString();    // D열: 주소 (3+8)
+        const address = (row[11] || '').toString();    // L열: 주소 (11번째 컬럼)
         
         // 빈 매장 ID 제외
         if (!storeId || storeId.toString().trim() === '') {
@@ -2092,14 +2092,14 @@ async function checkAndUpdateAddresses() {
     // 모든 주소에 대해 좌표 업데이트 (행 위치가 변경되어도 항상 처리)
     for (let i = 0; i < storeRows.length; i++) {
       const row = storeRows[i];
-      const address = row[3];  // D열: 주소
-      const status = row[4];    // E열: 거래상태
+      const address = row[11];  // L열: 주소 (8칸 밀림)
+      const status = row[12];    // M열: 거래상태 (8칸 밀림)
       
       if (status === "사용") {
         if (!address || address.toString().trim() === '') {
           // 사용 상태이지만 주소가 없는 경우 좌표 삭제
           updates.push({
-            range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+            range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
             values: [["", ""]]
           });
           continue;
@@ -2111,7 +2111,7 @@ async function checkAndUpdateAddresses() {
           if (result) {
             const { latitude, longitude } = result;
             updates.push({
-              range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+              range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
               values: [[latitude, longitude]]
             });
           }
@@ -2121,7 +2121,7 @@ async function checkAndUpdateAddresses() {
       } else {
         // 미사용 매장은 위도/경도 값을 빈 값으로 비움
         updates.push({
-          range: `${STORE_SHEET_NAME}!A${i + 2}:B${i + 2}`,
+          range: `${STORE_SHEET_NAME}!I${i + 2}:J${i + 2}`,
           values: [["", ""]]
         });
       }
