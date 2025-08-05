@@ -769,7 +769,7 @@ const InventoryStatusScreen = () => {
                    </TableRow>
                   
                                                          {/* 컬럼 헤더 행 (맨 아래) */}
-                      <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '85px', zIndex: 3, height: '14px' }}>
+                      <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '70px', zIndex: 3, height: '14px' }}>
                                                                                                                                            <TableCell sx={{ 
                           backgroundColor: '#1976d2', 
                           color: 'white', 
