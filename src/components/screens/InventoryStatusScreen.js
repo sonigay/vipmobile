@@ -681,13 +681,11 @@ const InventoryStatusScreen = () => {
                    </TableRow>
                   
                                                          {/* 요일 행 (중간) */}
-                      <TableRow sx={{ backgroundColor: '#ffffff', position: 'sticky', top: '40px', zIndex: 3, height: '20px' }}>
+                      <TableRow sx={{ backgroundColor: '#ffffff', position: 'sticky', top: '20px', zIndex: 3 }}>
                                                                                           <TableCell sx={{ 
                           backgroundColor: '#ffffff', 
                           fontWeight: 'bold',
                           minWidth: 35,
-                          height: '20px',
-                          lineHeight: '20px',
                           borderBottom: '1px solid #e0e0e0',
                           fontSize: '0.7rem',
                           p: 0.25
@@ -698,8 +696,6 @@ const InventoryStatusScreen = () => {
                           backgroundColor: '#ffffff', 
                           fontWeight: 'bold',
                           minWidth: 80,
-                          height: '20px',
-                          lineHeight: '20px',
                           borderBottom: '1px solid #e0e0e0',
                           fontSize: '0.7rem',
                           p: 0.25
@@ -711,11 +707,9 @@ const InventoryStatusScreen = () => {
                         backgroundColor: '#ffffff', 
                         fontWeight: 'bold',
                         minWidth: 80,
-                        height: '20px',
-                        lineHeight: '20px',
                         borderBottom: '1px solid #e0e0e0',
                         fontSize: '0.8rem',
-                        p: 0.25
+                        p: 0.5
                       }}>
                          
                       </TableCell>
@@ -724,11 +718,9 @@ const InventoryStatusScreen = () => {
                        backgroundColor: '#ffffff', 
                        fontWeight: 'bold',
                        minWidth: 50,
-                       height: '20px',
-                       lineHeight: '20px',
                        borderBottom: '1px solid #e0e0e0',
                        fontSize: '0.7rem',
-                       p: 0.25,
+                       p: 0.5,
                        borderLeft: '2px solid #ffffff'
                      }}>
                        
@@ -737,11 +729,9 @@ const InventoryStatusScreen = () => {
                        backgroundColor: '#ffffff', 
                        fontWeight: 'bold',
                        minWidth: 50,
-                       height: '20px',
-                       lineHeight: '20px',
                        borderBottom: '1px solid #e0e0e0',
                        fontSize: '0.7rem',
-                       p: 0.25
+                       p: 0.5
                      }}>
                        
                      </TableCell>
@@ -766,8 +756,6 @@ const InventoryStatusScreen = () => {
                             backgroundColor: '#ffffff', 
                             fontWeight: 'bold',
                             minWidth: 25,
-                            height: '20px',
-                            lineHeight: '20px',
                             p: 0.25,
                             fontSize: '0.7rem',
                             borderBottom: '1px solid #e0e0e0',
@@ -781,7 +769,7 @@ const InventoryStatusScreen = () => {
                    </TableRow>
                   
                                                          {/* 컬럼 헤더 행 (맨 아래) */}
-                      <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '60px', zIndex: 3, height: '14px' }}>
+                      <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '75px', zIndex: 3, height: '14px' }}>
                                                                                                                                            <TableCell sx={{ 
                           backgroundColor: '#1976d2', 
                           color: 'white', 
