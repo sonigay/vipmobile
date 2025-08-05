@@ -579,20 +579,28 @@ const InventoryStatusScreen = () => {
              {/* 재고 테이블 */}
        {!loading && !error && (
          <Box sx={{ flex: 1, overflow: 'auto' }}>
-           <TableContainer component={Paper} sx={{ 
-             borderRadius: 3, 
-             boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-             border: '1px solid #f0f0f0',
-             backgroundColor: '#ffffff',
-             '& .MuiTable-root': {
-               borderCollapse: 'separate',
-               borderSpacing: 0
-             }
-           }}>
-             <Table stickyHeader>
+                       <TableContainer component={Paper} sx={{ 
+              borderRadius: 3, 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              border: '1px solid #f0f0f0',
+              backgroundColor: '#ffffff',
+              maxHeight: 'calc(100vh - 400px)',
+              overflow: 'auto',
+              '& .MuiTable-root': {
+                borderCollapse: 'separate',
+                borderSpacing: 0
+              },
+              '& .MuiTableHead-root': {
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
+                backgroundColor: '#ffffff'
+              }
+            }}>
+                           <Table stickyHeader sx={{ '& .MuiTableHead-root': { position: 'sticky', top: 0, zIndex: 2 } }}>
                                <TableHead>
                                      {/* 총 수량 요약 행 (맨 위) */}
-                   <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
+                                       <TableRow sx={{ backgroundColor: '#f8f9fa', position: 'sticky', top: 0, zIndex: 3 }}>
                                                                   <TableCell sx={{ 
                          backgroundColor: '#f8f9fa', 
                          fontWeight: 'bold',
@@ -673,7 +681,7 @@ const InventoryStatusScreen = () => {
                    </TableRow>
                   
                                      {/* 요일 행 (중간) */}
-                   <TableRow sx={{ backgroundColor: '#ffffff' }}>
+                                       <TableRow sx={{ backgroundColor: '#ffffff', position: 'sticky', top: '40px', zIndex: 3 }}>
                                                                   <TableCell sx={{ 
                          backgroundColor: '#ffffff', 
                          fontWeight: 'bold',
@@ -761,7 +769,7 @@ const InventoryStatusScreen = () => {
                    </TableRow>
                   
                                      {/* 컬럼 헤더 행 (맨 아래) */}
-                   <TableRow sx={{ backgroundColor: '#1976d2' }}>
+                                       <TableRow sx={{ backgroundColor: '#1976d2', position: 'sticky', top: '80px', zIndex: 3 }}>
                                                                   <TableCell sx={{ 
                          backgroundColor: '#1976d2', 
                          color: 'white', 
