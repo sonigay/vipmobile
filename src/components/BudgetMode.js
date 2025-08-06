@@ -332,26 +332,28 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 변환된 데이터를 화면에 설정
       setBudgetData(transformedData);
       
-      // 날짜 범위 설정
-      if (result.dateRange) {
-        const { receiptStartDate, receiptEndDate, activationStartDate, activationEndDate } = result.dateRange;
-        
-        // 날짜와 시간 분리
-        const receiptStartMatch = receiptStartDate?.match(/^(.+?)\s+(.+)$/);
-        const receiptEndMatch = receiptEndDate?.match(/^(.+?)\s+(.+)$/);
-        const activationStartMatch = activationStartDate?.match(/^(.+?)\s+(.+)$/);
-        const activationEndMatch = activationEndDate?.match(/^(.+?)\s+(.+)$/);
-        
-        setDateRange({
-          receiptStartDate: receiptStartMatch ? receiptStartMatch[1] : '',
-          receiptStartTime: receiptStartMatch ? receiptStartMatch[2] : '10:00',
-          receiptEndDate: receiptEndMatch ? receiptEndMatch[1] : '',
-          receiptEndTime: receiptEndMatch ? receiptEndMatch[2] : '23:59',
-          activationStartDate: activationStartMatch ? activationStartMatch[1] : '',
-          activationStartTime: activationStartMatch ? activationStartMatch[2] : '10:00',
-          activationEndDate: activationEndMatch ? activationEndMatch[1] : '',
-          activationEndTime: activationEndMatch ? activationEndMatch[2] : '23:59'
-        });
+      // 날짜 범위 설정 - 새로운 4개 날짜 컬럼 구조
+      if (result.data && result.data.length > 0) {
+        // 첫 번째 행에서 날짜 정보 가져오기
+        const firstRow = result.data[0];
+        if (firstRow.receiptStartDate && firstRow.receiptEndDate && firstRow.activationStartDate && firstRow.activationEndDate) {
+          // 날짜와 시간 분리
+          const receiptStartMatch = firstRow.receiptStartDate?.match(/^(.+?)\s+(.+)$/);
+          const receiptEndMatch = firstRow.receiptEndDate?.match(/^(.+?)\s+(.+)$/);
+          const activationStartMatch = firstRow.activationStartDate?.match(/^(.+?)\s+(.+)$/);
+          const activationEndMatch = firstRow.activationEndDate?.match(/^(.+?)\s+(.+)$/);
+          
+          setDateRange({
+            receiptStartDate: receiptStartMatch ? receiptStartMatch[1] : '',
+            receiptStartTime: receiptStartMatch ? receiptStartMatch[2] : '10:00',
+            receiptEndDate: receiptEndMatch ? receiptEndMatch[1] : '',
+            receiptEndTime: receiptEndMatch ? receiptEndMatch[2] : '23:59',
+            activationStartDate: activationStartMatch ? activationStartMatch[1] : '',
+            activationStartTime: activationStartMatch ? activationStartMatch[2] : '10:00',
+            activationEndDate: activationEndMatch ? activationEndMatch[1] : '',
+            activationEndTime: activationEndMatch ? activationEndMatch[2] : '23:59'
+          });
+        }
       }
       
       // 정책그룹 설정
@@ -366,10 +368,19 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 시트 ID 설정
       setSheetId(sheet.id);
       
-      // 대상월 설정 (시트 이름에서 추출)
+      // 대상월 설정 (시트 이름에서 추출) - 날짜 형식 경고 해결
       const monthMatch = sheet.name?.match(/액면_(.+)/);
       if (monthMatch) {
-        setTargetMonth(monthMatch[1]);
+        const extractedName = monthMatch[1];
+        // 한글 이름이 아닌 실제 월 형식인지 확인
+        if (extractedName.match(/^\d{4}-\d{2}$/)) {
+          setTargetMonth(extractedName);
+        } else {
+          // 한글 이름인 경우 현재 월로 설정
+          const now = new Date();
+          const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          setTargetMonth(currentMonth);
+        }
       }
       
       setSnackbar({ open: true, message: '데이터를 성공적으로 불러왔습니다.', severity: 'success' });

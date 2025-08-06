@@ -3578,7 +3578,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   try {
     const budgetResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!A:I`, // A열부터 I열까지
+      range: `${userSheetName}!A:L`, // A열부터 L열까지 (3열 추가로 12개 컬럼)
     });
     budgetData = budgetResponse.data.values || [];
   } catch (error) {
@@ -3611,7 +3611,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       
       // 정책그룹 매칭
       if (selectedPolicyGroups.includes(policyGroup)) {
-        // 날짜 범위 필터링
+        // 날짜 범위 필터링 - 새로운 4개 날짜 컬럼 사용
         let isInDateRange = true;
         if (dateRange && dateRange.startDate && dateRange.endDate) {
           // 접수일 또는 개통일이 범위에 있는지 확인
@@ -3621,15 +3621,23 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
         }
         
         if (isInDateRange) {
-          // 정책군 매핑 (S군="S", A군="A")
+          // 정책군 매핑 (S, A, B, C, D, E 모두 매핑)
           let mappedArmyType = '';
           if (armyType === 'S') mappedArmyType = 'S군';
           else if (armyType === 'A') mappedArmyType = 'A군';
+          else if (armyType === 'B') mappedArmyType = 'B군';
+          else if (armyType === 'C') mappedArmyType = 'C군';
+          else if (armyType === 'D') mappedArmyType = 'D군';
+          else if (armyType === 'E') mappedArmyType = 'E군';
           else mappedArmyType = armyType; // 기타 경우 그대로 사용
           
-          // 유형 매핑 (기변 -> 보상)
+          // 유형 매핑 (신규, MNP, 보상, 기변 모두 매핑)
           let mappedCategoryType = categoryType;
-          if (categoryType === '기변') mappedCategoryType = '보상';
+          if (categoryType === '신규') mappedCategoryType = '신규';
+          else if (categoryType === 'MNP') mappedCategoryType = 'MNP';
+          else if (categoryType === '보상') mappedCategoryType = '보상';
+          else if (categoryType === '기변') mappedCategoryType = '보상';
+          else mappedCategoryType = categoryType; // 기타 경우 그대로 사용
           
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
@@ -3638,14 +3646,17 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           if (budgetData.length > 1) {
             for (let i = 1; i < budgetData.length; i++) {
               const budgetRow = budgetData[i];
-              if (budgetRow.length >= 8) {
-                const budgetModelName = budgetRow[2]; // C열: 모델명
-                const budgetArmyType = budgetRow[3]; // D열: 군
-                const budgetCategoryType = budgetRow[4]; // E열: 유형
-                const budgetUsedAmount = parseFloat(budgetRow[6]) || 0; // G열: 사용 예산
+              if (budgetRow.length >= 12) { // 12개 컬럼 필요
+                const budgetModelName = budgetRow[5]; // F열: 모델명 (기존 C열에서 3열 밀림)
+                const budgetArmyType = budgetRow[6]; // G열: 군 (기존 D열에서 3열 밀림)
+                const budgetCategoryType = budgetRow[7]; // H열: 유형 (기존 E열에서 3열 밀림)
+                const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산 (기존 G열에서 3열 밀림)
+                
+                // 폰클개통데이터 V열의 모델명과 비교
+                const activationModelName = row[21]; // V열: 모델명 (0부터 시작하므로 21)
                 
                 // 모델명, 군, 유형이 모두 일치하는 경우
-                if (budgetModelName === policyGroup && 
+                if (budgetModelName === activationModelName && 
                     budgetArmyType === mappedArmyType && 
                     budgetCategoryType === mappedCategoryType) {
                   calculatedBudgetValue = budgetUsedAmount;
@@ -3668,7 +3679,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           totalUsedBudget += calculatedBudgetValue;
           
-          // C열 업데이트 요청 추가 (5행부터 시작)
+          // C열 업데이트 요청 추가 (5행부터 시작 - C4셀 헤더, C5셀부터 데이터)
           updateRequests.push({
             range: `폰클개통데이터!C${index + 5}`,
             values: [[calculatedBudgetValue]]
@@ -14836,7 +14847,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
     // 사용자 시트에서 데이터 가져오기
     const userSheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: 'A2:I', // 사용자 시트 데이터 범위
+      range: 'A2:L', // 사용자 시트 데이터 범위 (12개 컬럼)
     });
     
     const userSheetRows = userSheetData.data.values || [];
@@ -14845,9 +14856,9 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
     const updateRequests = [];
     
     userSheetRows.forEach((row, index) => {
-      if (row.length >= 8) {
-        const armyType = row[3]; // 군 (D열)
-        const categoryType = row[4]; // 유형 (E열)
+      if (row.length >= 12) {
+        const armyType = row[6]; // 군 (G열 - 기존 D열에서 3열 밀림)
+        const categoryType = row[7]; // 유형 (H열 - 기존 E열에서 3열 밀림)
         
         // 폰클개통데이터에서 해당 군/유형에 맞는 사용예산 찾기
         const matchingData = calculateResult.calculatedData.find(data => 
@@ -14855,17 +14866,17 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
         );
         
         if (matchingData) {
-          // 사용예산 업데이트 (F열)
+          // 사용예산 업데이트 (J열 - 기존 F열에서 3열 밀림)
           updateRequests.push({
-            range: `F${index + 2}`,
+            range: `J${index + 2}`,
             values: [[matchingData.budgetValue]]
           });
           
-          // 잔액 업데이트 (G열) - 확보예산(40000) - 사용예산
+          // 잔액 업데이트 (K열 - 기존 G열에서 3열 밀림) - 확보예산(40000) - 사용예산
           const securedBudget = 40000;
           const remainingBudget = securedBudget - matchingData.budgetValue;
           updateRequests.push({
-            range: `G${index + 2}`,
+            range: `K${index + 2}`,
             values: [[remainingBudget]]
           });
         }
@@ -15237,21 +15248,19 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
             // 예산 잔액 계산
             const remainingBudget = securedBudget - usedBudget;
             
-            // 적용일 설정 - 시작일과 종료일 모두 포함
-            const appliedDate = dateRange.applyReceiptDate 
-              ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` 
-              : `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`;
-            
             rowsToSave.push([
-              appliedDate, // 적용일
-              `${userName}(레벨${userLevel || 'SS'})`, // 입력자(권한레벨) - 실제 권한 레벨 사용
-              item.modelName, // 모델명
-              armyType, // 군
-              categoryType, // 유형
-              securedBudget, // 확보된 예산 (원 단위)
-              usedBudget, // 사용된 예산 (원 단위)
-              remainingBudget, // 예산 잔액 (원 단위)
-              '정상' // 상태
+              dateRange.receiptStartDate || '', // A열: 접수일 시작
+              dateRange.receiptEndDate || '', // B열: 접수일 종료
+              dateRange.activationStartDate || '', // C열: 개통일 시작
+              dateRange.activationEndDate || '', // D열: 개통일 종료
+              `${userName}(레벨${userLevel || 'SS'})`, // E열: 입력자(권한레벨)
+              item.modelName, // F열: 모델명
+              armyType, // G열: 군
+              categoryType, // H열: 유형
+              securedBudget, // I열: 확보된 예산 (원 단위)
+              usedBudget, // J열: 사용된 예산 (원 단위)
+              remainingBudget, // K열: 예산 잔액 (원 단위)
+              '정상' // L열: 상태
             ]);
           }
         });
@@ -15261,7 +15270,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 기존 데이터 지우기 (헤더 제외)
     await sheets.spreadsheets.values.clear({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!A2:I`
+      range: `${userSheetName}!A2:L`
     });
 
     // 새 데이터 추가
@@ -15276,8 +15285,8 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       });
     }
 
-    // 메타데이터 시트에 저장 정보 추가
-    const metadataRange = `${userSheetName}!K1:N2`;
+    // 메타데이터 시트에 저장 정보 추가 (O1:R2로 이동)
+    const metadataRange = `${userSheetName}!O1:R2`;
     const metadata = [
       ['저장일시', '접수일범위', '개통일범위', '접수일적용여부'],
       [
@@ -15329,25 +15338,25 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     
     const userSheetName = `액면_${userName}`;
     
-    // 데이터 불러오기 (A2:I) - 새로운 형식에 맞춰 9개 컬럼
+    // 데이터 불러오기 (A2:L) - 새로운 형식에 맞춰 12개 컬럼
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!A2:I`
+      range: `${userSheetName}!A2:L`
     });
     
-    // 메타데이터 불러오기 (K1:N1) - 메타데이터 위치 변경
+    // 메타데이터 불러오기 (O1:R1) - 메타데이터 위치 변경
     const metadataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!K1:N1`
+      range: `${userSheetName}!O1:R1`
     });
     
     const data = dataResponse.data.values || [];
     const metadata = metadataResponse.data.values || [];
     
-    // 데이터 파싱 - 새로운 형식에 맞춰 수정
+    // 데이터 파싱 - 새로운 형식에 맞춰 수정 (12개 컬럼)
     const parsedData = data.map((row, index) => {
-      if (row.length >= 9) {
-        const [appliedDate, inputUserInfo, modelName, armyType, categoryType, securedBudget, usedBudget, remainingBudget, status] = row;
+      if (row.length >= 12) {
+        const [receiptStartDate, receiptEndDate, activationStartDate, activationEndDate, inputUserInfo, modelName, armyType, categoryType, securedBudget, usedBudget, remainingBudget, status] = row;
         
         // 입력자 정보 파싱 (예: "홍길동(레벨3)" -> "홍길동", "3")
         const userMatch = inputUserInfo.match(/^(.+?)\(레벨(\d+)\)$/);
@@ -15370,7 +15379,10 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
 
         return {
           id: `loaded-${index}`,
-          appliedDate,
+          receiptStartDate,
+          receiptEndDate,
+          activationStartDate,
+          activationEndDate,
           inputUser,
           userLevel,
           modelName,
