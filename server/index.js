@@ -3600,6 +3600,22 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   const activationRows = activationData.data.values || [];
   console.log('📱 폰클개통데이터 시트 데이터 로드:', activationRows.length, '행');
   
+  // 헤더 구조 확인
+  console.log('📋 폰클개통데이터 헤더 구조 확인:');
+  activationRows.slice(0, 10).forEach((row, i) => {
+    console.log(`  행${i + 1}:`, row.slice(0, 5).join(' | ')); // 처음 5개 컬럼만 출력
+  });
+  
+  // 실제 데이터 시작 행 확인 (C열이 비어있지 않은 첫 번째 행)
+  let dataStartRow = 1;
+  for (let i = 0; i < activationRows.length; i++) {
+    if (activationRows[i] && activationRows[i].length > 2 && activationRows[i][2] !== undefined && activationRows[i][2] !== '') {
+      dataStartRow = i + 1;
+      break;
+    }
+  }
+  console.log(`🎯 실제 데이터 시작 행: ${dataStartRow} (C${dataStartRow})`);
+  
   // 사용예산 계산 및 C열 업데이트
   let totalUsedBudget = 0;
   const calculatedData = [];
@@ -3613,7 +3629,9 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   let categoryTypeMismatch = 0;
   let successfulMatches = 0;
   
-  activationRows.slice(1).forEach((row, index) => { // 헤더 제외
+  // 헤더 이후의 데이터만 처리
+  activationRows.slice(dataStartRow - 1).forEach((row, index) => {
+    const actualRowNumber = dataStartRow + index; // 실제 행 번호
     if (row.length >= 20) { // 최소 20개 컬럼 필요
       const policyGroup = row[4]; // E열: 정책그룹
       const armyType = row[3]; // D열: 정책군
@@ -3678,7 +3696,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                   calculatedBudgetValue = budgetUsedAmount;
                   matchFound = true;
                   successfulMatches++;
-                  console.log(`✅ 매칭 성공 [행${index + 5}]: 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 예산=${calculatedBudgetValue}`);
+                  console.log(`✅ 매칭 성공 [행${actualRowNumber}]: 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 예산=${calculatedBudgetValue}`);
                   break;
                 }
               }
@@ -3688,7 +3706,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           if (!matchFound) {
             // 매칭 실패 원인 분석
             const activationModelName = row[21];
-            console.log(`❌ 매칭 실패 [행${index + 5}]: 정책그룹=${policyGroup}, 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
+            console.log(`❌ 매칭 실패 [행${actualRowNumber}]: 정책그룹=${policyGroup}, 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
             
             // 액면_홍남옥에서 해당 모델명이 있는지 확인
             const modelExists = budgetData.slice(1).some(budgetRow => 
@@ -3720,7 +3738,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           // 매핑된 데이터 저장
           calculatedData.push({
-            rowIndex: index + 2, // 실제 행 번호 (헤더 제외)
+            rowIndex: actualRowNumber, // 실제 행 번호
             policyGroup,
             armyType: mappedArmyType,
             categoryType: mappedCategoryType,
@@ -3731,26 +3749,26 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           totalUsedBudget += calculatedBudgetValue;
           
-          // C열 업데이트 요청 추가 (5행부터 시작 - C4셀 헤더, C5셀부터 데이터)
+          // C열 업데이트 요청 추가 (실제 데이터 시작 행부터)
           updateRequests.push({
-            range: `폰클개통데이터!C${index + 5}`,
+            range: `폰클개통데이터!C${actualRowNumber}`,
             values: [[calculatedBudgetValue]]
           });
         } else {
-          // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정 (5행부터 시작)
+          // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정
           dateRangeFiltered++;
-          console.log(`📅 날짜 범위 제외 [행${index + 5}]: 정책그룹=${policyGroup}, 접수일=${receptionDate}, 개통일=${activationDate}`);
+          console.log(`📅 날짜 범위 제외 [행${actualRowNumber}]: 정책그룹=${policyGroup}, 접수일=${receptionDate}, 개통일=${activationDate}`);
           updateRequests.push({
-            range: `폰클개통데이터!C${index + 5}`,
+            range: `폰클개통데이터!C${actualRowNumber}`,
             values: [[0]]
           });
         }
       } else {
-        // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정 (5행부터 시작)
+        // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정
         policyGroupFiltered++;
-        console.log(`🚫 정책그룹 제외 [행${index + 5}]: ${policyGroup} (선택되지 않음)`);
+        console.log(`🚫 정책그룹 제외 [행${actualRowNumber}]: ${policyGroup} (선택되지 않음)`);
         updateRequests.push({
-          range: `폰클개통데이터!C${index + 5}`,
+          range: `폰클개통데이터!C${actualRowNumber}`,
           values: [[0]]
         });
       }
