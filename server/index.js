@@ -3606,15 +3606,9 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     console.log(`  행${i + 1}:`, row.slice(0, 5).join(' | ')); // 처음 5개 컬럼만 출력
   });
   
-  // 실제 데이터 시작 행 확인 (C열이 비어있지 않은 첫 번째 행)
-  let dataStartRow = 1;
-  for (let i = 0; i < activationRows.length; i++) {
-    if (activationRows[i] && activationRows[i].length > 2 && activationRows[i][2] !== undefined && activationRows[i][2] !== '') {
-      dataStartRow = i + 1;
-      break;
-    }
-  }
-  console.log(`🎯 실제 데이터 시작 행: ${dataStartRow} (C${dataStartRow})`);
+  // 사용자가 명확히 알려준 대로 고정값 사용: C4행 헤더, C5행부터 데이터 시작
+  const dataStartRow = 5; // C5행부터 시작
+  console.log(`🎯 데이터 시작 행: ${dataStartRow} (C${dataStartRow}) - 고정값 사용`);
   
   // 사용예산 계산 및 C열 업데이트
   let totalUsedBudget = 0;
@@ -3629,9 +3623,9 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   let categoryTypeMismatch = 0;
   let successfulMatches = 0;
   
-  // 헤더 이후의 데이터만 처리
-  activationRows.slice(dataStartRow - 1).forEach((row, index) => {
-    const actualRowNumber = dataStartRow + index; // 실제 행 번호
+  // C5행부터 데이터 처리 (배열 인덱스 4부터 시작)
+  activationRows.slice(4).forEach((row, index) => {
+    const actualRowNumber = 5 + index; // C5, C6, C7, C8...
     if (row.length >= 20) { // 최소 20개 컬럼 필요
       const policyGroup = row[4]; // E열: 정책그룹
       const armyType = row[3]; // D열: 정책군
