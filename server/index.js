@@ -3571,6 +3571,11 @@ function isDateInRange(date, startDate, endDate) {
 async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName) {
   const sheets = google.sheets({ version: 'v4', auth });
   
+  console.log('🔍 [calculateUsageBudget] 시작');
+  console.log('📋 선택된 정책그룹:', selectedPolicyGroups);
+  console.log('📅 날짜 범위:', dateRange);
+  console.log('👤 사용자:', userName);
+  
   // 사용자별 예산 데이터 가져오기 (액면_홍남옥 (이사) 시트)
   const userSheetName = `액면_${userName}`;
   let budgetData = [];
@@ -3581,6 +3586,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       range: `${userSheetName}!A:L`, // A열부터 L열까지 (3열 추가로 12개 컬럼)
     });
     budgetData = budgetResponse.data.values || [];
+    console.log('💰 액면_홍남옥 시트 데이터 로드:', budgetData.length, '행');
   } catch (error) {
     console.warn(`사용자 시트 ${userSheetName}에서 예산 데이터를 가져올 수 없습니다:`, error.message);
   }
@@ -3592,11 +3598,20 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   });
   
   const activationRows = activationData.data.values || [];
+  console.log('📱 폰클개통데이터 시트 데이터 로드:', activationRows.length, '행');
   
   // 사용예산 계산 및 C열 업데이트
   let totalUsedBudget = 0;
   const calculatedData = [];
   const updateRequests = [];
+  
+  // 통계 변수
+  let policyGroupFiltered = 0;
+  let dateRangeFiltered = 0;
+  let modelMismatch = 0;
+  let armyTypeMismatch = 0;
+  let categoryTypeMismatch = 0;
+  let successfulMatches = 0;
   
   activationRows.slice(1).forEach((row, index) => { // 헤더 제외
     if (row.length >= 20) { // 최소 20개 컬럼 필요
@@ -3641,6 +3656,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
+          let matchFound = false;
           
           // 헤더 제외하고 예산 데이터에서 매칭
           if (budgetData.length > 1) {
@@ -3660,8 +3676,44 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                     budgetArmyType === mappedArmyType && 
                     budgetCategoryType === mappedCategoryType) {
                   calculatedBudgetValue = budgetUsedAmount;
+                  matchFound = true;
+                  successfulMatches++;
+                  console.log(`✅ 매칭 성공 [행${index + 5}]: 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 예산=${calculatedBudgetValue}`);
                   break;
                 }
+              }
+            }
+          }
+          
+          if (!matchFound) {
+            // 매칭 실패 원인 분석
+            const activationModelName = row[21];
+            console.log(`❌ 매칭 실패 [행${index + 5}]: 정책그룹=${policyGroup}, 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
+            
+            // 액면_홍남옥에서 해당 모델명이 있는지 확인
+            const modelExists = budgetData.slice(1).some(budgetRow => 
+              budgetRow.length >= 12 && budgetRow[5] === activationModelName
+            );
+            
+            if (!modelExists) {
+              modelMismatch++;
+              console.log(`  └─ 모델명 불일치: ${activationModelName} (액면_홍남옥에 없음)`);
+            } else {
+              // 모델은 있지만 군/유형이 다른 경우
+              const matchingBudgetRows = budgetData.slice(1).filter(budgetRow => 
+                budgetRow.length >= 12 && budgetRow[5] === activationModelName
+              );
+              
+              const armyTypeExists = matchingBudgetRows.some(budgetRow => budgetRow[6] === mappedArmyType);
+              const categoryTypeExists = matchingBudgetRows.some(budgetRow => budgetRow[7] === mappedCategoryType);
+              
+              if (!armyTypeExists) {
+                armyTypeMismatch++;
+                console.log(`  └─ 정책군 불일치: ${mappedArmyType} (액면_홍남옥에 없음)`);
+              }
+              if (!categoryTypeExists) {
+                categoryTypeMismatch++;
+                console.log(`  └─ 유형 불일치: ${mappedCategoryType} (액면_홍남옥에 없음)`);
               }
             }
           }
@@ -3686,6 +3738,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           });
         } else {
           // 날짜 범위에 포함되지 않는 경우 C열을 0으로 설정 (5행부터 시작)
+          dateRangeFiltered++;
+          console.log(`📅 날짜 범위 제외 [행${index + 5}]: 정책그룹=${policyGroup}, 접수일=${receptionDate}, 개통일=${activationDate}`);
           updateRequests.push({
             range: `폰클개통데이터!C${index + 5}`,
             values: [[0]]
@@ -3693,6 +3747,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
         }
       } else {
         // 선택되지 않은 정책그룹의 경우 C열을 0으로 설정 (5행부터 시작)
+        policyGroupFiltered++;
+        console.log(`🚫 정책그룹 제외 [행${index + 5}]: ${policyGroup} (선택되지 않음)`);
         updateRequests.push({
           range: `폰클개통데이터!C${index + 5}`,
           values: [[0]]
@@ -3700,6 +3756,17 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       }
     }
   });
+  
+  // 통계 출력
+  console.log('📊 [calculateUsageBudget] 통계:');
+  console.log(`  - 총 처리 행: ${activationRows.length - 1}`);
+  console.log(`  - 정책그룹 제외: ${policyGroupFiltered}`);
+  console.log(`  - 날짜 범위 제외: ${dateRangeFiltered}`);
+  console.log(`  - 모델명 불일치: ${modelMismatch}`);
+  console.log(`  - 정책군 불일치: ${armyTypeMismatch}`);
+  console.log(`  - 유형 불일치: ${categoryTypeMismatch}`);
+  console.log(`  - 매칭 성공: ${successfulMatches}`);
+  console.log(`  - 총 사용예산: ${totalUsedBudget}`);
   
   // 폰클개통데이터 시트의 C열 일괄 업데이트
   if (updateRequests.length > 0) {
