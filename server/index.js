@@ -15391,7 +15391,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
 app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
     const { sheetId } = req.params;
-    const { data, dateRange, userName, userLevel, budgetAmounts } = req.body; // Added budgetAmounts
+    const { data, dateRange, userName, userLevel, budgetAmounts, budgetType } = req.body; // Added budgetAmounts, budgetType
     
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ error: '저장할 데이터가 없습니다.' });
@@ -15403,7 +15403,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
 
     const sheets = google.sheets({ version: 'v4', auth });
     const baseUserName = userName.replace(/\(이사\)/, '').trim();
-    const userSheetName = `액면_${baseUserName}`;
+    const userSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) (이사)`;
     
     // 데이터를 사용자가 원하는 형식으로 변환
     // 각 모델별로 군/유형별 데이터를 개별 행으로 분리

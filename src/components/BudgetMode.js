@@ -701,8 +701,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         applyReceiptDate: applyReceiptDate // 접수일 적용 여부도 함께 저장
       };
       
-      // 예산금액 설정도 함께 전달
-      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel, budgetAmounts);
+      // 예산금액 설정과 budgetType도 함께 전달
+      await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel, budgetAmounts, faceValueSubMenu);
       
       // 생성된 시트 정보 반환
       return result;
