@@ -14945,11 +14945,11 @@ async function getSheetIdByName(sheetName) {
   }
 }
 
-// 사용자별 예산 시트의 사용예산을 폰클개통데이터 C열에서 업데이트하는 API
+// 사용자별 예산 시트의 사용예산을 폰클개통데이터에서 업데이트하는 API
 app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
   try {
     const { sheetId } = req.params;
-    const { selectedPolicyGroups, dateRange, userName } = req.body;
+    const { selectedPolicyGroups, dateRange, userName, budgetType } = req.body;
     
     if (!selectedPolicyGroups || !Array.isArray(selectedPolicyGroups)) {
       return res.status(400).json({ error: '선택된 정책그룹이 필요합니다.' });
@@ -14967,6 +14967,26 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
     });
     
     const userSheetRows = userSheetData.data.values || [];
+    
+    // 액면예산 타입에 따른 폰클개통데이터 매핑 컬럼 결정
+    const currentBudgetType = budgetType || 'Ⅰ';
+    let phoneklColumns = {};
+    
+    if (currentBudgetType === 'Ⅰ') {
+      // 액면예산(Ⅰ): L열(예산잔액), M열(확보예산), N열(사용예산)
+      phoneklColumns = {
+        remainingBudget: 'L', // 예산잔액
+        securedBudget: 'M',   // 확보예산
+        usedBudget: 'N'       // 사용예산
+      };
+    } else if (currentBudgetType === 'Ⅱ') {
+      // 액면예산(Ⅱ): I열(예산잔액), J열(확보예산), K열(사용예산)
+      phoneklColumns = {
+        remainingBudget: 'I', // 예산잔액
+        securedBudget: 'J',   // 확보예산
+        usedBudget: 'K'       // 사용예산
+      };
+    }
     
     // 폰클개통데이터에서 계산된 데이터를 사용자 시트의 사용예산에 반영
     const updateRequests = [];
@@ -15025,7 +15045,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
 // 사용자별 예산 시트 관리 API
 app.get('/api/budget/user-sheets', async (req, res) => {
   try {
-    const { userId, targetMonth } = req.query;
+    const { userId, targetMonth, showAllUsers } = req.query;
     const sheets = google.sheets({ version: 'v4', auth });
     
     // 사용자별 시트 목록 조회 (예산_사용자시트관리 시트에서)
@@ -15058,10 +15078,23 @@ app.get('/api/budget/user-sheets', async (req, res) => {
     const userSheets = [];
     
     for (const row of rows.slice(1)) {
-      // 대상월이 지정된 경우 해당 월의 시트만 필터링
-      if (row[0] === userId && (!targetMonth || row[5] === targetMonth)) {
+      // showAllUsers가 true이면 모든 사용자의 시트를 반환, 아니면 해당 사용자의 시트만
+      const shouldInclude = showAllUsers === 'true' 
+        ? (!targetMonth || row[5] === targetMonth) // 모든 사용자 + 대상월 필터
+        : (row[0] === userId && (!targetMonth || row[5] === targetMonth)); // 특정 사용자 + 대상월 필터
+      
+      if (shouldInclude) {
         const sheetId = row[1] || '';
         const sheetName = row[2] || '';
+        
+        // 액면예산(Ⅱ)인 경우 본인의 시트만 필터링
+        const isTypeII = sheetName.includes('(Ⅱ)');
+        const isOwnSheet = row[0] === userId;
+        
+        // 액면예산(Ⅱ)이면서 본인의 시트가 아닌 경우 제외
+        if (isTypeII && !isOwnSheet) {
+          continue;
+        }
         const createdAt = row[3] || '';
         const createdBy = row[4] || '';
         const month = row[5] || '';
@@ -15078,10 +15111,20 @@ app.get('/api/budget/user-sheets', async (req, res) => {
         };
         
         try {
-          // 폰클개통데이터에서 L열(예산잔액), M열(확보예산), N열(사용예산) 가져오기 (기존 A, B, C열에서 +11)
+          // 시트 이름에서 액면예산 타입 추출
+          const budgetTypeMatch = sheetName.match(/액면_.*?\(([ⅠⅡ])\)/);
+          const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
+          
+          // 액면예산 타입에 따른 폰클개통데이터 컬럼 결정
+          let phoneklRange = '폰클개통데이터!L:N'; // 기본값: 액면예산(Ⅰ)
+          if (budgetType === 'Ⅱ') {
+            phoneklRange = '폰클개통데이터!I:K'; // 액면예산(Ⅱ)
+          }
+          
+          // 폰클개통데이터에서 해당 컬럼들 가져오기
           const activationDataResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: '폰클개통데이터!L:N'
+            range: phoneklRange
           });
           
           const activationData = activationDataResponse.data.values || [];
@@ -15176,7 +15219,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
 
 app.post('/api/budget/user-sheets', async (req, res) => {
   try {
-    const { userId, userName, targetMonth, selectedPolicyGroups } = req.body;
+    const { userId, userName, targetMonth, selectedPolicyGroups, budgetType } = req.body;
     
     if (!userId || !userName || !targetMonth) {
       return res.status(400).json({ error: '사용자 ID, 이름, 대상월은 필수입니다.' });
@@ -15199,7 +15242,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     }
 
     const targetSheetId = targetMonthRow[1];
-    const userSheetName = `액면_${userName}`;
+    const userSheetName = `액면_${userName}(${budgetType}) (이사)`;
     
     // 기존 시트에 새로운 시트 추가
     try {
@@ -15471,6 +15514,81 @@ function getCategoryType(columnIndex) {
   return categoryTypes[columnIndex - 1] || 'Unknown';
 }
 
+// 액면예산 종합 계산 API
+app.get('/api/budget/summary/:targetMonth', async (req, res) => {
+  try {
+    const { targetMonth } = req.params;
+    const { userId } = req.query;
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    if (!targetMonth) {
+      return res.status(400).json({ error: '대상월이 필요합니다.' });
+    }
+    
+    // 대상월의 시트 ID 조회
+    const monthSheetsData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
+    });
+
+    const monthRows = monthSheetsData.data.values || [];
+    const targetMonthRow = monthRows.find(row => row[0] === targetMonth);
+    
+    if (!targetMonthRow || !targetMonthRow[1]) {
+      return res.status(400).json({ error: '해당 월의 시트 ID를 찾을 수 없습니다.' });
+    }
+
+    const targetSheetId = targetMonthRow[1];
+    
+    // 폰클개통데이터에서 F, G, H열 (합계) 가져오기
+    const summaryDataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: targetSheetId,
+      range: '폰클개통데이터!F:H'
+    });
+    
+    const summaryData = summaryDataResponse.data.values || [];
+    
+    // F, G, H열의 합계 계산 (헤더 제외, 공백 제외)
+    let totalRemainingBudget = 0; // F열: 예산잔액
+    let totalSecuredBudget = 0;   // G열: 확보예산
+    let totalUsedBudget = 0;      // H열: 사용예산
+    
+    summaryData.slice(4).forEach((row, index) => { // C5행부터 시작
+      if (row.length >= 3) {
+        // F열: 예산잔액 (공백이 아닌 경우만)
+        if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
+          const value = parseFloat(row[0]) || 0;
+          totalRemainingBudget += value;
+        }
+        // G열: 확보예산 (공백이 아닌 경우만)
+        if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
+          const value = parseFloat(row[1]) || 0;
+          totalSecuredBudget += value;
+        }
+        // H열: 사용예산 (공백이 아닌 경우만)
+        if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
+          const value = parseFloat(row[2]) || 0;
+          totalUsedBudget += value;
+        }
+      }
+    });
+    
+    res.json({
+      success: true,
+      summary: {
+        totalRemainingBudget,
+        totalSecuredBudget,
+        totalUsedBudget,
+        targetMonth
+      }
+    });
+    
+  } catch (error) {
+    console.error('액면예산 종합 계산 오류:', error);
+    res.status(500).json({ error: '액면예산 종합 계산 중 오류가 발생했습니다.' });
+  }
+});
+
 // 예산 데이터 불러오기 API
 app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
@@ -15482,7 +15600,12 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       return res.status(400).json({ error: '사용자 이름이 필요합니다.' });
     }
     
-    const userSheetName = `액면_${userName}`;
+    // 시트 이름에서 액면예산 타입 추출
+    const budgetTypeMatch = userName.match(/액면_.*?\(([ⅠⅡ])\)/);
+    const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
+    const baseUserName = userName.replace(/\([ⅠⅡ]\)/, '').replace(/\(이사\)/, '').trim();
+    
+    const userSheetName = `액면_${baseUserName}(${budgetType}) (이사)`;
     
     // 데이터 불러오기 (A2:L) - 새로운 형식에 맞춰 12개 컬럼
     const dataResponse = await sheets.spreadsheets.values.get({

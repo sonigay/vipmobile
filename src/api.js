@@ -474,6 +474,20 @@ export const cacheManager = {
 }; 
 
 // 예산 대상월 관리 API
+export const budgetSummaryAPI = {
+  // 액면예산 종합 계산
+  getSummary: async (targetMonth, userId) => {
+    const url = userId 
+      ? `${API_BASE_URL}/api/budget/summary/${targetMonth}?userId=${userId}`
+      : `${API_BASE_URL}/api/budget/summary/${targetMonth}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('액면예산 종합 계산에 실패했습니다.');
+    }
+    return response.json();
+  },
+};
+
 export const budgetMonthSheetAPI = {
   // 월별 시트 ID 목록 조회
   getMonthSheets: async () => {
@@ -513,10 +527,13 @@ export const budgetMonthSheetAPI = {
 
 export const budgetUserSheetAPI = {
   // 사용자별 시트 목록 조회 (대상월 필터링 추가)
-  getUserSheets: async (userId, targetMonth) => {
-    const url = targetMonth 
-      ? `${API_BASE_URL}/api/budget/user-sheets?userId=${userId}&targetMonth=${encodeURIComponent(targetMonth)}`
-      : `${API_BASE_URL}/api/budget/user-sheets?userId=${userId}`;
+  getUserSheets: async (userId, targetMonth, showAllUsers = false) => {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    if (targetMonth) params.append('targetMonth', targetMonth);
+    if (showAllUsers) params.append('showAllUsers', 'true');
+    
+    const url = `${API_BASE_URL}/api/budget/user-sheets?${params.toString()}`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error('사용자 시트 조회에 실패했습니다.');
@@ -525,13 +542,13 @@ export const budgetUserSheetAPI = {
   },
 
   // 사용자별 시트 생성
-  createUserSheet: async (userId, userName, targetMonth, selectedPolicyGroups) => {
+  createUserSheet: async (userId, userName, targetMonth, selectedPolicyGroups, budgetType) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, userName, targetMonth, selectedPolicyGroups }),
+      body: JSON.stringify({ userId, userName, targetMonth, selectedPolicyGroups, budgetType }),
     });
     if (!response.ok) {
       throw new Error('사용자 시트 생성에 실패했습니다.');
@@ -563,14 +580,14 @@ export const budgetUserSheetAPI = {
     return response.json();
   },
 
-  // 사용자 시트의 사용예산을 폰클개통데이터 C열에서 업데이트
-  updateUserSheetUsage: async (sheetId, selectedPolicyGroups, dateRange, userName) => {
+  // 사용자 시트의 사용예산을 폰클개통데이터에서 업데이트
+  updateUserSheetUsage: async (sheetId, selectedPolicyGroups, dateRange, userName, budgetType) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/update-usage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ selectedPolicyGroups, dateRange, userName }),
+      body: JSON.stringify({ selectedPolicyGroups, dateRange, userName, budgetType }),
     });
     if (!response.ok) {
       throw new Error('사용자 시트 사용예산 업데이트에 실패했습니다.');

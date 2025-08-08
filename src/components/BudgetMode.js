@@ -49,7 +49,7 @@ import {
   ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
-import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI } from '../api';
+import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI, budgetSummaryAPI } from '../api';
 
 function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
@@ -63,6 +63,14 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [budgetData, setBudgetData] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  
+  // 액면예산 종합 관련 상태
+  const [summaryData, setSummaryData] = useState({
+    totalRemainingBudget: 0,
+    totalSecuredBudget: 0,
+    totalUsedBudget: 0
+  });
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   
   // 예산금액 설정 상태
   const [budgetAmounts, setBudgetAmounts] = useState({
@@ -118,6 +126,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handleFaceValueSubMenuChange = (subMenu) => {
     setFaceValueSubMenu(subMenu);
     setShowFaceValueDropdown(false);
+    // 서브메뉴 변경 시 사용자 시트 목록 새로고침
+    if (showSheetList) {
+      loadUserSheets();
+    }
   };
 
   // 컴포넌트 마운트 시 업데이트 팝업 표시
@@ -201,7 +213,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const loadUserSheets = async () => {
     try {
       const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
-      const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth);
+      // 액면예산(Ⅰ)에서는 모든 사용자의 정책을 볼 수 있도록 설정
+      // 액면예산(Ⅱ)에서는 본인의 정책만 볼 수 있도록 설정
+      const showAllUsers = faceValueSubMenu === 'Ⅰ';
+      const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth, showAllUsers);
       setUserSheets(data);
     } catch (error) {
       console.error('사용자 시트 목록 로드 실패:', error);
@@ -289,6 +304,34 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('정책그룹 설정 삭제 실패:', error);
       setSnackbar({ open: true, message: '정책그룹 설정 삭제에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 미리보기 모달 상태
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+
+  // 액면예산 종합 데이터 로드
+  const loadSummaryData = async () => {
+    if (!targetMonth) {
+      setSnackbar({ open: true, message: '대상월을 먼저 선택해주세요.', severity: 'warning' });
+      return;
+    }
+    
+    try {
+      setIsLoadingSummary(true);
+      const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
+      const result = await budgetSummaryAPI.getSummary(targetMonth, userId);
+      
+      if (result.success) {
+        setSummaryData(result.summary);
+        setSnackbar({ open: true, message: '액면예산 종합 데이터를 로드했습니다.', severity: 'success' });
+      }
+    } catch (error) {
+      console.error('액면예산 종합 데이터 로드 실패:', error);
+      setSnackbar({ open: true, message: '액면예산 종합 데이터 로드에 실패했습니다.', severity: 'error' });
+    } finally {
+      setIsLoadingSummary(false);
     }
   };
 
@@ -614,7 +657,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           result.sheet.id, 
           selectedPolicyGroups, 
           serverDateRange, 
-          userName
+          userName,
+          faceValueSubMenu
         );
       }
       
@@ -644,7 +688,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
       
       // 항상 새 시트 생성 (기존 시트 확인 로직 제거)
-      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth, selectedPolicyGroups);
+      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth, selectedPolicyGroups, faceValueSubMenu);
       const targetSheetId = result.sheet.id;
       setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다.`, severity: 'success' });
       
@@ -1451,6 +1495,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       예산잔액
                     </TableCell>
                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      작업자
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
                       마지막수정
                     </TableCell>
                     <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
@@ -1493,6 +1540,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                         <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
                           {((sheet.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
                         </TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          {sheet.createdBy || 'Unknown'}
+                        </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem' }}>
                           {sheet.summary?.lastUpdated ? 
                             new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
@@ -1500,15 +1550,30 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           }
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="small"
-                            variant="outlined"
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            {faceValueSubMenu === 'Ⅰ' && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setPreviewData(sheet);
+                                  setShowPreviewModal(true);
+                                }}
+                                sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
+                              >
+                                미리보기
+                              </Button>
+                            )}
+                            <Button
+                              size="small"
+                              variant="outlined"
                               onClick={() => handleLoadUserSheet(sheet)}
                               sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
                             >
                               불러오기
                             </Button>
-                          </TableCell>
+                          </Box>
+                        </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -1716,6 +1781,91 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
            <Button onClick={() => setShowLoadSettingsModal(false)}>닫기</Button>
          </DialogActions>
        </Dialog>
+
+       {/* 미리보기 모달 */}
+       <Dialog 
+         open={showPreviewModal} 
+         onClose={() => setShowPreviewModal(false)}
+         maxWidth="md"
+         fullWidth
+       >
+         <DialogTitle>
+           <Typography variant="h6">📊 예산 데이터 미리보기</Typography>
+         </DialogTitle>
+         <DialogContent>
+           {previewData && (
+             <Box>
+               <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                 {previewData.name} - {previewData.createdBy}
+               </Typography>
+               
+               <Grid container spacing={2} sx={{ mb: 3 }}>
+                 <Grid item xs={4}>
+                   <Card sx={{ backgroundColor: '#e8f5e8' }}>
+                     <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                       <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold' }}>
+                         확보예산
+                       </Typography>
+                       <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                         {((previewData.summary?.totalSecuredBudget || 0) * 1000).toLocaleString()}원
+                       </Typography>
+                     </CardContent>
+                   </Card>
+                 </Grid>
+                 <Grid item xs={4}>
+                   <Card sx={{ backgroundColor: '#fff3e0' }}>
+                     <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                       <Typography variant="body2" color="warning.main" sx={{ fontWeight: 'bold' }}>
+                         사용예산
+                       </Typography>
+                       <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
+                         {((previewData.summary?.totalUsedBudget || 0) * 1000).toLocaleString()}원
+                       </Typography>
+                     </CardContent>
+                   </Card>
+                 </Grid>
+                 <Grid item xs={4}>
+                   <Card sx={{ backgroundColor: '#fce4ec' }}>
+                     <CardContent sx={{ textAlign: 'center', py: 1 }}>
+                       <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
+                         예산잔액
+                       </Typography>
+                       <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
+                         {((previewData.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
+                       </Typography>
+                     </CardContent>
+                   </Card>
+                 </Grid>
+               </Grid>
+               
+               <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
+                 <strong>예산적용일:</strong>
+               </Typography>
+               <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+                 <div 
+                   dangerouslySetInnerHTML={{
+                     __html: previewData.summary?.dateRange || '날짜 미설정'
+                   }}
+                   style={{ 
+                     whiteSpace: 'pre-line',
+                     lineHeight: '1.4'
+                   }}
+                 />
+               </Typography>
+               
+               <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
+                 <strong>마지막 수정:</strong> {previewData.summary?.lastUpdated ? 
+                   new Date(previewData.summary.lastUpdated).toLocaleString('ko-KR') : 
+                   new Date(previewData.createdAt).toLocaleString('ko-KR')
+                 }
+               </Typography>
+             </Box>
+           )}
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={() => setShowPreviewModal(false)}>닫기</Button>
+         </DialogActions>
+       </Dialog>
     </Box>
   );
 
@@ -1904,6 +2054,38 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         💰 액면예산(종합) 관리
       </Typography>
       
+      {/* 대상월 선택 및 데이터 로드 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📅 대상월 선택
+          </Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="대상월"
+                type="month"
+                value={targetMonth}
+                onChange={handleMonthChange}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Button
+                variant="contained"
+                onClick={loadSummaryData}
+                disabled={!targetMonth || isLoadingSummary}
+                startIcon={isLoadingSummary ? <CircularProgress size={20} /> : <CalculateIcon />}
+                sx={{ backgroundColor: '#795548' }}
+              >
+                {isLoadingSummary ? '로딩 중...' : '종합 데이터 로드'}
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+      
       {/* 최종 예산 잔액 */}
       <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
         <CardContent>
@@ -1911,7 +2093,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             🎯 최종 예산 잔액
           </Typography>
           <Typography variant="h4" sx={{ textAlign: 'center', color: '#2e7d32', fontWeight: 'bold' }}>
-            [F열 합계 - (별도추가 + 부가추가지원 + 부가차감지원 사용예산)]
+            {summaryData.totalRemainingBudget.toLocaleString()}원
+          </Typography>
+          <Typography variant="body2" sx={{ textAlign: 'center', color: '#666', mt: 1 }}>
+            F열 합계 - (별도추가 + 부가추가지원 + 부가차감지원 사용예산)
           </Typography>
         </CardContent>
       </Card>
@@ -1929,7 +2114,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Typography variant="h6" color="primary">
                     확보예산
                   </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    {summaryData.totalSecuredBudget.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
                     G열(합계계산금액)
                   </Typography>
                 </CardContent>
@@ -1941,7 +2129,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Typography variant="h6" color="warning.main">
                     사용예산
                   </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
+                    {summaryData.totalUsedBudget.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
                     H열(합계계산금액)
                   </Typography>
                 </CardContent>
@@ -1953,7 +2144,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Typography variant="h6" color="error">
                     예산잔액
                   </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
+                    {summaryData.totalRemainingBudget.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
                     F열(합계계산금액)
                   </Typography>
                 </CardContent>
