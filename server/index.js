@@ -3670,6 +3670,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
+          let securedBudgetValue = 0; // 확보예산 기본값
           let matchFound = false;
           
           // 헤더 제외하고 예산 데이터에서 매칭
@@ -3681,6 +3682,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                 const budgetArmyType = budgetRow[6]; // G열: 군 (기존 D열에서 3열 밀림)
                 const budgetCategoryType = budgetRow[7]; // H열: 유형 (기존 E열에서 3열 밀림)
                 const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산 (기존 G열에서 3열 밀림)
+                const budgetSecuredAmount = parseFloat(budgetRow[8]) || 0; // I열: 확보 예산 (기존 F열에서 3열 밀림)
                 
                 // 폰클개통데이터 V열의 모델명과 비교
                 const activationModelName = row[21]; // V열: 모델명 (0부터 시작하므로 21)
@@ -3690,6 +3692,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                     budgetArmyType === mappedArmyType && 
                     budgetCategoryType === mappedCategoryType) {
                   calculatedBudgetValue = budgetUsedAmount;
+                  securedBudgetValue = budgetSecuredAmount;
                   matchFound = true;
                   successfulMatches++;
                   console.log(`✅ 매칭 성공 [행${actualRowNumber}]: 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 예산=${calculatedBudgetValue}`);
@@ -3739,24 +3742,24 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
             armyType: mappedArmyType,
             categoryType: mappedCategoryType,
             budgetValue: calculatedBudgetValue,
-            securedBudget: budgetUsedAmount, // 확보예산 추가
-            remainingBudget: budgetUsedAmount, // 예산잔액 추가 (확보예산 - 사용예산)
+            securedBudget: securedBudgetValue, // 확보예산 추가
+            remainingBudget: securedBudgetValue - calculatedBudgetValue, // 예산잔액 추가 (확보예산 - 사용예산)
             receptionDate: receptionDate && !isNaN(receptionDate.getTime()) ? receptionDate.toISOString() : null,
             activationDate: activationDate && !isNaN(activationDate.getTime()) ? activationDate.toISOString() : null
           });
           
           totalUsedBudget += calculatedBudgetValue;
-          totalSecuredBudget += budgetUsedAmount;
-          totalRemainingBudget += (budgetUsedAmount - calculatedBudgetValue);
+          totalSecuredBudget += securedBudgetValue;
+          totalRemainingBudget += (securedBudgetValue - calculatedBudgetValue);
           
           // A열(예산잔액), B열(확보예산), C열(사용예산) 업데이트 요청 추가
           updateRequests.push({
             range: `폰클개통데이터!A${actualRowNumber}`,
-            values: [[budgetUsedAmount - calculatedBudgetValue]] // 예산잔액
+            values: [[securedBudgetValue - calculatedBudgetValue]] // 예산잔액
           });
           updateRequests.push({
             range: `폰클개통데이터!B${actualRowNumber}`,
-            values: [[budgetUsedAmount]] // 확보예산
+            values: [[securedBudgetValue]] // 확보예산
           });
           updateRequests.push({
             range: `폰클개통데이터!C${actualRowNumber}`,
