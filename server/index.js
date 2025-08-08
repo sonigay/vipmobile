@@ -3577,7 +3577,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   console.log('👤 사용자:', userName);
   
   // 사용자별 예산 데이터 가져오기 (액면_홍남옥 (이사) 시트)
-  const userSheetName = `액면_${userName}`;
+  const baseUserName = userName.replace(/\(이사\)/, '').trim();
+  const userSheetName = `액면_${baseUserName}`;
   let budgetData = [];
   
   try {
@@ -15242,7 +15243,10 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     }
 
     const targetSheetId = targetMonthRow[1];
-    const userSheetName = `액면_${userName}(${budgetType}) (이사)`;
+    
+    // userName에서 (이사) 부분을 제거하고 새로 추가
+    const baseUserName = userName.replace(/\(이사\)/, '').trim();
+    const userSheetName = `액면_${baseUserName}(${budgetType}) (이사)`;
     
     // 기존 시트에 새로운 시트 추가
     try {
@@ -15398,7 +15402,8 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     }
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const userSheetName = `액면_${userName}`;
+    const baseUserName = userName.replace(/\(이사\)/, '').trim();
+    const userSheetName = `액면_${baseUserName}`;
     
     // 데이터를 사용자가 원하는 형식으로 변환
     // 각 모델별로 군/유형별 데이터를 개별 행으로 분리
