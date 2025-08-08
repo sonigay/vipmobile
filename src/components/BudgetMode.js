@@ -1315,7 +1315,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       userSheets.map((sheet, index) => (
                         <TableRow key={index} hover>
                           <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                            {sheet.summary?.dateRange || '날짜 미설정'}
+                            <div 
+                              dangerouslySetInnerHTML={{
+                                __html: sheet.summary?.dateRange || '날짜 미설정'
+                              }}
+                              style={{ 
+                                whiteSpace: 'pre-line',
+                                lineHeight: '1.4'
+                              }}
+                            />
                             {sheet.summary?.applyReceiptDate && (
                               <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
                                 (접수일 적용)
@@ -1323,13 +1331,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             )}
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
-                            {(sheet.summary?.totalSecuredBudget || 0).toLocaleString()}원
+                            {((sheet.summary?.totalSecuredBudget || 0) * 1000).toLocaleString()}원
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-                            {(sheet.summary?.totalUsedBudget || 0).toLocaleString()}원
+                            {((sheet.summary?.totalUsedBudget || 0) * 1000).toLocaleString()}원
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
-                            {(sheet.summary?.totalRemainingBudget || 0).toLocaleString()}원
+                            {((sheet.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.8rem' }}>
                             {sheet.summary?.lastUpdated ? 
