@@ -643,13 +643,13 @@ export const budgetPolicyGroupAPI = {
   },
 
   // 사용예산 계산
-  calculateUsage: async (sheetId, selectedPolicyGroups, dateRange, userName) => {
+  calculateUsage: async (sheetId, selectedPolicyGroups, dateRange, userName, budgetType) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/calculate-usage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ sheetId, selectedPolicyGroups, dateRange, userName }),
+      body: JSON.stringify({ sheetId, selectedPolicyGroups, dateRange, userName, budgetType }),
     });
     if (!response.ok) {
       throw new Error('사용예산 계산에 실패했습니다.');

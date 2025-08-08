@@ -3568,7 +3568,7 @@ function isDateInRange(date, startDate, endDate) {
 }
 
 // 사용예산 계산 함수
-async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName) {
+async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
   const sheets = google.sheets({ version: 'v4', auth });
   
   console.log('🔍 [calculateUsageBudget] 시작');
@@ -3595,17 +3595,22 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     });
     
     // 해당 사용자의 시트 찾기 (액면_홍남옥(Ⅰ) (이사) 또는 액면_홍남옥(Ⅱ) (이사))
+    // userName에서 직함 추출 (예: "홍남옥 (이사)" -> "(이사)")
+    const titleMatch = userName.match(/\(([^)]+)\)/);
+    const userTitle = titleMatch ? `(${titleMatch[1]})` : '';
+    
+    // budgetType을 사용하여 정확한 시트 이름 매칭
+    const expectedSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) ${userTitle}`;
     const userSheet = sheetsList.find(sheet => 
-      sheet.properties.title.includes(`액면_${baseUserName}`) && 
-      sheet.properties.title.includes('(이사)')
+      sheet.properties.title === expectedSheetName
     );
     
     if (userSheet) {
       userSheetName = userSheet.properties.title;
       console.log(`✅ 사용자 시트 찾음: ${userSheetName}`);
     } else {
-      console.warn(`사용자 시트를 찾을 수 없습니다: 액면_${baseUserName}`);
-      console.warn(`검색 조건: 액면_${baseUserName} AND (이사)`);
+      console.warn(`사용자 시트를 찾을 수 없습니다: ${expectedSheetName}`);
+      console.warn(`검색 조건: 정확한 시트 이름 매칭 - ${expectedSheetName}`);
     }
   } catch (error) {
     console.warn('시트 목록 조회 중 오류:', error.message);
@@ -3870,13 +3875,13 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
 // 사용예산 계산 API
 app.post('/api/budget/calculate-usage', async (req, res) => {
   try {
-    const { sheetId, selectedPolicyGroups, dateRange, userName } = req.body;
+    const { sheetId, selectedPolicyGroups, dateRange, userName, budgetType } = req.body;
     
     if (!sheetId || !selectedPolicyGroups || !Array.isArray(selectedPolicyGroups)) {
       return res.status(400).json({ error: '필수 파라미터가 누락되었습니다.' });
     }
     
-    const result = await calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName);
+    const result = await calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName, budgetType);
     res.json(result);
     
   } catch (error) {
@@ -14989,7 +14994,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     
     // 먼저 폰클개통데이터 C열 업데이트
-    const calculateResult = await calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName);
+    const calculateResult = await calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName, budgetType);
     
     // 사용자 시트에서 데이터 가져오기
     const userSheetData = await sheets.spreadsheets.values.get({
