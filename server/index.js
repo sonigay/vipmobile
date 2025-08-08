@@ -3576,10 +3576,33 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   console.log('📅 날짜 범위:', dateRange);
   console.log('👤 사용자:', userName);
   
-  // 사용자별 예산 데이터 가져오기 (액면_홍남옥 (이사) 시트)
+  // 사용자별 예산 데이터 가져오기 - 시트 목록에서 해당 사용자의 시트 찾기
   const baseUserName = userName.replace(/\(이사\)/, '').trim();
-  const userSheetName = `액면_${baseUserName}`;
+  let userSheetName = `액면_${baseUserName}`;
   let budgetData = [];
+  
+  // 시트 목록에서 해당 사용자의 시트 찾기
+  try {
+    const sheetsListResponse = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId,
+    });
+    const sheetsList = sheetsListResponse.data.sheets || [];
+    
+    // 해당 사용자의 시트 찾기 (액면_홍남옥(Ⅰ) (이사) 또는 액면_홍남옥(Ⅱ) (이사))
+    const userSheet = sheetsList.find(sheet => 
+      sheet.properties.title.includes(`액면_${baseUserName}`) && 
+      sheet.properties.title.includes('(이사)')
+    );
+    
+    if (userSheet) {
+      userSheetName = userSheet.properties.title;
+      console.log(`✅ 사용자 시트 찾음: ${userSheetName}`);
+    } else {
+      console.warn(`사용자 시트를 찾을 수 없습니다: 액면_${baseUserName}`);
+    }
+  } catch (error) {
+    console.warn('시트 목록 조회 중 오류:', error.message);
+  }
   
   try {
     const budgetResponse = await sheets.spreadsheets.values.get({
@@ -3587,7 +3610,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       range: `${userSheetName}!A:L`, // A열부터 L열까지 (3열 추가로 12개 컬럼)
     });
     budgetData = budgetResponse.data.values || [];
-    console.log('💰 액면_홍남옥 시트 데이터 로드:', budgetData.length, '행');
+    console.log(`💰 ${userSheetName} 시트 데이터 로드:`, budgetData.length, '행');
   } catch (error) {
     console.warn(`사용자 시트 ${userSheetName}에서 예산 데이터를 가져올 수 없습니다:`, error.message);
   }
