@@ -27,7 +27,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  MenuItem
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import {
   AccountBalance as BudgetIcon,
@@ -42,7 +45,8 @@ import {
   Save as SaveIcon,
   Calculate as CalculateIcon,
   Add as AddIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI } from '../api';
@@ -50,6 +54,10 @@ import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI } from '.
 function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = React.useState(0);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 액면예산 서브메뉴 상태
+  const [faceValueSubMenu, setFaceValueSubMenu] = useState('Ⅰ'); // Ⅰ, Ⅱ, 종합
+  const [showFaceValueDropdown, setShowFaceValueDropdown] = useState(false);
   
   // 액면예산 관련 상태
   const [budgetData, setBudgetData] = useState([]);
@@ -105,6 +113,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+
+  const handleFaceValueSubMenuChange = (subMenu) => {
+    setFaceValueSubMenu(subMenu);
+    setShowFaceValueDropdown(false);
   };
 
   // 컴포넌트 마운트 시 업데이트 팝업 표시
@@ -682,19 +695,32 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   // 액면예산 탭 렌더링
-  const renderFaceValueBudget = () => (
+  const renderFaceValueBudget = (type = 'Ⅰ') => (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
-        💰 액면예산 관리
+        💰 액면예산({type}) 관리
       </Typography>
       
-      {/* 대상월 및 시트 ID 설정 */}
+      {/* 시트 설정 안내 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            ⚙️ 시트 설정 안내
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666' }}>
+            시트 생성 및 관리는 <strong>시트설정</strong> 탭에서 진행해주세요.
+            액면예산(Ⅰ)과 액면예산(Ⅱ)에서 사용할 시트를 먼저 생성한 후 데이터를 입력하실 수 있습니다.
+          </Typography>
+        </CardContent>
+      </Card>
+      
+      {/* 시트 ID 설정 */}
       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            ⚙️ 월별 시트 설정
+            🔗 시트 ID 설정
           </Typography>
-          <Grid container spacing={2} alignItems="flex-start">
+          <Grid container spacing={3}>
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
@@ -741,71 +767,71 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Grid>
           </Grid>
           
-                     {/* 저장된 월별 시트 ID 목록 */}
-           {Object.keys(monthSheetMappings).length > 0 && (
-             <Box sx={{ mt: 2 }}>
-               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                 <Typography variant="subtitle2" sx={{ color: '#795548', fontWeight: 'bold' }}>
-                   📋 저장된 월별 시트 ID
-                 </Typography>
-                 <Button
-                   variant="outlined"
-                   size="small"
-                   onClick={() => setShowMonthSheetList(!showMonthSheetList)}
-                   sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
-                 >
-                   {showMonthSheetList ? '숨기기' : '보기'}
-                 </Button>
-               </Box>
-               {showMonthSheetList && (
-                 <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
-                   <Table size="small">
-                     <TableHead>
-                       <TableRow>
-                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                           대상월
-                         </TableCell>
-                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                           시트 ID
-                         </TableCell>
-                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                           수정일시
-                         </TableCell>
-                         <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                           수정자
-                         </TableCell>
-                       </TableRow>
-                     </TableHead>
-                     <TableBody>
-                       {Object.entries(monthSheetMappings)
-                         .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 월부터 정렬
-                         .map(([month, id]) => {
-                         const detail = detailedMonthData[month];
-                         return (
-                           <TableRow 
-                             key={month} 
-                             hover
-                             onClick={() => {
-                               setTargetMonth(month);
-                               setSheetId(id);
-                             }}
-                             sx={{ cursor: 'pointer' }}
-                           >
-                             <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
-                             <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
-                             <TableCell sx={{ fontSize: '0.8rem' }}>
-                               {detail?.updatedAt ? new Date(detail.updatedAt).toLocaleString('ko-KR') : '-'}
-                             </TableCell>
-                             <TableCell sx={{ fontSize: '0.8rem' }}>{detail?.updatedBy || '-'}</TableCell>
-                           </TableRow>
-                         );
-                       })}
-                     </TableBody>
-                   </Table>
-                 </TableContainer>
-               )}
-             </Box>
-           )}
+          {/* 저장된 월별 시트 ID 목록 */}
+          {Object.keys(monthSheetMappings).length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#795548', fontWeight: 'bold' }}>
+                  📋 저장된 월별 시트 ID
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setShowMonthSheetList(!showMonthSheetList)}
+                  sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
+                >
+                  {showMonthSheetList ? '숨기기' : '보기'}
+                </Button>
+              </Box>
+              {showMonthSheetList && (
+                <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          대상월
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          시트 ID
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          수정일시
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          수정자
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(monthSheetMappings)
+                        .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 월부터 정렬
+                        .map(([month, id]) => {
+                        const detail = detailedMonthData[month];
+                        return (
+                          <TableRow 
+                            key={month} 
+                            hover
+                            onClick={() => {
+                              setTargetMonth(month);
+                              setSheetId(id);
+                            }}
+                            sx={{ cursor: 'pointer' }}
+                          >
+                            <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {detail?.updatedAt ? new Date(detail.updatedAt).toLocaleString('ko-KR') : '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>{detail?.updatedBy || '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          )}
           
           {!canEditSheetId && (
             <Alert severity="info" sx={{ mt: 1 }}>
@@ -815,100 +841,100 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </CardContent>
       </Card>
 
-             {/* 날짜/시간 입력 영역 */}
+       {/* 날짜/시간 입력 영역 */}
        <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
          <CardContent>
-           <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-             📅 접수일 및 개통일 범위 설정
-           </Typography>
-           
-           {/* 정책그룹 선택 버튼 */}
-           <Box sx={{ mb: 3 }}>
-             <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-               📊 정책그룹 선택
-             </Typography>
-             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-               <Button
-                 variant="outlined"
-                 onClick={() => {
-                   console.log('Opening policy group modal, selectedPolicyGroups:', selectedPolicyGroups);
-                   setShowPolicyGroupModal(true);
-                 }}
-                 sx={{ borderColor: '#795548', color: '#795548' }}
-               >
-                 정책그룹 선택
-               </Button>
-               {selectedPolicyGroups.length > 0 && (
-                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                   <Typography variant="body2" sx={{ color: '#666' }}>
-                     선택됨:
-                   </Typography>
-                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                     {selectedPolicyGroups.slice(0, 3).map((group) => (
-                       <Chip
-                         key={group}
-                         label={group}
-                         size="small"
-                         sx={{ backgroundColor: '#e3f2fd', fontSize: '0.7rem' }}
-                       />
-                     ))}
-                     {selectedPolicyGroups.length > 3 && (
-                       <Chip
-                         label={`+${selectedPolicyGroups.length - 3}개`}
-                         size="small"
-                         sx={{ backgroundColor: '#f5f5f5', fontSize: '0.7rem' }}
-                       />
-                     )}
-                   </Box>
-                 </Box>
-               )}
-             </Box>
-           </Box>
-           
-           {/* 접수일 적용 여부 체크박스 */}
-           <Box sx={{ mb: 3 }}>
-             <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-               ⚙️ 접수일 적용 설정
-             </Typography>
-             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-               <input
-                 type="checkbox"
-                 id="applyReceiptDate"
-                 checked={applyReceiptDate}
-                 onChange={(e) => setApplyReceiptDate(e.target.checked)}
-                 style={{ width: '18px', height: '18px' }}
-               />
-               <label htmlFor="applyReceiptDate" style={{ fontSize: '0.9rem', color: '#666' }}>
-                 접수일 기준으로 예산 계산 (미체크 시 개통일 기준으로 자동 계산)
-               </label>
-             </Box>
-           </Box>
-           
-           <Grid container spacing={3}>
-             {/* 접수일 범위 - 체크 시에만 표시 */}
-             {applyReceiptDate && (
-               <Grid item xs={12} sm={6}>
-                 <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
-                   📅 접수일 범위
-                 </Typography>
-                 <Grid container spacing={2}>
-                   <Grid item xs={6}>
-                     <TextField
-                       fullWidth
-                       label="시작일"
-                       type="date"
-                       value={dateRange.receiptStartDate}
-                       onChange={(e) => setDateRange({
-                         ...dateRange,
-                         receiptStartDate: e.target.value
-                       })}
-                       InputLabelProps={{ shrink: true }}
-                     />
-                   </Grid>
-                   <Grid item xs={6}>
-                     <TextField
-                       fullWidth
-                       label="시작시간"
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📅 접수일 및 개통일 범위 설정
+          </Typography>
+          
+          {/* 정책그룹 선택 버튼 */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+              📊 정책그룹 선택
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  console.log('Opening policy group modal, selectedPolicyGroups:', selectedPolicyGroups);
+                  setShowPolicyGroupModal(true);
+                }}
+                sx={{ borderColor: '#795548', color: '#795548' }}
+              >
+                정책그룹 선택
+              </Button>
+              {selectedPolicyGroups.length > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ color: '#666' }}>
+                    선택됨:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selectedPolicyGroups.slice(0, 3).map((group) => (
+                      <Chip
+                        key={group}
+                        label={group}
+                        size="small"
+                        sx={{ backgroundColor: '#e3f2fd', fontSize: '0.7rem' }}
+                      />
+                    ))}
+                    {selectedPolicyGroups.length > 3 && (
+                      <Chip
+                        label={`+${selectedPolicyGroups.length - 3}개`}
+                        size="small"
+                        sx={{ backgroundColor: '#f5f5f5', fontSize: '0.7rem' }}
+                      />
+                    )}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Box>
+          
+          {/* 접수일 적용 여부 체크박스 */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+              ⚙️ 접수일 적용 설정
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <input
+                type="checkbox"
+                id="applyReceiptDate"
+                checked={applyReceiptDate}
+                onChange={(e) => setApplyReceiptDate(e.target.checked)}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <label htmlFor="applyReceiptDate" style={{ fontSize: '0.9rem', color: '#666' }}>
+                접수일 기준으로 예산 계산 (미체크 시 개통일 기준으로 자동 계산)
+              </label>
+            </Box>
+          </Box>
+          
+          <Grid container spacing={3}>
+            {/* 접수일 범위 - 체크 시에만 표시 */}
+            {applyReceiptDate && (
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548', fontWeight: 'bold' }}>
+                  📅 접수일 범위
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="시작일"
+                      type="date"
+                      value={dateRange.receiptStartDate}
+                      onChange={(e) => setDateRange({
+                        ...dateRange,
+                        receiptStartDate: e.target.value
+                      })}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="시작시간"
                        type="time"
                        value={dateRange.receiptStartTime}
                        onChange={(e) => setDateRange({
@@ -1016,99 +1042,99 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          </CardContent>
        </Card>
 
-             {/* 엑셀형 예산 데이터 테이블 */}
+       {/* 엑셀형 예산 데이터 테이블 */}
        <Card sx={{ mb: 3, border: '2px solid #795548' }}>
-         <CardContent>
-           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-             <Typography variant="h6" sx={{ color: '#795548' }}>
-               📊 예산 데이터 입력 (엑셀 형식)
-             </Typography>
-             <Box sx={{ display: 'flex', gap: 1 }}>
-               <Button
-                 variant="contained"
-                 startIcon={<SaveIcon />}
-                 onClick={handleManualSave}
-                 disabled={isProcessing || !targetMonth || budgetData.length === 0}
-                 sx={{ 
-                   backgroundColor: '#795548',
-                   '&:hover': { backgroundColor: '#5D4037' }
-                 }}
-               >
-                 {isProcessing ? '저장 중...' : '저장'}
-               </Button>
-               <Button
-                 variant="outlined"
-                 startIcon={<ClearIcon />}
-                 onClick={() => {
-                   setBudgetData([]);
-                   setSnackbar({ open: true, message: '테이블 데이터가 초기화되었습니다.', severity: 'info' });
-                 }}
-                 sx={{ 
-                   borderColor: '#795548',
-                   color: '#795548',
-                   '&:hover': { 
-                     borderColor: '#5D4037',
-                     backgroundColor: 'rgba(121, 85, 72, 0.04)'
-                   }
-                 }}
-               >
-                 초기화
-               </Button>
-             </Box>
-           </Box>
-           
-           <TableContainer 
-             component={Paper} 
-             sx={{ maxHeight: 600 }}
-             onPaste={(e) => handlePaste(e, 0, 0)}
-             tabIndex={0}
-           >
-                        <Table stickyHeader size="small">
-               <TableHead>
-                 {/* 첫 번째 헤더 행: 예산금액 헤더 */}
-                 <TableRow>
-                   <TableCell 
-                     sx={{ 
-                       backgroundColor: '#795548', 
-                       color: 'white', 
-                       fontWeight: 'bold',
-                       textAlign: 'center',
-                       border: '1px solid #ddd',
-                       minWidth: 120
-                     }}
-                   >
-                     예산금액
-                   </TableCell>
-                   {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
-                     <TableCell 
-                       key={army}
-                       colSpan={3}
-                       sx={{ 
-                         backgroundColor: '#8D6E63', 
-                         color: 'white', 
-                         fontWeight: 'bold',
-                         textAlign: 'center',
-                         border: '1px solid #ddd',
-                         minWidth: 80
-                       }}
-                     >
-                                               <TextField
-                          size="small"
-                          type="number"
-                          value={budgetAmounts[army]}
-                          onChange={(e) => {
-                            const newAmounts = { ...budgetAmounts };
-                            newAmounts[army] = parseFloat(e.target.value) || 0;
-                            setBudgetAmounts(newAmounts);
-                          }}
-                          placeholder="40000"
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              fontSize: '0.8rem',
-                              backgroundColor: 'white',
-                              '& fieldset': {
-                                border: 'none'
-                              },
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#795548' }}>
+              📊 예산 데이터 입력 (엑셀 형식)
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handleManualSave}
+                disabled={isProcessing || !targetMonth || budgetData.length === 0}
+                sx={{ 
+                  backgroundColor: '#795548',
+                  '&:hover': { backgroundColor: '#5D4037' }
+                }}
+              >
+                {isProcessing ? '저장 중...' : '저장'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<ClearIcon />}
+                onClick={() => {
+                  setBudgetData([]);
+                  setSnackbar({ open: true, message: '테이블 데이터가 초기화되었습니다.', severity: 'info' });
+                }}
+                sx={{ 
+                  borderColor: '#795548',
+                  color: '#795548',
+                  '&:hover': { 
+                    borderColor: '#5D4037',
+                    backgroundColor: 'rgba(121, 85, 72, 0.04)'
+                  }
+                }}
+              >
+                초기화
+              </Button>
+            </Box>
+          </Box>
+          
+          <TableContainer 
+            component={Paper} 
+            sx={{ maxHeight: 600 }}
+            onPaste={(e) => handlePaste(e, 0, 0)}
+            tabIndex={0}
+          >
+            <Table stickyHeader size="small">
+              <TableHead>
+                {/* 첫 번째 헤더 행: 예산금액 헤더 */}
+                <TableRow>
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#795548', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      minWidth: 120
+                    }}
+                  >
+                    예산금액
+                  </TableCell>
+                  {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
+                    <TableCell 
+                      key={army}
+                      colSpan={3}
+                      sx={{ 
+                        backgroundColor: '#8D6E63', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        border: '1px solid #ddd',
+                        minWidth: 80
+                      }}
+                    >
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={budgetAmounts[army]}
+                        onChange={(e) => {
+                          const newAmounts = { ...budgetAmounts };
+                          newAmounts[army] = parseFloat(e.target.value) || 0;
+                          setBudgetAmounts(newAmounts);
+                        }}
+                        placeholder="40000"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: '0.8rem',
+                            backgroundColor: 'white',
+                            '& fieldset': {
+                              border: 'none'
+                            },
                               '& input': {
                                 textAlign: 'center',
                                 color: '#8D6E63',
@@ -1257,98 +1283,98 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </CardContent>
       </Card>
 
-             {/* 저장된 데이터 목록 */}
-       <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-         <CardContent>
-           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-             <Typography variant="h6" sx={{ color: '#795548' }}>
-               📋 저장된 데이터 목록
-             </Typography>
-             <Button
-               variant="outlined"
-               size="small"
-               onClick={() => {
-                 setShowSheetList(!showSheetList);
-                 if (!showSheetList) {
-                   loadUserSheets();
-                 }
-               }}
-               sx={{ borderColor: '#795548', color: '#795548' }}
-             >
-               {showSheetList ? '숨기기' : '보기'}
-             </Button>
-           </Box>
-           
-           {showSheetList && (
-             <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
-               <Table size="small">
-                                   <TableHead>
+      {/* 저장된 데이터 목록 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#795548' }}>
+              📋 저장된 데이터 목록
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setShowSheetList(!showSheetList);
+                if (!showSheetList) {
+                  loadUserSheets();
+                }
+              }}
+              sx={{ borderColor: '#795548', color: '#795548' }}
+            >
+              {showSheetList ? '숨기기' : '보기'}
+            </Button>
+          </Box>
+          
+          {showSheetList && (
+            <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      예산적용일
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      확보예산
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      사용예산
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      예산잔액
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      마지막수정
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                      작업
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {userSheets.length === 0 ? (
                     <TableRow>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        예산적용일
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        확보예산
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        사용예산
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        예산잔액
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        마지막수정
-                      </TableCell>
-                      <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        작업
+                      <TableCell colSpan={6} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
+                        저장된 데이터가 없습니다.
                       </TableCell>
                     </TableRow>
-                  </TableHead>
-                 <TableBody>
-                                       {userSheets.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
-                          저장된 데이터가 없습니다.
+                  ) : (
+                    userSheets.map((sheet, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          <div 
+                            dangerouslySetInnerHTML={{
+                              __html: sheet.summary?.dateRange || '날짜 미설정'
+                            }}
+                            style={{ 
+                              whiteSpace: 'pre-line',
+                              lineHeight: '1.4'
+                            }}
+                          />
+                          {sheet.summary?.applyReceiptDate && (
+                            <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
+                              (접수일 적용)
+                            </Typography>
+                          )}
                         </TableCell>
-                      </TableRow>
-                    ) : (
-                      userSheets.map((sheet, index) => (
-                        <TableRow key={index} hover>
-                          <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                            <div 
-                              dangerouslySetInnerHTML={{
-                                __html: sheet.summary?.dateRange || '날짜 미설정'
-                              }}
-                              style={{ 
-                                whiteSpace: 'pre-line',
-                                lineHeight: '1.4'
-                              }}
-                            />
-                            {sheet.summary?.applyReceiptDate && (
-                              <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
-                                (접수일 적용)
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
-                            {((sheet.summary?.totalSecuredBudget || 0) * 1000).toLocaleString()}원
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-                            {((sheet.summary?.totalUsedBudget || 0) * 1000).toLocaleString()}원
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
-                            {((sheet.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem' }}>
-                            {sheet.summary?.lastUpdated ? 
-                              new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
-                              new Date(sheet.createdAt).toLocaleString('ko-KR')
-                            }
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              variant="outlined"
+                        <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
+                          {((sheet.summary?.totalSecuredBudget || 0) * 1000).toLocaleString()}원
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
+                          {((sheet.summary?.totalUsedBudget || 0) * 1000).toLocaleString()}원
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
+                          {((sheet.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem' }}>
+                          {sheet.summary?.lastUpdated ? 
+                            new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
+                            new Date(sheet.createdAt).toLocaleString('ko-KR')
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="small"
+                            variant="outlined"
                               onClick={() => handleLoadUserSheet(sheet)}
                               sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
                             >
@@ -1625,12 +1651,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         <Box sx={{ 
           borderBottom: 1, 
           borderColor: '#e0e0e0', 
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          px: 2
         }}>
           <Tabs 
             value={activeTab} 
             onChange={handleTabChange}
             sx={{
+              flexGrow: 1,
               '& .MuiTab-root': {
                 color: '#666666',
                 fontWeight: 'bold',
@@ -1647,11 +1677,89 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             <Tab label="별도추가" icon={<AnalyticsIcon />} iconPosition="start" />
             <Tab label="부가추가지원" icon={<SettingsIcon />} iconPosition="start" />
             <Tab label="부가차감지원" icon={<TimelineIcon />} iconPosition="start" />
+            <Tab label="시트설정" icon={<SettingsIcon />} iconPosition="start" />
           </Tabs>
+          
+          {/* 액면예산 드롭다운 */}
+          {activeTab === 0 && (
+            <Box sx={{ position: 'relative', ml: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={() => setShowFaceValueDropdown(!showFaceValueDropdown)}
+                endIcon={<ExpandMoreIcon />}
+                sx={{
+                  borderColor: '#795548',
+                  color: '#795548',
+                  '&:hover': {
+                    borderColor: '#5d4037',
+                    backgroundColor: 'rgba(121, 85, 72, 0.04)'
+                  }
+                }}
+              >
+                액면예산({faceValueSubMenu})
+              </Button>
+              
+              {showFaceValueDropdown && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    zIndex: 1000,
+                    backgroundColor: 'white',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 1,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    minWidth: 150
+                  }}
+                >
+                  <MenuItem 
+                    onClick={() => handleFaceValueSubMenuChange('Ⅰ')}
+                    sx={{
+                      backgroundColor: faceValueSubMenu === 'Ⅰ' ? 'rgba(121, 85, 72, 0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(121, 85, 72, 0.05)'
+                      }
+                    }}
+                  >
+                    액면예산(Ⅰ)
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleFaceValueSubMenuChange('Ⅱ')}
+                    sx={{
+                      backgroundColor: faceValueSubMenu === 'Ⅱ' ? 'rgba(121, 85, 72, 0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(121, 85, 72, 0.05)'
+                      }
+                    }}
+                  >
+                    액면예산(Ⅱ)
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleFaceValueSubMenuChange('종합')}
+                    sx={{
+                      backgroundColor: faceValueSubMenu === '종합' ? 'rgba(121, 85, 72, 0.1)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'rgba(121, 85, 72, 0.05)'
+                      }
+                    }}
+                  >
+                    액면예산(종합)
+                  </MenuItem>
+                </Box>
+              )}
+            </Box>
+          )}
         </Box>
 
         {/* 탭별 콘텐츠 */}
-        {activeTab === 0 && renderFaceValueBudget()}
+        {activeTab === 0 && (
+          <>
+            {faceValueSubMenu === 'Ⅰ' && renderFaceValueBudget('Ⅰ')}
+            {faceValueSubMenu === 'Ⅱ' && renderFaceValueBudget('Ⅱ')}
+            {faceValueSubMenu === '종합' && renderFaceValueSummary()}
+          </>
+        )}
         {activeTab === 1 && (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
@@ -1673,6 +1781,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Typography>
           </Box>
         )}
+        {activeTab === 4 && renderSheetSettings()}
 
         {/* 업데이트 팝업 */}
         <AppUpdatePopup
@@ -1700,6 +1809,249 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           </Alert>
         </Snackbar>
       </Box>
+    </Box>
+  );
+
+  // 액면예산(종합) 렌더링
+  const renderFaceValueSummary = () => (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
+        💰 액면예산(종합) 관리
+      </Typography>
+      
+      {/* 최종 예산 잔액 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548', textAlign: 'center' }}>
+            🎯 최종 예산 잔액
+          </Typography>
+          <Typography variant="h4" sx={{ textAlign: 'center', color: '#2e7d32', fontWeight: 'bold' }}>
+            [F열 합계 - (별도추가 + 부가추가지원 + 부가차감지원 사용예산)]
+          </Typography>
+        </CardContent>
+      </Card>
+
+      {/* 액면예산(종합) 상세 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📊 액면예산(종합)
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#e8f5e8' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="primary">
+                    확보예산
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    G열(합계계산금액)
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#fff3e0' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="warning.main">
+                    사용예산
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    H열(합계계산금액)
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#fce4ec' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="error">
+                    예산잔액
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    F열(합계계산금액)
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* 향후 확장 항목들 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            🔮 향후 확장 예정
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#f3e5f5' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="secondary">
+                    별도추가
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
+                    0원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#e1f5fe' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="info.main">
+                    부가추가지원
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
+                    0원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#fff8e1' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="warning.main">
+                    부가차감지원
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
+                    0원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+
+  // 시트설정 렌더링
+  const renderSheetSettings = () => (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
+        ⚙️ 시트설정
+      </Typography>
+      
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📋 저장된 월별 시트 ID 관리
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+            액면예산(Ⅰ)과 액면예산(Ⅱ)에서 사용할 시트를 생성하고 관리합니다.
+          </Typography>
+          
+          {/* 기존 월별 시트 설정 UI를 여기에 이동 */}
+          <Grid container spacing={2} alignItems="flex-start">
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="대상월"
+                type="month"
+                value={targetMonth}
+                onChange={handleMonthChange}
+                InputLabelProps={{ shrink: true }}
+                sx={{ mb: 2 }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="구글시트 ID"
+                value={sheetId}
+                onChange={(e) => setSheetId(e.target.value)}
+                disabled={!canEditSheetId}
+                helperText={canEditSheetId ? "시트 ID를 입력하세요" : "권한이 없습니다 (SS 레벨만 수정 가능)"}
+                sx={{ mb: 2 }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSheetIdSave}
+                  disabled={!canEditSheetId || !targetMonth || !sheetId.trim()}
+                  sx={{ backgroundColor: '#795548', minWidth: '60px' }}
+                >
+                  저장
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleSheetIdDelete}
+                  disabled={!canEditSheetId || !targetMonth}
+                  sx={{ borderColor: '#795548', color: '#795548', minWidth: '60px' }}
+                >
+                  삭제
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+          
+          {/* 저장된 월별 시트 ID 목록 */}
+          {Object.keys(monthSheetMappings).length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#795548', fontWeight: 'bold' }}>
+                  📋 저장된 월별 시트 ID
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setShowMonthSheetList(!showMonthSheetList)}
+                  sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
+                >
+                  {showMonthSheetList ? '숨기기' : '보기'}
+                </Button>
+              </Box>
+              {showMonthSheetList && (
+                <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          대상월
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          시트 ID
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          수정일시
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          수정자
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(monthSheetMappings)
+                        .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 월부터 정렬
+                        .map(([month, id]) => {
+                        const detail = detailedMonthData[month];
+                        return (
+                          <TableRow key={month} hover>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {detail?.lastModified || 'N/A'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {detail?.modifiedBy || 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
     </Box>
   );
 }
