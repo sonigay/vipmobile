@@ -3628,15 +3628,15 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   // C5행부터 데이터 처리 (배열 인덱스 4부터 시작)
   activationRows.slice(4).forEach((row, index) => {
     const actualRowNumber = 5 + index; // C5, C6, C7, C8...
-    if (row.length >= 20) { // 최소 20개 컬럼 필요
-      const policyGroup = row[4]; // E열: 정책그룹
-      const armyType = row[3]; // D열: 정책군
-      const categoryType = row[19]; // T열: 유형
-      const currentBudgetValue = parseFloat(row[2]) || 0; // C열: 현재 예산값
+    if (row.length >= 31) { // 최소 31개 컬럼 필요 (11개 추가)
+      const policyGroup = row[15]; // P열: 정책그룹 (기존 E열에서 +11)
+      const armyType = row[14]; // O열: 정책군 (기존 D열에서 +11)
+      const categoryType = row[30]; // AE열: 유형 (기존 T열에서 +11)
+      const currentBudgetValue = parseFloat(row[13]) || 0; // N열: 현재 예산값 (기존 C열에서 +11)
       
       // 날짜 데이터 정규화
-      const receptionDate = normalizeReceptionDate(row[5]); // F열: 접수일
-      const activationDate = normalizeActivationDate(row[9], row[10], row[11]); // J, K, L열: 개통일
+      const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일 (기존 F열에서 +11)
+      const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일 (기존 J, K, L열에서 +11)
       
       // 정책그룹 매칭
       if (selectedPolicyGroups.includes(policyGroup)) {
@@ -3684,8 +3684,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                 const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산 (기존 G열에서 3열 밀림)
                 const budgetSecuredAmount = parseFloat(budgetRow[8]) || 0; // I열: 확보 예산 (기존 F열에서 3열 밀림)
                 
-                // 폰클개통데이터 V열의 모델명과 비교
-                const activationModelName = row[21]; // V열: 모델명 (0부터 시작하므로 21)
+                // 폰클개통데이터 AG열의 모델명과 비교
+                const activationModelName = row[32]; // AG열: 모델명 (기존 V열에서 +11)
                 
                 // 모델명, 군, 유형이 모두 일치하는 경우
                 if (budgetModelName === activationModelName && 
@@ -3704,7 +3704,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           if (!matchFound) {
             // 매칭 실패 원인 분석
-            const activationModelName = row[21];
+            const activationModelName = row[32]; // AG열: 모델명 (기존 V열에서 +11)
             console.log(`❌ 매칭 실패 [행${actualRowNumber}]: 정책그룹=${policyGroup}, 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
             
             // 액면_홍남옥에서 해당 모델명이 있는지 확인
@@ -3752,17 +3752,17 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           totalSecuredBudget += securedBudgetValue;
           totalRemainingBudget += (securedBudgetValue - calculatedBudgetValue);
           
-          // A열(예산잔액), B열(확보예산), C열(사용예산) 업데이트 요청 추가
+          // L열(예산잔액), M열(확보예산), N열(사용예산) 업데이트 요청 추가 (기존 A, B, C열에서 +11)
           updateRequests.push({
-            range: `폰클개통데이터!A${actualRowNumber}`,
+            range: `폰클개통데이터!L${actualRowNumber}`,
             values: [[securedBudgetValue - calculatedBudgetValue]] // 예산잔액
           });
           updateRequests.push({
-            range: `폰클개통데이터!B${actualRowNumber}`,
+            range: `폰클개통데이터!M${actualRowNumber}`,
             values: [[securedBudgetValue]] // 확보예산
           });
           updateRequests.push({
-            range: `폰클개통데이터!C${actualRowNumber}`,
+            range: `폰클개통데이터!N${actualRowNumber}`,
             values: [[calculatedBudgetValue]] // 사용예산
           });
         } else {
@@ -3770,15 +3770,15 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           dateRangeFiltered++;
           console.log(`📅 날짜 범위 제외 [행${actualRowNumber}]: 정책그룹=${policyGroup}, 접수일=${receptionDate}, 개통일=${activationDate}`);
           updateRequests.push({
-            range: `폰클개통데이터!A${actualRowNumber}`,
+            range: `폰클개통데이터!L${actualRowNumber}`,
             values: [['']] // 예산잔액 공백
           });
           updateRequests.push({
-            range: `폰클개통데이터!B${actualRowNumber}`,
+            range: `폰클개통데이터!M${actualRowNumber}`,
             values: [['']] // 확보예산 공백
           });
           updateRequests.push({
-            range: `폰클개통데이터!C${actualRowNumber}`,
+            range: `폰클개통데이터!N${actualRowNumber}`,
             values: [['']] // 사용예산 공백
           });
         }
@@ -3787,15 +3787,15 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
         policyGroupFiltered++;
         console.log(`🚫 정책그룹 제외 [행${actualRowNumber}]: ${policyGroup} (선택되지 않음)`);
         updateRequests.push({
-          range: `폰클개통데이터!A${actualRowNumber}`,
+          range: `폰클개통데이터!L${actualRowNumber}`,
           values: [['']] // 예산잔액 공백
         });
         updateRequests.push({
-          range: `폰클개통데이터!B${actualRowNumber}`,
+          range: `폰클개통데이터!M${actualRowNumber}`,
           values: [['']] // 확보예산 공백
         });
         updateRequests.push({
-          range: `폰클개통데이터!C${actualRowNumber}`,
+          range: `폰클개통데이터!N${actualRowNumber}`,
           values: [['']] // 사용예산 공백
         });
       }
@@ -3815,7 +3815,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   console.log(`  - 총 사용예산: ${totalUsedBudget}`);
   console.log(`  - 총 예산잔액: ${totalRemainingBudget}`);
   
-  // 폰클개통데이터 시트의 A열, B열, C열 일괄 업데이트
+  // 폰클개통데이터 시트의 L열, M열, N열 일괄 업데이트 (기존 A, B, C열에서 +11)
   if (updateRequests.length > 0) {
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: sheetId,
@@ -15078,15 +15078,15 @@ app.get('/api/budget/user-sheets', async (req, res) => {
         };
         
         try {
-          // 폰클개통데이터에서 A열(예산잔액), B열(확보예산), C열(사용예산) 가져오기
+          // 폰클개통데이터에서 L열(예산잔액), M열(확보예산), N열(사용예산) 가져오기 (기존 A, B, C열에서 +11)
           const activationDataResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: '폰클개통데이터!A:C'
+            range: '폰클개통데이터!L:N'
           });
           
           const activationData = activationDataResponse.data.values || [];
           
-          // A열, B열, C열의 계산된 값 합계 계산 (헤더 제외, 공백 제외)
+          // L열, M열, N열의 계산된 값 합계 계산 (헤더 제외, 공백 제외)
           let totalRemainingBudget = 0;
           let totalSecuredBudget = 0;
           let totalUsedBudget = 0;
@@ -15095,28 +15095,28 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           
           activationData.slice(4).forEach((row, index) => { // C5행부터 시작
             if (row.length >= 3) {
-              // A열: 예산잔액 (공백이 아닌 경우만)
+              // L열: 예산잔액 (공백이 아닌 경우만)
               if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
                 const value = parseFloat(row[0]) || 0;
                 totalRemainingBudget += value;
-                if (value > 0) console.log(`  A열[${index + 5}]: ${value}`);
+                if (value > 0) console.log(`  L열[${index + 5}]: ${value}`);
               }
-              // B열: 확보예산 (공백이 아닌 경우만)
+              // M열: 확보예산 (공백이 아닌 경우만)
               if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
                 const value = parseFloat(row[1]) || 0;
                 totalSecuredBudget += value;
-                if (value > 0) console.log(`  B열[${index + 5}]: ${value}`);
+                if (value > 0) console.log(`  M열[${index + 5}]: ${value}`);
               }
-              // C열: 사용예산 (공백이 아닌 경우만)
+              // N열: 사용예산 (공백이 아닌 경우만)
               if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
                 const value = parseFloat(row[2]) || 0;
                 totalUsedBudget += value;
-                if (value > 0) console.log(`  C열[${index + 5}]: ${value}`);
+                if (value > 0) console.log(`  N열[${index + 5}]: ${value}`);
               }
             }
           });
           
-          console.log(`📊 [${sheetName}] 최종 합계: A열=${totalRemainingBudget}, B열=${totalSecuredBudget}, C열=${totalUsedBudget}`);
+          console.log(`📊 [${sheetName}] 최종 합계: L열=${totalRemainingBudget}, M열=${totalSecuredBudget}, N열=${totalUsedBudget}`);
           
           // 원 단위 그대로 표시 (폰클개통데이터에서 직접 읽은 값)
           summary.totalRemainingBudget = totalRemainingBudget;
