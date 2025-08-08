@@ -41,7 +41,8 @@ import {
   ContentPaste as PasteIcon,
   Save as SaveIcon,
   Calculate as CalculateIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI } from '../api';
@@ -1022,18 +1023,38 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
              <Typography variant="h6" sx={{ color: '#795548' }}>
                📊 예산 데이터 입력 (엑셀 형식)
              </Typography>
-             <Button
-               variant="contained"
-               startIcon={<SaveIcon />}
-               onClick={handleManualSave}
-               disabled={isProcessing || !targetMonth || budgetData.length === 0}
-               sx={{ 
-                 backgroundColor: '#795548',
-                 '&:hover': { backgroundColor: '#5D4037' }
-               }}
-             >
-               {isProcessing ? '저장 중...' : '저장'}
-             </Button>
+             <Box sx={{ display: 'flex', gap: 1 }}>
+               <Button
+                 variant="contained"
+                 startIcon={<SaveIcon />}
+                 onClick={handleManualSave}
+                 disabled={isProcessing || !targetMonth || budgetData.length === 0}
+                 sx={{ 
+                   backgroundColor: '#795548',
+                   '&:hover': { backgroundColor: '#5D4037' }
+                 }}
+               >
+                 {isProcessing ? '저장 중...' : '저장'}
+               </Button>
+               <Button
+                 variant="outlined"
+                 startIcon={<ClearIcon />}
+                 onClick={() => {
+                   setBudgetData([]);
+                   setSnackbar({ open: true, message: '테이블 데이터가 초기화되었습니다.', severity: 'info' });
+                 }}
+                 sx={{ 
+                   borderColor: '#795548',
+                   color: '#795548',
+                   '&:hover': { 
+                     borderColor: '#5D4037',
+                     backgroundColor: 'rgba(121, 85, 72, 0.04)'
+                   }
+                 }}
+               >
+                 초기화
+               </Button>
+             </Box>
            </Box>
            
            <TableContainer 
