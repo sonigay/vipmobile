@@ -694,6 +694,134 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // TODO: 실제 예산 계산 로직 구현
   };
 
+  // 시트설정 렌더링
+  const renderSheetSettings = () => (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
+        ⚙️ 시트설정
+      </Typography>
+      
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📋 저장된 월별 시트 ID 관리
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+            액면예산(Ⅰ)과 액면예산(Ⅱ)에서 사용할 시트를 생성하고 관리합니다.
+          </Typography>
+          
+          {/* 기존 월별 시트 설정 UI를 여기에 이동 */}
+          <Grid container spacing={2} alignItems="flex-start">
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="대상월"
+                type="month"
+                value={targetMonth}
+                onChange={handleMonthChange}
+                InputLabelProps={{ shrink: true }}
+                sx={{ mb: 2 }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="구글시트 ID"
+                value={sheetId}
+                onChange={(e) => setSheetId(e.target.value)}
+                disabled={!canEditSheetId}
+                helperText={canEditSheetId ? "시트 ID를 입력하세요" : "권한이 없습니다 (SS 레벨만 수정 가능)"}
+                sx={{ mb: 2 }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSheetIdSave}
+                  disabled={!canEditSheetId || !targetMonth || !sheetId.trim()}
+                  sx={{ backgroundColor: '#795548', minWidth: '60px' }}
+                >
+                  저장
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleSheetIdDelete}
+                  disabled={!canEditSheetId || !targetMonth}
+                  sx={{ borderColor: '#795548', color: '#795548', minWidth: '60px' }}
+                >
+                  삭제
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+          
+          {/* 저장된 월별 시트 ID 목록 */}
+          {Object.keys(monthSheetMappings).length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#795548', fontWeight: 'bold' }}>
+                  📋 저장된 월별 시트 ID
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setShowMonthSheetList(!showMonthSheetList)}
+                  sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
+                >
+                  {showMonthSheetList ? '숨기기' : '보기'}
+                </Button>
+              </Box>
+              {showMonthSheetList && (
+                <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          대상월
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          시트 ID
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          수정일시
+                        </TableCell>
+                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          수정자
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(monthSheetMappings)
+                        .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 월부터 정렬
+                        .map(([month, id]) => {
+                        const detail = detailedMonthData[month];
+                        return (
+                          <TableRow key={month} hover>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {detail?.lastModified || 'N/A'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {detail?.modifiedBy || 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    </Box>
+  );
+
   // 액면예산 탭 렌더링
   const renderFaceValueBudget = (type = 'Ⅰ') => (
     <Box sx={{ p: 3 }}>
@@ -1679,86 +1807,43 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             <Tab label="부가차감지원" icon={<TimelineIcon />} iconPosition="start" />
             <Tab label="시트설정" icon={<SettingsIcon />} iconPosition="start" />
           </Tabs>
-          
-          {/* 액면예산 드롭다운 */}
-          {activeTab === 0 && (
-            <Box sx={{ position: 'relative', ml: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={() => setShowFaceValueDropdown(!showFaceValueDropdown)}
-                endIcon={<ExpandMoreIcon />}
-                sx={{
-                  borderColor: '#795548',
-                  color: '#795548',
-                  '&:hover': {
-                    borderColor: '#5d4037',
-                    backgroundColor: 'rgba(121, 85, 72, 0.04)'
-                  }
-                }}
-              >
-                액면예산({faceValueSubMenu})
-              </Button>
-              
-              {showFaceValueDropdown && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    zIndex: 1000,
-                    backgroundColor: 'white',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: 1,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                    minWidth: 150
-                  }}
-                >
-                  <MenuItem 
-                    onClick={() => handleFaceValueSubMenuChange('Ⅰ')}
-                    sx={{
-                      backgroundColor: faceValueSubMenu === 'Ⅰ' ? 'rgba(121, 85, 72, 0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(121, 85, 72, 0.05)'
-                      }
-                    }}
-                  >
-                    액면예산(Ⅰ)
-                  </MenuItem>
-                  <MenuItem 
-                    onClick={() => handleFaceValueSubMenuChange('Ⅱ')}
-                    sx={{
-                      backgroundColor: faceValueSubMenu === 'Ⅱ' ? 'rgba(121, 85, 72, 0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(121, 85, 72, 0.05)'
-                      }
-                    }}
-                  >
-                    액면예산(Ⅱ)
-                  </MenuItem>
-                  <MenuItem 
-                    onClick={() => handleFaceValueSubMenuChange('종합')}
-                    sx={{
-                      backgroundColor: faceValueSubMenu === '종합' ? 'rgba(121, 85, 72, 0.1)' : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'rgba(121, 85, 72, 0.05)'
-                      }
-                    }}
-                  >
-                    액면예산(종합)
-                  </MenuItem>
-                </Box>
-              )}
-            </Box>
-          )}
         </Box>
 
         {/* 탭별 콘텐츠 */}
         {activeTab === 0 && (
-          <>
+          <Box sx={{ p: 3 }}>
+            {/* 액면예산 서브메뉴 드롭다운 */}
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+              <FormControl sx={{ minWidth: 200 }}>
+                <InputLabel>액면예산 서브메뉴</InputLabel>
+                <Select
+                  value={faceValueSubMenu}
+                  onChange={(e) => handleFaceValueSubMenuChange(e.target.value)}
+                  label="액면예산 서브메뉴"
+                  sx={{
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#795548'
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#5d4037'
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#795548'
+                    }
+                  }}
+                >
+                  <MenuItem value="Ⅰ">액면예산(Ⅰ)</MenuItem>
+                  <MenuItem value="Ⅱ">액면예산(Ⅱ)</MenuItem>
+                  <MenuItem value="종합">액면예산(종합)</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            
+            {/* 서브메뉴별 콘텐츠 */}
             {faceValueSubMenu === 'Ⅰ' && renderFaceValueBudget('Ⅰ')}
             {faceValueSubMenu === 'Ⅱ' && renderFaceValueBudget('Ⅱ')}
             {faceValueSubMenu === '종합' && renderFaceValueSummary()}
-          </>
+          </Box>
         )}
         {activeTab === 1 && (
           <Box sx={{ p: 4, textAlign: 'center' }}>
@@ -1927,133 +2012,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     </Box>
   );
 
-  // 시트설정 렌더링
-  const renderSheetSettings = () => (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
-        ⚙️ 시트설정
-      </Typography>
-      
-      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            📋 저장된 월별 시트 ID 관리
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
-            액면예산(Ⅰ)과 액면예산(Ⅱ)에서 사용할 시트를 생성하고 관리합니다.
-          </Typography>
-          
-          {/* 기존 월별 시트 설정 UI를 여기에 이동 */}
-          <Grid container spacing={2} alignItems="flex-start">
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="대상월"
-                type="month"
-                value={targetMonth}
-                onChange={handleMonthChange}
-                InputLabelProps={{ shrink: true }}
-                sx={{ mb: 2 }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="구글시트 ID"
-                value={sheetId}
-                onChange={(e) => setSheetId(e.target.value)}
-                disabled={!canEditSheetId}
-                helperText={canEditSheetId ? "시트 ID를 입력하세요" : "권한이 없습니다 (SS 레벨만 수정 가능)"}
-                sx={{ mb: 2 }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={2}>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={handleSheetIdSave}
-                  disabled={!canEditSheetId || !targetMonth || !sheetId.trim()}
-                  sx={{ backgroundColor: '#795548', minWidth: '60px' }}
-                >
-                  저장
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleSheetIdDelete}
-                  disabled={!canEditSheetId || !targetMonth}
-                  sx={{ borderColor: '#795548', color: '#795548', minWidth: '60px' }}
-                >
-                  삭제
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-          
-          {/* 저장된 월별 시트 ID 목록 */}
-          {Object.keys(monthSheetMappings).length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2" sx={{ color: '#795548', fontWeight: 'bold' }}>
-                  📋 저장된 월별 시트 ID
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setShowMonthSheetList(!showMonthSheetList)}
-                  sx={{ borderColor: '#795548', color: '#795548', fontSize: '0.7rem' }}
-                >
-                  {showMonthSheetList ? '숨기기' : '보기'}
-                </Button>
-              </Box>
-              {showMonthSheetList && (
-                <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                          대상월
-                        </TableCell>
-                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                          시트 ID
-                        </TableCell>
-                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                          수정일시
-                        </TableCell>
-                        <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                          수정자
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {Object.entries(monthSheetMappings)
-                        .sort(([a], [b]) => new Date(b) - new Date(a)) // 최신 월부터 정렬
-                        .map(([month, id]) => {
-                        const detail = detailedMonthData[month];
-                        return (
-                          <TableRow key={month} hover>
-                            <TableCell sx={{ fontSize: '0.8rem' }}>{month}</TableCell>
-                            <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{id}</TableCell>
-                            <TableCell sx={{ fontSize: '0.8rem' }}>
-                              {detail?.lastModified || 'N/A'}
-                            </TableCell>
-                            <TableCell sx={{ fontSize: '0.8rem' }}>
-                              {detail?.modifiedBy || 'N/A'}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-    </Box>
-  );
 }
 
 export default BudgetMode; 
