@@ -866,6 +866,165 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     </Box>
   );
 
+  // 액면예산(종합) 렌더링
+  const renderFaceValueSummary = () => (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
+        💰 액면예산(종합) 관리
+      </Typography>
+      
+      {/* 대상월 선택 및 데이터 로드 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📅 대상월 선택
+          </Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="대상월"
+                type="month"
+                value={targetMonth}
+                onChange={handleMonthChange}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Button
+                variant="contained"
+                onClick={loadSummaryData}
+                disabled={!targetMonth || isLoadingSummary}
+                startIcon={isLoadingSummary ? <CircularProgress size={20} /> : <CalculateIcon />}
+                sx={{ backgroundColor: '#795548' }}
+              >
+                {isLoadingSummary ? '로딩 중...' : '종합 데이터 로드'}
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+      
+      {/* 최종 예산 잔액 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548', textAlign: 'center' }}>
+            🎯 최종 예산 잔액
+          </Typography>
+          <Typography variant="h4" sx={{ textAlign: 'center', color: '#2e7d32', fontWeight: 'bold' }}>
+            {summaryData.totalRemainingBudget.toLocaleString()}원
+          </Typography>
+          <Typography variant="body2" sx={{ textAlign: 'center', color: '#666', mt: 1 }}>
+            F열 합계 - (별도추가 + 부가추가지원 + 부가차감지원 사용예산)
+          </Typography>
+        </CardContent>
+      </Card>
+
+      {/* 액면예산(종합) 상세 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            📊 액면예산(종합)
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#e8f5e8' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="primary">
+                    확보예산
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    {summaryData.totalSecuredBudget.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
+                    G열(합계계산금액)
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#fff3e0' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="warning.main">
+                    사용예산
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
+                    {summaryData.totalUsedBudget.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
+                    H열(합계계산금액)
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#fce4ec' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="error">
+                    예산잔액
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
+                    {summaryData.totalRemainingBudget.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
+                    F열(합계계산금액)
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* 향후 확장 항목들 */}
+      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+            🔮 향후 확장 예정
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#f3e5f5' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="secondary">
+                    별도추가
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
+                    0원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#e1f5fe' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="info.main">
+                    부가추가지원
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
+                    0원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={4}>
+              <Card sx={{ backgroundColor: '#fff8e1' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="warning.main">
+                    부가차감지원
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
+                    0원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+
   // 액면예산 탭 렌더링
   const renderFaceValueBudget = (type = 'Ⅰ') => (
     <Box sx={{ p: 3 }}>
@@ -2044,165 +2203,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           </Alert>
         </Snackbar>
       </Box>
-    </Box>
-  );
-
-  // 액면예산(종합) 렌더링
-  const renderFaceValueSummary = () => (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
-        💰 액면예산(종합) 관리
-      </Typography>
-      
-      {/* 대상월 선택 및 데이터 로드 */}
-      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            📅 대상월 선택
-          </Typography>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="대상월"
-                type="month"
-                value={targetMonth}
-                onChange={handleMonthChange}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Button
-                variant="contained"
-                onClick={loadSummaryData}
-                disabled={!targetMonth || isLoadingSummary}
-                startIcon={isLoadingSummary ? <CircularProgress size={20} /> : <CalculateIcon />}
-                sx={{ backgroundColor: '#795548' }}
-              >
-                {isLoadingSummary ? '로딩 중...' : '종합 데이터 로드'}
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-      
-      {/* 최종 예산 잔액 */}
-      <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548', textAlign: 'center' }}>
-            🎯 최종 예산 잔액
-          </Typography>
-          <Typography variant="h4" sx={{ textAlign: 'center', color: '#2e7d32', fontWeight: 'bold' }}>
-            {summaryData.totalRemainingBudget.toLocaleString()}원
-          </Typography>
-          <Typography variant="body2" sx={{ textAlign: 'center', color: '#666', mt: 1 }}>
-            F열 합계 - (별도추가 + 부가추가지원 + 부가차감지원 사용예산)
-          </Typography>
-        </CardContent>
-      </Card>
-
-      {/* 액면예산(종합) 상세 */}
-      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            📊 액면예산(종합)
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <Card sx={{ backgroundColor: '#e8f5e8' }}>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" color="primary">
-                    확보예산
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                    {summaryData.totalSecuredBudget.toLocaleString()}원
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#666' }}>
-                    G열(합계계산금액)
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={4}>
-              <Card sx={{ backgroundColor: '#fff3e0' }}>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" color="warning.main">
-                    사용예산
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
-                    {summaryData.totalUsedBudget.toLocaleString()}원
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#666' }}>
-                    H열(합계계산금액)
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={4}>
-              <Card sx={{ backgroundColor: '#fce4ec' }}>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" color="error">
-                    예산잔액
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-                    {summaryData.totalRemainingBudget.toLocaleString()}원
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#666' }}>
-                    F열(합계계산금액)
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* 향후 확장 항목들 */}
-      <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-            🔮 향후 확장 예정
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <Card sx={{ backgroundColor: '#f3e5f5' }}>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" color="secondary">
-                    별도추가
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
-                    0원
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={4}>
-              <Card sx={{ backgroundColor: '#e1f5fe' }}>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" color="info.main">
-                    부가추가지원
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
-                    0원
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={4}>
-              <Card sx={{ backgroundColor: '#fff8e1' }}>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" color="warning.main">
-                    부가차감지원
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#666' }}>
-                    0원
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
     </Box>
   );
 
