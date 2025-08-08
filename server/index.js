@@ -3588,6 +3588,12 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     });
     const sheetsList = sheetsListResponse.data.sheets || [];
     
+    // 디버깅: 모든 시트 목록 출력
+    console.log('📋 전체 시트 목록:');
+    sheetsList.forEach(sheet => {
+      console.log(`  - ${sheet.properties.title}`);
+    });
+    
     // 해당 사용자의 시트 찾기 (액면_홍남옥(Ⅰ) (이사) 또는 액면_홍남옥(Ⅱ) (이사))
     const userSheet = sheetsList.find(sheet => 
       sheet.properties.title.includes(`액면_${baseUserName}`) && 
@@ -3599,6 +3605,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       console.log(`✅ 사용자 시트 찾음: ${userSheetName}`);
     } else {
       console.warn(`사용자 시트를 찾을 수 없습니다: 액면_${baseUserName}`);
+      console.warn(`검색 조건: 액면_${baseUserName} AND (이사)`);
     }
   } catch (error) {
     console.warn('시트 목록 조회 중 오류:', error.message);
