@@ -15091,26 +15091,39 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           let totalSecuredBudget = 0;
           let totalUsedBudget = 0;
           
-          activationData.slice(4).forEach(row => { // C5행부터 시작
+          console.log(`🔍 [${sheetName}] 폰클개통데이터 합계 계산 시작`);
+          
+          activationData.slice(4).forEach((row, index) => { // C5행부터 시작
             if (row.length >= 3) {
               // A열: 예산잔액 (공백이 아닌 경우만)
               if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
-                totalRemainingBudget += parseFloat(row[0]) || 0;
+                const value = parseFloat(row[0]) || 0;
+                totalRemainingBudget += value;
+                if (value > 0) console.log(`  A열[${index + 5}]: ${value}`);
               }
               // B열: 확보예산 (공백이 아닌 경우만)
               if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
-                totalSecuredBudget += parseFloat(row[1]) || 0;
+                const value = parseFloat(row[1]) || 0;
+                totalSecuredBudget += value;
+                if (value > 0) console.log(`  B열[${index + 5}]: ${value}`);
               }
               // C열: 사용예산 (공백이 아닌 경우만)
               if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
-                totalUsedBudget += parseFloat(row[2]) || 0;
+                const value = parseFloat(row[2]) || 0;
+                totalUsedBudget += value;
+                if (value > 0) console.log(`  C열[${index + 5}]: ${value}`);
               }
             }
           });
           
+          console.log(`📊 [${sheetName}] 최종 합계: A열=${totalRemainingBudget}, B열=${totalSecuredBudget}, C열=${totalUsedBudget}`);
+          
+          // 원 단위 그대로 표시 (폰클개통데이터에서 직접 읽은 값)
           summary.totalRemainingBudget = totalRemainingBudget;
           summary.totalSecuredBudget = totalSecuredBudget;
           summary.totalUsedBudget = totalUsedBudget;
+          
+          console.log(`📋 [${sheetName}] 📋 저장된 데이터 목록 표시값: 확보예산=${totalSecuredBudget}, 사용예산=${totalUsedBudget}, 예산잔액=${totalRemainingBudget}`);
           
           // 메타데이터에서 마지막 업데이트 시간과 날짜 범위 가져오기 (O1:R2로 이동)
           try {
@@ -15128,9 +15141,9 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               const activationRange = metadata[1][2] || ''; // 개통일 범위
               
               if (receiptRange === '미적용') {
-                summary.dateRange = `접수일 미설정~미설정\n개통일 ${activationRange}`;
+                summary.dateRange = `접수일 미설정~미설정<br/>개통일 ${activationRange}`;
               } else {
-                summary.dateRange = `접수일 ${receiptRange}\n개통일 ${activationRange}`;
+                summary.dateRange = `접수일 ${receiptRange}<br/>개통일 ${activationRange}`;
               }
               
               summary.applyReceiptDate = metadata[1][3] === '적용'; // 접수일 적용 여부
