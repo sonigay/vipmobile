@@ -1691,13 +1691,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
-                          {((sheet.summary?.totalSecuredBudget || 0) * 1000).toLocaleString()}원
+                          {(sheet.summary?.totalSecuredBudget || 0).toLocaleString()}원
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-                          {((sheet.summary?.totalUsedBudget || 0) * 1000).toLocaleString()}원
+                          {(sheet.summary?.totalUsedBudget || 0).toLocaleString()}원
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
-                          {((sheet.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
+                          {(sheet.summary?.totalRemainingBudget || 0).toLocaleString()}원
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
                           {sheet.createdBy || 'Unknown'}
@@ -1966,7 +1966,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                          확보예산
                        </Typography>
                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                         {((previewData.summary?.totalSecuredBudget || 0) * 1000).toLocaleString()}원
+                          {(previewData.summary?.totalSecuredBudget || 0).toLocaleString()}원
                        </Typography>
                      </CardContent>
                    </Card>
@@ -1978,7 +1978,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                          사용예산
                        </Typography>
                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
-                         {((previewData.summary?.totalUsedBudget || 0) * 1000).toLocaleString()}원
+                          {(previewData.summary?.totalUsedBudget || 0).toLocaleString()}원
                        </Typography>
                      </CardContent>
                    </Card>
@@ -1990,7 +1990,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                          예산잔액
                        </Typography>
                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-                         {((previewData.summary?.totalRemainingBudget || 0) * 1000).toLocaleString()}원
+                          {(previewData.summary?.totalRemainingBudget || 0).toLocaleString()}원
                        </Typography>
                      </CardContent>
                    </Card>
