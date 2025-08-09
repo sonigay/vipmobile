@@ -3637,10 +3637,10 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     console.warn(`사용자 시트 ${userSheetName}에서 예산 데이터를 가져올 수 없습니다:`, error.message);
   }
   
-  // 폰클개통데이터 시트에서 데이터 가져오기
+  // 폰클개통데이터 시트에서 데이터 가져오기 (AG열까지 필요)
   const activationData = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: '폰클개통데이터!A:Z', // 충분한 컬럼 범위
+    range: '폰클개통데이터!A:AG', // AG열까지 포함
   });
   
   const activationRows = activationData.data.values || [];
@@ -3674,7 +3674,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   // C5행부터 데이터 처리 (배열 인덱스 4부터 시작)
   activationRows.slice(4).forEach((row, index) => {
     const actualRowNumber = 5 + index; // C5, C6, C7, C8...
-    if (row.length >= 31) { // 최소 31개 컬럼 필요 (11개 추가)
+    if (row.length >= 33) { // AG열까지 접근하므로 최소 33개 컬럼 필요
       const policyGroup = row[15]; // P열: 정책그룹 (기존 E열에서 +11)
       const armyType = row[14]; // O열: 정책군 (기존 D열에서 +11)
       const categoryType = row[30]; // AE열: 유형 (기존 T열에서 +11)
