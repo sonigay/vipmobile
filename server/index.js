@@ -15824,7 +15824,14 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 실제 시트 소유자의 자격 정보를 대리점아이디관리에서 가져오기
     let userQualification = '이사'; // 기본값
     try {
-      if (agentValues) {
+      // 대리점아이디관리 시트에서 소유자의 자격 정보 가져오기
+      const agentSheetResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: AGENT_SHEET_NAME + '!A:B'
+      });
+      
+      const agentValues = agentSheetResponse.data.values;
+      if (agentValues && agentValues.length > 1) {
         const agentRows = agentValues.slice(1);
         const ownerAgent = agentRows.find(row => row[0] === actualSheetOwner); // A열: 대상(이름)으로 검색
         if (ownerAgent) {
