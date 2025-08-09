@@ -310,6 +310,45 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 미리보기 모달 상태
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+  const [previewRows, setPreviewRows] = useState([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // 미리보기 열기 (축소 테이블 데이터 로드)
+  const openPreview = async (sheet) => {
+    setPreviewData(sheet);
+    setShowPreviewModal(true);
+    setIsLoadingPreview(true);
+    setPreviewRows([]);
+    try {
+      const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
+      const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName);
+      const rows = [];
+      if (result?.data && Array.isArray(result.data)) {
+        const modelGroups = {};
+        result.data.forEach(item => {
+          if (!modelGroups[item.modelName]) {
+            modelGroups[item.modelName] = {
+              modelName: item.modelName,
+              expenditureValues: new Array(18).fill(0)
+            };
+          }
+          const armyIndex = ['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].indexOf(item.armyType);
+          const categoryIndex = ['신규', 'MNP', '보상'].indexOf(item.categoryType);
+          if (armyIndex !== -1 && categoryIndex !== -1) {
+            const columnIndex = armyIndex * 3 + categoryIndex;
+            modelGroups[item.modelName].expenditureValues[columnIndex] = Math.round((item.usedBudget || 0) / 10000);
+          }
+        });
+        // 최대 10개 모델만 미리보기
+        const compact = Object.values(modelGroups).slice(0, 10);
+        setPreviewRows(compact);
+      }
+    } catch (e) {
+      console.error('미리보기 데이터 로드 실패:', e);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   // 액면예산 종합 데이터 로드
   const loadSummaryData = async () => {
@@ -1714,10 +1753,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               <Button
                                 size="small"
                                 variant="outlined"
-                                onClick={() => {
-                                  setPreviewData(sheet);
-                                  setShowPreviewModal(true);
-                                }}
+                                onClick={() => openPreview(sheet)}
                                 sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
                               >
                                 미리보기
@@ -1948,79 +1984,57 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          maxWidth="md"
          fullWidth
        >
-         <DialogTitle>
-           <Typography variant="h6">📊 예산 데이터 미리보기</Typography>
-         </DialogTitle>
-         <DialogContent>
-           {previewData && (
-             <Box>
-               <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
-                 {previewData.name} - {previewData.createdBy}
-               </Typography>
-               
-               <Grid container spacing={2} sx={{ mb: 3 }}>
-                 <Grid item xs={4}>
-                   <Card sx={{ backgroundColor: '#e8f5e8' }}>
-                     <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                       <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold' }}>
-                         확보예산
-                       </Typography>
-                       <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                          {(previewData.summary?.totalSecuredBudget || 0).toLocaleString()}원
-                       </Typography>
-                     </CardContent>
-                   </Card>
-                 </Grid>
-                 <Grid item xs={4}>
-                   <Card sx={{ backgroundColor: '#fff3e0' }}>
-                     <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                       <Typography variant="body2" color="warning.main" sx={{ fontWeight: 'bold' }}>
-                         사용예산
-                       </Typography>
-                       <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
-                          {(previewData.summary?.totalUsedBudget || 0).toLocaleString()}원
-                       </Typography>
-                     </CardContent>
-                   </Card>
-                 </Grid>
-                 <Grid item xs={4}>
-                   <Card sx={{ backgroundColor: '#fce4ec' }}>
-                     <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                       <Typography variant="body2" color="error" sx={{ fontWeight: 'bold' }}>
-                         예산잔액
-                       </Typography>
-                       <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
-                          {(previewData.summary?.totalRemainingBudget || 0).toLocaleString()}원
-                       </Typography>
-                     </CardContent>
-                   </Card>
-                 </Grid>
-               </Grid>
-               
-               <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                 <strong>예산적용일:</strong>
-               </Typography>
-               <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
-                 <div 
-                   dangerouslySetInnerHTML={{
-                     __html: previewData.summary?.dateRange || '날짜 미설정'
-                   }}
-                   style={{ 
-                     whiteSpace: 'pre-line',
-                     lineHeight: '1.4'
-                   }}
-                 />
-               </Typography>
-               
-               <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
-                 <strong>마지막 수정:</strong> {previewData.summary?.lastUpdated ? 
-                   new Date(previewData.summary.lastUpdated).toLocaleString('ko-KR') : 
-                   new Date(previewData.createdAt).toLocaleString('ko-KR')
-                 }
-               </Typography>
-             </Box>
-           )}
-         </DialogContent>
+          <DialogTitle>
+            <Typography variant="h6">📊 예산 데이터 입력 (엑셀 형식) - 미리보기</Typography>
+          </DialogTitle>
+          <DialogContent>
+            {isLoadingPreview && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                <CircularProgress size={24} />
+              </Box>
+            )}
+            {previewData && !isLoadingPreview && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: '#666' }}>
+                  {previewData.name} · {previewData.createdBy}
+                </Typography>
+                <TableContainer component={Paper} sx={{ maxHeight: 360, border: '1px solid #e0e0e0' }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ backgroundColor: '#795548', color: '#fff', fontWeight: 'bold', textAlign: 'center', minWidth: 120 }}>모델명</TableCell>
+                        {['S군','A군','B군','C군','D군','E군'].map((army) => (
+                          ['신규','MNP','보상'].map((cat, ci) => (
+                            <TableCell key={`${army}-${cat}`} sx={{ backgroundColor: '#795548', color: '#fff', fontWeight: 'bold', textAlign: 'center', minWidth: 70 }}>
+                              {army}<br/>{cat}
+                            </TableCell>
+                          ))
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {previewRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={19} sx={{ textAlign: 'center', color: '#666' }}>표시할 데이터가 없습니다.</TableCell>
+                        </TableRow>
+                      ) : (
+                        previewRows.map((row) => (
+                          <TableRow key={row.modelName}>
+                            <TableCell sx={{ fontWeight: 'bold' }}>{row.modelName}</TableCell>
+                            {row.expenditureValues.map((val, idx) => (
+                              <TableCell key={idx} sx={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                                {val ? val.toLocaleString() : ''}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+          </DialogContent>
          <DialogActions>
            <Button onClick={() => setShowPreviewModal(false)}>닫기</Button>
          </DialogActions>
