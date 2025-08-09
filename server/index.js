@@ -15833,12 +15833,14 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       const agentValues = agentSheetResponse.data.values;
       if (agentValues && agentValues.length > 1) {
         const agentRows = agentValues.slice(1);
-        const ownerAgent = agentRows.find(row => row[0] === actualSheetOwner); // A열: 대상(이름)으로 검색
+        // actualSheetOwner에서 이름만 추출 (예: "김기송 (영업사원)" → "김기송")
+        const cleanOwnerName = actualSheetOwner.replace(/\([^)]+\)/, '').trim();
+        const ownerAgent = agentRows.find(row => row[0] === cleanOwnerName); // A열: 대상(이름)으로 검색
         if (ownerAgent) {
           userQualification = ownerAgent[1] || '이사'; // B열: 자격
-          console.log(`📋 [예산데이터조회] 시트 소유자 자격 확인: ${actualSheetOwner} → ${userQualification}`);
+          console.log(`📋 [예산데이터조회] 시트 소유자 자격 확인: ${cleanOwnerName} → ${userQualification}`);
         } else {
-          console.log(`⚠️ [예산데이터조회] 대리점아이디관리에서 ${actualSheetOwner} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+          console.log(`⚠️ [예산데이터조회] 대리점아이디관리에서 ${cleanOwnerName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
         }
       }
     } catch (error) {
