@@ -3577,9 +3577,27 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   console.log('👤 사용자:', userName);
   
   // 사용자별 예산 데이터 가져오기 - 시트 목록에서 해당 사용자의 시트 찾기
-  const baseUserName = userName.replace(/\(이사\)/, '').trim();
+  const baseUserName = userName.replace(/\([^)]+\)/, '').trim(); // 모든 괄호 내용 제거
   let userSheetName = `액면_${baseUserName}`;
   let budgetData = [];
+  
+  // 사용자의 자격 정보를 대리점아이디관리에서 가져오기
+  let userQualification = '이사'; // 기본값
+  try {
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    if (agentValues) {
+      const agentRows = agentValues.slice(1);
+      const userAgent = agentRows.find(row => row[0] === baseUserName); // A열: 이름으로 검색
+      if (userAgent) {
+        userQualification = userAgent[1] || '이사'; // B열: 자격
+        console.log(`📋 [calculateUsageBudget] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
+      } else {
+        console.log(`⚠️ [calculateUsageBudget] 대리점아이디관리에서 ${baseUserName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+      }
+    }
+  } catch (error) {
+    console.error('사용자 자격 정보 조회 실패:', error);
+  }
   
   // 시트 목록에서 해당 사용자의 시트 찾기
   try {
@@ -3594,13 +3612,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       console.log(`  - ${sheet.properties.title}`);
     });
     
-    // 해당 사용자의 시트 찾기 (액면_홍남옥(Ⅰ) (이사) 또는 액면_홍남옥(Ⅱ) (이사))
-    // userName에서 직함 추출 (예: "홍남옥 (이사)" -> "(이사)")
-    const titleMatch = userName.match(/\(([^)]+)\)/);
-    const userTitle = titleMatch ? `(${titleMatch[1]})` : '';
-    
     // budgetType을 사용하여 정확한 시트 이름 매칭
-    const expectedSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) ${userTitle}`;
+    const expectedSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
     console.log(`🧭 [calculateUsageBudget] budgetType=${budgetType || 'Ⅰ'}, expectedSheetName=${expectedSheetName}`);
     const userSheet = sheetsList.find(sheet => 
       sheet.properties.title === expectedSheetName
@@ -15302,9 +15315,28 @@ app.post('/api/budget/user-sheets', async (req, res) => {
 
     const targetSheetId = targetMonthRow[1];
     
-    // userName에서 (이사) 부분을 제거하고 새로 추가
-    const baseUserName = userName.replace(/\(이사\)/, '').trim();
-    const userSheetName = `액면_${baseUserName}(${budgetType}) (이사)`;
+    // userName에서 괄호 부분을 제거하고 실제 자격 정보를 대리점아이디관리에서 가져오기
+    const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+    
+    // 사용자의 자격 정보를 대리점아이디관리에서 가져오기
+    let userQualification = '이사'; // 기본값
+    try {
+      const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+      if (agentValues) {
+        const agentRows = agentValues.slice(1);
+        const userAgent = agentRows.find(row => row[0] === baseUserName); // A열: 이름으로 검색
+        if (userAgent) {
+          userQualification = userAgent[1] || '이사'; // B열: 자격
+          console.log(`📋 [시트생성] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
+        } else {
+          console.log(`⚠️ [시트생성] 대리점아이디관리에서 ${baseUserName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+        }
+      }
+    } catch (error) {
+      console.error('사용자 자격 정보 조회 실패:', error);
+    }
+    
+    const userSheetName = `액면_${baseUserName}(${budgetType}) (${userQualification})`;
     
     // 기존 시트에 새로운 시트 추가
     try {
@@ -15460,8 +15492,27 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     }
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const baseUserName = userName.replace(/\(이사\)/, '').trim();
-    const userSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) (이사)`;
+    const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+    
+    // 사용자의 자격 정보를 대리점아이디관리에서 가져오기
+    let userQualification = '이사'; // 기본값
+    try {
+      const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+      if (agentValues) {
+        const agentRows = agentValues.slice(1);
+        const userAgent = agentRows.find(row => row[0] === baseUserName); // A열: 이름으로 검색
+        if (userAgent) {
+          userQualification = userAgent[1] || '이사'; // B열: 자격
+          console.log(`📋 [데이터저장] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
+        } else {
+          console.log(`⚠️ [데이터저장] 대리점아이디관리에서 ${baseUserName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+        }
+      }
+    } catch (error) {
+      console.error('사용자 자격 정보 조회 실패:', error);
+    }
+    
+    const userSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
     
     // 데이터를 사용자가 원하는 형식으로 변환
     // 각 모델별로 군/유형별 데이터를 개별 행으로 분리
@@ -15656,19 +15707,97 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
 app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
     const { sheetId } = req.params;
-    const { userName } = req.query;
+    const { userName, currentUserId, budgetType } = req.query;
     const sheets = google.sheets({ version: 'v4', auth });
     
     if (!userName) {
       return res.status(400).json({ error: '사용자 이름이 필요합니다.' });
     }
     
-    // 시트 이름에서 액면예산 타입 추출
-    const budgetTypeMatch = userName.match(/액면_.*?\(([ⅠⅡ])\)/);
-    const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
-    const baseUserName = userName.replace(/\([ⅠⅡ]\)/, '').replace(/\(이사\)/, '').trim();
+    // 현재 사용자의 권한 확인 (액면예산(Ⅰ)에서만 다른 사용자 데이터 조회 허용)
+    let canAccessOtherUserData = false;
+    let actualSheetOwner = userName; // 기본값: 요청된 사용자 이름
     
-    const userSheetName = `액면_${baseUserName}(${budgetType}) (이사)`;
+    if (currentUserId && budgetType === 'Ⅰ') {
+      try {
+        // 대리점아이디관리 시트에서 현재 사용자의 권한 레벨 확인
+        const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+        if (agentValues) {
+          const agentRows = agentValues.slice(1);
+          const currentUserAgent = agentRows.find(row => row[2] === currentUserId); // C열: 연락처(아이디)
+          
+          if (currentUserAgent) {
+            const userRole = currentUserAgent[15] || ''; // P열: 권한레벨
+            console.log(`🔐 [예산데이터조회] 사용자 권한 확인: ${currentUserId} → 권한레벨: ${userRole}`);
+            
+            // SS, S, AA, BB, CC, DD, EE, FF 권한이 있는 경우 다른 사용자 데이터 조회 허용
+            if (['SS', 'S', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+              canAccessOtherUserData = true;
+              console.log(`✅ [예산데이터조회] 다른 사용자 데이터 조회 권한 있음: ${userRole}`);
+              
+              // 예산_사용자시트관리에서 실제 시트 소유자 확인
+              const userSheetManagementResponse = await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: '예산_사용자시트관리!A:G'
+              });
+              
+              const userSheetManagementData = userSheetManagementResponse.data.values || [];
+              if (userSheetManagementData.length > 1) {
+                // 헤더 제외하고 해당 시트 ID로 실제 소유자 찾기
+                for (let i = 1; i < userSheetManagementData.length; i++) {
+                  const row = userSheetManagementData[i];
+                  if (row.length >= 6 && row[1] === sheetId) { // B열: 시트ID
+                    actualSheetOwner = row[4] || userName; // E열: 생성자 (실제 소유자)
+                    console.log(`📋 [예산데이터조회] 실제 시트 소유자 확인: ${actualSheetOwner} (시트ID: ${sheetId})`);
+                    break;
+                  }
+                }
+              }
+            } else {
+              console.log(`❌ [예산데이터조회] 권한 부족: ${userRole} (액면예산(Ⅰ) 다른 사용자 조회 권한 없음)`);
+            }
+          } else {
+            console.log(`❌ [예산데이터조회] 사용자 정보 없음: ${currentUserId}`);
+          }
+        }
+      } catch (error) {
+        console.error('권한 확인 중 오류:', error);
+        // 권한 확인 실패 시에도 기본 로직 진행 (자신의 데이터는 조회 가능)
+      }
+    }
+    
+    // 액면예산(Ⅱ)이거나 권한이 없는 경우, 요청자와 시트 소유자가 다르면 접근 거부
+    if (budgetType === 'Ⅱ' || (!canAccessOtherUserData && actualSheetOwner !== userName)) {
+      return res.status(403).json({ 
+        error: '해당 데이터에 접근할 권한이 없습니다.',
+        details: budgetType === 'Ⅱ' ? '액면예산(Ⅱ)는 본인 데이터만 조회 가능합니다.' : '권한이 부족합니다.'
+      });
+    }
+    
+    // 실제 시트 소유자의 자격 정보를 대리점아이디관리에서 가져오기
+    let userQualification = '이사'; // 기본값
+    try {
+      if (agentValues) {
+        const agentRows = agentValues.slice(1);
+        const ownerAgent = agentRows.find(row => row[0] === actualSheetOwner); // A열: 대상(이름)으로 검색
+        if (ownerAgent) {
+          userQualification = ownerAgent[1] || '이사'; // B열: 자격
+          console.log(`📋 [예산데이터조회] 시트 소유자 자격 확인: ${actualSheetOwner} → ${userQualification}`);
+        } else {
+          console.log(`⚠️ [예산데이터조회] 대리점아이디관리에서 ${actualSheetOwner} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+        }
+      }
+    } catch (error) {
+      console.error('시트 소유자 자격 정보 조회 실패:', error);
+    }
+    
+    // 실제 시트 소유자 이름을 사용하여 시트 이름 구성
+    const baseUserName = actualSheetOwner.replace(/\([ⅠⅡ]\)/, '').replace(/\([^)]+\)/, '').trim();
+    const requestedBudgetType = budgetType || 'Ⅰ'; // 요청된 예산 타입 사용
+    
+    const userSheetName = `액면_${baseUserName}(${requestedBudgetType}) (${userQualification})`;
+    
+    console.log(`📊 [예산데이터조회] 시트명 구성: ${userSheetName} (소유자: ${actualSheetOwner}, 타입: ${requestedBudgetType}, 자격: ${userQualification})`);
     
     // 데이터 불러오기 (A2:L) - 새로운 형식에 맞춰 12개 컬럼
     const dataResponse = await sheets.spreadsheets.values.get({
@@ -15760,22 +15889,34 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 정책그룹 정보 가져오기 - "예산_사용자시트관리" 시트에서
     let selectedPolicyGroups = [];
     try {
-      const userSheetManagementResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '예산_사용자시트관리!A:G'
-      });
+      // 위에서 이미 가져온 userSheetManagementData가 있으면 재사용
+      let userSheetManagementData = [];
+      if (canAccessOtherUserData) {
+        // 이미 권한 확인 시 가져온 데이터 재사용
+        const userSheetManagementResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '예산_사용자시트관리!A:G'
+        });
+        userSheetManagementData = userSheetManagementResponse.data.values || [];
+      } else {
+        const userSheetManagementResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '예산_사용자시트관리!A:G'
+        });
+        userSheetManagementData = userSheetManagementResponse.data.values || [];
+      }
       
-      const userSheetManagementData = userSheetManagementResponse.data.values || [];
       if (userSheetManagementData.length > 1) {
-        // 헤더 제외하고 데이터 검색
+        // 헤더 제외하고 데이터 검색 - 시트 ID로 찾기
         for (let i = 1; i < userSheetManagementData.length; i++) {
           const row = userSheetManagementData[i];
-          if (row.length >= 7 && row[1] === userName && row[0] === sheetId) {
+          if (row.length >= 7 && row[1] === sheetId) { // B열: 시트ID로 검색
             // G열에 정책그룹 정보가 저장되어 있음
             const policyGroupsStr = row[6] || '';
             if (policyGroupsStr) {
               selectedPolicyGroups = policyGroupsStr.split(',').map(group => group.trim()).filter(group => group);
             }
+            console.log(`📋 [예산데이터조회] 정책그룹 정보 로드: ${selectedPolicyGroups.join(', ')}`);
             break;
           }
         }
@@ -15785,11 +15926,22 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       // 정책그룹 정보 불러오기 실패는 전체 API 실패로 처리하지 않음
     }
     
+    // 다른 사용자 데이터 조회 시 로그 기록
+    if (canAccessOtherUserData && actualSheetOwner !== userName) {
+      console.log(`📊 [접근로그] ${currentUserId}님이 ${actualSheetOwner}님의 예산 데이터를 조회했습니다. (시트ID: ${sheetId}, 타입: ${requestedBudgetType})`);
+    }
+    
     res.json({ 
       data: parsedData, 
       dateRange,
       selectedPolicyGroups,
-      metadata: metadata.length >= 2 ? metadata[1] : []
+      metadata: metadata.length >= 2 ? metadata[1] : [],
+      accessInfo: {
+        originalRequester: userName,
+        actualDataOwner: actualSheetOwner,
+        accessedBy: currentUserId,
+        isAccessedByOtherUser: canAccessOtherUserData && actualSheetOwner !== userName
+      }
     });
   } catch (error) {
     console.error('예산 데이터 불러오기 실패:', error);

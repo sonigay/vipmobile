@@ -572,8 +572,13 @@ export const budgetUserSheetAPI = {
   },
 
   // 예산 데이터 불러오기
-  loadBudgetData: async (sheetId, userName) => {
-    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data?userName=${encodeURIComponent(userName)}`);
+  loadBudgetData: async (sheetId, userName, currentUserId, budgetType) => {
+    const params = new URLSearchParams();
+    params.append('userName', userName);
+    if (currentUserId) params.append('currentUserId', currentUserId);
+    if (budgetType) params.append('budgetType', budgetType);
+    
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/data?${params.toString()}`);
     if (!response.ok) {
       throw new Error('예산 데이터 불러오기에 실패했습니다.');
     }

@@ -320,8 +320,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     setIsLoadingPreview(true);
     setPreviewRows([]);
     try {
-      const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
-      const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName);
+      const userName = sheet.userName || sheet.creator || loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
+      const currentUserId = loggedInStore?.id || loggedInStore?.agentInfo?.id || loggedInStore?.contactId;
+      const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName, currentUserId, faceValueSubMenu);
       const rows = [];
       if (result?.data && Array.isArray(result.data)) {
         const modelGroups = {};
@@ -380,9 +381,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handleLoadUserSheet = async (sheet) => {
     try {
       setIsProcessing(true);
-      const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
+      const userName = sheet.userName || sheet.creator || loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
+      const currentUserId = loggedInStore?.id || loggedInStore?.agentInfo?.id || loggedInStore?.contactId;
       
-      const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName);
+      const result = await budgetUserSheetAPI.loadBudgetData(sheet.id, userName, currentUserId, faceValueSubMenu);
       
       console.log('Loaded budget data result:', result);
       console.log('Parsed data:', result.data);
