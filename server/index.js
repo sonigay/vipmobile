@@ -3824,19 +3824,59 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           totalSecuredBudget += securedBudgetValue;
           totalRemainingBudget += (securedBudgetValue - calculatedBudgetValue);
           
-          // L열(예산잔액), M열(확보예산), N열(사용예산) 업데이트 요청 추가 (기존 A, B, C열에서 +11)
-          updateRequests.push({
-            range: `폰클개통데이터!L${actualRowNumber}`,
-            values: [[securedBudgetValue - calculatedBudgetValue]] // 예산잔액
-          });
-          updateRequests.push({
-            range: `폰클개통데이터!M${actualRowNumber}`,
-            values: [[securedBudgetValue]] // 확보예산
-          });
-          updateRequests.push({
-            range: `폰클개통데이터!N${actualRowNumber}`,
-            values: [[calculatedBudgetValue]] // 사용예산
-          });
+          // 액면예산 타입에 따라 다른 컬럼 업데이트
+          // 액면예산(Ⅰ): L열(예산잔액), M열(확보예산), N열(사용예산)
+          // 액면예산(Ⅱ): I열(예산잔액), J열(확보예산), K열(사용예산)
+          let remainingCol, securedCol, usedCol;
+          let remainingIdx, securedIdx, usedIdx;
+          
+          if (budgetType === 'Ⅱ') {
+            // 액면예산(Ⅱ): I, J, K열
+            remainingCol = 'I'; securedCol = 'J'; usedCol = 'K';
+            remainingIdx = 8; securedIdx = 9; usedIdx = 10; // I=9번째(8), J=10번째(9), K=11번째(10)
+          } else {
+            // 액면예산(Ⅰ): L, M, N열 (기본값)
+            remainingCol = 'L'; securedCol = 'M'; usedCol = 'N';
+            remainingIdx = 11; securedIdx = 12; usedIdx = 13; // L=12번째(11), M=13번째(12), N=14번째(13)
+          }
+          
+          // 기존 값이 있는지 확인 후 공백인 경우만 업데이트
+          const existingRemainingValue = row[remainingIdx] || '';
+          const existingSecuredValue = row[securedIdx] || '';
+          const existingUsedValue = row[usedIdx] || '';
+          
+          // 예산잔액 업데이트
+          if (!existingRemainingValue || existingRemainingValue.toString().trim() === '') {
+            updateRequests.push({
+              range: `폰클개통데이터!${remainingCol}${actualRowNumber}`,
+              values: [[securedBudgetValue - calculatedBudgetValue]]
+            });
+            console.log(`  └─ ${remainingCol}${actualRowNumber} 예산잔액 업데이트: ${securedBudgetValue - calculatedBudgetValue} (기존값 없음)`);
+          } else {
+            console.log(`  └─ ${remainingCol}${actualRowNumber} 예산잔액 유지: ${existingRemainingValue} (기존값 보존)`);
+          }
+          
+          // 확보예산 업데이트
+          if (!existingSecuredValue || existingSecuredValue.toString().trim() === '') {
+            updateRequests.push({
+              range: `폰클개통데이터!${securedCol}${actualRowNumber}`,
+              values: [[securedBudgetValue]]
+            });
+            console.log(`  └─ ${securedCol}${actualRowNumber} 확보예산 업데이트: ${securedBudgetValue} (기존값 없음)`);
+          } else {
+            console.log(`  └─ ${securedCol}${actualRowNumber} 확보예산 유지: ${existingSecuredValue} (기존값 보존)`);
+          }
+          
+          // 사용예산 업데이트
+          if (!existingUsedValue || existingUsedValue.toString().trim() === '') {
+            updateRequests.push({
+              range: `폰클개통데이터!${usedCol}${actualRowNumber}`,
+              values: [[calculatedBudgetValue]]
+            });
+            console.log(`  └─ ${usedCol}${actualRowNumber} 사용예산 업데이트: ${calculatedBudgetValue} (기존값 없음)`);
+          } else {
+            console.log(`  └─ ${usedCol}${actualRowNumber} 사용예산 유지: ${existingUsedValue} (기존값 보존)`);
+          }
         } else {
           // 날짜 범위에 포함되지 않는 경우 공백으로 설정 (데이터 손상 방지)
           dateRangeFiltered++;
@@ -15379,16 +15419,23 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       }
     });
 
-    // 기존 사용자 시트가 있는지 확인
+    // 기존 사용자 시트가 있는지 확인 - 정확한 조건으로 수정
     const existingSheetsData = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_사용자시트관리!A:G',
     });
     
     const existingRows = existingSheetsData.data.values || [];
+    // 동일한 사용자ID, 시트ID, 시트명이 모두 일치하는 경우만 기존 시트로 판단
     const existingSheet = existingRows.find(row => 
-      row[0] === userId && row[5] === targetMonth && row[2] === userSheetName
+      row[0] === userId && 
+      row[1] === targetSheetId && 
+      row[2] === userSheetName &&
+      row[5] === targetMonth
     );
+    
+    console.log(`📋 [시트생성] 기존 시트 검색: userId=${userId}, sheetId=${targetSheetId}, sheetName=${userSheetName}, month=${targetMonth}`);
+    console.log(`📋 [시트생성] 기존 시트 발견: ${existingSheet ? 'YES' : 'NO'}`);
     
     // 기존 시트가 없을 때만 새로 추가
     if (!existingSheet) {
