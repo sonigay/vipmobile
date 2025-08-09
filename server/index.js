@@ -3601,6 +3601,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     
     // budgetType을 사용하여 정확한 시트 이름 매칭
     const expectedSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) ${userTitle}`;
+    console.log(`🧭 [calculateUsageBudget] budgetType=${budgetType || 'Ⅰ'}, expectedSheetName=${expectedSheetName}`);
     const userSheet = sheetsList.find(sheet => 
       sheet.properties.title === expectedSheetName
     );
@@ -3617,12 +3618,21 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   }
   
   try {
+    console.log(`📥 [calculateUsageBudget] 사용자 시트 범위 읽기: ${userSheetName}!A:L`);
     const budgetResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: `${userSheetName}!A:L`, // A열부터 L열까지 (3열 추가로 12개 컬럼)
     });
     budgetData = budgetResponse.data.values || [];
     console.log(`💰 ${userSheetName} 시트 데이터 로드:`, budgetData.length, '행');
+    if (budgetData.length === 0) {
+      console.warn('⚠️ [calculateUsageBudget] 사용자 시트 데이터가 비어 있습니다. (헤더 포함 0행)');
+    } else {
+      console.log(`🪪 [calculateUsageBudget] 헤더: ${JSON.stringify(budgetData[0] || [])}`);
+      if (budgetData.length > 1) {
+        console.log(`🔎 [calculateUsageBudget] 샘플 1행: ${JSON.stringify(budgetData[1] || [])}`);
+      }
+    }
   } catch (error) {
     console.warn(`사용자 시트 ${userSheetName}에서 예산 데이터를 가져올 수 없습니다:`, error.message);
   }
@@ -3675,6 +3685,11 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일 (기존 J, K, L열에서 +11)
       
       // 정책그룹 매칭
+      if (!selectedPolicyGroups.includes(policyGroup)) {
+        if (index < 10) {
+          console.log(`🚫 [calculateUsageBudget] 정책그룹 불일치 [행${actualRowNumber}] policyGroup='${policyGroup}'`);
+        }
+      }
       if (selectedPolicyGroups.includes(policyGroup)) {
         // 날짜 범위 필터링 - 새로운 4개 날짜 컬럼 사용
         let isInDateRange = true;
@@ -3683,6 +3698,9 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.startDate, dateRange.endDate) : false;
           const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.startDate, dateRange.endDate) : false;
           isInDateRange = receptionInRange || activationInRange;
+        }
+        if (!isInDateRange && index < 10) {
+          console.log(`🕒 [calculateUsageBudget] 날짜범위 제외 [행${actualRowNumber}] 접수일=${receptionDate}, 개통일=${activationDate}`);
         }
         
         if (isInDateRange) {
@@ -3703,6 +3721,11 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           else if (categoryType === '보상') mappedCategoryType = '보상';
           else if (categoryType === '기변') mappedCategoryType = '보상';
           else mappedCategoryType = categoryType; // 기타 경우 그대로 사용
+
+          if (index < 10) {
+            const activationModelNamePreview = row[32];
+            console.log(`🔗 [calculateUsageBudget] 후보 [행${actualRowNumber}] 그룹='${policyGroup}', 모델='${activationModelNamePreview}', 군='${armyType}->${mappedArmyType}', 유형='${categoryType}->${mappedCategoryType}'`);
+          }
           
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
