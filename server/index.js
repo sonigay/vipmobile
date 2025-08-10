@@ -15443,6 +15443,19 @@ app.post('/api/budget/user-sheets', async (req, res) => {
           range: '예산_사용자시트관리!A:G',
         });
         console.log(`📋 [시트생성] append 후 실제 데이터:`, afterAppendData.data.values);
+        
+        // 3초 후 다시 한 번 확인 (Google Sheets 내부 처리 확인)
+        setTimeout(async () => {
+          try {
+            const finalCheck = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: '예산_사용자시트관리!A:G',
+            });
+            console.log(`📋 [시트생성] 3초 후 최종 확인:`, finalCheck.data.values);
+          } catch (error) {
+            console.error('3초 후 확인 실패:', error);
+          }
+        }, 3000);
       } catch (appendError) {
         // 시트가 존재하지 않으면 새로 생성하고 데이터 추가
         console.log('예산_사용자시트관리 시트가 존재하지 않아 새로 생성합니다.');
