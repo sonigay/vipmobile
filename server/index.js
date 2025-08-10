@@ -3843,8 +3843,8 @@ async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRan
     const userSheetData = userSheetResponse.data.values || [];
     console.log(`🧮 [DRY-RUN] 사용자 시트 데이터: ${userSheetData.length}행`);
     
-    // 2. 폰클개통데이터 읽기
-    const phoneklRange = '폰클개통데이터!A:Z';
+    // 2. 폰클개통데이터 읽기 (AG열까지 필요)
+    const phoneklRange = '폰클개통데이터!A:AG';
     const phoneklResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: phoneklRange
