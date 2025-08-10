@@ -17,26 +17,31 @@ class PhoneklDataManager {
       return {
         remainingBudget: 'I', // 예산잔액
         securedBudget: 'J',   // 확보예산  
-        usedBudget: 'K'       // 사용예산
+        usedBudget: 'K',      // 사용예산
+        owner: 'D',           // 입력자 (사용자명(예산타입) 형식)
+        timestamp: 'E'        // 입력일시
       };
     } else {
       // 기본값: 액면예산(Ⅰ)
       return {
         remainingBudget: 'L', // 예산잔액
         securedBudget: 'M',   // 확보예산
-        usedBudget: 'N'       // 사용예산
+        usedBudget: 'N',      // 사용예산
+        owner: 'D',           // 입력자 (사용자명(예산타입) 형식)
+        timestamp: 'E'        // 입력일시
       };
     }
   }
 
   /**
-   * 폰클개통데이터에서 현재 데이터 읽기
+   * 폰클개통데이터에서 현재 데이터 읽기 (소유권 정보 포함)
    */
   async readCurrentData(sheetId, budgetType) {
     console.log(`📱 [PhoneklDataManager] 현재 데이터 읽기 시작: ${budgetType}`);
     
     const columns = this.getColumnMapping(budgetType);
-    const range = `${this.phoneklSheetName}!${columns.remainingBudget}:${columns.usedBudget}`;
+    // D열부터 P열까지 읽기 (D,E: 소유권정보, L,M,N: 예산데이터)
+    const range = `${this.phoneklSheetName}!D:P`;
     
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
@@ -44,7 +49,7 @@ class PhoneklDataManager {
     });
     
     const data = response.data.values || [];
-    console.log(`📱 [PhoneklDataManager] 읽기 완료: ${data.length}행`);
+    console.log(`📱 [PhoneklDataManager] 읽기 완료: ${data.length}행 (소유권 정보 포함)`);
     
     return data;
   }
@@ -75,52 +80,71 @@ class PhoneklDataManager {
         const currentRow = currentData[rowIndex];
         const actualRowNumber = rowIndex + 1; // Google Sheets 행 번호 (1-based)
         
-        // 현재 행의 기존 값들 확인
-        const existingRemainingBudget = currentRow?.[0] || '';
-        const existingSecuredBudget = currentRow?.[1] || '';
-        const existingUsedBudget = currentRow?.[2] || '';
+        // D열부터 읽었으므로 인덱스 조정 (D=0, E=1, ..., L=8, M=9, N=10)
+        const existingOwner = currentRow?.[0] || ''; // D열: 입력자
+        const existingTimestamp = currentRow?.[1] || ''; // E열: 입력일시
+        const existingRemainingBudget = currentRow?.[8] || ''; // L열: 예산잔액 (D열부터 8번째)
+        const existingSecuredBudget = currentRow?.[9] || ''; // M열: 확보예산 (D열부터 9번째)
+        const existingUsedBudget = currentRow?.[10] || ''; // N열: 사용예산 (D열부터 10번째)
         
         // 해당 행에 매핑된 새 데이터가 있는지 확인
         const newData = newDataMap[actualRowNumber];
         
         if (newData) {
-          // 새 데이터가 있는 경우: 기존 값이 비어있는 경우만 업데이트
-          const updates = [];
+          // 예산타입을 포함한 소유권 식별자 생성
+          const currentOwnerWithType = `${userInfo.userName}(${userInfo.budgetType})`;
           
-          // 예산잔액 업데이트 (기존 값이 비어있는 경우만)
-          if (this.isEmpty(existingRemainingBudget) && !this.isEmpty(newData.remainingBudget)) {
-            updates.push({
-              range: `${this.phoneklSheetName}!${columns.remainingBudget}${actualRowNumber}`,
-              values: [[newData.remainingBudget]]
-            });
-          } else if (!this.isEmpty(existingRemainingBudget)) {
+          // 소유권 확인: 비어있거나 같은 사용자+예산타입인 경우만 업데이트
+          const canUpdate = this.isEmpty(existingOwner) || existingOwner === currentOwnerWithType;
+          
+          if (canUpdate) {
+            const updates = [];
+            const currentTime = new Date().toISOString();
+            
+            // 예산잔액 업데이트
+            if (!this.isEmpty(newData.remainingBudget)) {
+              updates.push({
+                range: `${this.phoneklSheetName}!${columns.remainingBudget}${actualRowNumber}`,
+                values: [[newData.remainingBudget]]
+              });
+            }
+            
+            // 확보예산 업데이트
+            if (!this.isEmpty(newData.securedBudget)) {
+              updates.push({
+                range: `${this.phoneklSheetName}!${columns.securedBudget}${actualRowNumber}`,
+                values: [[newData.securedBudget]]
+              });
+            }
+            
+            // 사용예산 업데이트
+            if (!this.isEmpty(newData.usedBudget)) {
+              updates.push({
+                range: `${this.phoneklSheetName}!${columns.usedBudget}${actualRowNumber}`,
+                values: [[newData.usedBudget]]
+              });
+            }
+            
+            // 소유권 정보 업데이트 (사용자명+예산타입)
+            if (updates.length > 0) {
+              const timestampWithType = `${currentTime} (${userInfo.budgetType})`;
+              
+              updates.push({
+                range: `${this.phoneklSheetName}!${columns.owner}${actualRowNumber}`,
+                values: [[currentOwnerWithType]]
+              });
+              updates.push({
+                range: `${this.phoneklSheetName}!${columns.timestamp}${actualRowNumber}`,
+                values: [[timestampWithType]]
+              });
+              
+              updateRequests.push(...updates);
+              updatedCount += updates.length;
+            }
+          } else {
+            // 다른 사용자 또는 다른 예산타입의 데이터이므로 보존
             preservedCount++;
-          }
-          
-          // 확보예산 업데이트 (기존 값이 비어있는 경우만)
-          if (this.isEmpty(existingSecuredBudget) && !this.isEmpty(newData.securedBudget)) {
-            updates.push({
-              range: `${this.phoneklSheetName}!${columns.securedBudget}${actualRowNumber}`,
-              values: [[newData.securedBudget]]
-            });
-          } else if (!this.isEmpty(existingSecuredBudget)) {
-            preservedCount++;
-          }
-          
-          // 사용예산 업데이트 (기존 값이 비어있는 경우만)
-          if (this.isEmpty(existingUsedBudget) && !this.isEmpty(newData.usedBudget)) {
-            updates.push({
-              range: `${this.phoneklSheetName}!${columns.usedBudget}${actualRowNumber}`,
-              values: [[newData.usedBudget]]
-            });
-          } else if (!this.isEmpty(existingUsedBudget)) {
-            preservedCount++;
-          }
-          
-          // 업데이트할 데이터가 있으면 요청 배열에 추가
-          if (updates.length > 0) {
-            updateRequests.push(...updates);
-            updatedCount += updates.length;
+            console.log(`🔒 [Row ${actualRowNumber}] 다른 사용자/타입 데이터 보존: ${existingOwner} vs ${currentOwnerWithType}`);
           }
         } else {
           // 새 데이터가 없는 경우: 기존 데이터 그대로 유지
