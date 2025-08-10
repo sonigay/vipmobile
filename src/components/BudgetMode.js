@@ -72,15 +72,20 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   });
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   
-  // 예산금액 설정 상태
-  const [budgetAmounts, setBudgetAmounts] = useState({
-    S군: 40000,
-    A군: 40000,
-    B군: 40000,
-    C군: 40000,
-    D군: 40000,
-    E군: 40000
-  });
+  // 예산금액 설정 상태 (예산 타입에 따라 다른 기본값)
+  const getDefaultBudgetAmounts = () => {
+    const defaultAmount = faceValueSubMenu === 'Ⅱ' ? 0 : 40000;
+    return {
+      S군: defaultAmount,
+      A군: defaultAmount,
+      B군: defaultAmount,
+      C군: defaultAmount,
+      D군: defaultAmount,
+      E군: defaultAmount
+    };
+  };
+  
+  const [budgetAmounts, setBudgetAmounts] = useState(getDefaultBudgetAmounts());
   
   // 시트 설정 관련 상태
   const [targetMonth, setTargetMonth] = useState('');
@@ -160,6 +165,23 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     loadPolicyGroupSettings();
   }, [loggedInStore]);
 
+  // 액면예산 타입 변경 시 예산금액 초기화 및 시트 목록 재로드
+  useEffect(() => {
+    setBudgetAmounts(getDefaultBudgetAmounts());
+    // 타입 변경 시 즉시 기존 목록 초기화 후 새로 로드
+    setUserSheets([]); // 기존 목록 즉시 초기화
+    if (targetMonth) {
+      loadUserSheets();
+    }
+  }, [faceValueSubMenu]);
+
+  // 대상월 변경 시 시트 목록 새로고침
+  useEffect(() => {
+    if (targetMonth) {
+      loadUserSheets();
+    }
+  }, [targetMonth]);
+
   // selectedPolicyGroups 상태 변화 모니터링
   useEffect(() => {
     console.log('selectedPolicyGroups state changed:', selectedPolicyGroups);
@@ -218,7 +240,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       const showAllUsers = faceValueSubMenu === 'Ⅰ';
       // 예산 타입별 필터링을 위해 budgetType 전달
       const budgetType = faceValueSubMenu; // 'Ⅰ', 'Ⅱ', '종합'
+      
       const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth, showAllUsers, budgetType);
+      
       setUserSheets(data);
     } catch (error) {
       console.error('사용자 시트 목록 로드 실패:', error);
@@ -1690,7 +1714,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                  <Box sx={{ mt: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
               <Typography variant="body2" sx={{ color: '#666', fontSize: '0.8rem' }}>
                 💡 <strong>사용법:</strong> 
-                <br/>• <strong>예산금액 설정:</strong> 상단 헤더에서 각 군별 예산금액을 설정할 수 있습니다 (기본값: 40,000원).
+                <br/>• <strong>예산금액 설정:</strong> 상단 헤더에서 각 군별 예산금액을 설정할 수 있습니다 (액면예산(Ⅰ): 40,000원, 액면예산(Ⅱ): 0원).
                 <br/>• <strong>직접 입력:</strong> 각 셀을 클릭하여 모델명과 지출예산 값을 직접 입력할 수 있습니다.
                 <br/>• <strong>엑셀 붙여넣기:</strong> 엑셀에서 데이터를 복사한 후 테이블 영역을 클릭하고 Ctrl+V로 붙여넣기하면 한 번에 여러 행의 데이터가 입력됩니다.
                 <br/>• <strong>저장:</strong> 데이터 입력 후 상단의 "저장" 버튼을 클릭하여 Google Sheet에 저장합니다.

@@ -16470,40 +16470,92 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     const targetSheetId = targetMonthRow[1];
     console.log(`📊 [예산종합] ${targetMonth}월 시트ID: ${targetSheetId}`);
     
-    // 폰클개통데이터에서 F, G, H열 (본인 관련 합계) 가져오기
+    // 폰클개통데이터에서 D~H열 (owner, timestamp, F, G, H) 가져오기
     const summaryDataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: targetSheetId,
-      range: '폰클개통데이터!F:H'
+      range: '폰클개통데이터!D:H'
     });
     
     const summaryData = summaryDataResponse.data.values || [];
     
-    // F, G, H열의 합계 계산 (5행부터, 본인 관련 데이터만)
+    // F, G, H열의 합계 계산 (5행부터, 본인이 입력한 데이터만)
     let totalRemainingBudget = 0; // F열: 예산잔액
     let totalSecuredBudget = 0;   // G열: 확보예산
     let totalUsedBudget = 0;      // H열: 사용예산
+    let processedRows = 0;
+    let ownRows = 0;
     
-    // TODO: 여기서 본인 관련 행만 필터링하는 로직 필요
-    // 현재는 모든 행을 합산하고 있음 - 이 부분은 별도 로직이 필요할 수 있음
+    // 대리점아이디관리에서 userId에 해당하는 실제 사용자명 조회
+    let actualUserName = '';
+    try {
+      const agentResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${AGENT_SHEET_NAME}!A:R`,
+      });
+      
+      const agentValues = agentResponse.data.values || [];
+      const agentRows = agentValues.slice(1); // 헤더 제외
+      const userAgent = agentRows.find(row => row[2] === userId); // C열: 연락처(아이디)
+      
+      if (userAgent) {
+        actualUserName = userAgent[0] || ''; // A열: 이름
+        console.log(`📊 [예산종합] 사용자명 조회: ${userId} → ${actualUserName}`);
+      } else {
+        console.log(`⚠️ [예산종합] 사용자명 조회 실패: ${userId}`);
+      }
+    } catch (error) {
+      console.error('📊 [예산종합] 사용자명 조회 오류:', error);
+    }
+    
+    console.log(`📊 [예산종합] 사용자 필터링 시작: ${userId} (${actualUserName})`);
+    
     summaryData.slice(4).forEach((row, index) => { // 5행부터 시작
-      if (row.length >= 3) {
-        // F열: 예산잔액 (공백이 아닌 경우만)
-        if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
-          const value = parseFloat(row[0]) || 0;
-          totalRemainingBudget += value;
+      if (row.length >= 5) { // D, E, F, G, H 열이 모두 있는지 확인
+        processedRows++;
+        
+        const owner = (row[0] || '').toString().trim(); // D열: 입력자
+        const timestamp = (row[1] || '').toString().trim(); // E열: 입력일시
+        const remainingValue = row[2]; // F열: 예산잔액
+        const securedValue = row[3]; // G열: 확보예산
+        const usedValue = row[4]; // H열: 사용예산
+        
+        // 본인이 입력한 데이터인지 확인
+        // owner 형식: "사용자명 (직급)(예산타입)" 예: "홍남옥 (이사)(Ⅰ)"
+        let isOwnData = false;
+        
+        if (owner !== '' && actualUserName !== '') {
+          // 정확한 사용자명으로 매칭
+          isOwnData = owner.includes(actualUserName);
+        } else if (owner !== '' && userId !== '') {
+          // Fallback: userId로 매칭 (전화번호 일부 매칭)
+          isOwnData = owner.includes(userId) || 
+                     owner.includes(userId.slice(-4)) || // 전화번호 뒷자리 4자리
+                     owner.includes(userId.slice(0, 3)); // 전화번호 앞자리 3자리
         }
-        // G열: 확보예산 (공백이 아닌 경우만)
-        if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
-          const value = parseFloat(row[1]) || 0;
-          totalSecuredBudget += value;
-        }
-        // H열: 사용예산 (공백이 아닌 경우만)
-        if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
-          const value = parseFloat(row[2]) || 0;
-          totalUsedBudget += value;
+        
+        if (isOwnData) {
+          ownRows++;
+          
+          // F열: 예산잔액 (공백이 아닌 경우만)
+          if (remainingValue !== '' && remainingValue !== undefined && remainingValue !== null) {
+            const value = parseFloat(remainingValue) || 0;
+            totalRemainingBudget += value;
+          }
+          // G열: 확보예산 (공백이 아닌 경우만)
+          if (securedValue !== '' && securedValue !== undefined && securedValue !== null) {
+            const value = parseFloat(securedValue) || 0;
+            totalSecuredBudget += value;
+          }
+          // H열: 사용예산 (공백이 아닌 경우만)
+          if (usedValue !== '' && usedValue !== undefined && usedValue !== null) {
+            const value = parseFloat(usedValue) || 0;
+            totalUsedBudget += value;
+          }
         }
       }
     });
+    
+    console.log(`📊 [예산종합] 필터링 결과: 전체=${processedRows}행, 본인=${ownRows}행, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
     
     console.log(`📊 [예산종합] F,G,H열 합계: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
     
