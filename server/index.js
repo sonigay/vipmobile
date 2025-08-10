@@ -15448,11 +15448,16 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     // 기존 시트가 없을 때만 새로 추가
     if (!existingSheet) {
       try {
-        await sheets.spreadsheets.values.append({
+        // append 대신 명시적인 행 번호 계산해서 update 사용 (덮어쓰기 방지)
+        const nextRowIndex = existingRows.length + 1; // 헤더(1행) + 기존 데이터 행 수
+        const newRowRange = `예산_사용자시트관리!A${nextRowIndex}:G${nextRowIndex}`;
+        
+        console.log(`📋 [시트생성] 새 데이터를 ${nextRowIndex}행에 추가: ${newRowRange}`);
+        
+        await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: '예산_사용자시트관리!A:G',
+          range: newRowRange,
           valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
           resource: {
             values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : '']]
           }
