@@ -15412,6 +15412,9 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     // 모든 저장은 새로운 행으로 추가 (고유성은 생성일시로 자동 보장)
     const existingSheet = null; // 항상 새로 추가하도록 수정
     
+    console.log(`📋 [시트생성] 기존 데이터 분석:`);
+    console.log(`  - 전체 행 수: ${existingRows.length}`);
+    console.log(`  - 기존 데이터:`, existingRows);
     console.log(`📋 [시트생성] 기존 시트 검색: userId=${userId}, sheetId=${targetSheetId}, sheetName=${userSheetName}, createdAt=${currentTime}, month=${targetMonth}`);
     console.log(`📋 [시트생성] 기존 시트 발견: ${existingSheet ? 'YES' : 'NO'}`);
     
