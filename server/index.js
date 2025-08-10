@@ -470,12 +470,62 @@ const auth = new google.auth.JWT({
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
-// Google Sheets API 초기화 (타임아웃 설정 포함)
-const sheets = google.sheets({ 
+// 원본 Google Sheets API 초기화 (타임아웃 설정 포함)
+const originalSheets = google.sheets({ 
   version: 'v4', 
   auth,
   timeout: 60000 // 60초 타임아웃
 });
+
+// 모든 API 호출을 추적하는 래퍼 함수
+function createTrackedSheets() {
+  return {
+    spreadsheets: {
+      values: {
+        get: async (params) => {
+          const timestamp = new Date().toISOString();
+          console.log(`🚨 [API-TRACE] GET 시작: ${timestamp} - Range: ${params.range}`);
+          const result = await originalSheets.spreadsheets.values.get(params);
+          console.log(`🚨 [API-TRACE] GET 완료: ${new Date().toISOString()} - Range: ${params.range}`);
+          return result;
+        },
+        update: async (params) => {
+          const timestamp = new Date().toISOString();
+          console.log(`🚨 [API-TRACE] UPDATE 시작: ${timestamp} - Range: ${params.range}`);
+          const result = await originalSheets.spreadsheets.values.update(params);
+          console.log(`🚨 [API-TRACE] UPDATE 완료: ${new Date().toISOString()} - Range: ${params.range}`);
+          return result;
+        },
+        append: async (params) => {
+          const timestamp = new Date().toISOString();
+          console.log(`🚨 [API-TRACE] APPEND 시작: ${timestamp} - Range: ${params.range}`);
+          const result = await originalSheets.spreadsheets.values.append(params);
+          console.log(`🚨 [API-TRACE] APPEND 완료: ${new Date().toISOString()} - Range: ${params.range}`);
+          return result;
+        },
+        batchUpdate: async (params) => {
+          const timestamp = new Date().toISOString();
+          console.log(`🚨 [API-TRACE] BATCH_UPDATE 시작: ${timestamp} - SpreadsheetId: ${params.spreadsheetId}`);
+          const result = await originalSheets.spreadsheets.values.batchUpdate(params);
+          console.log(`🚨 [API-TRACE] BATCH_UPDATE 완료: ${new Date().toISOString()} - SpreadsheetId: ${params.spreadsheetId}`);
+          return result;
+        }
+      },
+      get: async (params) => {
+        return await originalSheets.spreadsheets.get(params);
+      },
+      batchUpdate: async (params) => {
+        const timestamp = new Date().toISOString();
+        console.log(`🚨 [API-TRACE] SPREADSHEET_BATCH_UPDATE 시작: ${timestamp} - SpreadsheetId: ${params.spreadsheetId}`);
+        const result = await originalSheets.spreadsheets.batchUpdate(params);
+        console.log(`🚨 [API-TRACE] SPREADSHEET_BATCH_UPDATE 완료: ${new Date().toISOString()} - SpreadsheetId: ${params.spreadsheetId}`);
+        return result;
+      }
+    }
+  };
+}
+
+const sheets = createTrackedSheets();
 
 // 데이터 시트에서 값 가져오기 (캐싱 적용)
 async function getSheetValues(sheetName) {
