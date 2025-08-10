@@ -3639,8 +3639,10 @@ async function getUserSheetName(userName, budgetType) {
   return `액면_${actualSheetOwner}(${budgetType}) (${userQualification})`;
 }
 
-// 예산 매칭 계산 함수
+// 예산 매칭 계산 함수 (기존 로직 기반으로 정확히 구현)
 async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyGroups, dateRange, budgetType) {
+  console.log(`🧮 [performBudgetMatching] 시작: 정책그룹=${selectedPolicyGroups.join(',')}, 예산타입=${budgetType}`);
+  
   const calculationResults = [];
   const dataMapping = {};
   
@@ -3649,49 +3651,153 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   let totalRemainingBudget = 0;
   let processedRows = 0;
   let matchedItems = 0;
+  let policyGroupFiltered = 0;
+  let dateRangeFiltered = 0;
+  let modelMismatch = 0;
   
-  // 헤더 확인 (5행부터 시작)
-  const dataStartRow = 4; // 0-based index
+  // 헤더 확인 (5행부터 시작) - 기존 로직과 동일
+  const dataStartRow = 4; // 0-based index (실제 5행)
   
-  for (let rowIndex = dataStartRow; rowIndex < phoneklData.length; rowIndex++) {
-    const phoneklRow = phoneklData[rowIndex];
-    if (!phoneklRow || phoneklRow.length === 0) continue;
+  // C5행부터 데이터 처리 (기존 로직과 동일한 방식)
+  const activationRows = phoneklData.slice(dataStartRow);
+  
+  activationRows.forEach((row, index) => {
+    const actualRowNumber = 5 + index; // C5, C6, C7, C8...
     
-    processedRows++;
-    
-    // 각 행에 대해 사용자 시트 데이터와 매칭
-    const matchingUserData = findMatchingUserData(phoneklRow, userSheetData, selectedPolicyGroups, dateRange);
-    
-    if (matchingUserData) {
-      matchedItems++;
+    if (row.length >= 33) { // AG열까지 접근하므로 최소 33개 컬럼 필요
+      processedRows++;
       
-      const securedBudget = parseFloat(matchingUserData.securedBudget) || 0;
-      const usedBudget = parseFloat(matchingUserData.usedBudget) || 0;
-      const remainingBudget = securedBudget - usedBudget;
+      const policyGroup = row[15]; // P열: 정책그룹
+      const armyType = row[14]; // O열: 정책군
+      const categoryType = row[30]; // AE열: 유형
+      const currentBudgetValue = parseFloat(row[13]) || 0; // N열: 현재 예산값
       
-      totalSecuredBudget += securedBudget;
-      totalUsedBudget += usedBudget;
+      console.log(`📊 [Row ${actualRowNumber}] 정책그룹=${policyGroup}, 군=${armyType}, 유형=${categoryType}`);
+      
+      // 1. 정책그룹 매칭 확인
+      if (!selectedPolicyGroups.includes(policyGroup)) {
+        policyGroupFiltered++;
+        console.log(`🚫 [Row ${actualRowNumber}] 정책그룹 불일치: ${policyGroup} not in [${selectedPolicyGroups.join(',')}]`);
+        return;
+      }
+      
+      console.log(`✅ [Row ${actualRowNumber}] 정책그룹 매칭: ${policyGroup}`);
+      
+      // 2. 날짜 범위 필터링
+      let isInDateRange = true;
+      if (dateRange) {
+        const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일
+        const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일
+        
+        if (dateRange.receiptStartDate && dateRange.receiptEndDate) {
+          const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
+          isInDateRange = isInDateRange && receptionInRange;
+        }
+        
+        if (dateRange.activationStartDate && dateRange.activationEndDate) {
+          const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
+          isInDateRange = isInDateRange && activationInRange;
+        }
+      }
+      
+      if (!isInDateRange) {
+        dateRangeFiltered++;
+        console.log(`🚫 [Row ${actualRowNumber}] 날짜 범위 불일치`);
+        return;
+      }
+      
+      console.log(`✅ [Row ${actualRowNumber}] 날짜 범위 통과`);
+      
+      // 3. 정책군 매핑 (기존 로직과 동일)
+      let mappedArmyType = '';
+      if (armyType === 'S') mappedArmyType = 'S군';
+      else if (armyType === 'A') mappedArmyType = 'A군';
+      else if (armyType === 'B') mappedArmyType = 'B군';
+      else if (armyType === 'C') mappedArmyType = 'C군';
+      else if (armyType === 'D') mappedArmyType = 'D군';
+      else if (armyType === 'E') mappedArmyType = 'E군';
+      else mappedArmyType = armyType;
+      
+      // 4. 유형 매핑 (기존 로직과 동일)
+      let mappedCategoryType = categoryType;
+      if (categoryType === '신규') mappedCategoryType = '신규';
+      else if (categoryType === 'MNP') mappedCategoryType = 'MNP';
+      else if (categoryType === '보상') mappedCategoryType = '보상';
+      else if (categoryType === '기변') mappedCategoryType = '보상';
+      else mappedCategoryType = categoryType;
+      
+      // 5. 사용자 시트 데이터에서 매칭 찾기
+      const activationModelName = row[32]; // AG열: 모델명
+      let calculatedBudgetValue = 0;
+      let securedBudgetValue = 0;
+      let matchFound = false;
+      
+      console.log(`🔍 [Row ${actualRowNumber}] 매칭 검색: 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
+      
+      // 헤더 제외하고 예산 데이터에서 매칭
+      if (userSheetData.length > 1) {
+        for (let i = 1; i < userSheetData.length; i++) {
+          const budgetRow = userSheetData[i];
+          if (budgetRow.length >= 12) {
+            const budgetModelName = budgetRow[5]; // F열: 모델명
+            const budgetArmyType = budgetRow[6]; // G열: 군
+            const budgetCategoryType = budgetRow[7]; // H열: 유형
+            const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산
+            const budgetSecuredAmount = parseFloat(budgetRow[8]) || 0; // I열: 확보 예산
+            
+            // 모델명, 군, 유형이 모두 일치하는 경우
+            if (budgetModelName === activationModelName && 
+                budgetArmyType === mappedArmyType && 
+                budgetCategoryType === mappedCategoryType) {
+              
+              calculatedBudgetValue = budgetUsedAmount;
+              securedBudgetValue = budgetSecuredAmount;
+              matchFound = true;
+              matchedItems++;
+              
+              console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!matchFound) {
+        modelMismatch++;
+        console.log(`❌ [Row ${actualRowNumber}] 매칭 실패: 모델=${activationModelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
+        return;
+      }
+      
+      // 6. 계산 결과 저장
+      const remainingBudget = securedBudgetValue - calculatedBudgetValue;
+      
+      totalSecuredBudget += securedBudgetValue;
+      totalUsedBudget += calculatedBudgetValue;
       totalRemainingBudget += remainingBudget;
-      
-      // 실제 Google Sheets 행 번호 (1-based)
-      const actualRowNumber = rowIndex + 1;
       
       dataMapping[actualRowNumber] = {
         remainingBudget,
-        securedBudget,
-        usedBudget
+        securedBudget: securedBudgetValue,
+        usedBudget: calculatedBudgetValue
       };
       
       calculationResults.push({
-        rowIndex,
+        rowIndex: index + dataStartRow,
         actualRowNumber,
         calculatedBudgetValue: remainingBudget,
-        securedBudgetValue: securedBudget,
-        usedBudgetValue: usedBudget,
-        matchingData: matchingUserData
+        securedBudgetValue,
+        usedBudgetValue: calculatedBudgetValue,
+        matchingData: {
+          policyGroup,
+          armyType: mappedArmyType,
+          categoryType: mappedCategoryType,
+          modelName: activationModelName
+        }
       });
     }
-  }
+  });
+  
+  console.log(`📈 [performBudgetMatching] 완료: 처리=${processedRows}, 매칭=${matchedItems}, 정책그룹필터=${policyGroupFiltered}, 날짜필터=${dateRangeFiltered}, 모델불일치=${modelMismatch}`);
   
   return {
     dataMapping,
@@ -3700,29 +3806,16 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     totalUsedBudget,
     totalRemainingBudget,
     processedRows,
-    matchedItems
+    matchedItems,
+    statistics: {
+      policyGroupFiltered,
+      dateRangeFiltered,
+      modelMismatch
+    }
   };
 }
 
-// 매칭 데이터 찾기 함수 (간소화된 버전)
-function findMatchingUserData(phoneklRow, userSheetData, selectedPolicyGroups, dateRange) {
-  // 간단한 매칭 로직 - 필요에 따라 확장 가능
-  // 여기서는 선택된 정책그룹에 따라 기본 예산값 반환
-  
-  if (userSheetData.length > 0) {
-    // 첫 번째 유효한 사용자 시트 데이터 반환 (실제로는 더 복잡한 매칭 로직 필요)
-    const validData = userSheetData.find(row => row && row.length >= 11);
-    if (validData) {
-      return {
-        securedBudget: parseFloat(validData[8]) || 0, // I열
-        usedBudget: parseFloat(validData[9]) || 0,     // J열
-        remainingBudget: parseFloat(validData[10]) || 0 // K열
-      };
-    }
-  }
-  
-  return null;
-}
+// findMatchingUserData 함수는 제거됨 - performBudgetMatching에서 직접 처리
 
 // 안전한 계산 전용 함수 (실제 업데이트 없이 계산만 수행)
 async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
@@ -15476,41 +15569,55 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
-        // 폰클개통데이터에서 해당 시트의 합계 계산
-        let phoneklRange;
-        if (budgetType === 'Ⅰ') {
-          phoneklRange = '폰클개통데이터!L:N'; // L, M, N열
-        } else {
-          phoneklRange = '폰클개통데이터!I:K'; // I, J, K열
-        }
+        // 실제 정책그룹별 정확한 계산 수행
+        console.log(`📊 [NEW-API] ${sheet.sheetName} 정책그룹별 계산 시작`);
         
-        const activationDataResponse = await sheets_api.spreadsheets.values.get({
-          spreadsheetId: sheet.sheetId,
-          range: phoneklRange
-        });
-        
-        const activationData = activationDataResponse.data.values || [];
-        let totalRemainingBudget = 0;
-        let totalSecuredBudget = 0;
-        let totalUsedBudget = 0;
-        
-        activationData.slice(4).forEach((row) => {
-          if (row.length >= 3) {
-            if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
-              totalRemainingBudget += parseFloat(row[0]) || 0;
-            }
-            if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
-              totalSecuredBudget += parseFloat(row[1]) || 0;
-            }
-            if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
-              totalUsedBudget += parseFloat(row[2]) || 0;
-            }
+        try {
+          // 사용자 시트 데이터 읽기 
+          const userSheetRange = `${sheet.sheetName}!A2:L`;
+          const userSheetResponse = await sheets_api.spreadsheets.values.get({
+            spreadsheetId: sheet.sheetId,
+            range: userSheetRange
+          });
+          const userSheetData = userSheetResponse.data.values || [];
+          
+          // 폰클개통데이터 읽기
+          const phoneklResponse = await sheets_api.spreadsheets.values.get({
+            spreadsheetId: sheet.sheetId,
+            range: '폰클개통데이터!A:AG'
+          });
+          const phoneklData = phoneklResponse.data.values || [];
+          
+          // 저장된 정책그룹 파싱
+          const selectedPolicyGroups = sheet.selectedPolicyGroups ? 
+            sheet.selectedPolicyGroups.split(',').map(g => g.trim()) : [];
+          
+          console.log(`📊 [NEW-API] ${sheet.sheetName} 정책그룹: [${selectedPolicyGroups.join(', ')}]`);
+          
+          if (selectedPolicyGroups.length > 0 && userSheetData.length > 0) {
+            // 정확한 매칭 계산 수행
+            const calculationResult = await performBudgetMatching(
+              userSheetData,
+              phoneklData,
+              selectedPolicyGroups,
+              sheet.dateRange,
+              budgetType
+            );
+            
+            summary.totalRemainingBudget = calculationResult.totalRemainingBudget;
+            summary.totalSecuredBudget = calculationResult.totalSecuredBudget;
+            summary.totalUsedBudget = calculationResult.totalUsedBudget;
+            summary.itemCount = calculationResult.matchedItems;
+            
+            console.log(`✅ [NEW-API] ${sheet.sheetName} 계산 완료: 확보=${calculationResult.totalSecuredBudget}, 사용=${calculationResult.totalUsedBudget}, 잔액=${calculationResult.totalRemainingBudget}, 매칭=${calculationResult.matchedItems}개`);
+          } else {
+            console.log(`⚠️ [NEW-API] ${sheet.sheetName} 정책그룹 또는 사용자 데이터 없음`);
+            // 기본값 유지 (0, 0, 0)
           }
-        });
-        
-        summary.totalRemainingBudget = totalRemainingBudget;
-        summary.totalSecuredBudget = totalSecuredBudget;
-        summary.totalUsedBudget = totalUsedBudget;
+        } catch (calcError) {
+          console.error(`❌ [NEW-API] ${sheet.sheetName} 계산 실패:`, calcError);
+          // 기본값 유지 (0, 0, 0)
+        }
         
         // 날짜 범위 설정
         if (sheet.dateRange.receiptStartDate) {
