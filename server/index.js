@@ -3625,18 +3625,54 @@ function isDateInRange(date, startDate, endDate) {
 
 // 사용자 시트명 가져오기 헬퍼 함수
 async function getUserSheetName(userName, budgetType) {
-  // 사용자 qualification 조회
-  const agentResponse = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${AGENT_SHEET_NAME}!A:R`
-  });
+  try {
+    // 실제 생성된 시트명을 예산_사용자시트관리에서 조회 (1순위)
+    const userSheetManagementResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_사용자시트관리!A:G'
+    });
+    
+    const userSheetManagementData = userSheetManagementResponse.data.values || [];
+    if (userSheetManagementData.length > 1) {
+      const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim();
+      // 헤더 제외하고 해당 사용자의 예산타입별 시트명 찾기
+      for (let i = 1; i < userSheetManagementData.length; i++) {
+        const row = userSheetManagementData[i];
+        if (row.length >= 3) {
+          const sheetName = row[2]; // C열: 시트명
+          // 시트명 패턴 매칭: 액면_김기송(Ⅰ) (이사)
+          const pattern = new RegExp(`^액면_${actualSheetOwner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\(${budgetType}\\)\\s*\\([^)]+\\)$`);
+          if (pattern.test(sheetName)) {
+            console.log(`🎯 [getUserSheetName] 실제 시트명 발견: ${sheetName}`);
+            return sheetName;
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[getUserSheetName] 예산_사용자시트관리 조회 실패:', error);
+  }
   
-  const agentValues = agentResponse.data.values || [];
-  const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim(); // 괄호 부분 제거
-  const agentRow = agentValues.find(row => row[1] === actualSheetOwner); // B열에서 이름 찾기
-  const userQualification = agentRow ? agentRow[1] : '이사'; // B열의 qualification, 기본값 '이사'
-  
-  return `액면_${actualSheetOwner}(${budgetType}) (${userQualification})`;
+  // Fallback: 현재 직급으로 시트명 생성 (2순위)
+  try {
+    const agentResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${AGENT_SHEET_NAME}!A:R`
+    });
+    
+    const agentValues = agentResponse.data.values || [];
+    const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim();
+    const agentRow = agentValues.find(row => row[0] === actualSheetOwner); // A열에서 이름 찾기 (수정됨)
+    const userQualification = agentRow ? agentRow[1] : '이사'; // B열의 qualification
+    
+    const fallbackSheetName = `액면_${actualSheetOwner}(${budgetType}) (${userQualification})`;
+    console.log(`🎯 [getUserSheetName] Fallback 시트명: ${fallbackSheetName}`);
+    return fallbackSheetName;
+  } catch (error) {
+    console.error('[getUserSheetName] 대리점아이디관리 조회 실패:', error);
+    const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim();
+    return `액면_${actualSheetOwner}(${budgetType}) (이사)`;
+  }
 }
 
 // 예산 매칭 계산 함수 (기존 로직 기반으로 정확히 구현)
