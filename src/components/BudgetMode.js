@@ -715,6 +715,51 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   };
 
+  // 본인 시트 확인 함수
+  const isOwnSheet = (sheet) => {
+    const currentUserId = loggedInStore?.id || loggedInStore?.agentInfo?.id;
+    const currentUserName = loggedInStore?.name || loggedInStore?.agentInfo?.name;
+    
+    // userId 또는 작성자 이름으로 비교
+    return sheet.userId === currentUserId || 
+           sheet.createdBy === currentUserName ||
+           sheet.userName === currentUserName ||
+           sheet.creator === currentUserName;
+  };
+
+  // 사용자 시트 삭제 함수
+  const handleDeleteUserSheet = async (sheet) => {
+    if (!sheet.uuid) {
+      setSnackbar({ open: true, message: '삭제할 수 없는 시트입니다. (UUID 없음)', severity: 'error' });
+      return;
+    }
+
+    const confirmed = window.confirm(`정말로 시트 "${sheet.name}"을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`);
+    if (!confirmed) return;
+
+    try {
+      const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id;
+      await budgetUserSheetAPI.deleteUserSheet(sheet.uuid, userId);
+      
+      setSnackbar({ 
+        open: true, 
+        message: `시트 "${sheet.name}"이 성공적으로 삭제되었습니다.`, 
+        severity: 'success' 
+      });
+      
+      // 목록 새로고침
+      await loadUserSheets();
+      
+    } catch (error) {
+      console.error('시트 삭제 실패:', error);
+      setSnackbar({ 
+        open: true, 
+        message: `시트 삭제에 실패했습니다: ${error.message}`, 
+        severity: 'error' 
+      });
+    }
+  };
+
   // 자동 저장 함수
   const autoSaveToUserSheet = async (data) => {
     try {
@@ -1707,7 +1752,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <TableBody>
                   {userSheets.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
+                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3, color: '#666' }}>
                         저장된 데이터가 없습니다.
                       </TableCell>
                     </TableRow>
@@ -1749,7 +1794,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           }
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                             {faceValueSubMenu === 'Ⅰ' && (
                               <Button
                                 size="small"
@@ -1768,6 +1813,25 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             >
                               불러오기
                             </Button>
+                            {/* 작성자 본인만 삭제 가능 */}
+                            {sheet.uuid && isOwnSheet(sheet) && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleDeleteUserSheet(sheet)}
+                                sx={{ 
+                                  fontSize: '0.7rem', 
+                                  borderColor: '#d32f2f', 
+                                  color: '#d32f2f',
+                                  '&:hover': {
+                                    backgroundColor: '#ffebee',
+                                    borderColor: '#d32f2f'
+                                  }
+                                }}
+                              >
+                                삭제
+                              </Button>
+                            )}
                           </Box>
                         </TableCell>
                         </TableRow>

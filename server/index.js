@@ -8,6 +8,7 @@ const ExcelJS = require('exceljs');
 const monthlyAwardAPI = require('./monthlyAwardAPI');
 const setupTeamRoutes = require('./teamRoutes');
 const UserSheetManager = require('./UserSheetManager');
+const PhoneklDataManager = require('./PhoneklDataManager');
 
 // 기본 설정
 const app = express();
@@ -478,8 +479,9 @@ const originalSheets = google.sheets({
   timeout: 60000 // 60초 타임아웃
 });
 
-// UserSheetManager 인스턴스 생성
+// UserSheetManager 및 PhoneklDataManager 인스턴스 생성
 const userSheetManager = new UserSheetManager(originalSheets, SPREADSHEET_ID);
+const phoneklDataManager = new PhoneklDataManager(originalSheets, SPREADSHEET_ID);
 
 // 모든 API 호출을 추적하는 래퍼 함수
 function createTrackedSheets() {
@@ -3621,7 +3623,23 @@ function isDateInRange(date, startDate, endDate) {
   return targetDate >= start && targetDate <= end;
 }
 
-// 사용예산 계산 함수
+// 안전한 계산 전용 함수 (실제 업데이트 없이 계산만 수행)
+async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
+  console.log('🧮 [DRY-RUN] calculateUsageBudgetDryRun 시작 - 사용자:', userName);
+  
+  try {
+    // 동일한 계산 로직 수행하되 실제 Google Sheets 업데이트는 제외
+    const result = await performBudgetCalculation(sheetId, selectedPolicyGroups, dateRange, userName, budgetType, false);
+    
+    console.log('✅ [DRY-RUN] 계산 완료 - 업데이트 없이 결과만 반환');
+    return result;
+  } catch (error) {
+    console.error('❌ [DRY-RUN] 계산 실패:', error);
+    throw error;
+  }
+}
+
+// 기존 사용예산 계산 함수 (레거시)
 async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
   const sheets = google.sheets({ version: 'v4', auth });
   
@@ -15143,7 +15161,58 @@ async function ensureUserSheetManagementExists(sheets) {
   }
 }
 
-// 사용자별 예산 시트의 사용예산을 폰클개통데이터에서 업데이트하는 API
+// 새로운 안전한 폰클개통데이터 업데이트 API
+app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) => {
+  console.log('🔒 [SAFE-UPDATE] POST /api/budget/user-sheets/:sheetId/update-usage-safe 호출됨!');
+  try {
+    const { sheetId } = req.params;
+    const { selectedPolicyGroups, dateRange, userName, budgetType } = req.body;
+    
+    if (!selectedPolicyGroups || !Array.isArray(selectedPolicyGroups)) {
+      return res.status(400).json({ error: '선택된 정책그룹이 필요합니다.' });
+    }
+    
+    // 사용자 정보 설정
+    const userInfo = {
+      userName: userName || 'Unknown',
+      budgetType: budgetType || 'Ⅰ',
+      selectedPolicyGroups
+    };
+    
+    console.log(`🔒 [SAFE-UPDATE] 처리 시작: 사용자=${userInfo.userName}, 타입=${userInfo.budgetType}`);
+    
+    // 1. 기존 calculateUsageBudget 함수로 계산 수행 (실제 업데이트는 하지 않음)
+    const calculatedResult = await calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRange, userName, budgetType);
+    
+    // 2. PhoneklDataManager를 사용하여 안전한 업데이트
+    const updateResult = await phoneklDataManager.safeUpdateData(
+      sheetId, 
+      budgetType, 
+      calculatedResult.dataMapping, 
+      userInfo
+    );
+    
+    console.log(`✅ [SAFE-UPDATE] 완료: ${updateResult.message}`);
+    
+    res.json({
+      message: '폰클개통데이터가 안전하게 업데이트되었습니다.',
+      result: updateResult,
+      calculationSummary: {
+        totalSecuredBudget: calculatedResult.totalSecuredBudget,
+        totalUsedBudget: calculatedResult.totalUsedBudget,
+        totalRemainingBudget: calculatedResult.totalRemainingBudget,
+        processedRows: calculatedResult.processedRows,
+        matchedItems: calculatedResult.matchedItems
+      }
+    });
+    
+  } catch (error) {
+    console.error('[SAFE-UPDATE] 안전 업데이트 오류:', error);
+    res.status(500).json({ error: '안전 업데이트 중 오류가 발생했습니다: ' + error.message });
+  }
+});
+
+// 기존 API (레거시)
 app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
   try {
     const { sheetId } = req.params;
