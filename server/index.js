@@ -3722,7 +3722,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           else mappedCategoryType = categoryType; // 기타 경우 그대로 사용
 
           if (index < 10) {
-            // 매칭 조건 확인
+            // 매칭 조건 확인 (디버그용)
+          }
           
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
