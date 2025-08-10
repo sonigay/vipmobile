@@ -80,12 +80,21 @@ class PhoneklDataManager {
         const currentRow = currentData[rowIndex];
         const actualRowNumber = rowIndex + 1; // Google Sheets 행 번호 (1-based)
         
-        // D열부터 읽었으므로 인덱스 조정 (D=0, E=1, ..., L=8, M=9, N=10)
+        // D열부터 읽었으므로 인덱스 조정
         const existingOwner = currentRow?.[0] || ''; // D열: 입력자
         const existingTimestamp = currentRow?.[1] || ''; // E열: 입력일시
-        const existingRemainingBudget = currentRow?.[8] || ''; // L열: 예산잔액 (D열부터 8번째)
-        const existingSecuredBudget = currentRow?.[9] || ''; // M열: 확보예산 (D열부터 9번째)
-        const existingUsedBudget = currentRow?.[10] || ''; // N열: 사용예산 (D열부터 10번째)
+        
+        // 예산타입에 따른 컬럼 인덱스 결정 (D열부터 0-based)
+        let existingRemainingBudget, existingSecuredBudget, existingUsedBudget;
+        if (budgetType === 'Ⅱ') {
+          existingRemainingBudget = currentRow?.[5] || ''; // I열: 예산잔액 (D열부터 5번째)
+          existingSecuredBudget = currentRow?.[6] || ''; // J열: 확보예산 (D열부터 6번째)
+          existingUsedBudget = currentRow?.[7] || ''; // K열: 사용예산 (D열부터 7번째)
+        } else {
+          existingRemainingBudget = currentRow?.[8] || ''; // L열: 예산잔액 (D열부터 8번째)
+          existingSecuredBudget = currentRow?.[9] || ''; // M열: 확보예산 (D열부터 9번째)
+          existingUsedBudget = currentRow?.[10] || ''; // N열: 사용예산 (D열부터 10번째)
+        }
         
         // 해당 행에 매핑된 새 데이터가 있는지 확인
         const newData = newDataMap[actualRowNumber];
@@ -94,8 +103,12 @@ class PhoneklDataManager {
           // 예산타입을 포함한 소유권 식별자 생성
           const currentOwnerWithType = `${userInfo.userName}(${userInfo.budgetType})`;
           
-          // 소유권 확인: 비어있거나 같은 사용자+예산타입인 경우만 업데이트
-          const canUpdate = this.isEmpty(existingOwner) || existingOwner === currentOwnerWithType;
+          // 소유권 확인: 해당 예산타입의 셀들이 비어있거나 같은 사용자+예산타입인 경우만 업데이트
+          const budgetCellsEmpty = this.isEmpty(existingRemainingBudget) && 
+                                   this.isEmpty(existingSecuredBudget) && 
+                                   this.isEmpty(existingUsedBudget);
+          const sameOwner = existingOwner === currentOwnerWithType;
+          const canUpdate = budgetCellsEmpty || sameOwner;
           
           if (canUpdate) {
             const updates = [];
