@@ -3661,11 +3661,19 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   // C5행부터 데이터 처리 (기존 로직과 동일한 방식)
   const activationRows = phoneklData.slice(dataStartRow);
   
+  console.log(`🔍 [DEBUG] 전체 데이터: ${phoneklData.length}행, 처리 대상: ${activationRows.length}행, 시작 인덱스: ${dataStartRow}`);
+  console.log(`🔍 [DEBUG] 첫 번째 처리 행 예시:`, activationRows[0]);
+  
   activationRows.forEach((row, index) => {
     const actualRowNumber = 5 + index; // C5, C6, C7, C8...
     
     if (row.length >= 33) { // AG열까지 접근하므로 최소 33개 컬럼 필요
       processedRows++;
+      
+      // 처음 5개 행만 디버깅 로그
+      if (index < 5) {
+        console.log(`🔍 [DEBUG-ROW-${actualRowNumber}] 컬럼 수: ${row.length}, P열(정책그룹): "${row[15]}", O열(정책군): "${row[14]}", AE열(유형): "${row[30]}", AG열(모델): "${row[32]}"`);
+      }
       
       const policyGroup = row[15]; // P열: 정책그룹
       const armyType = row[14]; // O열: 정책군
