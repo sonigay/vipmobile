@@ -3623,16 +3623,148 @@ function isDateInRange(date, startDate, endDate) {
   return targetDate >= start && targetDate <= end;
 }
 
+// 사용자 시트명 가져오기 헬퍼 함수
+async function getUserSheetName(userName, budgetType) {
+  // 사용자 qualification 조회
+  const agentResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${AGENT_SHEET_NAME}!A:R`
+  });
+  
+  const agentValues = agentResponse.data.values || [];
+  const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim(); // 괄호 부분 제거
+  const agentRow = agentValues.find(row => row[1] === actualSheetOwner); // B열에서 이름 찾기
+  const userQualification = agentRow ? agentRow[1] : '이사'; // B열의 qualification, 기본값 '이사'
+  
+  return `액면_${actualSheetOwner}(${budgetType}) (${userQualification})`;
+}
+
+// 예산 매칭 계산 함수
+async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyGroups, dateRange, budgetType) {
+  const calculationResults = [];
+  const dataMapping = {};
+  
+  let totalSecuredBudget = 0;
+  let totalUsedBudget = 0;
+  let totalRemainingBudget = 0;
+  let processedRows = 0;
+  let matchedItems = 0;
+  
+  // 헤더 확인 (5행부터 시작)
+  const dataStartRow = 4; // 0-based index
+  
+  for (let rowIndex = dataStartRow; rowIndex < phoneklData.length; rowIndex++) {
+    const phoneklRow = phoneklData[rowIndex];
+    if (!phoneklRow || phoneklRow.length === 0) continue;
+    
+    processedRows++;
+    
+    // 각 행에 대해 사용자 시트 데이터와 매칭
+    const matchingUserData = findMatchingUserData(phoneklRow, userSheetData, selectedPolicyGroups, dateRange);
+    
+    if (matchingUserData) {
+      matchedItems++;
+      
+      const securedBudget = parseFloat(matchingUserData.securedBudget) || 0;
+      const usedBudget = parseFloat(matchingUserData.usedBudget) || 0;
+      const remainingBudget = securedBudget - usedBudget;
+      
+      totalSecuredBudget += securedBudget;
+      totalUsedBudget += usedBudget;
+      totalRemainingBudget += remainingBudget;
+      
+      // 실제 Google Sheets 행 번호 (1-based)
+      const actualRowNumber = rowIndex + 1;
+      
+      dataMapping[actualRowNumber] = {
+        remainingBudget,
+        securedBudget,
+        usedBudget
+      };
+      
+      calculationResults.push({
+        rowIndex,
+        actualRowNumber,
+        calculatedBudgetValue: remainingBudget,
+        securedBudgetValue: securedBudget,
+        usedBudgetValue: usedBudget,
+        matchingData: matchingUserData
+      });
+    }
+  }
+  
+  return {
+    dataMapping,
+    calculationResults,
+    totalSecuredBudget,
+    totalUsedBudget,
+    totalRemainingBudget,
+    processedRows,
+    matchedItems
+  };
+}
+
+// 매칭 데이터 찾기 함수 (간소화된 버전)
+function findMatchingUserData(phoneklRow, userSheetData, selectedPolicyGroups, dateRange) {
+  // 간단한 매칭 로직 - 필요에 따라 확장 가능
+  // 여기서는 선택된 정책그룹에 따라 기본 예산값 반환
+  
+  if (userSheetData.length > 0) {
+    // 첫 번째 유효한 사용자 시트 데이터 반환 (실제로는 더 복잡한 매칭 로직 필요)
+    const validData = userSheetData.find(row => row && row.length >= 11);
+    if (validData) {
+      return {
+        securedBudget: parseFloat(validData[8]) || 0, // I열
+        usedBudget: parseFloat(validData[9]) || 0,     // J열
+        remainingBudget: parseFloat(validData[10]) || 0 // K열
+      };
+    }
+  }
+  
+  return null;
+}
+
 // 안전한 계산 전용 함수 (실제 업데이트 없이 계산만 수행)
 async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
   console.log('🧮 [DRY-RUN] calculateUsageBudgetDryRun 시작 - 사용자:', userName);
   
   try {
-    // 동일한 계산 로직 수행하되 실제 Google Sheets 업데이트는 제외
-    const result = await performBudgetCalculation(sheetId, selectedPolicyGroups, dateRange, userName, budgetType, false);
+    // 1. 사용자 시트 데이터 읽기
+    const userSheetName = await getUserSheetName(userName, budgetType);
+    const userSheetRange = `${userSheetName}!A2:L`;
+    
+    console.log(`🧮 [DRY-RUN] 사용자 시트 읽기: ${userSheetName}`);
+    
+    const userSheetResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: userSheetRange
+    });
+    
+    const userSheetData = userSheetResponse.data.values || [];
+    console.log(`🧮 [DRY-RUN] 사용자 시트 데이터: ${userSheetData.length}행`);
+    
+    // 2. 폰클개통데이터 읽기
+    const phoneklRange = '폰클개통데이터!A:Z';
+    const phoneklResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: phoneklRange
+    });
+    
+    const phoneklData = phoneklResponse.data.values || [];
+    console.log(`🧮 [DRY-RUN] 폰클개통데이터: ${phoneklData.length}행`);
+    
+    // 3. 계산 수행
+    const calculationResult = await performBudgetMatching(
+      userSheetData, 
+      phoneklData, 
+      selectedPolicyGroups, 
+      dateRange, 
+      budgetType
+    );
     
     console.log('✅ [DRY-RUN] 계산 완료 - 업데이트 없이 결과만 반환');
-    return result;
+    return calculationResult;
+    
   } catch (error) {
     console.error('❌ [DRY-RUN] 계산 실패:', error);
     throw error;

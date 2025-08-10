@@ -629,8 +629,23 @@ export const budgetUserSheetAPI = {
     return response.json();
   },
 
-  // 사용자 시트의 사용예산을 폰클개통데이터에서 업데이트
+  // 사용자 시트의 사용예산을 폰클개통데이터에서 안전하게 업데이트
   updateUserSheetUsage: async (sheetId, selectedPolicyGroups, dateRange, userName, budgetType) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/update-usage-safe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ selectedPolicyGroups, dateRange, userName, budgetType }),
+    });
+    if (!response.ok) {
+      throw new Error(`사용예산 업데이트 실패: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  // 레거시 사용예산 업데이트 (필요시 사용)
+  updateUserSheetUsageLegacy: async (sheetId, selectedPolicyGroups, dateRange, userName, budgetType) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/update-usage`, {
       method: 'POST',
       headers: {
