@@ -3571,10 +3571,7 @@ function isDateInRange(date, startDate, endDate) {
 async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
   const sheets = google.sheets({ version: 'v4', auth });
   
-  console.log('🔍 [calculateUsageBudget] 시작');
-  console.log('📋 선택된 정책그룹:', selectedPolicyGroups);
-  console.log('📅 날짜 범위:', dateRange);
-  console.log('👤 사용자:', userName);
+  console.log('🔍 [calculateUsageBudget] 시작 - 사용자:', userName);
   
   // 사용자별 예산 데이터 가져오기 - 시트 목록에서 해당 사용자의 시트 찾기
   const baseUserName = userName.replace(/\([^)]+\)/, '').trim(); // 모든 괄호 내용 제거
@@ -3606,11 +3603,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     });
     const sheetsList = sheetsListResponse.data.sheets || [];
     
-    // 디버깅: 모든 시트 목록 출력
-    console.log('📋 전체 시트 목록:');
-    sheetsList.forEach(sheet => {
-      console.log(`  - ${sheet.properties.title}`);
-    });
+    // 시트 목록에서 사용자 시트 찾기
     
     // budgetType을 사용하여 정확한 시트 이름 매칭
     const expectedSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
@@ -3641,10 +3634,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     if (budgetData.length === 0) {
       console.warn('⚠️ [calculateUsageBudget] 사용자 시트 데이터가 비어 있습니다. (헤더 포함 0행)');
     } else {
-      console.log(`🪪 [calculateUsageBudget] 헤더: ${JSON.stringify(budgetData[0] || [])}`);
-      if (budgetData.length > 1) {
-        console.log(`🔎 [calculateUsageBudget] 샘플 1행: ${JSON.stringify(budgetData[1] || [])}`);
-      }
+      // 헤더 정보 확인
     }
   } catch (error) {
     console.warn(`사용자 시트 ${userSheetName}에서 예산 데이터를 가져올 수 없습니다:`, error.message);
@@ -3699,9 +3689,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       
       // 정책그룹 매칭
       if (!selectedPolicyGroups.includes(policyGroup)) {
-        if (index < 10) {
-          console.log(`🚫 [calculateUsageBudget] 정책그룹 불일치 [행${actualRowNumber}] policyGroup='${policyGroup}'`);
-        }
+        // 정책그룹 불일치로 제외
       }
       if (selectedPolicyGroups.includes(policyGroup)) {
         // 날짜 범위 필터링 - 새로운 4개 날짜 컬럼 사용
@@ -3712,9 +3700,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.startDate, dateRange.endDate) : false;
           isInDateRange = receptionInRange || activationInRange;
         }
-        if (!isInDateRange && index < 10) {
-          console.log(`🕒 [calculateUsageBudget] 날짜범위 제외 [행${actualRowNumber}] 접수일=${receptionDate}, 개통일=${activationDate}`);
-        }
+        // 날짜 범위 제외
         
         if (isInDateRange) {
           // 정책군 매핑 (S, A, B, C, D, E 모두 매핑)
@@ -3736,9 +3722,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           else mappedCategoryType = categoryType; // 기타 경우 그대로 사용
 
           if (index < 10) {
-            const activationModelNamePreview = row[32];
-            console.log(`🔗 [calculateUsageBudget] 후보 [행${actualRowNumber}] 그룹='${policyGroup}', 모델='${activationModelNamePreview}', 군='${armyType}->${mappedArmyType}', 유형='${categoryType}->${mappedCategoryType}'`);
-          }
+            // 매칭 조건 확인
           
           // 사용자별 예산 데이터에서 해당하는 사용 예산 찾기
           let calculatedBudgetValue = 0; // 기본값 0원
@@ -3914,15 +3898,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     }
   });
   
-  // 통계 출력
-  console.log('📊 [calculateUsageBudget] 통계:');
-  console.log(`  - 총 처리 행: ${activationRows.length - 1}`);
-  console.log(`  - 정책그룹 제외: ${policyGroupFiltered}`);
-  console.log(`  - 날짜 범위 제외: ${dateRangeFiltered}`);
-  console.log(`  - 모델명 불일치: ${modelMismatch}`);
-  console.log(`  - 정책군 불일치: ${armyTypeMismatch}`);
-  console.log(`  - 유형 불일치: ${categoryTypeMismatch}`);
-  console.log(`  - 매칭 성공: ${successfulMatches}`);
+  // 통계 요약
+  console.log(`📊 [calculateUsageBudget] 완료 - 처리: ${activationRows.length - 1}행, 매칭: ${successfulMatches}개`);
   console.log(`  - 총 확보예산: ${totalSecuredBudget}`);
   console.log(`  - 총 사용예산: ${totalUsedBudget}`);
   console.log(`  - 총 예산잔액: ${totalRemainingBudget}`);
@@ -15254,19 +15231,19 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
                 const value = parseFloat(row[0]) || 0;
                 totalRemainingBudget += value;
-                if (value > 0) console.log(`  L열[${index + 5}]: ${value}`);
+                // L열 데이터 처리
               }
               // M열: 확보예산 (공백이 아닌 경우만)
               if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
                 const value = parseFloat(row[1]) || 0;
                 totalSecuredBudget += value;
-                if (value > 0) console.log(`  M열[${index + 5}]: ${value}`);
+                // M열 데이터 처리
               }
               // N열: 사용예산 (공백이 아닌 경우만)
               if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
                 const value = parseFloat(row[2]) || 0;
                 totalUsedBudget += value;
-                if (value > 0) console.log(`  N열[${index + 5}]: ${value}`);
+                // N열 데이터 처리
               }
             }
           });
