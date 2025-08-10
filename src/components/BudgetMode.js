@@ -241,6 +241,14 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 예산 타입별 필터링을 위해 budgetType 전달
       const budgetType = faceValueSubMenu; // 'Ⅰ', 'Ⅱ', '종합'
       
+      console.log('🔍 [Frontend] loadUserSheets 호출:', {
+        faceValueSubMenu,
+        userId,
+        targetMonth,
+        showAllUsers,
+        budgetType
+      });
+      
       const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth, showAllUsers, budgetType);
       
       setUserSheets(data);
