@@ -7,6 +7,7 @@ const webpush = require('web-push');
 const ExcelJS = require('exceljs');
 const monthlyAwardAPI = require('./monthlyAwardAPI');
 const setupTeamRoutes = require('./teamRoutes');
+const UserSheetManager = require('./UserSheetManager');
 
 // 기본 설정
 const app = express();
@@ -476,6 +477,9 @@ const originalSheets = google.sheets({
   auth,
   timeout: 60000 // 60초 타임아웃
 });
+
+// UserSheetManager 인스턴스 생성
+const userSheetManager = new UserSheetManager(originalSheets, SPREADSHEET_ID);
 
 // 모든 API 호출을 추적하는 래퍼 함수
 function createTrackedSheets() {
@@ -15236,7 +15240,137 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
   }
 });
 
-// 사용자별 예산 시트 관리 API
+// 새로운 사용자 시트 조회 API (UserSheetManager 사용)
+app.get('/api/budget/user-sheets-v2', async (req, res) => {
+  console.log('🔍 [NEW-API] GET /api/budget/user-sheets-v2 호출됨!', req.query);
+  try {
+    const { userId, targetMonth, showAllUsers } = req.query;
+    
+    await userSheetManager.ensureSheetExists();
+    
+    const options = {
+      userId,
+      targetMonth,
+      showAllUsers: showAllUsers === 'true'
+    };
+    
+    const userSheets = await userSheetManager.getUserSheets(options);
+    
+    // 각 시트의 요약 정보 가져오기
+    const enrichedSheets = await Promise.all(userSheets.map(async (sheet) => {
+      let summary = {
+        totalSecuredBudget: 0,
+        totalUsedBudget: 0,
+        totalRemainingBudget: 0,
+        itemCount: 0,
+        lastUpdated: sheet.createdAt,
+        dateRange: '',
+        applyReceiptDate: false
+      };
+      
+      try {
+        const sheets_api = google.sheets({ version: 'v4', auth });
+        
+        // 시트의 예산 데이터 요약 정보 가져오기
+        const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
+        const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
+        
+        // 폰클개통데이터에서 해당 시트의 합계 계산
+        let phoneklRange;
+        if (budgetType === 'Ⅰ') {
+          phoneklRange = '폰클개통데이터!L:N'; // L, M, N열
+        } else {
+          phoneklRange = '폰클개통데이터!I:K'; // I, J, K열
+        }
+        
+        const activationDataResponse = await sheets_api.spreadsheets.values.get({
+          spreadsheetId: sheet.sheetId,
+          range: phoneklRange
+        });
+        
+        const activationData = activationDataResponse.data.values || [];
+        let totalRemainingBudget = 0;
+        let totalSecuredBudget = 0;
+        let totalUsedBudget = 0;
+        
+        activationData.slice(4).forEach((row) => {
+          if (row.length >= 3) {
+            if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
+              totalRemainingBudget += parseFloat(row[0]) || 0;
+            }
+            if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
+              totalSecuredBudget += parseFloat(row[1]) || 0;
+            }
+            if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
+              totalUsedBudget += parseFloat(row[2]) || 0;
+            }
+          }
+        });
+        
+        summary.totalRemainingBudget = totalRemainingBudget;
+        summary.totalSecuredBudget = totalSecuredBudget;
+        summary.totalUsedBudget = totalUsedBudget;
+        
+        // 날짜 범위 설정
+        if (sheet.dateRange.receiptStartDate) {
+          summary.dateRange = `접수일 ${sheet.dateRange.receiptStartDate} ~ ${sheet.dateRange.receiptEndDate}<br/>개통일 ${sheet.dateRange.activationStartDate} ~ ${sheet.dateRange.activationEndDate}`;
+          summary.applyReceiptDate = true;
+        } else {
+          summary.dateRange = `접수일 미설정~미설정<br/>개통일 ${sheet.dateRange.activationStartDate} ~ ${sheet.dateRange.activationEndDate}`;
+        }
+        
+      } catch (dataError) {
+        console.log(`[NEW-API] 시트 ${sheet.sheetName} 데이터 조회 실패:`, dataError.message);
+      }
+      
+      return {
+        id: sheet.sheetId,
+        name: sheet.sheetName,
+        createdAt: sheet.createdAt,
+        createdBy: sheet.createdBy,
+        month: sheet.targetMonth,
+        summary,
+        uuid: sheet.uuid,
+        userName: sheet.createdBy,
+        creator: sheet.createdBy
+      };
+    }));
+    
+    console.log(`✅ [NEW-API] 사용자 시트 조회 완료: ${enrichedSheets.length}개`);
+    res.json(enrichedSheets);
+    
+  } catch (error) {
+    console.error('[NEW-API] 사용자별 시트 조회 오류:', error);
+    res.status(500).json({ error: '사용자별 시트 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 사용자 시트 삭제 API (새로 추가)
+app.delete('/api/budget/user-sheets-v2/:uuid', async (req, res) => {
+  console.log('🗑️ [NEW-API] DELETE /api/budget/user-sheets-v2 호출됨!', req.params);
+  try {
+    const { uuid } = req.params;
+    const { userId } = req.query; // 요청자 ID
+    
+    if (!userId) {
+      return res.status(400).json({ error: '사용자 ID가 필요합니다.' });
+    }
+    
+    const result = await userSheetManager.deleteUserSheet(uuid, userId);
+    
+    console.log(`✅ [NEW-API] 시트 삭제 완료: ${result.deletedSheetName}`);
+    res.json({ 
+      message: '시트가 성공적으로 삭제되었습니다.',
+      deletedSheetName: result.deletedSheetName 
+    });
+    
+  } catch (error) {
+    console.error('[NEW-API] 시트 삭제 오류:', error);
+    res.status(500).json({ error: error.message || '시트 삭제 중 오류가 발생했습니다.' });
+  }
+});
+
+// 기존 API (레거시)
 app.get('/api/budget/user-sheets', async (req, res) => {
   try {
     const { userId, targetMonth, showAllUsers } = req.query;
@@ -15411,6 +15545,140 @@ app.get('/api/budget/user-sheets', async (req, res) => {
   }
 });
 
+// 새로운 사용자 시트 생성 API (UserSheetManager 사용)
+app.post('/api/budget/user-sheets-v2', async (req, res) => {
+  console.log('🚀 [NEW-API] POST /api/budget/user-sheets-v2 호출됨!', req.body);
+  try {
+    const { userId, userName, targetMonth, selectedPolicyGroups, budgetType, dateRange } = req.body;
+    
+    if (!userId || !userName || !targetMonth) {
+      return res.status(400).json({ error: '사용자 ID, 이름, 대상월은 필수입니다.' });
+    }
+
+    // 1. 대상월의 시트 ID 조회
+    const sheets = google.sheets({ version: 'v4', auth });
+    const monthSheetsData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
+    });
+
+    const monthRows = monthSheetsData.data.values || [];
+    const targetMonthRow = monthRows.find(row => row[0] === targetMonth);
+    
+    if (!targetMonthRow || !targetMonthRow[1]) {
+      return res.status(400).json({ error: '해당 월의 시트 ID를 찾을 수 없습니다.' });
+    }
+
+    const targetSheetId = targetMonthRow[1];
+
+    // 2. 사용자의 자격 정보 조회
+    const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+    let userQualification = '이사';
+    
+    try {
+      const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+      if (agentValues) {
+        const agentRows = agentValues.slice(1);
+        const userAgent = agentRows.find(row => row[0] === baseUserName);
+        if (userAgent) {
+          userQualification = userAgent[1] || '이사';
+          console.log(`📋 [NEW-API] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
+        }
+      }
+    } catch (error) {
+      console.error('[NEW-API] 사용자 자격 정보 조회 실패:', error);
+    }
+
+    const userSheetName = `액면_${baseUserName}(${budgetType}) (${userQualification})`;
+
+    // 3. 사용자 시트 생성 (이미 존재하면 무시)
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: targetSheetId,
+        resource: {
+          requests: [{
+            addSheet: {
+              properties: {
+                title: userSheetName,
+                gridProperties: {
+                  rowCount: 1000,
+                  columnCount: 20
+                }
+              }
+            }
+          }]
+        }
+      });
+      console.log(`✅ [NEW-API] 시트 "${userSheetName}" 생성 완료`);
+    } catch (addSheetError) {
+      if (addSheetError.code === 400 && addSheetError.message.includes('already exists')) {
+        console.log(`📋 [NEW-API] 시트 "${userSheetName}" 이미 존재`);
+      } else {
+        throw addSheetError;
+      }
+    }
+
+    // 4. 헤더 설정
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: targetSheetId,
+      range: `${userSheetName}!A1:I1`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['적용일', '입력자(권한레벨)', '모델명', '군', '유형', '확보된 예산', '사용된 예산', '예산 잔액', '상태']]
+      }
+    });
+
+    // 5. UserSheetManager를 사용하여 예산_사용자시트관리에 레코드 추가
+    await userSheetManager.ensureSheetExists();
+    
+    const sheetData = {
+      userId,
+      targetSheetId,
+      userSheetName,
+      userName,
+      targetMonth,
+      selectedPolicyGroups,
+      dateRange
+    };
+
+    const result = await userSheetManager.addUserSheet(sheetData);
+    
+    console.log(`✅ [NEW-API] 사용자 시트 레코드 추가 완료: UUID=${result.uuid}`);
+
+    const newSheet = {
+      id: targetSheetId,
+      name: userSheetName,
+      createdAt: result.createdAt,
+      createdBy: userName,
+      uuid: result.uuid
+    };
+
+    res.json({ 
+      message: '사용자별 시트가 생성되었습니다.',
+      sheet: newSheet
+    });
+
+  } catch (error) {
+    console.error('[NEW-API] 사용자별 시트 생성 오류:', error);
+    
+    let errorMessage = '사용자별 시트 생성 중 오류가 발생했습니다.';
+    if (error.code === 400) {
+      if (error.message.includes('already exists')) {
+        errorMessage = '시트가 이미 존재합니다.';
+      } else if (error.message.includes('Invalid value')) {
+        errorMessage = '잘못된 값이 입력되었습니다.';
+      }
+    } else if (error.code === 403) {
+      errorMessage = 'Google Sheets 접근 권한이 없습니다.';
+    } else if (error.code === 404) {
+      errorMessage = '대상 시트를 찾을 수 없습니다.';
+    }
+    
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
+// 기존 API (레거시)
 app.post('/api/budget/user-sheets', async (req, res) => {
   console.log('🚀 [DEBUG] POST /api/budget/user-sheets 호출됨!', {
     userId: req.body.userId,

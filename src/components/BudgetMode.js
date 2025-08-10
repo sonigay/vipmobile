@@ -728,19 +728,18 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         return;
       }
       
-      // 항상 새 시트 생성 (기존 시트 확인 로직 제거)
-      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth, selectedPolicyGroups, faceValueSubMenu);
-      const targetSheetId = result.sheet.id;
-      setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다.`, severity: 'success' });
-      
-      // 데이터 저장 - 접수일 적용 여부에 따라 설정
+      // 새 API 사용하여 시트 생성 (날짜 범위 정보 포함)
       const saveDateRange = {
         receiptStartDate: applyReceiptDate ? `${dateRange.receiptStartDate} ${dateRange.receiptStartTime}` : '',
         receiptEndDate: applyReceiptDate ? `${dateRange.receiptEndDate} ${dateRange.receiptEndTime}` : '',
         activationStartDate: `${dateRange.activationStartDate} ${dateRange.activationStartTime}`,
         activationEndDate: `${dateRange.activationEndDate} ${dateRange.activationEndTime}`,
-        applyReceiptDate: applyReceiptDate // 접수일 적용 여부도 함께 저장
+        applyReceiptDate: applyReceiptDate
       };
+      
+      const result = await budgetUserSheetAPI.createUserSheet(userId, userName, targetMonth, selectedPolicyGroups, faceValueSubMenu, saveDateRange);
+      const targetSheetId = result.sheet.id;
+      setSnackbar({ open: true, message: `시트 "액면_${userName}"에 데이터가 저장되었습니다. (UUID: ${result.sheet.uuid?.slice(0,8)}...)`, severity: 'success' });
       
       // 예산금액 설정과 budgetType도 함께 전달
       await budgetUserSheetAPI.saveBudgetData(targetSheetId, data, saveDateRange, userName, userLevel, budgetAmounts, faceValueSubMenu);

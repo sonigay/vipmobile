@@ -20,6 +20,7 @@
     "google-spreadsheet": "^3.3.0",
     "googleapis": "^118.0.0",
     "node-geocoder": "^4.2.0",
+    "uuid": "^11.1.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

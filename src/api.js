@@ -526,8 +526,23 @@ export const budgetMonthSheetAPI = {
 };
 
 export const budgetUserSheetAPI = {
-  // 사용자별 시트 목록 조회 (대상월 필터링 추가)
+  // 사용자별 시트 목록 조회 (새 API 사용)
   getUserSheets: async (userId, targetMonth, showAllUsers = false) => {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    if (targetMonth) params.append('targetMonth', targetMonth);
+    if (showAllUsers) params.append('showAllUsers', 'true');
+    
+    const url = `${API_BASE_URL}/api/budget/user-sheets-v2?${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('사용자 시트 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 사용자별 시트 목록 조회 (레거시)
+  getUserSheetsLegacy: async (userId, targetMonth, showAllUsers = false) => {
     const params = new URLSearchParams();
     if (userId) params.append('userId', userId);
     if (targetMonth) params.append('targetMonth', targetMonth);
@@ -541,8 +556,37 @@ export const budgetUserSheetAPI = {
     return response.json();
   },
 
-  // 사용자별 시트 생성
-  createUserSheet: async (userId, userName, targetMonth, selectedPolicyGroups, budgetType) => {
+  // 사용자 시트 삭제 (새로 추가)
+  deleteUserSheet: async (uuid, userId) => {
+    const params = new URLSearchParams();
+    params.append('userId', userId);
+    
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets-v2/${uuid}?${params.toString()}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error('사용자 시트 삭제에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 사용자별 시트 생성 (새 API 사용)
+  createUserSheet: async (userId, userName, targetMonth, selectedPolicyGroups, budgetType, dateRange) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets-v2`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, userName, targetMonth, selectedPolicyGroups, budgetType, dateRange }),
+    });
+    if (!response.ok) {
+      throw new Error('사용자 시트 생성에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 사용자별 시트 생성 (레거시)
+  createUserSheetLegacy: async (userId, userName, targetMonth, selectedPolicyGroups, budgetType) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets`, {
       method: 'POST',
       headers: {
