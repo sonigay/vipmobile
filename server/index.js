@@ -15033,6 +15033,58 @@ async function getSheetIdByName(sheetName) {
   }
 }
 
+// 예산_사용자시트관리 시트 존재 확인 및 생성 함수
+async function ensureUserSheetManagementExists(sheets) {
+  try {
+    // 시트 목록 조회
+    const spreadsheetResponse = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    
+    const sheetExists = spreadsheetResponse.data.sheets.some(
+      sheet => sheet.properties.title === '예산_사용자시트관리'
+    );
+    
+    if (!sheetExists) {
+      console.log('📋 [시트관리] 예산_사용자시트관리 시트가 없어 새로 생성합니다.');
+      
+      // 시트 생성
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: '예산_사용자시트관리',
+                  gridProperties: {
+                    rowCount: 1000,
+                    columnCount: 10
+                  }
+                }
+              }
+            }
+          ]
+        }
+      });
+      
+      // 헤더 추가
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '예산_사용자시트관리!A1:G1',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [['사용자ID', '시트ID', '시트명', '생성일시', '생성자', '대상월', '선택된정책그룹']]
+        }
+      });
+      
+      console.log('✅ [시트관리] 예산_사용자시트관리 시트 생성 및 헤더 설정 완료');
+    }
+  } catch (error) {
+    console.error('예산_사용자시트관리 시트 확인/생성 실패:', error);
+  }
+}
+
 // 사용자별 예산 시트의 사용예산을 폰클개통데이터에서 업데이트하는 API
 app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
   try {
@@ -15401,6 +15453,9 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       }
     });
 
+    // 예산_사용자시트관리 시트가 존재하는지 확인하고 없으면 생성
+    await ensureUserSheetManagementExists(sheets);
+    
     // 기존 사용자 시트가 있는지 확인 - 정확한 조건으로 수정
     const existingSheetsData = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
