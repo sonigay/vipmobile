@@ -3572,6 +3572,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   const sheets = google.sheets({ version: 'v4', auth });
   
   console.log('🔍 [calculateUsageBudget] 시작 - 사용자:', userName);
+  console.log('🚨 [TRACE] calculateUsageBudget 함수 시작:', new Date().toISOString());
   
   // 사용자별 예산 데이터 가져오기 - 시트 목록에서 해당 사용자의 시트 찾기
   const baseUserName = userName.replace(/\([^)]+\)/, '').trim(); // 모든 괄호 내용 제거
@@ -3902,9 +3903,11 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   console.log(`  - 총 확보예산: ${totalSecuredBudget}`);
   console.log(`  - 총 사용예산: ${totalUsedBudget}`);
   console.log(`  - 총 예산잔액: ${totalRemainingBudget}`);
+  console.log('🚨 [TRACE] calculateUsageBudget 함수 완료:', new Date().toISOString());
   
   // 폰클개통데이터 시트의 L열, M열, N열 일괄 업데이트 (기존 A, B, C열에서 +11)
   if (updateRequests.length > 0) {
+    console.log('🚨 [TRACE] batchUpdate 시작 - 폰클개통데이터:', new Date().toISOString());
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: sheetId,
       resource: {
@@ -3912,6 +3915,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
         data: updateRequests
       }
     });
+    console.log('🚨 [TRACE] batchUpdate 완료 - 폰클개통데이터:', new Date().toISOString());
   }
   
   return {
@@ -15457,10 +15461,12 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     await ensureUserSheetManagementExists(sheets);
     
     // 기존 사용자 시트가 있는지 확인 - 정확한 조건으로 수정
+    console.log('🚨 [TRACE] 예산_사용자시트관리 읽기 시작:', new Date().toISOString());
     const existingSheetsData = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: '예산_사용자시트관리!A:G',
     });
+    console.log('🚨 [TRACE] 예산_사용자시트관리 읽기 완료:', new Date().toISOString());
     
     const existingRows = existingSheetsData.data.values || [];
     // 동일한 사용자ID, 시트ID, 시트명, 대상월이 일치하는 기존 시트는 절대 덮어쓰지 않음
@@ -15480,6 +15486,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
         console.log(`📋 [시트생성] append 실행 전 - 기존 행 수: ${existingRows.length}`);
         console.log(`📋 [시트생성] 추가할 데이터:`, [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : '']);
         
+        console.log('🚨 [TRACE] 예산_사용자시트관리 append 시작:', new Date().toISOString());
         const appendResult = await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
           range: '예산_사용자시트관리!A:G',
@@ -15489,23 +15496,28 @@ app.post('/api/budget/user-sheets', async (req, res) => {
             values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : '']]
           }
         });
+        console.log('🚨 [TRACE] 예산_사용자시트관리 append 완료:', new Date().toISOString());
         
         console.log(`📋 [시트생성] append 응답:`, JSON.stringify(appendResult.data, null, 2));
         
         // append 후 실제 데이터 다시 확인
+        console.log('🚨 [TRACE] 예산_사용자시트관리 재확인 시작:', new Date().toISOString());
         const afterAppendData = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: '예산_사용자시트관리!A:G',
         });
+        console.log('🚨 [TRACE] 예산_사용자시트관리 재확인 완료:', new Date().toISOString());
         console.log(`📋 [시트생성] append 후 실제 데이터:`, afterAppendData.data.values);
         
         // 3초 후 다시 한 번 확인 (Google Sheets 내부 처리 확인)
         setTimeout(async () => {
           try {
+            console.log('🚨 [TRACE] 예산_사용자시트관리 3초후 확인 시작:', new Date().toISOString());
             const finalCheck = await sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: '예산_사용자시트관리!A:G',
             });
+            console.log('🚨 [TRACE] 예산_사용자시트관리 3초후 확인 완료:', new Date().toISOString());
             console.log(`📋 [시트생성] 3초 후 최종 확인:`, finalCheck.data.values);
           } catch (error) {
             console.error('3초 후 확인 실패:', error);
@@ -15845,10 +15857,12 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
               console.log(`✅ [예산데이터조회] 다른 사용자 데이터 조회 권한 있음: ${userRole}`);
               
               // 예산_사용자시트관리에서 실제 시트 소유자 확인
+              console.log('🚨 [TRACE] [예산데이터조회] 예산_사용자시트관리 읽기 시작:', new Date().toISOString());
               const userSheetManagementResponse = await sheets.spreadsheets.values.get({
                 spreadsheetId: SPREADSHEET_ID,
                 range: '예산_사용자시트관리!A:G'
               });
+              console.log('🚨 [TRACE] [예산데이터조회] 예산_사용자시트관리 읽기 완료:', new Date().toISOString());
               
               const userSheetManagementData = userSheetManagementResponse.data.values || [];
               if (userSheetManagementData.length > 1) {
@@ -16011,16 +16025,20 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       let userSheetManagementData = [];
       if (canAccessOtherUserData) {
         // 이미 권한 확인 시 가져온 데이터 재사용
+      console.log('🚨 [TRACE] [정책그룹조회1] 예산_사용자시트관리 읽기 시작:', new Date().toISOString());
       const userSheetManagementResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: '예산_사용자시트관리!A:G'
       });
+      console.log('🚨 [TRACE] [정책그룹조회1] 예산_사용자시트관리 읽기 완료:', new Date().toISOString());
         userSheetManagementData = userSheetManagementResponse.data.values || [];
       } else {
+        console.log('🚨 [TRACE] [정책그룹조회2] 예산_사용자시트관리 읽기 시작:', new Date().toISOString());
         const userSheetManagementResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: '예산_사용자시트관리!A:G'
         });
+        console.log('🚨 [TRACE] [정책그룹조회2] 예산_사용자시트관리 읽기 완료:', new Date().toISOString());
         userSheetManagementData = userSheetManagementResponse.data.values || [];
       }
       
