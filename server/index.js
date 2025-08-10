@@ -15330,6 +15330,12 @@ app.get('/api/budget/user-sheets', async (req, res) => {
 });
 
 app.post('/api/budget/user-sheets', async (req, res) => {
+  console.log('🚀 [DEBUG] POST /api/budget/user-sheets 호출됨!', {
+    userId: req.body.userId,
+    userName: req.body.userName,
+    targetMonth: req.body.targetMonth,
+    budgetType: req.body.budgetType
+  });
   try {
     const { userId, userName, targetMonth, selectedPolicyGroups, budgetType } = req.body;
     
