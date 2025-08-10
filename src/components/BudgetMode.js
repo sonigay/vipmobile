@@ -216,7 +216,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 액면예산(Ⅰ)에서는 모든 사용자의 정책을 볼 수 있도록 설정
       // 액면예산(Ⅱ)에서는 본인의 정책만 볼 수 있도록 설정
       const showAllUsers = faceValueSubMenu === 'Ⅰ';
-      const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth, showAllUsers);
+      // 예산 타입별 필터링을 위해 budgetType 전달
+      const budgetType = faceValueSubMenu; // 'Ⅰ', 'Ⅱ', '종합'
+      const data = await budgetUserSheetAPI.getUserSheets(userId, targetMonth, showAllUsers, budgetType);
       setUserSheets(data);
     } catch (error) {
       console.error('사용자 시트 목록 로드 실패:', error);

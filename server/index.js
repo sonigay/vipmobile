@@ -15581,14 +15581,15 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
 app.get('/api/budget/user-sheets-v2', async (req, res) => {
   console.log('🔍 [NEW-API] GET /api/budget/user-sheets-v2 호출됨!', req.query);
   try {
-    const { userId, targetMonth, showAllUsers } = req.query;
+    const { userId, targetMonth, showAllUsers, budgetType } = req.query;
     
     await userSheetManager.ensureSheetExists();
     
     const options = {
       userId,
       targetMonth,
-      showAllUsers: showAllUsers === 'true'
+      showAllUsers: showAllUsers === 'true',
+      budgetType: budgetType || null
     };
     
     const userSheets = await userSheetManager.getUserSheets(options);
@@ -15734,7 +15735,7 @@ app.delete('/api/budget/user-sheets-v2/:uuid', async (req, res) => {
 // 기존 API (레거시)
 app.get('/api/budget/user-sheets', async (req, res) => {
   try {
-    const { userId, targetMonth, showAllUsers } = req.query;
+    const { userId, targetMonth, showAllUsers, budgetType } = req.query;
     const sheets = google.sheets({ version: 'v4', auth });
     
     // 사용자별 시트 목록 조회 (예산_사용자시트관리 시트에서)
@@ -15776,13 +15777,25 @@ app.get('/api/budget/user-sheets', async (req, res) => {
         const sheetId = row[1] || '';
         const sheetName = row[2] || '';
         
-        // 액면예산(Ⅱ)인 경우 본인의 시트만 필터링
+        // 예산 타입별 필터링 (budgetType 파라미터 기준)
+        if (budgetType) {
+          const requestedType = budgetType; // 'Ⅰ' 또는 'Ⅱ'
+          const hasRequestedType = sheetName.includes(`(${requestedType})`);
+          
+          if (!hasRequestedType) {
+            continue; // 요청된 예산 타입이 아닌 시트 제외
+          }
+        }
+        
+        // 소유권 기반 필터링
+        const isTypeI = sheetName.includes('(Ⅰ)');
         const isTypeII = sheetName.includes('(Ⅱ)');
         const isOwnSheet = row[0] === userId;
         
-        // 액면예산(Ⅱ)이면서 본인의 시트가 아닌 경우 제외
+        // 액면예산(Ⅰ): 모든 사용자 시트 표시 (필터링 없음)
+        // 액면예산(Ⅱ): 본인의 시트만 표시
         if (isTypeII && !isOwnSheet) {
-          continue;
+          continue; // 액면예산(Ⅱ)이면서 본인 시트가 아닌 경우 제외
         }
         const createdAt = row[3] || '';
         const createdBy = row[4] || '';
@@ -16435,9 +16448,11 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     const { userId } = req.query;
     const sheets = google.sheets({ version: 'v4', auth });
     
-    if (!targetMonth) {
-      return res.status(400).json({ error: '대상월이 필요합니다.' });
+    if (!targetMonth || !userId) {
+      return res.status(400).json({ error: '대상월과 사용자 ID가 필요합니다.' });
     }
+    
+    console.log(`📊 [예산종합] ${targetMonth}월 ${userId} 사용자 종합 계산 시작`);
     
     // 대상월의 시트 ID 조회
     const monthSheetsData = await sheets.spreadsheets.values.get({
@@ -16453,8 +16468,9 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     }
 
     const targetSheetId = targetMonthRow[1];
+    console.log(`📊 [예산종합] ${targetMonth}월 시트ID: ${targetSheetId}`);
     
-    // 폰클개통데이터에서 F, G, H열 (합계) 가져오기
+    // 폰클개통데이터에서 F, G, H열 (본인 관련 합계) 가져오기
     const summaryDataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: targetSheetId,
       range: '폰클개통데이터!F:H'
@@ -16462,12 +16478,14 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     
     const summaryData = summaryDataResponse.data.values || [];
     
-    // F, G, H열의 합계 계산 (헤더 제외, 공백 제외)
+    // F, G, H열의 합계 계산 (5행부터, 본인 관련 데이터만)
     let totalRemainingBudget = 0; // F열: 예산잔액
     let totalSecuredBudget = 0;   // G열: 확보예산
     let totalUsedBudget = 0;      // H열: 사용예산
     
-    summaryData.slice(4).forEach((row, index) => { // C5행부터 시작
+    // TODO: 여기서 본인 관련 행만 필터링하는 로직 필요
+    // 현재는 모든 행을 합산하고 있음 - 이 부분은 별도 로직이 필요할 수 있음
+    summaryData.slice(4).forEach((row, index) => { // 5행부터 시작
       if (row.length >= 3) {
         // F열: 예산잔액 (공백이 아닌 경우만)
         if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
@@ -16486,6 +16504,8 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         }
       }
     });
+    
+    console.log(`📊 [예산종합] F,G,H열 합계: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
     
     res.json({
       success: true,

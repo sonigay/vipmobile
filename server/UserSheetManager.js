@@ -191,12 +191,25 @@ class UserSheetManager {
           
           const [userId, sheetId, sheetName] = row;
           
-          // 액면예산(Ⅱ)는 본인만 조회 가능
+          // 예산 타입별 필터링 (budgetType 파라미터 기준)
+          if (options.budgetType) {
+            const requestedType = options.budgetType; // 'Ⅰ' 또는 'Ⅱ'
+            const hasRequestedType = sheetName.includes(`(${requestedType})`);
+            
+            if (!hasRequestedType) {
+              return false; // 요청된 예산 타입이 아닌 시트 제외
+            }
+          }
+          
+          // 소유권 기반 필터링
+          const isTypeI = sheetName.includes('(Ⅰ)');
           const isTypeII = sheetName.includes('(Ⅱ)');
           const isOwnSheet = userId === options.userId;
           
+          // 액면예산(Ⅰ): 모든 사용자 시트 표시 (필터링 없음)
+          // 액면예산(Ⅱ): 본인의 시트만 표시
           if (isTypeII && !isOwnSheet) {
-            return false;
+            return false; // 액면예산(Ⅱ)이면서 본인 시트가 아닌 경우 제외
           }
           
           // 대상월 필터링

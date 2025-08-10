@@ -527,11 +527,12 @@ export const budgetMonthSheetAPI = {
 
 export const budgetUserSheetAPI = {
   // 사용자별 시트 목록 조회 (새 API 사용)
-  getUserSheets: async (userId, targetMonth, showAllUsers = false) => {
+  getUserSheets: async (userId, targetMonth, showAllUsers = false, budgetType = null) => {
     const params = new URLSearchParams();
     if (userId) params.append('userId', userId);
     if (targetMonth) params.append('targetMonth', targetMonth);
     if (showAllUsers) params.append('showAllUsers', 'true');
+    if (budgetType && budgetType !== '종합') params.append('budgetType', budgetType); // '종합'은 모든 타입 표시
     
     const url = `${API_BASE_URL}/api/budget/user-sheets-v2?${params.toString()}`;
     const response = await fetch(url);
