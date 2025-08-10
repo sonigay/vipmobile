@@ -171,7 +171,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // 타입 변경 시 즉시 기존 목록 초기화 후 새로 로드
     setUserSheets([]); // 기존 목록 즉시 초기화
     if (targetMonth) {
-      loadUserSheets();
+      // 명시적으로 현재 faceValueSubMenu 값을 전달하여 상태 업데이트 타이밍 문제 방지
+      loadUserSheets(faceValueSubMenu);
     }
   }, [faceValueSubMenu]);
 
@@ -232,16 +233,19 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   // 사용자 시트 목록 불러오기
-  const loadUserSheets = async () => {
+  const loadUserSheets = async (currentSubMenu = null) => {
     try {
       const userId = loggedInStore?.id || loggedInStore?.agentInfo?.id || 'unknown';
+      // 현재 서브메뉴 값 사용 (파라미터가 있으면 우선, 없으면 state 값 사용)
+      const activeSubMenu = currentSubMenu || faceValueSubMenu;
       // 액면예산(Ⅰ)에서는 모든 사용자의 정책을 볼 수 있도록 설정
       // 액면예산(Ⅱ)에서는 본인의 정책만 볼 수 있도록 설정
-      const showAllUsers = faceValueSubMenu === 'Ⅰ';
+      const showAllUsers = activeSubMenu === 'Ⅰ';
       // 예산 타입별 필터링을 위해 budgetType 전달
-      const budgetType = faceValueSubMenu; // 'Ⅰ', 'Ⅱ', '종합'
+      const budgetType = activeSubMenu; // 'Ⅰ', 'Ⅱ', '종합'
       
       console.log('🔍 [Frontend] loadUserSheets 호출:', {
+        activeSubMenu,
         faceValueSubMenu,
         userId,
         targetMonth,
