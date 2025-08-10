@@ -133,7 +133,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     setShowFaceValueDropdown(false);
     // 서브메뉴 변경 시 사용자 시트 목록 새로고침
     if (showSheetList) {
-      loadUserSheets();
+      loadUserSheets(subMenu); // 새로운 subMenu 값을 직접 전달
     }
   };
 
