@@ -69,7 +69,7 @@ class PhoneklDataManager {
       // 3. 헤더 행 건너뛰고 데이터 시작 행부터 처리 (5행부터)
       const dataStartRow = 4; // 0-based index로 4 (실제 5행)
       
-      console.log(`📊 [PhoneklDataManager] 처리 시작: 데이터 시작행=${dataStartRow + 1}, 신규 매핑 데이터=${Object.keys(newDataMap).length}개`);
+      console.log(`📊 [CRITICAL] PhoneklDataManager 처리 시작: 신규 매핑 데이터=${Object.keys(newDataMap).length}개`);
       
       for (let rowIndex = dataStartRow; rowIndex < currentData.length; rowIndex++) {
         const currentRow = currentData[rowIndex];

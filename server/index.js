@@ -3687,16 +3687,11 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
     const currentBudgetValue = parseFloat(row[13]) || 0; // N열: 현재 예산값
     
-    console.log(`📊 [Row ${actualRowNumber}] 정책그룹=${policyGroup}, 군=${armyType}, 유형=${categoryType}`);
-    
     // 1. 정책그룹 매칭 확인
     if (!selectedPolicyGroups.includes(policyGroup)) {
       policyGroupFiltered++;
-      console.log(`🚫 [Row ${actualRowNumber}] 정책그룹 불일치: ${policyGroup} not in [${selectedPolicyGroups.join(',')}]`);
       return;
     }
-    
-    console.log(`✅ [Row ${actualRowNumber}] 정책그룹 매칭: ${policyGroup}`);
     
     // 2. 날짜 범위 필터링
     let isInDateRange = true;
@@ -3717,11 +3712,8 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     
     if (!isInDateRange) {
       dateRangeFiltered++;
-      console.log(`🚫 [Row ${actualRowNumber}] 날짜 범위 불일치`);
       return;
     }
-    
-    console.log(`✅ [Row ${actualRowNumber}] 날짜 범위 통과`);
     
     // 3. 정책군 매핑 (기존 로직과 동일)
     let mappedArmyType = '';
@@ -3746,7 +3738,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     let securedBudgetValue = 0;
     let matchFound = false;
     
-    console.log(`🔍 [Row ${actualRowNumber}] 매칭 검색: 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
+    // 매칭 로그는 성공/실패 시에만 출력
     
     // 헤더 제외하고 예산 데이터에서 매칭
     if (userSheetData.length > 1) {
@@ -3769,16 +3761,17 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
             matchFound = true;
             matchedItems++;
             
-            console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
             break;
           }
         }
       }
+    } else {
+      console.log(`🚫 사용자 시트 데이터가 비어있음 (헤더만 존재)`);
     }
     
     if (!matchFound) {
       modelMismatch++;
-      console.log(`❌ [Row ${actualRowNumber}] 매칭 실패: 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}`);
       return;
     }
     
@@ -3811,6 +3804,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   });
   
   console.log(`📈 [performBudgetMatching] 완료: 처리=${processedRows}, 매칭=${matchedItems}, 정책그룹필터=${policyGroupFiltered}, 날짜필터=${dateRangeFiltered}, 모델불일치=${modelMismatch}`);
+  console.log(`📋 [CRITICAL] dataMapping 생성 완료: ${Object.keys(dataMapping).length}개 행`);
   
   return {
     dataMapping,
