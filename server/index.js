@@ -15588,9 +15588,19 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
           });
           const phoneklData = phoneklResponse.data.values || [];
           
-          // 저장된 정책그룹 파싱
-          const selectedPolicyGroups = sheet.selectedPolicyGroups ? 
-            sheet.selectedPolicyGroups.split(',').map(g => g.trim()) : [];
+          // 저장된 정책그룹 파싱 (안전하게 처리)
+          let selectedPolicyGroups = [];
+          if (sheet.selectedPolicyGroups) {
+            if (Array.isArray(sheet.selectedPolicyGroups)) {
+              // 이미 배열인 경우
+              selectedPolicyGroups = sheet.selectedPolicyGroups;
+            } else if (typeof sheet.selectedPolicyGroups === 'string') {
+              // 문자열인 경우
+              selectedPolicyGroups = sheet.selectedPolicyGroups.split(',').map(g => g.trim()).filter(g => g);
+            } else {
+              console.warn(`⚠️ [NEW-API] ${sheet.sheetName} 예상치 못한 정책그룹 타입:`, typeof sheet.selectedPolicyGroups, sheet.selectedPolicyGroups);
+            }
+          }
           
           console.log(`📊 [NEW-API] ${sheet.sheetName} 정책그룹: [${selectedPolicyGroups.join(', ')}]`);
           
