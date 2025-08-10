@@ -3514,7 +3514,7 @@ function normalizeReceptionDate(receptionDateStr) {
     
     // 유효한 날짜인지 확인
     if (isNaN(date.getTime())) {
-      console.warn('유효하지 않은 접수일 형식:', receptionDateStr);
+      // 유효하지 않은 접수일 형식
       return null;
     }
     
