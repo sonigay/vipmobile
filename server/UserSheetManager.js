@@ -217,11 +217,6 @@ class UserSheetManager {
             return false;
           }
           
-          // showAllUsers가 false면 본인 것만
-          if (!options.showAllUsers && !isOwnSheet) {
-            return false;
-          }
-          
           return true;
         })
         .map(row => ({
