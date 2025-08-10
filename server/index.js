@@ -3661,24 +3661,24 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   // C5행부터 데이터 처리 (기존 로직과 동일한 방식)
   const activationRows = phoneklData.slice(dataStartRow);
   
-  console.log(`🔍 [DEBUG] 전체 데이터: ${phoneklData.length}행, 처리 대상: ${activationRows.length}행, 시작 인덱스: ${dataStartRow}`);
-  console.log(`🔍 [DEBUG] 첫 번째 처리 행 예시:`, activationRows[0]);
+  // console.log(`🔍 [DEBUG] 전체 데이터: ${phoneklData.length}행, 처리 대상: ${activationRows.length}행, 시작 인덱스: ${dataStartRow}`);
+  // console.log(`🔍 [DEBUG] 첫 번째 처리 행 예시:`, activationRows[0]);
   
   activationRows.forEach((row, index) => {
     const actualRowNumber = 5 + index; // C5, C6, C7, C8...
     
     // 행이 존재하고 AG열(32번 인덱스)까지 접근할 수 있는지 확인
     if (!row || row.length < 33) {
-      console.log(`🚫 [Row ${actualRowNumber}] 건너뜀: 컬럼 수 부족 (${row ? row.length : 0}/33 필요)`);
+      // console.log(`🚫 [Row ${actualRowNumber}] 건너뜀: 컬럼 수 부족 (${row ? row.length : 0}/33 필요)`);
       return;
     }
     
     processedRows++;
     
     // 처음 5개 행만 디버깅 로그
-    if (index < 5) {
-      console.log(`🔍 [DEBUG-ROW-${actualRowNumber}] 컬럼 수: ${row.length}, P열(정책그룹): "${row[15]}", O열(정책군): "${row[14]}", AE열(유형): "${row[30]}", AG열(모델): "${row[32]}"`);
-    }
+    // if (index < 5) {
+    //   console.log(`🔍 [DEBUG-ROW-${actualRowNumber}] 컬럼 수: ${row.length}, P열(정책그룹): "${row[15]}", O열(정책군): "${row[14]}", AE열(유형): "${row[30]}", AG열(모델): "${row[32]}"`);
+    // }
     
     // 안전한 데이터 추출
     const policyGroup = (row[15] || '').toString().trim(); // P열: 정책그룹
@@ -3761,7 +3761,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
             matchFound = true;
             matchedItems++;
             
-            console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            // console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
             break;
           }
         }
