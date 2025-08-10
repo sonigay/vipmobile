@@ -16,7 +16,7 @@ class UserSheetManager {
   /**
    * 동시 접근 방지를 위한 뮤텍스 패턴
    */
-  async withLock(operation) {
+  async withLock(operation, operationName = 'Unknown') {
     return new Promise((resolve, reject) => {
       const executeOperation = async () => {
         if (this.isProcessing) {
@@ -27,12 +27,12 @@ class UserSheetManager {
 
         this.isProcessing = true;
         try {
-          console.log(`🔒 [UserSheetManager] 작업 시작: ${operation.name || 'Unknown'}`);
+          console.log(`🔒 [UserSheetManager] 작업 시작: ${operationName}`);
           const result = await operation();
-          console.log(`✅ [UserSheetManager] 작업 완료: ${operation.name || 'Unknown'}`);
+          console.log(`✅ [UserSheetManager] 작업 완료: ${operationName}`);
           resolve(result);
         } catch (error) {
-          console.error(`❌ [UserSheetManager] 작업 실패: ${operation.name || 'Unknown'}`, error);
+          console.error(`❌ [UserSheetManager] 작업 실패: ${operationName}`, error);
           reject(error);
         } finally {
           this.isProcessing = false;
@@ -112,8 +112,7 @@ class UserSheetManager {
       }
     };
 
-    operation.name = 'ensureSheetExists';
-    return this.withLock(operation);
+    return this.withLock(operation, 'ensureSheetExists');
   }
 
   /**
@@ -162,8 +161,7 @@ class UserSheetManager {
       };
     };
 
-    operation.name = 'addUserSheet';
-    return this.withLock(operation);
+    return this.withLock(operation, 'addUserSheet');
   }
 
   /**
@@ -234,8 +232,7 @@ class UserSheetManager {
       return filteredSheets;
     };
 
-    operation.name = 'getUserSheets';
-    return this.withLock(operation);
+    return this.withLock(operation, 'getUserSheets');
   }
 
   /**
@@ -293,8 +290,7 @@ class UserSheetManager {
       return { success: true, deletedSheetName: targetRow[2] };
     };
 
-    operation.name = 'deleteUserSheet';
-    return this.withLock(operation);
+    return this.withLock(operation, 'deleteUserSheet');
   }
 
   /**
