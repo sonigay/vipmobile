@@ -167,7 +167,18 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   // 액면예산 타입 변경 시 예산금액 초기화 및 시트 목록 재로드
   useEffect(() => {
-    setBudgetAmounts(getDefaultBudgetAmounts());
+    // 명시적으로 현재 faceValueSubMenu 값에 따른 기본값 설정
+    const defaultAmount = faceValueSubMenu === 'Ⅱ' ? 0 : 40000;
+    const newBudgetAmounts = {
+      S군: defaultAmount,
+      A군: defaultAmount,
+      B군: defaultAmount,
+      C군: defaultAmount,
+      D군: defaultAmount,
+      E군: defaultAmount
+    };
+    setBudgetAmounts(newBudgetAmounts);
+    
     // 타입 변경 시 즉시 기존 목록 초기화 후 새로 로드
     setUserSheets([]); // 기존 목록 즉시 초기화
     if (targetMonth) {

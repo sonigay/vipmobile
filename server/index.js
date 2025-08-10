@@ -15543,8 +15543,9 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
             values: [[matchingData.budgetValue]]
           });
           
-          // 잔액 업데이트 (K열 - 기존 G열에서 3열 밀림) - 확보예산(40000) - 사용예산
-          const securedBudget = 40000;
+          // 잔액 업데이트 (K열 - 기존 G열에서 3열 밀림) - 예산타입에 따른 확보예산
+          const defaultSecuredBudget = budgetType === 'Ⅱ' ? 0 : 40000;
+          const securedBudget = defaultSecuredBudget;
           const remainingBudget = securedBudget - matchingData.budgetValue;
           updateRequests.push({
             range: `K${index + 2}`,
@@ -16339,8 +16340,9 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
             const armyType = getArmyType(index + 1);
             const categoryType = getCategoryType(index + 1);
             
-            // 해당 군의 예산금액 가져오기
-            const securedBudget = budgetAmounts?.[armyType] || 40000;
+            // 해당 군의 예산금액 가져오기 (예산타입에 따른 기본값 적용)
+            const defaultAmount = budgetType === 'Ⅱ' ? 0 : 40000;
+            const securedBudget = budgetAmounts?.[armyType] || defaultAmount;
             
             // 지출예산을 1만원 단위에서 원 단위로 변환 (예: 2 -> 20000)
             const usedBudget = expenditureValue * 10000; // Multiplied by 10000
