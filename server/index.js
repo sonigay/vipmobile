@@ -15421,10 +15421,11 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     // 기존 시트가 없을 때만 새로 추가
     if (!existingSheet) {
       try {
-        // append 사용 (Google Sheets가 자동으로 마지막 행에 추가)
-        console.log(`📋 [시트생성] append를 사용하여 새 데이터 추가`);
+        // append 사용하되 상세한 응답 로깅
+        console.log(`📋 [시트생성] append 실행 전 - 기존 행 수: ${existingRows.length}`);
+        console.log(`📋 [시트생성] 추가할 데이터:`, [userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : '']);
         
-        await sheets.spreadsheets.values.append({
+        const appendResult = await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
           range: '예산_사용자시트관리!A:G',
           valueInputOption: 'RAW',
@@ -15433,6 +15434,15 @@ app.post('/api/budget/user-sheets', async (req, res) => {
             values: [[userId, targetSheetId, userSheetName, currentTime, userName, targetMonth, selectedPolicyGroups ? selectedPolicyGroups.join(',') : '']]
           }
         });
+        
+        console.log(`📋 [시트생성] append 응답:`, JSON.stringify(appendResult.data, null, 2));
+        
+        // append 후 실제 데이터 다시 확인
+        const afterAppendData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '예산_사용자시트관리!A:G',
+        });
+        console.log(`📋 [시트생성] append 후 실제 데이터:`, afterAppendData.data.values);
       } catch (appendError) {
         // 시트가 존재하지 않으면 새로 생성하고 데이터 추가
         console.log('예산_사용자시트관리 시트가 존재하지 않아 새로 생성합니다.');
