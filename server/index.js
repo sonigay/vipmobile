@@ -15408,15 +15408,9 @@ app.post('/api/budget/user-sheets', async (req, res) => {
     });
     
     const existingRows = existingSheetsData.data.values || [];
-    // 동일한 사용자ID, 시트ID, 시트명, 대상월, 생성일시가 모두 일치하는 경우만 기존 시트로 판단
-    // 생성일시(currentTime)를 고유 식별자로 사용하여 같은 사용자라도 다른 시간에 저장하면 새로 추가
-    const existingSheet = existingRows.find(row => 
-      row[0] === userId && 
-      row[1] === targetSheetId && 
-      row[2] === userSheetName &&
-      row[3] === currentTime &&  // 생성일시도 체크 (고유 식별자)
-      row[5] === targetMonth
-    );
+    // 동일한 사용자ID, 시트ID, 시트명, 대상월이 일치하는 기존 시트는 절대 덮어쓰지 않음
+    // 모든 저장은 새로운 행으로 추가 (고유성은 생성일시로 자동 보장)
+    const existingSheet = null; // 항상 새로 추가하도록 수정
     
     console.log(`📋 [시트생성] 기존 시트 검색: userId=${userId}, sheetId=${targetSheetId}, sheetName=${userSheetName}, createdAt=${currentTime}, month=${targetMonth}`);
     console.log(`📋 [시트생성] 기존 시트 발견: ${existingSheet ? 'YES' : 'NO'}`);
