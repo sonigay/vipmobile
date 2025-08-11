@@ -125,8 +125,12 @@ class PhoneklDataManager {
           }
           
           // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
-          if (dateRange.activationStartDate && dateRange.activationEndDate) {
-            const activationInRange = activationDate ? this.isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
+          // dateRange 객체의 다양한 속성명 지원
+          const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
+          const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
+          
+          if (activationStartDate && activationEndDate) {
+            const activationInRange = activationDate ? this.isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
             isInDateRange = isInDateRange && activationInRange;
           }
           
@@ -134,7 +138,9 @@ class PhoneklDataManager {
           if (rowIndex < 5) {
             console.log(`🔍 [Row ${actualRowNumber}] 날짜 필터링: 접수일=${receptionDate}, 개통일=${activationDate}, 범위내=${isInDateRange}`);
             if (dateRange) {
-              console.log(`📅 [Row ${actualRowNumber}] 날짜 범위 설정: 접수일적용=${dateRange.applyReceiptDate}, 접수일범위=${dateRange.receiptStartDate}~${dateRange.receiptEndDate}, 개통일범위=${dateRange.activationStartDate}~${dateRange.activationEndDate}`);
+              const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
+              const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
+              console.log(`📅 [Row ${actualRowNumber}] 날짜 범위 설정: 접수일적용=${dateRange.applyReceiptDate}, 접수일범위=${dateRange.receiptStartDate}~${dateRange.receiptEndDate}, 개통일범위=${activationStartDate}~${activationEndDate}`);
               console.log(`🔍 [Row ${actualRowNumber}] dateRange 객체 전체:`, JSON.stringify(dateRange, null, 2));
             } else {
               console.log(`❌ [Row ${actualRowNumber}] dateRange가 null입니다!`);
