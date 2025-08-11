@@ -3735,11 +3735,13 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
       const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일
       const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일
       
-      if (dateRange.receiptStartDate && dateRange.receiptEndDate) {
+      // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
+      if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
         const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
         isInDateRange = isInDateRange && receptionInRange;
       }
       
+      // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
       if (dateRange.activationStartDate && dateRange.activationEndDate) {
         const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
         isInDateRange = isInDateRange && activationInRange;
