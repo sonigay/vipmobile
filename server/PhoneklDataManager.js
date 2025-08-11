@@ -7,6 +7,10 @@ class PhoneklDataManager {
     this.sheets = sheets;
     this.spreadsheetId = spreadsheetId;
     this.phoneklSheetName = '폰클개통데이터';
+    
+    // 간단한 캐시 시스템
+    this.cache = new Map();
+    this.cacheTTL = 5 * 60 * 1000; // 5분
   }
 
   /**
@@ -65,17 +69,31 @@ class PhoneklDataManager {
       const currentData = await this.readCurrentData(sheetId, budgetType);
       const columns = this.getColumnMapping(budgetType);
       
-      // 2. 날짜 필터링을 위한 전체 데이터 한 번만 읽기
+      // 2. 날짜 필터링을 위한 전체 데이터 한 번만 읽기 (캐시 활용)
       let fullData = null;
       if (dateRange) {
         console.log(`📅 [PhoneklDataManager] 날짜 필터링을 위한 전체 데이터 읽기 시작`);
-        const fullRange = `${this.phoneklSheetName}!A:AG`;
-        const fullResponse = await this.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: fullRange
-        });
-        fullData = fullResponse.data.values || [];
-        console.log(`📅 [PhoneklDataManager] 전체 데이터 읽기 완료: ${fullData.length}행`);
+        
+        // 캐시 키 생성
+        const cacheKey = `phonekl_full_data_${sheetId}`;
+        
+        // 캐시에서 먼저 확인
+        const cachedData = this.getFromCache(cacheKey);
+        if (cachedData) {
+          fullData = cachedData;
+          console.log(`📅 [PhoneklDataManager] 캐시에서 데이터 로드: ${fullData.length}행`);
+        } else {
+          const fullRange = `${this.phoneklSheetName}!A:AG`;
+          const fullResponse = await this.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: fullRange
+          });
+          fullData = fullResponse.data.values || [];
+          console.log(`📅 [PhoneklDataManager] 전체 데이터 읽기 완료: ${fullData.length}행`);
+          
+          // 캐시에 저장
+          this.setToCache(cacheKey, fullData);
+        }
       }
       
       // 3. 업데이트할 요청들 준비
@@ -262,6 +280,32 @@ class PhoneklDataManager {
    */
   isEmpty(value) {
     return value === '' || value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+  }
+
+  /**
+   * 캐시에서 데이터 가져오기
+   */
+  getFromCache(key) {
+    const item = this.cache.get(key);
+    if (!item) return null;
+    
+    const now = Date.now();
+    if (now > item.timestamp + this.cacheTTL) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return item.data;
+  }
+
+  /**
+   * 캐시에 데이터 저장하기
+   */
+  setToCache(key, data) {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
   }
 
   /**

@@ -52,6 +52,13 @@ const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5분 (5 * 60 * 1000ms)
 const MAX_CACHE_SIZE = 100; // 최대 캐시 항목 수
 
+// API 호출 제한 설정
+const API_RATE_LIMIT = {
+  maxRequestsPerMinute: 60, // 분당 최대 요청 수
+  requests: [],
+  isRateLimited: false
+};
+
 // 캐시 유틸리티 함수들
 const cacheUtils = {
   // 캐시에 데이터 저장
@@ -120,6 +127,41 @@ const cacheUtils = {
         cache.delete(key);
       }
     }
+  }
+};
+
+// API 호출 제한 유틸리티
+const rateLimitUtils = {
+  // API 호출 가능 여부 확인
+  canMakeRequest: () => {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60 * 1000;
+    
+    // 1분 이전의 요청들 제거
+    API_RATE_LIMIT.requests = API_RATE_LIMIT.requests.filter(time => time > oneMinuteAgo);
+    
+    // 현재 요청 수가 제한을 초과했는지 확인
+    if (API_RATE_LIMIT.requests.length >= API_RATE_LIMIT.maxRequestsPerMinute) {
+      API_RATE_LIMIT.isRateLimited = true;
+      return false;
+    }
+    
+    API_RATE_LIMIT.isRateLimited = false;
+    return true;
+  },
+  
+  // API 호출 기록
+  recordRequest: () => {
+    API_RATE_LIMIT.requests.push(Date.now());
+  },
+  
+  // 대기 시간 계산
+  getWaitTime: () => {
+    if (API_RATE_LIMIT.requests.length === 0) return 0;
+    
+    const oldestRequest = Math.min(...API_RATE_LIMIT.requests);
+    const timeSinceOldest = Date.now() - oldestRequest;
+    return Math.max(0, 60000 - timeSinceOldest); // 1분 - 경과 시간
   }
 };
 
@@ -569,6 +611,16 @@ async function getSheetValuesWithoutCache(sheetName) {
 async function fetchSheetValuesDirectly(sheetName) {
   
   try {
+    // API 호출 제한 확인
+    if (!rateLimitUtils.canMakeRequest()) {
+      const waitTime = rateLimitUtils.getWaitTime();
+      console.log(`⏳ [API-LIMIT] API 호출 제한됨. ${Math.ceil(waitTime/1000)}초 대기 중...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    
+    // API 호출 기록
+    rateLimitUtils.recordRequest();
+    
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
