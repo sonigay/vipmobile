@@ -69,39 +69,13 @@ class PhoneklDataManager {
       const currentData = await this.readCurrentData(sheetId, budgetType);
       const columns = this.getColumnMapping(budgetType);
       
-      // 2. 날짜 필터링을 위한 전체 데이터 한 번만 읽기 (캐시 활용)
-      let fullData = null;
-      if (dateRange) {
-        console.log(`📅 [PhoneklDataManager] 날짜 필터링을 위한 전체 데이터 읽기 시작`);
-        
-        // 캐시 키 생성
-        const cacheKey = `phonekl_full_data_${sheetId}`;
-        
-        // 캐시에서 먼저 확인
-        const cachedData = this.getFromCache(cacheKey);
-        if (cachedData) {
-          fullData = cachedData;
-          console.log(`📅 [PhoneklDataManager] 캐시에서 데이터 로드: ${fullData.length}행`);
-        } else {
-          const fullRange = `${this.phoneklSheetName}!A:AG`;
-          const fullResponse = await this.sheets.spreadsheets.values.get({
-            spreadsheetId: sheetId,
-            range: fullRange
-          });
-          fullData = fullResponse.data.values || [];
-          console.log(`📅 [PhoneklDataManager] 전체 데이터 읽기 완료: ${fullData.length}행`);
-          
-          // 캐시에 저장
-          this.setToCache(cacheKey, fullData);
-        }
-      }
+             // 날짜 필터링 제거로 인해 전체 데이터 읽기 불필요
       
       // 3. 업데이트할 요청들 준비
       const updateRequests = [];
-      let preservedCount = 0;
-      let updatedCount = 0;
-      let skippedCount = 0;
-      let dateFilteredCount = 0;
+             let preservedCount = 0;
+       let updatedCount = 0;
+       let skippedCount = 0;
       
       // 4. 헤더 행 건너뛰고 데이터 시작 행부터 처리 (5행부터)
       const dataStartRow = 4; // 0-based index로 4 (실제 5행)
@@ -112,47 +86,8 @@ class PhoneklDataManager {
         const currentRow = currentData[rowIndex];
         const actualRowNumber = rowIndex + 1; // Google Sheets 행 번호 (1-based)
         
-        // 날짜 필터링 적용 (계산 로직과 동일)
-        let isInDateRange = true;
-        if (dateRange && fullData && fullData[rowIndex] && fullData[rowIndex].length >= 23) {
-          const receptionDate = this.normalizeReceptionDate(fullData[rowIndex][16]); // Q열: 접수일
-          const activationDate = this.normalizeActivationDate(fullData[rowIndex][20], fullData[rowIndex][21], fullData[rowIndex][22]); // U, V, W열: 개통일
-          
-          // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
-          if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
-            const receptionInRange = receptionDate ? this.isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
-            isInDateRange = isInDateRange && receptionInRange;
-          }
-          
-          // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
-          // dateRange 객체의 다양한 속성명 지원
-          const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
-          const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
-          
-          if (activationStartDate && activationEndDate) {
-            const activationInRange = activationDate ? this.isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
-            isInDateRange = isInDateRange && activationInRange;
-          }
-          
-          // 디버깅: 처음 몇 행만 로그 출력
-          if (rowIndex < 5) {
-            console.log(`🔍 [Row ${actualRowNumber}] 날짜 필터링: 접수일=${receptionDate}, 개통일=${activationDate}, 범위내=${isInDateRange}`);
-            if (dateRange) {
-              const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
-              const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
-              console.log(`📅 [Row ${actualRowNumber}] 날짜 범위 설정: 접수일적용=${dateRange.applyReceiptDate}, 접수일범위=${dateRange.receiptStartDate}~${dateRange.receiptEndDate}, 개통일범위=${activationStartDate}~${activationEndDate}`);
-              console.log(`🔍 [Row ${actualRowNumber}] dateRange 객체 전체:`, JSON.stringify(dateRange, null, 2));
-            } else {
-              console.log(`❌ [Row ${actualRowNumber}] dateRange가 null입니다!`);
-            }
-          }
-        }
-        
-        // 날짜 범위에 포함되지 않는 경우 건너뛰기
-        if (!isInDateRange) {
-          dateFilteredCount++;
-          continue;
-        }
+                 // 날짜 필터링 제거 - performBudgetMatching에서 이미 필터링된 데이터만 전달받음
+         // 따라서 여기서는 추가 필터링 없이 계산된 데이터만 입력
         
         // B열부터 읽었으므로 인덱스 조정
         // 예산타입에 따른 소유권 정보 컬럼 결정 (B열부터 0-based)
@@ -269,13 +204,12 @@ class PhoneklDataManager {
       // 5. 결과 반환
       const result = {
         success: true,
-        updatedCells: updateRequests.length,
-        preservedCells: preservedCount,
-        skippedRows: skippedCount,
-        dateFilteredRows: dateFilteredCount,
-        budgetType,
-        userInfo,
-        message: `업데이트: ${updateRequests.length}개 셀, 보존: ${preservedCount}개 셀, 건너뜀: ${skippedCount}행, 날짜필터: ${dateFilteredCount}행`
+                 updatedCells: updateRequests.length,
+         preservedCells: preservedCount,
+         skippedRows: skippedCount,
+         budgetType,
+         userInfo,
+         message: `업데이트: ${updateRequests.length}개 셀, 보존: ${preservedCount}개 셀, 건너뜀: ${skippedCount}행`
       };
       
       console.log(`📊 [PhoneklDataManager] 최종 결과:`, result);
