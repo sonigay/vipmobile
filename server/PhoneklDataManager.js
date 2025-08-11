@@ -18,8 +18,8 @@ class PhoneklDataManager {
         remainingBudget: 'I', // 예산잔액
         securedBudget: 'J',   // 확보예산  
         usedBudget: 'K',      // 사용예산
-        owner: 'D',           // 입력자 (사용자명(예산타입) 형식)
-        timestamp: 'E'        // 입력일시
+        owner: 'B',           // 입력자(Ⅱ)
+        timestamp: 'C'        // 입력일시(Ⅱ)
       };
     } else {
       // 기본값: 액면예산(Ⅰ)
@@ -27,8 +27,8 @@ class PhoneklDataManager {
         remainingBudget: 'L', // 예산잔액
         securedBudget: 'M',   // 확보예산
         usedBudget: 'N',      // 사용예산
-        owner: 'D',           // 입력자 (사용자명(예산타입) 형식)
-        timestamp: 'E'        // 입력일시
+        owner: 'D',           // 입력자(Ⅰ)
+        timestamp: 'E'        // 입력일시(Ⅰ)
       };
     }
   }
@@ -40,8 +40,8 @@ class PhoneklDataManager {
     console.log(`📱 [PhoneklDataManager] 현재 데이터 읽기 시작: ${budgetType}`);
     
     const columns = this.getColumnMapping(budgetType);
-    // D열부터 P열까지 읽기 (D,E: 소유권정보, L,M,N: 예산데이터)
-    const range = `${this.phoneklSheetName}!D:P`;
+    // B열부터 P열까지 읽기 (B,C: 소유권정보(Ⅱ), D,E: 소유권정보(Ⅰ), I,J,K: 예산데이터(Ⅱ), L,M,N: 예산데이터(Ⅰ))
+    const range = `${this.phoneklSheetName}!B:P`;
     
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
@@ -80,20 +80,27 @@ class PhoneklDataManager {
         const currentRow = currentData[rowIndex];
         const actualRowNumber = rowIndex + 1; // Google Sheets 행 번호 (1-based)
         
-        // D열부터 읽었으므로 인덱스 조정
-        const existingOwner = currentRow?.[0] || ''; // D열: 입력자
-        const existingTimestamp = currentRow?.[1] || ''; // E열: 입력일시
+        // B열부터 읽었으므로 인덱스 조정
+        // 예산타입에 따른 소유권 정보 컬럼 결정 (B열부터 0-based)
+        let existingOwner, existingTimestamp;
+        if (budgetType === 'Ⅱ') {
+          existingOwner = currentRow?.[0] || ''; // B열: 입력자(Ⅱ) (B열부터 0번째)
+          existingTimestamp = currentRow?.[1] || ''; // C열: 입력일시(Ⅱ) (B열부터 1번째)
+        } else {
+          existingOwner = currentRow?.[2] || ''; // D열: 입력자(Ⅰ) (B열부터 2번째)
+          existingTimestamp = currentRow?.[3] || ''; // E열: 입력일시(Ⅰ) (B열부터 3번째)
+        }
         
-        // 예산타입에 따른 컬럼 인덱스 결정 (D열부터 0-based)
+        // 예산타입에 따른 예산 데이터 컬럼 결정 (B열부터 0-based)
         let existingRemainingBudget, existingSecuredBudget, existingUsedBudget;
         if (budgetType === 'Ⅱ') {
-          existingRemainingBudget = currentRow?.[5] || ''; // I열: 예산잔액 (D열부터 5번째)
-          existingSecuredBudget = currentRow?.[6] || ''; // J열: 확보예산 (D열부터 6번째)
-          existingUsedBudget = currentRow?.[7] || ''; // K열: 사용예산 (D열부터 7번째)
+          existingRemainingBudget = currentRow?.[7] || ''; // I열: 예산잔액 (B열부터 7번째)
+          existingSecuredBudget = currentRow?.[8] || ''; // J열: 확보예산 (B열부터 8번째)
+          existingUsedBudget = currentRow?.[9] || ''; // K열: 사용예산 (B열부터 9번째)
         } else {
-          existingRemainingBudget = currentRow?.[8] || ''; // L열: 예산잔액 (D열부터 8번째)
-          existingSecuredBudget = currentRow?.[9] || ''; // M열: 확보예산 (D열부터 9번째)
-          existingUsedBudget = currentRow?.[10] || ''; // N열: 사용예산 (D열부터 10번째)
+          existingRemainingBudget = currentRow?.[10] || ''; // L열: 예산잔액 (B열부터 10번째)
+          existingSecuredBudget = currentRow?.[11] || ''; // M열: 확보예산 (B열부터 11번째)
+          existingUsedBudget = currentRow?.[12] || ''; // N열: 사용예산 (B열부터 12번째)
         }
         
         // 해당 행에 매핑된 새 데이터가 있는지 확인
