@@ -65,14 +65,27 @@ class PhoneklDataManager {
       const currentData = await this.readCurrentData(sheetId, budgetType);
       const columns = this.getColumnMapping(budgetType);
       
-      // 2. 업데이트할 요청들 준비
+      // 2. 날짜 필터링을 위한 전체 데이터 한 번만 읽기
+      let fullData = null;
+      if (dateRange) {
+        console.log(`📅 [PhoneklDataManager] 날짜 필터링을 위한 전체 데이터 읽기 시작`);
+        const fullRange = `${this.phoneklSheetName}!A:AG`;
+        const fullResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: fullRange
+        });
+        fullData = fullResponse.data.values || [];
+        console.log(`📅 [PhoneklDataManager] 전체 데이터 읽기 완료: ${fullData.length}행`);
+      }
+      
+      // 3. 업데이트할 요청들 준비
       const updateRequests = [];
       let preservedCount = 0;
       let updatedCount = 0;
       let skippedCount = 0;
       let dateFilteredCount = 0;
       
-      // 3. 헤더 행 건너뛰고 데이터 시작 행부터 처리 (5행부터)
+      // 4. 헤더 행 건너뛰고 데이터 시작 행부터 처리 (5행부터)
       const dataStartRow = 4; // 0-based index로 4 (실제 5행)
       
       console.log(`📊 [CRITICAL] PhoneklDataManager 처리 시작: 신규 매핑 데이터=${Object.keys(newDataMap).length}개`);
@@ -83,30 +96,25 @@ class PhoneklDataManager {
         
         // 날짜 필터링 적용 (계산 로직과 동일)
         let isInDateRange = true;
-        if (dateRange) {
-          // 폰클개통데이터에서 날짜 정보 읽기 (전체 시트 기준)
-          const fullRange = `${this.phoneklSheetName}!A:AG`;
-          const fullResponse = await this.sheets.spreadsheets.values.get({
-            spreadsheetId: sheetId,
-            range: fullRange
-          });
-          const fullData = fullResponse.data.values || [];
+        if (dateRange && fullData && fullData[rowIndex] && fullData[rowIndex].length >= 23) {
+          const receptionDate = this.normalizeReceptionDate(fullData[rowIndex][16]); // Q열: 접수일
+          const activationDate = this.normalizeActivationDate(fullData[rowIndex][20], fullData[rowIndex][21], fullData[rowIndex][22]); // U, V, W열: 개통일
           
-          if (fullData[rowIndex] && fullData[rowIndex].length >= 23) {
-            const receptionDate = this.normalizeReceptionDate(fullData[rowIndex][16]); // Q열: 접수일
-            const activationDate = this.normalizeActivationDate(fullData[rowIndex][20], fullData[rowIndex][21], fullData[rowIndex][22]); // U, V, W열: 개통일
-            
-            // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
-            if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
-              const receptionInRange = receptionDate ? this.isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
-              isInDateRange = isInDateRange && receptionInRange;
-            }
-            
-            // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
-            if (dateRange.activationStartDate && dateRange.activationEndDate) {
-              const activationInRange = activationDate ? this.isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
-              isInDateRange = isInDateRange && activationInRange;
-            }
+          // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
+          if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
+            const receptionInRange = receptionDate ? this.isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
+            isInDateRange = isInDateRange && receptionInRange;
+          }
+          
+          // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
+          if (dateRange.activationStartDate && dateRange.activationEndDate) {
+            const activationInRange = activationDate ? this.isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
+            isInDateRange = isInDateRange && activationInRange;
+          }
+          
+          // 디버깅: 처음 몇 행만 로그 출력
+          if (rowIndex < 5) {
+            console.log(`🔍 [Row ${actualRowNumber}] 날짜 필터링: 접수일=${receptionDate}, 개통일=${activationDate}, 범위내=${isInDateRange}`);
           }
         }
         
@@ -338,7 +346,14 @@ class PhoneklDataManager {
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
       
-      return target >= start && target <= end;
+      const result = target >= start && target <= end;
+      
+      // 디버깅: 처음 몇 번만 로그 출력
+      if (Math.random() < 0.01) { // 1% 확률로 로그 출력
+        console.log(`📅 [isDateInRange] target=${targetDate}(${target.toISOString()}), start=${startDate}(${start.toISOString()}), end=${endDate}(${end.toISOString()}), result=${result}`);
+      }
+      
+      return result;
     } catch (error) {
       console.error('날짜 범위 확인 오류:', error);
       return false;
