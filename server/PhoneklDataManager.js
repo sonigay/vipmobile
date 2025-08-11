@@ -133,6 +133,9 @@ class PhoneklDataManager {
           // 디버깅: 처음 몇 행만 로그 출력
           if (rowIndex < 5) {
             console.log(`🔍 [Row ${actualRowNumber}] 날짜 필터링: 접수일=${receptionDate}, 개통일=${activationDate}, 범위내=${isInDateRange}`);
+            if (dateRange) {
+              console.log(`📅 [Row ${actualRowNumber}] 날짜 범위 설정: 접수일적용=${dateRange.applyReceiptDate}, 접수일범위=${dateRange.receiptStartDate}~${dateRange.receiptEndDate}, 개통일범위=${dateRange.activationStartDate}~${dateRange.activationEndDate}`);
+            }
           }
         }
         
@@ -385,16 +388,16 @@ class PhoneklDataManager {
       const start = new Date(startDate);
       const end = new Date(endDate);
       
-      // 시간 정보 제거하고 날짜만 비교
-      target.setHours(0, 0, 0, 0);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
+      // 날짜만 비교 (시간 제거)
+      const targetDateOnly = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+      const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
       
-      const result = target >= start && target <= end;
+      const result = targetDateOnly >= startDateOnly && targetDateOnly <= endDateOnly;
       
       // 디버깅: 처음 몇 번만 로그 출력
       if (Math.random() < 0.01) { // 1% 확률로 로그 출력
-        console.log(`📅 [isDateInRange] target=${targetDate}(${target.toISOString()}), start=${startDate}(${start.toISOString()}), end=${endDate}(${end.toISOString()}), result=${result}`);
+        console.log(`📅 [isDateInRange] target=${targetDate}(${targetDateOnly.toISOString()}), start=${startDate}(${startDateOnly.toISOString()}), end=${endDate}(${endDateOnly.toISOString()}), result=${result}`);
       }
       
       return result;
