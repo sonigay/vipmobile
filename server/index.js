@@ -3795,8 +3795,12 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
       }
       
       // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
-      if (dateRange.activationStartDate && dateRange.activationEndDate) {
-        const activationInRange = activationDate ? isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
+      // dateRange 객체의 다양한 속성명 지원
+      const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
+      const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
+      
+      if (activationStartDate && activationEndDate) {
+        const activationInRange = activationDate ? isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
         isInDateRange = isInDateRange && activationInRange;
       }
     }
