@@ -3730,6 +3730,7 @@ async function getUserSheetName(userName, budgetType) {
 // 예산 매칭 계산 함수 (기존 로직 기반으로 정확히 구현)
 async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyGroups, dateRange, budgetType) {
   console.log(`🧮 [performBudgetMatching] 시작: 정책그룹=${selectedPolicyGroups.join(',')}, 예산타입=${budgetType}`);
+  console.log(`🧮 [performBudgetMatching] dateRange 확인:`, JSON.stringify(dateRange, null, 2));
   
   const calculationResults = [];
   const dataMapping = {};
@@ -3917,6 +3918,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
 // 안전한 계산 전용 함수 (실제 업데이트 없이 계산만 수행)
 async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRange, userName, budgetType) {
   console.log('🧮 [DRY-RUN] calculateUsageBudgetDryRun 시작 - 사용자:', userName);
+  console.log('🧮 [DRY-RUN] dateRange 확인:', JSON.stringify(dateRange, null, 2));
   
   try {
     // 1. 사용자 시트 데이터 읽기
@@ -3943,7 +3945,8 @@ async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRan
     const phoneklData = phoneklResponse.data.values || [];
     console.log(`🧮 [DRY-RUN] 폰클개통데이터: ${phoneklData.length}행`);
     
-    // 3. 계산 수행
+    // 3. 계산 수행 (dateRange 명시적 전달)
+    console.log('🧮 [DRY-RUN] performBudgetMatching 호출 전 dateRange:', JSON.stringify(dateRange, null, 2));
     const calculationResult = await performBudgetMatching(
       userSheetData, 
       phoneklData, 
