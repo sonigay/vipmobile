@@ -57,7 +57,7 @@ class PhoneklDataManager {
   /**
    * 안전한 데이터 업데이트 (기존 데이터 보존)
    */
-  async safeUpdateData(sheetId, budgetType, newDataMap, userInfo) {
+  async safeUpdateData(sheetId, budgetType, newDataMap, userInfo, dateRange = null) {
     console.log(`🔒 [PhoneklDataManager] 안전 업데이트 시작: ${budgetType}, 사용자: ${userInfo.userName}`);
     
     try {
@@ -70,6 +70,7 @@ class PhoneklDataManager {
       let preservedCount = 0;
       let updatedCount = 0;
       let skippedCount = 0;
+      let dateFilteredCount = 0;
       
       // 3. 헤더 행 건너뛰고 데이터 시작 행부터 처리 (5행부터)
       const dataStartRow = 4; // 0-based index로 4 (실제 5행)
@@ -79,6 +80,41 @@ class PhoneklDataManager {
       for (let rowIndex = dataStartRow; rowIndex < currentData.length; rowIndex++) {
         const currentRow = currentData[rowIndex];
         const actualRowNumber = rowIndex + 1; // Google Sheets 행 번호 (1-based)
+        
+        // 날짜 필터링 적용 (계산 로직과 동일)
+        let isInDateRange = true;
+        if (dateRange) {
+          // 폰클개통데이터에서 날짜 정보 읽기 (전체 시트 기준)
+          const fullRange = `${this.phoneklSheetName}!A:AG`;
+          const fullResponse = await this.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: fullRange
+          });
+          const fullData = fullResponse.data.values || [];
+          
+          if (fullData[rowIndex] && fullData[rowIndex].length >= 23) {
+            const receptionDate = this.normalizeReceptionDate(fullData[rowIndex][16]); // Q열: 접수일
+            const activationDate = this.normalizeActivationDate(fullData[rowIndex][20], fullData[rowIndex][21], fullData[rowIndex][22]); // U, V, W열: 개통일
+            
+            // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
+            if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
+              const receptionInRange = receptionDate ? this.isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
+              isInDateRange = isInDateRange && receptionInRange;
+            }
+            
+            // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
+            if (dateRange.activationStartDate && dateRange.activationEndDate) {
+              const activationInRange = activationDate ? this.isDateInRange(activationDate, dateRange.activationStartDate, dateRange.activationEndDate) : false;
+              isInDateRange = isInDateRange && activationInRange;
+            }
+          }
+        }
+        
+        // 날짜 범위에 포함되지 않는 경우 건너뛰기
+        if (!isInDateRange) {
+          dateFilteredCount++;
+          continue;
+        }
         
         // B열부터 읽었으므로 인덱스 조정
         // 예산타입에 따른 소유권 정보 컬럼 결정 (B열부터 0-based)
@@ -198,9 +234,10 @@ class PhoneklDataManager {
         updatedCells: updateRequests.length,
         preservedCells: preservedCount,
         skippedRows: skippedCount,
+        dateFilteredRows: dateFilteredCount,
         budgetType,
         userInfo,
-        message: `업데이트: ${updateRequests.length}개 셀, 보존: ${preservedCount}개 셀, 건너뜀: ${skippedCount}행`
+        message: `업데이트: ${updateRequests.length}개 셀, 보존: ${preservedCount}개 셀, 건너뜀: ${skippedCount}행, 날짜필터: ${dateFilteredCount}행`
       };
       
       console.log(`📊 [PhoneklDataManager] 최종 결과:`, result);
@@ -217,6 +254,95 @@ class PhoneklDataManager {
    */
   isEmpty(value) {
     return value === '' || value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+  }
+
+  /**
+   * 접수일 정규화 (계산 로직과 동일)
+   */
+  normalizeReceptionDate(dateValue) {
+    if (!dateValue || typeof dateValue !== 'string') return null;
+    
+    // 다양한 날짜 형식 처리
+    const dateStr = dateValue.toString().trim();
+    
+    // 2025-01-16 형식
+    const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // 2025/01/16 형식
+    const slashMatch = dateStr.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if (slashMatch) {
+      const [, year, month, day] = slashMatch;
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // 01/16 형식 (현재 연도 가정)
+    const shortMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})/);
+    if (shortMatch) {
+      const [, month, day] = shortMatch;
+      const currentYear = new Date().getFullYear();
+      return new Date(currentYear, parseInt(month) - 1, parseInt(day));
+    }
+    
+    return null;
+  }
+
+  /**
+   * 개통일 정규화 (계산 로직과 동일)
+   */
+  normalizeActivationDate(dateValue, timeValue, timezoneValue) {
+    if (!dateValue || typeof dateValue !== 'string') return null;
+    
+    const dateStr = dateValue.toString().trim();
+    
+    // 2025-01-16 형식
+    const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // 2025/01/16 형식
+    const slashMatch = dateStr.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if (slashMatch) {
+      const [, year, month, day] = slashMatch;
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // 01/16 형식 (현재 연도 가정)
+    const shortMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})/);
+    if (shortMatch) {
+      const [, month, day] = shortMatch;
+      return new Date(currentYear, parseInt(month) - 1, parseInt(day));
+    }
+    
+    return null;
+  }
+
+  /**
+   * 날짜가 범위 내에 있는지 확인 (계산 로직과 동일)
+   */
+  isDateInRange(targetDate, startDate, endDate) {
+    if (!targetDate || !startDate || !endDate) return false;
+    
+    try {
+      const target = new Date(targetDate);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // 시간 정보 제거하고 날짜만 비교
+      target.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      
+      return target >= start && target <= end;
+    } catch (error) {
+      console.error('날짜 범위 확인 오류:', error);
+      return false;
+    }
   }
 
   /**

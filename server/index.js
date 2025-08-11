@@ -15459,7 +15459,8 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
       sheetId, 
       budgetType, 
       calculatedResult.dataMapping, 
-      userInfo
+      userInfo,
+      dateRange
     );
     
     console.log(`✅ [SAFE-UPDATE] 완료: ${updateResult.message}`);
