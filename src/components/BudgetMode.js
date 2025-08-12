@@ -1790,7 +1790,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       <TextField
                         fullWidth
                         size="small"
-                        disabled
                         placeholder="펫네임"
                         sx={{
                           '& .MuiOutlinedInput-root': {
@@ -1814,7 +1813,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       <TextField
                         fullWidth
                         size="small"
-                        disabled
                         placeholder="출고가"
                         sx={{
                           '& .MuiOutlinedInput-root': {
