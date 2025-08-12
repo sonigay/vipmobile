@@ -1557,7 +1557,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           >
             <Table stickyHeader size="small">
               <TableHead>
-                {/* 첫 번째 헤더 행: 예산금액 헤더 */}
+                                {/* 첫 번째 헤더 행: 예산금액 헤더 */}
                 <TableRow>
                   <TableCell 
                     sx={{ 
@@ -1571,77 +1571,129 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   >
                     예산금액
                   </TableCell>
+                  {/* 펫네임 더미 컬럼 */}
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#A1887F', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      minWidth: 240
+                    }}
+                  >
+                    펫네임
+                  </TableCell>
+                  {/* 출고가 더미 컬럼 */}
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#A1887F', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      minWidth: 100
+                    }}
+                  >
+                    출고가
+                  </TableCell>
                   {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
-                                         <TableCell 
-                       key={army}
-                       colSpan={3}
-                       sx={{ 
-                         backgroundColor: '#8D6E63', 
-                         color: 'white', 
-                         fontWeight: 'bold',
-                         textAlign: 'center',
-                         border: '1px solid #ddd',
-                         minWidth: 60
+                    <TableCell 
+                      key={army}
+                      colSpan={3}
+                      sx={{ 
+                        backgroundColor: '#8D6E63', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        border: '1px solid #ddd',
+                        minWidth: 60
+                      }}
+                    >
+                     <TextField
+                       size="small"
+                       type="number"
+                       value={budgetAmounts[army]}
+                       onChange={(e) => {
+                         const newAmounts = { ...budgetAmounts };
+                         newAmounts[army] = parseFloat(e.target.value) || 0;
+                         setBudgetAmounts(newAmounts);
                        }}
-                     >
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={budgetAmounts[army]}
-                        onChange={(e) => {
-                          const newAmounts = { ...budgetAmounts };
-                          newAmounts[army] = parseFloat(e.target.value) || 0;
-                          setBudgetAmounts(newAmounts);
-                        }}
-                        placeholder="40000"
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            fontSize: '0.8rem',
-                            backgroundColor: 'white',
-                            '& fieldset': {
-                              border: 'none'
-                            },
-                              '& input': {
-                                textAlign: 'center',
-                                color: '#8D6E63',
-                                fontWeight: 'bold'
-                              }
-                            }
-                          }}
-                        />
-                     </TableCell>
-                   ))}
-                 </TableRow>
+                       placeholder="40000"
+                       sx={{
+                         '& .MuiOutlinedInput-root': {
+                           fontSize: '0.8rem',
+                           backgroundColor: 'white',
+                           '& fieldset': {
+                             border: 'none'
+                           },
+                             '& input': {
+                               textAlign: 'center',
+                               color: '#8D6E63',
+                               fontWeight: 'bold'
+                             }
+                           }
+                         }}
+                       />
+                    </TableCell>
+                  ))}
+                </TableRow>
                  
-                 {/* 두 번째 헤더 행: 정책군 헤더 */}
-                 <TableRow>
-                   <TableCell 
-                     sx={{ 
-                       backgroundColor: '#795548', 
-                       color: 'white', 
-                       fontWeight: 'bold',
-                       textAlign: 'center',
-                       border: '1px solid #ddd'
-                     }}
-                   >
-                     정책군
-                   </TableCell>
-                   {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
-                     <TableCell 
-                       key={army}
-                       colSpan={3}
-                       sx={{ 
-                         backgroundColor: '#8D6E63', 
-                         color: 'white', 
-                         fontWeight: 'bold',
-                         textAlign: 'center',
-                         border: '1px solid #ddd'
-                       }}
-                     >
-                       {army}
-                     </TableCell>
-                   ))}
-                 </TableRow>
+                                 {/* 두 번째 헤더 행: 정책군 헤더 */}
+                <TableRow>
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#795548', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    정책군
+                  </TableCell>
+                  {/* 펫네임 더미 컬럼 */}
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#A1887F', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      minWidth: 240
+                    }}
+                  >
+                    펫네임
+                  </TableCell>
+                  {/* 출고가 더미 컬럼 */}
+                  <TableCell 
+                    sx={{ 
+                      backgroundColor: '#A1887F', 
+                      color: 'white', 
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      border: '1px solid #ddd',
+                      minWidth: 100
+                    }}
+                  >
+                    출고가
+                  </TableCell>
+                  {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
+                    <TableCell 
+                      key={army}
+                      colSpan={3}
+                      sx={{ 
+                        backgroundColor: '#8D6E63', 
+                        color: 'white', 
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        border: '1px solid #ddd'
+                      }}
+                    >
+                      {army}
+                    </TableCell>
+                  ))}
+                </TableRow>
                  
                  {/* 세 번째 헤더 행: 카테고리 헤더 */}
                  <TableRow>
