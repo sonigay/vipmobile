@@ -680,15 +680,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           if (currentColIndex === 0) {
             // 모델명
             newData[currentRowIndex].modelName = value;
-          } else if (currentColIndex >= 1 && currentColIndex <= 18) {
-            // 지출예산 값 (1-18번 컬럼) - 복사 붙여넣기한 숫자들
+          } else if (currentColIndex >= 3 && currentColIndex <= 20) {
+            // 지출예산 값 (3-20번 컬럼) - 펫네임, 출고가 포함하여 모든 데이터 처리
             const numValue = parseFloat(value) || 0;
-            newData[currentRowIndex].expenditureValues[currentColIndex - 1] = numValue;
+            const actualColIndex = currentColIndex - 3; // 펫네임, 출고가를 포함한 실제 인덱스
+            newData[currentRowIndex].expenditureValues[actualColIndex] = numValue;
             newData[currentRowIndex].usedBudget = numValue;
             
             // 군/유형 매핑
-            const armyType = getArmyType(currentColIndex);
-            const categoryType = getCategoryType(currentColIndex);
+            const armyType = getArmyType(actualColIndex + 1);
+            const categoryType = getCategoryType(actualColIndex + 1);
             newData[currentRowIndex].armyType = armyType;
             newData[currentRowIndex].categoryType = categoryType;
           }
@@ -1550,7 +1551,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           
           <TableContainer 
             component={Paper} 
-            sx={{ maxHeight: 600 }}
+            sx={{ maxHeight: 600, overflowX: 'auto' }}
             onPaste={(e) => handlePaste(e, 0, 0)}
             tabIndex={0}
           >
@@ -1565,24 +1566,24 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       fontWeight: 'bold',
                       textAlign: 'center',
                       border: '1px solid #ddd',
-                      minWidth: 120
+                      minWidth: 100
                     }}
                   >
                     예산금액
                   </TableCell>
                   {['S군', 'A군', 'B군', 'C군', 'D군', 'E군'].map((army, armyIndex) => (
-                    <TableCell 
-                      key={army}
-                      colSpan={3}
-                      sx={{ 
-                        backgroundColor: '#8D6E63', 
-                        color: 'white', 
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        border: '1px solid #ddd',
-                        minWidth: 80
-                      }}
-                    >
+                                         <TableCell 
+                       key={army}
+                       colSpan={3}
+                       sx={{ 
+                         backgroundColor: '#8D6E63', 
+                         color: 'white', 
+                         fontWeight: 'bold',
+                         textAlign: 'center',
+                         border: '1px solid #ddd',
+                         minWidth: 60
+                       }}
+                     >
                       <TextField
                         size="small"
                         type="number"
@@ -1650,10 +1651,35 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                        color: 'white', 
                        fontWeight: 'bold',
                        textAlign: 'center',
-                       border: '1px solid #ddd'
+                       border: '1px solid #ddd',
+                       minWidth: 100
                      }}
                    >
                      모델명
+                   </TableCell>
+                   <TableCell 
+                     sx={{ 
+                       backgroundColor: '#A1887F', 
+                       color: 'white', 
+                       fontWeight: 'bold',
+                       textAlign: 'center',
+                       border: '1px solid #ddd',
+                       minWidth: 240
+                     }}
+                   >
+                     펫네임
+                   </TableCell>
+                   <TableCell 
+                     sx={{ 
+                       backgroundColor: '#A1887F', 
+                       color: 'white', 
+                       fontWeight: 'bold',
+                       textAlign: 'center',
+                       border: '1px solid #ddd',
+                       minWidth: 100
+                     }}
+                   >
+                     출고가
                    </TableCell>
                    {['신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상', '신규', 'MNP', '보상'].map((category, index) => (
                      <TableCell 
@@ -1664,7 +1690,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                          fontWeight: 'bold',
                          textAlign: 'center',
                          border: '1px solid #ddd',
-                         minWidth: 80
+                         minWidth: 60
                        }}
                      >
                        {category}
@@ -1701,7 +1727,55 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       />
                     </TableCell>
                     
-                                         {/* 지출예산 값 셀들 (18개) */}
+                    {/* 펫네임 셀 (더미) */}
+                    <TableCell 
+                      sx={{ 
+                        border: '1px solid #ddd',
+                        padding: '4px',
+                        backgroundColor: '#f5f5f5'
+                      }}
+                    >
+                      <TextField
+                        fullWidth
+                        size="small"
+                        disabled
+                        placeholder="펫네임"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: '0.8rem',
+                            '& fieldset': {
+                              border: 'none'
+                            }
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    
+                    {/* 출고가 셀 (더미) */}
+                    <TableCell 
+                      sx={{ 
+                        border: '1px solid #ddd',
+                        padding: '4px',
+                        backgroundColor: '#f5f5f5'
+                      }}
+                    >
+                      <TextField
+                        fullWidth
+                        size="small"
+                        disabled
+                        placeholder="출고가"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: '0.8rem',
+                            '& fieldset': {
+                              border: 'none'
+                            }
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    
+                    {/* 지출예산 값 셀들 (18개) */}
                      {Array.from({ length: 18 }, (_, colIndex) => (
                        <TableCell 
                          key={colIndex}
@@ -1741,7 +1815,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <br/>• <strong>직접 입력:</strong> 각 셀을 클릭하여 모델명과 지출예산 값을 직접 입력할 수 있습니다.
                 <br/>• <strong>엑셀 붙여넣기:</strong> 엑셀에서 데이터를 복사한 후 테이블 영역을 클릭하고 Ctrl+V로 붙여넣기하면 한 번에 여러 행의 데이터가 입력됩니다.
                 <br/>• <strong>저장:</strong> 데이터 입력 후 상단의 "저장" 버튼을 클릭하여 Google Sheet에 저장합니다.
-                <br/>• <strong>데이터 형식:</strong> 첫 번째 열은 모델명, 나머지 18개 열은 각 군별(신규/MNP/보상) 지출예산 값입니다.
+                <br/>• <strong>데이터 형식:</strong> 첫 번째 열은 모델명, 두 번째와 세 번째 열은 펫네임과 출고가(더미), 나머지 18개 열은 각 군별(신규/MNP/보상) 지출예산 값입니다.
                 <br/>• <strong>계산 방식:</strong> 예산잔액 = 설정된 예산금액 - 지출예산
               </Typography>
             </Box>
