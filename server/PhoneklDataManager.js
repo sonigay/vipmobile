@@ -1,12 +1,12 @@
 /**
- * 폰클개통데이터 안전 업데이트 관리 클래스
+ * 액면예산 안전 업데이트 관리 클래스
  * 기존 데이터 보존, 공백 부분만 새 데이터 입력
  */
 class PhoneklDataManager {
   constructor(sheets, spreadsheetId) {
     this.sheets = sheets;
     this.spreadsheetId = spreadsheetId;
-    this.phoneklSheetName = '폰클개통데이터';
+    this.phoneklSheetName = '액면예산';
     
     // 간단한 캐시 시스템
     this.cache = new Map();
@@ -38,7 +38,7 @@ class PhoneklDataManager {
   }
 
   /**
-   * 폰클개통데이터에서 현재 데이터 읽기 (소유권 정보 포함)
+   * 액면예산에서 현재 데이터 읽기 (소유권 정보 포함)
    */
   async readCurrentData(sheetId, budgetType) {
     console.log(`📱 [PhoneklDataManager] 현재 데이터 읽기 시작: ${budgetType}`);

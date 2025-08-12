@@ -630,7 +630,7 @@ export const budgetUserSheetAPI = {
     return response.json();
   },
 
-  // 사용자 시트의 사용예산을 폰클개통데이터에서 안전하게 업데이트
+  // 사용자 시트의 사용예산을 액면예산에서 안전하게 업데이트
   updateUserSheetUsage: async (sheetId, selectedPolicyGroups, dateRange, userName, budgetType) => {
     const response = await fetch(`${API_BASE_URL}/api/budget/user-sheets/${sheetId}/update-usage-safe`, {
       method: 'POST',

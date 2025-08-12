@@ -730,7 +730,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       const result = await autoSaveToUserSheet(budgetData);
       
-      // 저장 후 사용자 시트의 사용예산을 폰클개통데이터 C열에서 업데이트
+      // 저장 후 사용자 시트의 사용예산을 액면예산 C열에서 업데이트
       if (result && result.sheet && result.sheet.id && selectedPolicyGroups.length > 0) {
         const userName = loggedInStore?.name || loggedInStore?.agentInfo?.name || 'unknown';
         
