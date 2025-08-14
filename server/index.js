@@ -3830,10 +3830,8 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     
     // 5. 사용자 시트 데이터에서 매칭 찾기
     let calculatedBudgetValue = 0;
-    let securedBudgetValue = 0;
+    let securedBudgetValue = 40000; // 기본 확보예산 40000
     let matchFound = false;
-    
-    // 매칭 로그는 성공/실패 시에만 출력
     
     // 헤더 제외하고 예산 데이터에서 매칭
     if (userSheetData.length > 1) {
@@ -3844,7 +3842,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           const budgetArmyType = (budgetRow[6] || '').toString().trim(); // G열: 군
           const budgetCategoryType = (budgetRow[7] || '').toString().trim(); // H열: 유형
           const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산
-          const budgetSecuredAmount = parseFloat(budgetRow[8]) || 0; // I열: 확보 예산
+          const budgetSecuredAmount = parseFloat(budgetRow[8]) || 40000; // I열: 확보 예산 (기본값 40000)
           
           // 모델명, 군, 유형이 모두 일치하는 경우
           if (budgetModelName === modelName && 
@@ -3863,6 +3861,17 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
       }
     } else {
       console.log(`🚫 사용자 시트 데이터가 비어있음 (헤더만 존재)`);
+    }
+    
+    // 모델명이 있으면 매칭 성공으로 처리 (숫자 입력 여부와 관계없이)
+    if (!matchFound && modelName) {
+      // 모델명이 있지만 매칭되지 않은 경우, 기본값으로 처리
+      calculatedBudgetValue = 0;
+      securedBudgetValue = 40000;
+      matchFound = true;
+      matchedItems++;
+      
+      console.log(`🎯 [Row ${actualRowNumber}] 기본 매칭: 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
     }
     
     if (!matchFound) {
@@ -16398,35 +16407,34 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       if (item.modelName && item.expenditureValues) {
         // 18개 컬럼의 지출예산 값을 각각 개별 행으로 저장
         item.expenditureValues.forEach((expenditureValue, index) => {
-          if (expenditureValue > 0) { // 값이 있는 경우만 저장
-            const armyType = getArmyType(index + 1);
-            const categoryType = getCategoryType(index + 1);
-            
-            // 해당 군의 예산금액 가져오기 (예산타입에 따른 기본값 적용)
-            const defaultAmount = budgetType === 'Ⅱ' ? 0 : 40000;
-            const securedBudget = budgetAmounts?.[armyType] || defaultAmount;
-            
-            // 지출예산을 1만원 단위에서 원 단위로 변환 (예: 2 -> 20000)
-            const usedBudget = expenditureValue * 10000; // Multiplied by 10000
-            
-            // 예산 잔액 계산
-            const remainingBudget = securedBudget - usedBudget;
-            
-            rowsToSave.push([
-              dateRange.receiptStartDate || '', // A열: 접수일 시작
-              dateRange.receiptEndDate || '', // B열: 접수일 종료
-              dateRange.activationStartDate || '', // C열: 개통일 시작
-              dateRange.activationEndDate || '', // D열: 개통일 종료
-              `${userName}(레벨${userLevel || 'SS'})`, // E열: 입력자(권한레벨)
-              item.modelName, // F열: 모델명
-              armyType, // G열: 군
-              categoryType, // H열: 유형
-              securedBudget, // I열: 확보된 예산 (원 단위)
-              usedBudget, // J열: 사용된 예산 (원 단위)
-              remainingBudget, // K열: 예산 잔액 (원 단위)
-              '정상' // L열: 상태
-            ]);
-          }
+          // 모델명이 있으면 모든 행을 저장 (값이 0이어도 포함)
+          const armyType = getArmyType(index + 1);
+          const categoryType = getCategoryType(index + 1);
+          
+          // 해당 군의 예산금액 가져오기 (예산타입에 따른 기본값 적용)
+          const defaultAmount = budgetType === 'Ⅱ' ? 0 : 40000;
+          const securedBudget = budgetAmounts?.[armyType] || defaultAmount;
+          
+          // 지출예산을 1만원 단위에서 원 단위로 변환 (예: 2 -> 20000, -2 -> -20000)
+          const usedBudget = expenditureValue * 10000; // Multiplied by 10000
+          
+          // 예산 잔액 계산
+          const remainingBudget = securedBudget - usedBudget;
+          
+          rowsToSave.push([
+            dateRange.receiptStartDate || '', // A열: 접수일 시작
+            dateRange.receiptEndDate || '', // B열: 접수일 종료
+            dateRange.activationStartDate || '', // C열: 개통일 시작
+            dateRange.activationEndDate || '', // D열: 개통일 종료
+            `${userName}(레벨${userLevel || 'SS'})`, // E열: 입력자(권한레벨)
+            item.modelName, // F열: 모델명
+            armyType, // G열: 군
+            categoryType, // H열: 유형
+            securedBudget, // I열: 확보된 예산 (원 단위)
+            usedBudget, // J열: 사용된 예산 (원 단위)
+            remainingBudget, // K열: 예산 잔액 (원 단위)
+            '정상' // L열: 상태
+          ]);
         });
       }
     });

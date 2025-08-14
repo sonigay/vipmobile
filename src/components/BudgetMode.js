@@ -682,7 +682,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             newData[currentRowIndex].modelName = value;
           } else if (currentColIndex >= 3 && currentColIndex <= 20) {
             // 지출예산 값 (3-20번 컬럼) - 펫네임, 출고가 포함하여 모든 데이터 처리
-            const numValue = parseFloat(value) || 0;
+            // 빈 셀이나 숫자가 아닌 값은 0으로 처리
+            const numValue = value === '' || value === null || value === undefined ? 0 : (parseFloat(value) || 0);
             const actualColIndex = currentColIndex - 3; // 펫네임, 출고가를 포함한 실제 인덱스
             newData[currentRowIndex].expenditureValues[actualColIndex] = numValue;
             newData[currentRowIndex].usedBudget = numValue;
