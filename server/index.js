@@ -3747,167 +3747,148 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   // 헤더 확인 (5행부터 시작) - 기존 로직과 동일
   const dataStartRow = 4; // 0-based index (실제 5행)
   
-  // C5행부터 데이터 처리 (기존 로직과 동일한 방식)
-  const activationRows = phoneklData.slice(dataStartRow);
-  
-  // console.log(`🔍 [DEBUG] 전체 데이터: ${phoneklData.length}행, 처리 대상: ${activationRows.length}행, 시작 인덱스: ${dataStartRow}`);
-  // console.log(`🔍 [DEBUG] 첫 번째 처리 행 예시:`, activationRows[0]);
-  
-  activationRows.forEach((row, index) => {
-    const actualRowNumber = 5 + index; // C5, C6, C7, C8...
-    
-    // 행이 존재하고 AG열(32번 인덱스)까지 접근할 수 있는지 확인
-    if (!row || row.length < 33) {
-      // console.log(`🚫 [Row ${actualRowNumber}] 건너뜀: 컬럼 수 부족 (${row ? row.length : 0}/33 필요)`);
-      return;
-    }
-    
-    processedRows++;
-    
-    // 처음 5개 행만 디버깅 로그
-    // if (index < 5) {
-    //   console.log(`🔍 [DEBUG-ROW-${actualRowNumber}] 컬럼 수: ${row.length}, P열(정책그룹): "${row[15]}", O열(정책군): "${row[14]}", AE열(유형): "${row[30]}", AG열(모델): "${row[32]}"`);
-    // }
-    
-    // 안전한 데이터 추출
-    const policyGroup = (row[15] || '').toString().trim(); // P열: 정책그룹
-    const armyType = (row[14] || '').toString().trim(); // O열: 정책군
-    const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
-    const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
-    const currentBudgetValue = parseFloat(row[13]) || 0; // N열: 현재 예산값
-    
-    // 1. 정책그룹 매칭 확인
-    if (!selectedPolicyGroups.includes(policyGroup)) {
-      policyGroupFiltered++;
-      return;
-    }
-    
-    // 2. 날짜 범위 필터링
-    let isInDateRange = true;
-    if (dateRange) {
-      const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일
-      const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일
-      
-      // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
-      if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
-        const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
-        isInDateRange = isInDateRange && receptionInRange;
-      }
-      
-      // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
-      // dateRange 객체의 다양한 속성명 지원
-      const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
-      const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
-      
-      if (activationStartDate && activationEndDate) {
-        const activationInRange = activationDate ? isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
-        isInDateRange = isInDateRange && activationInRange;
-      }
-    }
-    
-    if (!isInDateRange) {
-      dateRangeFiltered++;
-      return;
-    }
-    
-    // 3. 정책군 매핑 (기존 로직과 동일)
-    let mappedArmyType = '';
-    if (armyType === 'S') mappedArmyType = 'S군';
-    else if (armyType === 'A') mappedArmyType = 'A군';
-    else if (armyType === 'B') mappedArmyType = 'B군';
-    else if (armyType === 'C') mappedArmyType = 'C군';
-    else if (armyType === 'D') mappedArmyType = 'D군';
-    else if (armyType === 'E') mappedArmyType = 'E군';
-    else mappedArmyType = armyType;
-    
-    // 4. 유형 매핑 (기존 로직과 동일)
-    let mappedCategoryType = '';
-    if (categoryType === '신규') mappedCategoryType = '신규';
-    else if (categoryType === 'MNP') mappedCategoryType = 'MNP';
-    else if (categoryType === '보상') mappedCategoryType = '보상';
-    else if (categoryType === '기변') mappedCategoryType = '보상';
-    else mappedCategoryType = categoryType;
-    
-    // 5. 사용자 시트 데이터에서 매칭 찾기
-    let calculatedBudgetValue = 0;
-    let securedBudgetValue = 40000; // 기본 확보예산 40000
-    let matchFound = false;
-    
-    // 헤더 제외하고 예산 데이터에서 매칭
-    if (userSheetData.length > 1) {
-      for (let i = 1; i < userSheetData.length; i++) {
-        const budgetRow = userSheetData[i];
-        if (budgetRow.length >= 12) {
-          const budgetModelName = (budgetRow[5] || '').toString().trim(); // F열: 모델명
-          const budgetArmyType = (budgetRow[6] || '').toString().trim(); // G열: 군
-          const budgetCategoryType = (budgetRow[7] || '').toString().trim(); // H열: 유형
-          const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산
-          const budgetSecuredAmount = parseFloat(budgetRow[8]) || 40000; // I열: 확보 예산 (기본값 40000)
+  // 사용자 시트의 모델명을 기준으로 액면예산에서 매칭 찾기
+  // 헤더 제외하고 사용자 시트 데이터 처리
+  if (userSheetData.length > 1) {
+    for (let i = 1; i < userSheetData.length; i++) {
+      const budgetRow = userSheetData[i];
+      if (budgetRow.length >= 12) {
+        const budgetModelName = (budgetRow[5] || '').toString().trim(); // F열: 모델명
+        const budgetArmyType = (budgetRow[6] || '').toString().trim(); // G열: 군
+        const budgetCategoryType = (budgetRow[7] || '').toString().trim(); // H열: 유형
+        const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산
+        const budgetSecuredAmount = parseFloat(budgetRow[8]) || 40000; // I열: 확보 예산 (기본값 40000)
+        
+        // 사용자 시트의 모델명이 비어있으면 건너뛰기
+        if (!budgetModelName) {
+          continue;
+        }
+        
+        // 액면예산에서 해당 모델명, 군, 유형을 찾기
+        let matchFound = false;
+        let calculatedBudgetValue = budgetUsedAmount;
+        let securedBudgetValue = budgetSecuredAmount;
+        
+        // C5행부터 액면예산 데이터 처리
+        const activationRows = phoneklData.slice(dataStartRow);
+        
+        for (let j = 0; j < activationRows.length; j++) {
+          const row = activationRows[j];
+          const actualRowNumber = 5 + j; // C5, C6, C7, C8...
           
-          // 모델명, 군, 유형이 모두 일치하는 경우
+          // 행이 존재하고 AG열(32번 인덱스)까지 접근할 수 있는지 확인
+          if (!row || row.length < 33) {
+            continue;
+          }
+          
+          // 안전한 데이터 추출
+          const policyGroup = (row[15] || '').toString().trim(); // P열: 정책그룹
+          const armyType = (row[14] || '').toString().trim(); // O열: 정책군
+          const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
+          const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
+          
+          // 1. 정책그룹 매칭 확인
+          if (!selectedPolicyGroups.includes(policyGroup)) {
+            continue;
+          }
+          
+          // 2. 날짜 범위 필터링
+          let isInDateRange = true;
+          if (dateRange) {
+            const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일
+            const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일
+            
+            // 접수일 적용이 체크되어 있고, 접수일 범위가 설정되어 있으면 접수일 조건 확인
+            if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
+              const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
+              isInDateRange = isInDateRange && receptionInRange;
+            }
+            
+            // 개통일 범위가 설정되어 있으면 개통일 조건 확인 (항상 확인)
+            const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
+            const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
+            
+            if (activationStartDate && activationEndDate) {
+              const activationInRange = activationDate ? isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
+              isInDateRange = isInDateRange && activationInRange;
+            }
+          }
+          
+          if (!isInDateRange) {
+            continue;
+          }
+          
+          // 3. 정책군 매핑
+          let mappedArmyType = '';
+          if (armyType === 'S') mappedArmyType = 'S군';
+          else if (armyType === 'A') mappedArmyType = 'A군';
+          else if (armyType === 'B') mappedArmyType = 'B군';
+          else if (armyType === 'C') mappedArmyType = 'C군';
+          else if (armyType === 'D') mappedArmyType = 'D군';
+          else if (armyType === 'E') mappedArmyType = 'E군';
+          else mappedArmyType = armyType;
+          
+          // 4. 유형 매핑
+          let mappedCategoryType = '';
+          if (categoryType === '신규') mappedCategoryType = '신규';
+          else if (categoryType === 'MNP') mappedCategoryType = 'MNP';
+          else if (categoryType === '보상') mappedCategoryType = '보상';
+          else if (categoryType === '기변') mappedCategoryType = '보상';
+          else mappedCategoryType = categoryType;
+          
+          // 5. 모델명, 군, 유형이 모두 일치하는 경우 매칭 성공
           if (budgetModelName === modelName && 
               budgetArmyType === mappedArmyType && 
               budgetCategoryType === mappedCategoryType) {
             
-            calculatedBudgetValue = budgetUsedAmount;
-            securedBudgetValue = budgetSecuredAmount;
             matchFound = true;
             matchedItems++;
+            processedRows++;
             
-            // console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            // 6. 계산 결과 저장
+            const remainingBudget = securedBudgetValue - calculatedBudgetValue;
+            
+            totalSecuredBudget += securedBudgetValue;
+            totalUsedBudget += calculatedBudgetValue;
+            totalRemainingBudget += remainingBudget;
+            
+            dataMapping[actualRowNumber] = {
+              remainingBudget,
+              securedBudget: securedBudgetValue,
+              usedBudget: calculatedBudgetValue
+            };
+            
+            calculationResults.push({
+              rowIndex: j + dataStartRow,
+              actualRowNumber,
+              calculatedBudgetValue: remainingBudget,
+              securedBudgetValue,
+              usedBudgetValue: calculatedBudgetValue,
+              matchingData: {
+                policyGroup,
+                armyType: mappedArmyType,
+                categoryType: mappedCategoryType,
+                modelName
+              }
+            });
+            
+            console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
             break;
           }
         }
+        
+        // 매칭되지 않은 경우 로그
+        if (!matchFound) {
+          modelMismatch++;
+          console.log(`❌ [사용자시트] 매칭 실패: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
+        }
       }
-    } else {
-      console.log(`🚫 사용자 시트 데이터가 비어있음 (헤더만 존재)`);
     }
-    
-    // 모델명이 있으면 매칭 성공으로 처리 (숫자 입력 여부와 관계없이)
-    if (!matchFound && modelName) {
-      // 모델명이 있지만 매칭되지 않은 경우, 기본값으로 처리
-      calculatedBudgetValue = 0;
-      securedBudgetValue = 40000;
-      matchFound = true;
-      matchedItems++;
-      
-      console.log(`🎯 [Row ${actualRowNumber}] 기본 매칭: 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
-    }
-    
-    if (!matchFound) {
-      modelMismatch++;
-      return;
-    }
-    
-    // 6. 계산 결과 저장
-    const remainingBudget = securedBudgetValue - calculatedBudgetValue;
-    
-    totalSecuredBudget += securedBudgetValue;
-    totalUsedBudget += calculatedBudgetValue;
-    totalRemainingBudget += remainingBudget;
-    
-    dataMapping[actualRowNumber] = {
-      remainingBudget,
-      securedBudget: securedBudgetValue,
-      usedBudget: calculatedBudgetValue
-    };
-    
-    calculationResults.push({
-      rowIndex: index + dataStartRow,
-      actualRowNumber,
-      calculatedBudgetValue: remainingBudget,
-      securedBudgetValue,
-      usedBudgetValue: calculatedBudgetValue,
-      matchingData: {
-        policyGroup,
-        armyType: mappedArmyType,
-        categoryType: mappedCategoryType,
-        modelName
-      }
-    });
-  });
+  } else {
+    console.log(`🚫 사용자 시트 데이터가 비어있음 (헤더만 존재)`);
+  }
   
-  console.log(`📈 [performBudgetMatching] 완료: 처리=${processedRows}, 매칭=${matchedItems}, 정책그룹필터=${policyGroupFiltered}, 날짜필터=${dateRangeFiltered}, 모델불일치=${modelMismatch}`);
+  console.log(`📈 [performBudgetMatching] 완료: 처리=${processedRows}, 매칭=${matchedItems}, 모델불일치=${modelMismatch}`);
   console.log(`📋 [CRITICAL] dataMapping 생성 완료: ${Object.keys(dataMapping).length}개 행`);
   
   return {
@@ -3919,8 +3900,8 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     processedRows,
     matchedItems,
     statistics: {
-      policyGroupFiltered,
-      dateRangeFiltered,
+      policyGroupFiltered: 0, // 사용자 시트 기준이므로 정책그룹 필터링은 액면예산에서 처리
+      dateRangeFiltered: 0,   // 사용자 시트 기준이므로 날짜 필터링은 액면예산에서 처리
       modelMismatch
     }
   };
