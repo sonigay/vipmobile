@@ -2560,6 +2560,98 @@ async function checkAndUpdateAddresses() {
   }
 }
 
+// SALES_SHEET_ID 주소 업데이트를 확인하고 실행하는 함수
+async function checkAndUpdateSalesAddresses() {
+  try {
+    // SALES_SHEET_ID 환경변수 확인
+    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
+    if (!SALES_SPREADSHEET_ID) {
+      console.log('SALES_SHEET_ID 환경변수가 설정되지 않아 주소 업데이트를 건너뜁니다.');
+      return;
+    }
+    
+    const SALES_SHEET_NAME = '판매점정보';
+    const salesValues = await getSheetValues(SALES_SHEET_NAME, SALES_SPREADSHEET_ID);
+    if (!salesValues) {
+      throw new Error('Failed to fetch data from sales sheet');
+    }
+
+    // 헤더 제거 (2행부터 시작)
+    const salesRows = salesValues.slice(1);
+    const updates = [];
+    let processedCount = 0;
+    let updatedCount = 0;
+    
+    console.log(`🔍 [SALES] 판매점정보 시트 데이터 로드: ${salesRows.length}개 행`);
+    
+    // 모든 주소에 대해 좌표 업데이트
+    for (let i = 0; i < salesRows.length; i++) {
+      const row = salesRows[i];
+      const address = row[7];  // H열: 주소
+      const existingLat = row[5]; // F열: 기존 위도
+      const existingLng = row[6]; // G열: 기존 경도
+      
+      // 주소가 없거나 '주소확인필요'인 경우 건너뛰기
+      if (!address || address.toString().trim() === '' || address.toString().trim() === '주소확인필요') {
+        continue;
+      }
+      
+      processedCount++;
+      
+      // 기존 좌표가 모두 존재하면 지오코딩 생략
+      if (existingLat && existingLng) {
+        continue;
+      }
+      
+      // 주소 해시 비교 (변경 감지) - 좌표가 없을 경우에만 적용
+      const addressHash = createHash(address.toString().trim());
+      const existingAddressHash = createHash('');
+      
+      // 좌표가 없는 경우에만 지오코딩 실행
+      if (addressHash !== existingAddressHash) {
+        try {
+          console.log(`🔍 [SALES] 좌표 업데이트 시작: ${address}`);
+          const result = await geocodeAddress(address);
+          if (result) {
+            const { latitude, longitude } = result;
+            updates.push({
+              range: `${SALES_SHEET_NAME}!F${i + 2}:G${i + 2}`,
+              values: [[latitude, longitude]]
+            });
+            updatedCount++;
+            console.log(`✅ [SALES] 좌표 업데이트 성공: ${address} (${latitude}, ${longitude})`);
+          } else {
+            console.log(`❌ [SALES] Geocoding 결과 없음: ${address}`);
+          }
+        } catch (error) {
+          console.error(`❌ [SALES] Geocoding 오류: ${address}`, error.message);
+        }
+        
+        // API 할당량 제한을 피하기 위한 지연 (0.2초)
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
+    // 일괄 업데이트 실행
+    if (updates.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: SALES_SPREADSHEET_ID,
+        resource: {
+          valueInputOption: 'USER_ENTERED',
+          data: updates
+        }
+      });
+      console.log(`✅ [SALES] 일괄 업데이트 완료: ${updates.length}개 좌표 업데이트`);
+    } else {
+      console.log(`ℹ️ [SALES] 업데이트할 좌표가 없습니다.`);
+    }
+    
+    console.log(`📊 [SALES] 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개`);
+  } catch (error) {
+    console.error('Error in checkAndUpdateSalesAddresses:', error);
+  }
+}
+
 // 재고배정 상태 계산 API
 app.get('/api/inventory/assignment-status', async (req, res) => {
   try {
@@ -4745,6 +4837,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('✅ [서버시작] 주소 업데이트 함수 완료');
     }).catch(error => {
       console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
+    });
+    
+    // SALES_SHEET_ID 주소 업데이트 함수 호출 (비동기로 처리)
+    console.log('🔍 [서버시작] SALES_SHEET_ID 주소 업데이트 함수 시작 (비동기 처리)');
+    checkAndUpdateSalesAddresses().then(() => {
+      console.log('✅ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 완료');
+    }).catch(error => {
+      console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
     });
     
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)
