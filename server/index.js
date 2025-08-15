@@ -576,8 +576,8 @@ function createTrackedSheets() {
 const sheets = createTrackedSheets();
 
 // 데이터 시트에서 값 가져오기 (캐싱 적용)
-async function getSheetValues(sheetName) {
-  const cacheKey = `sheet_${sheetName}`;
+async function getSheetValues(sheetName, spreadsheetId = SPREADSHEET_ID) {
+  const cacheKey = `sheet_${sheetName}_${spreadsheetId}`;
   
   // 캐시에서 먼저 확인
   const cachedData = cacheUtils.get(cacheKey);
@@ -585,7 +585,7 @@ async function getSheetValues(sheetName) {
     return cachedData;
   }
   
-  return await fetchSheetValuesDirectly(sheetName);
+  return await fetchSheetValuesDirectly(sheetName, spreadsheetId);
 }
 
 // 캐시를 무시하고 직접 시트에서 데이터를 가져오는 함수
@@ -608,7 +608,7 @@ async function getSheetValuesWithoutCache(sheetName) {
 }
 
 // 시트에서 직접 데이터를 가져오는 공통 함수
-async function fetchSheetValuesDirectly(sheetName) {
+async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_ID) {
   
   try {
     // API 호출 제한 확인
@@ -625,7 +625,7 @@ async function fetchSheetValuesDirectly(sheetName) {
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: safeSheetName
     });
     
@@ -639,7 +639,7 @@ async function fetchSheetValuesDirectly(sheetName) {
     try {
       console.log(`🔄 [시트조회] 시트 목록 확인 중...`);
       const spreadsheet = await sheets.spreadsheets.get({
-        spreadsheetId: SPREADSHEET_ID
+        spreadsheetId: spreadsheetId
       });
       
       const sheetNames = spreadsheet.data.sheets.map(sheet => sheet.properties.title);
@@ -652,7 +652,7 @@ async function fetchSheetValuesDirectly(sheetName) {
         const safeSheetName = `'${exactSheetName}'`;
         
         const retryResponse = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
+          spreadsheetId: spreadsheetId,
           range: safeSheetName
         });
         
@@ -1203,6 +1203,116 @@ app.post('/api/update-coordinates', async (req, res) => {
     });
   }
 });
+
+// 판매점정보 시트의 주소를 위도/경도로 변환하여 업데이트
+app.post('/api/update-sales-coordinates', async (req, res) => {
+  try {
+    console.log('Updating sales coordinates...');
+    
+    // 새로운 구글 시트 ID 확인
+    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
+    if (!SALES_SPREADSHEET_ID) {
+      throw new Error('SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
+    }
+    
+    const SALES_SHEET_NAME = '판매점정보';
+    const salesValues = await getSheetValues(SALES_SHEET_NAME, SALES_SPREADSHEET_ID);
+    if (!salesValues) {
+      throw new Error('Failed to fetch data from sales sheet');
+    }
+
+    // 헤더 제거 (2행부터 시작)
+    const salesRows = salesValues.slice(1);
+    const updates = [];
+    let processedCount = 0;
+    let updatedCount = 0;
+
+    for (let i = 0; i < salesRows.length; i++) {
+      const row = salesRows[i];
+      const address = row[7];  // H열: 주소
+      const existingLat = row[5]; // F열: 기존 위도
+      const existingLng = row[6]; // G열: 기존 경도
+      
+      // 주소가 없으면 건너뛰기
+      if (!address || address.toString().trim() === '') {
+        continue;
+      }
+      
+      processedCount++;
+      
+      // 주소 해시 비교 (변경 감지)
+      const addressHash = createHash(address.toString().trim());
+      const existingAddressHash = createHash((existingLat && existingLng) ? `${existingLat},${existingLng}` : '');
+      
+      // 주소가 변경되었거나 기존 좌표가 없는 경우에만 지오코딩 실행
+      if (addressHash !== existingAddressHash || !existingLat || !existingLng) {
+        try {
+          console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
+          const result = await geocodeAddress(address);
+          if (result) {
+            const { latitude, longitude } = result;
+            updates.push({
+              range: `${SALES_SHEET_NAME}!F${i + 2}:G${i + 2}`,
+              values: [[latitude, longitude]]
+            });
+            updatedCount++;
+            console.log(`✅ 좌표 업데이트 성공: ${address}`);
+            console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
+          } else {
+            console.log(`❌ Geocoding 결과 없음: ${address}`);
+          }
+        } catch (error) {
+          console.error(`❌ Geocoding 오류: ${address}`, error.message);
+        }
+        
+        // API 할당량 제한을 피하기 위한 지연 (0.2초)
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } else {
+        console.log(`⏭️ 주소 변경 없음, 건너뛰기: ${address}`);
+      }
+    }
+
+    // 일괄 업데이트 실행
+    if (updates.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: SALES_SPREADSHEET_ID,
+        resource: {
+          valueInputOption: 'USER_ENTERED',
+          data: updates
+        }
+      });
+      console.log(`Successfully updated ${updates.length} coordinates`);
+    } else {
+      console.log('No coordinates to update');
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Processed ${processedCount} addresses, updated ${updatedCount} coordinates`,
+      processed: processedCount,
+      updated: updatedCount
+    });
+  } catch (error) {
+    console.error('Error updating sales coordinates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update sales coordinates', 
+      message: error.message 
+    });
+  }
+});
+
+// 해시 함수 (주소 변경 감지용)
+function createHash(str) {
+  let hash = 0;
+  if (str.length === 0) return hash.toString();
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 32bit 정수로 변환
+  }
+  return hash.toString();
+}
 
 // 스토어 데이터 가져오기 (캐싱 적용)
 app.get('/api/stores', async (req, res) => {
