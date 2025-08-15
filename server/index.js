@@ -1557,6 +1557,10 @@ app.get('/api/sales-data', async (req, res) => {
       const subRegion = (row[25] || '').toString(); // Z열: 세부상권
       const performance = parseInt(row[27]);   // AB열: 실적
       
+      // 추가 필터 데이터
+      const manager = (row[14] || '').toString();   // O열: 담당
+      const branch = (row[15] || '').toString();    // P열: 지점
+      
       // 개별 데이터 추가
       const salesItem = {
         latitude,
@@ -1568,7 +1572,9 @@ app.get('/api/sales-data', async (req, res) => {
         storeName,
         region,
         subRegion,
-        performance
+        performance,
+        manager,
+        branch
       };
       
       salesData.push(salesItem);
@@ -1583,6 +1589,8 @@ app.get('/api/sales-data', async (req, res) => {
           storeName,
           region,
           subRegion,
+          manager,
+          branch,
           totalPerformance: 0,
           agents: new Map() // 대리점 정보도 Map으로 관리
         });
