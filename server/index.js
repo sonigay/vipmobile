@@ -2331,6 +2331,7 @@ app.post('/api/login', async (req, res) => {
         const hasReservationPermission = agent[12] === 'O'; // M열
         const hasChartPermission = agent[13] === 'O'; // N열: 장표모드 권한
         const hasBudgetPermission = agent[16] === 'O'; // Q열: 예산모드 권한
+        const hasSalesPermission = agent[18] === 'O'; // S열: 영업모드 권한
         
         // console.log('Step 6.5: Permission check:', {
         //   inventory: hasInventoryPermission,
@@ -2354,7 +2355,8 @@ app.post('/api/login', async (req, res) => {
           inspectionOverview: hasInspectionOverviewPermission,
           meeting: hasMeetingPermission,
           reservation: hasReservationPermission,
-          budget: hasBudgetPermission // 예산모드 권한
+          budget: hasBudgetPermission, // 예산모드 권한
+          sales: hasSalesPermission // 영업모드 권한
         };
         
         // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
@@ -2367,7 +2369,7 @@ app.post('/api/login', async (req, res) => {
             fields: [
               {
                 name: '관리자 정보',
-                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}`
+                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}`
               },
               {
                 name: '접속 정보',
