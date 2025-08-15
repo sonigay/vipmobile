@@ -28,9 +28,7 @@ app.use(cors({
     const allowedOrigins = [
       'https://vipmobile.netlify.app',
       'http://localhost:3000',
-      'http://localhost:3001',
-      'https://vipmobile.netlify.app/',
-      'https://vipmobile.netlify.app'
+      'http://localhost:3001'
     ];
     
     // origin이 없거나 허용된 도메인에 포함되어 있으면 허용
@@ -49,7 +47,17 @@ app.use(cors({
 
 // OPTIONS 요청 명시적 처리
 app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -1498,6 +1506,19 @@ app.get('/api/stores', async (req, res) => {
 
 // 영업 모드 데이터 가져오기 (캐싱 적용)
 app.get('/api/sales-data', async (req, res) => {
+  // CORS 헤더 명시적 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   const cacheKey = 'sales_data';
   
   // 캐시에서 먼저 확인
@@ -1660,8 +1681,8 @@ app.get('/api/sales-data', async (req, res) => {
       processingTime: Date.now() - startTime
     };
     
-    // 캐시에 저장 (1시간 TTL로 단축)
-    cacheUtils.set(cacheKey, result, 60 * 60 * 1000);
+    // 캐시에 저장 (24시간 TTL로 연장)
+    cacheUtils.set(cacheKey, result, 24 * 60 * 60 * 1000);
     
     console.log(`✅ [SALES] 영업 데이터 로드 완료: ${salesData.length}개 레코드, ${posCodeMap.size}개 POS코드 (처리시간: ${Date.now() - startTime}ms)`);
     
@@ -1676,8 +1697,184 @@ app.get('/api/sales-data', async (req, res) => {
   }
 });
 
+// 영업 데이터 미리 로드 함수
+async function preloadSalesData() {
+  try {
+    console.log('🔄 [SALES] 영업 데이터 미리 로드 시작...');
+    
+    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
+    if (!SALES_SPREADSHEET_ID) {
+      console.log('⚠️ [SALES] SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
+      return;
+    }
+    
+    const RAW_DATA_SHEET_NAME = 'raw데이터';
+    const rawDataValues = await getSheetValues(RAW_DATA_SHEET_NAME, SALES_SPREADSHEET_ID);
+    
+    if (!rawDataValues) {
+      console.log('⚠️ [SALES] raw데이터 시트에서 데이터를 가져올 수 없습니다.');
+      return;
+    }
+
+    // 헤더 제거 (3행이 헤더, 4행부터 데이터)
+    const rawDataRows = rawDataValues.slice(3);
+    
+    console.log(`🔍 [SALES] raw데이터 처리 시작: ${rawDataRows.length}개 행`);
+    
+    // 필터링된 데이터 처리 (성능 최적화)
+    const salesData = [];
+    const posCodeMap = new Map();
+    const regionMap = new Map();
+    
+    // 유효한 데이터만 먼저 필터링
+    const validRows = rawDataRows.filter(row => {
+      if (!row || row.length < 28) return false;
+      
+      const latitude = parseFloat(row[10]) || 0;
+      const longitude = parseFloat(row[11]) || 0;
+      const performance = parseInt(row[27]) || 0;
+      
+      return latitude && longitude && performance > 0;
+    });
+    
+    console.log(`✅ [SALES] 유효한 데이터: ${validRows.length}개 행`);
+    
+    validRows.forEach((row, index) => {
+      const latitude = parseFloat(row[10]);
+      const longitude = parseFloat(row[11]);
+      const address = (row[12] || '').toString();
+      const agentCode = (row[16] || '').toString();
+      const agentName = (row[17] || '').toString();
+      const posCode = (row[21] || '').toString();
+      const storeName = (row[22] || '').toString();
+      const region = (row[24] || '').toString();
+      const subRegion = (row[25] || '').toString();
+      const performance = parseInt(row[27]);
+      const manager = (row[14] || '').toString();
+      const branch = (row[15] || '').toString();
+      
+      // 개별 데이터 추가
+      const salesItem = {
+        latitude,
+        longitude,
+        address,
+        agentCode,
+        agentName,
+        posCode,
+        storeName,
+        region,
+        subRegion,
+        performance,
+        manager,
+        branch
+      };
+      
+      salesData.push(salesItem);
+      
+      // POS코드별 실적 합계
+      if (!posCodeMap.has(posCode)) {
+        posCodeMap.set(posCode, {
+          latitude,
+          longitude,
+          address,
+          posCode,
+          storeName,
+          region,
+          subRegion,
+          manager,
+          branch,
+          totalPerformance: 0,
+          agents: new Map()
+        });
+      }
+      
+      const posCodeData = posCodeMap.get(posCode);
+      posCodeData.totalPerformance += performance;
+      
+      // 대리점 정보 추가
+      if (!posCodeData.agents.has(agentCode)) {
+        posCodeData.agents.set(agentCode, {
+          agentCode,
+          agentName,
+          performance
+        });
+      } else {
+        posCodeData.agents.get(agentCode).performance += performance;
+      }
+      
+      // 지역별 실적 합계
+      const regionKey = `${region}_${subRegion}`;
+      if (!regionMap.has(regionKey)) {
+        regionMap.set(regionKey, {
+          region,
+          subRegion,
+          totalPerformance: 0,
+          posCodes: new Set()
+        });
+      }
+      
+      const regionData = regionMap.get(regionKey);
+      regionData.totalPerformance += performance;
+      regionData.posCodes.add(posCode);
+    });
+    
+    // Map을 Object로 변환
+    const posCodeMapObj = {};
+    posCodeMap.forEach((value, key) => {
+      posCodeMapObj[key] = {
+        ...value,
+        agents: Array.from(value.agents.values())
+      };
+    });
+    
+    const regionMapObj = {};
+    regionMap.forEach((value, key) => {
+      regionMapObj[key] = {
+        ...value,
+        posCodes: Array.from(value.posCodes)
+      };
+    });
+    
+    // 결과 데이터 구성
+    const result = {
+      success: true,
+      data: {
+        salesData,
+        posCodeMap: posCodeMapObj,
+        regionMap: regionMapObj,
+        summary: {
+          totalRecords: salesData.length,
+          totalPosCodes: posCodeMap.size,
+          totalRegions: regionMap.size,
+          totalPerformance: Array.from(posCodeMap.values()).reduce((sum, item) => sum + item.totalPerformance, 0)
+        }
+      }
+    };
+    
+    // 캐시에 저장 (24시간 TTL)
+    cacheUtils.set('sales_data', result, 24 * 60 * 60 * 1000);
+    
+    console.log(`✅ [SALES] 영업 데이터 미리 로드 완료: ${salesData.length}개 레코드, ${posCodeMap.size}개 POS코드`);
+  } catch (error) {
+    console.error('❌ [SALES] 영업 데이터 미리 로드 실패:', error);
+  }
+}
+
 // 영업 모드 접근 권한 확인
 app.get('/api/sales-mode-access', async (req, res) => {
+  // CORS 헤더 명시적 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   try {
     // 대리점아이디관리 시트에서 S열 권한 확인
     const agentResponse = await sheets.spreadsheets.values.get({
@@ -4895,6 +5092,14 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('✅ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 완료');
     }).catch(error => {
       console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
+    });
+    
+    // 영업 데이터 미리 로드 (비동기로 처리)
+    console.log('🔍 [서버시작] 영업 데이터 미리 로드 시작 (비동기 처리)');
+    preloadSalesData().then(() => {
+      console.log('✅ [서버시작] 영업 데이터 미리 로드 완료');
+    }).catch(error => {
+      console.error('❌ [서버시작] 영업 데이터 미리 로드 실패:', error.message);
     });
     
     // 매 시간마다 업데이트 체크 실행 (3600000ms = 1시간)

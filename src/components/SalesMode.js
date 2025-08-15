@@ -718,15 +718,51 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     }
   }, []);
 
-  // 영업 데이터 로드
+  // 영업 데이터 로드 (캐시 활용)
   const loadSalesData = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // 캐시된 데이터가 있는지 확인
+      const cachedData = sessionStorage.getItem('sales_data_cache');
+      const cacheTimestamp = sessionStorage.getItem('sales_data_timestamp');
+      const now = Date.now();
+      
+      // 캐시가 30분 이내인지 확인
+      if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < 30 * 60 * 1000) {
+        console.log('📦 [SALES] 세션 캐시에서 데이터 로드');
+        const data = JSON.parse(cachedData);
+        setSalesData(data);
+        
+        // 필터 옵션 생성
+        const regions = [...new Set(data.salesData.map(item => item.region))];
+        const subRegions = [...new Set(data.salesData.map(item => item.subRegion))];
+        const managers = [...new Set(data.salesData.map(item => item.manager))];
+        const branches = [...new Set(data.salesData.map(item => item.branch))];
+        const agents = [...new Set(data.salesData.map(item => `${item.agentName} (${item.agentCode})`))];
+        
+        setFilterOptions({
+          regions: regions.sort(),
+          subRegions: subRegions.sort(),
+          managers: managers.sort(),
+          branches: branches.sort(),
+          agents: agents.sort()
+        });
+        
+        setLoading(false);
+        return;
+      }
+      
+      console.log('🌐 [SALES] 서버에서 데이터 로드');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
       const data = await response.json();
       
       if (data.success) {
         setSalesData(data.data);
+        
+        // 세션 스토리지에 캐시 저장 (30분)
+        sessionStorage.setItem('sales_data_cache', JSON.stringify(data.data));
+        sessionStorage.setItem('sales_data_timestamp', now.toString());
         
         // 필터 옵션 생성
         const regions = [...new Set(data.data.salesData.map(item => item.region))];
@@ -812,9 +848,50 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     initialize();
   }, [checkAccess, loadSalesData]);
 
-  // 데이터 새로고침
+  // 데이터 새로고침 (캐시 무시)
   const handleRefresh = async () => {
-    await loadSalesData();
+    try {
+      setLoading(true);
+      
+      // 캐시 삭제
+      sessionStorage.removeItem('sales_data_cache');
+      sessionStorage.removeItem('sales_data_timestamp');
+      
+      console.log('🔄 [SALES] 데이터 새로고침 - 서버에서 최신 데이터 로드');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setSalesData(data.data);
+        
+        // 새로운 캐시 저장
+        const now = Date.now();
+        sessionStorage.setItem('sales_data_cache', JSON.stringify(data.data));
+        sessionStorage.setItem('sales_data_timestamp', now.toString());
+        
+        // 필터 옵션 생성
+        const regions = [...new Set(data.data.salesData.map(item => item.region))];
+        const subRegions = [...new Set(data.data.salesData.map(item => item.subRegion))];
+        const managers = [...new Set(data.data.salesData.map(item => item.manager))];
+        const branches = [...new Set(data.data.salesData.map(item => item.branch))];
+        const agents = [...new Set(data.data.salesData.map(item => `${item.agentName} (${item.agentCode})`))];
+        
+        setFilterOptions({
+          regions: regions.sort(),
+          subRegions: subRegions.sort(),
+          managers: managers.sort(),
+          branches: branches.sort(),
+          agents: agents.sort()
+        });
+      } else {
+        setError('영업 데이터를 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('영업 데이터 새로고침 실패:', error);
+      setError('영업 데이터 새로고침 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!accessGranted) {
