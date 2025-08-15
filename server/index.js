@@ -1233,19 +1233,24 @@ app.post('/api/update-sales-coordinates', async (req, res) => {
       const existingLat = row[5]; // F열: 기존 위도
       const existingLng = row[6]; // G열: 기존 경도
       
-      // 주소가 없으면 건너뛰기
-      if (!address || address.toString().trim() === '') {
+      // 주소가 없거나 '주소확인필요'인 경우 건너뛰기
+      if (!address || address.toString().trim() === '' || address.toString().trim() === '주소확인필요') {
         continue;
       }
       
       processedCount++;
       
-      // 주소 해시 비교 (변경 감지)
+      // 기존 좌표가 모두 존재하면 지오코딩 생략
+      if (existingLat && existingLng) {
+        continue;
+      }
+
+      // 주소 해시 비교 (변경 감지) - 좌표가 없을 경우에만 적용
       const addressHash = createHash(address.toString().trim());
-      const existingAddressHash = createHash((existingLat && existingLng) ? `${existingLat},${existingLng}` : '');
-      
-      // 주소가 변경되었거나 기존 좌표가 없는 경우에만 지오코딩 실행
-      if (addressHash !== existingAddressHash || !existingLat || !existingLng) {
+      const existingAddressHash = createHash('');
+
+      // 좌표가 없는 경우에만 지오코딩 실행
+      if (addressHash !== existingAddressHash) {
         try {
           console.log(`\n=== 좌표 업데이트 시작: ${address} ===`);
           const result = await geocodeAddress(address);
@@ -4457,6 +4462,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('🔧 [서버시작] 환경변수 상태 확인:');
     console.log('- GOOGLE_SHEET_ID 설정됨:', !!process.env.GOOGLE_SHEET_ID);
     console.log('- SHEET_ID 설정됨:', !!process.env.SHEET_ID);
+    console.log('- SALES_SHEET_ID 설정됨:', !!process.env.SALES_SHEET_ID);
     
     const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
     console.log('- 최종 사용할 Spreadsheet ID 설정됨:', !!spreadsheetId);
@@ -4464,6 +4470,10 @@ const server = app.listen(port, '0.0.0.0', async () => {
     if (spreadsheetId) {
       console.log('- Spreadsheet ID 길이:', spreadsheetId.length);
       console.log('- Spreadsheet ID 시작:', spreadsheetId.substring(0, 10) + '...');
+    }
+    if (process.env.SALES_SHEET_ID) {
+      console.log('- SALES_SHEET_ID 길이:', process.env.SALES_SHEET_ID.length);
+      console.log('- SALES_SHEET_ID 시작:', process.env.SALES_SHEET_ID.substring(0, 10) + '...');
     }
     // console.log('Discord 봇 환경변수 상태:');
     // console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
