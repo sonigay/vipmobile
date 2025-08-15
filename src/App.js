@@ -1360,7 +1360,7 @@ function AppContent() {
       }));
     }
     // 영업 모드인지 확인
-    else if (store.isSales) {
+    else if (store.modePermissions && store.modePermissions.sales) {
       // console.log('로그인: 영업 모드');
       setIsSalesMode(true);
       setIsAgentMode(false);

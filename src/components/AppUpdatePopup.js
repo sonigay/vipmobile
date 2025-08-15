@@ -49,7 +49,8 @@ const MODE_COLORS = {
   'meeting': '#667eea',    // 보라파란색
   'reservation': '#ff9a9e', // 핑크색
   'chart': '#ff9800',      // 주황색
-  'budget': '#795548'      // 갈색 (예산모드)
+  'budget': '#795548',     // 갈색 (예산모드)
+  'sales': '#e91e63'       // 핑크색 (영업모드)
 };
 
 // 모드별 제목
@@ -63,7 +64,8 @@ const MODE_TITLES = {
   'meeting': '회의 모드',
   'reservation': '사전예약 모드',
   'chart': '장표 모드',
-  'budget': '예산 모드'
+  'budget': '예산 모드',
+  'sales': '영업 모드'
 };
 
 function AppUpdatePopup({ 

@@ -22,11 +22,13 @@ import {
   LocationOn, 
   Business,
   TrendingUp,
-  Close
+  Close,
+  Update
 } from '@mui/icons-material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../api';
+import AppUpdatePopup from './AppUpdatePopup';
 
 // Leaflet 마커 아이콘 설정
 delete L.Icon.Default.prototype._getIconUrl;
@@ -209,7 +211,7 @@ const SalesFilterPanel = ({ filters, setFilters, filterOptions }) => {
 };
 
 // 영업 모드 메인 컴포넌트
-const SalesMode = () => {
+const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) => {
   const [salesData, setSalesData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -233,6 +235,7 @@ const SalesMode = () => {
     storeNames: []
   });
   const [selectedMarker, setSelectedMarker] = useState(null);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // 접근 권한 확인
   const checkAccess = useCallback(async () => {
@@ -367,20 +370,57 @@ const SalesMode = () => {
 
   return (
     <Box sx={{ height: '100vh', position: 'relative' }}>
+      {/* 헤더 */}
+      <Box sx={{ 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        zIndex: 1000,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid #e0e0e0',
+        p: 1
+      }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ color: '#e91e63', fontWeight: 'bold' }}>
+            영업 모드
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="업데이트 확인">
+              <IconButton 
+                onClick={() => setShowUpdatePopup(true)}
+                sx={{ color: '#e91e63' }}
+              >
+                <Update />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="데이터 새로고침">
+              <IconButton onClick={handleRefresh} color="primary">
+                <Refresh />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="모드 변경">
+              <IconButton onClick={onModeChange} color="primary">
+                <Business />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="로그아웃">
+              <IconButton onClick={onLogout} color="error">
+                <Close />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+      </Box>
+
       {/* 필터 패널 */}
-      <SalesFilterPanel 
-        filters={filters}
-        setFilters={setFilters}
-        filterOptions={filterOptions}
-      />
-      
-      {/* 새로고침 버튼 */}
-      <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
-        <Tooltip title="데이터 새로고침">
-          <IconButton onClick={handleRefresh} color="primary">
-            <Refresh />
-          </IconButton>
-        </Tooltip>
+      <Box sx={{ position: 'absolute', top: 70, left: 10, zIndex: 1000 }}>
+        <SalesFilterPanel 
+          filters={filters}
+          setFilters={setFilters}
+          filterOptions={filterOptions}
+        />
       </Box>
       
       {/* 지도 */}
@@ -455,6 +495,17 @@ const SalesMode = () => {
           총 실적: {filteredData.reduce((sum, item) => sum + item.totalPerformance, 0)}개
         </Typography>
       </Box>
+
+      {/* 업데이트 팝업 */}
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="sales"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          setShowUpdatePopup(false);
+        }}
+      />
     </Box>
   );
 };

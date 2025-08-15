@@ -14185,7 +14185,8 @@ app.post('/api/app-updates', async (req, res) => {
       'meeting': 8,    // I열: 회의모드
       'reservation': 9, // J열: 사전예약모드
       'chart': 10,     // K열: 장표모드
-      'budget': 11     // L열: 예산모드
+      'budget': 11,    // L열: 예산모드
+      'sales': 12      // M열: 영업모드
     };
     
     const columnIndex = modeColumnMap[mode];
