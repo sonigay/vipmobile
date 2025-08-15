@@ -22,7 +22,8 @@ import {
   MeetingRoom as MeetingRoomIcon,
   Event as EventIcon,
   CheckCircle as CheckCircleIcon,
-  AccountBalance as BudgetIcon
+  AccountBalance as BudgetIcon,
+  TrendingUp as SalesIcon
 } from '@mui/icons-material';
 
 const ModeSelectionPopup = ({ 
@@ -141,6 +142,18 @@ const ModeSelectionPopup = ({
         '별도추가 관리',
         '부가추가지원 관리',
         '부가차감지원 관리'
+      ]
+    },
+    sales: {
+      title: '영업 모드',
+      description: '지도 기반 실적 시각화 및 영업 데이터 분석',
+      icon: <SalesIcon sx={{ fontSize: 40, color: '#e91e63' }} />,
+      color: '#e91e63',
+      features: [
+        '지도 기반 실적 표시',
+        'POS코드별 실적 집계',
+        '지역별 실적 분석',
+        '실시간 필터링'
       ]
     }
   };
