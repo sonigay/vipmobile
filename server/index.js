@@ -21,13 +21,40 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS 설정 - 모든 도메인 허용
+// CORS 설정 - 더 안전하고 포괄적인 설정
 app.use(cors({
-  origin: ['https://vipmobile.netlify.app', 'http://localhost:3000', 'http://localhost:3001'],
+  origin: function (origin, callback) {
+    // 허용할 도메인 목록
+    const allowedOrigins = [
+      'https://vipmobile.netlify.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://vipmobile.netlify.app/',
+      'https://vipmobile.netlify.app'
+    ];
+    
+    // origin이 없거나 허용된 도메인에 포함되어 있으면 허용
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
+  optionsSuccessStatus: 200
 }));
+
+// OPTIONS 요청 명시적 처리
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).end();
+});
 
 // VAPID 키 설정 (환경변수에서 가져오거나 생성)
 const vapidKeys = process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY 
@@ -1498,16 +1525,29 @@ app.get('/api/sales-data', async (req, res) => {
     // 헤더 제거 (3행이 헤더, 4행부터 데이터)
     const rawDataRows = rawDataValues.slice(3);
     
-    // 필터링된 데이터 처리
-    const salesData = [];
-    const posCodeMap = {}; // POS코드별 실적 합계
-    const regionMap = {}; // 지역별 실적 합계
+    console.log(`🔍 [SALES] raw데이터 처리 시작: ${rawDataRows.length}개 행`);
     
-    rawDataRows.forEach((row, index) => {
-      if (!row || row.length < 28) return; // AB열까지 데이터가 있어야 함
+    // 필터링된 데이터 처리 (성능 최적화)
+    const salesData = [];
+    const posCodeMap = new Map(); // Map 사용으로 성능 향상
+    const regionMap = new Map(); // Map 사용으로 성능 향상
+    
+    // 유효한 데이터만 먼저 필터링
+    const validRows = rawDataRows.filter(row => {
+      if (!row || row.length < 28) return false;
       
-      const latitude = parseFloat(row[10]) || 0;    // K열: 위도
-      const longitude = parseFloat(row[11]) || 0;   // L열: 경도
+      const latitude = parseFloat(row[10]) || 0;
+      const longitude = parseFloat(row[11]) || 0;
+      const performance = parseInt(row[27]) || 0;
+      
+      return latitude && longitude && performance > 0;
+    });
+    
+    console.log(`✅ [SALES] 유효한 데이터: ${validRows.length}개 행`);
+    
+    validRows.forEach((row, index) => {
+      const latitude = parseFloat(row[10]);    // K열: 위도
+      const longitude = parseFloat(row[11]);   // L열: 경도
       const address = (row[12] || '').toString();   // M열: 주소
       const agentCode = (row[16] || '').toString(); // Q열: 대리점코드
       const agentName = (row[17] || '').toString(); // R열: 대리점명
@@ -1515,12 +1555,7 @@ app.get('/api/sales-data', async (req, res) => {
       const storeName = (row[22] || '').toString(); // W열: 판매점명
       const region = (row[24] || '').toString();    // Y열: 광역상권
       const subRegion = (row[25] || '').toString(); // Z열: 세부상권
-      const performance = parseInt(row[27]) || 0;   // AB열: 실적
-      
-      // 좌표가 없거나 실적이 0인 경우 제외
-      if (!latitude || !longitude || performance === 0) {
-        return;
-      }
+      const performance = parseInt(row[27]);   // AB열: 실적
       
       // 개별 데이터 추가
       const salesItem = {
@@ -1538,9 +1573,9 @@ app.get('/api/sales-data', async (req, res) => {
       
       salesData.push(salesItem);
       
-      // POS코드별 실적 합계
-      if (!posCodeMap[posCode]) {
-        posCodeMap[posCode] = {
+      // POS코드별 실적 합계 (Map 사용으로 성능 향상)
+      if (!posCodeMap.has(posCode)) {
+        posCodeMap.set(posCode, {
           latitude,
           longitude,
           address,
@@ -1549,41 +1584,55 @@ app.get('/api/sales-data', async (req, res) => {
           region,
           subRegion,
           totalPerformance: 0,
-          agents: []
-        };
+          agents: new Map() // 대리점 정보도 Map으로 관리
+        });
       }
       
-      posCodeMap[posCode].totalPerformance += performance;
+      const posCodeData = posCodeMap.get(posCode);
+      posCodeData.totalPerformance += performance;
       
-      // 대리점 정보 추가 (중복 방지)
-      const existingAgent = posCodeMap[posCode].agents.find(agent => agent.agentCode === agentCode);
-      if (!existingAgent) {
-        posCodeMap[posCode].agents.push({
+      // 대리점 정보 추가 (Map으로 중복 방지)
+      if (!posCodeData.agents.has(agentCode)) {
+        posCodeData.agents.set(agentCode, {
           agentCode,
           agentName,
           performance
         });
       } else {
-        existingAgent.performance += performance;
+        posCodeData.agents.get(agentCode).performance += performance;
       }
       
       // 지역별 실적 합계
       const regionKey = `${region}_${subRegion}`;
-      if (!regionMap[regionKey]) {
-        regionMap[regionKey] = {
+      if (!regionMap.has(regionKey)) {
+        regionMap.set(regionKey, {
           region,
           subRegion,
           totalPerformance: 0,
-          posCodes: []
-        };
+          posCodes: new Set() // Set으로 중복 방지
+        });
       }
       
-      regionMap[regionKey].totalPerformance += performance;
-      
-      // POS코드 추가 (중복 방지)
-      if (!regionMap[regionKey].posCodes.includes(posCode)) {
-        regionMap[regionKey].posCodes.push(posCode);
-      }
+      const regionData = regionMap.get(regionKey);
+      regionData.totalPerformance += performance;
+      regionData.posCodes.add(posCode);
+    });
+    
+    // Map을 Object로 변환 (API 응답용)
+    const posCodeMapObj = {};
+    posCodeMap.forEach((value, key) => {
+      posCodeMapObj[key] = {
+        ...value,
+        agents: Array.from(value.agents.values())
+      };
+    });
+    
+    const regionMapObj = {};
+    regionMap.forEach((value, key) => {
+      regionMapObj[key] = {
+        ...value,
+        posCodes: Array.from(value.posCodes)
+      };
     });
     
     // 결과 데이터 구성
@@ -1591,22 +1640,22 @@ app.get('/api/sales-data', async (req, res) => {
       success: true,
       data: {
         salesData, // 개별 데이터
-        posCodeMap, // POS코드별 집계
-        regionMap,  // 지역별 집계
+        posCodeMap: posCodeMapObj, // POS코드별 집계
+        regionMap: regionMapObj,  // 지역별 집계
         summary: {
           totalRecords: salesData.length,
-          totalPosCodes: Object.keys(posCodeMap).length,
-          totalRegions: Object.keys(regionMap).length,
-          totalPerformance: Object.values(posCodeMap).reduce((sum, item) => sum + item.totalPerformance, 0)
+          totalPosCodes: posCodeMap.size,
+          totalRegions: regionMap.size,
+          totalPerformance: Array.from(posCodeMap.values()).reduce((sum, item) => sum + item.totalPerformance, 0)
         }
       },
       processingTime: Date.now() - startTime
     };
     
-    // 캐시에 저장 (5일 TTL)
-    cacheUtils.set(cacheKey, result, 5 * 24 * 60 * 60 * 1000);
+    // 캐시에 저장 (1시간 TTL로 단축)
+    cacheUtils.set(cacheKey, result, 60 * 60 * 1000);
     
-    console.log(`✅ 영업 데이터 로드 완료: ${salesData.length}개 레코드, ${Object.keys(posCodeMap).length}개 POS코드`);
+    console.log(`✅ [SALES] 영업 데이터 로드 완료: ${salesData.length}개 레코드, ${posCodeMap.size}개 POS코드 (처리시간: ${Date.now() - startTime}ms)`);
     
     res.json(result);
   } catch (error) {
