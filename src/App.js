@@ -30,6 +30,7 @@ import PolicyMode from './components/PolicyMode';
 import MeetingMode from './components/MeetingMode';
 import ReservationMode from './components/ReservationMode';
 import BudgetMode from './components/BudgetMode';
+import SalesMode from './components/SalesMode';
 
 
 
@@ -125,6 +126,7 @@ function AppContent() {
   const [settlementUserName, setSettlementUserName] = useState(''); // 정산모드 접속자 이름 추가
   // 검수모드 관련 상태 추가
   const [isInspectionMode, setIsInspectionMode] = useState(false);
+  const [isSalesMode, setIsSalesMode] = useState(false);
   // 장표모드 관련 상태 추가
   const [isChartMode, setIsChartMode] = useState(false);
   // 정책모드 관련 상태 추가
@@ -1357,6 +1359,41 @@ function AppContent() {
         inventoryUserName: store.manager || '재고관리자'
       }));
     }
+    // 영업 모드인지 확인
+    else if (store.isSales) {
+      // console.log('로그인: 영업 모드');
+      setIsSalesMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setCurrentMode('sales');
+      
+      // 영업 모드에서는 서울시청을 중심으로 전체 지역 보기
+      setUserLocation({
+        lat: 37.5665,
+        lng: 126.9780,
+      });
+      setSelectedRadius(50000);
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isSales: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        store: store
+      }));
+    }
     // 관리자 모드인지 확인
     else if (store.isAgent) {
       // console.log('로그인: 관리자 모드');
@@ -2058,6 +2095,30 @@ function AppContent() {
             setIsSettlementMode(false);
             setShowModeSelection(true);
             // console.log('SettlementMode 모드 선택 팝업 열기 완료');
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 영업모드일 때는 별도 화면 렌더링
+  if (isSalesMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <SalesMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            // console.log('App.js SalesMode onModeChange 호출됨');
+            const currentModes = getCurrentUserAvailableModes();
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsSalesMode(false);
+            setShowModeSelection(true);
+            // console.log('SalesMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />

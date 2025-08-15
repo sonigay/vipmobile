@@ -1472,6 +1472,199 @@ app.get('/api/stores', async (req, res) => {
   }
 });
 
+// 영업 모드 데이터 가져오기 (캐싱 적용)
+app.get('/api/sales-data', async (req, res) => {
+  const cacheKey = 'sales_data';
+  
+  // 캐시에서 먼저 확인
+  const cachedSalesData = cacheUtils.get(cacheKey);
+  if (cachedSalesData) {
+    return res.json(cachedSalesData);
+  }
+  
+  try {
+    const startTime = Date.now();
+    
+    // 새로운 구글 시트 ID 확인
+    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
+    if (!SALES_SPREADSHEET_ID) {
+      throw new Error('SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
+    }
+    
+    const RAW_DATA_SHEET_NAME = 'raw데이터';
+    const rawDataValues = await getSheetValues(RAW_DATA_SHEET_NAME, SALES_SPREADSHEET_ID);
+    
+    if (!rawDataValues) {
+      throw new Error('Failed to fetch data from raw data sheet');
+    }
+
+    // 헤더 제거 (3행이 헤더, 4행부터 데이터)
+    const rawDataRows = rawDataValues.slice(3);
+    
+    // 필터링된 데이터 처리
+    const salesData = [];
+    const posCodeMap = {}; // POS코드별 실적 합계
+    const regionMap = {}; // 지역별 실적 합계
+    
+    rawDataRows.forEach((row, index) => {
+      if (!row || row.length < 28) return; // AB열까지 데이터가 있어야 함
+      
+      const latitude = parseFloat(row[10]) || 0;    // K열: 위도
+      const longitude = parseFloat(row[11]) || 0;   // L열: 경도
+      const address = (row[12] || '').toString();   // M열: 주소
+      const agentCode = (row[16] || '').toString(); // Q열: 대리점코드
+      const agentName = (row[17] || '').toString(); // R열: 대리점명
+      const posCode = (row[21] || '').toString();   // V열: POS코드
+      const storeName = (row[22] || '').toString(); // W열: 판매점명
+      const region = (row[24] || '').toString();    // Y열: 광역상권
+      const subRegion = (row[25] || '').toString(); // Z열: 세부상권
+      const performance = parseInt(row[27]) || 0;   // AB열: 실적
+      
+      // 좌표가 없거나 실적이 0인 경우 제외
+      if (!latitude || !longitude || performance === 0) {
+        return;
+      }
+      
+      // 개별 데이터 추가
+      const salesItem = {
+        latitude,
+        longitude,
+        address,
+        agentCode,
+        agentName,
+        posCode,
+        storeName,
+        region,
+        subRegion,
+        performance
+      };
+      
+      salesData.push(salesItem);
+      
+      // POS코드별 실적 합계
+      if (!posCodeMap[posCode]) {
+        posCodeMap[posCode] = {
+          latitude,
+          longitude,
+          address,
+          posCode,
+          storeName,
+          region,
+          subRegion,
+          totalPerformance: 0,
+          agents: []
+        };
+      }
+      
+      posCodeMap[posCode].totalPerformance += performance;
+      
+      // 대리점 정보 추가 (중복 방지)
+      const existingAgent = posCodeMap[posCode].agents.find(agent => agent.agentCode === agentCode);
+      if (!existingAgent) {
+        posCodeMap[posCode].agents.push({
+          agentCode,
+          agentName,
+          performance
+        });
+      } else {
+        existingAgent.performance += performance;
+      }
+      
+      // 지역별 실적 합계
+      const regionKey = `${region}_${subRegion}`;
+      if (!regionMap[regionKey]) {
+        regionMap[regionKey] = {
+          region,
+          subRegion,
+          totalPerformance: 0,
+          posCodes: []
+        };
+      }
+      
+      regionMap[regionKey].totalPerformance += performance;
+      
+      // POS코드 추가 (중복 방지)
+      if (!regionMap[regionKey].posCodes.includes(posCode)) {
+        regionMap[regionKey].posCodes.push(posCode);
+      }
+    });
+    
+    // 결과 데이터 구성
+    const result = {
+      success: true,
+      data: {
+        salesData, // 개별 데이터
+        posCodeMap, // POS코드별 집계
+        regionMap,  // 지역별 집계
+        summary: {
+          totalRecords: salesData.length,
+          totalPosCodes: Object.keys(posCodeMap).length,
+          totalRegions: Object.keys(regionMap).length,
+          totalPerformance: Object.values(posCodeMap).reduce((sum, item) => sum + item.totalPerformance, 0)
+        }
+      },
+      processingTime: Date.now() - startTime
+    };
+    
+    // 캐시에 저장 (5일 TTL)
+    cacheUtils.set(cacheKey, result, 5 * 24 * 60 * 60 * 1000);
+    
+    console.log(`✅ 영업 데이터 로드 완료: ${salesData.length}개 레코드, ${Object.keys(posCodeMap).length}개 POS코드`);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching sales data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch sales data', 
+      message: error.message 
+    });
+  }
+});
+
+// 영업 모드 접근 권한 확인
+app.get('/api/sales-mode-access', async (req, res) => {
+  try {
+    // 대리점아이디관리 시트에서 S열 권한 확인
+    const agentResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${AGENT_SHEET_NAME}!A:S`
+    });
+
+    if (!agentResponse.data.values || agentResponse.data.values.length === 0) {
+      throw new Error('Failed to fetch agent data');
+    }
+
+    // 헤더 제거
+    const agentRows = agentResponse.data.values.slice(1);
+    
+    // S열에서 "O" 권한이 있는 대리점 찾기
+    const authorizedAgents = agentRows
+      .filter(row => row && row.length > 18 && row[18] === 'O') // S열 (18번 인덱스)
+      .map(row => ({
+        agentCode: row[0] || '', // A열: 대리점코드
+        agentName: row[1] || '', // B열: 대리점명
+        accessLevel: row[18] || '' // S열: 접근권한
+      }));
+
+    res.json({
+      success: true,
+      hasAccess: authorizedAgents.length > 0,
+      authorizedAgents,
+      totalAgents: agentRows.length,
+      authorizedCount: authorizedAgents.length
+    });
+  } catch (error) {
+    console.error('Error checking sales mode access:', error);
+    res.status(500).json({
+      success: false,
+      hasAccess: false,
+      error: 'Failed to check sales mode access',
+      message: error.message
+    });
+  }
+});
+
 // 모델과 색상 데이터 가져오기 (캐싱 적용)
 app.get('/api/models', async (req, res) => {
   const cacheKey = 'processed_models_data';
