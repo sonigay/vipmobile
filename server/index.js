@@ -1223,9 +1223,9 @@ app.post('/api/update-sales-coordinates', async (req, res) => {
 
     // 헤더 제거 (2행부터 시작)
     const salesRows = salesValues.slice(1);
-    const updates = [];
     let processedCount = 0;
     let updatedCount = 0;
+    let skippedCount = 0;
 
     for (let i = 0; i < salesRows.length; i++) {
       const row = salesRows[i];
@@ -1242,6 +1242,7 @@ app.post('/api/update-sales-coordinates', async (req, res) => {
       
       // 기존 좌표가 모두 존재하면 지오코딩 생략
       if (existingLat && existingLng) {
+        skippedCount++;
         continue;
       }
 
@@ -1256,10 +1257,17 @@ app.post('/api/update-sales-coordinates', async (req, res) => {
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
-            updates.push({
+            
+            // 개별 업데이트 실행 (즉시 저장)
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SALES_SPREADSHEET_ID,
               range: `${SALES_SHEET_NAME}!F${i + 2}:G${i + 2}`,
-              values: [[latitude, longitude]]
+              valueInputOption: 'USER_ENTERED',
+              resource: {
+                values: [[latitude, longitude]]
+              }
             });
+            
             updatedCount++;
             console.log(`✅ 좌표 업데이트 성공: ${address}`);
             console.log(`📍 위도: ${latitude}, 경도: ${longitude}`);
@@ -1277,25 +1285,14 @@ app.post('/api/update-sales-coordinates', async (req, res) => {
       }
     }
 
-    // 일괄 업데이트 실행
-    if (updates.length > 0) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: SALES_SPREADSHEET_ID,
-        resource: {
-          valueInputOption: 'USER_ENTERED',
-          data: updates
-        }
-      });
-      console.log(`Successfully updated ${updates.length} coordinates`);
-    } else {
-      console.log('No coordinates to update');
-    }
+    console.log(`📊 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개, 건너뜀: ${skippedCount}개`);
 
     res.json({ 
       success: true, 
-      message: `Processed ${processedCount} addresses, updated ${updatedCount} coordinates`,
+      message: `Processed ${processedCount} addresses, updated ${updatedCount} coordinates, skipped ${skippedCount}`,
       processed: processedCount,
-      updated: updatedCount
+      updated: updatedCount,
+      skipped: skippedCount
     });
   } catch (error) {
     console.error('Error updating sales coordinates:', error);
@@ -2580,13 +2577,13 @@ async function checkAndUpdateSalesAddresses() {
 
     // 헤더 제거 (2행부터 시작)
     const salesRows = salesValues.slice(1);
-    const updates = [];
     let processedCount = 0;
     let updatedCount = 0;
+    let skippedCount = 0;
     
     console.log(`🔍 [SALES] 판매점정보 시트 데이터 로드: ${salesRows.length}개 행`);
     
-    // 모든 주소에 대해 좌표 업데이트
+    // 모든 주소에 대해 좌표 업데이트 (개별 업데이트 방식)
     for (let i = 0; i < salesRows.length; i++) {
       const row = salesRows[i];
       const address = row[7];  // H열: 주소
@@ -2602,6 +2599,7 @@ async function checkAndUpdateSalesAddresses() {
       
       // 기존 좌표가 모두 존재하면 지오코딩 생략
       if (existingLat && existingLng) {
+        skippedCount++;
         continue;
       }
       
@@ -2616,10 +2614,17 @@ async function checkAndUpdateSalesAddresses() {
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
-            updates.push({
+            
+            // 개별 업데이트 실행 (즉시 저장)
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SALES_SPREADSHEET_ID,
               range: `${SALES_SHEET_NAME}!F${i + 2}:G${i + 2}`,
-              values: [[latitude, longitude]]
+              valueInputOption: 'USER_ENTERED',
+              resource: {
+                values: [[latitude, longitude]]
+              }
             });
+            
             updatedCount++;
             console.log(`✅ [SALES] 좌표 업데이트 성공: ${address} (${latitude}, ${longitude})`);
           } else {
@@ -2633,22 +2638,8 @@ async function checkAndUpdateSalesAddresses() {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
-
-    // 일괄 업데이트 실행
-    if (updates.length > 0) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: SALES_SPREADSHEET_ID,
-        resource: {
-          valueInputOption: 'USER_ENTERED',
-          data: updates
-        }
-      });
-      console.log(`✅ [SALES] 일괄 업데이트 완료: ${updates.length}개 좌표 업데이트`);
-    } else {
-      console.log(`ℹ️ [SALES] 업데이트할 좌표가 없습니다.`);
-    }
     
-    console.log(`📊 [SALES] 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개`);
+    console.log(`📊 [SALES] 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개, 건너뜀: ${skippedCount}개`);
   } catch (error) {
     console.error('Error in checkAndUpdateSalesAddresses:', error);
   }
