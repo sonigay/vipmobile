@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef, useTransition } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import { 
   Paper, 
@@ -84,6 +84,7 @@ const defaultCenter = {
 const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isPending, startTransition] = useTransition();
   const [expandedSections, setExpandedSections] = useState({
     regions: true,
     subRegions: true
@@ -130,6 +131,35 @@ const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
       subRegion.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [filterOptions.subRegions, searchTerm]);
+
+  // 검색어에 따른 그룹핑된 데이터 필터링
+  const filteredGroupedRegions = useMemo(() => {
+    if (!searchTerm) return groupedRegions;
+    const filtered = {};
+    Object.entries(groupedRegions).forEach(([baseRegion, regions]) => {
+      const matchingRegions = regions.filter(region => 
+        region.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (matchingRegions.length > 0) {
+        filtered[baseRegion] = matchingRegions;
+      }
+    });
+    return filtered;
+  }, [groupedRegions, searchTerm]);
+
+  const filteredRegionSubRegionsMap = useMemo(() => {
+    if (!searchTerm) return regionSubRegionsMap;
+    const filtered = {};
+    Object.entries(regionSubRegionsMap).forEach(([baseSubRegion, subRegions]) => {
+      const matchingSubRegions = subRegions.filter(subRegion => 
+        subRegion.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (matchingSubRegions.length > 0) {
+        filtered[baseSubRegion] = matchingSubRegions;
+      }
+    });
+    return filtered;
+  }, [regionSubRegionsMap, searchTerm]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
@@ -215,23 +245,34 @@ const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
           
           <Divider sx={{ mb: 3 }} />
           
-          {/* 검색바 */}
-          <Box sx={{ mb: 3 }}>
-            <input
-              type="text"
-              placeholder="지역명 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                marginBottom: '10px'
-              }}
-            />
-          </Box>
+                     {/* 검색바 */}
+           <Box sx={{ mb: 3 }}>
+             <input
+               type="text"
+               placeholder="지역명 검색..."
+               value={searchTerm}
+               onChange={(e) => {
+                 const value = e.target.value;
+                 setSearchTerm(value);
+                 startTransition(() => {
+                   // 검색 상태를 비동기로 처리하여 UI 블로킹 방지
+                 });
+               }}
+               style={{
+                 width: '100%',
+                 padding: '12px',
+                 border: '1px solid #ddd',
+                 borderRadius: '8px',
+                 fontSize: '14px',
+                 marginBottom: '10px'
+               }}
+             />
+             {isPending && (
+               <Box sx={{ mt: 1, textAlign: 'center' }}>
+                 <CircularProgress size={16} />
+               </Box>
+             )}
+           </Box>
           
           {/* 광역상권 필터 - 아코디언 방식 */}
           <Box sx={{ mb: 2 }}>
@@ -251,9 +292,9 @@ const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
               {expandedSections.regions ? <ExpandLess /> : <ExpandMore />}
             </Button>
             
-            {expandedSections.regions && (
-              <Box sx={{ mt: 1, ml: 2 }}>
-                {Object.entries(groupedRegions).map(([baseRegion, regions]) => {
+                         {expandedSections.regions && (
+               <Box sx={{ mt: 1, ml: 2 }}>
+                 {Object.entries(filteredGroupedRegions).map(([baseRegion, regions]) => {
                   const allSelected = regions.every(region => filters.regions.includes(region));
                   const someSelected = regions.some(region => filters.regions.includes(region));
                   
@@ -314,9 +355,9 @@ const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
               {expandedSections.subRegions ? <ExpandLess /> : <ExpandMore />}
             </Button>
             
-            {expandedSections.subRegions && (
-              <Box sx={{ mt: 1, ml: 2 }}>
-                {Object.entries(regionSubRegionsMap).map(([baseSubRegion, subRegions]) => {
+                         {expandedSections.subRegions && (
+               <Box sx={{ mt: 1, ml: 2 }}>
+                 {Object.entries(filteredRegionSubRegionsMap).map(([baseSubRegion, subRegions]) => {
                   const allSelected = subRegions.every(subRegion => filters.subRegions.includes(subRegion));
                   const someSelected = subRegions.some(subRegion => filters.subRegions.includes(subRegion));
                   
@@ -418,6 +459,7 @@ const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
 const AgentFilterPanel = ({ filters, setFilters, filterOptions }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isPending, startTransition] = useTransition();
   const [expandedSections, setExpandedSections] = useState({
     managers: true,
     branches: true,
@@ -503,23 +545,34 @@ const AgentFilterPanel = ({ filters, setFilters, filterOptions }) => {
           
           <Divider sx={{ mb: 3 }} />
           
-          {/* 검색바 */}
-          <Box sx={{ mb: 3 }}>
-            <input
-              type="text"
-              placeholder="대리점명 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                marginBottom: '10px'
-              }}
-            />
-          </Box>
+                     {/* 검색바 */}
+           <Box sx={{ mb: 3 }}>
+             <input
+               type="text"
+               placeholder="대리점명 검색..."
+               value={searchTerm}
+               onChange={(e) => {
+                 const value = e.target.value;
+                 setSearchTerm(value);
+                 startTransition(() => {
+                   // 검색 상태를 비동기로 처리하여 UI 블로킹 방지
+                 });
+               }}
+               style={{
+                 width: '100%',
+                 padding: '12px',
+                 border: '1px solid #ddd',
+                 borderRadius: '8px',
+                 fontSize: '14px',
+                 marginBottom: '10px'
+               }}
+             />
+             {isPending && (
+               <Box sx={{ mt: 1, textAlign: 'center' }}>
+                 <CircularProgress size={16} />
+               </Box>
+             )}
+           </Box>
           
           {/* 담당 필터 - 아코디언 방식 */}
           <Box sx={{ mb: 2 }}>
@@ -974,9 +1027,22 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     }
   }, []);
 
-  // 필터링된 데이터 계산
+  // 필터링된 데이터 계산 (성능 최적화)
   const filteredData = useMemo(() => {
     if (!salesData) return [];
+    
+    // 필터 조건이 없는 경우 전체 데이터 반환
+    const hasFilters = filters.regions.length > 0 || 
+                      filters.subRegions.length > 0 || 
+                      filters.managers.length > 0 || 
+                      filters.branches.length > 0 || 
+                      filters.agents.length > 0 || 
+                      filters.minPerformance || 
+                      filters.maxPerformance;
+    
+    if (!hasFilters) {
+      return Object.values(salesData.posCodeMap);
+    }
     
     return Object.values(salesData.posCodeMap).filter(item => {
       // 지역 필터
@@ -1129,56 +1195,60 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
           <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
             영업 모드
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="업데이트 확인">
-              <IconButton 
-                onClick={() => setShowUpdatePopup(true)}
-                sx={{ 
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  borderRadius: 1
-                }}
-              >
-                <Update />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="데이터 새로고침">
-              <IconButton 
-                onClick={handleRefresh} 
-                sx={{ 
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  borderRadius: 1
-                }}
-              >
-                <Refresh />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="모드 변경">
-              <IconButton 
-                onClick={onModeChange} 
-                sx={{ 
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  borderRadius: 1
-                }}
-              >
-                <Business />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="로그아웃">
-              <IconButton 
-                onClick={onLogout} 
-                sx={{ 
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  borderRadius: 1
-                }}
-              >
-                <Close />
-              </IconButton>
-            </Tooltip>
-          </Box>
+                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+             <Tooltip title="업데이트 확인">
+               <Button
+                 color="inherit"
+                 startIcon={<Update />}
+                 onClick={() => setShowUpdatePopup(true)}
+                 sx={{ 
+                   border: '1px solid rgba(255,255,255,0.3)',
+                   borderRadius: 2,
+                   px: 2
+                 }}
+               >
+                 업데이트 확인
+               </Button>
+             </Tooltip>
+             <Tooltip title="데이터 새로고침">
+               <IconButton 
+                 onClick={handleRefresh} 
+                 sx={{ 
+                   color: 'inherit',
+                   border: '1px solid rgba(255,255,255,0.3)',
+                   borderRadius: 1
+                 }}
+               >
+                 <Refresh />
+               </IconButton>
+             </Tooltip>
+             <Tooltip title="모드 변경">
+               <IconButton 
+                 onClick={onModeChange} 
+                 sx={{ 
+                   color: 'inherit',
+                   border: '1px solid rgba(255,255,255,0.3)',
+                   borderRadius: 1
+                 }}
+               >
+                 <Business />
+               </IconButton>
+             </Tooltip>
+             <Tooltip title="로그아웃">
+               <Button
+                 color="inherit"
+                 startIcon={<Close />}
+                 onClick={onLogout}
+                 sx={{ 
+                   border: '1px solid rgba(255,255,255,0.3)',
+                   borderRadius: 2,
+                   px: 2
+                 }}
+               >
+                 로그아웃
+               </Button>
+             </Tooltip>
+           </Box>
         </Box>
       </Box>
 
