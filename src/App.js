@@ -1359,9 +1359,13 @@ function AppContent() {
         inventoryUserName: store.manager || '재고관리자'
       }));
     }
+    
     // 영업 모드인지 확인
-    else if (store.modePermissions && store.modePermissions.sales) {
-      // console.log('로그인: 영업 모드');
+    console.log('영업 모드 조건 확인:', store.modePermissions && store.modePermissions.sales);
+    if (store.modePermissions && store.modePermissions.sales) {
+      console.log('로그인: 영업 모드');
+      console.log('store.modePermissions:', store.modePermissions);
+      console.log('store.modePermissions.sales:', store.modePermissions.sales);
       setIsSalesMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1564,6 +1568,7 @@ function AppContent() {
     setIsMeetingMode(false);
     setIsReservationMode(false);
     setIsBudgetMode(false);
+    setIsSalesMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1610,6 +1615,10 @@ function AppContent() {
       case 'budget':
         // console.log('예산 모드로 전환');
         setIsBudgetMode(true);
+        break;
+      case 'sales':
+        // console.log('영업 모드로 전환');
+        setIsSalesMode(true);
         break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
@@ -2103,6 +2112,8 @@ function AppContent() {
   }
 
   // 영업모드일 때는 별도 화면 렌더링
+  console.log('🔍 [App] isSalesMode 상태:', isSalesMode);
+  console.log('🔍 [App] 현재 모드들:', { isSalesMode, isAgentMode, isInventoryMode });
   if (isSalesMode) {
     return (
       <ThemeProvider theme={theme}>
