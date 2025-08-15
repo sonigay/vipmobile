@@ -27,7 +27,6 @@ import {
 } from '@mui/icons-material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { api } from '../api';
 import AppUpdatePopup from './AppUpdatePopup';
 
 // Leaflet 마커 아이콘 설정
@@ -240,8 +239,10 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
   // 접근 권한 확인
   const checkAccess = useCallback(async () => {
     try {
-      const response = await api.get('/api/sales-mode-access');
-      if (response.data.success && response.data.hasAccess) {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-mode-access`);
+      const data = await response.json();
+      
+      if (data.success && data.hasAccess) {
         setAccessGranted(true);
         return true;
       } else {
@@ -259,18 +260,19 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
   const loadSalesData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/sales-data');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
+      const data = await response.json();
       
-      if (response.data.success) {
-        setSalesData(response.data.data);
+      if (data.success) {
+        setSalesData(data.data);
         
         // 필터 옵션 생성
-        const regions = [...new Set(response.data.data.salesData.map(item => item.region))];
-        const subRegions = [...new Set(response.data.data.salesData.map(item => item.subRegion))];
-        const agentCodes = [...new Set(response.data.data.salesData.map(item => item.agentCode))];
-        const agentNames = [...new Set(response.data.data.salesData.map(item => item.agentName))];
-        const posCodes = [...new Set(response.data.data.salesData.map(item => item.posCode))];
-        const storeNames = [...new Set(response.data.data.salesData.map(item => item.storeName))];
+        const regions = [...new Set(data.data.salesData.map(item => item.region))];
+        const subRegions = [...new Set(data.data.salesData.map(item => item.subRegion))];
+        const agentCodes = [...new Set(data.data.salesData.map(item => item.agentCode))];
+        const agentNames = [...new Set(data.data.salesData.map(item => item.agentName))];
+        const posCodes = [...new Set(data.data.salesData.map(item => item.posCode))];
+        const storeNames = [...new Set(data.data.salesData.map(item => item.storeName))];
         
         setFilterOptions({
           regions: regions.sort(),
