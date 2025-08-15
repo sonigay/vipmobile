@@ -26,7 +26,7 @@ import {
 } from '@mui/icons-material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import api from '../api';
+import { api } from '../api';
 
 // Leaflet 마커 아이콘 설정
 delete L.Icon.Default.prototype._getIconUrl;
