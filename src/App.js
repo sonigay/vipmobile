@@ -1534,11 +1534,12 @@ function AppContent() {
     processLogin(modifiedStore);
     
     // 모드 진입 시 업데이트 팝업 표시
-    console.log('🔍 [App] handleModeSelect - 모드 진입 시 팝업 표시:', selectedMode);
+    // 로그 최소화 (성능 최적화)
+    // console.log('🔍 [App] handleModeSelect - 모드 진입 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
-    console.log('✅ [App] showAppUpdatePopup을 true로 설정');
-    console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
+    // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
+    // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
     
     // 상태 초기화
     setPendingLoginData(null);
@@ -1626,11 +1627,12 @@ function AppContent() {
     }
     
     // 모드 진입 시 업데이트 팝업 표시
-    console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
+    // 로그 최소화 (성능 최적화)
+    // console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     setShowAppUpdatePopup(true);
-    console.log('✅ [App] showAppUpdatePopup을 true로 설정');
-    console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
+    // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
+    // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
     
     // 모드 선택 팝업 닫기
     setShowModeSelection(false);
@@ -2112,8 +2114,9 @@ function AppContent() {
   }
 
   // 영업모드일 때는 별도 화면 렌더링
-  console.log('🔍 [App] isSalesMode 상태:', isSalesMode);
-  console.log('🔍 [App] 현재 모드들:', { isSalesMode, isAgentMode, isInventoryMode });
+  // 로그 최소화 (성능 최적화)
+  // console.log('🔍 [App] isSalesMode 상태:', isSalesMode);
+  // console.log('🔍 [App] 현재 모드들:', { isSalesMode, isAgentMode, isInventoryMode });
   if (isSalesMode) {
     return (
       <ThemeProvider theme={theme}>
@@ -2949,16 +2952,17 @@ function AppContent() {
         loggedInStore={loggedInStore}
         onUpdateAdded={() => {
           // 업데이트 추가 시 캐시 무효화 등의 처리
-          console.log('새 업데이트가 추가되었습니다.');
+          // 로그 최소화 (성능 최적화)
+          // console.log('새 업데이트가 추가되었습니다.');
         }}
       />
-      {/* 디버깅용 로그 */}
-      {console.log('🔍 [App] AppUpdatePopup props:', { 
+      {/* 디버깅용 로그 제거 (성능 최적화) */}
+      {/* {console.log('🔍 [App] AppUpdatePopup props:', { 
         showAppUpdatePopup, 
         currentMode, 
         loggedInStore: loggedInStore?.name,
         hideUntil: currentMode ? localStorage.getItem(`hideUpdate_${currentMode}`) : null
-      })}
+      })} */}
     </ThemeProvider>
   );
 }

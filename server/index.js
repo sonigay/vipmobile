@@ -82,16 +82,60 @@ webpush.setVapidDetails(
 // 푸시 구독 저장소 (실제로는 데이터베이스 사용 권장)
 const pushSubscriptions = new Map();
 
-// 캐싱 시스템 설정
+// 캐싱 시스템 설정 (트래픽 최적화)
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5분 (5 * 60 * 1000ms)
-const MAX_CACHE_SIZE = 100; // 최대 캐시 항목 수
+const MAX_CACHE_SIZE = 200; // 최대 캐시 항목 수 증가 (100 → 200)
 
-// API 호출 제한 설정
+// 동시 요청 제한 설정
+const concurrentRequestLimit = {
+  maxConcurrent: 10, // 최대 동시 요청 수
+  currentRequests: 0,
+  queue: []
+};
+
+// API 호출 제한 설정 (트래픽 최적화)
 const API_RATE_LIMIT = {
-  maxRequestsPerMinute: 60, // 분당 최대 요청 수
+  maxRequestsPerMinute: 120, // 분당 최대 요청 수 증가 (60 → 120)
   requests: [],
   isRateLimited: false
+};
+
+// 요청 큐 관리 함수
+const processRequestQueue = async () => {
+  if (concurrentRequestLimit.queue.length > 0 && 
+      concurrentRequestLimit.currentRequests < concurrentRequestLimit.maxConcurrent) {
+    const { resolve, reject, requestFunction } = concurrentRequestLimit.queue.shift();
+    concurrentRequestLimit.currentRequests++;
+    
+    try {
+      const result = await requestFunction();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    } finally {
+      concurrentRequestLimit.currentRequests--;
+      processRequestQueue(); // 다음 요청 처리
+    }
+  }
+};
+
+// 요청 제한 래퍼 함수
+const withConcurrencyLimit = (requestFunction) => {
+  return new Promise((resolve, reject) => {
+    if (concurrentRequestLimit.currentRequests < concurrentRequestLimit.maxConcurrent) {
+      concurrentRequestLimit.currentRequests++;
+      requestFunction()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          concurrentRequestLimit.currentRequests--;
+          processRequestQueue();
+        });
+    } else {
+      concurrentRequestLimit.queue.push({ resolve, reject, requestFunction });
+    }
+  });
 };
 
 // 캐시 유틸리티 함수들
@@ -1524,20 +1568,68 @@ app.get('/api/sales-data', async (req, res) => {
   // 캐시에서 먼저 확인
   const cachedSalesData = cacheUtils.get(cacheKey);
   if (cachedSalesData) {
+    // 로그 최소화 (성능 최적화)
+    // console.log('📦 [SALES] 캐시에서 데이터 반환 (트래픽 절약)');
     return res.json(cachedSalesData);
   }
   
   try {
+    // 동시 요청 제한 적용
+    const result = await withConcurrencyLimit(async () => {
+      // 로그 최소화 (성능 최적화)
+      // console.log(`🔄 [SALES] 동시 요청 처리 중... (현재: ${concurrentRequestLimit.currentRequests}/${concurrentRequestLimit.maxConcurrent})`);
+      return await processSalesData();
+    });
+    
+    // 캐시에 저장 (6시간 TTL)
+    cacheUtils.set(cacheKey, result, 6 * 60 * 60 * 1000);
+    
+    // 로그 최소화 (성능 최적화)
+    // console.log(`✅ [SALES] 영업 데이터 로드 완료: ${result.data.salesData.length}개 레코드, ${result.data.summary.totalPosCodes}개 POS코드 (처리시간: ${result.processingTime}ms)`);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching sales data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch sales data', 
+      message: error.message 
+    });
+  }
+});
+
+// 영업 데이터 미리 로드 함수 (공통 함수 활용 + 메모리 최적화 + 트래픽 최적화 + 로그 최적화)
+async function preloadSalesData() {
+  try {
+    // 로그 최소화 (성능 최적화)
+    // console.log('🔄 [SALES] 영업 데이터 미리 로드 시작...');
+    
+    // 동시 요청 제한 적용
+    const result = await withConcurrencyLimit(async () => {
+      return await processSalesData();
+    });
+    
+    // 캐시에 저장 (6시간 TTL)
+    cacheUtils.set('sales_data', result, 6 * 60 * 60 * 1000);
+    
+    // 로그 최소화 (성능 최적화)
+    // console.log(`✅ [SALES] 영업 데이터 미리 로드 완료: ${result.data.salesData.length}개 레코드, ${result.data.summary.totalPosCodes}개 POS코드 (트래픽 최적화됨)`);
+  } catch (error) {
+    console.error('❌ [SALES] 영업 데이터 미리 로드 실패:', error);
+  }
+}
+
+// 영업 데이터 처리 공통 함수 (코드 중복 제거)
+async function processSalesData(spreadsheetId = process.env.SALES_SHEET_ID) {
+  try {
     const startTime = Date.now();
     
-    // 새로운 구글 시트 ID 확인
-    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
-    if (!SALES_SPREADSHEET_ID) {
+    if (!spreadsheetId) {
       throw new Error('SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
     }
     
     const RAW_DATA_SHEET_NAME = 'raw데이터';
-    const rawDataValues = await getSheetValues(RAW_DATA_SHEET_NAME, SALES_SPREADSHEET_ID);
+    const rawDataValues = await getSheetValues(RAW_DATA_SHEET_NAME, spreadsheetId);
     
     if (!rawDataValues) {
       throw new Error('Failed to fetch data from raw data sheet');
@@ -1582,6 +1674,12 @@ app.get('/api/sales-data', async (req, res) => {
       const manager = (row[14] || '').toString();   // O열: 담당
       const branch = (row[15] || '').toString();    // P열: 지점
       
+      // 주소 계층 데이터 (E, F, G, H열)
+      const province = (row[4] || '').toString();   // E열: 도/광역시
+      const city = (row[5] || '').toString();       // F열: 시/구
+      const district = (row[6] || '').toString();   // G열: 구/동
+      const detailArea = (row[7] || '').toString(); // H열: 동/상세
+      
       // 개별 데이터 추가
       const salesItem = {
         latitude,
@@ -1595,7 +1693,12 @@ app.get('/api/sales-data', async (req, res) => {
         subRegion,
         performance,
         manager,
-        branch
+        branch,
+        // 주소 계층 데이터 추가
+        province,
+        city,
+        district,
+        detailArea
       };
       
       salesData.push(salesItem);
@@ -1612,6 +1715,11 @@ app.get('/api/sales-data', async (req, res) => {
           subRegion,
           manager,
           branch,
+          // 주소 계층 데이터 추가
+          province,
+          city,
+          district,
+          detailArea,
           totalPerformance: 0,
           agents: new Map() // 대리점 정보도 Map으로 관리
         });
@@ -1621,177 +1729,6 @@ app.get('/api/sales-data', async (req, res) => {
       posCodeData.totalPerformance += performance;
       
       // 대리점 정보 추가 (Map으로 중복 방지)
-      if (!posCodeData.agents.has(agentCode)) {
-        posCodeData.agents.set(agentCode, {
-          agentCode,
-          agentName,
-          performance
-        });
-      } else {
-        posCodeData.agents.get(agentCode).performance += performance;
-      }
-      
-      // 지역별 실적 합계
-      const regionKey = `${region}_${subRegion}`;
-      if (!regionMap.has(regionKey)) {
-        regionMap.set(regionKey, {
-          region,
-          subRegion,
-          totalPerformance: 0,
-          posCodes: new Set() // Set으로 중복 방지
-        });
-      }
-      
-      const regionData = regionMap.get(regionKey);
-      regionData.totalPerformance += performance;
-      regionData.posCodes.add(posCode);
-    });
-    
-    // Map을 Object로 변환 (API 응답용)
-    const posCodeMapObj = {};
-    posCodeMap.forEach((value, key) => {
-      posCodeMapObj[key] = {
-        ...value,
-        agents: Array.from(value.agents.values())
-      };
-    });
-    
-    const regionMapObj = {};
-    regionMap.forEach((value, key) => {
-      regionMapObj[key] = {
-        ...value,
-        posCodes: Array.from(value.posCodes)
-      };
-    });
-    
-    // 결과 데이터 구성
-    const result = {
-      success: true,
-      data: {
-        salesData, // 개별 데이터
-        posCodeMap: posCodeMapObj, // POS코드별 집계
-        regionMap: regionMapObj,  // 지역별 집계
-        summary: {
-          totalRecords: salesData.length,
-          totalPosCodes: posCodeMap.size,
-          totalRegions: regionMap.size,
-          totalPerformance: Array.from(posCodeMap.values()).reduce((sum, item) => sum + item.totalPerformance, 0)
-        }
-      },
-      processingTime: Date.now() - startTime
-    };
-    
-    // 캐시에 저장 (24시간 TTL로 연장)
-    cacheUtils.set(cacheKey, result, 24 * 60 * 60 * 1000);
-    
-    console.log(`✅ [SALES] 영업 데이터 로드 완료: ${salesData.length}개 레코드, ${posCodeMap.size}개 POS코드 (처리시간: ${Date.now() - startTime}ms)`);
-    
-    res.json(result);
-  } catch (error) {
-    console.error('Error fetching sales data:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch sales data', 
-      message: error.message 
-    });
-  }
-});
-
-// 영업 데이터 미리 로드 함수
-async function preloadSalesData() {
-  try {
-    console.log('🔄 [SALES] 영업 데이터 미리 로드 시작...');
-    
-    const SALES_SPREADSHEET_ID = process.env.SALES_SHEET_ID;
-    if (!SALES_SPREADSHEET_ID) {
-      console.log('⚠️ [SALES] SALES_SHEET_ID 환경변수가 설정되어 있지 않습니다.');
-      return;
-    }
-    
-    const RAW_DATA_SHEET_NAME = 'raw데이터';
-    const rawDataValues = await getSheetValues(RAW_DATA_SHEET_NAME, SALES_SPREADSHEET_ID);
-    
-    if (!rawDataValues) {
-      console.log('⚠️ [SALES] raw데이터 시트에서 데이터를 가져올 수 없습니다.');
-      return;
-    }
-
-    // 헤더 제거 (3행이 헤더, 4행부터 데이터)
-    const rawDataRows = rawDataValues.slice(3);
-    
-    console.log(`🔍 [SALES] raw데이터 처리 시작: ${rawDataRows.length}개 행`);
-    
-    // 필터링된 데이터 처리 (성능 최적화)
-    const salesData = [];
-    const posCodeMap = new Map();
-    const regionMap = new Map();
-    
-    // 유효한 데이터만 먼저 필터링
-    const validRows = rawDataRows.filter(row => {
-      if (!row || row.length < 28) return false;
-      
-      const latitude = parseFloat(row[10]) || 0;
-      const longitude = parseFloat(row[11]) || 0;
-      const performance = parseInt(row[27]) || 0;
-      
-      return latitude && longitude && performance > 0;
-    });
-    
-    console.log(`✅ [SALES] 유효한 데이터: ${validRows.length}개 행`);
-    
-    validRows.forEach((row, index) => {
-      const latitude = parseFloat(row[10]);
-      const longitude = parseFloat(row[11]);
-      const address = (row[12] || '').toString();
-      const agentCode = (row[16] || '').toString();
-      const agentName = (row[17] || '').toString();
-      const posCode = (row[21] || '').toString();
-      const storeName = (row[22] || '').toString();
-      const region = (row[24] || '').toString();
-      const subRegion = (row[25] || '').toString();
-      const performance = parseInt(row[27]);
-      const manager = (row[14] || '').toString();
-      const branch = (row[15] || '').toString();
-      
-      // 개별 데이터 추가
-      const salesItem = {
-        latitude,
-        longitude,
-        address,
-        agentCode,
-        agentName,
-        posCode,
-        storeName,
-        region,
-        subRegion,
-        performance,
-        manager,
-        branch
-      };
-      
-      salesData.push(salesItem);
-      
-      // POS코드별 실적 합계
-      if (!posCodeMap.has(posCode)) {
-        posCodeMap.set(posCode, {
-          latitude,
-          longitude,
-          address,
-          posCode,
-          storeName,
-          region,
-          subRegion,
-          manager,
-          branch,
-          totalPerformance: 0,
-          agents: new Map()
-        });
-      }
-      
-      const posCodeData = posCodeMap.get(posCode);
-      posCodeData.totalPerformance += performance;
-      
-      // 대리점 정보 추가
       if (!posCodeData.agents.has(agentCode)) {
         posCodeData.agents.set(agentCode, {
           agentCode,
@@ -2813,7 +2750,7 @@ async function checkAndUpdateAddresses() {
   }
 }
 
-// SALES_SHEET_ID 주소 업데이트를 확인하고 실행하는 함수
+// SALES_SHEET_ID 주소 업데이트를 확인하고 실행하는 함수 (로그 최적화)
 async function checkAndUpdateSalesAddresses() {
   try {
     // SALES_SHEET_ID 환경변수 확인
@@ -2834,6 +2771,7 @@ async function checkAndUpdateSalesAddresses() {
     let processedCount = 0;
     let updatedCount = 0;
     let skippedCount = 0;
+    let errorCount = 0;
     
     console.log(`🔍 [SALES] 판매점정보 시트 데이터 로드: ${salesRows.length}개 행`);
     
@@ -2864,7 +2802,7 @@ async function checkAndUpdateSalesAddresses() {
       // 좌표가 없는 경우에만 지오코딩 실행
       if (addressHash !== existingAddressHash) {
         try {
-          console.log(`🔍 [SALES] 좌표 업데이트 시작: ${address}`);
+          // 개별 주소 로그 제거 (성능 최적화)
           const result = await geocodeAddress(address);
           if (result) {
             const { latitude, longitude } = result;
@@ -2880,12 +2818,20 @@ async function checkAndUpdateSalesAddresses() {
             });
             
             updatedCount++;
-            console.log(`✅ [SALES] 좌표 업데이트 성공: ${address} (${latitude}, ${longitude})`);
+            
+            // 100개마다 진행상황 로그 (로그 최적화)
+            if (updatedCount % 100 === 0) {
+              console.log(`📊 [SALES] 진행상황: ${updatedCount}개 업데이트 완료`);
+            }
           } else {
-            console.log(`❌ [SALES] Geocoding 결과 없음: ${address}`);
+            errorCount++;
           }
         } catch (error) {
-          console.error(`❌ [SALES] Geocoding 오류: ${address}`, error.message);
+          errorCount++;
+          // 에러 로그도 최소화 (성능 최적화)
+          if (errorCount <= 5) {
+            console.error(`❌ [SALES] Geocoding 오류: ${address}`, error.message);
+          }
         }
         
         // API 할당량 제한을 피하기 위한 지연 (0.2초)
@@ -2893,7 +2839,7 @@ async function checkAndUpdateSalesAddresses() {
       }
     }
     
-    console.log(`📊 [SALES] 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개, 건너뜀: ${skippedCount}개`);
+    console.log(`📊 [SALES] 주소 업데이트 완료 - 처리: ${processedCount}개, 업데이트: ${updatedCount}개, 건너뜀: ${skippedCount}개, 오류: ${errorCount}개`);
   } catch (error) {
     console.error('Error in checkAndUpdateSalesAddresses:', error);
   }

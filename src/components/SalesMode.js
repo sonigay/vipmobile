@@ -30,6 +30,8 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import AppUpdatePopup from './AppUpdatePopup';
+import AddressHierarchyFilter from './AddressHierarchyFilter';
+import AgentHierarchyFilter from './AgentHierarchyFilter';
 
 // Leaflet 마커 아이콘 설정
 delete L.Icon.Default.prototype._getIconUrl;
@@ -80,695 +82,9 @@ const defaultCenter = {
   lng: 126.9780
 };
 
-// 지역 필터 패널 컴포넌트
-const RegionFilterPanel = ({ filters, setFilters, filterOptions }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isPending, startTransition] = useTransition();
-  const [expandedSections, setExpandedSections] = useState({
-    regions: true,
-    subRegions: true
-  });
 
-  // 지역별 세부상권 그룹핑
-  const regionSubRegionsMap = useMemo(() => {
-    const map = {};
-    filterOptions.subRegions.forEach(subRegion => {
-      // 주소에서 지역 추출 (예: "구월2동" -> "구월동")
-      const baseRegion = subRegion.replace(/\d+동$/, '동');
-      if (!map[baseRegion]) {
-        map[baseRegion] = [];
-      }
-      map[baseRegion].push(subRegion);
-    });
-    return map;
-  }, [filterOptions.subRegions]);
 
-  // 광역상권 그룹핑 (예: "경기도 수원시" -> "경기도")
-  const groupedRegions = useMemo(() => {
-    const groups = {};
-    filterOptions.regions.forEach(region => {
-      const baseRegion = region.split(' ')[0]; // 첫 번째 단어만 추출
-      if (!groups[baseRegion]) {
-        groups[baseRegion] = [];
-      }
-      groups[baseRegion].push(region);
-    });
-    return groups;
-  }, [filterOptions.regions]);
 
-  // 검색 필터링된 데이터
-  const filteredRegions = useMemo(() => {
-    if (!searchTerm) return filterOptions.regions;
-    return filterOptions.regions.filter(region => 
-      region.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [filterOptions.regions, searchTerm]);
-
-  const filteredSubRegions = useMemo(() => {
-    if (!searchTerm) return filterOptions.subRegions;
-    return filterOptions.subRegions.filter(subRegion => 
-      subRegion.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [filterOptions.subRegions, searchTerm]);
-
-  // 검색어에 따른 그룹핑된 데이터 필터링
-  const filteredGroupedRegions = useMemo(() => {
-    if (!searchTerm) return groupedRegions;
-    const filtered = {};
-    Object.entries(groupedRegions).forEach(([baseRegion, regions]) => {
-      const matchingRegions = regions.filter(region => 
-        region.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      if (matchingRegions.length > 0) {
-        filtered[baseRegion] = matchingRegions;
-      }
-    });
-    return filtered;
-  }, [groupedRegions, searchTerm]);
-
-  const filteredRegionSubRegionsMap = useMemo(() => {
-    if (!searchTerm) return regionSubRegionsMap;
-    const filtered = {};
-    Object.entries(regionSubRegionsMap).forEach(([baseSubRegion, subRegions]) => {
-      const matchingSubRegions = subRegions.filter(subRegion => 
-        subRegion.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      if (matchingSubRegions.length > 0) {
-        filtered[baseSubRegion] = matchingSubRegions;
-      }
-    });
-    return filtered;
-  }, [regionSubRegionsMap, searchTerm]);
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters(prev => ({
-      ...prev,
-      regions: [],
-      subRegions: []
-    }));
-  };
-
-  const handleRegionGroupClick = (baseRegion) => {
-    const regions = groupedRegions[baseRegion];
-    const currentRegions = filters.regions;
-    
-    // 이미 모든 하위 지역이 선택되어 있으면 해제, 아니면 선택
-    const allSelected = regions.every(region => currentRegions.includes(region));
-    
-    if (allSelected) {
-      handleFilterChange('regions', currentRegions.filter(r => !regions.includes(r)));
-    } else {
-      handleFilterChange('regions', [...new Set([...currentRegions, ...regions])]);
-    }
-  };
-
-  const handleSubRegionGroupClick = (baseSubRegion) => {
-    const subRegions = regionSubRegionsMap[baseSubRegion];
-    const currentSubRegions = filters.subRegions;
-    
-    // 이미 모든 하위 지역이 선택되어 있으면 해제, 아니면 선택
-    const allSelected = subRegions.every(subRegion => currentSubRegions.includes(subRegion));
-    
-    if (allSelected) {
-      handleFilterChange('subRegions', currentSubRegions.filter(sr => !subRegions.includes(sr)));
-    } else {
-      handleFilterChange('subRegions', [...new Set([...currentSubRegions, ...subRegions])]);
-    }
-  };
-
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  return (
-    <Box sx={{ position: 'absolute', top: 70, left: 10, zIndex: 1000 }}>
-              <Button
-          variant="contained"
-          startIcon={<FilterList />}
-          onClick={() => setIsOpen(!isOpen)}
-          sx={{ 
-            mb: 1, 
-            backgroundColor: '#2196f3',
-            '&:hover': { backgroundColor: '#1976d2' }
-          }}
-        >
-          지역 필터 설정
-        </Button>
-      
-      {isOpen && (
-        <Paper sx={{ 
-          p: 3, 
-          width: 450, 
-          maxHeight: '80vh', 
-          overflow: 'auto',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
-        }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ color: '#2196f3', fontWeight: 'bold' }}>
-              지역 필터 설정
-            </Typography>
-            <IconButton size="small" onClick={() => setIsOpen(false)}>
-              <Close />
-            </IconButton>
-          </Box>
-          
-          <Divider sx={{ mb: 3 }} />
-          
-                     {/* 검색바 */}
-           <Box sx={{ mb: 3 }}>
-             <input
-               type="text"
-               placeholder="지역명 검색..."
-               value={searchTerm}
-               onChange={(e) => {
-                 const value = e.target.value;
-                 setSearchTerm(value);
-                 startTransition(() => {
-                   // 검색 상태를 비동기로 처리하여 UI 블로킹 방지
-                 });
-               }}
-               style={{
-                 width: '100%',
-                 padding: '12px',
-                 border: '1px solid #ddd',
-                 borderRadius: '8px',
-                 fontSize: '14px',
-                 marginBottom: '10px'
-               }}
-             />
-             {isPending && (
-               <Box sx={{ mt: 1, textAlign: 'center' }}>
-                 <CircularProgress size={16} />
-               </Box>
-             )}
-           </Box>
-          
-          {/* 광역상권 필터 - 아코디언 방식 */}
-          <Box sx={{ mb: 2 }}>
-            <Button
-              fullWidth
-              onClick={() => toggleSection('regions')}
-              sx={{
-                justifyContent: 'space-between',
-                textAlign: 'left',
-                backgroundColor: '#f5f5f5',
-                '&:hover': { backgroundColor: '#e0e0e0' }
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#333' }}>
-                광역상권 ({filteredRegions.length}개)
-              </Typography>
-              {expandedSections.regions ? <ExpandLess /> : <ExpandMore />}
-            </Button>
-            
-                         {expandedSections.regions && (
-               <Box sx={{ mt: 1, ml: 2 }}>
-                 {Object.entries(filteredGroupedRegions).map(([baseRegion, regions]) => {
-                  const allSelected = regions.every(region => filters.regions.includes(region));
-                  const someSelected = regions.some(region => filters.regions.includes(region));
-                  
-                  return (
-                    <Box key={baseRegion} sx={{ mb: 2 }}>
-                      <Chip
-                        label={`${baseRegion} (${regions.length})`}
-                        size="medium"
-                        onClick={() => handleRegionGroupClick(baseRegion)}
-                        color={allSelected ? 'primary' : someSelected ? 'secondary' : 'default'}
-                        variant={allSelected ? 'filled' : someSelected ? 'outlined' : 'outlined'}
-                        sx={{ 
-                          mr: 1, 
-                          mb: 1,
-                          fontWeight: 'bold',
-                          '&:hover': { backgroundColor: '#2196f3', color: 'white' }
-                        }}
-                      />
-                      <Box sx={{ ml: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {regions.map(region => (
-                          <Chip
-                            key={region}
-                            label={region}
-                            size="small"
-                            onClick={() => handleFilterChange('regions', 
-                              filters.regions.includes(region) 
-                                ? filters.regions.filter(r => r !== region)
-                                : [...filters.regions, region]
-                            )}
-                            color={filters.regions.includes(region) ? 'primary' : 'default'}
-                            variant="outlined"
-                            sx={{ fontSize: '0.75rem' }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-          </Box>
-          
-          {/* 세부상권 필터 - 아코디언 방식 */}
-          <Box sx={{ mb: 2 }}>
-            <Button
-              fullWidth
-              onClick={() => toggleSection('subRegions')}
-              sx={{
-                justifyContent: 'space-between',
-                textAlign: 'left',
-                backgroundColor: '#f5f5f5',
-                '&:hover': { backgroundColor: '#e0e0e0' }
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#333' }}>
-                세부상권 ({filteredSubRegions.length}개)
-              </Typography>
-              {expandedSections.subRegions ? <ExpandLess /> : <ExpandMore />}
-            </Button>
-            
-                         {expandedSections.subRegions && (
-               <Box sx={{ mt: 1, ml: 2 }}>
-                 {Object.entries(filteredRegionSubRegionsMap).map(([baseSubRegion, subRegions]) => {
-                  const allSelected = subRegions.every(subRegion => filters.subRegions.includes(subRegion));
-                  const someSelected = subRegions.some(subRegion => filters.subRegions.includes(subRegion));
-                  
-                  return (
-                    <Box key={baseSubRegion} sx={{ mb: 2 }}>
-                      <Chip
-                        label={`${baseSubRegion} (${subRegions.length})`}
-                        size="medium"
-                        onClick={() => handleSubRegionGroupClick(baseSubRegion)}
-                        color={allSelected ? 'primary' : someSelected ? 'secondary' : 'default'}
-                        variant={allSelected ? 'filled' : someSelected ? 'outlined' : 'outlined'}
-                        sx={{ 
-                          mr: 1, 
-                          mb: 1,
-                          fontWeight: 'bold',
-                          '&:hover': { backgroundColor: '#2196f3', color: 'white' }
-                        }}
-                      />
-                      <Box sx={{ ml: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {subRegions.map(subRegion => (
-                          <Chip
-                            key={subRegion}
-                            label={subRegion}
-                            size="small"
-                            onClick={() => handleFilterChange('subRegions',
-                              filters.subRegions.includes(subRegion)
-                                ? filters.subRegions.filter(r => r !== subRegion)
-                                : [...filters.subRegions, subRegion]
-                            )}
-                            color={filters.subRegions.includes(subRegion) ? 'primary' : 'default'}
-                            variant="outlined"
-                            sx={{ fontSize: '0.75rem' }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-          </Box>
-          
-
-          
-          {/* 선택된 필터 표시 */}
-          {(filters.regions.length > 0 || filters.subRegions.length > 0) && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                선택된 필터:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {filters.regions.map(region => (
-                  <Chip
-                    key={region}
-                    label={region}
-                    size="small"
-                    color="primary"
-                    onDelete={() => handleFilterChange('regions', filters.regions.filter(r => r !== region))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                                 {filters.subRegions.map(subRegion => (
-                   <Chip
-                     key={subRegion}
-                     label={subRegion}
-                     size="small"
-                     color="secondary"
-                     onDelete={() => handleFilterChange('subRegions', filters.subRegions.filter(sr => sr !== subRegion))}
-                     sx={{ fontSize: '0.75rem' }}
-                   />
-                 ))}
-              </Box>
-            </Box>
-          )}
-          
-          <Button
-            variant="outlined"
-            onClick={clearFilters}
-            fullWidth
-            sx={{ 
-              mb: 1,
-              borderColor: '#2196f3',
-              color: '#2196f3',
-              '&:hover': { 
-                borderColor: '#1976d2',
-                backgroundColor: '#e3f2fd'
-              }
-            }}
-          >
-            필터 초기화
-          </Button>
-        </Paper>
-      )}
-    </Box>
-  );
-};
-
-// 대리점 필터 패널 컴포넌트
-const AgentFilterPanel = ({ filters, setFilters, filterOptions }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isPending, startTransition] = useTransition();
-  const [expandedSections, setExpandedSections] = useState({
-    managers: true,
-    branches: true,
-    agents: true
-  });
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters(prev => ({
-      ...prev,
-      managers: [],
-      branches: [],
-      agents: []
-    }));
-  };
-
-  // 검색 필터링된 데이터
-  const filteredManagers = useMemo(() => {
-    if (!searchTerm) return filterOptions.managers;
-    return filterOptions.managers.filter(manager => 
-      manager.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [filterOptions.managers, searchTerm]);
-
-  const filteredBranches = useMemo(() => {
-    if (!searchTerm) return filterOptions.branches;
-    return filterOptions.branches.filter(branch => 
-      branch.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [filterOptions.branches, searchTerm]);
-
-  const filteredAgents = useMemo(() => {
-    if (!searchTerm) return filterOptions.agents;
-    return filterOptions.agents.filter(agent => 
-      agent.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [filterOptions.agents, searchTerm]);
-
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  return (
-    <Box sx={{ position: 'absolute', top: 70, left: 200, zIndex: 1000 }}>
-      <Button
-        variant="contained"
-        startIcon={<FilterList />}
-        onClick={() => setIsOpen(!isOpen)}
-        sx={{ 
-          mb: 1, 
-          backgroundColor: '#e91e63',
-          '&:hover': { backgroundColor: '#c2185b' }
-        }}
-      >
-        대리점 필터 설정
-      </Button>
-      
-      {isOpen && (
-        <Paper sx={{ 
-          p: 3, 
-          width: 450, 
-          maxHeight: '80vh', 
-          overflow: 'auto',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
-        }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ color: '#e91e63', fontWeight: 'bold' }}>
-              대리점 필터 설정
-            </Typography>
-            <IconButton size="small" onClick={() => setIsOpen(false)}>
-              <Close />
-            </IconButton>
-          </Box>
-          
-          <Divider sx={{ mb: 3 }} />
-          
-                     {/* 검색바 */}
-           <Box sx={{ mb: 3 }}>
-             <input
-               type="text"
-               placeholder="대리점명 검색..."
-               value={searchTerm}
-               onChange={(e) => {
-                 const value = e.target.value;
-                 setSearchTerm(value);
-                 startTransition(() => {
-                   // 검색 상태를 비동기로 처리하여 UI 블로킹 방지
-                 });
-               }}
-               style={{
-                 width: '100%',
-                 padding: '12px',
-                 border: '1px solid #ddd',
-                 borderRadius: '8px',
-                 fontSize: '14px',
-                 marginBottom: '10px'
-               }}
-             />
-             {isPending && (
-               <Box sx={{ mt: 1, textAlign: 'center' }}>
-                 <CircularProgress size={16} />
-               </Box>
-             )}
-           </Box>
-          
-          {/* 담당 필터 - 아코디언 방식 */}
-          <Box sx={{ mb: 2 }}>
-            <Button
-              fullWidth
-              onClick={() => toggleSection('managers')}
-              sx={{
-                justifyContent: 'space-between',
-                textAlign: 'left',
-                backgroundColor: '#f5f5f5',
-                '&:hover': { backgroundColor: '#e0e0e0' }
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#333' }}>
-                담당 ({filteredManagers.length}개)
-              </Typography>
-              {expandedSections.managers ? <ExpandLess /> : <ExpandMore />}
-            </Button>
-            
-            {expandedSections.managers && (
-              <Box sx={{ mt: 1, ml: 2 }}>
-                {filteredManagers.map(manager => (
-                  <Chip
-                    key={manager}
-                    label={manager}
-                    size="medium"
-                    onClick={() => handleFilterChange('managers', 
-                      filters.managers.includes(manager) 
-                        ? filters.managers.filter(m => m !== manager)
-                        : [...filters.managers, manager]
-                    )}
-                    color={filters.managers.includes(manager) ? 'primary' : 'default'}
-                    variant={filters.managers.includes(manager) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mr: 1, 
-                      mb: 1,
-                      fontWeight: 'bold',
-                      '&:hover': { backgroundColor: '#e91e63', color: 'white' }
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-          </Box>
-          
-          {/* 지점 필터 - 아코디언 방식 */}
-          <Box sx={{ mb: 2 }}>
-            <Button
-              fullWidth
-              onClick={() => toggleSection('branches')}
-              sx={{
-                justifyContent: 'space-between',
-                textAlign: 'left',
-                backgroundColor: '#f5f5f5',
-                '&:hover': { backgroundColor: '#e0e0e0' }
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#333' }}>
-                지점 ({filteredBranches.length}개)
-              </Typography>
-              {expandedSections.branches ? <ExpandLess /> : <ExpandMore />}
-            </Button>
-            
-            {expandedSections.branches && (
-              <Box sx={{ mt: 1, ml: 2 }}>
-                {filteredBranches.map(branch => (
-                  <Chip
-                    key={branch}
-                    label={branch}
-                    size="medium"
-                    onClick={() => handleFilterChange('branches',
-                      filters.branches.includes(branch)
-                        ? filters.branches.filter(b => b !== branch)
-                        : [...filters.branches, branch]
-                    )}
-                    color={filters.branches.includes(branch) ? 'primary' : 'default'}
-                    variant={filters.branches.includes(branch) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mr: 1, 
-                      mb: 1,
-                      fontWeight: 'bold',
-                      '&:hover': { backgroundColor: '#e91e63', color: 'white' }
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-          </Box>
-          
-          {/* 대리점 필터 - 아코디언 방식 */}
-          <Box sx={{ mb: 2 }}>
-            <Button
-              fullWidth
-              onClick={() => toggleSection('agents')}
-              sx={{
-                justifyContent: 'space-between',
-                textAlign: 'left',
-                backgroundColor: '#f5f5f5',
-                '&:hover': { backgroundColor: '#e0e0e0' }
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#333' }}>
-                대리점 ({filteredAgents.length}개)
-              </Typography>
-              {expandedSections.agents ? <ExpandLess /> : <ExpandMore />}
-            </Button>
-            
-            {expandedSections.agents && (
-              <Box sx={{ mt: 1, ml: 2 }}>
-                {filteredAgents.map(agent => (
-                  <Chip
-                    key={agent}
-                    label={agent}
-                    size="medium"
-                    onClick={() => handleFilterChange('agents',
-                      filters.agents.includes(agent)
-                        ? filters.agents.filter(a => a !== agent)
-                        : [...filters.agents, agent]
-                    )}
-                    color={filters.agents.includes(agent) ? 'primary' : 'default'}
-                    variant={filters.agents.includes(agent) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mr: 1, 
-                      mb: 1,
-                      fontWeight: 'bold',
-                      fontSize: '0.8rem',
-                      '&:hover': { backgroundColor: '#e91e63', color: 'white' }
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-          </Box>
-          
-          {/* 선택된 필터 표시 */}
-          {(filters.managers.length > 0 || filters.branches.length > 0 || filters.agents.length > 0) && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                선택된 필터:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {filters.managers.map(manager => (
-                  <Chip
-                    key={manager}
-                    label={manager}
-                    size="small"
-                    color="primary"
-                    onDelete={() => handleFilterChange('managers', filters.managers.filter(m => m !== manager))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.branches.map(branch => (
-                  <Chip
-                    key={branch}
-                    label={branch}
-                    size="small"
-                    color="secondary"
-                    onDelete={() => handleFilterChange('branches', filters.branches.filter(b => b !== branch))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.agents.map(agent => (
-                  <Chip
-                    key={agent}
-                    label={agent}
-                    size="small"
-                    color="info"
-                    onDelete={() => handleFilterChange('agents', filters.agents.filter(a => a !== agent))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-              </Box>
-            </Box>
-          )}
-          
-          <Button
-            variant="outlined"
-            onClick={clearFilters}
-            fullWidth
-            sx={{ 
-              mb: 1,
-              borderColor: '#e91e63',
-              color: '#e91e63',
-              '&:hover': { 
-                borderColor: '#c2185b',
-                backgroundColor: '#fce4ec'
-              }
-            }}
-          >
-            필터 초기화
-          </Button>
-        </Paper>
-      )}
-    </Box>
-  );
-};
 
 // 실적 범위 필터 패널 컴포넌트
 const PerformanceFilterPanel = ({ filters, setFilters }) => {
@@ -918,17 +234,25 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
   const [error, setError] = useState(null);
   const [accessGranted, setAccessGranted] = useState(false);
   const [filters, setFilters] = useState({
-    regions: [],
-    subRegions: [],
+    // 주소 계층 필터
+    provinces: [],
+    cities: [],
+    districts: [],
+    detailAreas: [],
+    // 대리점 계층 필터
     managers: [],
     branches: [],
     agents: [],
+    // 실적 범위 필터
     minPerformance: '',
     maxPerformance: ''
   });
   const [filterOptions, setFilterOptions] = useState({
-    regions: [],
-    subRegions: [],
+    salesData: [],
+    provinces: [],
+    cities: [],
+    districts: [],
+    detailAreas: [],
     managers: [],
     branches: [],
     agents: []
@@ -956,7 +280,7 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     }
   }, []);
 
-  // 영업 데이터 로드 (캐시 활용)
+    // 영업 데이터 로드 (캐시 활용 + 메모리 최적화)
   const loadSalesData = useCallback(async () => {
     try {
       setLoading(true);
@@ -966,55 +290,51 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
       const cacheTimestamp = sessionStorage.getItem('sales_data_timestamp');
       const now = Date.now();
       
-      // 캐시가 30분 이내인지 확인
-      if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < 30 * 60 * 1000) {
-        console.log('📦 [SALES] 세션 캐시에서 데이터 로드');
+             // 캐시가 1시간 이내인지 확인
+       if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < 60 * 60 * 1000) {
+         // 로그 최소화 (성능 최적화)
+         // console.log('📦 [SALES] 세션 캐시에서 데이터 로드');
         const data = JSON.parse(cachedData);
         setSalesData(data);
         
-        // 필터 옵션 생성
-        const regions = [...new Set(data.salesData.map(item => item.region))];
-        const subRegions = [...new Set(data.salesData.map(item => item.subRegion))];
-        const managers = [...new Set(data.salesData.map(item => item.manager))];
-        const branches = [...new Set(data.salesData.map(item => item.branch))];
-        const agents = [...new Set(data.salesData.map(item => `${item.agentName} (${item.agentCode})`))];
-        
-        setFilterOptions({
-          regions: regions.sort(),
-          subRegions: subRegions.sort(),
-          managers: managers.sort(),
-          branches: branches.sort(),
-          agents: agents.sort()
-        });
+                 // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
+         setFilterOptions({
+           salesData: data.salesData,
+           provinces: [],
+           cities: [],
+           districts: [],
+           detailAreas: [],
+           managers: [],
+           branches: [],
+           agents: []
+         });
         
         setLoading(false);
         return;
       }
       
-      console.log('🌐 [SALES] 서버에서 데이터 로드');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
+             // 로그 최소화 (성능 최적화)
+       // console.log('🌐 [SALES] 서버에서 데이터 로드');
+       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
       const data = await response.json();
       
       if (data.success) {
         setSalesData(data.data);
         
-        // 세션 스토리지에 캐시 저장 (30분)
+        // 세션 스토리지에 캐시 저장 (1시간)
         sessionStorage.setItem('sales_data_cache', JSON.stringify(data.data));
         sessionStorage.setItem('sales_data_timestamp', now.toString());
         
-        // 필터 옵션 생성
-        const regions = [...new Set(data.data.salesData.map(item => item.region))];
-        const subRegions = [...new Set(data.data.salesData.map(item => item.subRegion))];
-        const managers = [...new Set(data.data.salesData.map(item => item.manager))];
-        const branches = [...new Set(data.data.salesData.map(item => item.branch))];
-        const agents = [...new Set(data.data.salesData.map(item => `${item.agentName} (${item.agentCode})`))];
-        
+        // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
         setFilterOptions({
-          regions: regions.sort(),
-          subRegions: subRegions.sort(),
-          managers: managers.sort(),
-          branches: branches.sort(),
-          agents: agents.sort()
+          salesData: data.data.salesData,
+          provinces: [],
+          cities: [],
+          districts: [],
+          detailAreas: [],
+          managers: [],
+          branches: [],
+          agents: []
         });
       } else {
         setError('영업 데이터를 불러오는데 실패했습니다.');
@@ -1032,8 +352,10 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     if (!salesData) return [];
     
     // 필터 조건이 없는 경우 전체 데이터 반환
-    const hasFilters = filters.regions.length > 0 || 
-                      filters.subRegions.length > 0 || 
+    const hasFilters = filters.provinces.length > 0 || 
+                      filters.cities.length > 0 || 
+                      filters.districts.length > 0 || 
+                      filters.detailAreas.length > 0 ||
                       filters.managers.length > 0 || 
                       filters.branches.length > 0 || 
                       filters.agents.length > 0 || 
@@ -1045,27 +367,32 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     }
     
     return Object.values(salesData.posCodeMap).filter(item => {
-      // 지역 필터
-      if (filters.regions.length > 0 && !filters.regions.includes(item.region)) {
+      // 주소 계층 필터
+      if (filters.provinces.length > 0 && !filters.provinces.includes(item.province)) {
         return false;
       }
       
-      // 세부상권 필터
-      if (filters.subRegions.length > 0 && !filters.subRegions.includes(item.subRegion)) {
+      if (filters.cities.length > 0 && !filters.cities.includes(item.city)) {
         return false;
       }
       
-      // 담당 필터
+      if (filters.districts.length > 0 && !filters.districts.includes(item.district)) {
+        return false;
+      }
+      
+      if (filters.detailAreas.length > 0 && !filters.detailAreas.includes(item.detailArea)) {
+        return false;
+      }
+      
+      // 대리점 계층 필터
       if (filters.managers.length > 0 && !filters.managers.includes(item.manager)) {
         return false;
       }
       
-      // 지점 필터
       if (filters.branches.length > 0 && !filters.branches.includes(item.branch)) {
         return false;
       }
       
-      // 대리점 필터
       if (filters.agents.length > 0) {
         const itemAgents = Array.from(item.agents.values()).map(agent => `${agent.agentName} (${agent.agentCode})`);
         const hasMatchingAgent = itemAgents.some(agent => filters.agents.includes(agent));
@@ -1099,17 +426,18 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     initialize();
   }, [checkAccess, loadSalesData]);
 
-  // 데이터 새로고침 (캐시 무시)
+  // 데이터 새로고침 (캐시 무시 + 메모리 최적화)
   const handleRefresh = async () => {
     try {
       setLoading(true);
       
-      // 캐시 삭제
-      sessionStorage.removeItem('sales_data_cache');
-      sessionStorage.removeItem('sales_data_timestamp');
-      
-      console.log('🔄 [SALES] 데이터 새로고침 - 서버에서 최신 데이터 로드');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
+             // 캐시 삭제
+       sessionStorage.removeItem('sales_data_cache');
+       sessionStorage.removeItem('sales_data_timestamp');
+       
+       // 로그 최소화 (성능 최적화)
+       // console.log('🔄 [SALES] 데이터 새로고침 - 서버에서 최신 데이터 로드');
+       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-data`);
       const data = await response.json();
       
       if (data.success) {
@@ -1120,19 +448,16 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
         sessionStorage.setItem('sales_data_cache', JSON.stringify(data.data));
         sessionStorage.setItem('sales_data_timestamp', now.toString());
         
-        // 필터 옵션 생성
-        const regions = [...new Set(data.data.salesData.map(item => item.region))];
-        const subRegions = [...new Set(data.data.salesData.map(item => item.subRegion))];
-        const managers = [...new Set(data.data.salesData.map(item => item.manager))];
-        const branches = [...new Set(data.data.salesData.map(item => item.branch))];
-        const agents = [...new Set(data.data.salesData.map(item => `${item.agentName} (${item.agentCode})`))];
-        
+        // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
         setFilterOptions({
-          regions: regions.sort(),
-          subRegions: subRegions.sort(),
-          managers: managers.sort(),
-          branches: branches.sort(),
-          agents: agents.sort()
+          salesData: data.data.salesData,
+          provinces: [],
+          cities: [],
+          districts: [],
+          detailAreas: [],
+          managers: [],
+          branches: [],
+          agents: []
         });
       } else {
         setError('영업 데이터를 불러오는데 실패했습니다.');
@@ -1252,21 +577,21 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
         </Box>
       </Box>
 
-      {/* 필터 패널들 */}
-      <RegionFilterPanel 
-        filters={filters}
-        setFilters={setFilters}
-        filterOptions={filterOptions}
-      />
-      <AgentFilterPanel 
-        filters={filters}
-        setFilters={setFilters}
-        filterOptions={filterOptions}
-      />
-      <PerformanceFilterPanel 
-        filters={filters}
-        setFilters={setFilters}
-      />
+             {/* 새로운 계층적 필터 패널들 */}
+       <AddressHierarchyFilter 
+         filters={filters}
+         setFilters={setFilters}
+         filterOptions={filterOptions}
+       />
+       <AgentHierarchyFilter 
+         filters={filters}
+         setFilters={setFilters}
+         filterOptions={filterOptions}
+       />
+       <PerformanceFilterPanel 
+         filters={filters}
+         setFilters={setFilters}
+       />
       
       {/* 지도 */}
       <MapContainer

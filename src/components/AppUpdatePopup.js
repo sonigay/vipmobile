@@ -98,18 +98,20 @@ function AppUpdatePopup({
     setError('');
     
     try {
-      console.log(`🔍 [AppUpdatePopup] 업데이트 로드 시작: ${mode} 모드, showAll: ${showAll}`);
+      // 로그 최소화 (성능 최적화)
+    // console.log(`🔍 [AppUpdatePopup] 업데이트 로드 시작: ${mode} 모드, showAll: ${showAll}`);
       let updateData;
       if (showAll) {
         updateData = await getUpdatesForMode(mode);
       } else {
         updateData = await getLatestUpdateForMode(mode, 1);
       }
-      console.log(`✅ [AppUpdatePopup] 업데이트 로드 완료: ${mode} 모드, 데이터 개수: ${updateData.length}`, updateData);
+      // 로그 최소화 (성능 최적화)
+      // console.log(`✅ [AppUpdatePopup] 업데이트 로드 완료: ${mode} 모드, 데이터 개수: ${updateData.length}`, updateData);
       
       // 데이터가 없을 때의 처리
       if (updateData.length === 0) {
-        console.log(`⚠️ [AppUpdatePopup] ${mode} 모드에 업데이트 데이터가 없습니다.`);
+        // console.log(`⚠️ [AppUpdatePopup] ${mode} 모드에 업데이트 데이터가 없습니다.`);
         // 데이터가 없어도 팝업은 표시하되, "최신 업데이트가 없습니다" 메시지를 보여줌
       }
       
@@ -213,39 +215,40 @@ function AppUpdatePopup({
 
   // 초기화
   useEffect(() => {
-    console.log('🔍 [AppUpdatePopup] useEffect 호출:', { open, mode, showHistory });
+    // 로그 최소화 (성능 최적화)
+    // console.log('🔍 [AppUpdatePopup] useEffect 호출:', { open, mode, showHistory });
     
     if (open && mode) {
-      console.log('🔍 [AppUpdatePopup] 팝업 열기 시작:', mode);
+      // console.log('🔍 [AppUpdatePopup] 팝업 열기 시작:', mode);
       
       // 오늘 하루 보지 않기 설정 확인
       const hideUntil = localStorage.getItem(`hideUpdate_${mode}`);
-      console.log('🔍 [AppUpdatePopup] 숨김 설정 확인:', { hideUntil, currentTime: new Date().toISOString() });
+      // console.log('🔍 [AppUpdatePopup] 숨김 설정 확인:', { hideUntil, currentTime: new Date().toISOString() });
       
       if (hideUntil && new Date() < new Date(hideUntil)) {
-        console.log(`❌ [AppUpdatePopup] 팝업 숨김 설정됨: ${mode} 모드`);
+        // console.log(`❌ [AppUpdatePopup] 팝업 숨김 설정됨: ${mode} 모드`);
         onClose();
         return;
       }
       
-      console.log('✅ [AppUpdatePopup] 팝업 표시 진행');
+      // console.log('✅ [AppUpdatePopup] 팝업 표시 진행');
       loadUpdates(showHistory);
       loadAvailableDates();
       checkAdmin();
     } else {
-      console.log('❌ [AppUpdatePopup] 팝업 열기 조건 불만족:', { open, mode });
+      // console.log('❌ [AppUpdatePopup] 팝업 열기 조건 불만족:', { open, mode });
     }
   }, [open, mode, showHistory]);
 
-  // 팝업 렌더링 상태 로그
-  console.log('🔍 [AppUpdatePopup] 렌더링 상태:', { 
-    open, 
-    mode, 
-    updatesCount: updates.length,
-    loading,
-    error,
-    isAdmin
-  });
+  // 팝업 렌더링 상태 로그 제거 (성능 최적화)
+  // console.log('🔍 [AppUpdatePopup] 렌더링 상태:', { 
+  //   open, 
+  //   mode, 
+  //   updatesCount: updates.length,
+  //   loading,
+  //   error,
+  //   isAdmin
+  // });
 
   return (
     <Dialog 
