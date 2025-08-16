@@ -604,37 +604,41 @@ const originalSheets = google.sheets({
 const userSheetManager = new UserSheetManager(originalSheets, SPREADSHEET_ID);
 const phoneklDataManager = new PhoneklDataManager(originalSheets, SPREADSHEET_ID);
 
-// 모든 API 호출을 추적하는 래퍼 함수
+// 모든 API 호출을 추적하는 래퍼 함수 (로그 최적화)
 function createTrackedSheets() {
   return {
     spreadsheets: {
       values: {
         get: async (params) => {
-          const timestamp = new Date().toISOString();
-          console.log(`🚨 [API-TRACE] GET 시작: ${timestamp} - Range: ${params.range}`);
+          // 로그 최소화 - 성능 최적화
+          // const timestamp = new Date().toISOString();
+          // console.log(`🚨 [API-TRACE] GET 시작: ${timestamp} - Range: ${params.range}`);
           const result = await originalSheets.spreadsheets.values.get(params);
-          console.log(`🚨 [API-TRACE] GET 완료: ${new Date().toISOString()} - Range: ${params.range}`);
+          // console.log(`🚨 [API-TRACE] GET 완료: ${new Date().toISOString()} - Range: ${params.range}`);
           return result;
         },
         update: async (params) => {
-          const timestamp = new Date().toISOString();
-          console.log(`🚨 [API-TRACE] UPDATE 시작: ${timestamp} - Range: ${params.range}`);
+          // 로그 최소화 - 성능 최적화
+          // const timestamp = new Date().toISOString();
+          // console.log(`🚨 [API-TRACE] UPDATE 시작: ${timestamp} - Range: ${params.range}`);
           const result = await originalSheets.spreadsheets.values.update(params);
-          console.log(`🚨 [API-TRACE] UPDATE 완료: ${new Date().toISOString()} - Range: ${params.range}`);
+          // console.log(`🚨 [API-TRACE] UPDATE 완료: ${new Date().toISOString()} - Range: ${params.range}`);
           return result;
         },
         append: async (params) => {
-          const timestamp = new Date().toISOString();
-          console.log(`🚨 [API-TRACE] APPEND 시작: ${timestamp} - Range: ${params.range}`);
+          // 로그 최소화 - 성능 최적화
+          // const timestamp = new Date().toISOString();
+          // console.log(`🚨 [API-TRACE] APPEND 시작: ${timestamp} - Range: ${params.range}`);
           const result = await originalSheets.spreadsheets.values.append(params);
-          console.log(`🚨 [API-TRACE] APPEND 완료: ${new Date().toISOString()} - Range: ${params.range}`);
+          // console.log(`🚨 [API-TRACE] APPEND 완료: ${new Date().toISOString()} - Range: ${params.range}`);
           return result;
         },
         batchUpdate: async (params) => {
-          const timestamp = new Date().toISOString();
-          console.log(`🚨 [API-TRACE] BATCH_UPDATE 시작: ${timestamp} - SpreadsheetId: ${params.spreadsheetId}`);
+          // 로그 최소화 - 성능 최적화
+          // const timestamp = new Date().toISOString();
+          // console.log(`🚨 [API-TRACE] BATCH_UPDATE 시작: ${timestamp} - SpreadsheetId: ${params.spreadsheetId}`);
           const result = await originalSheets.spreadsheets.values.batchUpdate(params);
-          console.log(`🚨 [API-TRACE] BATCH_UPDATE 완료: ${new Date().toISOString()} - SpreadsheetId: ${params.spreadsheetId}`);
+          // console.log(`🚨 [API-TRACE] BATCH_UPDATE 완료: ${new Date().toISOString()} - SpreadsheetId: ${params.spreadsheetId}`);
           return result;
         }
       },
@@ -642,10 +646,11 @@ function createTrackedSheets() {
         return await originalSheets.spreadsheets.get(params);
       },
       batchUpdate: async (params) => {
-        const timestamp = new Date().toISOString();
-        console.log(`🚨 [API-TRACE] SPREADSHEET_BATCH_UPDATE 시작: ${timestamp} - SpreadsheetId: ${params.spreadsheetId}`);
+        // 로그 최소화 - 성능 최적화
+        // const timestamp = new Date().toISOString();
+        // console.log(`🚨 [API-TRACE] SPREADSHEET_BATCH_UPDATE 시작: ${timestamp} - SpreadsheetId: ${params.spreadsheetId}`);
         const result = await originalSheets.spreadsheets.batchUpdate(params);
-        console.log(`🚨 [API-TRACE] SPREADSHEET_BATCH_UPDATE 완료: ${new Date().toISOString()} - SpreadsheetId: ${params.spreadsheetId}`);
+        // console.log(`🚨 [API-TRACE] SPREADSHEET_BATCH_UPDATE 완료: ${new Date().toISOString()} - SpreadsheetId: ${params.spreadsheetId}`);
         return result;
       }
     }
@@ -1581,6 +1586,11 @@ app.get('/api/sales-data', async (req, res) => {
       return await processSalesData();
     });
     
+    // 결과 검증
+    if (!result || !result.success) {
+      throw new Error('영업 데이터 처리 결과가 유효하지 않습니다.');
+    }
+    
     // 캐시에 저장 (6시간 TTL)
     cacheUtils.set(cacheKey, result, 6 * 60 * 60 * 1000);
     
@@ -1590,11 +1600,20 @@ app.get('/api/sales-data', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error fetching sales data:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch sales data', 
-      message: error.message 
-    });
+    
+    // 더 자세한 오류 정보 제공
+    const errorResponse = {
+      success: false,
+      error: 'Failed to fetch sales data',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+      details: {
+        hasSalesSheetId: !!process.env.SALES_SHEET_ID,
+        salesSheetId: process.env.SALES_SHEET_ID ? 'SET' : 'NOT_SET'
+      }
+    };
+    
+    res.status(500).json(errorResponse);
   }
 });
 
@@ -1792,8 +1811,12 @@ async function processSalesData(spreadsheetId = process.env.SALES_SHEET_ID) {
     cacheUtils.set('sales_data', result, 24 * 60 * 60 * 1000);
     
     console.log(`✅ [SALES] 영업 데이터 미리 로드 완료: ${salesData.length}개 레코드, ${posCodeMap.size}개 POS코드`);
+    
+    // 결과 반환 추가
+    return result;
   } catch (error) {
     console.error('❌ [SALES] 영업 데이터 미리 로드 실패:', error);
+    throw error; // 오류를 다시 던져서 호출자가 처리할 수 있도록 함
   }
 }
 
