@@ -1194,7 +1194,7 @@ async function getMonthlyAwardData(req, res) {
       officeGroups: Array.from(officeGroupMap.values()),
       departmentGroups: Array.from(departmentGroupMap.values()),
       unmatchedItems: {
-        companies: Array.from(unmatchedCompanies),
+        companies: [], // 인터넷 비중 계산에서 업체명 매핑 제거로 인해 더 이상 필요하지 않음
         strategicProducts: Array.from(unmatchedStrategicProducts),
         plans: Array.from(unmatchedPlans)
       }
