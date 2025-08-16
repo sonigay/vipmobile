@@ -635,9 +635,8 @@ async function getMonthlyAwardData(req, res) {
           return;
         }
         
-        // 요금제군 확인 (2nd군 제외)
-        const planInfo = planMapping.get(planName);
-        if (planInfo && planInfo.group === '2nd군') {
+        // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
+        if (planName.includes('태블릿') || planName.includes('스마트기기') || planName.includes('Wearable')) {
           return;
         }
         
