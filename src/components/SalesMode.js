@@ -285,32 +285,39 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
     try {
       setLoading(true);
       
-      // 캐시된 데이터가 있는지 확인
-      const cachedData = sessionStorage.getItem('sales_data_cache');
-      const cacheTimestamp = sessionStorage.getItem('sales_data_timestamp');
-      const now = Date.now();
-      
-             // 캐시가 1시간 이내인지 확인
-       if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < 60 * 60 * 1000) {
-         // 로그 최소화 (성능 최적화)
-         // console.log('📦 [SALES] 세션 캐시에서 데이터 로드');
-        const data = JSON.parse(cachedData);
-        setSalesData(data);
+      // 캐시된 데이터가 있는지 확인 (안전한 읽기)
+      try {
+        const cachedData = sessionStorage.getItem('sales_data_cache');
+        const cacheTimestamp = sessionStorage.getItem('sales_data_timestamp');
+        const now = Date.now();
         
-                 // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
-         setFilterOptions({
-           salesData: data.salesData,
-           provinces: [],
-           cities: [],
-           districts: [],
-           detailAreas: [],
-           managers: [],
-           branches: [],
-           agents: []
-         });
-        
-        setLoading(false);
-        return;
+        // 캐시가 1시간 이내인지 확인
+        if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < 60 * 60 * 1000) {
+          // 로그 최소화 (성능 최적화)
+          // console.log('📦 [SALES] 세션 캐시에서 데이터 로드');
+          const data = JSON.parse(cachedData);
+          setSalesData(data);
+          
+          // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
+          setFilterOptions({
+            salesData: data.salesData,
+            provinces: [],
+            cities: [],
+            districts: [],
+            detailAreas: [],
+            managers: [],
+            branches: [],
+            agents: []
+          });
+          
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.warn('캐시 읽기 실패:', error);
+        // 캐시 오류 시 기존 캐시 정리
+        sessionStorage.removeItem('sales_data_cache');
+        sessionStorage.removeItem('sales_data_timestamp');
       }
       
              // 로그 최소화 (성능 최적화)
@@ -321,9 +328,28 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
       if (data.success) {
         setSalesData(data.data);
         
-        // 세션 스토리지에 캐시 저장 (1시간)
-        sessionStorage.setItem('sales_data_cache', JSON.stringify(data.data));
-        sessionStorage.setItem('sales_data_timestamp', now.toString());
+        // 세션 스토리지에 캐시 저장 (용량 제한 적용)
+        try {
+          const dataString = JSON.stringify(data.data);
+          const dataSize = new Blob([dataString]).size;
+          const maxSize = 5 * 1024 * 1024; // 5MB 제한
+          
+          if (dataSize <= maxSize) {
+            sessionStorage.setItem('sales_data_cache', dataString);
+            sessionStorage.setItem('sales_data_timestamp', now.toString());
+            console.log(`✅ [SALES] 캐시 저장 완료 (${(dataSize / 1024 / 1024).toFixed(2)}MB)`);
+          } else {
+            console.warn(`⚠️ [SALES] 데이터가 너무 큽니다 (${(dataSize / 1024 / 1024).toFixed(2)}MB). 캐시 저장을 건너뜁니다.`);
+            // 기존 캐시 정리
+            sessionStorage.removeItem('sales_data_cache');
+            sessionStorage.removeItem('sales_data_timestamp');
+          }
+        } catch (error) {
+          console.warn('캐시 저장 실패:', error);
+          // 기존 캐시 정리
+          sessionStorage.removeItem('sales_data_cache');
+          sessionStorage.removeItem('sales_data_timestamp');
+        }
         
         // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
         setFilterOptions({
@@ -443,10 +469,29 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
       if (data.success) {
         setSalesData(data.data);
         
-        // 새로운 캐시 저장
+        // 새로운 캐시 저장 (용량 제한 적용)
         const now = Date.now();
-        sessionStorage.setItem('sales_data_cache', JSON.stringify(data.data));
-        sessionStorage.setItem('sales_data_timestamp', now.toString());
+        try {
+          const dataString = JSON.stringify(data.data);
+          const dataSize = new Blob([dataString]).size;
+          const maxSize = 5 * 1024 * 1024; // 5MB 제한
+          
+          if (dataSize <= maxSize) {
+            sessionStorage.setItem('sales_data_cache', dataString);
+            sessionStorage.setItem('sales_data_timestamp', now.toString());
+            console.log(`✅ [SALES] 새로고침 캐시 저장 완료 (${(dataSize / 1024 / 1024).toFixed(2)}MB)`);
+          } else {
+            console.warn(`⚠️ [SALES] 새로고침 데이터가 너무 큽니다 (${(dataSize / 1024 / 1024).toFixed(2)}MB). 캐시 저장을 건너뜁니다.`);
+            // 기존 캐시 정리
+            sessionStorage.removeItem('sales_data_cache');
+            sessionStorage.removeItem('sales_data_timestamp');
+          }
+        } catch (error) {
+          console.warn('새로고침 캐시 저장 실패:', error);
+          // 기존 캐시 정리
+          sessionStorage.removeItem('sales_data_cache');
+          sessionStorage.removeItem('sales_data_timestamp');
+        }
         
         // 필터 옵션 생성 (메모리 최적화: 필요한 데이터만 추출)
         setFilterOptions({
