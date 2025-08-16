@@ -568,8 +568,8 @@ async function getMonthlyAwardData(req, res) {
         }
         
         // 기본조건 확인 (컬럼 인덱스 수정)
-        const finalPolicy = (row[49] || '').toString().trim(); // AW열: 최종영업정책
-        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
+        const finalPolicy = (row[48] || '').toString().trim(); // AW열: 최종영업정책
+        const modelType = (row[98] || '').toString().trim(); // CU열: 모델유형
         
         // 기본조건 검증 (가입번호 조건 제거)
         if (finalPolicy === 'BLANK' || 
@@ -615,8 +615,8 @@ async function getMonthlyAwardData(req, res) {
     };
 
     const calculateInternetRatio = (manager) => {
-      const activationRows = activationData.slice(1);
-      const homeRows = homeData.slice(1);
+      const activationRows = activationData.slice(3); // 헤더가 3행에 있으므로 4행부터 시작
+      const homeRows = homeData.slice(3); // 헤더가 3행에 있으므로 4행부터 시작
       
       let numerator = 0;
       let denominator = 0;
@@ -724,10 +724,10 @@ async function getMonthlyAwardData(req, res) {
       console.log('G열(6) - 사무실:', firstRow[6]);
       console.log('H열(7) - 소속:', firstRow[7]);
       console.log('T열(19) - 가입구분:', firstRow[19]);
-      console.log('AN열(39) - 개통모델:', firstRow[39]);
+      console.log('AM열(38) - 개통모델:', firstRow[38]);
       console.log('AT열(45) - 개통요금제:', firstRow[45]);
-      console.log('AW열(49) - 최종영업정책:', firstRow[49]);
-      console.log('CU열(76) - 모델유형:', firstRow[76]);
+      console.log('AW열(48) - 최종영업정책:', firstRow[48]);
+      console.log('CU열(98) - 모델유형:', firstRow[98]);
       console.log('CV열(99) - 105군/115군:', firstRow[99]);
       console.log('DH열(111) - 업셀대상:', firstRow[111]);
       console.log('DP열(119) - 뮤직류:', firstRow[119]);
@@ -851,8 +851,8 @@ async function getMonthlyAwardData(req, res) {
 
 
     // 담당자별 인터넷 비중 계산
-    const activationRows = activationData.slice(1);
-    const homeRows = homeData.slice(1);
+    const activationRows = activationData.slice(3); // 헤더가 3행에 있으므로 4행부터 시작
+    const homeRows = homeData.slice(3); // 헤더가 3행에 있으므로 4행부터 시작
     
     console.log('=== 인터넷 비중 계산 디버깅 ===');
     console.log('개통데이터 행 수:', activationRows.length);
