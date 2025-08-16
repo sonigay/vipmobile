@@ -501,23 +501,37 @@ async function getMonthlyAwardData(req, res) {
         const finalModel = (row[38] || '').toString().trim(); // AM열: 개통모델
         
         // 기본조건 검증 (가입번호 조건 제거)
-        if (finalPolicy === 'BLANK' || 
-            modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델' ||
-            (joinType !== '정책기변' && joinType !== '재가입')) {
+        if (finalPolicy === 'BLANK') {
+          console.log(`${manager} 기변105이상 제외: 최종영업정책 BLANK`);
+          return;
+        }
+        if (modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
+          console.log(`${manager} 기변105이상 제외: 모델유형 ${modelType}`);
+          return;
+        }
+        if (joinType !== '정책기변' && joinType !== '재가입') {
+          console.log(`${manager} 기변105이상 제외: 가입구분 ${joinType} (정책기변/재가입 아님)`);
           return;
         }
         
         // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
         if (finalPlan.includes('태블릿') || finalPlan.includes('스마트기기') || finalPlan.includes('Wearable')) {
+          console.log(`${manager} 기변105이상 제외: 요금제 ${finalPlan} (태블릿/스마트기기/Wearable 포함)`);
           return;
         }
         
         // 요금제명 제외 (현역병사 포함)
-        if (finalPlan.includes('현역병사')) return;
+        if (finalPlan.includes('현역병사')) {
+          console.log(`${manager} 기변105이상 제외: 요금제 ${finalPlan} (현역병사 포함)`);
+          return;
+        }
         
         // 모델명 제외
         const excludedModels = ['LM-Y110L', 'LM-Y120L', 'SM-G160N', 'AT-M120', 'AT-M120B', 'AT-M140L'];
-        if (excludedModels.includes(finalModel)) return;
+        if (excludedModels.includes(finalModel)) {
+          console.log(`${manager} 기변105이상 제외: 모델 ${finalModel} (제외 모델)`);
+          return;
+        }
         
         // 모수 카운팅
         denominator++;
@@ -525,17 +539,20 @@ async function getMonthlyAwardData(req, res) {
         
         // 자수 카운팅 (CV열에서 105군/115군 직접 확인)
         const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
+        console.log(`${manager} 기변105이상 - CV열 값: "${planGroup}" (요금제: ${finalPlan})`);
         if (planGroup === '105군' || planGroup === '115군') {
           // 특별 조건: 티빙, 멀티팩 포함 시 1.2 카운트
           if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
             numerator += 1.2;
-            console.log(`${manager} 기변105이상 인정: ${planGroup}, 티빙/멀티팩 포함`);
+            console.log(`✅ [기변105이상] ${manager} 인정: ${planGroup}, 티빙/멀티팩 포함`);
           } else {
             numerator += 1.0;
-            console.log(`${manager} 기변105이상 인정: ${planGroup}`);
+            console.log(`✅ [기변105이상] ${manager} 인정: ${planGroup}`);
           }
         } else if (planGroup) {
-          console.log(`${manager} 기변105이상 제외: ${planGroup} (105군/115군 아님)`);
+          console.log(`❌ [기변105이상] ${manager} 제외: ${planGroup} (105군/115군 아님)`);
+        } else {
+          console.log(`❌ [기변105이상] ${manager} 제외: CV열 값 없음`);
         }
       });
       
@@ -606,7 +623,7 @@ async function getMonthlyAwardData(req, res) {
         numerator += totalPoints;
       });
       
-      console.log(`${manager} 전략상품 결과: numerator=${numerator}, denominator=${denominator}`);
+      // console.log(`${manager} 전략상품 결과: numerator=${numerator}, denominator=${denominator}`);
       return {
         numerator,
         denominator,
@@ -676,18 +693,18 @@ async function getMonthlyAwardData(req, res) {
         // 자수 조건 확인
         if (product.includes('인터넷')) {
           internetRows++;
-          console.log(`${manager} 인터넷 상품 발견: ${product}`);
+          // console.log(`${manager} 인터넷 상품 발견: ${product}`);
           // 동판 문구가 없는 경우에만 추가 조건 확인
           if (!product.includes('동판')) {
             if (product !== '선불' && product !== '소호') {
               numerator++;
-              console.log(`${manager} 인터넷 비중 인정: ${product}`);
+              // console.log(`${manager} 인터넷 비중 인정: ${product}`);
             } else {
               console.log(`${manager} 인터넷 비중 제외: ${product} (선불/소호)`);
             }
           } else {
             numerator++;
-            console.log(`${manager} 인터넷 비중 인정: ${product} (동판 포함)`);
+            // console.log(`${manager} 인터넷 비중 인정: ${product} (동판 포함)`);
           }
         }
       });
@@ -966,7 +983,7 @@ async function getMonthlyAwardData(req, res) {
             if (internetAgentMap.has(manager)) {
               internetAgentMap.get(manager).numerator++;
               homeMatchedCount++;
-              console.log(`인터넷 비중 인정: ${manager} - ${product}`);
+              // console.log(`인터넷 비중 인정: ${manager} - ${product}`);
             } else {
               console.log(`홈데이터 담당자 매칭 실패: "${manager}" (상품: ${product})`);
             }
@@ -975,7 +992,7 @@ async function getMonthlyAwardData(req, res) {
           if (internetAgentMap.has(manager)) {
             internetAgentMap.get(manager).numerator++;
             homeMatchedCount++;
-            console.log(`인터넷 비중 인정 (동판): ${manager} - ${product}`);
+            // console.log(`인터넷 비중 인정 (동판): ${manager} - ${product}`);
           } else {
             console.log(`홈데이터 담당자 매칭 실패: "${manager}" (상품: ${product})`);
           }
@@ -999,7 +1016,7 @@ async function getMonthlyAwardData(req, res) {
     });
 
     // 담당자별 전략상품 계산 (별도 함수 사용)
-    console.log('=== 전략상품 계산 시작 ===');
+    // console.log('=== 전략상품 계산 시작 ===');
     agentMap.forEach(agent => {
       const strategicResult = calculateStrategicProducts(agent.name);
       agent.strategicProducts.numerator = strategicResult.numerator;
