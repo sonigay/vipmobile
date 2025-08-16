@@ -378,7 +378,7 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
   const filteredData = useMemo(() => {
     if (!salesData) return [];
     
-    // 필터 조건이 없는 경우 전체 데이터 반환
+    // 필터 조건이 없는 경우 빈 배열 반환 (성능 최적화)
     const hasFilters = filters.provinces.length > 0 || 
                       filters.cities.length > 0 || 
                       filters.districts.length > 0 || 
@@ -390,7 +390,7 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
                       filters.maxPerformance;
     
     if (!hasFilters) {
-      return Object.values(salesData.posCodeMap);
+      return []; // 필터가 없으면 아무것도 표시하지 않음
     }
     
     return Object.values(salesData.posCodeMap).filter(item => {
@@ -650,6 +650,34 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         
+        {/* 필터 안내 메시지 */}
+        {filteredData.length === 0 && (
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1000,
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 2,
+            p: 3,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            textAlign: 'center',
+            maxWidth: 400
+          }}>
+            <Typography variant="h6" sx={{ mb: 2, color: '#2196f3', fontWeight: 'bold' }}>
+              📍 필터를 설정해주세요
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2, color: '#666' }}>
+              지도에 매장을 표시하려면 상단의 필터 버튼을 클릭하여<br/>
+              지역, 대리점, 실적 범위 등을 선택해주세요.
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#999', fontSize: '0.9rem' }}>
+              💡 성능 최적화를 위해 필터 선택 시에만 마커가 표시됩니다.
+            </Typography>
+          </Box>
+        )}
+        
         {/* 마커들 */}
         {filteredData.map((item, index) => (
           <Marker
@@ -697,20 +725,22 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
       </MapContainer>
       
       {/* 요약 정보 */}
-      <Box sx={{ 
-        position: 'absolute', 
-        bottom: 10, 
-        left: 10, 
-        zIndex: 1000,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: 1,
-        p: 2
-      }}>
-        <Typography variant="body2">
-          총 {filteredData.length}개 매장 | 
-          총 실적: {filteredData.reduce((sum, item) => sum + item.totalPerformance, 0)}개
-        </Typography>
-      </Box>
+      {filteredData.length > 0 && (
+        <Box sx={{ 
+          position: 'absolute', 
+          bottom: 10, 
+          left: 10, 
+          zIndex: 1000,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          borderRadius: 1,
+          p: 2
+        }}>
+          <Typography variant="body2">
+            총 {filteredData.length}개 매장 | 
+            총 실적: {filteredData.reduce((sum, item) => sum + item.totalPerformance, 0)}개
+          </Typography>
+        </Box>
+      )}
 
       {/* 업데이트 팝업 */}
       <AppUpdatePopup
