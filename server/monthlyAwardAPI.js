@@ -490,6 +490,7 @@ async function getMonthlyAwardData(req, res) {
         // 담당자 매칭 확인
         const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
         if (currentManager !== manager) {
+          console.log(`${manager} 기변105이상 - 담당자 불일치: "${currentManager}" vs "${manager}"`);
           return; // 해당 담당자가 아닌 경우 제외
         }
         
@@ -521,6 +522,7 @@ async function getMonthlyAwardData(req, res) {
         
         // 모수 카운팅
         denominator++;
+        console.log(`${manager} 기변105이상 - 모수 추가: ${denominator}`);
         
         // 자수 카운팅 (CV열에서 105군/115군 직접 확인)
         const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
@@ -649,10 +651,12 @@ async function getMonthlyAwardData(req, res) {
         
         // 담당자 매칭 확인
         if (currentManager !== manager) {
+          console.log(`${manager} 인터넷 비중 - 개통데이터 담당자 불일치: "${currentManager}" vs "${manager}"`);
           return; // 해당 담당자가 아닌 경우 제외
         }
         
         denominator++;
+        console.log(`${manager} 인터넷 비중 - 개통데이터 모수 추가: ${denominator}`);
       });
       
       // 홈데이터 기준으로 자수 계산
@@ -664,10 +668,12 @@ async function getMonthlyAwardData(req, res) {
         
         // 담당자 매칭 확인
         if (currentManager !== manager) {
+          console.log(`${manager} 인터넷 비중 - 홈데이터 담당자 불일치: "${currentManager}" vs "${manager}"`);
           return; // 해당 담당자가 아닌 경우 제외
         }
         
         matchedHomeRows++;
+        console.log(`${manager} 인터넷 비중 - 홈데이터 매칭: ${matchedHomeRows}`);
         
         // 자수 조건 확인
         if (product.includes('인터넷')) {
