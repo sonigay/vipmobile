@@ -886,6 +886,9 @@ async function getMonthlyAwardData(req, res) {
     // 폰클개통데이터와 폰클홈데이터에서 직접 담당자 정보 사용
     console.log('=== 폰클개통데이터/홈데이터에서 직접 담당자 정보 사용 ===');
     
+    // 인터넷 비중 계산용 담당자별 Map 생성
+    const internetAgentMap = new Map();
+    
     // 개통데이터에서 담당자별 모수 계산
     let activationProcessedCount = 0;
     let activationMatchedCount = 0;
@@ -911,17 +914,22 @@ async function getMonthlyAwardData(req, res) {
         return;
       }
       
-      // 요금제군 확인 (2nd군 제외)
-      const planInfo = planMapping.get(planName);
-      if (planInfo && planInfo.group === '2nd군') {
+      // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
+      if (planName.includes('태블릿') || planName.includes('스마트기기') || planName.includes('Wearable')) {
         return;
       }
       
-      // 해당 담당자의 모수 증가
-      if (agentMap.has(manager)) {
-        agentMap.get(manager).internetRatio.denominator++;
-        activationMatchedCount++;
+      // 인터넷 비중 계산용 Map에 담당자 추가
+      if (!internetAgentMap.has(manager)) {
+        internetAgentMap.set(manager, {
+          name: manager,
+          denominator: 0,
+          numerator: 0
+        });
       }
+      
+      internetAgentMap.get(manager).denominator++;
+      activationMatchedCount++;
     });
     
     console.log('개통데이터 처리 결과:', {
@@ -937,31 +945,39 @@ async function getMonthlyAwardData(req, res) {
     homeRows.forEach(row => {
       if (row.length < 10) return;
       
-      const product = (row[9] || '').toString().trim(); // J열: 가입상품
+      const product = (row[17] || '').toString().trim(); // R열: 가입상품 (수정)
       const manager = (row[7] || '').toString().trim(); // H열: 담당자 (폰클홈데이터)
       
       homeProcessedCount++;
       
       // 담당자 정보 확인
       if (!manager) {
+        console.log(`홈데이터 담당자 없음: ${product}`);
         return;
       }
       
       // 자수 조건 확인
       if (product.includes('인터넷')) {
         internetCount++;
+        console.log(`인터넷 상품 발견: ${manager} - ${product}`);
         // 동판 문구가 없는 경우에만 추가 조건 확인
         if (!product.includes('동판')) {
           if (product !== '선불' && product !== '소호') {
-            if (agentMap.has(manager)) {
-              agentMap.get(manager).internetRatio.numerator++;
+            if (internetAgentMap.has(manager)) {
+              internetAgentMap.get(manager).numerator++;
               homeMatchedCount++;
+              console.log(`인터넷 비중 인정: ${manager} - ${product}`);
+            } else {
+              console.log(`홈데이터 담당자 매칭 실패: "${manager}" (상품: ${product})`);
             }
           }
         } else {
-          if (agentMap.has(manager)) {
-            agentMap.get(manager).internetRatio.numerator++;
+          if (internetAgentMap.has(manager)) {
+            internetAgentMap.get(manager).numerator++;
             homeMatchedCount++;
+            console.log(`인터넷 비중 인정 (동판): ${manager} - ${product}`);
+          } else {
+            console.log(`홈데이터 담당자 매칭 실패: "${manager}" (상품: ${product})`);
           }
         }
       }
@@ -971,6 +987,15 @@ async function getMonthlyAwardData(req, res) {
       processed: homeProcessedCount,
       matched: homeMatchedCount,
       internetProducts: internetCount
+    });
+    
+    // 인터넷 비중 결과를 agentMap에 반영
+    internetAgentMap.forEach((internetAgent, managerName) => {
+      if (agentMap.has(managerName)) {
+        agentMap.get(managerName).internetRatio.numerator = internetAgent.numerator;
+        agentMap.get(managerName).internetRatio.denominator = internetAgent.denominator;
+        console.log(`인터넷 비중 결과 반영: ${managerName} - ${internetAgent.numerator}/${internetAgent.denominator}`);
+      }
     });
 
     // 담당자별 전략상품 계산 (별도 함수 사용)
