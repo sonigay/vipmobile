@@ -187,76 +187,30 @@ async function getMonthlyAwardData(req, res) {
       throw new Error('필요한 시트 데이터를 불러올 수 없습니다.');
     }
 
-    // 담당자 매핑 테이블 생성 (수기초에 있는 실판매POS 코드만)
-    const managerMapping = new Map();
-    const companyManagerMapping = new Map(); // 업체명 → 담당자 매핑 (인터넷 비중용)
+    // 수기초에서 직접 담당자, 사무실, 소속 정보 사용
+    console.log('=== 수기초에서 직접 담당자/사무실/소속 정보 사용 ===');
+    
     const managerOfficeMapping = new Map(); // 담당자별 사무실/소속 매핑
-    const storeRows = storeData.slice(1);
+    const manualRows = manualData.slice(1);
     
-    // 수기초에 있는 실판매POS 코드 수집
-    const manualPosCodes = new Set();
-    manualData.slice(1).forEach(row => {
-      if (row.length >= 17) {
-        const posCode = (row[16] || '').toString().trim(); // Q열: 실판매POS 코드 (기존 H열에서 +9)
-        if (posCode) {
-          manualPosCodes.add(posCode);
-        }
-      }
-    });
-    
-    console.log('수기초에 있는 실판매POS 코드 수:', manualPosCodes.size);
-    console.log('수기초 실판매POS 코드 예시:', Array.from(manualPosCodes).slice(0, 10));
-    
-    // 수기초에 있는 실판매POS 코드만 매핑 (미사용 상태 제외)
-    storeRows.forEach(row => {
-      if (row.length >= 22) {
-        const posCode = (row[15] || '').toString().trim(); // P열: 실판매POS 코드 (기존 H열에서 +8)
-        const companyName = (row[14] || '').toString().trim(); // O열: 업체명 (기존 G열에서 +8)
-        const manager = (row[21] || '').toString().trim(); // V열: 담당자 (기존 N열에서 +8)
-        const status = (row[12] || '').toString().trim(); // M열: 상태 (기존 E열에서 +8)
+    // 수기초에서 담당자별 사무실/소속 정보 수집
+    manualRows.forEach(row => {
+      if (row.length >= 9) {
+        const manager = (row[8] || '').toString().trim(); // I열: 담당자
+        const office = (row[6] || '').toString().trim(); // G열: 사무실
+        const department = (row[7] || '').toString().trim(); // H열: 소속
         
-        // 미사용 상태 제외하고, 수기초에 있는 실판매POS 코드만 매핑
-        if (posCode && manager && status !== '미사용' && manualPosCodes.has(posCode)) {
-          // 담당자 이름에서 괄호 부분 제거
-          const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
-          managerMapping.set(posCode, cleanManager);
-          
-          // 업체명 → 담당자 매핑도 추가
-          if (companyName) {
-            companyManagerMapping.set(companyName, cleanManager);
-          }
+        if (manager) {
+          managerOfficeMapping.set(manager, {
+            office: office || '미분류',
+            department: department || '미분류'
+          });
         }
       }
     });
-
-    // 디버깅 로그 추가
-    console.log('담당자 매핑 테이블 크기:', managerMapping.size);
-    console.log('담당자 목록:', Array.from(managerMapping.values()));
-    console.log('매핑된 실판매POS 코드 수:', managerMapping.size);
-    console.log('매핑된 실판매POS 코드 예시:', Array.from(managerMapping.keys()).slice(0, 10));
-    console.log('매뉴얼데이터 첫 번째 행:', manualData[0]);
-    console.log('매뉴얼데이터 두 번째 행:', manualData[1]);
-
-    // 담당자별 사무실/소속 정보 수집 (대리점아이디관리 시트)
-    if (officeData && officeData.length > 1) {
-      const officeRows = officeData.slice(1);
-      officeRows.forEach(row => {
-        if (row.length >= 5) {
-          const manager = (row[0] || '').toString().trim(); // A열: 담당자
-          const office = (row[3] || '').toString().trim(); // D열: 사무실
-          const department = (row[4] || '').toString().trim(); // E열: 소속
-          
-          if (manager) {
-            managerOfficeMapping.set(manager, {
-              office: office,
-              department: department
-            });
-          }
-        }
-      });
-    }
     
     console.log('담당자별 사무실/소속 매핑:', Object.fromEntries(managerOfficeMapping));
+    console.log('담당자 수:', managerOfficeMapping.size);
 
     // 요금제 매핑 테이블 생성
     const planMapping = new Map();
@@ -476,39 +430,40 @@ async function getMonthlyAwardData(req, res) {
       console.log(`\n=== ${manager} 업셀기변 계산 시작 ===`);
       
       manualRows.forEach(row => {
-        if (row.length < 99) return; // 최소 필요한 열 수 확인 (+9)
+        if (row.length < 112) return; // 최소 필요한 열 수 확인 (DH열까지)
         
         // 담당자 매칭 확인
-        const posCode = (row[16] || '').toString().trim(); // Q열: 실판매POS 코드 (기존 H열에서 +9)
-        const matchedManager = managerMapping.get(posCode);
-        if (matchedManager !== manager) {
+        const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
+        if (currentManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
         
         // 기본조건 확인
-        const subscriptionNumber = (row[9] || '').toString().trim(); // J열: 가입번호 (기존 A열에서 +9)
-        const finalPolicy = (row[48] || '').toString().trim(); // AV열: 최종영업정책 (기존 AN열에서 +9)
-        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형 (기존 CL열에서 +9)
-        const joinType = (row[19] || '').toString().trim(); // T열: 가입구분 (기존 K열에서 +9)
-        const finalPlan = (row[47] || '').toString().trim(); // AU열: 최종요금제 (기존 AM열에서 +9)
-        const finalModel = (row[41] || '').toString().trim(); // AQ열: 최종모델 (기존 AG열에서 +9)
+        const finalPolicy = (row[48] || '').toString().trim(); // AV열: 최종영업정책
+        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
+        const joinType = (row[19] || '').toString().trim(); // T열: 가입구분
+        
+        // 모수 조건 확인
+        if (finalPolicy === 'BLANK' || 
+            modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델' ||
+            (joinType !== '정책기변' && joinType !== '재가입')) {
+          return;
+        }
         
         // 모수 카운팅
         denominator++;
         
-        // 최종요금제와 변경전요금제 기본료 추출
-        const finalPlanInfo = planMapping.get(finalPlan);
-        const beforePlanInfo = planMapping.get(beforePlan);
+        // 자수 조건 확인
+        const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
+        const upsellTarget = (row[111] || '').toString().trim(); // DH열: 업셀대상
         
-        if (finalPlanInfo && beforePlanInfo) {
-          // 특별 조건: 115군, 105군이면 무조건 인정
-          if (beforePlanInfo.group === '115군' || beforePlanInfo.group === '105군') {
-            numerator++;
-          }
-          // 일반 조건: 업셀 (변경전 < 최종)
-          else if (beforePlanInfo.price < finalPlanInfo.price) {
-            numerator++;
-          }
+        // 특별 조건: 105군, 115군이면 무조건 인정
+        if (planGroup === '105군' || planGroup === '115군') {
+          numerator++;
+        }
+        // 일반 조건: 업셀대상이 'Y'인 경우
+        else if (upsellTarget === 'Y') {
+          numerator++;
         }
       });
       
@@ -532,22 +487,20 @@ async function getMonthlyAwardData(req, res) {
         if (row.length < 90) return;
         
         // 담당자 매칭 확인
-        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
-        const matchedManager = managerMapping.get(posCode);
-        if (matchedManager !== manager) {
+        const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
+        if (currentManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
         
-        // 기본조건 확인
-        const subscriptionNumber = (row[0] || '').toString().trim();
-        const finalPolicy = (row[39] || '').toString().trim();
-        const modelType = (row[67] || '').toString().trim();
-        const joinType = (row[10] || '').toString().trim();
-        const finalPlan = (row[38] || '').toString().trim();
-        const finalModel = (row[32] || '').toString().trim(); // AG열: 최종모델
+        // 기본조건 확인 (컬럼 인덱스 수정)
+        const finalPolicy = (row[49] || '').toString().trim(); // AW열: 최종영업정책
+        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
+        const joinType = (row[19] || '').toString().trim(); // T열: 가입구분
+        const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
+        const finalModel = (row[39] || '').toString().trim(); // AN열: 개통모델
         
-        // 기본조건 검증
-        if (!subscriptionNumber || finalPolicy === 'BLANK' || 
+        // 기본조건 검증 (가입번호 조건 제거)
+        if (finalPolicy === 'BLANK' || 
             modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델' ||
             (joinType !== '정책기변' && joinType !== '재가입')) {
           return;
@@ -573,8 +526,8 @@ async function getMonthlyAwardData(req, res) {
         
         // 자수 카운팅 (105군, 115군)
         if (finalPlanInfo.group === '105군' || finalPlanInfo.group === '115군') {
-          // 특별 조건: 디즈니, 멀티팩 포함 시 1.2 카운트
-          if (finalPlan.includes('디즈니') || finalPlan.includes('멀티팩')) {
+          // 특별 조건: 티빙, 멀티팩 포함 시 1.2 카운트 (디즈니 → 티빙으로 수정)
+          if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
             numerator += 1.2;
           } else {
             numerator += 1.0;
@@ -604,19 +557,17 @@ async function getMonthlyAwardData(req, res) {
         if (row.length < 90) return;
         
         // 담당자 매칭 확인
-        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
-        const matchedManager = managerMapping.get(posCode);
-        if (matchedManager !== manager) {
+        const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
+        if (currentManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
         
-        // 기본조건 확인
-        const subscriptionNumber = (row[0] || '').toString().trim();
-        const finalPolicy = (row[39] || '').toString().trim();
-        const modelType = (row[67] || '').toString().trim();
+        // 기본조건 확인 (컬럼 인덱스 수정)
+        const finalPolicy = (row[49] || '').toString().trim(); // AW열: 최종영업정책
+        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
         
-        // 기본조건 검증
-        if (!subscriptionNumber || finalPolicy === 'BLANK' || 
+        // 기본조건 검증 (가입번호 조건 제거)
+        if (finalPolicy === 'BLANK' || 
             modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
           return;
         }
@@ -625,10 +576,10 @@ async function getMonthlyAwardData(req, res) {
         denominator++;
         
         // 자수 계산 (전략상품 포인트 합계)
-        const insurance = (row[124] || '').toString().trim(); // DU열: 보험(폰교체) (기존 DL열에서 +9)
-        const uflix = (row[127] || '').toString().trim(); // DX열: 유플릭스 (기존 DO열에서 +9)
-        const callTone = (row[131] || '').toString().trim(); // EA열: 통화연결음 (기존 DS열에서 +9)
-        const music = (row[119] || '').toString().trim(); // DT열: 뮤직류 (기존 DG열에서 +9)
+        const insurance = (row[124] || '').toString().trim(); // DU열: 보험(폰교체)
+        const uflix = (row[127] || '').toString().trim(); // DX열: 유플릭스
+        const callTone = (row[131] || '').toString().trim(); // EB열: 통화연결음
+        const music = (row[119] || '').toString().trim(); // DP열: 뮤직류
         
         let totalPoints = 0;
         
@@ -677,7 +628,7 @@ async function getMonthlyAwardData(req, res) {
         const modelName = (row[21] || '').toString().trim(); // V열: 모델명 (기존 N열에서 +8)
         const inputStore = (row[12] || '').toString().trim(); // M열: 입고처 (기존 E열에서 +8)
         const planName = (row[29] || '').toString().trim(); // AD열: 요금제 (기존 V열에서 +8)
-        const companyName = (row[14] || '').toString().trim(); // O열: 업체명 (기존 G열에서 +8)
+        const currentManager = (row[8] || '').toString().trim(); // I열: 담당자 (폰클개통데이터)
         
         // 모수 조건 확인
         if (activation === '선불개통' || !modelName || inputStore === '중고') {
@@ -690,9 +641,8 @@ async function getMonthlyAwardData(req, res) {
           return;
         }
         
-        // 담당자 매칭 확인 (업체명으로 매칭)
-        const matchedManager = companyManagerMapping.get(companyName);
-        if (matchedManager !== manager) {
+        // 담당자 매칭 확인
+        if (currentManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
         
@@ -703,12 +653,11 @@ async function getMonthlyAwardData(req, res) {
       homeRows.forEach(row => {
         if (row.length < 8) return;
         
-        const product = (row[9] || '').toString().trim(); // J열: 가입상품
-        const companyName = (row[2] || '').toString().trim(); // C열: 업체명 (폰클홈데이터는 C열)
+        const product = (row[17] || '').toString().trim(); // R열: 가입상품
+        const currentManager = (row[7] || '').toString().trim(); // H열: 담당자 (폰클홈데이터)
         
-        // 담당자 매칭 확인 (업체명으로 매칭)
-        const matchedManager = companyManagerMapping.get(companyName);
-        if (matchedManager !== manager) {
+        // 담당자 매칭 확인
+        if (currentManager !== manager) {
           return; // 해당 담당자가 아닌 경우 제외
         }
         
@@ -745,12 +694,10 @@ async function getMonthlyAwardData(req, res) {
     const agentMap = new Map();
     
     // 매칭되지 않은 항목들 추적 (전역으로 이동)
-    const unmatchedCompanies = new Set(); // 인터넷 비중용
     const unmatchedStrategicProducts = new Set(); // 전략상품용
     const unmatchedPlans = new Set(); // 요금제 매핑용
     
-    // 담당자별 데이터 수집
-    const manualRows = manualData.slice(1);
+    // 담당자별 데이터 수집 (manualRows는 이미 위에서 선언됨)
     console.log('매뉴얼데이터 행 수:', manualRows.length);
     
     // 첫 번째 행에서 컬럼 구조 확인
@@ -758,44 +705,34 @@ async function getMonthlyAwardData(req, res) {
       const firstRow = manualRows[0];
       console.log('=== 매뉴얼데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstRow.length);
-      console.log('J열(9) - 가입번호:', firstRow[9]); // 기존 A열에서 +9
-      console.log('Q열(16) - 실판매POS 코드:', firstRow[16]); // 기존 H열에서 +9
-      console.log('T열(19) - 가입구분:', firstRow[19]); // 기존 K열에서 +9
-      console.log('AQ열(41) - 최종모델:', firstRow[41]); // 기존 AG열에서 +9
-      console.log('AU열(47) - 최종요금제:', firstRow[47]); // 기존 AM열에서 +9
-      console.log('AV열(48) - 최종영업정책:', firstRow[48]); // 기존 AN열에서 +9
-      console.log('CU열(76) - 모델유형:', firstRow[76]); // 기존 CL열에서 +9
-      console.log('DG열(110) - 변경전요금제:', firstRow[110]); // 기존 CX열에서 +9
-      console.log('DT열(119) - 뮤직류:', firstRow[119]); // 기존 DG열에서 +9
-      console.log('DU열(124) - 보험(폰교체):', firstRow[124]); // 기존 DL열에서 +9
-      console.log('DX열(127) - 유플릭스:', firstRow[127]); // 기존 DO열에서 +9
-      console.log('EA열(131) - 통화연결음:', firstRow[131]); // 기존 DS열에서 +9
-      console.log('================================');
-      
-      // 전략상품 관련 컬럼들을 더 넓게 확인 (79-109 범위) (+9)
-      console.log('=== 전략상품 관련 컬럼 확장 확인 ===');
-      for (let i = 79; i <= 109; i++) {
-        const value = firstRow[i];
-        if (value && value.toString().trim() !== '') {
-          console.log(`${i}열: "${value}"`);
-        }
-      }
+      console.log('I열(8) - 담당자:', firstRow[8]);
+      console.log('G열(6) - 사무실:', firstRow[6]);
+      console.log('H열(7) - 소속:', firstRow[7]);
+      console.log('T열(19) - 가입구분:', firstRow[19]);
+      console.log('AN열(39) - 개통모델:', firstRow[39]);
+      console.log('AT열(45) - 개통요금제:', firstRow[45]);
+      console.log('AW열(49) - 최종영업정책:', firstRow[49]);
+      console.log('CU열(76) - 모델유형:', firstRow[76]);
+      console.log('CV열(99) - 105군/115군:', firstRow[99]);
+      console.log('DH열(111) - 업셀대상:', firstRow[111]);
+      console.log('DP열(119) - 뮤직류:', firstRow[119]);
+      console.log('DU열(124) - 보험(폰교체):', firstRow[124]);
+      console.log('DX열(127) - 유플릭스:', firstRow[127]);
+      console.log('EB열(131) - 통화연결음:', firstRow[131]);
       console.log('================================');
     }
     
     let matchedCount = 0;
-    let unmatchedStores = new Set();
     
     manualRows.forEach(row => {
-      if (row.length < 99) return; // 최소 필요한 열 수 확인 (+9)
+      if (row.length < 132) return; // 최소 필요한 열 수 확인 (EB열까지)
       
-      const posCode = (row[16] || '').toString().trim(); // Q열: 실판매POS 코드 (기존 H열에서 +9)
-      const manager = managerMapping.get(posCode);
+      const manager = (row[8] || '').toString().trim(); // I열: 담당자
       
       if (manager) {
         matchedCount++;
         if (!agentMap.has(manager)) {
-          const officeInfo = managerOfficeMapping.get(manager) || { office: '', department: '' };
+          const officeInfo = managerOfficeMapping.get(manager) || { office: '미분류', department: '미분류' };
           agentMap.set(manager, {
             name: manager,
             office: officeInfo.office,
@@ -823,45 +760,41 @@ async function getMonthlyAwardData(req, res) {
         
         // 업셀기변 계산
         if (joinType === '정책기변' || joinType === '재가입') {
-          agent.upsellChange.denominator++;
+          // 모수 조건 확인
+          const finalPolicy = (row[48] || '').toString().trim(); // AV열: 최종영업정책
+          const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
           
-          const finalPlan = (row[47] || '').toString().trim(); // AU열: 최종요금제 (기존 AM열에서 +9)
-          const beforePlan = (row[110] || '').toString().trim(); // DG열: 변경전요금제 (기존 CX열에서 +9)
-          
-          // 첫 번째 담당자만 로그 출력 (너무 많은 로그 방지)
-          if (manager === Array.from(agentMap.keys())[0] && finalPlan && beforePlan) {
-            console.log(`${manager} 업셀기변 확인: finalPlan="${finalPlan}", beforePlan="${beforePlan}"`);
+          if (finalPolicy === 'BLANK' || 
+              modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
+            return;
           }
           
-          const finalPlanInfo = planMapping.get(finalPlan);
-          const beforePlanInfo = planMapping.get(beforePlan);
+          agent.upsellChange.denominator++;
           
-          if (finalPlanInfo && beforePlanInfo) {
+          // 자수 조건 확인
+          const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
+          const upsellTarget = (row[111] || '').toString().trim(); // DH열: 업셀대상
+          
+          // 특별 조건: 105군, 115군이면 무조건 인정
+          if (planGroup === '105군' || planGroup === '115군') {
+            agent.upsellChange.numerator++;
             if (manager === Array.from(agentMap.keys())[0]) {
-              console.log(`${manager} 요금제 정보: final=${finalPlanInfo.group}(${finalPlanInfo.price}), before=${beforePlanInfo.group}(${beforePlanInfo.price})`);
+              console.log(`${manager} 업셀기변 인정: 105군/115군 조건`);
             }
-            if (beforePlanInfo.group === '115군' || beforePlanInfo.group === '105군') {
-              agent.upsellChange.numerator++;
-              if (manager === Array.from(agentMap.keys())[0]) {
-                console.log(`${manager} 업셀기변 인정: 115군/105군 조건`);
-              }
-            } else if (beforePlanInfo.price < finalPlanInfo.price) {
-              agent.upsellChange.numerator++;
-              if (manager === Array.from(agentMap.keys())[0]) {
-                console.log(`${manager} 업셀기변 인정: 가격 상승 조건`);
-              }
-            }
-          } else {
+          }
+          // 일반 조건: 업셀대상이 'Y'인 경우
+          else if (upsellTarget === 'Y') {
+            agent.upsellChange.numerator++;
             if (manager === Array.from(agentMap.keys())[0]) {
-              console.log(`${manager} 요금제 정보 없음: finalPlanInfo=${!!finalPlanInfo}, beforePlanInfo=${!!beforePlanInfo}`);
+              console.log(`${manager} 업셀기변 인정: 업셀대상 Y 조건`);
             }
           }
         }
         
         // 기변105이상 계산
         if (joinType === '정책기변' || joinType === '재가입') {
-          const finalPlan = (row[38] || '').toString().trim();
-          const finalModel = (row[32] || '').toString().trim(); // AG열: 최종모델
+          const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
+          const finalModel = (row[39] || '').toString().trim(); // AN열: 개통모델
           
           const finalPlanInfo = planMapping.get(finalPlan);
           if (!finalPlanInfo) return;
@@ -878,7 +811,7 @@ async function getMonthlyAwardData(req, res) {
           agent.change105Above.denominator++;
           
           if (finalPlanInfo.group === '105군' || finalPlanInfo.group === '115군') {
-            if (finalPlan.includes('디즈니') || finalPlan.includes('멀티팩')) {
+            if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
               agent.change105Above.numerator += 1.2;
             } else {
               agent.change105Above.numerator += 1.0;
@@ -887,19 +820,17 @@ async function getMonthlyAwardData(req, res) {
         }
         
         // 전략상품 계산은 별도 함수에서 처리 (중복 제거)
-      } else {
-        unmatchedStores.add(posCode);
       }
     });
     
     // 디버깅 로그 추가
     console.log('매칭된 담당자 수:', matchedCount);
-    console.log('매칭되지 않은 업체들:', Array.from(unmatchedStores));
+    console.log('담당자별 데이터 수집 완료');
     console.log('매칭 예시:');
     if (manualRows.length > 0) {
       const firstRow = manualRows[0];
-      const posCode = (firstRow[7] || '').toString().trim();
-      console.log(`실판매POS: "${posCode}"`);
+      const manager = (firstRow[8] || '').toString().trim();
+      console.log(`담당자: "${manager}"`);
     }
 
 
@@ -911,19 +842,18 @@ async function getMonthlyAwardData(req, res) {
     console.log('=== 인터넷 비중 계산 디버깅 ===');
     console.log('개통데이터 행 수:', activationRows.length);
     console.log('홈데이터 행 수:', homeRows.length);
-    console.log('담당자 매핑 테이블 크기:', managerMapping.size);
-    console.log('담당자 목록:', Array.from(managerMapping.values()));
+    console.log('담당자별 사무실/소속 매핑 수:', managerOfficeMapping.size);
     
     // 개통데이터/홈데이터 컬럼 구조 확인
     if (activationRows.length > 0) {
       const firstActivationRow = activationRows[0];
       console.log('=== 개통데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstActivationRow.length);
-      console.log('E열(4) - 입고처:', firstActivationRow[4]);
-      console.log('G열(6) - 업체명:', firstActivationRow[6]);
-      console.log('N열(13) - 모델명:', firstActivationRow[13]);
-      console.log('V열(21) - 요금제:', firstActivationRow[21]);
-      console.log('L열(11) - 개통:', firstActivationRow[11]);
+      console.log('M열(12) - 입고처:', firstActivationRow[12]);
+      console.log('I열(8) - 담당자:', firstActivationRow[8]);
+      console.log('V열(21) - 모델명:', firstActivationRow[21]);
+      console.log('AD열(29) - 요금제:', firstActivationRow[29]);
+      console.log('T열(19) - 개통:', firstActivationRow[19]);
       console.log('================================');
     }
     
@@ -931,78 +861,33 @@ async function getMonthlyAwardData(req, res) {
       const firstHomeRow = homeRows[0];
       console.log('=== 홈데이터 컬럼 구조 확인 ===');
       console.log('전체 행 길이:', firstHomeRow.length);
-              console.log('C열(10) - 업체명:', firstHomeRow[10]); // 2+8
-        console.log('J열(17) - 가입상품:', firstHomeRow[17]); // 9+8
+      console.log('H열(7) - 담당자:', firstHomeRow[7]);
+      console.log('R열(17) - 가입상품:', firstHomeRow[17]);
       console.log('================================');
     }
     
-    // 폰클출고처데이터 컬럼 구조 확인
-    if (storeRows.length > 0) {
-      const firstStoreRow = storeRows[0];
-      console.log('=== 폰클출고처데이터 컬럼 구조 확인 ===');
-      console.log('전체 행 길이:', firstStoreRow.length);
-              console.log('C열(10) - 출고처:', firstStoreRow[10]); // 2+8
-        console.log('G열(14) - 업체명:', firstStoreRow[14]); // 6+8
-        console.log('E열(12) - 상태:', firstStoreRow[12]); // 4+8
-        console.log('H열(15) - 실판매POS 코드:', firstStoreRow[15]); // 7+8
-        console.log('N열(21) - 담당자:', firstStoreRow[21]); // 13+8
-      console.log('================================');
-      
-      // 폰클출고처데이터의 실제 업체명들 확인 (처음 10개)
-      console.log('=== 폰클출고처데이터 업체명 샘플 ===');
-      storeRows.slice(1, 11).forEach((row, index) => {
-        if (row.length >= 14) {
-          const companyName = (row[6] || '').toString().trim(); // G열로 수정
-          const manager = (row[13] || '').toString().trim();
-          const status = (row[4] || '').toString().trim();
-          if (companyName && manager && status !== '미사용') {
-            console.log(`${index + 1}. "${companyName}" -> "${manager}"`);
-          }
-        }
-      });
-      console.log('================================');
-    }
+
     
-    // 개통데이터/홈데이터의 업체명을 폰클출고처데이터와 매칭하기 위한 매핑 생성
-    const companyNameMapping = new Map();
-    
-    storeRows.forEach(row => {
-      if (row.length >= 14) {
-        const posCode = (row[7] || '').toString().trim(); // H열: 실판매POS 코드
-        const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (수정됨)
-        const manager = (row[13] || '').toString().trim(); // N열: 담당자
-        const status = (row[4] || '').toString().trim(); // E열: 상태
-        
-        if (companyName && manager && status !== '미사용') {
-          const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
-          companyNameMapping.set(companyName, cleanManager);
-        }
-      }
-    });
-    
-    console.log('업체명 매핑 테이블 크기:', companyNameMapping.size);
-    console.log('업체명 매핑 예시:', Array.from(companyNameMapping.entries()).slice(0, 5));
+    // 폰클개통데이터와 폰클홈데이터에서 직접 담당자 정보 사용
+    console.log('=== 폰클개통데이터/홈데이터에서 직접 담당자 정보 사용 ===');
     
     // 개통데이터에서 담당자별 모수 계산
     let activationProcessedCount = 0;
     let activationMatchedCount = 0;
     
     activationRows.forEach(row => {
-      if (row.length < 12) return;
+      if (row.length < 30) return;
       
-      const activation = (row[11] || '').toString().trim(); // L열: 개통
-      const modelName = (row[13] || '').toString().trim(); // N열: 모델명
-      const inputStore = (row[4] || '').toString().trim(); // E열: 입고처
-      const planName = (row[21] || '').toString().trim(); // V열: 요금제
-      const companyName = (row[6] || '').toString().trim(); // G열: 업체명 (개통데이터는 G열)
+      const activation = (row[19] || '').toString().trim(); // T열: 개통
+      const modelName = (row[21] || '').toString().trim(); // V열: 모델명
+      const inputStore = (row[12] || '').toString().trim(); // M열: 입고처
+      const planName = (row[29] || '').toString().trim(); // AD열: 요금제
+      const manager = (row[8] || '').toString().trim(); // I열: 담당자 (폰클개통데이터)
       
       activationProcessedCount++;
       
-      // 담당자 매칭 확인 (업체명으로 매칭)
-      const manager = companyNameMapping.get(companyName);
-      
+      // 담당자 정보 확인
       if (!manager) {
-        unmatchedCompanies.add(companyName);
         return;
       }
       
@@ -1026,8 +911,7 @@ async function getMonthlyAwardData(req, res) {
     
     console.log('개통데이터 처리 결과:', {
       processed: activationProcessedCount,
-      matched: activationMatchedCount,
-      unmatchedCompanies: Array.from(unmatchedCompanies).slice(0, 10) // 처음 10개만 표시
+      matched: activationMatchedCount
     });
     
     // 홈데이터에서 담당자별 자수 계산
@@ -1039,15 +923,12 @@ async function getMonthlyAwardData(req, res) {
       if (row.length < 10) return;
       
       const product = (row[9] || '').toString().trim(); // J열: 가입상품
-      const companyName = (row[2] || '').toString().trim(); // C열: 업체명 (홈데이터는 C열)
+      const manager = (row[7] || '').toString().trim(); // H열: 담당자 (폰클홈데이터)
       
       homeProcessedCount++;
       
-      // 담당자 매칭 확인 (업체명으로 매칭)
-      const manager = companyNameMapping.get(companyName);
-      
+      // 담당자 정보 확인
       if (!manager) {
-        unmatchedCompanies.add(companyName);
         return;
       }
       
@@ -1074,8 +955,7 @@ async function getMonthlyAwardData(req, res) {
     console.log('홈데이터 처리 결과:', {
       processed: homeProcessedCount,
       matched: homeMatchedCount,
-      internetProducts: internetCount,
-      unmatchedCompanies: Array.from(unmatchedCompanies).slice(0, 10) // 처음 10개만 표시
+      internetProducts: internetCount
     });
 
     // 담당자별 전략상품 계산 (별도 함수 사용)
