@@ -811,14 +811,14 @@ async function getMonthlyAwardData(req, res) {
           if (planGroup === '105군' || planGroup === '115군') {
             agent.upsellChange.numerator++;
             if (manager === Array.from(agentMap.keys())[0]) {
-              console.log(`${manager} 업셀기변 인정: 105군/115군 조건`);
+              // console.log(`${manager} 업셀기변 인정: 105군/115군 조건`);
             }
           }
           // 일반 조건: 업셀대상이 'Y'인 경우
           else if (upsellTarget === 'Y') {
             agent.upsellChange.numerator++;
             if (manager === Array.from(agentMap.keys())[0]) {
-              console.log(`${manager} 업셀기변 인정: 업셀대상 Y 조건`);
+              // console.log(`${manager} 업셀기변 인정: 업셀대상 Y 조건`);
             }
           }
         }
@@ -856,13 +856,13 @@ async function getMonthlyAwardData(req, res) {
     });
     
     // 디버깅 로그 추가
-    console.log('매칭된 담당자 수:', matchedCount);
-    console.log('담당자별 데이터 수집 완료');
-    console.log('매칭 예시:');
+    // console.log('매칭된 담당자 수:', matchedCount);
+    // console.log('담당자별 데이터 수집 완료');
+    // console.log('매칭 예시:');
     if (manualRows.length > 0) {
       const firstRow = manualRows[0];
       const manager = (firstRow[8] || '').toString().trim();
-      console.log(`담당자: "${manager}"`);
+              // console.log(`담당자: "${manager}"`);
     }
 
 
@@ -871,37 +871,37 @@ async function getMonthlyAwardData(req, res) {
     const activationRows = activationData.slice(3); // 헤더가 3행에 있으므로 4행부터 시작
     const homeRows = homeData.slice(3); // 헤더가 3행에 있으므로 4행부터 시작
     
-    console.log('=== 인터넷 비중 계산 디버깅 ===');
-    console.log('개통데이터 행 수:', activationRows.length);
-    console.log('홈데이터 행 수:', homeRows.length);
-    console.log('담당자별 사무실/소속 매핑 수:', managerOfficeMapping.size);
+    // console.log('=== 인터넷 비중 계산 디버깅 ===');
+    // console.log('개통데이터 행 수:', activationRows.length);
+    // console.log('홈데이터 행 수:', homeRows.length);
+    // console.log('담당자별 사무실/소속 매핑 수:', managerOfficeMapping.size);
     
     // 개통데이터/홈데이터 컬럼 구조 확인
     if (activationRows.length > 0) {
       const firstActivationRow = activationRows[0];
-      console.log('=== 개통데이터 컬럼 구조 확인 ===');
-      console.log('전체 행 길이:', firstActivationRow.length);
-      console.log('M열(12) - 입고처:', firstActivationRow[12]);
-      console.log('I열(8) - 담당자:', firstActivationRow[8]);
-      console.log('V열(21) - 모델명:', firstActivationRow[21]);
-      console.log('AD열(29) - 요금제:', firstActivationRow[29]);
-      console.log('T열(19) - 개통:', firstActivationRow[19]);
+      // console.log('=== 개통데이터 컬럼 구조 확인 ===');
+              // console.log('전체 행 길이:', firstActivationRow.length);
+              // console.log('M열(12) - 입고처:', firstActivationRow[12]);
+              // console.log('I열(8) - 담당자:', firstActivationRow[8]);
+              // console.log('V열(21) - 모델명:', firstActivationRow[21]);
+              // console.log('AD열(29) - 요금제:', firstActivationRow[29]);
+              // console.log('T열(19) - 개통:', firstActivationRow[19]);
       console.log('================================');
     }
     
     if (homeRows.length > 0) {
       const firstHomeRow = homeRows[0];
-      console.log('=== 홈데이터 컬럼 구조 확인 ===');
-      console.log('전체 행 길이:', firstHomeRow.length);
-      console.log('H열(7) - 담당자:', firstHomeRow[7]);
-      console.log('R열(17) - 가입상품:', firstHomeRow[17]);
-      console.log('================================');
+      // console.log('=== 홈데이터 컬럼 구조 확인 ===');
+              // console.log('전체 행 길이:', firstHomeRow.length);
+              // console.log('H열(7) - 담당자:', firstHomeRow[7]);
+              // console.log('R열(17) - 가입상품:', firstHomeRow[17]);
+      // console.log('================================');
     }
     
 
     
     // 폰클개통데이터와 폰클홈데이터에서 직접 담당자 정보 사용
-    console.log('=== 폰클개통데이터/홈데이터에서 직접 담당자 정보 사용 ===');
+    // console.log('=== 폰클개통데이터/홈데이터에서 직접 담당자 정보 사용 ===');
     
     // 인터넷 비중 계산용 담당자별 Map 생성
     const internetAgentMap = new Map();
@@ -949,10 +949,10 @@ async function getMonthlyAwardData(req, res) {
       activationMatchedCount++;
     });
     
-    console.log('개통데이터 처리 결과:', {
-      processed: activationProcessedCount,
-      matched: activationMatchedCount
-    });
+    // console.log('개통데이터 처리 결과:', {
+    //   processed: activationProcessedCount,
+    //   matched: activationMatchedCount
+    // });
     
     // 홈데이터에서 담당자별 자수 계산
     let homeProcessedCount = 0;
@@ -976,7 +976,7 @@ async function getMonthlyAwardData(req, res) {
       // 자수 조건 확인
       if (product.includes('인터넷')) {
         internetCount++;
-        console.log(`인터넷 상품 발견: ${manager} - ${product}`);
+        // console.log(`인터넷 상품 발견: ${manager} - ${product}`);
         // 동판 문구가 없는 경우에만 추가 조건 확인
         if (!product.includes('동판')) {
           if (product !== '선불' && product !== '소호') {
@@ -1000,18 +1000,18 @@ async function getMonthlyAwardData(req, res) {
       }
     });
     
-    console.log('홈데이터 처리 결과:', {
-      processed: homeProcessedCount,
-      matched: homeMatchedCount,
-      internetProducts: internetCount
-    });
+    // console.log('홈데이터 처리 결과:', {
+    //   processed: homeProcessedCount,
+    //   matched: homeMatchedCount,
+    //   internetProducts: internetCount
+    // });
     
     // 인터넷 비중 결과를 agentMap에 반영
     internetAgentMap.forEach((internetAgent, managerName) => {
       if (agentMap.has(managerName)) {
         agentMap.get(managerName).internetRatio.numerator = internetAgent.numerator;
         agentMap.get(managerName).internetRatio.denominator = internetAgent.denominator;
-        console.log(`인터넷 비중 결과 반영: ${managerName} - ${internetAgent.numerator}/${internetAgent.denominator}`);
+        // console.log(`인터넷 비중 결과 반영: ${managerName} - ${internetAgent.numerator}/${internetAgent.denominator}`);
       }
     });
 
