@@ -493,11 +493,11 @@ async function getMonthlyAwardData(req, res) {
         }
         
         // 기본조건 확인 (컬럼 인덱스 수정)
-        const finalPolicy = (row[49] || '').toString().trim(); // AW열: 최종영업정책
-        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
+        const finalPolicy = (row[48] || '').toString().trim(); // AW열: 최종영업정책
+        const modelType = (row[98] || '').toString().trim(); // CU열: 모델유형
         const joinType = (row[19] || '').toString().trim(); // T열: 가입구분
         const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
-        const finalModel = (row[39] || '').toString().trim(); // AN열: 개통모델
+        const finalModel = (row[38] || '').toString().trim(); // AM열: 개통모델
         
         // 기본조건 검증 (가입번호 조건 제거)
         if (finalPolicy === 'BLANK' || 
@@ -506,13 +506,10 @@ async function getMonthlyAwardData(req, res) {
           return;
         }
         
-        // 제외대상 확인
-        const finalPlanInfo = planMapping.get(finalPlan);
-        if (!finalPlanInfo) return;
-        
-        // 요금제군 제외
-        const excludedGroups = ['시니어 Ⅰ군', '시니어 Ⅱ군', '청소년 Ⅰ군', '청소년 Ⅱ군', '청소년 Ⅲ군', '키즈군', '키즈22군'];
-        if (excludedGroups.includes(finalPlanInfo.group)) return;
+        // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
+        if (finalPlan.includes('태블릿') || finalPlan.includes('스마트기기') || finalPlan.includes('Wearable')) {
+          return;
+        }
         
         // 요금제명 제외 (현역병사 포함)
         if (finalPlan.includes('현역병사')) return;
@@ -524,9 +521,10 @@ async function getMonthlyAwardData(req, res) {
         // 모수 카운팅
         denominator++;
         
-        // 자수 카운팅 (105군, 115군)
-        if (finalPlanInfo.group === '105군' || finalPlanInfo.group === '115군') {
-          // 특별 조건: 티빙, 멀티팩 포함 시 1.2 카운트 (디즈니 → 티빙으로 수정)
+        // 자수 카운팅 (CV열에서 105군/115군 직접 확인)
+        const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
+        if (planGroup === '105군' || planGroup === '115군') {
+          // 특별 조건: 티빙, 멀티팩 포함 시 1.2 카운트
           if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
             numerator += 1.2;
           } else {
@@ -793,14 +791,12 @@ async function getMonthlyAwardData(req, res) {
         // 기변105이상 계산
         if (joinType === '정책기변' || joinType === '재가입') {
           const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
-          const finalModel = (row[39] || '').toString().trim(); // AN열: 개통모델
+          const finalModel = (row[38] || '').toString().trim(); // AM열: 개통모델
           
-          const finalPlanInfo = planMapping.get(finalPlan);
-          if (!finalPlanInfo) return;
-          
-          // 제외대상 확인
-          const excludedGroups = ['시니어 Ⅰ군', '시니어 Ⅱ군', '청소년 Ⅰ군', '청소년 Ⅱ군', '청소년 Ⅲ군', '키즈군', '키즈22군'];
-          if (excludedGroups.includes(finalPlanInfo.group)) return;
+          // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
+          if (finalPlan.includes('태블릿') || finalPlan.includes('스마트기기') || finalPlan.includes('Wearable')) {
+            return;
+          }
           
           if (finalPlan.includes('현역병사')) return;
           
@@ -809,7 +805,9 @@ async function getMonthlyAwardData(req, res) {
           
           agent.change105Above.denominator++;
           
-          if (finalPlanInfo.group === '105군' || finalPlanInfo.group === '115군') {
+          // CV열에서 105군/115군 직접 확인
+          const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
+          if (planGroup === '105군' || planGroup === '115군') {
             if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
               agent.change105Above.numerator += 1.2;
             } else {
