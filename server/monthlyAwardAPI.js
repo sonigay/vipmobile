@@ -481,8 +481,7 @@ async function getMonthlyAwardData(req, res) {
       let numerator = 0;
       let denominator = 0;
       
-      console.log(`\n=== ${manager} 기변105이상 계산 시작 ===`);
-      console.log(`전체 행 수: ${manualRows.length}`);
+      console.log(`\n🔍 [기변105이상] ${manager} 계산 시작 (전체 행 수: ${manualRows.length})`);
       
       manualRows.forEach(row => {
         if (row.length < 100) return; // CV열(99번 인덱스) 사용을 위해 100 이상 필요
@@ -490,7 +489,7 @@ async function getMonthlyAwardData(req, res) {
         // 담당자 매칭 확인
         const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
         if (currentManager !== manager) {
-          console.log(`${manager} 기변105이상 - 담당자 불일치: "${currentManager}" vs "${manager}"`);
+          console.log(`❌ [기변105이상] ${manager} 담당자 불일치: "${currentManager}" vs "${manager}"`);
           return; // 해당 담당자가 아닌 경우 제외
         }
         
@@ -554,9 +553,10 @@ async function getMonthlyAwardData(req, res) {
       let numerator = 0;
       let denominator = 0;
       
-      console.log(`\n=== ${manager} 전략상품 계산 시작 ===`);
-      console.log(`전략상품 설정:`, finalStrategicProducts);
-      console.log(`전략상품 설정 개수:`, finalStrategicProducts.length);
+      // 전략상품 로그 최소화
+      // console.log(`\n=== ${manager} 전략상품 계산 시작 ===`);
+      // console.log(`전략상품 설정:`, finalStrategicProducts);
+      // console.log(`전략상품 설정 개수:`, finalStrategicProducts.length);
       
       manualRows.forEach(row => {
         if (row.length < 132) return; // EB열(131번 인덱스) 사용을 위해 132 이상 필요
@@ -625,9 +625,7 @@ async function getMonthlyAwardData(req, res) {
       let matchedHomeRows = 0;
       let internetRows = 0;
       
-      console.log(`\n=== ${manager} 인터넷 비중 계산 시작 ===`);
-      console.log(`개통데이터 행 수: ${activationRows.length}`);
-      console.log(`홈데이터 행 수: ${homeRows.length}`);
+      console.log(`\n🌐 [인터넷 비중] ${manager} 계산 시작 (개통: ${activationRows.length}, 홈: ${homeRows.length})`);
       
       // 개통데이터 기준으로 모수 계산
       activationRows.forEach(row => {
@@ -651,12 +649,12 @@ async function getMonthlyAwardData(req, res) {
         
         // 담당자 매칭 확인
         if (currentManager !== manager) {
-          console.log(`${manager} 인터넷 비중 - 개통데이터 담당자 불일치: "${currentManager}" vs "${manager}"`);
+          console.log(`❌ [인터넷 비중] ${manager} 개통데이터 담당자 불일치: "${currentManager}" vs "${manager}"`);
           return; // 해당 담당자가 아닌 경우 제외
         }
         
         denominator++;
-        console.log(`${manager} 인터넷 비중 - 개통데이터 모수 추가: ${denominator}`);
+        console.log(`✅ [인터넷 비중] ${manager} 개통데이터 모수 추가: ${denominator}`);
       });
       
       // 홈데이터 기준으로 자수 계산
@@ -668,12 +666,12 @@ async function getMonthlyAwardData(req, res) {
         
         // 담당자 매칭 확인
         if (currentManager !== manager) {
-          console.log(`${manager} 인터넷 비중 - 홈데이터 담당자 불일치: "${currentManager}" vs "${manager}"`);
+          console.log(`❌ [인터넷 비중] ${manager} 홈데이터 담당자 불일치: "${currentManager}" vs "${manager}"`);
           return; // 해당 담당자가 아닌 경우 제외
         }
         
         matchedHomeRows++;
-        console.log(`${manager} 인터넷 비중 - 홈데이터 매칭: ${matchedHomeRows}`);
+        console.log(`✅ [인터넷 비중] ${manager} 홈데이터 매칭: ${matchedHomeRows}`);
         
         // 자수 조건 확인
         if (product.includes('인터넷')) {
