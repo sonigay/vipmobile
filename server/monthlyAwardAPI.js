@@ -482,9 +482,10 @@ async function getMonthlyAwardData(req, res) {
       let denominator = 0;
       
       console.log(`\n=== ${manager} 기변105이상 계산 시작 ===`);
+      console.log(`전체 행 수: ${manualRows.length}`);
       
       manualRows.forEach(row => {
-        if (row.length < 90) return;
+        if (row.length < 100) return; // CV열(99번 인덱스) 사용을 위해 100 이상 필요
         
         // 담당자 매칭 확인
         const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
@@ -527,9 +528,13 @@ async function getMonthlyAwardData(req, res) {
           // 특별 조건: 티빙, 멀티팩 포함 시 1.2 카운트
           if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
             numerator += 1.2;
+            console.log(`${manager} 기변105이상 인정: ${planGroup}, 티빙/멀티팩 포함`);
           } else {
             numerator += 1.0;
+            console.log(`${manager} 기변105이상 인정: ${planGroup}`);
           }
+        } else if (planGroup) {
+          console.log(`${manager} 기변105이상 제외: ${planGroup} (105군/115군 아님)`);
         }
       });
       
@@ -552,7 +557,7 @@ async function getMonthlyAwardData(req, res) {
       console.log(`전략상품 설정 개수:`, finalStrategicProducts.length);
       
       manualRows.forEach(row => {
-        if (row.length < 90) return;
+        if (row.length < 132) return; // EB열(131번 인덱스) 사용을 위해 132 이상 필요
         
         // 담당자 매칭 확인
         const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
@@ -614,9 +619,13 @@ async function getMonthlyAwardData(req, res) {
       let numerator = 0;
       let denominator = 0;
       
-      // 인터넷 비중 계산 (로그 최소화)
+      // 인터넷 비중 계산 디버깅
       let matchedHomeRows = 0;
       let internetRows = 0;
+      
+      console.log(`\n=== ${manager} 인터넷 비중 계산 시작 ===`);
+      console.log(`개통데이터 행 수: ${activationRows.length}`);
+      console.log(`홈데이터 행 수: ${homeRows.length}`);
       
       // 개통데이터 기준으로 모수 계산
       activationRows.forEach(row => {
@@ -663,13 +672,18 @@ async function getMonthlyAwardData(req, res) {
         // 자수 조건 확인
         if (product.includes('인터넷')) {
           internetRows++;
+          console.log(`${manager} 인터넷 상품 발견: ${product}`);
           // 동판 문구가 없는 경우에만 추가 조건 확인
           if (!product.includes('동판')) {
             if (product !== '선불' && product !== '소호') {
               numerator++;
+              console.log(`${manager} 인터넷 비중 인정: ${product}`);
+            } else {
+              console.log(`${manager} 인터넷 비중 제외: ${product} (선불/소호)`);
             }
           } else {
             numerator++;
+            console.log(`${manager} 인터넷 비중 인정: ${product} (동판 포함)`);
           }
         }
       });
