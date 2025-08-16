@@ -333,6 +333,7 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
           const dataString = JSON.stringify(data.data);
           const dataSize = new Blob([dataString]).size;
           const maxSize = 5 * 1024 * 1024; // 5MB 제한
+          const now = Date.now();
           
           if (dataSize <= maxSize) {
             sessionStorage.setItem('sales_data_cache', dataString);
