@@ -77,7 +77,7 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
   }, [addressHierarchy.provinces, searchTerm]);
 
   const filteredCities = useMemo(() => {
-    if (!searchTerm) return {};
+    if (!searchTerm) return addressHierarchy.cities;
     const filtered = {};
     Object.entries(addressHierarchy.cities).forEach(([province, cities]) => {
       const matchingCities = Array.from(cities)
@@ -90,7 +90,7 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
   }, [addressHierarchy.cities, searchTerm]);
 
   const filteredDistricts = useMemo(() => {
-    if (!searchTerm) return {};
+    if (!searchTerm) return addressHierarchy.districts;
     const filtered = {};
     Object.entries(addressHierarchy.districts).forEach(([cityKey, districts]) => {
       const matchingDistricts = Array.from(districts)
@@ -103,7 +103,7 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
   }, [addressHierarchy.districts, searchTerm]);
 
   const filteredDetailAreas = useMemo(() => {
-    if (!searchTerm) return {};
+    if (!searchTerm) return addressHierarchy.detailAreas;
     const filtered = {};
     Object.entries(addressHierarchy.detailAreas).forEach(([districtKey, detailAreas]) => {
       const matchingDetailAreas = Array.from(detailAreas)
@@ -315,8 +315,8 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
             
             {expandedSections.cities && (
               <Box sx={{ mt: 1, ml: 2 }}>
-                {Object.entries(addressHierarchy.cities).map(([province, cities]) => {
-                  const cityList = Array.from(cities);
+                {Object.entries(filteredCities).map(([province, cities]) => {
+                  const cityList = Array.isArray(cities) ? cities : Array.from(cities);
                   return (
                     <Box key={province} sx={{ mb: 2 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#666', mb: 1 }}>
@@ -325,7 +325,7 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
                       <Box sx={{ ml: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {cityList.map(city => {
                           const cityKey = `${province}_${city}`;
-                          const districts = Array.from(addressHierarchy.districts[cityKey] || []);
+                          const districts = Array.from(filteredDistricts[cityKey] || []);
                           const allSelected = districts.every(district => filters.districts.includes(district));
                           const someSelected = districts.some(district => filters.districts.includes(district));
                           

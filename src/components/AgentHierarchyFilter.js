@@ -67,7 +67,7 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
   }, [agentHierarchy.managers, searchTerm]);
 
   const filteredBranches = useMemo(() => {
-    if (!searchTerm) return {};
+    if (!searchTerm) return agentHierarchy.branches;
     const filtered = {};
     Object.entries(agentHierarchy.branches).forEach(([manager, branches]) => {
       const matchingBranches = Array.from(branches)
@@ -80,7 +80,7 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
   }, [agentHierarchy.branches, searchTerm]);
 
   const filteredAgents = useMemo(() => {
-    if (!searchTerm) return {};
+    if (!searchTerm) return agentHierarchy.agents;
     const filtered = {};
     Object.entries(agentHierarchy.agents).forEach(([branchKey, agents]) => {
       const matchingAgents = Array.from(agents)
@@ -291,8 +291,8 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
             
             {expandedSections.branches && (
               <Box sx={{ mt: 1, ml: 2 }}>
-                {Object.entries(agentHierarchy.branches).map(([manager, branches]) => {
-                  const branchList = Array.from(branches);
+                {Object.entries(filteredBranches).map(([manager, branches]) => {
+                  const branchList = Array.isArray(branches) ? branches : Array.from(branches);
                   return (
                     <Box key={manager} sx={{ mb: 2 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#666', mb: 1 }}>
@@ -301,7 +301,7 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
                       <Box sx={{ ml: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {branchList.map(branch => {
                           const branchKey = `${manager}_${branch}`;
-                          const agents = Array.from(agentHierarchy.agents[branchKey] || []);
+                          const agents = Array.from(filteredAgents[branchKey] || []);
                           const allSelected = agents.every(agent => filters.agents.includes(agent));
                           const someSelected = agents.some(agent => filters.agents.includes(agent));
                           
