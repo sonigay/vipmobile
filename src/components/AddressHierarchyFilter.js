@@ -68,50 +68,148 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
     return hierarchy;
   }, [filterOptions.salesData]);
 
-  // 검색 필터링된 데이터
+  // 검색 필터링된 데이터 (통합 검색)
   const filteredProvinces = useMemo(() => {
     if (!searchTerm) return Array.from(addressHierarchy.provinces).sort();
-    return Array.from(addressHierarchy.provinces)
+    
+    // 검색어가 포함된 모든 계층의 데이터를 수집
+    const matchingProvinces = new Set();
+    
+    // 1. 도/광역시에서 직접 검색
+    Array.from(addressHierarchy.provinces)
       .filter(province => province.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort();
-  }, [addressHierarchy.provinces, searchTerm]);
+      .forEach(province => matchingProvinces.add(province));
+    
+    // 2. 시/구에서 검색하여 상위 도/광역시 포함
+    Object.entries(addressHierarchy.cities).forEach(([province, cities]) => {
+      const hasMatchingCity = Array.from(cities)
+        .some(city => city.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (hasMatchingCity) {
+        matchingProvinces.add(province);
+      }
+    });
+    
+    // 3. 구/군에서 검색하여 상위 도/광역시 포함
+    Object.entries(addressHierarchy.districts).forEach(([cityKey, districts]) => {
+      const hasMatchingDistrict = Array.from(districts)
+        .some(district => district.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (hasMatchingDistrict) {
+        const [province] = cityKey.split('_');
+        matchingProvinces.add(province);
+      }
+    });
+    
+    // 4. 동/읍/면에서 검색하여 상위 도/광역시 포함
+    Object.entries(addressHierarchy.detailAreas).forEach(([districtKey, detailAreas]) => {
+      const hasMatchingDetailArea = Array.from(detailAreas)
+        .some(detailArea => detailArea.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (hasMatchingDetailArea) {
+        const [province] = districtKey.split('_');
+        matchingProvinces.add(province);
+      }
+    });
+    
+    return Array.from(matchingProvinces).sort();
+  }, [addressHierarchy, searchTerm]);
 
   const filteredCities = useMemo(() => {
     if (!searchTerm) return addressHierarchy.cities;
     const filtered = {};
+    
     Object.entries(addressHierarchy.cities).forEach(([province, cities]) => {
-      const matchingCities = Array.from(cities)
-        .filter(city => city.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchingCities = [];
+      
+      // 1. 시/구에서 직접 검색
+      Array.from(cities)
+        .filter(city => city.toLowerCase().includes(searchTerm.toLowerCase()))
+        .forEach(city => matchingCities.push(city));
+      
+      // 2. 구/군에서 검색하여 상위 시/구 포함
+      Array.from(cities).forEach(city => {
+        const cityKey = `${province}_${city}`;
+        const districts = addressHierarchy.districts[cityKey];
+        if (districts) {
+          const hasMatchingDistrict = Array.from(districts)
+            .some(district => district.toLowerCase().includes(searchTerm.toLowerCase()));
+          if (hasMatchingDistrict && !matchingCities.includes(city)) {
+            matchingCities.push(city);
+          }
+        }
+      });
+      
+      // 3. 동/읍/면에서 검색하여 상위 시/구 포함
+      Array.from(cities).forEach(city => {
+        const cityKey = `${province}_${city}`;
+        const districts = addressHierarchy.districts[cityKey];
+        if (districts) {
+          Array.from(districts).forEach(district => {
+            const districtKey = `${cityKey}_${district}`;
+            const detailAreas = addressHierarchy.detailAreas[districtKey];
+            if (detailAreas) {
+              const hasMatchingDetailArea = Array.from(detailAreas)
+                .some(detailArea => detailArea.toLowerCase().includes(searchTerm.toLowerCase()));
+              if (hasMatchingDetailArea && !matchingCities.includes(city)) {
+                matchingCities.push(city);
+              }
+            }
+          });
+        }
+      });
+      
       if (matchingCities.length > 0) {
         filtered[province] = matchingCities;
       }
     });
+    
     return filtered;
-  }, [addressHierarchy.cities, searchTerm]);
+  }, [addressHierarchy, searchTerm]);
 
   const filteredDistricts = useMemo(() => {
     if (!searchTerm) return addressHierarchy.districts;
     const filtered = {};
+    
     Object.entries(addressHierarchy.districts).forEach(([cityKey, districts]) => {
-      const matchingDistricts = Array.from(districts)
-        .filter(district => district.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchingDistricts = [];
+      
+      // 1. 구/군에서 직접 검색
+      Array.from(districts)
+        .filter(district => district.toLowerCase().includes(searchTerm.toLowerCase()))
+        .forEach(district => matchingDistricts.push(district));
+      
+      // 2. 동/읍/면에서 검색하여 상위 구/군 포함
+      Array.from(districts).forEach(district => {
+        const districtKey = `${cityKey}_${district}`;
+        const detailAreas = addressHierarchy.detailAreas[districtKey];
+        if (detailAreas) {
+          const hasMatchingDetailArea = Array.from(detailAreas)
+            .some(detailArea => detailArea.toLowerCase().includes(searchTerm.toLowerCase()));
+          if (hasMatchingDetailArea && !matchingDistricts.includes(district)) {
+            matchingDistricts.push(district);
+          }
+        }
+      });
+      
       if (matchingDistricts.length > 0) {
         filtered[cityKey] = matchingDistricts;
       }
     });
+    
     return filtered;
-  }, [addressHierarchy.districts, searchTerm]);
+  }, [addressHierarchy, searchTerm]);
 
   const filteredDetailAreas = useMemo(() => {
     if (!searchTerm) return addressHierarchy.detailAreas;
     const filtered = {};
+    
     Object.entries(addressHierarchy.detailAreas).forEach(([districtKey, detailAreas]) => {
       const matchingDetailAreas = Array.from(detailAreas)
         .filter(detailArea => detailArea.toLowerCase().includes(searchTerm.toLowerCase()));
+      
       if (matchingDetailAreas.length > 0) {
         filtered[districtKey] = matchingDetailAreas;
       }
     });
+    
     return filtered;
   }, [addressHierarchy.detailAreas, searchTerm]);
 
@@ -372,74 +470,6 @@ const AddressHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
               </Box>
             )}
           </Box>
-          
-          {/* 선택된 필터 표시 */}
-          {(filters.provinces.length > 0 || filters.cities.length > 0 || filters.districts.length > 0 || filters.detailAreas.length > 0) && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                선택된 필터:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {filters.provinces.map(province => (
-                  <Chip
-                    key={province}
-                    label={province}
-                    size="small"
-                    color="primary"
-                    onDelete={() => handleFilterChange('provinces', filters.provinces.filter(p => p !== province))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.cities.map(city => (
-                  <Chip
-                    key={city}
-                    label={city}
-                    size="small"
-                    color="secondary"
-                    onDelete={() => handleFilterChange('cities', filters.cities.filter(c => c !== city))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.districts.map(district => (
-                  <Chip
-                    key={district}
-                    label={district}
-                    size="small"
-                    color="info"
-                    onDelete={() => handleFilterChange('districts', filters.districts.filter(d => d !== district))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.detailAreas.map(detailArea => (
-                  <Chip
-                    key={detailArea}
-                    label={detailArea}
-                    size="small"
-                    color="warning"
-                    onDelete={() => handleFilterChange('detailAreas', filters.detailAreas.filter(d => d !== detailArea))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-              </Box>
-            </Box>
-          )}
-          
-          <Button
-            variant="outlined"
-            onClick={clearFilters}
-            fullWidth
-            sx={{ 
-              mb: 1,
-              borderColor: '#2196f3',
-              color: '#2196f3',
-              '&:hover': { 
-                borderColor: '#1976d2',
-                backgroundColor: '#e3f2fd'
-              }
-            }}
-          >
-            필터 초기화
-          </Button>
         </Paper>
       )}
     </Box>

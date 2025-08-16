@@ -58,37 +58,86 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
     return hierarchy;
   }, [filterOptions.salesData]);
 
-  // 검색 필터링된 데이터
+  // 검색 필터링된 데이터 (통합 검색)
   const filteredManagers = useMemo(() => {
     if (!searchTerm) return Array.from(agentHierarchy.managers).sort();
-    return Array.from(agentHierarchy.managers)
+    
+    // 검색어가 포함된 모든 계층의 데이터를 수집
+    const matchingManagers = new Set();
+    
+    // 1. 담당에서 직접 검색
+    Array.from(agentHierarchy.managers)
       .filter(manager => manager.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort();
-  }, [agentHierarchy.managers, searchTerm]);
+      .forEach(manager => matchingManagers.add(manager));
+    
+    // 2. 지점에서 검색하여 상위 담당 포함
+    Object.entries(agentHierarchy.branches).forEach(([manager, branches]) => {
+      const hasMatchingBranch = Array.from(branches)
+        .some(branch => branch.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (hasMatchingBranch) {
+        matchingManagers.add(manager);
+      }
+    });
+    
+    // 3. 대리점에서 검색하여 상위 담당 포함
+    Object.entries(agentHierarchy.agents).forEach(([branchKey, agents]) => {
+      const hasMatchingAgent = Array.from(agents)
+        .some(agent => agent.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (hasMatchingAgent) {
+        const [manager] = branchKey.split('_');
+        matchingManagers.add(manager);
+      }
+    });
+    
+    return Array.from(matchingManagers).sort();
+  }, [agentHierarchy, searchTerm]);
 
   const filteredBranches = useMemo(() => {
     if (!searchTerm) return agentHierarchy.branches;
     const filtered = {};
+    
     Object.entries(agentHierarchy.branches).forEach(([manager, branches]) => {
-      const matchingBranches = Array.from(branches)
-        .filter(branch => branch.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchingBranches = [];
+      
+      // 1. 지점에서 직접 검색
+      Array.from(branches)
+        .filter(branch => branch.toLowerCase().includes(searchTerm.toLowerCase()))
+        .forEach(branch => matchingBranches.push(branch));
+      
+      // 2. 대리점에서 검색하여 상위 지점 포함
+      Array.from(branches).forEach(branch => {
+        const branchKey = `${manager}_${branch}`;
+        const agents = agentHierarchy.agents[branchKey];
+        if (agents) {
+          const hasMatchingAgent = Array.from(agents)
+            .some(agent => agent.toLowerCase().includes(searchTerm.toLowerCase()));
+          if (hasMatchingAgent && !matchingBranches.includes(branch)) {
+            matchingBranches.push(branch);
+          }
+        }
+      });
+      
       if (matchingBranches.length > 0) {
         filtered[manager] = matchingBranches;
       }
     });
+    
     return filtered;
-  }, [agentHierarchy.branches, searchTerm]);
+  }, [agentHierarchy, searchTerm]);
 
   const filteredAgents = useMemo(() => {
     if (!searchTerm) return agentHierarchy.agents;
     const filtered = {};
+    
     Object.entries(agentHierarchy.agents).forEach(([branchKey, agents]) => {
       const matchingAgents = Array.from(agents)
         .filter(agent => agent.toLowerCase().includes(searchTerm.toLowerCase()));
+      
       if (matchingAgents.length > 0) {
         filtered[branchKey] = matchingAgents;
       }
     });
+    
     return filtered;
   }, [agentHierarchy.agents, searchTerm]);
 
@@ -348,64 +397,6 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
               </Box>
             )}
           </Box>
-          
-          {/* 선택된 필터 표시 */}
-          {(filters.managers.length > 0 || filters.branches.length > 0 || filters.agents.length > 0) && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                선택된 필터:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {filters.managers.map(manager => (
-                  <Chip
-                    key={manager}
-                    label={manager}
-                    size="small"
-                    color="primary"
-                    onDelete={() => handleFilterChange('managers', filters.managers.filter(m => m !== manager))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.branches.map(branch => (
-                  <Chip
-                    key={branch}
-                    label={branch}
-                    size="small"
-                    color="secondary"
-                    onDelete={() => handleFilterChange('branches', filters.branches.filter(b => b !== branch))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-                {filters.agents.map(agent => (
-                  <Chip
-                    key={agent}
-                    label={agent}
-                    size="small"
-                    color="info"
-                    onDelete={() => handleFilterChange('agents', filters.agents.filter(a => a !== agent))}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                ))}
-              </Box>
-            </Box>
-          )}
-          
-          <Button
-            variant="outlined"
-            onClick={clearFilters}
-            fullWidth
-            sx={{ 
-              mb: 1,
-              borderColor: '#e91e63',
-              color: '#e91e63',
-              '&:hover': { 
-                borderColor: '#c2185b',
-                backgroundColor: '#fce4ec'
-              }
-            }}
-          >
-            필터 초기화
-          </Button>
         </Paper>
       )}
     </Box>

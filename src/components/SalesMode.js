@@ -175,52 +175,6 @@ const PerformanceFilterPanel = ({ filters, setFilters }) => {
               />
             </Grid>
           </Grid>
-          
-          {/* 선택된 필터 표시 */}
-          {(filters.minPerformance || filters.maxPerformance) && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#666' }}>
-                선택된 필터:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {filters.minPerformance && (
-                  <Chip
-                    label={`최소: ${filters.minPerformance}`}
-                    size="small"
-                    color="info"
-                    onDelete={() => handleFilterChange('minPerformance', '')}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                )}
-                {filters.maxPerformance && (
-                  <Chip
-                    label={`최대: ${filters.maxPerformance}`}
-                    size="small"
-                    color="info"
-                    onDelete={() => handleFilterChange('maxPerformance', '')}
-                    sx={{ fontSize: '0.75rem' }}
-                  />
-                )}
-              </Box>
-            </Box>
-          )}
-          
-          <Button
-            variant="outlined"
-            onClick={clearFilters}
-            fullWidth
-            sx={{ 
-              mb: 1,
-              borderColor: '#4caf50',
-              color: '#4caf50',
-              '&:hover': { 
-                borderColor: '#388e3c',
-                backgroundColor: '#e8f5e8'
-              }
-            }}
-          >
-            필터 초기화
-          </Button>
         </Paper>
       )}
     </Box>
@@ -623,21 +577,193 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
         </Box>
       </Box>
 
-             {/* 새로운 계층적 필터 패널들 */}
-       <AddressHierarchyFilter 
-         filters={filters}
-         setFilters={setFilters}
-         filterOptions={filterOptions}
-       />
-       <AgentHierarchyFilter 
-         filters={filters}
-         setFilters={setFilters}
-         filterOptions={filterOptions}
-       />
-       <PerformanceFilterPanel 
-         filters={filters}
-         setFilters={setFilters}
-       />
+      {/* 통합된 필터 표시 영역 */}
+      {(filters.provinces.length > 0 || filters.cities.length > 0 || filters.districts.length > 0 || 
+        filters.detailAreas.length > 0 || filters.managers.length > 0 || filters.branches.length > 0 || 
+        filters.agents.length > 0 || filters.minPerformance || filters.maxPerformance) && (
+        <Box sx={{
+          position: 'absolute',
+          top: 60,
+          left: 10,
+          right: 10,
+          zIndex: 999,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: 2,
+          p: 2,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#333' }}>
+              선택된 필터:
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setFilters({
+                provinces: [],
+                cities: [],
+                districts: [],
+                detailAreas: [],
+                managers: [],
+                branches: [],
+                agents: [],
+                minPerformance: '',
+                maxPerformance: ''
+              })}
+              sx={{
+                borderColor: '#e91e63',
+                color: '#e91e63',
+                fontSize: '0.75rem',
+                py: 0.5,
+                px: 1.5,
+                '&:hover': {
+                  borderColor: '#c2185b',
+                  backgroundColor: '#fce4ec'
+                }
+              }}
+            >
+              전체 초기화
+            </Button>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {/* 주소 필터 */}
+            {filters.provinces.map(province => (
+              <Chip
+                key={`province-${province}`}
+                label={province}
+                size="small"
+                color="primary"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  provinces: prev.provinces.filter(p => p !== province)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {filters.cities.map(city => (
+              <Chip
+                key={`city-${city}`}
+                label={city}
+                size="small"
+                color="secondary"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  cities: prev.cities.filter(c => c !== city)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {filters.districts.map(district => (
+              <Chip
+                key={`district-${district}`}
+                label={district}
+                size="small"
+                color="info"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  districts: prev.districts.filter(d => d !== district)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {filters.detailAreas.map(detailArea => (
+              <Chip
+                key={`detailArea-${detailArea}`}
+                label={detailArea}
+                size="small"
+                color="warning"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  detailAreas: prev.detailAreas.filter(d => d !== detailArea)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {/* 대리점 필터 */}
+            {filters.managers.map(manager => (
+              <Chip
+                key={`manager-${manager}`}
+                label={manager}
+                size="small"
+                color="primary"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  managers: prev.managers.filter(m => m !== manager)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {filters.branches.map(branch => (
+              <Chip
+                key={`branch-${branch}`}
+                label={branch}
+                size="small"
+                color="secondary"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  branches: prev.branches.filter(b => b !== branch)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {filters.agents.map(agent => (
+              <Chip
+                key={`agent-${agent}`}
+                label={agent}
+                size="small"
+                color="info"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  agents: prev.agents.filter(a => a !== agent)
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            ))}
+            {/* 실적 범위 필터 */}
+            {filters.minPerformance && (
+              <Chip
+                label={`최소: ${filters.minPerformance}`}
+                size="small"
+                color="success"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  minPerformance: ''
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            )}
+            {filters.maxPerformance && (
+              <Chip
+                label={`최대: ${filters.maxPerformance}`}
+                size="small"
+                color="success"
+                onDelete={() => setFilters(prev => ({
+                  ...prev,
+                  maxPerformance: ''
+                }))}
+                sx={{ fontSize: '0.7rem' }}
+              />
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* 새로운 계층적 필터 패널들 */}
+      <AddressHierarchyFilter 
+        filters={filters}
+        setFilters={setFilters}
+        filterOptions={filterOptions}
+      />
+      <AgentHierarchyFilter 
+        filters={filters}
+        setFilters={setFilters}
+        filterOptions={filterOptions}
+      />
+      <PerformanceFilterPanel 
+        filters={filters}
+        setFilters={setFilters}
+      />
       
       {/* 지도 */}
       <MapContainer
