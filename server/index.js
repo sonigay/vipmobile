@@ -17702,17 +17702,48 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   });
   
   // 운영모델 필터링 (휴대폰만)
-  const phoneModels = new Set();
-  if (operationModelData && operationModelData.length > 8) {
-    for (let i = 8; i < operationModelData.length; i++) {
-      const row = operationModelData[i];
-      if (row.length > 2 && row[2] === '휴대폰') { // C열: 휴대폰여부
-        phoneModels.add(row[0]); // A열: 모델명
+  console.log('🔍 [마감장표] 운영모델 데이터 구조 확인:');
+  if (operationModelData && operationModelData.length > 0) {
+    console.log('🔍 [마감장표] 운영모델 전체 행 수:', operationModelData.length);
+    console.log('🔍 [마감장표] 운영모델 첫 번째 행:', operationModelData[0]);
+    console.log('🔍 [마감장표] 운영모델 8번째 행:', operationModelData[7]);
+    console.log('🔍 [마감장표] 운영모델 9번째 행:', operationModelData[8]);
+    
+    // 모든 행에서 휴대폰 관련 데이터 찾기
+    const phoneModels = new Set();
+    const allModels = new Set();
+    
+    operationModelData.forEach((row, index) => {
+      if (row.length > 0) {
+        allModels.add(row[0]); // A열: 모델명
+        
+        // C열(휴대폰여부) 확인
+        if (row.length > 2) {
+          const phoneType = (row[2] || '').toString();
+          if (phoneType.includes('휴대폰') || phoneType.includes('폰')) {
+            phoneModels.add(row[0]);
+            console.log('🔍 [마감장표] 휴대폰 모델 발견:', { 행: index, 모델: row[0], 타입: phoneType });
+          }
+        }
+        
+        // 다른 컬럼들도 확인
+        if (row.length > 1) {
+          const col1 = (row[1] || '').toString();
+          if (col1.includes('휴대폰') || col1.includes('폰')) {
+            phoneModels.add(row[0]);
+            console.log('🔍 [마감장표] 휴대폰 모델 발견(B열):', { 행: index, 모델: row[0], 타입: col1 });
+          }
+        }
       }
-    }
+    });
+    
+    console.log('🔍 [마감장표] 전체 모델 목록:', Array.from(allModels));
+    console.log('🔍 [마감장표] 휴대폰 모델 수:', phoneModels.size);
+    console.log('🔍 [마감장표] 휴대폰 모델 목록:', Array.from(phoneModels));
+  } else {
+    console.log('🔍 [마감장표] 운영모델 데이터가 없음');
+    const phoneModels = new Set();
   }
-  console.log('🔍 [마감장표] 휴대폰 모델 수:', phoneModels.size);
-  console.log('🔍 [마감장표] 휴대폰 모델 목록:', Array.from(phoneModels));
   
   // 개통 데이터 필터링
   console.log('🔍 [마감장표] 개통 데이터 필터링 시작');
@@ -17785,6 +17816,26 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
         수수료: filteredPhoneklData[0][3] // D열
       }
     });
+  } else {
+    // 필터링된 데이터가 없으면 원본 데이터 샘플 확인
+    if (phoneklData && phoneklData.length > 0) {
+      console.log('🔍 [마감장표] 원본 개통 데이터 샘플:', {
+        첫번째행: phoneklData[0],
+        컬럼구조: {
+          코드: phoneklData[0][4], // E열
+          사무실: phoneklData[0][6], // G열
+          담당자: phoneklData[0][8], // I열
+          개통일: phoneklData[0][9], // J열
+          모델: phoneklData[0][13], // N열
+          수수료: phoneklData[0][3] // D열
+        }
+      });
+      
+      // 날짜 필터링 문제 확인
+      const sampleDates = phoneklData.slice(0, 10).map(row => row[9]).filter(date => date);
+      console.log('🔍 [마감장표] 샘플 개통일 형식:', sampleDates);
+      console.log('🔍 [마감장표] 타겟 날짜:', targetDate);
+    }
   }
   
   // 코드별/사무실별/담당자별 데이터 집계
