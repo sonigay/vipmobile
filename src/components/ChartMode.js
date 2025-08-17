@@ -2307,7 +2307,7 @@ function ClosingChartTab() {
         });
       }, 100);
 
-      const response = await fetch(`/api/closing-chart?date=${date}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/closing-chart?date=${date}`);
       if (!response.ok) {
         throw new Error('데이터 로드에 실패했습니다.');
       }
@@ -2332,7 +2332,7 @@ function ClosingChartTab() {
   // 매핑 실패 데이터 로드
   const loadMappingFailures = useCallback(async () => {
     try {
-      const response = await fetch(`/api/closing-chart/mapping-failures?date=${selectedDate}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/closing-chart/mapping-failures?date=${selectedDate}`);
       if (response.ok) {
         const result = await response.json();
         setMappingFailures(result.failures || []);
@@ -2371,7 +2371,7 @@ function ClosingChartTab() {
   // 목표 설정 저장
   const handleTargetSave = async (targets) => {
     try {
-      const response = await fetch('/api/closing-chart/targets', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/closing-chart/targets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
