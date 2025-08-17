@@ -1528,20 +1528,32 @@ function MonthlyAwardTab() {
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#2e7d32' }}>업셀기변 기준값</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[6, 5, 4, 3, 2, 1].map((score) => (
-                  <Grid item xs={12} md={4} key={`upsell-${score}`}>
-                    <TextField
-                      fullWidth
-                      label={`${score}점 기준 (%)`}
-                      type="number"
-                      name={`upsell-${score}`}
-                      value={matrixValues[`upsell-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0)}
-                      onChange={(e) => setMatrixValues(prev => ({
-                        ...prev,
-                        [`upsell-${score}`]: parseFloat(e.target.value) || 0
-                      }))}
-                      inputProps={{ min: 0, max: 100, step: 0.1 }}
-                      sx={{ mb: 1 }}
-                    />
+                  <Grid item xs={12} md={6} key={`upsell-${score}`}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        label={`${score}점 기준 (%)`}
+                        type="number"
+                        name={`upsell-${score}`}
+                        value={matrixValues[`upsell-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.percentage || 0)}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`upsell-${score}`]: parseFloat(e.target.value) || 0
+                        }))}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="설명"
+                        name={`upsell-desc-${score}`}
+                        value={matrixValues[`upsell-desc-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell')?.description || '')}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`upsell-desc-${score}`]: e.target.value
+                        }))}
+                        placeholder="만점/이상/미만"
+                      />
+                    </Box>
                   </Grid>
                 ))}
               </Grid>
@@ -1550,20 +1562,32 @@ function MonthlyAwardTab() {
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#f57c00' }}>기변105이상 기준값</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[6, 5, 4, 3, 2, 1].map((score) => (
-                  <Grid item xs={12} md={4} key={`change105-${score}`}>
-                    <TextField
-                      fullWidth
-                      label={`${score}점 기준 (%)`}
-                      type="number"
-                      name={`change105-${score}`}
-                      value={matrixValues[`change105-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0)}
-                      onChange={(e) => setMatrixValues(prev => ({
-                        ...prev,
-                        [`change105-${score}`]: parseFloat(e.target.value) || 0
-                      }))}
-                      inputProps={{ min: 0, max: 100, step: 0.1 }}
-                      sx={{ mb: 1 }}
-                    />
+                  <Grid item xs={12} md={6} key={`change105-${score}`}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        label={`${score}점 기준 (%)`}
+                        type="number"
+                        name={`change105-${score}`}
+                        value={matrixValues[`change105-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.percentage || 0)}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`change105-${score}`]: parseFloat(e.target.value) || 0
+                        }))}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="설명"
+                        name={`change105-desc-${score}`}
+                        value={matrixValues[`change105-desc-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105')?.description || '')}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`change105-desc-${score}`]: e.target.value
+                        }))}
+                        placeholder="만점/이상/미만"
+                      />
+                    </Box>
                   </Grid>
                 ))}
               </Grid>
@@ -1572,20 +1596,32 @@ function MonthlyAwardTab() {
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#7b1fa2' }}>전략상품 기준값</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[6, 5, 4, 3, 2, 1].map((score) => (
-                  <Grid item xs={12} md={4} key={`strategic-${score}`}>
-                    <TextField
-                      fullWidth
-                      label={`${score}점 기준 (%)`}
-                      type="number"
-                      name={`strategic-${score}`}
-                      value={matrixValues[`strategic-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0)}
-                      onChange={(e) => setMatrixValues(prev => ({
-                        ...prev,
-                        [`strategic-${score}`]: parseFloat(e.target.value) || 0
-                      }))}
-                      inputProps={{ min: 0, max: 100, step: 0.1 }}
-                      sx={{ mb: 1 }}
-                    />
+                  <Grid item xs={12} md={6} key={`strategic-${score}`}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        label={`${score}점 기준 (%)`}
+                        type="number"
+                        name={`strategic-${score}`}
+                        value={matrixValues[`strategic-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.percentage || 0)}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`strategic-${score}`]: parseFloat(e.target.value) || 0
+                        }))}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="설명"
+                        name={`strategic-desc-${score}`}
+                        value={matrixValues[`strategic-desc-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic')?.description || '')}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`strategic-desc-${score}`]: e.target.value
+                        }))}
+                        placeholder="만점/이상/미만"
+                      />
+                    </Box>
                   </Grid>
                 ))}
               </Grid>
@@ -1594,20 +1630,32 @@ function MonthlyAwardTab() {
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#c2185b' }}>인터넷 비중 기준값</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[3, 2, 1].map((score) => (
-                  <Grid item xs={12} md={4} key={`internet-${score}`}>
-                    <TextField
-                      fullWidth
-                      label={`${score}점 기준 (%)`}
-                      type="number"
-                      name={`internet-${score}`}
-                      value={matrixValues[`internet-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0)}
-                      onChange={(e) => setMatrixValues(prev => ({
-                        ...prev,
-                        [`internet-${score}`]: parseFloat(e.target.value) || 0
-                      }))}
-                      inputProps={{ min: 0, max: 100, step: 0.1 }}
-                      sx={{ mb: 1 }}
-                    />
+                  <Grid item xs={12} md={6} key={`internet-${score}`}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        fullWidth
+                        label={`${score}점 기준 (%)`}
+                        type="number"
+                        name={`internet-${score}`}
+                        value={matrixValues[`internet-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.percentage || 0)}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`internet-${score}`]: parseFloat(e.target.value) || 0
+                        }))}
+                        inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="설명"
+                        name={`internet-desc-${score}`}
+                        value={matrixValues[`internet-desc-${score}`] ?? (data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet')?.description || '')}
+                        onChange={(e) => setMatrixValues(prev => ({
+                          ...prev,
+                          [`internet-desc-${score}`]: e.target.value
+                        }))}
+                        placeholder="만점/이상/미만"
+                      />
+                    </Box>
                   </Grid>
                 ))}
               </Grid>
@@ -2038,11 +2086,13 @@ function MonthlyAwardTab() {
                 ['upsell', 'change105', 'strategic'].forEach(indicator => {
                   [6, 5, 4, 3, 2, 1].forEach(score => {
                     const value = matrixValues[`${indicator}-${score}`];
+                    const description = matrixValues[`${indicator}-desc-${score}`] || '';
                     if (value !== undefined) {
                       matrixCriteria.push({
                         score,
                         indicator,
-                        percentage: value
+                        percentage: value,
+                        description: description
                       });
                     }
                   });
@@ -2050,11 +2100,13 @@ function MonthlyAwardTab() {
                 // 인터넷 비중은 3점까지만
                 [3, 2, 1].forEach(score => {
                   const value = matrixValues[`internet-${score}`];
+                  const description = matrixValues[`internet-desc-${score}`] || '';
                   if (value !== undefined) {
                     matrixCriteria.push({
                       score,
                       indicator: 'internet',
-                      percentage: value
+                      percentage: value,
+                      description: description
                     });
                   }
                 });
