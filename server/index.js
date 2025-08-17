@@ -7587,10 +7587,10 @@ app.get('/api/inspection/columns', async (req, res) => {
   try {
     // 현재 컬럼 설정 반환
     const columnSettings = {
-      manualKeyColumn: 'A', // 수기초 가입번호 컬럼
+      manualKeyColumn: 'U', // 수기초 가입번호 컬럼
       manualKeyColumnName: '가입번호',
-      systemKeyColumn: 'BO', // 폰클개통데이터 메모1 컬럼
-      systemKeyColumnName: '메모1',
+      systemKeyColumn: 'BW', // 폰클개통데이터 가입번호 컬럼
+      systemKeyColumnName: '가입번호',
       systemAgentColumn: 'BR', // 폰클개통데이터 등록직원 컬럼
       systemAgentColumnName: '등록직원',
       systemMemo2Column: 'BP', // 폰클개통데이터 메모2 컬럼
@@ -7599,9 +7599,9 @@ app.get('/api/inspection/columns', async (req, res) => {
       dynamicMappings: [
         {
           key: 'store_code',
-          manualColumn: 'F',
+          manualColumn: 'O',
           manualColumnName: '대리점코드',
-          systemColumn: 'BP',
+          systemColumn: 'BX',
           systemColumnName: '메모2',
           description: '대리점코드 비교 (메모2에서 숫자 추출)',
           regex: '\\d+',
@@ -7609,18 +7609,18 @@ app.get('/api/inspection/columns', async (req, res) => {
         },
         {
           key: 'activation_datetime',
-          manualColumns: ['U', 'V'],
+          manualColumns: ['AD', 'AE'],
           manualColumnNames: ['가입일자', '개통시간'],
-          systemColumns: ['B', 'C', 'D'],
+          systemColumns: ['J', 'K', 'L'],
           systemColumnNames: ['개통일', '개통시', '개통분'],
           description: '개통일시분 비교 (초 제외, 24시간 형식)',
           enabled: true
         },
         {
           key: 'model_serial',
-          manualColumns: ['AD', 'AS'],
+          manualColumns: ['AM', 'AN'],
           manualColumnNames: ['개통모델', '판매모델일련번호'],
-          systemColumns: ['N', 'P'],
+          systemColumns: ['V', 'X'],
           systemColumnNames: ['모델명', '일련번호'],
           description: '모델명과 일련번호 비교 (모델명 정규화, 일련번호 6자리 비교)',
           enabled: true
@@ -8669,8 +8669,8 @@ const COLUMN_MATCHING_CONFIG = [
   },
   {
     manualField: { name: '실판매POS', key: 'sales_pos', column: 16 }, // Q열 (기존 H열에서 +9)
-    systemField: { name: '실판매POS', key: 'sales_pos', column: 14 }, // O열 (기존 G열에서 +8)
-    description: '실판매POS 비교 (VLOOKUP 방식 정규화, 전략온라인 제외)'
+    systemField: { name: '실판매POS', key: 'sales_pos', column: 5 }, // F열 (새로 추가된 POS코드 컬럼)
+    description: '실판매POS 비교 (직접 비교, 전략온라인 제외)'
   },
   {
     manualField: { name: '요금제', key: 'plan', column: 46 }, // AU열 (기존 AL열에서 +9)
@@ -8904,35 +8904,25 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
   // 수기초 데이터 정규화 (Q열, R열)
   let manualPos = '';
   if (manualRow.length > 17) { // 최소 R열(17)은 있어야 함
-            const salesPos = (manualRow[16] || '').toString().trim(); // Q열: 실판매POS
-        const strategyOnline = (manualRow[17] || '').toString().trim(); // R열: 전략온라인 체크
+    const salesPos = (manualRow[16] || '').toString().trim(); // Q열: 실판매POS
+    const strategyOnline = (manualRow[17] || '').toString().trim(); // R열: 전략온라인 체크
     
     // 전략온라인 제외 조건
     if (strategyOnline && strategyOnline.includes('전략온라인')) {
       return { manualPos: '', systemPos: '' }; // 검수 대상에서 제외
     }
     
-    // 수기초 정규화: H열 & (VLOOKUP 결과)
-    if (salesPos && storeData) {
-      const vlookupResult = vlookupPosCodeToStoreName(salesPos, storeData);
-      manualPos = vlookupResult ? `${salesPos} & (${vlookupResult})` : salesPos;
-    } else {
-      manualPos = salesPos;
-    }
+    // 수기초 정규화: Q열 값 그대로 사용
+    manualPos = salesPos;
   }
   
-  // 폰클 데이터 정규화 (O열)
+  // 폰클 데이터 정규화 (F열 - 새로 추가된 POS코드 컬럼)
   let systemPos = '';
-  if (systemRow.length > 14) { // 최소 O열(14)은 있어야 함
-    const storeCode = (systemRow[14] || '').toString().trim(); // O열: 출고처
+  if (systemRow.length > 5) { // 최소 F열(5)은 있어야 함
+    const posCode = (systemRow[5] || '').toString().trim(); // F열: POS코드
     
-          // 폰클 정규화: VLOOKUP 결과 & O열
-    if (storeCode && storeData) {
-      const vlookupResult = vlookupStoreNameToPosCode(storeCode, storeData);
-      systemPos = vlookupResult ? `${vlookupResult} & (${storeCode})` : `(${storeCode})`;
-    } else {
-      systemPos = storeCode ? `(${storeCode})` : '';
-    }
+    // 폰클 정규화: F열 POS코드 값 그대로 사용
+    systemPos = posCode;
   }
   
   return { manualPos, systemPos };
@@ -9339,8 +9329,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
     
     // 실판매POS 비교 로직
     if (manualField.key === 'sales_pos') {
-      // 배열 범위 체크 (Q=16, R=17, O=14)
-      if (manualRow.length <= 17 || systemRow.length <= 14) {
+      // 배열 범위 체크 (Q=16, R=17, F=5)
+      if (manualRow.length <= 17 || systemRow.length <= 5) {
         return;
       }
       
