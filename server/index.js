@@ -7895,8 +7895,8 @@ app.get('/api/inspection-data', async (req, res) => {
       throw new Error('Failed to fetch data from sheets');
     }
 
-    // 헤더 제거
-    const manualRows = manualValues.slice(3);
+    // 헤더 제거 (수기초: 1행 헤더, 폰클개통데이터: 3행 헤더)
+    const manualRows = manualValues.slice(1);
     const systemRows = systemValues.slice(3);
 
     // 데이터 비교 및 차이점 찾기
@@ -7904,11 +7904,11 @@ app.get('/api/inspection-data', async (req, res) => {
     const manualMap = new Map();
     const systemMap = new Map();
 
-    // 수기초 데이터 인덱싱 (A열: 가입번호 기준)
+    // 수기초 데이터 인덱싱 (U열: 가입번호 기준)
     manualRows.forEach((row, index) => {
-      if (row.length > 0 && row[0]) {
-        const key = row[0].toString().trim();
-        manualMap.set(key, { row, index: index + 4 }); // +4는 헤더와 1-based 인덱스 때문
+      if (row.length > 20 && row[20]) {
+        const key = row[20].toString().trim();
+        manualMap.set(key, { row, index: index + 2 }); // +2는 헤더와 1-based 인덱스 때문
       }
     });
 
@@ -7923,19 +7923,19 @@ app.get('/api/inspection-data', async (req, res) => {
         const currentRow = duplicateRows[i];
         const rowDifferences = [];
         
-        // 모델명 비교 (N열: 13번째 컬럼)
-        if (baseRow[13] !== currentRow[13]) {
-          rowDifferences.push(`모델명: ${baseRow[13] || '없음'} vs ${currentRow[13] || '없음'}`);
+        // 모델명 비교 (V열: 21번째 컬럼)
+        if (baseRow[21] !== currentRow[21]) {
+          rowDifferences.push(`모델명: ${baseRow[21] || '없음'} vs ${currentRow[21] || '없음'}`);
         }
         
-        // 개통유형 비교 (L열: 11번째 컬럼)
-        if (baseRow[11] !== currentRow[11]) {
-          rowDifferences.push(`개통유형: ${baseRow[11] || '없음'} vs ${currentRow[11] || '없음'}`);
+        // 개통유형 비교 (T열: 19번째 컬럼)
+        if (baseRow[19] !== currentRow[19]) {
+          rowDifferences.push(`개통유형: ${baseRow[19] || '없음'} vs ${currentRow[19] || '없음'}`);
         }
         
-        // 입고처 비교 (E열: 4번째 컬럼)
-        if (baseRow[4] !== currentRow[4]) {
-          rowDifferences.push(`입고처: ${baseRow[4] || '없음'} vs ${currentRow[4] || '없음'}`);
+        // 입고처 비교 (M열: 12번째 컬럼)
+        if (baseRow[12] !== currentRow[12]) {
+          rowDifferences.push(`입고처: ${baseRow[12] || '없음'} vs ${currentRow[12] || '없음'}`);
         }
         
         if (rowDifferences.length > 0) {
@@ -7961,19 +7961,19 @@ app.get('/api/inspection-data', async (req, res) => {
         const otherRow = duplicateRows[i];
         const rowDifferences = [];
         
-        // 입고처 비교 (E열: 4번째 컬럼)
-        if (currentRow[4] !== otherRow[4]) {
-          rowDifferences.push(`${currentRow[4] || '없음'}`);
+        // 입고처 비교 (M열: 12번째 컬럼)
+        if (currentRow[12] !== otherRow[12]) {
+          rowDifferences.push(`${currentRow[12] || '없음'}`);
         }
         
-        // 모델명 비교 (N열: 13번째 컬럼)
-        if (currentRow[13] !== otherRow[13]) {
-          rowDifferences.push(`${currentRow[13] || '모델명없음'}`);
+        // 모델명 비교 (V열: 21번째 컬럼)
+        if (currentRow[21] !== otherRow[21]) {
+          rowDifferences.push(`${currentRow[21] || '모델명없음'}`);
         }
         
-        // 개통유형 비교 (L열: 11번째 컬럼)
-        if (currentRow[11] !== otherRow[11]) {
-          rowDifferences.push(`${currentRow[11] || '개통유형없음'}`);
+        // 개통유형 비교 (T열: 19번째 컬럼)
+        if (currentRow[19] !== otherRow[19]) {
+          rowDifferences.push(`${currentRow[19] || '개통유형없음'}`);
         }
         
         if (rowDifferences.length > 0) {
@@ -8007,12 +8007,12 @@ app.get('/api/inspection-data', async (req, res) => {
     
     // 모든 수기초 데이터 추가
     manualRows.forEach((row, index) => {
-      if (row.length > 0 && row[0]) {
-        const key = row[0].toString().trim();
+      if (row.length > 20 && row[20]) {
+        const key = row[20].toString().trim();
         allRows.push({
           key,
           row,
-          index: index + 4,
+          index: index + 2,
           source: 'manual'
         });
       }
@@ -8020,8 +8020,8 @@ app.get('/api/inspection-data', async (req, res) => {
     
     // 모든 폰클 데이터 추가
     systemRows.forEach((row, index) => {
-      if (row.length > 66 && row[66]) { // BO열은 67번째 컬럼 (0-based)
-        const key = row[66].toString().trim();
+      if (row.length > 74 && row[74]) { // BW열은 75번째 컬럼 (0-based)
+        const key = row[74].toString().trim();
         allRows.push({
           key,
           row,
@@ -8083,7 +8083,7 @@ app.get('/api/inspection-data', async (req, res) => {
                   ...diff,
                   manualRow: manualItem.index,
                   systemRow: systemItem.index,
-                  assignedAgent: systemItem.row[69] || '', // BR열: 등록직원
+                  assignedAgent: systemItem.row[77] || '', // BZ열: 등록직원
                   isDuplicate: isManualDuplicate || isSystemDuplicate,
                   duplicateType: duplicateType,
                   duplicateInfo: duplicateInfo
@@ -8147,7 +8147,7 @@ app.get('/api/inspection-data', async (req, res) => {
               incorrectValue: '수기초에 없음',
               manualRow: null,
               systemRow: systemItem.index,
-              assignedAgent: systemItem.row[69] || '', // BR열: 등록직원
+                                assignedAgent: systemItem.row[77] || '', // BZ열: 등록직원
               isDuplicate: isSystemDuplicate,
               duplicateType: duplicateType,
               duplicateInfo: duplicateInfo
