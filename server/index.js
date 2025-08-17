@@ -761,13 +761,13 @@ function vlookupPosCodeToStoreName(posCode, storeData) {
   
   const searchPosCode = posCode.toString().trim();
   
-  // H열(POS코드)에서 검색하여 G열(업체명) 반환
+  // P열(POS코드)에서 검색하여 O열(업체명) 반환
   for (let i = 1; i < storeData.length; i++) { // 헤더 제외하고 검색
     const row = storeData[i];
-    if (row && row.length > 7) { // 최소 H열(7)은 있어야 함
-      const storePosCode = (row[7] || '').toString().trim(); // H열: POS코드
+    if (row && row.length > 14) { // 최소 P열(14)은 있어야 함
+      const storePosCode = (row[14] || '').toString().trim(); // P열: POS코드
       if (storePosCode === searchPosCode) {
-        return (row[6] || '').toString().trim(); // G열: 업체명
+        return (row[13] || '').toString().trim(); // O열: 업체명
       }
     }
   }
@@ -783,13 +783,13 @@ function vlookupStoreNameToPosCode(storeName, storeData) {
   
   const searchStoreName = storeName.toString().trim();
   
-  // G열(업체명)에서 검색하여 H열(POS코드) 반환
+  // O열(업체명)에서 검색하여 P열(POS코드) 반환
   for (let i = 1; i < storeData.length; i++) { // 헤더 제외하고 검색
     const row = storeData[i];
-    if (row && row.length > 7) { // 최소 H열(7)은 있어야 함
-      const rowStoreName = (row[6] || '').toString().trim(); // G열: 업체명
+    if (row && row.length > 14) { // 최소 P열(14)은 있어야 함
+      const rowStoreName = (row[13] || '').toString().trim(); // O열: 업체명
       if (rowStoreName === searchStoreName) {
-        return (row[7] || '').toString().trim(); // H열: POS코드
+        return (row[14] || '').toString().trim(); // P열: POS코드
       }
     }
   }
@@ -7883,7 +7883,7 @@ app.get('/api/inspection-data', async (req, res) => {
     console.log('검수 데이터 처리 시작... (개인정보 보안 처리 포함)');
     const startTime = Date.now();
     
-    // 수기초, 폰클개통데이터, 폰클출고처데이터, 무선요금제군 병렬 로드
+    // 수기초, 폰클개통데이터, 폰클출고처데이터, 무선요금제군 병렬 로드 (캐시 활용)
     const [manualValues, systemValues, storeValues, planValues] = await Promise.all([
       getSheetValues(MANUAL_DATA_SHEET_NAME),
       getSheetValues(CURRENT_MONTH_ACTIVATION_SHEET_NAME),
@@ -8271,6 +8271,29 @@ function findOriginalKeyFromHash(hashId, differences) {
     }
   }
   return null;
+}
+
+// 선택적 캐시 무효화 함수
+function invalidateInspectionCache(userId, field = null) {
+  const cacheKeysToDelete = [
+    `inspection_data_personal_${userId}`,
+    `inspection_data_overview_${userId}`,
+    `inspection_data_personal_${userId}_all`,
+    `inspection_data_overview_${userId}_all`
+  ];
+  
+  // 특정 필드가 지정된 경우 해당 필드 캐시도 삭제
+  if (field && field !== 'all') {
+    cacheKeysToDelete.push(`inspection_data_personal_${userId}_${field}`);
+    cacheKeysToDelete.push(`inspection_data_overview_${userId}_${field}`);
+  }
+  
+  cacheKeysToDelete.forEach(key => {
+    if (cacheUtils.get(key)) {
+      cacheUtils.delete(key);
+      console.log(`캐시 무효화: ${key}`);
+    }
+  });
 }
 
 // 검수 완료 상태 업데이트 (해시화된 ID 처리)
@@ -8881,11 +8904,11 @@ function normalizeActivationType(manualRow, systemRow) {
 
 // 실판매POS 정규화 함수
 function normalizeSalesPos(manualRow, systemRow, storeData = null) {
-  // 수기초 데이터 정규화 (H열)
+  // 수기초 데이터 정규화 (Q열, R열)
   let manualPos = '';
-  if (manualRow.length > 7) { // 최소 H열(7)은 있어야 함
-            const salesPos = (manualRow[16] || '').toString().trim(); // H열: 실판매POS (7+9)
-        const strategyOnline = (manualRow[17] || '').toString().trim(); // I열: 전략온라인 체크 (8+9)
+  if (manualRow.length > 17) { // 최소 R열(17)은 있어야 함
+            const salesPos = (manualRow[16] || '').toString().trim(); // Q열: 실판매POS
+        const strategyOnline = (manualRow[17] || '').toString().trim(); // R열: 전략온라인 체크
     
     // 전략온라인 제외 조건
     if (strategyOnline && strategyOnline.includes('전략온라인')) {
@@ -8901,12 +8924,12 @@ function normalizeSalesPos(manualRow, systemRow, storeData = null) {
     }
   }
   
-  // 폰클 데이터 정규화 (G열)
+  // 폰클 데이터 정규화 (O열)
   let systemPos = '';
-  if (systemRow.length > 6) { // 최소 G열(6)은 있어야 함
-    const storeCode = (systemRow[14] || '').toString().trim(); // G열: 출고처 (6+8)
+  if (systemRow.length > 14) { // 최소 O열(14)은 있어야 함
+    const storeCode = (systemRow[14] || '').toString().trim(); // O열: 출고처
     
-    // 폰클 정규화: VLOOKUP 결과 & G열
+          // 폰클 정규화: VLOOKUP 결과 & O열
     if (storeCode && storeData) {
       const vlookupResult = vlookupStoreNameToPosCode(storeCode, storeData);
       systemPos = vlookupResult ? `${vlookupResult} & (${storeCode})` : `(${storeCode})`;
@@ -9319,8 +9342,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
     
     // 실판매POS 비교 로직
     if (manualField.key === 'sales_pos') {
-      // 배열 범위 체크 (H=7, I=8, G=6)
-      if (manualRow.length <= 8 || systemRow.length <= 6) {
+      // 배열 범위 체크 (Q=16, R=17, O=14)
+      if (manualRow.length <= 17 || systemRow.length <= 14) {
         return;
       }
       
@@ -10086,7 +10109,7 @@ function getFieldType(fieldKey) {
 }
 
 // 개인정보 포함 캐시 TTL 단축 (보안 강화)
-const SECURE_CACHE_TTL = 2 * 60 * 1000; // 2분 (기존 5분에서 단축)
+const SECURE_CACHE_TTL = 10 * 60 * 1000; // 10분 (검수 데이터는 자주 변경되지 않음)
 
 // 검수 완료 상태 업데이트
 app.post('/api/inspection/complete', async (req, res) => {
