@@ -2619,6 +2619,20 @@ function ClosingChartTab() {
         />
       </Paper>
 
+      {/* 소속별 랭킹 테이블 */}
+      <Paper sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          소속별 랭킹
+        </Typography>
+        <ClosingChartTable
+          data={data.departmentData}
+          type="department"
+          rankingType={rankingType}
+          total={calculateTotal(data?.departmentData, 'performance')}
+          headerColor="lightblue"
+        />
+      </Paper>
+
       {/* 담당자 랭킹 테이블 */}
       <Paper sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
@@ -2685,7 +2699,9 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
         <TableBody>
           {/* 상단 합계 행 (헤더 위쪽) */}
           <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
-            <TableCell colSpan={3}>합계</TableCell>
+            <TableCell>합계</TableCell>
+            <TableCell>합계</TableCell>
+            <TableCell>합계</TableCell>
             <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
             <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
             <TableCell align="right">0</TableCell>
@@ -2743,10 +2759,10 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
             >
               <TableCell>{index + 1}</TableCell>
               <TableCell>
-                {type === 'code' ? 'VIP' : type === 'office' ? '사무실' : '영업'}
+                {type === 'code' ? 'VIP' : type === 'office' ? '사무실' : type === 'department' ? '소속' : '영업'}
               </TableCell>
               <TableCell>
-                {type === 'code' ? item.code : type === 'office' ? item.office : item.agent}
+                {type === 'code' ? item.code : type === 'office' ? item.office : type === 'department' ? item.department : item.agent}
               </TableCell>
               <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
               <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
@@ -2781,6 +2797,13 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
 
   useEffect(() => {
     if (open) {
+      console.log('🔍 [목표설정] 모달 열림:', {
+        agentsLength: agents?.length || 0,
+        agents: agents,
+        excludedAgentsLength: excludedAgents?.length || 0,
+        excludedAgents: excludedAgents
+      });
+      
       // 기존 목표값 로드
       const initialTargets = agents.map(agent => ({
         agent: agent.agent,
@@ -2788,6 +2811,8 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
         excluded: excludedAgents.includes(agent.agent)
       }));
       setTargets(initialTargets);
+      
+      console.log('🔍 [목표설정] 초기 목표값:', initialTargets);
     }
   }, [open, agents, excludedAgents]);
 
@@ -2816,52 +2841,63 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>목표 설정</DialogTitle>
       <DialogContent>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>담당자</TableCell>
-                <TableCell align="right">목표값</TableCell>
-                <TableCell align="center">제외</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {targets.map((target, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {target.agent}
-                      {target.excluded && (
-                        <Chip 
-                          label="제외" 
-                          size="small" 
-                          color="default" 
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    <TextField
-                      type="number"
-                      value={target.target}
-                      onChange={(e) => handleTargetChange(index, e.target.value)}
-                      size="small"
-                      disabled={target.excluded}
-                      sx={{ width: 100 }}
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    <Checkbox
-                      checked={target.excluded}
-                      onChange={(e) => handleExcludedChange(index, e.target.checked)}
-                    />
-                  </TableCell>
+        {targets.length === 0 ? (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              담당자 데이터가 없습니다.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              데이터를 먼저 로드해주세요.
+            </Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>담당자</TableCell>
+                  <TableCell align="right">목표값</TableCell>
+                  <TableCell align="center">제외</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {targets.map((target, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {target.agent}
+                        {target.excluded && (
+                          <Chip 
+                            label="제외" 
+                            size="small" 
+                            color="default" 
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TextField
+                        type="number"
+                        value={target.target}
+                        onChange={(e) => handleTargetChange(index, e.target.value)}
+                        size="small"
+                        disabled={target.excluded}
+                        sx={{ width: 100 }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={target.excluded}
+                        onChange={(e) => handleExcludedChange(index, e.target.checked)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>취소</Button>
