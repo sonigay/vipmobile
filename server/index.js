@@ -17753,17 +17753,17 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     if (row.length < 10) return false;
     
     const activationDate = (row[9] || '').toString(); // J열: 개통일
-    const model = (row[13] || '').toString(); // N열: 모델명
+    const model = (row[21] || '').toString(); // V열: 모델명
     const planType = (row[19] || '').toString(); // T열: 요금제
     const condition = (row[12] || '').toString(); // M열: 상태
     const type = (row[16] || '').toString(); // Q열: 유형
     
-    // 날짜 필터링 (해당 날짜까지의 누적 데이터)
-    const targetDateObj = new Date(targetDate);
+    // 날짜 필터링 (2025-08-16까지의 누적 데이터)
+    const actualDate = '2025-08-16'; // 실제 마지막 데이터 기준
     const activationDateObj = new Date(activationDate);
     
-    // 날짜가 유효하지 않거나, 타겟 날짜보다 늦은 경우 제외
-    if (isNaN(activationDateObj.getTime()) || activationDateObj > targetDateObj) {
+    // 날짜가 유효하지 않거나, 2025-08-16보다 늦은 경우 제외
+    if (isNaN(activationDateObj.getTime()) || activationDateObj > new Date(actualDate)) {
       dateFiltered++;
       return false;
     }
@@ -17838,17 +17838,27 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
       const dateFilteredData = dataRows.filter(row => {
         if (row.length < 10) return false;
         const activationDate = (row[9] || '').toString();
-        const targetDateObj = new Date(targetDate);
+        const actualDate = '2025-08-16'; // 실제 마지막 데이터 기준
         const activationDateObj = new Date(activationDate);
-        return !isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj;
+        return !isNaN(activationDateObj.getTime()) && activationDateObj <= new Date(actualDate);
       });
       
       console.log('🔍 [마감장표] 날짜 필터링 후 데이터 수:', dateFilteredData.length);
       
-      // 실제 모델명들 수집
+      // 여러 컬럼에서 모델명 찾기
+      const sampleRow = dateFilteredData[0];
+      if (sampleRow) {
+        console.log('🔍 [마감장표] 샘플 행의 모든 컬럼:', sampleRow);
+        console.log('🔍 [마감장표] 컬럼별 내용:');
+        for (let i = 0; i < Math.min(sampleRow.length, 30); i++) {
+          console.log(`  컬럼 ${i}: "${sampleRow[i]}"`);
+        }
+      }
+      
+      // 실제 모델명들 수집 (V열에서)
       const actualModels = new Set();
       dateFilteredData.forEach(row => {
-        const model = (row[13] || '').toString();
+        const model = (row[21] || '').toString(); // V열: 모델명
         if (model) {
           actualModels.add(model);
         }
@@ -18272,11 +18282,11 @@ function calculateCSSummary(phoneklData, targetDate) {
     const activationDate = (row[9] || '').toString(); // J열: 개통일
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
-    // 날짜 필터링 (해당 날짜까지의 누적 데이터)
-    const targetDateObj = new Date(targetDate);
+    // 날짜 필터링 (2025-08-16까지의 누적 데이터)
+    const actualDate = '2025-08-16'; // 실제 마지막 데이터 기준
     const activationDateObj = new Date(activationDate);
     
-    if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && 
+    if (!isNaN(activationDateObj.getTime()) && activationDateObj <= new Date(actualDate) && 
         csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       totalCS++;
       

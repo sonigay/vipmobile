@@ -2519,55 +2519,7 @@ function ClosingChartTab() {
             </Box>
           )}
           
-          {/* 요약 수치들 */}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-            <Typography variant="body2" color="white" sx={{ fontWeight: 'bold' }}>
-              {data.codeData?.reduce((sum, item) => sum + (item.fee || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.codeData?.reduce((sum, item) => sum + (item.fee || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.codeData?.reduce((sum, item) => sum + (item.supportFund || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.registeredStores || 0), 0)}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.activeStores || 0), 0)}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {Math.round(data.agentData?.reduce((sum, item) => sum + (item.activeStores || 0), 0) / 
-                         data.agentData?.reduce((sum, item) => sum + (item.registeredStores || 0), 0) * 100)}%
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.registeredStores || 0), 0) - 
-               data.agentData?.reduce((sum, item) => sum + (item.activeStores || 0), 0)}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.devices || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.sims || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {Math.round(data.codeData?.reduce((sum, item) => sum + (item.performance || 0), 0) / 
-                         data.agentData?.reduce((sum, item) => sum + (item.devices || 0), 0) * 100)}%
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.devices || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.devices || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {data.agentData?.reduce((sum, item) => sum + (item.sims || 0), 0).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="white">
-              {Math.round(data.codeData?.reduce((sum, item) => sum + (item.performance || 0), 0) / 
-                         data.agentData?.reduce((sum, item) => sum + (item.devices || 0), 0) * 100)}%
-            </Typography>
-          </Box>
+
         </Box>
 
         {/* 합계 일치 경고 */}
