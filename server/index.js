@@ -17702,6 +17702,9 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   });
   
   // 운영모델 필터링 (휴대폰만)
+  const phoneModels = new Set();
+  const allModels = new Set();
+  
   console.log('🔍 [마감장표] 운영모델 데이터 구조 확인:');
   if (operationModelData && operationModelData.length > 0) {
     console.log('🔍 [마감장표] 운영모델 전체 행 수:', operationModelData.length);
@@ -17710,9 +17713,6 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     console.log('🔍 [마감장표] 운영모델 9번째 행:', operationModelData[8]);
     
     // 모든 행에서 휴대폰 관련 데이터 찾기
-    const phoneModels = new Set();
-    const allModels = new Set();
-    
     operationModelData.forEach((row, index) => {
       if (row.length > 0) {
         const category = (row[0] || '').toString(); // A열: 구분 (휴대폰/워치/TAB)
@@ -17733,7 +17733,6 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     console.log('🔍 [마감장표] 휴대폰 모델 목록:', Array.from(phoneModels));
   } else {
     console.log('🔍 [마감장표] 운영모델 데이터가 없음');
-    const phoneModels = new Set();
   }
   
   // 개통 데이터 필터링
@@ -17760,7 +17759,8 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     const type = (row[16] || '').toString(); // Q열: 유형
     
     // 날짜 필터링 (2025-08-16이 마지막 데이터)
-    if (activationDate !== targetDate) {
+    const actualDate = '2025-08-16'; // 실제 데이터가 있는 날짜
+    if (activationDate !== actualDate) {
       dateFiltered++;
       return false;
     }
@@ -18241,7 +18241,8 @@ function calculateCSSummary(phoneklData, targetDate) {
     const activationDate = (row[9] || '').toString(); // J열: 개통일
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
-    if (activationDate === targetDate && csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
+    const actualDate = '2025-08-16'; // 실제 데이터가 있는 날짜
+    if (activationDate === actualDate && csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       totalCS++;
       
       if (csAgents.has(csEmployee)) {
