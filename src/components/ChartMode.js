@@ -2458,7 +2458,7 @@ function ClosingChartTab() {
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6">마감장표</Typography>
+            <Typography variant="h6">31일 마감 실적장표</Typography>
             <TextField
               type="date"
               value={selectedDate}
@@ -2528,53 +2528,44 @@ function ClosingChartTab() {
         </Tabs>
       </Paper>
 
-      {/* 데이터 테이블들 */}
-      <Grid container spacing={2}>
-        {/* 코드별 테이블 */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, height: 'fit-content' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              코드별 실적
-            </Typography>
-            <ClosingChartTable
-              data={data.codeData}
-              type="code"
-              rankingType={rankingType}
-              total={calculateTotal(data?.codeData, 'performance')}
-            />
-          </Paper>
-        </Grid>
+      {/* VIP 랭킹 테이블 (코드별) */}
+      <Paper sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          VIP 랭킹
+        </Typography>
+        <ClosingChartTable
+          data={data.codeData}
+          type="code"
+          rankingType={rankingType}
+          total={calculateTotal(data?.codeData, 'performance')}
+        />
+      </Paper>
 
-        {/* 사무실별 테이블 */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, height: 'fit-content' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              사무실별 실적
-            </Typography>
-            <ClosingChartTable
-              data={data.officeData}
-              type="office"
-              rankingType={rankingType}
-              total={calculateTotal(data?.officeData, 'performance')}
-            />
-          </Paper>
-        </Grid>
+      {/* 사무실 랭킹 테이블 */}
+      <Paper sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          사무실 랭킹
+        </Typography>
+        <ClosingChartTable
+          data={data.officeData}
+          type="office"
+          rankingType={rankingType}
+          total={calculateTotal(data?.officeData, 'performance')}
+        />
+      </Paper>
 
-        {/* 담당자별 테이블 */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, height: 'fit-content' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              담당자별 실적
-            </Typography>
-            <ClosingChartTable
-              data={data.agentData}
+      {/* 담당자 랭킹 테이블 */}
+      <Paper sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          담당자 랭킹
+        </Typography>
+        <ClosingChartTable
+          data={data.agentData}
               type="agent"
               rankingType={rankingType}
               total={calculateTotal(data?.agentData, 'performance')}
-            />
-          </Paper>
-        </Grid>
-      </Grid>
+        />
+      </Paper>
 
       {/* 목표 설정 모달 */}
       <TargetSettingModal
