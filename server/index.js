@@ -18627,11 +18627,17 @@ app.post('/api/closing-chart/targets', async (req, res) => {
     const targetData = targets.map(target => [
       target.agent, // A열: 담당자명
       target.target, // B열: 목표값
-      target.excluded ? 'Y' : 'N', // C열: 제외여부
-      new Date().toISOString() // D열: 설정일시
+      target.excluded ? 'Y' : 'N' // C열: 제외여부
     ]);
     
-    await updateSheetData('영업사원목표', targetData);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '영업사원목표!A2',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: targetData
+      }
+    });
     
     // 캐시 무효화
     cache.flush();

@@ -2293,7 +2293,7 @@ function ClosingChartTab() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [rankingType, setRankingType] = useState('fee'); // 'fee' or 'performance'
+  const [rankingType, setRankingType] = useState('performance'); // 'fee' or 'performance'
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [mappingFailures, setMappingFailures] = useState([]);
@@ -2596,8 +2596,8 @@ function ClosingChartTab() {
           onChange={(e, newValue) => setRankingType(newValue)}
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="수수료 기준" value="fee" />
           <Tab label="실적 기준" value="performance" />
+          <Tab label="수수료 기준" value="fee" />
         </Tabs>
       </Paper>
 
