@@ -18623,6 +18623,14 @@ app.post('/api/closing-chart/targets', async (req, res) => {
       return res.status(400).json({ error: '목표 데이터가 올바르지 않습니다.' });
     }
     
+    // Google Sheets API 인증
+    const auth = new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
     // 영업사원목표 시트에 저장
     const targetData = targets.map(target => [
       target.agent, // A열: 담당자명
