@@ -2603,21 +2603,48 @@ function ClosingChartTab() {
 
       {/* 코드별 랭킹 테이블 */}
       {/* 코드별 실적 테이블 */}
-      <Paper sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">코드별 실적</Typography>
+      <Paper sx={{ 
+        mb: 2, 
+        borderRadius: 2,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        overflow: 'hidden'
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          p: 2, 
+          background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+          color: 'white'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            📊 코드별 실적
+          </Typography>
           <Button
             size="small"
             onClick={() => setCodeTableOpen(!codeTableOpen)}
             startIcon={codeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ 
+              color: 'white', 
+              borderColor: 'white',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+            }}
+            variant="outlined"
           >
             {codeTableOpen ? '접기' : '펼치기'}
           </Button>
         </Box>
         {!codeTableOpen && (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Box sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+          }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#4CAF50', mb: 1 }}>
+              {calculateTotal(data?.codeData, 'performance')}
+            </Typography>
             <Typography variant="body1" color="text.secondary">
-              합계: {calculateTotal(data?.codeData, 'performance')}건
+              총 실적 건수
             </Typography>
           </Box>
         )}
@@ -2627,27 +2654,54 @@ function ClosingChartTab() {
             type="code"
             rankingType={rankingType}
             total={calculateTotal(data?.codeData, 'performance')}
-            headerColor="lightgreen"
+            headerColor="#4CAF50"
           />
         )}
       </Paper>
 
       {/* 사무실별 실적 테이블 */}
-      <Paper sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">사무실별 실적</Typography>
+      <Paper sx={{ 
+        mb: 2, 
+        borderRadius: 2,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        overflow: 'hidden'
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          p: 2, 
+          background: 'linear-gradient(135deg, #E91E63 0%, #C2185B 100%)',
+          color: 'white'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            🏢 사무실별 실적
+          </Typography>
           <Button
             size="small"
             onClick={() => setOfficeTableOpen(!officeTableOpen)}
             startIcon={officeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ 
+              color: 'white', 
+              borderColor: 'white',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+            }}
+            variant="outlined"
           >
             {officeTableOpen ? '접기' : '펼치기'}
           </Button>
         </Box>
         {!officeTableOpen && (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Box sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+          }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#E91E63', mb: 1 }}>
+              {calculateTotal(data?.officeData, 'performance')}
+            </Typography>
             <Typography variant="body1" color="text.secondary">
-              합계: {calculateTotal(data?.officeData, 'performance')}건
+              총 실적 건수
             </Typography>
           </Box>
         )}
@@ -2657,27 +2711,54 @@ function ClosingChartTab() {
             type="office"
             rankingType={rankingType}
             total={calculateTotal(data?.officeData, 'performance')}
-            headerColor="lightpink"
+            headerColor="#E91E63"
           />
         )}
       </Paper>
 
       {/* 소속별 실적 테이블 */}
-      <Paper sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">소속별 실적</Typography>
+      <Paper sx={{ 
+        mb: 2, 
+        borderRadius: 2,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        overflow: 'hidden'
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          p: 2, 
+          background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+          color: 'white'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            👥 소속별 실적
+          </Typography>
           <Button
             size="small"
             onClick={() => setDepartmentTableOpen(!departmentTableOpen)}
             startIcon={departmentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ 
+              color: 'white', 
+              borderColor: 'white',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+            }}
+            variant="outlined"
           >
             {departmentTableOpen ? '접기' : '펼치기'}
           </Button>
         </Box>
         {!departmentTableOpen && (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Box sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+          }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2196F3', mb: 1 }}>
+              {calculateTotal(data?.departmentData, 'performance')}
+            </Typography>
             <Typography variant="body1" color="text.secondary">
-              합계: {calculateTotal(data?.departmentData, 'performance')}건
+              총 실적 건수
             </Typography>
           </Box>
         )}
@@ -2687,27 +2768,54 @@ function ClosingChartTab() {
             type="department"
             rankingType={rankingType}
             total={calculateTotal(data?.departmentData, 'performance')}
-            headerColor="lightblue"
+            headerColor="#2196F3"
           />
         )}
       </Paper>
 
       {/* 담당자별 실적 테이블 */}
-      <Paper sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">담당자별 실적</Typography>
+      <Paper sx={{ 
+        mb: 2, 
+        borderRadius: 2,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        overflow: 'hidden'
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          p: 2, 
+          background: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)',
+          color: 'white'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            👤 담당자별 실적
+          </Typography>
           <Button
             size="small"
             onClick={() => setAgentTableOpen(!agentTableOpen)}
             startIcon={agentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ 
+              color: 'white', 
+              borderColor: 'white',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+            }}
+            variant="outlined"
           >
             {agentTableOpen ? '접기' : '펼치기'}
           </Button>
         </Box>
         {!agentTableOpen && (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Box sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+          }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FF9800', mb: 1 }}>
+              {calculateTotal(data?.agentData, 'performance')}
+            </Typography>
             <Typography variant="body1" color="text.secondary">
-              합계: {calculateTotal(data?.agentData, 'performance')}건
+              총 실적 건수
             </Typography>
           </Box>
         )}
@@ -2717,7 +2825,7 @@ function ClosingChartTab() {
             type="agent"
             rankingType={rankingType}
             total={calculateTotal(data?.agentData, 'performance')}
-            headerColor="lightyellow"
+            headerColor="#FF9800"
           />
         )}
       </Paper>
@@ -2769,11 +2877,20 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
   const totalExpectedClosing = calculateTotal(data, 'expectedClosing');
 
   return (
-    <TableContainer>
+    <TableContainer sx={{ borderRadius: 1, overflow: 'hidden' }}>
       <Table size="small">
         <TableBody>
           {/* 상단 합계 행 (헤더 위쪽) */}
-          <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
+          <TableRow sx={{ 
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+            fontWeight: 'bold',
+            '& .MuiTableCell-root': {
+              borderBottom: '2px solid #dee2e6',
+              fontWeight: 'bold',
+              fontSize: '0.9rem',
+              color: '#495057'
+            }
+          }}>
             <TableCell>합계</TableCell>
             <TableCell>합계</TableCell>
             <TableCell>합계</TableCell>
@@ -2788,9 +2905,9 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
             <TableCell align="right">{calculateTotal(data, 'sims')}</TableCell>
             <TableCell align="right">{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
             <TableCell align="right">{total}</TableCell>
-            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold' }}>{totalExpectedClosing}</TableCell>
+            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f' }}>{totalExpectedClosing}</TableCell>
             <TableCell align="right">{calculateTotal(data, 'target')}</TableCell>
-            <TableCell align="right" sx={{ color: '#f44336', fontWeight: 'bold' }}>
+            <TableCell align="right" sx={{ color: '#d32f2f', fontWeight: 'bold' }}>
               {Math.round(totalExpectedClosing / calculateTotal(data, 'target') * 100)}%
             </TableCell>
           </TableRow>
@@ -2799,10 +2916,18 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
       
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ backgroundColor: headerColor }}>
+          <TableRow sx={{ 
+            backgroundColor: headerColor,
+            '& .MuiTableCell-root': {
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '0.85rem',
+              borderBottom: '2px solid rgba(255,255,255,0.3)'
+            }
+          }}>
             <TableCell>당월RANK</TableCell>
             <TableCell>구분</TableCell>
-            <TableCell>{type === 'code' ? '코드' : type === 'office' ? '사무실' : '담당자'}</TableCell>
+            <TableCell>{type === 'code' ? '코드' : type === 'office' ? '사무실' : type === 'department' ? '소속' : '담당자'}</TableCell>
             <TableCell align="right">합계</TableCell>
             <TableCell align="right">수수료</TableCell>
             <TableCell align="right">지원금</TableCell>
@@ -2814,9 +2939,9 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
             <TableCell align="right">보유유심</TableCell>
             <TableCell align="right">회전율</TableCell>
             <TableCell align="right">당월실적</TableCell>
-            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2' }}>예상마감</TableCell>
+            <TableCell align="right" sx={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>예상마감</TableCell>
             <TableCell align="right">목표</TableCell>
-            <TableCell align="right" sx={{ color: '#f44336' }}>달성율</TableCell>
+            <TableCell align="right" sx={{ color: '#FFD700' }}>달성율</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -2827,34 +2952,39 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
               key={index}
               sx={{ 
                 backgroundColor: getRowBackgroundColor(index),
+                '&:hover': {
+                  backgroundColor: 'rgba(0,0,0,0.04)',
+                  transition: 'background-color 0.2s'
+                },
                 '& .MuiTableCell-root': {
-                  borderBottom: '1px solid rgba(224, 224, 224, 1)'
+                  borderBottom: '1px solid rgba(224, 224, 224, 0.5)',
+                  fontSize: '0.85rem'
                 }
               }}
             >
-              <TableCell>{index + 1}</TableCell>
-              <TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#495057' }}>{index + 1}</TableCell>
+              <TableCell sx={{ color: '#6c757d' }}>
                 {type === 'code' ? 'VIP' : type === 'office' ? '사무실' : type === 'department' ? '소속' : '영업'}
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212529' }}>
                 {type === 'code' ? item.code : type === 'office' ? item.office : type === 'department' ? item.department : item.agent}
               </TableCell>
-              <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
-              <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
-              <TableCell align="right">0</TableCell>
-              <TableCell align="right">{item.registeredStores || 0}</TableCell>
-              <TableCell align="right">{item.activeStores || 0}</TableCell>
-              <TableCell align="right">{item.utilization || 0}%</TableCell>
-              <TableCell align="right">{(item.registeredStores || 0) - (item.activeStores || 0)}</TableCell>
-              <TableCell align="right">{item.devices || 0}</TableCell>
-              <TableCell align="right">{item.sims || 0}</TableCell>
-              <TableCell align="right">{item.rotation || 0}%</TableCell>
-              <TableCell align="right">{item.performance}</TableCell>
-              <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold' }}>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057' }}>{item.fee.toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.fee.toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>0</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.registeredStores || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.activeStores || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.utilization || 0}%</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{(item.registeredStores || 0) - (item.activeStores || 0)}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.devices || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.sims || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.rotation || 0}%</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057' }}>{item.performance}</TableCell>
+              <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f' }}>
                 {item.expectedClosing}
               </TableCell>
-              <TableCell align="right">{item.target || 0}</TableCell>
-              <TableCell align="right" sx={{ color: '#f44336', fontWeight: 'bold' }}>
+              <TableCell align="right" sx={{ color: '#6c757d' }}>{item.target || 0}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: item.achievement >= 100 ? '#4caf50' : '#d32f2f' }}>
                 {item.achievement || 0}%
               </TableCell>
             </TableRow>

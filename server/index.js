@@ -17974,9 +17974,50 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   
+  console.log('🔍 [코드별집계] 계산 정보:', {
+    today: today.toISOString(),
+    daysInMonth,
+    currentDay: today.getDate()
+  });
+  
+  // 등록점, 가동점, 보유단말, 보유유심 계산
   codeMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    
+    // 등록점 계산 (폰클출고처데이터에서 해당 코드의 출고처 수)
+    data.registeredStores = calculateRegisteredStores(data.code, storeData);
+    
+    // 가동점 계산 (폰클재고데이터에서 해당 코드의 활성 출고처 수)
+    data.activeStores = calculateActiveStores(data.code, inventoryData);
+    
+    // 가동율 계산
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    
+    // 무실적점 계산
+    data.inactiveStores = data.registeredStores - data.activeStores;
+    
+    // 보유단말, 보유유심 계산
+    const deviceSimData = calculateDeviceSimData(data.code, inventoryData);
+    data.devices = deviceSimData.devices;
+    data.sims = deviceSimData.sims;
+    
+    // 회전율 계산 (당월실적 / 보유단말 * 100)
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    
+    console.log(`🔍 [코드별집계] ${data.code} 상세 계산:`, {
+      performance: data.performance,
+      expectedClosing: data.expectedClosing,
+      target: data.target,
+      achievement: data.achievement,
+      registeredStores: data.registeredStores,
+      activeStores: data.activeStores,
+      utilization: data.utilization,
+      inactiveStores: data.inactiveStores,
+      devices: data.devices,
+      sims: data.sims,
+      rotation: data.rotation
+    });
   });
   
   return Array.from(codeMap.values()).sort((a, b) => b.performance - a.performance);
@@ -18264,6 +18305,12 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
 
 // CS 개통 요약 계산 (무선 + 유선)
 function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
+  console.log('🔍 [CS개통] 계산 시작:', {
+    phoneklDataLength: phoneklData?.length || 0,
+    phoneklHomeDataLength: phoneklHomeData?.length || 0,
+    targetDate
+  });
+  
   const csAgents = new Map();
   let totalWireless = 0;
   let totalWired = 0;
@@ -18277,23 +18324,40 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
     }
   });
   
+  console.log('🔍 [CS개통] 무선 CS 직원 목록:', Array.from(csEmployeeSet));
+  
   // CN열에서 CS 직원들 명단 추출 (고유값) - 유선
+  const wiredCSEmployees = new Set();
   if (phoneklHomeData) {
-    phoneklHomeData.forEach(row => {
+    console.log('🔍 [CS개통] 폰클홈데이터 샘플:', phoneklHomeData.slice(0, 3));
+    
+    phoneklHomeData.forEach((row, index) => {
       const csEmployee = (row[81] || '').toString().trim(); // CN열: CS직원
       if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
-        csEmployeeSet.add(csEmployee);
+        wiredCSEmployees.add(csEmployee);
+        if (index < 5) {
+          console.log(`🔍 [CS개통] 유선 CS 직원 발견 (행 ${index}):`, csEmployee);
+        }
       }
     });
+    
+    console.log('🔍 [CS개통] 유선 CS 직원 목록:', Array.from(wiredCSEmployees));
+  } else {
+    console.log('🔍 [CS개통] 폰클홈데이터가 없습니다!');
   }
   
+  // 모든 CS 직원 통합
+  csEmployeeSet.forEach(employee => wiredCSEmployees.add(employee));
+  console.log('🔍 [CS개통] 통합 CS 직원 목록:', Array.from(wiredCSEmployees));
+  
   // 각 CS 직원별로 실적 계산 초기화
-  csEmployeeSet.forEach(csEmployee => {
+  wiredCSEmployees.forEach(csEmployee => {
     csAgents.set(csEmployee, { wireless: 0, wired: 0, total: 0 });
   });
   
   // 무선 개통 데이터 처리 (폰클개통데이터 BZ열)
-  phoneklData.forEach(row => {
+  let wirelessProcessed = 0;
+  phoneklData.forEach((row, index) => {
     const activationDate = (row[9] || '').toString(); // J열: 개통일
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
@@ -18304,6 +18368,7 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
     if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && 
         csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       totalWireless++;
+      wirelessProcessed++;
       
       if (csAgents.has(csEmployee)) {
         csAgents.get(csEmployee).wireless++;
@@ -18312,9 +18377,12 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
     }
   });
   
+  console.log('🔍 [CS개통] 무선 개통 처리 결과:', { totalWireless, wirelessProcessed });
+  
   // 유선 개통 데이터 처리 (폰클홈데이터 CN열)
+  let wiredProcessed = 0;
   if (phoneklHomeData) {
-    phoneklHomeData.forEach(row => {
+    phoneklHomeData.forEach((row, index) => {
       const activationDate = (row[9] || '').toString(); // J열: 개통일
       const csEmployee = (row[81] || '').toString().trim(); // CN열: CS직원
       
@@ -18325,13 +18393,26 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
       if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && 
           csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
         totalWired++;
+        wiredProcessed++;
         
         if (csAgents.has(csEmployee)) {
           csAgents.get(csEmployee).wired++;
           csAgents.get(csEmployee).total++;
         }
       }
+      
+      if (index < 5) {
+        console.log(`🔍 [CS개통] 유선 데이터 샘플 (행 ${index}):`, {
+          activationDate,
+          csEmployee,
+          isValidDate: !isNaN(activationDateObj.getTime()),
+          isWithinDate: activationDateObj <= targetDateObj,
+          isValidEmployee: csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO'
+        });
+      }
     });
+    
+    console.log('🔍 [CS개통] 유선 개통 처리 결과:', { totalWired, wiredProcessed });
   }
   
   return {
@@ -18348,6 +18429,68 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
         total: data.total
       }))
   };
+}
+
+// 등록점 계산 함수
+function calculateRegisteredStores(code, storeData) {
+  if (!storeData) return 0;
+  
+  let count = 0;
+  storeData.forEach(row => {
+    if (row.length > 14) {
+      const storeCode = (row[14] || '').toString(); // O열: 출고처코드
+      if (storeCode.includes(code)) {
+        count++;
+      }
+    }
+  });
+  
+  console.log(`🔍 [등록점계산] ${code}: ${count}개`);
+  return count;
+}
+
+// 가동점 계산 함수
+function calculateActiveStores(code, inventoryData) {
+  if (!inventoryData) return 0;
+  
+  const activeStores = new Set();
+  inventoryData.forEach(row => {
+    if (row.length > 4) {
+      const storeName = (row[4] || '').toString(); // E열: 출고처명
+      const quantity = parseFloat(row[5] || 0); // F열: 수량
+      
+      if (storeName.includes(code) && quantity > 0) {
+        activeStores.add(storeName);
+      }
+    }
+  });
+  
+  console.log(`🔍 [가동점계산] ${code}: ${activeStores.size}개`);
+  return activeStores.size;
+}
+
+// 보유단말, 보유유심 계산 함수
+function calculateDeviceSimData(code, inventoryData) {
+  if (!inventoryData) return { devices: 0, sims: 0 };
+  
+  let devices = 0;
+  let sims = 0;
+  
+  inventoryData.forEach(row => {
+    if (row.length > 4) {
+      const storeName = (row[4] || '').toString(); // E열: 출고처명
+      const quantity = parseFloat(row[5] || 0); // F열: 수량
+      
+      if (storeName.includes(code)) {
+        // 단말기와 유심 구분 (임시로 단말기로 계산)
+        devices += quantity;
+        sims += quantity; // 실제로는 유심 데이터가 별도로 있어야 함
+      }
+    }
+  });
+  
+  console.log(`🔍 [보유단말계산] ${code}: 단말 ${devices}개, 유심 ${sims}개`);
+  return { devices, sims };
 }
 
 // 매핑 실패 데이터 찾기
