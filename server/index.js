@@ -17830,6 +17830,32 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
       const sampleDates = phoneklData.slice(0, 10).map(row => row[9]).filter(date => date);
       console.log('🔍 [마감장표] 샘플 개통일 형식:', sampleDates);
       console.log('🔍 [마감장표] 타겟 날짜:', targetDate);
+      
+      // 모델 필터링 문제 확인 - 실제 개통 데이터의 모델명들 확인
+      const dateFilteredData = dataRows.filter(row => {
+        if (row.length < 10) return false;
+        const activationDate = (row[9] || '').toString();
+        return activationDate === '2025-08-16';
+      });
+      
+      console.log('🔍 [마감장표] 날짜 필터링 후 데이터 수:', dateFilteredData.length);
+      
+      // 실제 모델명들 수집
+      const actualModels = new Set();
+      dateFilteredData.forEach(row => {
+        const model = (row[13] || '').toString();
+        if (model) {
+          actualModels.add(model);
+        }
+      });
+      
+      console.log('🔍 [마감장표] 실제 개통 데이터의 모델명들:', Array.from(actualModels));
+      console.log('🔍 [마감장표] 실제 모델 수:', actualModels.size);
+      
+      // 매칭되지 않는 모델들 확인
+      const unmatchedModels = Array.from(actualModels).filter(model => !phoneModels.has(model));
+      console.log('🔍 [마감장표] 매칭되지 않는 모델들:', unmatchedModels);
+      console.log('🔍 [마감장표] 매칭되지 않는 모델 수:', unmatchedModels.length);
     }
   }
   
