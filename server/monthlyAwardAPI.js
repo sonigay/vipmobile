@@ -140,8 +140,8 @@ async function getMonthlyAwardData(req, res) {
   try {
     console.log('월간시상 데이터 구글시트에서 로드');
 
-    // 캐시 무효화 (개발 중이므로 캐시 비활성화)
-    invalidateCache();
+    // 캐시 확인 (개발 중이지만 성능을 위해 캐시 활용)
+    // invalidateCache(); // 개발 중 캐시 비활성화 주석 처리
 
     // 1단계: 사용 가능한 시트 목록 확인
     const availableSheets = await debugSheetNames();
@@ -1594,13 +1594,19 @@ async function saveMonthlyAwardSettings(req, res) {
       }
     });
 
-    // 캐시 무효화
-    invalidateCache(MANUAL_DATA_SHEET_NAME);
-    invalidateCache(PLAN_SHEET_NAME);
-    invalidateCache(STORE_SHEET_NAME);
-    invalidateCache(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
-    invalidateCache(PHONEKL_HOME_DATA_SHEET_NAME);
-    invalidateCache(MONTHLY_AWARD_SETTINGS_SHEET_NAME);
+    // 캐시 무효화 (저장된 타입에 따라 선택적 무효화)
+    if (type === 'matrix_criteria') {
+      // Matrix 기준값만 저장한 경우 해당 시트만 무효화
+      invalidateCache(MONTHLY_AWARD_SETTINGS_SHEET_NAME);
+    } else {
+      // 다른 설정을 저장한 경우 관련 캐시들 무효화
+      invalidateCache(MANUAL_DATA_SHEET_NAME);
+      invalidateCache(PLAN_SHEET_NAME);
+      invalidateCache(STORE_SHEET_NAME);
+      invalidateCache(CURRENT_MONTH_ACTIVATION_SHEET_NAME);
+      invalidateCache(PHONEKL_HOME_DATA_SHEET_NAME);
+      invalidateCache(MONTHLY_AWARD_SETTINGS_SHEET_NAME);
+    }
 
     res.json({
       success: true,
