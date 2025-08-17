@@ -2303,6 +2303,7 @@ function ClosingChartTab() {
   const [officeTableOpen, setOfficeTableOpen] = useState(false);
   const [departmentTableOpen, setDepartmentTableOpen] = useState(false);
   const [agentTableOpen, setAgentTableOpen] = useState(false);
+  const [csSummaryOpen, setCsSummaryOpen] = useState(false); // 기본값: 접기 상태
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
@@ -2511,73 +2512,95 @@ function ClosingChartTab() {
         </Box>
 
         {/* CS 개통 요약 */}
-        <Paper sx={{ mb: 2, p: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', textAlign: 'center' }}>
-            📞 CS 개통 실적
-          </Typography>
+        <Paper sx={{ mb: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              📞 CS 개통 실적
+            </Typography>
+            <Button
+              onClick={() => setCsSummaryOpen(!csSummaryOpen)}
+              sx={{ color: 'white', minWidth: 'auto' }}
+              startIcon={csSummaryOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            >
+              {csSummaryOpen ? '접기' : '펼치기'}
+            </Button>
+          </Box>
           
-          {/* 총계 카드 */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                  {data.csSummary?.total || 0}
-                </Typography>
-                <Typography variant="body2">총 개통</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#87CEEB' }}>
-                  {data.csSummary?.totalWireless || 0}
-                </Typography>
-                <Typography variant="body2">무선 개통</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#98FB98' }}>
-                  {data.csSummary?.totalWired || 0}
-                </Typography>
-                <Typography variant="body2">유선 개통</Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-
-          {/* CS 직원별 랭킹 */}
-          {data.csSummary?.agents && data.csSummary.agents.length > 0 && (
-            <Box>
-              <Typography variant="subtitle1" sx={{ mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
-                🏆 CS 직원별 랭킹
+          {!csSummaryOpen && (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
+                {data.csSummary?.total || 0}
               </Typography>
-              <Grid container spacing={1}>
-                {data.csSummary.agents.map((agent, index) => (
-                  <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Paper sx={{ 
-                      p: 1.5, 
-                      background: index < 3 ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
-                      border: index < 3 ? '2px solid #FFD700' : '1px solid rgba(255,255,255,0.3)',
-                      borderRadius: 2
-                    }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                            {index + 1}. {agent.agent}
-                          </Typography>
-                          <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            무선: {agent.wireless} | 유선: {agent.wired}
-                          </Typography>
-                        </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
-                          {agent.total}
-                        </Typography>
-                      </Box>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
+              <Typography variant="body2">총 개통</Typography>
             </Box>
           )}
+          
+          <Collapse in={csSummaryOpen}>
+            <Box sx={{ p: 2 }}>
+              {/* 총계 카드 */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
+                      {data.csSummary?.total || 0}
+                    </Typography>
+                    <Typography variant="body2">총 개통</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#87CEEB' }}>
+                      {data.csSummary?.totalWireless || 0}
+                    </Typography>
+                    <Typography variant="body2">무선 개통</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#98FB98' }}>
+                      {data.csSummary?.totalWired || 0}
+                    </Typography>
+                    <Typography variant="body2">유선 개통</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* CS 직원별 랭킹 */}
+              {data.csSummary?.agents && data.csSummary.agents.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle1" sx={{ mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
+                    🏆 CS 직원별 랭킹
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {data.csSummary.agents.map((agent, index) => (
+                      <Grid item xs={12} sm={6} md={4} key={index}>
+                        <Paper sx={{ 
+                          p: 1.5, 
+                          background: index < 3 ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
+                          border: index < 3 ? '2px solid #FFD700' : '1px solid rgba(255,255,255,0.3)',
+                          borderRadius: 2
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                {index + 1}. {agent.agent}
+                              </Typography>
+                              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                                무선: {agent.wireless} | 유선: {agent.wired}
+                              </Typography>
+                            </Box>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
+                              {agent.total}
+                            </Typography>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+            </Box>
+          </Collapse>
         </Paper>
 
         {/* 합계 일치 경고 */}
