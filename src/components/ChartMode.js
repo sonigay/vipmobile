@@ -24,6 +24,7 @@ import {
   TableHead,
   TableRow,
   Alert,
+  AlertTitle,
   CircularProgress,
   Chip,
   Grid,
@@ -2675,8 +2676,8 @@ function ClosingChartTable({ data, type, rankingType, total }) {
           <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
             <TableCell colSpan={2}>합계</TableCell>
             <TableCell align="right">{total}</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'fee').toLocaleString()}</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'expectedClosing')}</TableCell>
+            <TableCell align="right">{calculateTotal(data.agentData, 'fee').toLocaleString()}</TableCell>
+            <TableCell align="right">{calculateTotal(data.agentData, 'expectedClosing')}</TableCell>
             {type === 'agent' && <TableCell colSpan={6} />}
           </TableRow>
         </TableBody>
