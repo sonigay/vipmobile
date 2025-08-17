@@ -1626,13 +1626,17 @@ function AppContent() {
         break;
     }
     
-    // 모드 진입 시 업데이트 팝업 표시
+    // 모드 진입 시 업데이트 팝업 표시 (검수모드 제외)
     // 로그 최소화 (성능 최적화)
     // console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
-    setShowAppUpdatePopup(true);
-    // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
-    // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
+    
+    // 검수모드는 자체 업데이트 팝업을 사용하므로 App.js에서 표시하지 않음
+    if (selectedMode !== 'inspection') {
+      setShowAppUpdatePopup(true);
+      // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
+      // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
+    }
     
     // 모드 선택 팝업 닫기
     setShowModeSelection(false);
