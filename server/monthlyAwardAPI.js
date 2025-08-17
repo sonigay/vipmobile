@@ -259,17 +259,17 @@ async function getMonthlyAwardData(req, res) {
     console.log('매칭되지 않은 요금제명 목록:', Array.from(unmatchedPlansForDebug));
     console.log('================================');
 
-    // 전략상품 부가서비스명 수집 (디버깅용)
+    // 전략상품 부가서비스명 수집 (디버깅용) - 올바른 컬럼으로 수정
     const manualRowsForServiceMapping = manualData.slice(1);
     const uniqueServices = new Set();
     
     manualRowsForServiceMapping.forEach(row => {
-      if (row.length >= 123) {
-        // 전략상품 관련 컬럼들 확인
-        const musicService = (row[110] || '').toString().trim(); // DG열: 뮤직류
-        const insuranceService = (row[115] || '').toString().trim(); // DL열: 보험(폰교체)
-        const uflixService = (row[118] || '').toString().trim(); // DO열: 유플릭스
-        const callToneService = (row[122] || '').toString().trim(); // DS열: 통화연결음
+      if (row.length >= 132) {
+        // 전략상품 관련 컬럼들 확인 (올바른 컬럼 인덱스 사용)
+        const musicService = (row[119] || '').toString().trim(); // DP열: 뮤직류
+        const insuranceService = (row[124] || '').toString().trim(); // DU열: 보험(폰교체)
+        const uflixService = (row[127] || '').toString().trim(); // DX열: 유플릭스
+        const callToneService = (row[131] || '').toString().trim(); // EB열: 통화연결음
         
         // 고유한 부가서비스명들 수집
         if (musicService) uniqueServices.add(musicService);
@@ -807,19 +807,20 @@ async function getMonthlyAwardData(req, res) {
           const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
           const upsellTarget = (row[111] || '').toString().trim(); // DH열: 업셀대상
           
+          console.log(`🔍 [업셀기변] ${manager} - CV열: "${planGroup}", DH열: "${upsellTarget}"`);
+          
           // 특별 조건: 105군, 115군이면 무조건 인정
           if (planGroup === '105군' || planGroup === '115군') {
             agent.upsellChange.numerator++;
-            if (manager === Array.from(agentMap.keys())[0]) {
-              // console.log(`${manager} 업셀기변 인정: 105군/115군 조건`);
-            }
+            console.log(`✅ [업셀기변] ${manager} 인정: 105군/115군 조건 (${planGroup})`);
           }
           // 일반 조건: 업셀대상이 'Y'인 경우
           else if (upsellTarget === 'Y') {
             agent.upsellChange.numerator++;
-            if (manager === Array.from(agentMap.keys())[0]) {
-              // console.log(`${manager} 업셀기변 인정: 업셀대상 Y 조건`);
-            }
+            console.log(`✅ [업셀기변] ${manager} 인정: 업셀대상 Y 조건`);
+          }
+          else {
+            console.log(`❌ [업셀기변] ${manager} 제외: 조건 불충족 (CV: ${planGroup}, DH: ${upsellTarget})`);
           }
         }
         
@@ -828,26 +829,42 @@ async function getMonthlyAwardData(req, res) {
           const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
           const finalModel = (row[38] || '').toString().trim(); // AM열: 개통모델
           
+          console.log(`🔍 [기변105이상] ${manager} - 가입구분: "${joinType}", 요금제: "${finalPlan}", 모델: "${finalModel}"`);
+          
           // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
           if (finalPlan.includes('태블릿') || finalPlan.includes('스마트기기') || finalPlan.includes('Wearable')) {
+            console.log(`❌ [기변105이상] ${manager} 제외: 요금제 제외 조건 (${finalPlan})`);
             return;
           }
           
-          if (finalPlan.includes('현역병사')) return;
+          if (finalPlan.includes('현역병사')) {
+            console.log(`❌ [기변105이상] ${manager} 제외: 현역병사 포함 (${finalPlan})`);
+            return;
+          }
           
           const excludedModels = ['LM-Y110L', 'LM-Y120L', 'SM-G160N', 'AT-M120', 'AT-M120B', 'AT-M140L'];
-          if (excludedModels.includes(finalModel)) return;
+          if (excludedModels.includes(finalModel)) {
+            console.log(`❌ [기변105이상] ${manager} 제외: 제외 모델 (${finalModel})`);
+            return;
+          }
           
           agent.change105Above.denominator++;
+          console.log(`✅ [기변105이상] ${manager} 모수 추가: ${agent.change105Above.denominator}`);
           
           // CV열에서 105군/115군 직접 확인
           const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
+          console.log(`🔍 [기변105이상] ${manager} - CV열: "${planGroup}"`);
+          
           if (planGroup === '105군' || planGroup === '115군') {
             if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
               agent.change105Above.numerator += 1.2;
+              console.log(`✅ [기변105이상] ${manager} 자수 추가: 1.2 (티빙/멀티팩 포함, ${planGroup})`);
             } else {
               agent.change105Above.numerator += 1.0;
+              console.log(`✅ [기변105이상] ${manager} 자수 추가: 1.0 (${planGroup})`);
             }
+          } else {
+            console.log(`❌ [기변105이상] ${manager} 자수 제외: CV열 값 불일치 (${planGroup})`);
           }
         }
         
