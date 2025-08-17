@@ -66,6 +66,9 @@ import InventoryStatusScreen from './screens/InventoryStatusScreen';
 
 // 합계 계산 유틸리티 함수
 const calculateTotal = (dataArray, field) => {
+  if (!dataArray || !Array.isArray(dataArray)) {
+    return 0;
+  }
   return dataArray.reduce((sum, item) => sum + (item[field] || 0), 0);
 };
 
@@ -2401,9 +2404,9 @@ function ClosingChartTab() {
   const checkTotalConsistency = () => {
     if (!data) return true;
     
-    const codeTotal = calculateTotal(data.codeData, 'performance');
-    const officeTotal = calculateTotal(data.officeData, 'performance');
-    const agentTotal = calculateTotal(data.agentData, 'performance');
+    const codeTotal = calculateTotal(data?.codeData, 'performance');
+    const officeTotal = calculateTotal(data?.officeData, 'performance');
+    const agentTotal = calculateTotal(data?.agentData, 'performance');
     
     return codeTotal === officeTotal && officeTotal === agentTotal;
   };
@@ -2537,7 +2540,7 @@ function ClosingChartTab() {
               data={data.codeData}
               type="code"
               rankingType={rankingType}
-              total={calculateTotal(data.codeData, 'performance')}
+              total={calculateTotal(data?.codeData, 'performance')}
             />
           </Paper>
         </Grid>
@@ -2552,7 +2555,7 @@ function ClosingChartTab() {
               data={data.officeData}
               type="office"
               rankingType={rankingType}
-              total={calculateTotal(data.officeData, 'performance')}
+              total={calculateTotal(data?.officeData, 'performance')}
             />
           </Paper>
         </Grid>
@@ -2567,7 +2570,7 @@ function ClosingChartTab() {
               data={data.agentData}
               type="agent"
               rankingType={rankingType}
-              total={calculateTotal(data.agentData, 'performance')}
+              total={calculateTotal(data?.agentData, 'performance')}
             />
           </Paper>
         </Grid>
@@ -2676,8 +2679,8 @@ function ClosingChartTable({ data, type, rankingType, total }) {
           <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
             <TableCell colSpan={2}>합계</TableCell>
             <TableCell align="right">{total}</TableCell>
-            <TableCell align="right">{calculateTotal(data.agentData, 'fee').toLocaleString()}</TableCell>
-            <TableCell align="right">{calculateTotal(data.agentData, 'expectedClosing')}</TableCell>
+            <TableCell align="right">{calculateTotal(data?.agentData, 'fee').toLocaleString()}</TableCell>
+            <TableCell align="right">{calculateTotal(data?.agentData, 'expectedClosing')}</TableCell>
             {type === 'agent' && <TableCell colSpan={6} />}
           </TableRow>
         </TableBody>
