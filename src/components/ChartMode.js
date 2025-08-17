@@ -2591,7 +2591,7 @@ function ClosingChartTab() {
         </Tabs>
       </Paper>
 
-      {/* VIP 랭킹 테이블 (코드별) */}
+      {/* 코드별 랭킹 테이블 */}
       <Paper sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
           코드별 랭킹
@@ -2601,6 +2601,7 @@ function ClosingChartTab() {
           type="code"
           rankingType={rankingType}
           total={calculateTotal(data?.codeData, 'performance')}
+          headerColor="lightgreen"
         />
       </Paper>
 
@@ -2614,6 +2615,7 @@ function ClosingChartTab() {
           type="office"
           rankingType={rankingType}
           total={calculateTotal(data?.officeData, 'performance')}
+          headerColor="lightpink"
         />
       </Paper>
 
@@ -2624,9 +2626,10 @@ function ClosingChartTab() {
         </Typography>
         <ClosingChartTable
           data={data.agentData}
-              type="agent"
-              rankingType={rankingType}
-              total={calculateTotal(data?.agentData, 'performance')}
+          type="agent"
+          rankingType={rankingType}
+          total={calculateTotal(data?.agentData, 'performance')}
+          headerColor="lightyellow"
         />
       </Paper>
 
@@ -2650,7 +2653,7 @@ function ClosingChartTab() {
 }
 
 // 마감장표 테이블 컴포넌트 (이미지와 동일한 구조)
-function ClosingChartTable({ data, type, rankingType, total }) {
+function ClosingChartTable({ data, type, rankingType, total, headerColor = 'lightgreen' }) {
   // 랭킹 기준에 따른 정렬
   const sortedData = useMemo(() => {
     if (!data) return [];
@@ -2679,8 +2682,33 @@ function ClosingChartTable({ data, type, rankingType, total }) {
   return (
     <TableContainer>
       <Table size="small">
+        <TableBody>
+          {/* 상단 합계 행 (헤더 위쪽) */}
+          <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
+            <TableCell colSpan={3}>합계</TableCell>
+            <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
+            <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
+            <TableCell align="right">0</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'registeredStores')}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'activeStores')}</TableCell>
+            <TableCell align="right">{Math.round(calculateTotal(data, 'activeStores') / calculateTotal(data, 'registeredStores') * 100)}%</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'registeredStores') - calculateTotal(data, 'activeStores')}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'devices')}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'sims')}</TableCell>
+            <TableCell align="right">{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
+            <TableCell align="right">{total}</TableCell>
+            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold' }}>{totalExpectedClosing}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'target')}</TableCell>
+            <TableCell align="right" sx={{ color: '#f44336', fontWeight: 'bold' }}>
+              {Math.round(totalExpectedClosing / calculateTotal(data, 'target') * 100)}%
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+      
+      <Table size="small">
         <TableHead>
-          <TableRow sx={{ backgroundColor: 'lightgreen' }}>
+          <TableRow sx={{ backgroundColor: headerColor }}>
             <TableCell>당월RANK</TableCell>
             <TableCell>구분</TableCell>
             <TableCell>{type === 'code' ? '코드' : type === 'office' ? '사무실' : '담당자'}</TableCell>
@@ -2701,26 +2729,6 @@ function ClosingChartTable({ data, type, rankingType, total }) {
           </TableRow>
         </TableHead>
         <TableBody>
-          {/* 상단 합계 행 */}
-          <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
-            <TableCell colSpan={3}>합계</TableCell>
-            <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
-            <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
-            <TableCell align="right">0</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'registeredStores')}</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'activeStores')}</TableCell>
-            <TableCell align="right">{Math.round(calculateTotal(data, 'activeStores') / calculateTotal(data, 'registeredStores') * 100)}%</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'registeredStores') - calculateTotal(data, 'activeStores')}</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'devices')}</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'sims')}</TableCell>
-            <TableCell align="right">{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
-            <TableCell align="right">{total}</TableCell>
-            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold' }}>{totalExpectedClosing}</TableCell>
-            <TableCell align="right">{calculateTotal(data, 'target')}</TableCell>
-            <TableCell align="right" sx={{ color: '#f44336', fontWeight: 'bold' }}>
-              {Math.round(totalExpectedClosing / calculateTotal(data, 'target') * 100)}%
-            </TableCell>
-          </TableRow>
           
           {/* 데이터 행들 */}
           {sortedData.map((item, index) => (

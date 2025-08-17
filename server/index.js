@@ -17690,6 +17690,17 @@ function getExcludedStores(inventoryData) {
 
 // 마감장표 데이터 처리
 function processClosingChartData({ phoneklData, storeData, inventoryData, operationModelData, customerData, targetDate, excludedAgents, excludedStores }) {
+  console.log('🔍 [마감장표] 데이터 처리 시작');
+  console.log('🔍 [마감장표] 입력 데이터:', {
+    phoneklDataLength: phoneklData?.length || 0,
+    storeDataLength: storeData?.length || 0,
+    inventoryDataLength: inventoryData?.length || 0,
+    operationModelDataLength: operationModelData?.length || 0,
+    targetDate,
+    excludedAgentsLength: excludedAgents?.length || 0,
+    excludedStoresLength: excludedStores?.length || 0
+  });
+  
   // 운영모델 필터링 (휴대폰만)
   const phoneModels = new Set();
   if (operationModelData && operationModelData.length > 8) {
@@ -17700,8 +17711,19 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
       }
     }
   }
+  console.log('🔍 [마감장표] 휴대폰 모델 수:', phoneModels.size);
+  console.log('🔍 [마감장표] 휴대폰 모델 목록:', Array.from(phoneModels));
   
   // 개통 데이터 필터링
+  console.log('🔍 [마감장표] 개통 데이터 필터링 시작');
+  console.log('🔍 [마감장표] 원본 개통 데이터 수:', phoneklData?.length || 0);
+  
+  let dateFiltered = 0;
+  let modelFiltered = 0;
+  let planFiltered = 0;
+  let conditionFiltered = 0;
+  let typeFiltered = 0;
+  
   const filteredPhoneklData = phoneklData.filter(row => {
     if (row.length < 10) return false;
     
@@ -17712,29 +17734,83 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     const type = (row[16] || '').toString(); // Q열: 유형
     
     // 날짜 필터링
-    if (activationDate !== targetDate) return false;
+    if (activationDate !== targetDate) {
+      dateFiltered++;
+      return false;
+    }
     
     // 모델 필터링 (휴대폰만)
-    if (!phoneModels.has(model)) return false;
+    if (!phoneModels.has(model)) {
+      modelFiltered++;
+      return false;
+    }
     
     // 제외 조건
-    if (planType.includes('선불')) return false;
-    if (condition.includes('중고')) return false;
-    if (type.includes('중고') || type.includes('유심')) return false;
+    if (planType.includes('선불')) {
+      planFiltered++;
+      return false;
+    }
+    if (condition.includes('중고')) {
+      conditionFiltered++;
+      return false;
+    }
+    if (type.includes('중고') || type.includes('유심')) {
+      typeFiltered++;
+      return false;
+    }
     
     return true;
   });
   
+  console.log('🔍 [마감장표] 필터링 결과:', {
+    원본데이터수: phoneklData?.length || 0,
+    날짜필터링제외: dateFiltered,
+    모델필터링제외: modelFiltered,
+    요금제필터링제외: planFiltered,
+    상태필터링제외: conditionFiltered,
+    유형필터링제외: typeFiltered,
+    최종필터링결과: filteredPhoneklData.length
+  });
+  
+  // 샘플 데이터 확인
+  if (filteredPhoneklData.length > 0) {
+    console.log('🔍 [마감장표] 샘플 필터링 데이터:', {
+      첫번째행: filteredPhoneklData[0],
+      컬럼구조: {
+        코드: filteredPhoneklData[0][4], // E열
+        사무실: filteredPhoneklData[0][6], // G열
+        담당자: filteredPhoneklData[0][8], // I열
+        개통일: filteredPhoneklData[0][9], // J열
+        모델: filteredPhoneklData[0][13], // N열
+        수수료: filteredPhoneklData[0][3] // D열
+      }
+    });
+  }
+  
   // 코드별/사무실별/담당자별 데이터 집계
+  console.log('🔍 [마감장표] 데이터 집계 시작');
+  
   const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
   const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
   const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
+  
+  console.log('🔍 [마감장표] 집계 결과:', {
+    코드별데이터수: codeData?.length || 0,
+    사무실별데이터수: officeData?.length || 0,
+    담당자별데이터수: agentData?.length || 0
+  });
   
   // CS 개통 요약
   const csSummary = calculateCSSummary(phoneklData, targetDate);
   
   // 매핑 실패 데이터
   const mappingFailures = findMappingFailures(filteredPhoneklData, storeData);
+  
+  console.log('🔍 [마감장표] 최종 결과:', {
+    CS개통총수: csSummary?.total || 0,
+    CS직원수: csSummary?.agents?.length || 0,
+    매핑실패수: mappingFailures?.length || 0
+  });
   
   return {
     date: targetDate,
@@ -17750,14 +17826,27 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
 
 // 코드별 집계
 function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+  console.log('🔍 [코드별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
+  console.log('🔍 [코드별집계] 제외 담당자:', excludedAgents);
+  
   const codeMap = new Map();
+  let excludedCount = 0;
+  let noCodeCount = 0;
   
   phoneklData.forEach(row => {
     const code = (row[4] || '').toString(); // E열: 코드명
     const office = (row[6] || '').toString(); // G열: 사무실
     const agent = (row[8] || '').toString(); // I열: 담당자
     
-    if (!code || excludedAgents.includes(agent)) return;
+    if (!code) {
+      noCodeCount++;
+      return;
+    }
+    
+    if (excludedAgents.includes(agent)) {
+      excludedCount++;
+      return;
+    }
     
     if (!codeMap.has(code)) {
       codeMap.set(code, {
@@ -17779,6 +17868,13 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     // 수수료 계산 (D열)
     const fee = parseFloat(row[3] || 0);
     data.fee += fee;
+  });
+  
+  console.log('🔍 [코드별집계] 처리 결과:', {
+    코드없음제외: noCodeCount,
+    제외담당자제외: excludedCount,
+    최종코드수: codeMap.size,
+    코드목록: Array.from(codeMap.keys())
   });
   
   // 목표값 및 추가 계산
