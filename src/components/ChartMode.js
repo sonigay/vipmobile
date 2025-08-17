@@ -2458,7 +2458,9 @@ function ClosingChartTab() {
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6">31일 마감 실적장표</Typography>
+            <Typography variant="h6">
+              {new Date(selectedDate).getDate()}일 마감 실적장표
+            </Typography>
             <TextField
               type="date"
               value={selectedDate}
@@ -2502,9 +2504,18 @@ function ClosingChartTab() {
 
         {/* CS 개통 요약 */}
         <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
-          <Typography variant="h6" color="white">
-            CS 개통: {data.csSummary}건
+          <Typography variant="h6" color="white" sx={{ mb: 1 }}>
+            CS 개통 ({data.csSummary?.total || 0})
           </Typography>
+          {data.csSummary?.agents && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {data.csSummary.agents.map((agent, index) => (
+                <Typography key={index} variant="body2" color="white">
+                  {agent.agent} ({agent.count})
+                </Typography>
+              ))}
+            </Box>
+          )}
         </Box>
 
         {/* 합계 일치 경고 */}
@@ -2531,7 +2542,7 @@ function ClosingChartTab() {
       {/* VIP 랭킹 테이블 (코드별) */}
       <Paper sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          VIP 랭킹
+          코드별 랭킹
         </Typography>
         <ClosingChartTable
           data={data.codeData}
@@ -2586,7 +2597,7 @@ function ClosingChartTab() {
   );
 }
 
-// 마감장표 테이블 컴포넌트
+// 마감장표 테이블 컴포넌트 (이미지와 동일한 구조)
 function ClosingChartTable({ data, type, rankingType, total }) {
   // 랭킹 기준에 따른 정렬
   const sortedData = useMemo(() => {
@@ -2601,79 +2612,102 @@ function ClosingChartTable({ data, type, rankingType, total }) {
   }, [data, rankingType]);
 
   // 배경색 결정
-  const getRowBackgroundColor = (item) => {
-    if (type === 'agent') {
-      if (item.agent.includes('(별도)') || item.agent.includes('(직영)')) {
-        return 'rgba(135, 206, 250, 0.1)'; // 하늘색
-      }
-      if (item.agent.includes('(집단)')) {
-        return 'rgba(255, 255, 0, 0.1)'; // 연노랑색
-      }
-    }
+  const getRowBackgroundColor = (index) => {
+    if (index === 0) return 'rgba(128, 0, 128, 0.1)'; // 1위: 보라색
+    if (index === 1) return 'rgba(147, 112, 219, 0.1)'; // 2위: 연보라색
+    if (index === 2) return 'rgba(255, 255, 224, 0.3)'; // 3위: 연노랑색
+    if (index === 3) return 'rgba(255, 165, 0, 0.1)'; // 4위: 연주황색
+    if (index === 4) return 'rgba(255, 255, 0, 0.1)'; // 5위: 노랑색
     return 'transparent';
   };
+
+  const totalFee = calculateTotal(data, 'fee');
+  const totalExpectedClosing = calculateTotal(data, 'expectedClosing');
 
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
-          <TableRow>
-            <TableCell>순위</TableCell>
+          <TableRow sx={{ backgroundColor: 'lightgreen' }}>
+            <TableCell>당월RANK</TableCell>
+            <TableCell>구분</TableCell>
             <TableCell>{type === 'code' ? '코드' : type === 'office' ? '사무실' : '담당자'}</TableCell>
-            <TableCell align="right">실적</TableCell>
-            <TableCell align="right">수수료</TableCell>
-            <TableCell align="right">예상마감</TableCell>
-            {type === 'agent' && (
-              <>
-                <TableCell align="right">등록점</TableCell>
-                <TableCell align="right">가동점</TableCell>
-                <TableCell align="right">가동율</TableCell>
-                <TableCell align="right">보유단말</TableCell>
-                <TableCell align="right">보유유심</TableCell>
-                <TableCell align="right">회전율</TableCell>
-              </>
-            )}
+            <TableCell align="right">합계</TableCell>
+            <TableCell align="right">무선수수료</TableCell>
+            <TableCell align="right">지원금</TableCell>
+            <TableCell align="right">등록점</TableCell>
+            <TableCell align="right">가동점</TableCell>
+            <TableCell align="right">가동율</TableCell>
+            <TableCell align="right">무실적점</TableCell>
+            <TableCell align="right">보유단말</TableCell>
+            <TableCell align="right">보유유심</TableCell>
+            <TableCell align="right">회전율</TableCell>
+            <TableCell align="right">당월실적</TableCell>
+            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2' }}>예상마감</TableCell>
+            <TableCell align="right">목표</TableCell>
+            <TableCell align="right" sx={{ color: '#f44336' }}>달성율</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
+          {/* 상단 합계 행 */}
+          <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
+            <TableCell colSpan={3}>합계</TableCell>
+            <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
+            <TableCell align="right">{totalFee.toLocaleString()}</TableCell>
+            <TableCell align="right">0</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'registeredStores')}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'activeStores')}</TableCell>
+            <TableCell align="right">{Math.round(calculateTotal(data, 'activeStores') / calculateTotal(data, 'registeredStores') * 100)}%</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'registeredStores') - calculateTotal(data, 'activeStores')}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'devices')}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'sims')}</TableCell>
+            <TableCell align="right">{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
+            <TableCell align="right">{total}</TableCell>
+            <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold' }}>{totalExpectedClosing}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'target')}</TableCell>
+            <TableCell align="right" sx={{ color: '#f44336', fontWeight: 'bold' }}>
+              {Math.round(totalExpectedClosing / calculateTotal(data, 'target') * 100)}%
+            </TableCell>
+          </TableRow>
+          
+          {/* 데이터 행들 */}
           {sortedData.map((item, index) => (
             <TableRow 
               key={index}
               sx={{ 
-                backgroundColor: getRowBackgroundColor(item),
+                backgroundColor: getRowBackgroundColor(index),
                 '& .MuiTableCell-root': {
-                  borderBottom: item.expectedClosing > 0 ? '2px solid #f44336' : '1px solid rgba(224, 224, 224, 1)'
+                  borderBottom: '1px solid rgba(224, 224, 224, 1)'
                 }
               }}
             >
               <TableCell>{index + 1}</TableCell>
               <TableCell>
+                {type === 'code' ? 'VIP' : type === 'office' ? '사무실' : '영업'}
+              </TableCell>
+              <TableCell>
                 {type === 'code' ? item.code : type === 'office' ? item.office : item.agent}
               </TableCell>
-              <TableCell align="right">{item.performance}</TableCell>
               <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#f44336' }}>
+              <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
+              <TableCell align="right">0</TableCell>
+              <TableCell align="right">{item.registeredStores || 0}</TableCell>
+              <TableCell align="right">{item.activeStores || 0}</TableCell>
+              <TableCell align="right">{item.utilization || 0}%</TableCell>
+              <TableCell align="right">{(item.registeredStores || 0) - (item.activeStores || 0)}</TableCell>
+              <TableCell align="right">{item.devices || 0}</TableCell>
+              <TableCell align="right">{item.sims || 0}</TableCell>
+              <TableCell align="right">{item.rotation || 0}%</TableCell>
+              <TableCell align="right">{item.performance}</TableCell>
+              <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold' }}>
                 {item.expectedClosing}
               </TableCell>
-              {type === 'agent' && (
-                <>
-                  <TableCell align="right">{item.registeredStores}</TableCell>
-                  <TableCell align="right">{item.activeStores}</TableCell>
-                  <TableCell align="right">{item.utilization}%</TableCell>
-                  <TableCell align="right">{item.devices}</TableCell>
-                  <TableCell align="right">{item.sims}</TableCell>
-                  <TableCell align="right">{item.rotation}%</TableCell>
-                </>
-              )}
+              <TableCell align="right">{item.target || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#f44336', fontWeight: 'bold' }}>
+                {item.achievement || 0}%
+              </TableCell>
             </TableRow>
           ))}
-          <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
-            <TableCell colSpan={2}>합계</TableCell>
-            <TableCell align="right">{total}</TableCell>
-            <TableCell align="right">{calculateTotal(data?.agentData, 'fee').toLocaleString()}</TableCell>
-            <TableCell align="right">{calculateTotal(data?.agentData, 'expectedClosing')}</TableCell>
-            {type === 'agent' && <TableCell colSpan={6} />}
-          </TableRow>
         </TableBody>
       </Table>
     </TableContainer>

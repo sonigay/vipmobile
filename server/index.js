@@ -17939,18 +17939,31 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
 
 // CS 개통 요약 계산
 function calculateCSSummary(phoneklData, targetDate) {
-  let csCount = 0;
+  const csAgents = new Map();
+  let totalCS = 0;
   
   phoneklData.forEach(row => {
     const activationDate = (row[9] || '').toString(); // J열: 개통일
     const csType = (row[77] || '').toString(); // BZ열: CS개통
+    const agent = (row[8] || '').toString(); // I열: 담당자
     
     if (activationDate === targetDate && csType) {
-      csCount++;
+      totalCS++;
+      
+      if (!csAgents.has(agent)) {
+        csAgents.set(agent, 0);
+      }
+      csAgents.set(agent, csAgents.get(agent) + 1);
     }
   });
   
-  return csCount;
+  return {
+    total: totalCS,
+    agents: Array.from(csAgents.entries()).map(([agent, count]) => ({
+      agent,
+      count
+    }))
+  };
 }
 
 // 매핑 실패 데이터 찾기
