@@ -8395,8 +8395,7 @@ app.post('/api/inspection/normalize', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -8476,8 +8475,7 @@ app.post('/api/inspection/update-system-data', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -9704,8 +9702,7 @@ app.post('/api/inspection/complete', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -9756,8 +9753,7 @@ app.post('/api/inspection/normalize', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -9837,8 +9833,7 @@ app.post('/api/inspection/update-system-data', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -10143,8 +10138,7 @@ app.post('/api/inspection/complete', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -10195,8 +10189,7 @@ app.post('/api/inspection/normalize', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
@@ -10276,8 +10269,7 @@ app.post('/api/inspection/update-system-data', async (req, res) => {
     });
 
     // 캐시 무효화
-    cacheUtils.delete(`inspection_data_personal_${userId}`);
-    cacheUtils.delete(`inspection_data_overview_${userId}`);
+    invalidateInspectionCache(userId);
 
     res.json({ 
       success: true, 
