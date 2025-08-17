@@ -17942,27 +17942,42 @@ function calculateCSSummary(phoneklData, targetDate) {
   const csAgents = new Map();
   let totalCS = 0;
   
+  // BZ열에서 CS 직원들 명단 추출 (고유값)
+  const csEmployeeSet = new Set();
+  phoneklData.forEach(row => {
+    const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
+    if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
+      csEmployeeSet.add(csEmployee);
+    }
+  });
+  
+  // 각 CS 직원별로 실적 계산
+  csEmployeeSet.forEach(csEmployee => {
+    csAgents.set(csEmployee, 0);
+  });
+  
   phoneklData.forEach(row => {
     const activationDate = (row[9] || '').toString(); // J열: 개통일
-    const csType = (row[77] || '').toString(); // BZ열: CS개통
-    const agent = (row[8] || '').toString(); // I열: 담당자
+    const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
-    if (activationDate === targetDate && csType) {
+    if (activationDate === targetDate && csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       totalCS++;
       
-      if (!csAgents.has(agent)) {
-        csAgents.set(agent, 0);
+      if (csAgents.has(csEmployee)) {
+        csAgents.set(csEmployee, csAgents.get(csEmployee) + 1);
       }
-      csAgents.set(agent, csAgents.get(agent) + 1);
     }
   });
   
   return {
     total: totalCS,
-    agents: Array.from(csAgents.entries()).map(([agent, count]) => ({
-      agent,
-      count
-    }))
+    agents: Array.from(csAgents.entries())
+      .filter(([agent, count]) => count > 0) // 실적이 있는 직원만
+      .sort((a, b) => b[1] - a[1]) // 실적 순으로 정렬
+      .map(([agent, count]) => ({
+        agent,
+        count
+      }))
   };
 }
 
