@@ -17621,12 +17621,12 @@ app.get('/api/closing-chart', async (req, res) => {
       customerData,
       salesTargetData
     ] = await Promise.all([
-      loadSheetData('폰클개통데이터'),
-      loadSheetData('폰클출고처데이터'),
-      loadSheetData('폰클재고데이터'),
-      loadSheetData('운영모델'),
-      loadSheetData('거래처정보'),
-      loadSheetData('영업사원목표')
+      getSheetValues('폰클개통데이터'),
+      getSheetValues('폰클출고처데이터'),
+      getSheetValues('폰클재고데이터'),
+      getSheetValues('운영모델'),
+      getSheetValues('거래처정보'),
+      getSheetValues('영업사원목표')
     ]);
     
     // 제외 조건 설정
@@ -18030,8 +18030,8 @@ app.get('/api/closing-chart/mapping-failures', async (req, res) => {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
     
-    const phoneklData = await loadSheetData('폰클개통데이터');
-    const storeData = await loadSheetData('폰클출고처데이터');
+    const phoneklData = await getSheetValues('폰클개통데이터');
+    const storeData = await getSheetValues('폰클출고처데이터');
     
     const failures = findMappingFailures(phoneklData, storeData);
     
