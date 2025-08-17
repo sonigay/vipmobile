@@ -17619,14 +17619,16 @@ app.get('/api/closing-chart', async (req, res) => {
       inventoryData,
       operationModelData,
       customerData,
-      salesTargetData
+      salesTargetData,
+      phoneklHomeData
     ] = await Promise.all([
       getSheetValues('폰클개통데이터'),
       getSheetValues('폰클출고처데이터'),
       getSheetValues('폰클재고데이터'),
       getSheetValues('운영모델'),
       getSheetValues('거래처정보'),
-      getSheetValues('영업사원목표')
+      getSheetValues('영업사원목표'),
+      getSheetValues('폰클홈데이터')
     ]);
     
     // 제외 조건 설정
@@ -17640,6 +17642,7 @@ app.get('/api/closing-chart', async (req, res) => {
       inventoryData,
       operationModelData,
       customerData,
+      phoneklHomeData,
       targetDate,
       excludedAgents,
       excludedStores
@@ -17689,7 +17692,7 @@ function getExcludedStores(inventoryData) {
 }
 
 // 마감장표 데이터 처리
-function processClosingChartData({ phoneklData, storeData, inventoryData, operationModelData, customerData, targetDate, excludedAgents, excludedStores }) {
+function processClosingChartData({ phoneklData, storeData, inventoryData, operationModelData, customerData, phoneklHomeData, targetDate, excludedAgents, excludedStores }) {
   console.log('🔍 [마감장표] 데이터 처리 시작');
   console.log('🔍 [마감장표] 입력 데이터:', {
     phoneklDataLength: phoneklData?.length || 0,
@@ -17758,12 +17761,12 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     const condition = (row[12] || '').toString(); // M열: 상태
     const type = (row[16] || '').toString(); // Q열: 유형
     
-    // 날짜 필터링 (2025-08-16까지의 누적 데이터)
-    const actualDate = '2025-08-16'; // 실제 마지막 데이터 기준
+    // 날짜 필터링 (해당 날짜까지의 누적 데이터)
+    const targetDateObj = new Date(targetDate);
     const activationDateObj = new Date(activationDate);
     
-    // 날짜가 유효하지 않거나, 2025-08-16보다 늦은 경우 제외
-    if (isNaN(activationDateObj.getTime()) || activationDateObj > new Date(actualDate)) {
+    // 날짜가 유효하지 않거나, 타겟 날짜보다 늦은 경우 제외
+    if (isNaN(activationDateObj.getTime()) || activationDateObj > targetDateObj) {
       dateFiltered++;
       return false;
     }
@@ -17838,9 +17841,9 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
       const dateFilteredData = dataRows.filter(row => {
         if (row.length < 10) return false;
         const activationDate = (row[9] || '').toString();
-        const actualDate = '2025-08-16'; // 실제 마지막 데이터 기준
+        const targetDateObj = new Date(targetDate);
         const activationDateObj = new Date(activationDate);
-        return !isNaN(activationDateObj.getTime()) && activationDateObj <= new Date(actualDate);
+        return !isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj;
       });
       
       console.log('🔍 [마감장표] 날짜 필터링 후 데이터 수:', dateFilteredData.length);
@@ -17890,7 +17893,7 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   });
   
   // CS 개통 요약
-  const csSummary = calculateCSSummary(phoneklData, targetDate);
+      const csSummary = calculateCSSummary(phoneklData, phoneklHomeData, targetDate);
   
   // 매핑 실패 데이터
   const mappingFailures = findMappingFailures(filteredPhoneklData, storeData);
@@ -18259,12 +18262,13 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
   }
 }
 
-// CS 개통 요약 계산
-function calculateCSSummary(phoneklData, targetDate) {
+// CS 개통 요약 계산 (무선 + 유선)
+function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
   const csAgents = new Map();
-  let totalCS = 0;
+  let totalWireless = 0;
+  let totalWired = 0;
   
-  // BZ열에서 CS 직원들 명단 추출 (고유값)
+  // BZ열에서 CS 직원들 명단 추출 (고유값) - 무선
   const csEmployeeSet = new Set();
   phoneklData.forEach(row => {
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
@@ -18273,37 +18277,75 @@ function calculateCSSummary(phoneklData, targetDate) {
     }
   });
   
-  // 각 CS 직원별로 실적 계산
+  // CN열에서 CS 직원들 명단 추출 (고유값) - 유선
+  if (phoneklHomeData) {
+    phoneklHomeData.forEach(row => {
+      const csEmployee = (row[81] || '').toString().trim(); // CN열: CS직원
+      if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
+        csEmployeeSet.add(csEmployee);
+      }
+    });
+  }
+  
+  // 각 CS 직원별로 실적 계산 초기화
   csEmployeeSet.forEach(csEmployee => {
-    csAgents.set(csEmployee, 0);
+    csAgents.set(csEmployee, { wireless: 0, wired: 0, total: 0 });
   });
   
+  // 무선 개통 데이터 처리 (폰클개통데이터 BZ열)
   phoneklData.forEach(row => {
     const activationDate = (row[9] || '').toString(); // J열: 개통일
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
-    // 날짜 필터링 (2025-08-16까지의 누적 데이터)
-    const actualDate = '2025-08-16'; // 실제 마지막 데이터 기준
+    // 날짜 필터링 (해당 날짜까지의 누적 데이터)
+    const targetDateObj = new Date(targetDate);
     const activationDateObj = new Date(activationDate);
     
-    if (!isNaN(activationDateObj.getTime()) && activationDateObj <= new Date(actualDate) && 
+    if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && 
         csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
-      totalCS++;
+      totalWireless++;
       
       if (csAgents.has(csEmployee)) {
-        csAgents.set(csEmployee, csAgents.get(csEmployee) + 1);
+        csAgents.get(csEmployee).wireless++;
+        csAgents.get(csEmployee).total++;
       }
     }
   });
   
+  // 유선 개통 데이터 처리 (폰클홈데이터 CN열)
+  if (phoneklHomeData) {
+    phoneklHomeData.forEach(row => {
+      const activationDate = (row[9] || '').toString(); // J열: 개통일
+      const csEmployee = (row[81] || '').toString().trim(); // CN열: CS직원
+      
+      // 날짜 필터링 (해당 날짜까지의 누적 데이터)
+      const targetDateObj = new Date(targetDate);
+      const activationDateObj = new Date(activationDate);
+      
+      if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && 
+          csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
+        totalWired++;
+        
+        if (csAgents.has(csEmployee)) {
+          csAgents.get(csEmployee).wired++;
+          csAgents.get(csEmployee).total++;
+        }
+      }
+    });
+  }
+  
   return {
-    total: totalCS,
+    totalWireless,
+    totalWired,
+    total: totalWireless + totalWired,
     agents: Array.from(csAgents.entries())
-      .filter(([agent, count]) => count > 0) // 실적이 있는 직원만
-      .sort((a, b) => b[1] - a[1]) // 실적 순으로 정렬
-      .map(([agent, count]) => ({
+      .filter(([agent, data]) => data.total > 0) // 실적이 있는 직원만
+      .sort((a, b) => b[1].total - a[1].total) // 총 실적 순으로 정렬
+      .map(([agent, data]) => ({
         agent,
-        count
+        wireless: data.wireless,
+        wired: data.wired,
+        total: data.total
       }))
   };
 }

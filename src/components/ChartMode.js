@@ -57,7 +57,9 @@ import {
   Receipt as ReceiptIcon,
   Refresh as RefreshIcon,
   Settings as SettingsIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
 
@@ -2295,6 +2297,12 @@ function ClosingChartTab() {
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [mappingFailures, setMappingFailures] = useState([]);
+  
+  // 테이블 접기/펼치기 상태
+  const [codeTableOpen, setCodeTableOpen] = useState(false);
+  const [officeTableOpen, setOfficeTableOpen] = useState(false);
+  const [departmentTableOpen, setDepartmentTableOpen] = useState(false);
+  const [agentTableOpen, setAgentTableOpen] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
@@ -2503,24 +2511,74 @@ function ClosingChartTab() {
         </Box>
 
         {/* CS 개통 요약 */}
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
-          <Typography variant="h6" color="white" sx={{ mb: 2 }}>
-            CS 개통 ({data.csSummary?.total || 0})
+        <Paper sx={{ mb: 2, p: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', textAlign: 'center' }}>
+            📞 CS 개통 실적
           </Typography>
           
-          {/* 담당자별 CS 개통 개수 */}
-          {data.csSummary?.agents && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-              {data.csSummary.agents.map((agent, index) => (
-                <Typography key={index} variant="body2" color="white">
-                  {agent.agent} ({agent.count})
+          {/* 총계 카드 */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={4}>
+              <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
+                  {data.csSummary?.total || 0}
                 </Typography>
-              ))}
+                <Typography variant="body2">총 개통</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#87CEEB' }}>
+                  {data.csSummary?.totalWireless || 0}
+                </Typography>
+                <Typography variant="body2">무선 개통</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Paper sx={{ p: 2, textAlign: 'center', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#98FB98' }}>
+                  {data.csSummary?.totalWired || 0}
+                </Typography>
+                <Typography variant="body2">유선 개통</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* CS 직원별 랭킹 */}
+          {data.csSummary?.agents && data.csSummary.agents.length > 0 && (
+            <Box>
+              <Typography variant="subtitle1" sx={{ mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
+                🏆 CS 직원별 랭킹
+              </Typography>
+              <Grid container spacing={1}>
+                {data.csSummary.agents.map((agent, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Paper sx={{ 
+                      p: 1.5, 
+                      background: index < 3 ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
+                      border: index < 3 ? '2px solid #FFD700' : '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: 2
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {index + 1}. {agent.agent}
+                          </Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                            무선: {agent.wireless} | 유선: {agent.wired}
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
+                          {agent.total}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
             </Box>
           )}
-          
-
-        </Box>
+        </Paper>
 
         {/* 합계 일치 경고 */}
         {!checkTotalConsistency() && (
@@ -2544,59 +2602,124 @@ function ClosingChartTab() {
       </Paper>
 
       {/* 코드별 랭킹 테이블 */}
+      {/* 코드별 실적 테이블 */}
       <Paper sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          코드별 랭킹
-        </Typography>
-        <ClosingChartTable
-          data={data.codeData}
-          type="code"
-          rankingType={rankingType}
-          total={calculateTotal(data?.codeData, 'performance')}
-          headerColor="lightgreen"
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6">코드별 실적</Typography>
+          <Button
+            size="small"
+            onClick={() => setCodeTableOpen(!codeTableOpen)}
+            startIcon={codeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          >
+            {codeTableOpen ? '접기' : '펼치기'}
+          </Button>
+        </Box>
+        {!codeTableOpen && (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              합계: {calculateTotal(data?.codeData, 'performance')}건
+            </Typography>
+          </Box>
+        )}
+        {codeTableOpen && (
+          <ClosingChartTable
+            data={data.codeData}
+            type="code"
+            rankingType={rankingType}
+            total={calculateTotal(data?.codeData, 'performance')}
+            headerColor="lightgreen"
+          />
+        )}
       </Paper>
 
-      {/* 사무실 랭킹 테이블 */}
+      {/* 사무실별 실적 테이블 */}
       <Paper sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          사무실 랭킹
-        </Typography>
-        <ClosingChartTable
-          data={data.officeData}
-          type="office"
-          rankingType={rankingType}
-          total={calculateTotal(data?.officeData, 'performance')}
-          headerColor="lightpink"
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6">사무실별 실적</Typography>
+          <Button
+            size="small"
+            onClick={() => setOfficeTableOpen(!officeTableOpen)}
+            startIcon={officeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          >
+            {officeTableOpen ? '접기' : '펼치기'}
+          </Button>
+        </Box>
+        {!officeTableOpen && (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              합계: {calculateTotal(data?.officeData, 'performance')}건
+            </Typography>
+          </Box>
+        )}
+        {officeTableOpen && (
+          <ClosingChartTable
+            data={data.officeData}
+            type="office"
+            rankingType={rankingType}
+            total={calculateTotal(data?.officeData, 'performance')}
+            headerColor="lightpink"
+          />
+        )}
       </Paper>
 
-      {/* 소속별 랭킹 테이블 */}
+      {/* 소속별 실적 테이블 */}
       <Paper sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          소속별 랭킹
-        </Typography>
-        <ClosingChartTable
-          data={data.departmentData}
-          type="department"
-          rankingType={rankingType}
-          total={calculateTotal(data?.departmentData, 'performance')}
-          headerColor="lightblue"
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6">소속별 실적</Typography>
+          <Button
+            size="small"
+            onClick={() => setDepartmentTableOpen(!departmentTableOpen)}
+            startIcon={departmentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          >
+            {departmentTableOpen ? '접기' : '펼치기'}
+          </Button>
+        </Box>
+        {!departmentTableOpen && (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              합계: {calculateTotal(data?.departmentData, 'performance')}건
+            </Typography>
+          </Box>
+        )}
+        {departmentTableOpen && (
+          <ClosingChartTable
+            data={data.departmentData}
+            type="department"
+            rankingType={rankingType}
+            total={calculateTotal(data?.departmentData, 'performance')}
+            headerColor="lightblue"
+          />
+        )}
       </Paper>
 
-      {/* 담당자 랭킹 테이블 */}
+      {/* 담당자별 실적 테이블 */}
       <Paper sx={{ mb: 2 }}>
-        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          담당자 랭킹
-        </Typography>
-        <ClosingChartTable
-          data={data.agentData}
-          type="agent"
-          rankingType={rankingType}
-          total={calculateTotal(data?.agentData, 'performance')}
-          headerColor="lightyellow"
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6">담당자별 실적</Typography>
+          <Button
+            size="small"
+            onClick={() => setAgentTableOpen(!agentTableOpen)}
+            startIcon={agentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          >
+            {agentTableOpen ? '접기' : '펼치기'}
+          </Button>
+        </Box>
+        {!agentTableOpen && (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              합계: {calculateTotal(data?.agentData, 'performance')}건
+            </Typography>
+          </Box>
+        )}
+        {agentTableOpen && (
+          <ClosingChartTable
+            data={data.agentData}
+            type="agent"
+            rankingType={rankingType}
+            total={calculateTotal(data?.agentData, 'performance')}
+            headerColor="lightyellow"
+          />
+        )}
       </Paper>
 
       {/* 목표 설정 모달 */}
@@ -2681,7 +2804,7 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
             <TableCell>구분</TableCell>
             <TableCell>{type === 'code' ? '코드' : type === 'office' ? '사무실' : '담당자'}</TableCell>
             <TableCell align="right">합계</TableCell>
-            <TableCell align="right">무선수수료</TableCell>
+            <TableCell align="right">수수료</TableCell>
             <TableCell align="right">지원금</TableCell>
             <TableCell align="right">등록점</TableCell>
             <TableCell align="right">가동점</TableCell>
