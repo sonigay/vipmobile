@@ -64,6 +64,11 @@ import { createWorker } from 'tesseract.js';
 import AppUpdatePopup from './AppUpdatePopup';
 import InventoryStatusScreen from './screens/InventoryStatusScreen';
 
+// 합계 계산 유틸리티 함수
+const calculateTotal = (dataArray, field) => {
+  return dataArray.reduce((sum, item) => sum + (item[field] || 0), 0);
+};
+
 function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [activeTab, setActiveTab] = useState(0);
   
@@ -2390,11 +2395,6 @@ function ClosingChartTab() {
     } catch (err) {
       setError(err.message);
     }
-  };
-
-  // 합계 계산
-  const calculateTotal = (dataArray, field) => {
-    return dataArray.reduce((sum, item) => sum + (item[field] || 0), 0);
   };
 
   // 합계 일치 여부 확인
