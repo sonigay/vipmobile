@@ -895,6 +895,18 @@ function MonthlyAwardTab() {
         setLoading(true);
         const result = await api.getMonthlyAwardData();
         setData(result);
+        
+        // Matrix 기준값 초기화
+        if (result.matrixCriteria) {
+          const initialMatrixValues = {};
+          result.matrixCriteria.forEach(criterion => {
+            const key = `${criterion.indicator}-${criterion.score}`;
+            const descKey = `${criterion.indicator}-desc-${criterion.score}`;
+            initialMatrixValues[key] = criterion.percentage;
+            initialMatrixValues[descKey] = criterion.description || '';
+          });
+          setMatrixValues(initialMatrixValues);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -953,19 +965,35 @@ function MonthlyAwardTab() {
     }
   };
 
-  // 점수 계산 함수
-  const calculateScore = (percentage, criteria, maxScore) => {
+  // 점수 계산 함수 (백엔드와 동일한 로직)
+  const calculateScore = (percentage, criteria) => {
     if (!criteria || criteria.length === 0) return 0;
     
-    // 기준값을 내림차순으로 정렬 (높은 점수부터 확인)
+    // 기준값을 점수별로 정렬
     const sortedCriteria = [...criteria].sort((a, b) => b.score - a.score);
     
-    for (let i = 0; i < sortedCriteria.length; i++) {
-      if (percentage >= sortedCriteria[i].percentage) {
-        return sortedCriteria[i].score;
+    for (const criterion of sortedCriteria) {
+      if (criterion.description === '미만') {
+        // 미만 조건: 해당 퍼센트 미만이면 해당 점수
+        if (percentage < criterion.percentage) {
+          return criterion.score;
+        }
+      } else if (criterion.description === '만점') {
+        // 만점 조건: 해당 퍼센트 이상이면 해당 점수
+        if (percentage >= criterion.percentage) {
+          return criterion.score;
+        }
+      } else {
+        // 이상 조건: 해당 퍼센트 이상이면 해당 점수
+        if (percentage >= criterion.percentage) {
+          return criterion.score;
+        }
       }
     }
-    return 0; // 기준 미달 시 0점
+    
+    // 모든 조건을 만족하지 않으면 최소 점수 반환
+    const minScore = Math.min(...criteria.map(c => c.score));
+    return minScore;
   };
 
   // 추가 전략상품 핸들러
@@ -1156,7 +1184,7 @@ function MonthlyAwardTab() {
                 <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#e8f5e8', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <Typography variant="h6" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
                     {getPerformanceIcon(data.indicators.upsellChange.percentage, 'upsell')}
-                    {calculateScore(parseFloat(data.indicators.upsellChange.percentage), data.matrixCriteria?.filter(c => c.indicator === 'upsell') || [], data.maxScores?.upsell || 6)}점
+                    {calculateScore(parseFloat(data.indicators.upsellChange.percentage), data.matrixCriteria?.filter(c => c.indicator === 'upsell') || [])}점
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     업셀기변
@@ -1168,7 +1196,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.change105Above.percentage, 'change105')}
-                  {calculateScore(parseFloat(data.indicators.change105Above.percentage), data.matrixCriteria?.filter(c => c.indicator === 'change105') || [], data.maxScores?.change105 || 6)}점
+                  {calculateScore(parseFloat(data.indicators.change105Above.percentage), data.matrixCriteria?.filter(c => c.indicator === 'change105') || [])}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   기변105이상
@@ -1180,7 +1208,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.strategicProducts.percentage, 'strategic')}
-                  {calculateScore(parseFloat(data.indicators.strategicProducts.percentage), data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [], data.maxScores?.strategic || 6)}점
+                  {calculateScore(parseFloat(data.indicators.strategicProducts.percentage), data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [])}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   전략상품
@@ -1192,7 +1220,7 @@ function MonthlyAwardTab() {
               <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>
                   {getPerformanceIcon(data.indicators.internetRatio.percentage, 'internet')}
-                  {calculateScore(parseFloat(data.indicators.internetRatio.percentage), data.matrixCriteria?.filter(c => c.indicator === 'internet') || [], data.maxScores?.internet || 3)}점
+                  {calculateScore(parseFloat(data.indicators.internetRatio.percentage), data.matrixCriteria?.filter(c => c.indicator === 'internet') || [])}점
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   인터넷 비중
