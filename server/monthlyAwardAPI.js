@@ -346,12 +346,13 @@ async function getMonthlyAwardData(req, res) {
           console.log('Matrix 행 데이터:', matrixRows);
           matrixRows.forEach((row, index) => {
             console.log(`행 ${index}:`, row);
-            if (row.length >= 3 && row[0] && row[1] && row[2]) { // 지표명, 점수, 퍼센트가 있는 경우만
+            if (row.length >= 4 && row[0] && row[1] && row[2]) { // 지표명, 점수, 퍼센트, 설명이 있는 경우만
               const indicatorName = row[0] || ''; // A열: 지표명
               const score = parseInt(row[1]); // B열: 점수
               const percentage = parseFloat(row[2]); // C열: 퍼센트
+              const description = row[3] || ''; // D열: 설명
               
-              console.log(`처리 중: indicatorName="${indicatorName}", score=${score}, percentage=${percentage}`);
+              console.log(`처리 중: indicatorName="${indicatorName}", score=${score}, percentage=${percentage}, description="${description}"`);
               
               if (!isNaN(score) && !isNaN(percentage)) {
                 // 지표명에서 indicator 추출
@@ -372,9 +373,10 @@ async function getMonthlyAwardData(req, res) {
                   matrixCriteria.push({ 
                     score, 
                     percentage, 
+                    description,
                     indicator: indicatorType 
                   });
-                  console.log(`Matrix 기준값 추가: ${indicatorType} ${score}점 ${percentage}%`);
+                  console.log(`Matrix 기준값 추가: ${indicatorType} ${score}점 ${percentage}% (${description})`);
                 }
               }
             }
@@ -382,43 +384,26 @@ async function getMonthlyAwardData(req, res) {
         }
       }
     } catch (error) {
-      console.log('Matrix 기준값 데이터 로드 실패, 기본값 사용:', error.message);
+      console.error('Matrix 기준값 데이터 로드 실패:', error.message);
+      throw new Error(`Matrix 기준값을 로드할 수 없습니다. 장표모드셋팅메뉴 시트의 A1:D30 범위를 확인해주세요. 오류: ${error.message}`);
     }
 
-    // 기본 Matrix 기준값 (설정이 없을 때 사용)
-    const defaultMatrixCriteria = [
-      // 업셀기변 기준값
-      { score: 6, indicator: 'upsell', percentage: 92.0 },
-      { score: 5, indicator: 'upsell', percentage: 85.0 },
-      { score: 4, indicator: 'upsell', percentage: 78.0 },
-      { score: 3, indicator: 'upsell', percentage: 70.0 },
-      { score: 2, indicator: 'upsell', percentage: 60.0 },
-      { score: 1, indicator: 'upsell', percentage: 50.0 },
-      
-      // 기변105이상 기준값
-      { score: 6, indicator: 'change105', percentage: 88.0 },
-      { score: 5, indicator: 'change105', percentage: 80.0 },
-      { score: 4, indicator: 'change105', percentage: 72.0 },
-      { score: 3, indicator: 'change105', percentage: 64.0 },
-      { score: 2, indicator: 'change105', percentage: 56.0 },
-      { score: 1, indicator: 'change105', percentage: 48.0 },
-      
-      // 전략상품 기준값 (90%에서 6점)
-      { score: 6, indicator: 'strategic', percentage: 90.0 },
-      { score: 5, indicator: 'strategic', percentage: 80.0 },
-      { score: 4, indicator: 'strategic', percentage: 70.0 },
-      { score: 3, indicator: 'strategic', percentage: 60.0 },
-      { score: 2, indicator: 'strategic', percentage: 50.0 },
-      { score: 1, indicator: 'strategic', percentage: 40.0 },
-      
-      // 인터넷 비중 기준값 (7%에서 3점)
-      { score: 3, indicator: 'internet', percentage: 7.0 },
-      { score: 2, indicator: 'internet', percentage: 6.0 },
-      { score: 1, indicator: 'internet', percentage: 5.0 }
-    ];
+    // Matrix 기준값 검증
+    if (matrixCriteria.length === 0) {
+      throw new Error('Matrix 기준값이 설정되지 않았습니다. 장표모드셋팅메뉴 시트에 데이터를 입력해주세요.');
+    }
 
-    // 설정된 값이 없으면 기본값 사용
-    const finalMatrixCriteria = matrixCriteria.length > 0 ? matrixCriteria : defaultMatrixCriteria;
+    // 각 지표별로 최소 1개 이상의 기준값이 있는지 확인
+    const indicators = ['upsell', 'change105', 'strategic', 'internet'];
+    const missingIndicators = indicators.filter(indicator => 
+      !matrixCriteria.some(criterion => criterion.indicator === indicator)
+    );
+    
+    if (missingIndicators.length > 0) {
+      throw new Error(`다음 지표의 Matrix 기준값이 누락되었습니다: ${missingIndicators.join(', ')}`);
+    }
+
+    const finalMatrixCriteria = matrixCriteria;
 
     // 월간시상 계산 함수들
     const calculateUpsellChange = (manager) => {
@@ -1185,14 +1170,35 @@ async function getMonthlyAwardData(req, res) {
       ? (totalInternetRatio.numerator / totalInternetRatio.denominator * 100).toFixed(2) 
       : '0.00';
 
-    // 각 지표별 점수 계산 함수
+    // 각 지표별 점수 계산 함수 (개선된 버전)
     const calculateScore = (percentage, criteria, maxScore) => {
-      for (let i = 0; i < criteria.length; i++) {
-        if (percentage >= criteria[i].percentage) {
-          return criteria[i].score;
+      // 기준값을 점수 순으로 정렬 (높은 점수부터)
+      const sortedCriteria = criteria.sort((a, b) => b.score - a.score);
+      
+      for (let i = 0; i < sortedCriteria.length; i++) {
+        const criterion = sortedCriteria[i];
+        
+        if (criterion.description === '미만') {
+          // 미만 조건: 해당 퍼센트 미만이면 해당 점수
+          if (percentage < criterion.percentage) {
+            return criterion.score;
+          }
+        } else if (criterion.description === '만점') {
+          // 만점 조건: 해당 퍼센트 이상이면 해당 점수
+          if (percentage >= criterion.percentage) {
+            return criterion.score;
+          }
+        } else {
+          // 이상 조건: 해당 퍼센트 이상이면 해당 점수
+          if (percentage >= criterion.percentage) {
+            return criterion.score;
+          }
         }
       }
-      return 0; // 기준 미달 시 0점
+      
+      // 모든 조건을 만족하지 않으면 최소 점수 반환
+      const minScore = Math.min(...criteria.map(c => c.score));
+      return minScore;
     };
 
     // 각 지표별 점수 계산
@@ -1303,6 +1309,41 @@ async function saveMonthlyAwardSettings(req, res) {
       data = [];
     }
 
+    // 데이터 검증 함수
+    const validateMatrixData = (data) => {
+      const errors = [];
+      
+      if (!Array.isArray(data) || data.length === 0) {
+        errors.push('데이터가 비어있습니다.');
+        return errors;
+      }
+      
+      // 각 지표별로 데이터가 있는지 확인
+      const requiredIndicators = ['upsell', 'change105', 'strategic', 'internet'];
+      const missingIndicators = requiredIndicators.filter(indicator => 
+        !data.some(item => item.indicator === indicator)
+      );
+      
+      if (missingIndicators.length > 0) {
+        errors.push(`누락된 지표: ${missingIndicators.join(', ')}`);
+      }
+      
+      // 각 지표별로 퍼센트가 내림차순인지 확인
+      requiredIndicators.forEach(indicator => {
+        const indicatorData = data.filter(item => item.indicator === indicator);
+        if (indicatorData.length > 1) {
+          for (let i = 1; i < indicatorData.length; i++) {
+            if (indicatorData[i-1].percentage <= indicatorData[i].percentage) {
+              errors.push(`${indicator} 지표의 퍼센트가 내림차순이 아닙니다.`);
+              break;
+            }
+          }
+        }
+      });
+      
+      return errors;
+    };
+
     let sheetData = [];
     
     console.log('=== 전략상품 저장 디버깅 ===');
@@ -1315,35 +1356,17 @@ async function saveMonthlyAwardSettings(req, res) {
         console.log('=== Matrix 기준값 저장 디버깅 ===');
         console.log('원본 데이터:', data);
         
-        // 프론트엔드에서 전송된 실제 데이터 사용
-        if (!data || data.length === 0) {
-          console.log('데이터가 없어서 기본값을 사용합니다.');
-          data = [
-            { score: 6, indicator: 'upsell', percentage: 92.0 },
-            { score: 5, indicator: 'upsell', percentage: 88.0 },
-            { score: 4, indicator: 'upsell', percentage: 84.0 },
-            { score: 3, indicator: 'upsell', percentage: 80.0 },
-            { score: 2, indicator: 'upsell', percentage: 76.0 },
-            { score: 1, indicator: 'upsell', percentage: 75.0 },
-            { score: 6, indicator: 'change105', percentage: 88.0 },
-            { score: 5, indicator: 'change105', percentage: 84.0 },
-            { score: 4, indicator: 'change105', percentage: 80.0 },
-            { score: 3, indicator: 'change105', percentage: 76.0 },
-            { score: 2, indicator: 'change105', percentage: 72.0 },
-            { score: 1, indicator: 'change105', percentage: 71.0 },
-            { score: 6, indicator: 'strategic', percentage: 90.0 },
-            { score: 5, indicator: 'strategic', percentage: 80.0 },
-            { score: 4, indicator: 'strategic', percentage: 70.0 },
-            { score: 3, indicator: 'strategic', percentage: 60.0 },
-            { score: 2, indicator: 'strategic', percentage: 50.0 },
-            { score: 1, indicator: 'strategic', percentage: 49.0 },
-            { score: 3, indicator: 'internet', percentage: 7.0 },
-            { score: 2, indicator: 'internet', percentage: 6.0 },
-            { score: 1, indicator: 'internet', percentage: 5.0 }
-          ];
-        } else {
-          console.log('프론트엔드에서 전송된 데이터를 사용합니다.');
+        // 데이터 검증
+        const validationErrors = validateMatrixData(data);
+        if (validationErrors.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: '데이터 검증 실패',
+            details: validationErrors
+          });
         }
+        
+        console.log('데이터 검증 통과');
         
         // 각 지표별 최대 점수 설정
         const maxScores = {
@@ -1382,7 +1405,14 @@ async function saveMonthlyAwardSettings(req, res) {
             const score = scoreRange[i];
             const item = indicatorData.find(d => d.score === score);
             if (item && item.percentage > 0) {
-              const description = i === 0 ? '만점' : ''; // 첫 번째 점수만 '만점' 표시
+              let description = '';
+              if (i === 0) {
+                description = '만점';
+              } else if (i === scoreRange.length - 1) {
+                description = '미만';
+              } else {
+                description = '이상';
+              }
               organizedData.push([
                 `${indicatorNames[indicator]} (${maxScore}점)`,
                 score,
