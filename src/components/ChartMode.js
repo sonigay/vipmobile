@@ -2510,7 +2510,7 @@ function ClosingChartTab() {
           
           {/* 담당자별 CS 개통 개수 */}
           {data.csSummary?.agents && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
               {data.csSummary.agents.map((agent, index) => (
                 <Typography key={index} variant="body2" color="white">
                   {agent.agent} ({agent.count})
