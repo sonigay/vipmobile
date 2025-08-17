@@ -17590,3 +17590,455 @@ async function createPolicyNotification(policyId, userId, notificationType, appr
     console.error('정책 알림 생성 실패:', error);
   }
 }
+
+// ========================================
+// 마감장표 API
+// ========================================
+
+// 마감장표 데이터 조회 API
+app.get('/api/closing-chart', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    
+    console.log(`마감장표 데이터 조회 시작: ${targetDate}`);
+    
+    // 캐시 키 생성
+    const cacheKey = `closing_chart_${targetDate}`;
+    
+    // 캐시 확인
+    if (cache.has(cacheKey)) {
+      console.log('캐시된 마감장표 데이터 반환');
+      return res.json(cache.get(cacheKey));
+    }
+    
+    // 필요한 시트 데이터 로드 (병렬 처리)
+    const [
+      phoneklData,
+      storeData,
+      inventoryData,
+      operationModelData,
+      customerData,
+      salesTargetData
+    ] = await Promise.all([
+      loadSheetData('폰클개통데이터'),
+      loadSheetData('폰클출고처데이터'),
+      loadSheetData('폰클재고데이터'),
+      loadSheetData('운영모델'),
+      loadSheetData('거래처정보'),
+      loadSheetData('영업사원목표')
+    ]);
+    
+    // 제외 조건 설정
+    const excludedAgents = getExcludedAgents(salesTargetData);
+    const excludedStores = getExcludedStores(inventoryData);
+    
+    // 데이터 처리
+    const processedData = processClosingChartData({
+      phoneklData,
+      storeData,
+      inventoryData,
+      operationModelData,
+      customerData,
+      targetDate,
+      excludedAgents,
+      excludedStores
+    });
+    
+    // 캐시 저장 (5분)
+    cache.set(cacheKey, processedData, 300);
+    
+    console.log('마감장표 데이터 처리 완료');
+    res.json(processedData);
+    
+  } catch (error) {
+    console.error('마감장표 데이터 조회 오류:', error);
+    res.status(500).json({ error: '마감장표 데이터 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 제외된 담당자 목록 조회
+function getExcludedAgents(salesTargetData) {
+  if (!salesTargetData || salesTargetData.length < 2) return [];
+  
+  const excluded = [];
+  for (let i = 1; i < salesTargetData.length; i++) {
+    const row = salesTargetData[i];
+    if (row.length > 2 && row[2] === 'Y') { // C열: 제외여부
+      excluded.push(row[0]); // A열: 담당자명
+    }
+  }
+  return excluded;
+}
+
+// 제외된 출고처 목록 조회
+function getExcludedStores(inventoryData) {
+  if (!inventoryData || inventoryData.length < 7) return [];
+  
+  const excluded = [];
+  for (let i = 6; i < inventoryData.length; i++) { // E7:E부터 시작
+    const row = inventoryData[i];
+    if (row.length > 4) {
+      const storeName = (row[4] || '').toString(); // E열
+      if (storeName.includes('사무실') || storeName.includes('거래종료') || storeName.includes('본점판매')) {
+        excluded.push(storeName);
+      }
+    }
+  }
+  return excluded;
+}
+
+// 마감장표 데이터 처리
+function processClosingChartData({ phoneklData, storeData, inventoryData, operationModelData, customerData, targetDate, excludedAgents, excludedStores }) {
+  // 운영모델 필터링 (휴대폰만)
+  const phoneModels = new Set();
+  if (operationModelData && operationModelData.length > 8) {
+    for (let i = 8; i < operationModelData.length; i++) {
+      const row = operationModelData[i];
+      if (row.length > 2 && row[2] === '휴대폰') { // C열: 휴대폰여부
+        phoneModels.add(row[0]); // A열: 모델명
+      }
+    }
+  }
+  
+  // 개통 데이터 필터링
+  const filteredPhoneklData = phoneklData.filter(row => {
+    if (row.length < 10) return false;
+    
+    const activationDate = (row[9] || '').toString(); // J열: 개통일
+    const model = (row[13] || '').toString(); // N열: 모델명
+    const planType = (row[19] || '').toString(); // T열: 요금제
+    const condition = (row[12] || '').toString(); // M열: 상태
+    const type = (row[16] || '').toString(); // Q열: 유형
+    
+    // 날짜 필터링
+    if (activationDate !== targetDate) return false;
+    
+    // 모델 필터링 (휴대폰만)
+    if (!phoneModels.has(model)) return false;
+    
+    // 제외 조건
+    if (planType.includes('선불')) return false;
+    if (condition.includes('중고')) return false;
+    if (type.includes('중고') || type.includes('유심')) return false;
+    
+    return true;
+  });
+  
+  // 코드별/사무실별/담당자별 데이터 집계
+  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
+  const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
+  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
+  
+  // CS 개통 요약
+  const csSummary = calculateCSSummary(phoneklData, targetDate);
+  
+  // 매핑 실패 데이터
+  const mappingFailures = findMappingFailures(filteredPhoneklData, storeData);
+  
+  return {
+    date: targetDate,
+    codeData,
+    officeData,
+    agentData,
+    csSummary,
+    mappingFailures,
+    excludedAgents,
+    excludedStores
+  };
+}
+
+// 코드별 집계
+function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+  const codeMap = new Map();
+  
+  phoneklData.forEach(row => {
+    const code = (row[4] || '').toString(); // E열: 코드명
+    const office = (row[6] || '').toString(); // G열: 사무실
+    const agent = (row[8] || '').toString(); // I열: 담당자
+    
+    if (!code || excludedAgents.includes(agent)) return;
+    
+    if (!codeMap.has(code)) {
+      codeMap.set(code, {
+        code,
+        office,
+        agent,
+        performance: 0,
+        fee: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0
+      });
+    }
+    
+    const data = codeMap.get(code);
+    data.performance++;
+    
+    // 수수료 계산 (D열)
+    const fee = parseFloat(row[3] || 0);
+    data.fee += fee;
+  });
+  
+  // 목표값 및 추가 계산
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  
+  codeMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+  });
+  
+  return Array.from(codeMap.values()).sort((a, b) => b.performance - a.performance);
+}
+
+// 사무실별 집계
+function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+  const officeMap = new Map();
+  
+  phoneklData.forEach(row => {
+    const office = (row[6] || '').toString(); // G열: 사무실
+    const agent = (row[8] || '').toString(); // I열: 담당자
+    
+    if (!office || excludedAgents.includes(agent)) return;
+    
+    if (!officeMap.has(office)) {
+      officeMap.set(office, {
+        office,
+        performance: 0,
+        fee: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0
+      });
+    }
+    
+    const data = officeMap.get(office);
+    data.performance++;
+    
+    const fee = parseFloat(row[3] || 0);
+    data.fee += fee;
+  });
+  
+  // 추가 계산
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  
+  officeMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+  });
+  
+  return Array.from(officeMap.values()).sort((a, b) => b.performance - a.performance);
+}
+
+// 담당자별 집계
+function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+  const agentMap = new Map();
+  
+  phoneklData.forEach(row => {
+    const agent = (row[8] || '').toString(); // I열: 담당자
+    
+    if (!agent || excludedAgents.includes(agent)) return;
+    
+    if (!agentMap.has(agent)) {
+      agentMap.set(agent, {
+        agent,
+        performance: 0,
+        fee: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0,
+        registeredStores: 0,
+        activeStores: 0,
+        devices: 0,
+        sims: 0,
+        utilization: 0
+      });
+    }
+    
+    const data = agentMap.get(agent);
+    data.performance++;
+    
+    const fee = parseFloat(row[3] || 0);
+    data.fee += fee;
+  });
+  
+  // 등록점, 가동점, 보유단말, 보유유심 계산
+  calculateAgentDetails(agentMap, storeData, inventoryData, excludedStores);
+  
+  // 추가 계산
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  
+  agentMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
+  });
+  
+  return Array.from(agentMap.values()).sort((a, b) => b.fee - a.fee);
+}
+
+// 담당자 상세 정보 계산
+function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStores) {
+  // 등록점 계산 (폰클출고처데이터)
+  if (storeData) {
+    storeData.forEach(row => {
+      if (row.length > 21) {
+        const agent = (row[21] || '').toString(); // V열: 담당자
+        const storeCode = (row[14] || '').toString(); // O열: 출고처코드
+        
+        if (agent && agentMap.has(agent) && storeCode) {
+          agentMap.get(agent).registeredStores++;
+        }
+      }
+    });
+  }
+  
+  // 가동점 계산
+  agentMap.forEach((data, agent) => {
+    // 가동점 = 등록점 중에서 실적이 있는 곳
+    let activeCount = 0;
+    if (storeData) {
+      storeData.forEach(row => {
+        if (row.length > 21 && row[21] === agent) {
+          const storeCode = (row[14] || '').toString();
+          if (storeCode && data.performance > 0) {
+            activeCount++;
+          }
+        }
+      });
+    }
+    data.activeStores = activeCount;
+  });
+  
+  // 보유단말, 보유유심 계산 (폰클재고데이터)
+  if (inventoryData) {
+    inventoryData.forEach(row => {
+      if (row.length > 8) {
+        const agent = (row[8] || '').toString(); // I열: 담당자
+        const type = (row[12] || '').toString(); // M열: 유형
+        const store = (row[21] || '').toString(); // V열: 출고처
+        
+        if (agent && agentMap.has(agent) && !excludedStores.includes(store)) {
+          if (type === '유심') {
+            agentMap.get(agent).sims++;
+          } else {
+            agentMap.get(agent).devices++;
+          }
+        }
+      }
+    });
+  }
+}
+
+// CS 개통 요약 계산
+function calculateCSSummary(phoneklData, targetDate) {
+  let csCount = 0;
+  
+  phoneklData.forEach(row => {
+    const activationDate = (row[9] || '').toString(); // J열: 개통일
+    const csType = (row[77] || '').toString(); // BZ열: CS개통
+    
+    if (activationDate === targetDate && csType) {
+      csCount++;
+    }
+  });
+  
+  return csCount;
+}
+
+// 매핑 실패 데이터 찾기
+function findMappingFailures(phoneklData, storeData) {
+  const failures = [];
+  const failureMap = new Map();
+  
+  phoneklData.forEach(row => {
+    if (row.length > 14) {
+      const storeCode = (row[14] || '').toString(); // O열: 출고처
+      const agent = (row[8] || '').toString(); // I열: 담당자
+      
+      if (storeCode && !findStoreInData(storeCode, storeData)) {
+        const key = `${storeCode}_${agent}`;
+        if (!failureMap.has(key)) {
+          failureMap.set(key, {
+            storeCode,
+            agent,
+            reason: '출고처 매핑 실패',
+            count: 0
+          });
+        }
+        failureMap.get(key).count++;
+      }
+    }
+  });
+  
+  return Array.from(failureMap.values());
+}
+
+// 출고처 데이터에서 매칭 찾기
+function findStoreInData(storeCode, storeData) {
+  if (!storeData) return false;
+  
+  return storeData.some(row => {
+    if (row.length > 14) {
+      const code = (row[14] || '').toString(); // O열: 출고처코드
+      return code === storeCode;
+    }
+    return false;
+  });
+}
+
+// 목표 설정 API
+app.post('/api/closing-chart/targets', async (req, res) => {
+  try {
+    const { targets } = req.body;
+    
+    if (!targets || !Array.isArray(targets)) {
+      return res.status(400).json({ error: '목표 데이터가 올바르지 않습니다.' });
+    }
+    
+    // 영업사원목표 시트에 저장
+    const targetData = targets.map(target => [
+      target.agent, // A열: 담당자명
+      target.target, // B열: 목표값
+      target.excluded ? 'Y' : 'N', // C열: 제외여부
+      new Date().toISOString() // D열: 설정일시
+    ]);
+    
+    await updateSheetData('영업사원목표', targetData);
+    
+    // 캐시 무효화
+    cache.flush();
+    
+    res.json({ success: true, message: '목표가 성공적으로 저장되었습니다.' });
+    
+  } catch (error) {
+    console.error('목표 설정 오류:', error);
+    res.status(500).json({ error: '목표 설정 중 오류가 발생했습니다.' });
+  }
+});
+
+// 매핑 실패 데이터 조회 API
+app.get('/api/closing-chart/mapping-failures', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    
+    const phoneklData = await loadSheetData('폰클개통데이터');
+    const storeData = await loadSheetData('폰클출고처데이터');
+    
+    const failures = findMappingFailures(phoneklData, storeData);
+    
+    res.json({ failures });
+    
+  } catch (error) {
+    console.error('매핑 실패 데이터 조회 오류:', error);
+    res.status(500).json({ error: '매핑 실패 데이터 조회 중 오류가 발생했습니다.' });
+  }
+});

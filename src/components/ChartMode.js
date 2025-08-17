@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../api';
 import {
   Box,
@@ -32,7 +32,9 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  LinearProgress,
+  Checkbox
 } from '@mui/material';
 import {
   BarChart as BarChartIcon,
@@ -50,7 +52,11 @@ import {
   ShowChart as ShowChartIcon,
   PieChart as PieChartIcon,
   Update as UpdateIcon,
-  Inventory as InventoryIcon
+  Inventory as InventoryIcon,
+  Receipt as ReceiptIcon,
+  Refresh as RefreshIcon,
+  Settings as SettingsIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
 
@@ -81,8 +87,8 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const handleTabChange = (event, newValue) => {
-    // 채권장표 탭(0번)에 접근할 때 권한 체크
-    if (newValue === 0 && !loggedInStore?.modePermissions?.bondChart) {
+    // 채권장표 탭(1번)에 접근할 때 권한 체크 (마감장표가 0번이 되므로)
+    if (newValue === 1 && !loggedInStore?.modePermissions?.bondChart) {
       alert('채권장표 메뉴에 대한 권한이 없습니다.');
       return;
     }
@@ -91,6 +97,12 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   // 탭 구성 (권한에 따라 조건부 렌더링)
   const tabs = [
+    {
+      label: '마감장표',
+      icon: <ReceiptIcon />,
+      component: <ClosingChartTab />,
+      hasPermission: true // 마감장표 탭은 모든 사용자에게 표시
+    },
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
@@ -2261,6 +2273,558 @@ function StructurePolicyTab() {
         빠른 시일 내에 서비스를 제공하겠습니다.
       </Typography>
     </Paper>
+  );
+}
+
+// 마감장표 탭 컴포넌트
+function ClosingChartTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [rankingType, setRankingType] = useState('fee'); // 'fee' or 'performance'
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [mappingFailures, setMappingFailures] = useState([]);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  // 데이터 로드
+  const loadData = useCallback(async (date = selectedDate) => {
+    setLoading(true);
+    setProgress(0);
+    setError(null);
+
+    try {
+      // 프로그레스바 시뮬레이션
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 100);
+
+      const response = await fetch(`/api/closing-chart?date=${date}`);
+      if (!response.ok) {
+        throw new Error('데이터 로드에 실패했습니다.');
+      }
+
+      const result = await response.json();
+      setData(result);
+      setLastUpdate(new Date());
+      setProgress(100);
+
+      setTimeout(() => {
+        setProgress(0);
+        setLoading(false);
+      }, 500);
+
+    } catch (err) {
+      setError(err.message);
+      setProgress(0);
+      setLoading(false);
+    }
+  }, [selectedDate]);
+
+  // 매핑 실패 데이터 로드
+  const loadMappingFailures = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/closing-chart/mapping-failures?date=${selectedDate}`);
+      if (response.ok) {
+        const result = await response.json();
+        setMappingFailures(result.failures || []);
+      }
+    } catch (err) {
+      console.error('매핑 실패 데이터 로드 오류:', err);
+    }
+  }, [selectedDate]);
+
+  // 초기 로드
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 자동 업데이트 (10분마다)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData();
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  // 날짜 변경 시 데이터 재로드
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    loadData(newDate);
+  };
+
+  // 수동 새로고침
+  const handleRefresh = () => {
+    loadData();
+    loadMappingFailures();
+  };
+
+  // 목표 설정 저장
+  const handleTargetSave = async (targets) => {
+    try {
+      const response = await fetch('/api/closing-chart/targets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targets }),
+      });
+
+      if (response.ok) {
+        // 데이터 재로드
+        loadData();
+        setShowTargetModal(false);
+      } else {
+        throw new Error('목표 저장에 실패했습니다.');
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // 합계 계산
+  const calculateTotal = (dataArray, field) => {
+    return dataArray.reduce((sum, item) => sum + (item[field] || 0), 0);
+  };
+
+  // 합계 일치 여부 확인
+  const checkTotalConsistency = () => {
+    if (!data) return true;
+    
+    const codeTotal = calculateTotal(data.codeData, 'performance');
+    const officeTotal = calculateTotal(data.officeData, 'performance');
+    const agentTotal = calculateTotal(data.agentData, 'performance');
+    
+    return codeTotal === officeTotal && officeTotal === agentTotal;
+  };
+
+  if (loading && progress > 0) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          마감장표 데이터 로딩 중...
+        </Typography>
+        <LinearProgress 
+          variant="determinate" 
+          value={progress} 
+          sx={{ height: 8, borderRadius: 4, mb: 2 }}
+        />
+        <Typography variant="body2" color="text.secondary">
+          {progress}% 완료
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        <AlertTitle>오류</AlertTitle>
+        {error}
+        <Button onClick={handleRefresh} sx={{ ml: 2 }}>
+          다시 시도
+        </Button>
+      </Alert>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <CircularProgress />
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          데이터를 불러오는 중...
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 2 }}>
+      {/* 상단 컨트롤 */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h6">마감장표</Typography>
+            <TextField
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              size="small"
+            />
+            <Button
+              variant="outlined"
+              onClick={handleRefresh}
+              startIcon={<RefreshIcon />}
+            >
+              새로고침
+            </Button>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => setShowTargetModal(true)}
+              startIcon={<SettingsIcon />}
+            >
+              목표 설정
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                loadMappingFailures();
+                setShowMappingModal(true);
+              }}
+              startIcon={<WarningIcon />}
+            >
+              매핑 실패 ({mappingFailures.length})
+            </Button>
+            {lastUpdate && (
+              <Typography variant="caption" color="text.secondary">
+                마지막 업데이트: {lastUpdate.toLocaleTimeString()}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+
+        {/* CS 개통 요약 */}
+        <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
+          <Typography variant="h6" color="white">
+            CS 개통: {data.csSummary}건
+          </Typography>
+        </Box>
+
+        {/* 합계 일치 경고 */}
+        {!checkTotalConsistency() && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            <AlertTitle>주의</AlertTitle>
+            코드별, 사무실별, 담당자별 실적 합계가 일치하지 않습니다.
+          </Alert>
+        )}
+      </Paper>
+
+      {/* 랭킹 기준 탭 */}
+      <Paper sx={{ mb: 2 }}>
+        <Tabs 
+          value={rankingType} 
+          onChange={(e, newValue) => setRankingType(newValue)}
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="수수료 기준" value="fee" />
+          <Tab label="실적 기준" value="performance" />
+        </Tabs>
+      </Paper>
+
+      {/* 데이터 테이블들 */}
+      <Grid container spacing={2}>
+        {/* 코드별 테이블 */}
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 2, height: 'fit-content' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              코드별 실적
+            </Typography>
+            <ClosingChartTable
+              data={data.codeData}
+              type="code"
+              rankingType={rankingType}
+              total={calculateTotal(data.codeData, 'performance')}
+            />
+          </Paper>
+        </Grid>
+
+        {/* 사무실별 테이블 */}
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 2, height: 'fit-content' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              사무실별 실적
+            </Typography>
+            <ClosingChartTable
+              data={data.officeData}
+              type="office"
+              rankingType={rankingType}
+              total={calculateTotal(data.officeData, 'performance')}
+            />
+          </Paper>
+        </Grid>
+
+        {/* 담당자별 테이블 */}
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 2, height: 'fit-content' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              담당자별 실적
+            </Typography>
+            <ClosingChartTable
+              data={data.agentData}
+              type="agent"
+              rankingType={rankingType}
+              total={calculateTotal(data.agentData, 'performance')}
+            />
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* 목표 설정 모달 */}
+      <TargetSettingModal
+        open={showTargetModal}
+        onClose={() => setShowTargetModal(false)}
+        onSave={handleTargetSave}
+        agents={data?.agentData || []}
+        excludedAgents={data?.excludedAgents || []}
+      />
+
+      {/* 매핑 실패 모달 */}
+      <MappingFailureModal
+        open={showMappingModal}
+        onClose={() => setShowMappingModal(false)}
+        failures={mappingFailures}
+      />
+    </Box>
+  );
+}
+
+// 마감장표 테이블 컴포넌트
+function ClosingChartTable({ data, type, rankingType, total }) {
+  // 랭킹 기준에 따른 정렬
+  const sortedData = useMemo(() => {
+    if (!data) return [];
+    return [...data].sort((a, b) => {
+      if (rankingType === 'fee') {
+        return b.fee - a.fee;
+      } else {
+        return b.performance - a.performance;
+      }
+    });
+  }, [data, rankingType]);
+
+  // 배경색 결정
+  const getRowBackgroundColor = (item) => {
+    if (type === 'agent') {
+      if (item.agent.includes('(별도)') || item.agent.includes('(직영)')) {
+        return 'rgba(135, 206, 250, 0.1)'; // 하늘색
+      }
+      if (item.agent.includes('(집단)')) {
+        return 'rgba(255, 255, 0, 0.1)'; // 연노랑색
+      }
+    }
+    return 'transparent';
+  };
+
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>순위</TableCell>
+            <TableCell>{type === 'code' ? '코드' : type === 'office' ? '사무실' : '담당자'}</TableCell>
+            <TableCell align="right">실적</TableCell>
+            <TableCell align="right">수수료</TableCell>
+            <TableCell align="right">예상마감</TableCell>
+            {type === 'agent' && (
+              <>
+                <TableCell align="right">등록점</TableCell>
+                <TableCell align="right">가동점</TableCell>
+                <TableCell align="right">가동율</TableCell>
+                <TableCell align="right">보유단말</TableCell>
+                <TableCell align="right">보유유심</TableCell>
+                <TableCell align="right">회전율</TableCell>
+              </>
+            )}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {sortedData.map((item, index) => (
+            <TableRow 
+              key={index}
+              sx={{ 
+                backgroundColor: getRowBackgroundColor(item),
+                '& .MuiTableCell-root': {
+                  borderBottom: item.expectedClosing > 0 ? '2px solid #f44336' : '1px solid rgba(224, 224, 224, 1)'
+                }
+              }}
+            >
+              <TableCell>{index + 1}</TableCell>
+              <TableCell>
+                {type === 'code' ? item.code : type === 'office' ? item.office : item.agent}
+              </TableCell>
+              <TableCell align="right">{item.performance}</TableCell>
+              <TableCell align="right">{item.fee.toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#f44336' }}>
+                {item.expectedClosing}
+              </TableCell>
+              {type === 'agent' && (
+                <>
+                  <TableCell align="right">{item.registeredStores}</TableCell>
+                  <TableCell align="right">{item.activeStores}</TableCell>
+                  <TableCell align="right">{item.utilization}%</TableCell>
+                  <TableCell align="right">{item.devices}</TableCell>
+                  <TableCell align="right">{item.sims}</TableCell>
+                  <TableCell align="right">{item.rotation}%</TableCell>
+                </>
+              )}
+            </TableRow>
+          ))}
+          <TableRow sx={{ backgroundColor: 'grey.100', fontWeight: 'bold' }}>
+            <TableCell colSpan={2}>합계</TableCell>
+            <TableCell align="right">{total}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'fee').toLocaleString()}</TableCell>
+            <TableCell align="right">{calculateTotal(data, 'expectedClosing')}</TableCell>
+            {type === 'agent' && <TableCell colSpan={6} />}
+          </TableRow>
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+// 목표 설정 모달
+function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
+  const [targets, setTargets] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      // 기존 목표값 로드
+      const initialTargets = agents.map(agent => ({
+        agent: agent.agent,
+        target: agent.target || 0,
+        excluded: excludedAgents.includes(agent.agent)
+      }));
+      setTargets(initialTargets);
+    }
+  }, [open, agents, excludedAgents]);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await onSave(targets);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTargetChange = (index, value) => {
+    const newTargets = [...targets];
+    newTargets[index].target = parseInt(value) || 0;
+    setTargets(newTargets);
+  };
+
+  const handleExcludedChange = (index, excluded) => {
+    const newTargets = [...targets];
+    newTargets[index].excluded = excluded;
+    setTargets(newTargets);
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>목표 설정</DialogTitle>
+      <DialogContent>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>담당자</TableCell>
+                <TableCell align="right">목표값</TableCell>
+                <TableCell align="center">제외</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {targets.map((target, index) => (
+                <TableRow key={index}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {target.agent}
+                      {target.excluded && (
+                        <Chip 
+                          label="제외" 
+                          size="small" 
+                          color="default" 
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell align="right">
+                    <TextField
+                      type="number"
+                      value={target.target}
+                      onChange={(e) => handleTargetChange(index, e.target.value)}
+                      size="small"
+                      disabled={target.excluded}
+                      sx={{ width: 100 }}
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <Checkbox
+                      checked={target.excluded}
+                      onChange={(e) => handleExcludedChange(index, e.target.checked)}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>취소</Button>
+        <Button 
+          onClick={handleSave} 
+          variant="contained" 
+          disabled={loading}
+        >
+          {loading ? '저장 중...' : '저장'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// 매핑 실패 모달
+function MappingFailureModal({ open, onClose, failures }) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>매핑 실패 데이터</DialogTitle>
+      <DialogContent>
+        {failures.length === 0 ? (
+          <Typography>매핑 실패 데이터가 없습니다.</Typography>
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>출고처명</TableCell>
+                  <TableCell>담당자명</TableCell>
+                  <TableCell>실패 원인</TableCell>
+                  <TableCell align="right">발생 건수</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {failures.map((failure, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{failure.storeCode}</TableCell>
+                    <TableCell>{failure.agent}</TableCell>
+                    <TableCell>{failure.reason}</TableCell>
+                    <TableCell align="right">{failure.count}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>닫기</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
