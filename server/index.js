@@ -18156,6 +18156,19 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     const agentInventory = new Map(); // 담당자별 재고 데이터
     
     // 1단계: 해당 코드의 담당자들의 고유 출고처 수집
+    const codeAgents = new Set(); // 해당 코드의 담당자 목록
+    
+    // 먼저 해당 코드의 담당자들을 수집
+    phoneklData.forEach(row => {
+      const rowCode = (row[4] || '').toString(); // E열: 코드
+      const rowAgent = (row[8] || '').toString(); // I열: 담당자
+      if (rowCode === data.code && !excludedAgents.includes(rowAgent)) {
+        codeAgents.add(rowAgent);
+      }
+    });
+    
+    console.log(`🔍 [코드별집계] ${data.code} 담당자 목록:`, Array.from(codeAgents));
+    
     if (storeData) {
       storeData.forEach(storeRow => {
         if (storeRow.length > 21) {
@@ -18163,13 +18176,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
           const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
           
           // 해당 코드의 담당자인지 확인
-          const isCodeAgent = phoneklData.some(row => {
-            const rowCode = (row[4] || '').toString(); // E열: 코드
-            const rowAgent = (row[8] || '').toString(); // I열: 담당자
-            return rowCode === data.code && rowAgent === storeAgent && !excludedAgents.includes(rowAgent);
-          });
-          
-          if (isCodeAgent && storeCode) {
+          if (codeAgents.has(storeAgent) && storeCode) {
             // 제외 조건들
             if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
@@ -18193,13 +18200,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
           const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
           
           // 해당 코드의 담당자인지 확인
-          const isCodeAgent = phoneklData.some(row => {
-            const rowCode = (row[4] || '').toString(); // E열: 코드
-            const rowAgent = (row[8] || '').toString(); // I열: 담당자
-            return rowCode === data.code && rowAgent === inventoryAgent && !excludedAgents.includes(rowAgent);
-          });
-          
-          if (isCodeAgent && !excludedStores.includes(inventoryStore)) {
+          if (codeAgents.has(inventoryAgent) && !excludedStores.includes(inventoryStore)) {
             if (!agentInventory.has(inventoryAgent)) {
               agentInventory.set(inventoryAgent, { devices: 0, sims: 0 });
             }
