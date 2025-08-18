@@ -18735,6 +18735,32 @@ function findMappingFailures(phoneklData, storeData) {
   return Array.from(failureMap.values());
 }
 
+// 실제 데이터에서 담당자-코드 조합 추출
+function extractAgentCodeCombinations(phoneklData) {
+  const combinations = new Map();
+  
+  phoneklData.forEach(row => {
+    const agent = (row[8] || '').toString().trim(); // I열: 담당자
+    const code = (row[4] || '').toString().trim(); // E열: 코드명
+    
+    // 헤더 제외
+    if (agent === '담당자' || code === '코드명') return;
+    
+    if (agent && code) {
+      const key = `${agent}|${code}`;
+      if (!combinations.has(key)) {
+        combinations.set(key, {
+          agent,
+          code,
+          displayName: `${agent} (${code})`
+        });
+      }
+    }
+  });
+  
+  return Array.from(combinations.values());
+}
+
 // 출고처 데이터에서 매칭 찾기
 function findStoreInData(storeCode, storeData) {
   if (!storeData) return false;
@@ -18800,5 +18826,66 @@ app.get('/api/closing-chart/mapping-failures', async (req, res) => {
   } catch (error) {
     console.error('매핑 실패 데이터 조회 오류:', error);
     res.status(500).json({ error: '매핑 실패 데이터 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 담당자-코드 조합 추출 API
+app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    
+    // 폰클개통데이터 가져오기
+    const phoneklData = await getSheetValues('폰클개통데이터');
+    
+    if (!phoneklData || phoneklData.length < 2) {
+      return res.json({ combinations: [] });
+    }
+    
+    // 헤더 제외하고 데이터만 처리
+    const dataRows = phoneklData.slice(1);
+    
+    // 실제 데이터에서 담당자-코드 조합 추출
+    const combinations = extractAgentCodeCombinations(dataRows);
+    
+    // 기존 목표값 데이터 가져오기
+    const targetData = await getSheetValues('영업사원목표');
+    const existingTargets = new Map();
+    
+    if (targetData && targetData.length > 1) {
+      targetData.slice(1).forEach(row => {
+        const agent = row[0] || '';
+        const code = row[1] || '';
+        const target = parseInt(row[2]) || 0;
+        const excluded = row[3] === 'Y';
+        const key = `${agent}|${code}`;
+        existingTargets.set(key, { agent, code, target, excluded });
+      });
+    }
+    
+    // 조합에 기존 목표값 병합
+    const result = combinations.map(combo => {
+      const key = `${combo.agent}|${combo.code}`;
+      const existing = existingTargets.get(key);
+      
+      return {
+        agent: combo.agent,
+        code: combo.code,
+        target: existing ? existing.target : 0,
+        excluded: existing ? existing.excluded : false
+      };
+    });
+    
+    console.log('🔍 [담당자-코드조합] 추출 결과:', {
+      총조합수: result.length,
+      기존목표값수: existingTargets.size,
+      샘플: result.slice(0, 5)
+    });
+    
+    res.json({ combinations: result });
+    
+  } catch (error) {
+    console.error('담당자-코드 조합 추출 오류:', error);
+    res.status(500).json({ error: '담당자-코드 조합 추출 중 오류가 발생했습니다.' });
   }
 });

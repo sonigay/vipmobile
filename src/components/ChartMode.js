@@ -3035,27 +3035,33 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
 function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [combinations, setCombinations] = useState([]);
 
+  // 담당자-코드 조합 데이터 가져오기
   useEffect(() => {
     if (open) {
-      console.log('🔍 [목표설정] 모달 열림:', {
-        agentsLength: agents?.length || 0,
-        agents: agents,
-        excludedAgentsLength: excludedAgents?.length || 0,
-        excludedAgents: excludedAgents
-      });
-      
-      // 기존 목표값 로드
-      const initialTargets = agents.map(agent => ({
-        agent: agent.agent,
-        target: agent.target || 0,
-        excluded: excludedAgents.includes(agent.agent)
-      }));
-      setTargets(initialTargets);
-      
-      console.log('🔍 [목표설정] 초기 목표값:', initialTargets);
+      fetchAgentCodeCombinations();
     }
-  }, [open, agents, excludedAgents]);
+  }, [open]);
+
+  const fetchAgentCodeCombinations = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/closing-chart/agent-code-combinations`);
+      const data = await response.json();
+      
+      if (data.combinations) {
+        setCombinations(data.combinations);
+        setTargets(data.combinations);
+        
+        console.log('🔍 [목표설정] 담당자-코드 조합 로드:', {
+          총조합수: data.combinations.length,
+          샘플: data.combinations.slice(0, 5)
+        });
+      }
+    } catch (error) {
+      console.error('담당자-코드 조합 로드 오류:', error);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -3085,7 +3091,7 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
         {targets.length === 0 ? (
           <Box sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="body1" color="text.secondary">
-              담당자 데이터가 없습니다.
+              담당자-코드 조합 데이터가 없습니다.
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               데이터를 먼저 로드해주세요.
@@ -3096,7 +3102,8 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>담당자</TableCell>
+                  <TableCell>담당자명</TableCell>
+                  <TableCell>코드명</TableCell>
                   <TableCell align="right">목표값</TableCell>
                   <TableCell align="center">제외</TableCell>
                 </TableRow>
@@ -3117,6 +3124,7 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
                         )}
                       </Box>
                     </TableCell>
+                    <TableCell>{target.code}</TableCell>
                     <TableCell align="right">
                       <TextField
                         type="number"
