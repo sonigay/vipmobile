@@ -18140,7 +18140,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     
     // 지원금 적용
     data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
@@ -18236,7 +18236,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     
     // 지원금 적용
     data.support = officeSupportMap ? (officeSupportMap.get(data.office) || 0) : 0;
@@ -18319,7 +18319,7 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
     
@@ -18455,7 +18455,7 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
     
@@ -18475,6 +18475,11 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
         const agent = (row[21] || '').toString(); // V열: 담당자
         const storeCode = (row[14] || '').toString(); // O열: 출고처코드
         
+        // 제외 조건들
+        if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외
+        if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외
+        if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외
+        
         if (agent && agentMap.has(agent) && storeCode) {
           agentMap.get(agent).registeredStores++;
         }
@@ -18490,6 +18495,12 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
       storeData.forEach(row => {
         if (row.length > 21 && row[21] === agent) {
           const storeCode = (row[14] || '').toString();
+          
+          // 제외 조건들 (등록점과 동일)
+          if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외
+          if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외
+          if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외
+          
           if (storeCode && data.performance > 0) {
             activeCount++;
           }
