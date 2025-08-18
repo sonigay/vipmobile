@@ -18437,7 +18437,7 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
   });
   
   // 등록점, 가동점, 보유단말, 보유유심 계산
-  calculateAgentDetails(agentMap, storeData, inventoryData, excludedStores);
+  calculateAgentDetails(agentMap, storeData, inventoryData, excludedStores, filteredPhoneklData);
   
   // 추가 계산
   const today = new Date();
@@ -18467,7 +18467,7 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
 }
 
 // 담당자 상세 정보 계산
-function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStores) {
+function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStores, filteredPhoneklData) {
   // 등록점 계산 (폰클출고처데이터)
   if (storeData) {
     storeData.forEach(row => {
@@ -18501,7 +18501,14 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
           if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외
           if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외
           
-          if (storeCode && data.performance > 0) {
+          // 해당 출고처에서 당월실적이 있는지 확인
+          const hasPerformance = filteredPhoneklData.some(performanceRow => {
+            const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처코드
+            const performanceAgent = (performanceRow[8] || '').toString(); // I열: 담당자
+            return performanceStoreCode === storeCode && performanceAgent === agent;
+          });
+          
+          if (storeCode && hasPerformance) {
             activeCount++;
           }
         }
