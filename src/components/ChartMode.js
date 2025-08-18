@@ -2915,23 +2915,23 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
               textAlign: 'center'
             }
           }}>
-            <TableCell sx={{ width: { xs: '30px', sm: '40px' } }}></TableCell>
-            <TableCell sx={{ width: { xs: '35px', sm: '50px' } }}></TableCell>
-            <TableCell sx={{ width: { xs: '60px', sm: '80px' } }}></TableCell>
-            <TableCell align="right" sx={{ width: { xs: '50px', sm: '70px' } }}>{((totalFee + calculateTotal(data, 'support')) * 1000).toLocaleString()}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '50px', sm: '70px' } }}>{(totalFee * 1000).toLocaleString()}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{(calculateTotal(data, 'support') * 1000).toLocaleString()}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{calculateTotal(data, 'registeredStores')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{calculateTotal(data, 'activeStores')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '40px', sm: '50px' } }}>{Math.round(calculateTotal(data, 'activeStores') / calculateTotal(data, 'registeredStores') * 100)}%</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{calculateTotal(data, 'registeredStores') - calculateTotal(data, 'activeStores')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{calculateTotal(data, 'devices')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{calculateTotal(data, 'sims')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '40px', sm: '50px' } }}>{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{total}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '50px', sm: '70px' }, backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f' }}>{totalExpectedClosing}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>{calculateTotal(data, 'target')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '40px', sm: '50px' }, color: '#d32f2f', fontWeight: 'bold' }}>
+            <TableCell sx={{ width: { xs: '25px', sm: '40px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}></TableCell>
+            <TableCell sx={{ width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}></TableCell>
+            <TableCell sx={{ width: { xs: '50px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}></TableCell>
+            <TableCell align="right" sx={{ width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{((totalFee + calculateTotal(data, 'support')) * 1000).toLocaleString()}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{(totalFee * 1000).toLocaleString()}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{(calculateTotal(data, 'support') * 1000).toLocaleString()}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{calculateTotal(data, 'registeredStores')}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{calculateTotal(data, 'activeStores')}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{Math.round(calculateTotal(data, 'activeStores') / calculateTotal(data, 'registeredStores') * 100)}%</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{calculateTotal(data, 'registeredStores') - calculateTotal(data, 'activeStores')}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{calculateTotal(data, 'devices')}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{calculateTotal(data, 'sims')}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{total}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '40px', sm: '70px' }, backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f', fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{totalExpectedClosing}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{calculateTotal(data, 'target')}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '30px', sm: '50px' }, color: '#d32f2f', fontWeight: 'bold', fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>
               {Math.round(totalExpectedClosing / calculateTotal(data, 'target') * 100)}%
             </TableCell>
           </TableRow>
@@ -2951,23 +2951,23 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
               textAlign: 'center'
             }
           }}>
-            <TableCell sx={{ width: { xs: '30px', sm: '40px' } }}>RANK</TableCell>
-            <TableCell sx={{ width: { xs: '35px', sm: '50px' } }}>구분</TableCell>
-            <TableCell sx={{ width: { xs: '60px', sm: '80px' } }}>{type === 'code' ? '코드' : type === 'office' ? '사무실' : type === 'department' ? '소속' : '담당자'}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '50px', sm: '70px' } }}>합계</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '50px', sm: '70px' } }}>수수료</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>지원금</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>등록점</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>가동점</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '40px', sm: '50px' } }}>가동율</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>무실적점</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>보유단말</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>보유유심</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '40px', sm: '50px' } }}>회전율</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>당월실적</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '50px', sm: '70px' }, backgroundColor: 'rgba(255,255,255,0.2)' }}>예상마감</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '45px', sm: '60px' } }}>목표</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '40px', sm: '50px' }, color: '#FFD700' }}>달성율</TableCell>
+            <TableCell sx={{ width: { xs: '25px', sm: '40px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>RANK</TableCell>
+            <TableCell sx={{ width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>구분</TableCell>
+            <TableCell sx={{ width: { xs: '50px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{type === 'code' ? '코드' : type === 'office' ? '사무실' : type === 'department' ? '소속' : '담당자'}</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>합계</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>수수료</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>지원금</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>등록점</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>가동점</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>가동율</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>무실적점</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유단말</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유유심</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>당월실적</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '40px', sm: '70px' }, backgroundColor: 'rgba(255,255,255,0.2)', fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>예상마감</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>목표</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '30px', sm: '50px' }, color: '#FFD700', fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>달성율</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -2983,35 +2983,35 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
                 },
                 '& .MuiTableCell-root': {
                   borderBottom: '1px solid rgba(224, 224, 224, 0.5)',
-                  fontSize: { xs: '0.6rem', sm: '0.7rem' },
-                  padding: { xs: '3px 2px', sm: '6px 4px' },
+                  fontSize: { xs: '0.5rem', sm: '0.7rem' },
+                  padding: { xs: '2px 1px', sm: '6px 4px' },
                   textAlign: 'center'
                 }
               }}
             >
-              <TableCell sx={{ fontWeight: 'bold', color: '#495057', width: { xs: '30px', sm: '40px' } }}>{index + 1}</TableCell>
-              <TableCell sx={{ color: '#6c757d', width: { xs: '35px', sm: '50px' } }}>
+              <TableCell sx={{ fontWeight: 'bold', color: '#495057', width: { xs: '25px', sm: '40px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{index + 1}</TableCell>
+              <TableCell sx={{ color: '#6c757d', width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>
                 {type === 'code' ? 'VIP' : type === 'office' ? '사무실' : type === 'department' ? '소속' : '영업'}
               </TableCell>
-              <TableCell sx={{ fontWeight: 'bold', color: '#212529', width: { xs: '60px', sm: '80px' } }}>
+              <TableCell sx={{ fontWeight: 'bold', color: '#212529', width: { xs: '50px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>
                 {type === 'code' ? item.code : type === 'office' ? item.office : type === 'department' ? item.department : item.agent}
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057', width: { xs: '50px', sm: '70px' } }}>{((item.fee + item.support) * 1000).toLocaleString()}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '50px', sm: '70px' } }}>{(item.fee * 1000).toLocaleString()}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{(item.support * 1000).toLocaleString()}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{item.registeredStores || 0}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{item.activeStores || 0}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '40px', sm: '50px' } }}>{item.utilization || 0}%</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{(item.registeredStores || 0) - (item.activeStores || 0)}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{item.devices || 0}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{item.sims || 0}</TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '40px', sm: '50px' } }}>{item.rotation || 0}%</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057', width: { xs: '45px', sm: '60px' } }}>{item.performance}</TableCell>
-              <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f', width: { xs: '50px', sm: '70px' } }}>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057', width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{((item.fee + item.support) * 1000).toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{(item.fee * 1000).toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{(item.support * 1000).toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.registeredStores || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.activeStores || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.utilization || 0}%</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{(item.registeredStores || 0) - (item.activeStores || 0)}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.devices || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.sims || 0}</TableCell>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.rotation || 0}%</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.performance}</TableCell>
+              <TableCell align="right" sx={{ backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f', width: { xs: '40px', sm: '70px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>
                 {item.expectedClosing}
               </TableCell>
-              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '45px', sm: '60px' } }}>{item.target || 0}</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', color: item.achievement >= 100 ? '#4caf50' : '#d32f2f', width: { xs: '40px', sm: '50px' } }}>
+              <TableCell align="right" sx={{ color: '#6c757d', width: { xs: '35px', sm: '60px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>{item.target || 0}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: item.achievement >= 100 ? '#4caf50' : '#d32f2f', width: { xs: '30px', sm: '50px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>
                 {item.achievement || 0}%
               </TableCell>
             </TableRow>
