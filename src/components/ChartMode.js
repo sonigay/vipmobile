@@ -2926,7 +2926,7 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
             <TableCell sx={{ width: '40px' }}>합계</TableCell>
             <TableCell sx={{ width: '50px' }}>합계</TableCell>
             <TableCell sx={{ width: '80px' }}>합계</TableCell>
-            <TableCell align="right" sx={{ width: '70px' }}>{(totalFee * 1000).toLocaleString()}</TableCell>
+            <TableCell align="right" sx={{ width: '70px' }}>{((totalFee + calculateTotal(data, 'support')) * 1000).toLocaleString()}</TableCell>
             <TableCell align="right" sx={{ width: '70px' }}>{(totalFee * 1000).toLocaleString()}</TableCell>
             <TableCell align="right" sx={{ width: '60px' }}>{(calculateTotal(data, 'support') * 1000).toLocaleString()}</TableCell>
             <TableCell align="right" sx={{ width: '60px' }}>{calculateTotal(data, 'registeredStores')}</TableCell>
@@ -3005,7 +3005,7 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
               <TableCell sx={{ fontWeight: 'bold', color: '#212529', width: '80px' }}>
                 {type === 'code' ? item.code : type === 'office' ? item.office : type === 'department' ? item.department : item.agent}
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057', width: '70px' }}>{(item.fee * 1000).toLocaleString()}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#495057', width: '70px' }}>{((item.fee + item.support) * 1000).toLocaleString()}</TableCell>
               <TableCell align="right" sx={{ color: '#6c757d', width: '70px' }}>{(item.fee * 1000).toLocaleString()}</TableCell>
               <TableCell align="right" sx={{ color: '#6c757d', width: '60px' }}>{(item.support * 1000).toLocaleString()}</TableCell>
               <TableCell align="right" sx={{ color: '#6c757d', width: '60px' }}>{item.registeredStores || 0}</TableCell>
