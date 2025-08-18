@@ -17892,8 +17892,8 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     담당자별데이터수: agentData?.length || 0
   });
   
-  // CS 개통 요약
-      const csSummary = calculateCSSummary(phoneklData, phoneklHomeData, targetDate);
+    // CS 개통 요약
+  const csSummary = calculateCSSummary(phoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents);
   
   // 매핑 실패 데이터
   const mappingFailures = findMappingFailures(filteredPhoneklData, storeData);
@@ -18304,7 +18304,7 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
 }
 
 // CS 개통 요약 계산 (무선 + 유선)
-function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
+function calculateCSSummary(phoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents) {
   console.log('🔍 [CS개통] 계산 시작:', {
     phoneklDataLength: phoneklData?.length || 0,
     phoneklHomeDataLength: phoneklHomeData?.length || 0,
@@ -18371,18 +18371,67 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
     csAgents.set(csEmployee, { wireless: 0, wired: 0, total: 0 });
   });
   
-  // 무선 개통 데이터 처리 (폰클개통데이터 BZ열)
+  // 무선 개통 데이터 처리 (폰클개통데이터 BZ열) - 필터링 적용
   let wirelessProcessed = 0;
+  let dateFiltered = 0;
+  let modelFiltered = 0;
+  let agentFiltered = 0;
+  let planFiltered = 0;
+  let conditionFiltered = 0;
+  let typeFiltered = 0;
+  
   phoneklData.forEach((row, index) => {
+    if (row.length < 22) return; // 최소한 V열까지 있는지 확인
+    
     const activationDate = (row[9] || '').toString(); // J열: 개통일
+    const model = (row[21] || '').toString(); // V열: 모델
+    const planType = (row[29] || '').toString(); // AD열: 요금제
+    const condition = (row[15] || '').toString(); // P열: 상태
+    const type = (row[16] || '').toString(); // Q열: 유형
+    const agent = (row[8] || '').toString(); // I열: 담당자
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
     // 날짜 필터링 (해당 날짜까지의 누적 데이터)
     const targetDateObj = new Date(targetDate);
     const activationDateObj = new Date(activationDate);
     
-    if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && 
-        csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
+    if (isNaN(activationDateObj.getTime()) || activationDateObj > targetDateObj) {
+      dateFiltered++;
+      return;
+    }
+    
+    // 모델 필터링 (휴대폰만)
+    if (!phoneModels.has(model)) {
+      modelFiltered++;
+      return;
+    }
+    
+    // 제외 담당자 필터링
+    if (excludedAgents.includes(agent)) {
+      agentFiltered++;
+      return;
+    }
+    
+    // 요금제 필터링 (유심 요금제 제외)
+    if (planType.includes('유심')) {
+      planFiltered++;
+      return;
+    }
+    
+    // 상태 필터링 (개통, 정상, 유지, 완료만 포함)
+    if (!['개통', '정상', '유지', '완료'].includes(condition)) {
+      conditionFiltered++;
+      return;
+    }
+    
+    // 유형 필터링 (신규, 번호이동, 기기변경만 포함)
+    if (!['신규', '번호이동', '기기변경'].includes(type)) {
+      typeFiltered++;
+      return;
+    }
+    
+    // CS 직원 필터링
+    if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       totalWireless++;
       wirelessProcessed++;
       
@@ -18391,6 +18440,17 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
         csAgents.get(csEmployee).total++;
       }
     }
+  });
+  
+  console.log('🔍 [CS개통] 무선 개통 필터링 결과:', {
+    원본데이터수: phoneklData?.length || 0,
+    날짜필터링제외: dateFiltered,
+    모델필터링제외: modelFiltered,
+    제외담당자필터링제외: agentFiltered,
+    요금제필터링제외: planFiltered,
+    상태필터링제외: conditionFiltered,
+    유형필터링제외: typeFiltered,
+    최종처리결과: wirelessProcessed
   });
   
   console.log('🔍 [CS개통] 무선 개통 처리 결과:', { totalWireless, wirelessProcessed });
