@@ -18760,7 +18760,7 @@ app.post('/api/closing-chart/targets', async (req, res) => {
     });
     
     // 캐시 무효화
-    cache.flush();
+    cacheUtils.cleanup();
     
     res.json({ success: true, message: '목표가 성공적으로 저장되었습니다.' });
     
