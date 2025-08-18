@@ -17642,6 +17642,7 @@ app.get('/api/closing-chart', async (req, res) => {
       inventoryData,
       operationModelData,
       customerData,
+      salesTargetData,
       phoneklHomeData,
       targetDate,
       excludedAgents,
@@ -17692,7 +17693,7 @@ function getExcludedStores(inventoryData) {
 }
 
 // 마감장표 데이터 처리
-function processClosingChartData({ phoneklData, storeData, inventoryData, operationModelData, customerData, phoneklHomeData, targetDate, excludedAgents, excludedStores }) {
+function processClosingChartData({ phoneklData, storeData, inventoryData, operationModelData, customerData, salesTargetData, phoneklHomeData, targetDate, excludedAgents, excludedStores }) {
   console.log('🔍 [마감장표] 데이터 처리 시작');
   console.log('🔍 [마감장표] 입력 데이터:', {
     phoneklDataLength: phoneklData?.length || 0,
@@ -17883,10 +17884,23 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   // 코드별/사무실별/소속별/담당자별 데이터 집계
   console.log('🔍 [마감장표] 데이터 집계 시작');
   
-  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap);
-  const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap);
-  const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap);
-  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap);
+  // 목표값 데이터 처리
+  const targets = new Map();
+  if (salesTargetData && salesTargetData.length > 1) {
+    salesTargetData.slice(1).forEach(row => {
+      const agent = row[0] || '';
+      const code = row[1] || '';
+      const target = parseInt(row[2]) || 0;
+      const excluded = row[3] === 'Y';
+      const key = `${agent}|${code}`;
+      targets.set(key, { agent, code, target, excluded });
+    });
+  }
+  
+  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets);
+  const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap, targets);
+  const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap, targets);
+  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets);
   
   console.log('🔍 [마감장표] 집계 결과:', {
     코드별데이터수: codeData?.length || 0,
