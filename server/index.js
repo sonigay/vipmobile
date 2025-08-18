@@ -18130,6 +18130,16 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
   // 등록점, 가동점, 보유단말, 보유유심 계산
   codeMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    
+    // 목표값 적용 (해당 코드의 모든 담당자 목표값 합계)
+    let totalTarget = 0;
+    targets.forEach((targetInfo, key) => {
+      if (!targetInfo.excluded && targetInfo.code === data.code) {
+        totalTarget += targetInfo.target;
+      }
+    });
+    data.target = totalTarget;
+    
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     
     // 지원금 적용
@@ -18209,6 +18219,23 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
   
   officeMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    
+    // 목표값 적용 (해당 사무실의 모든 담당자-코드 조합 목표값 합계)
+    let totalTarget = 0;
+    targets.forEach((targetInfo, key) => {
+      if (!targetInfo.excluded) {
+        // 해당 사무실의 담당자인지 확인
+        const agentData = phoneklData.find(row => 
+          (row[8] || '').toString() === targetInfo.agent && 
+          (row[6] || '').toString() === data.office
+        );
+        if (agentData) {
+          totalTarget += targetInfo.target;
+        }
+      }
+    });
+    data.target = totalTarget;
+    
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     
     // 지원금 적용
@@ -18275,6 +18302,23 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
   
   departmentMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    
+    // 목표값 적용 (해당 소속의 모든 담당자-코드 조합 목표값 합계)
+    let totalTarget = 0;
+    targets.forEach((targetInfo, key) => {
+      if (!targetInfo.excluded) {
+        // 해당 소속의 담당자인지 확인
+        const agentData = phoneklData.find(row => 
+          (row[8] || '').toString() === targetInfo.agent && 
+          (row[7] || '').toString() === data.department
+        );
+        if (agentData) {
+          totalTarget += targetInfo.target;
+        }
+      }
+    });
+    data.target = totalTarget;
+    
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
@@ -18401,6 +18445,16 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
   
   agentMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    
+    // 목표값 적용 (해당 담당자의 모든 코드 목표값 합계)
+    let totalTarget = 0;
+    targets.forEach((targetInfo, key) => {
+      if (!targetInfo.excluded && targetInfo.agent === data.agent) {
+        totalTarget += targetInfo.target;
+      }
+    });
+    data.target = totalTarget;
+    
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
