@@ -18331,36 +18331,28 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
   if (phoneklHomeData) {
     console.log('🔍 [CS개통] 폰클홈데이터 샘플:', phoneklHomeData.slice(0, 3));
     
+    // 헤더 제외 (3행까지 제외, 4행부터 데이터)
+    const dataRows = phoneklHomeData.slice(3);
+    console.log('🔍 [CS개통] 헤더 제외 후 데이터 수:', dataRows.length);
+    
     // 실제 데이터 구조 파악을 위한 상세 로그
-    phoneklHomeData.slice(0, 10).forEach((row, index) => {
-      console.log(`🔍 [CS개통] 폰클홈데이터 행 ${index}:`, {
+    dataRows.slice(0, 5).forEach((row, index) => {
+      console.log(`🔍 [CS개통] 폰클홈데이터 데이터 행 ${index}:`, {
         rowLength: row.length,
-        sample: row.slice(0, 20), // 처음 20개 컬럼만
-        csColumn: row[81] || '없음', // CN열
-        installDate: row[9] || '없음', // J열: 설치일
-        employee: row[8] || '없음' // I열: 담당사원
+        csColumn: row[91] || '없음', // CN열: CS 직원
+        receiptDate: row[90] || '없음', // CM열: 접수일
+        sample: row.slice(0, 20) // 처음 20개 컬럼만
       });
     });
     
-    // 실제 CS 직원 컬럼 찾기 (등록직원 컬럼으로 추정)
-    phoneklHomeData.forEach((row, index) => {
-      // 여러 컬럼에서 CS 직원 찾기 시도
-      const possibleCSColumns = [
-        row[8], // I열: 담당사원
-        row[81], // CN열: 원래 시도했던 컬럼
-        row[7], // H열: 소속
-        row[6]  // G열: 사무실
-      ];
-      
-      for (const csEmployee of possibleCSColumns) {
-        const employee = (csEmployee || '').toString().trim();
-        if (employee && employee !== '' && employee !== 'N' && employee !== 'NO' && 
-            (employee.includes('MIN') || employee.includes('VIP') || employee.includes('등록'))) {
-          wiredCSEmployees.add(employee);
-          if (index < 5) {
-            console.log(`🔍 [CS개통] 유선 CS 직원 발견 (행 ${index}):`, employee);
-          }
-          break; // 첫 번째 유효한 CS 직원을 찾으면 중단
+    // CN열에서 CS 직원 추출
+    dataRows.forEach((row, index) => {
+      const csEmployee = (row[91] || '').toString().trim(); // CN열: CS 직원
+      if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO' && 
+          (csEmployee.includes('MIN') || csEmployee.includes('VIP') || csEmployee.includes('등록'))) {
+        wiredCSEmployees.add(csEmployee);
+        if (index < 5) {
+          console.log(`🔍 [CS개통] 유선 CS 직원 발견 (행 ${index}):`, csEmployee);
         }
       }
     });
@@ -18406,46 +18398,23 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
   // 유선 개통 데이터 처리 (폰클홈데이터)
   let wiredProcessed = 0;
   if (phoneklHomeData) {
-    phoneklHomeData.forEach((row, index) => {
-      // 여러 컬럼에서 CS 직원과 날짜 찾기
-      const possibleCSColumns = [
-        row[8], // I열: 담당사원
-        row[81], // CN열: 원래 시도했던 컬럼
-        row[7], // H열: 소속
-        row[6]  // G열: 사무실
-      ];
+    // 헤더 제외 (3행까지 제외, 4행부터 데이터)
+    const dataRows = phoneklHomeData.slice(3);
+    
+    dataRows.forEach((row, index) => {
+      // CN열에서 CS 직원 정보 추출
+      const csEmployee = (row[91] || '').toString().trim(); // CN열: CS 직원
       
-      let csEmployee = '';
-      for (const col of possibleCSColumns) {
-        const employee = (col || '').toString().trim();
-        if (employee && employee !== '' && employee !== 'N' && employee !== 'NO' && 
-            (employee.includes('MIN') || employee.includes('VIP') || employee.includes('등록'))) {
-          csEmployee = employee;
-          break;
-        }
-      }
-      
-      // 날짜 컬럼 찾기 (여러 컬럼 시도)
-      const possibleDateColumns = [
-        row[9], // J열: 설치일
-        row[5], // F열: 다른 날짜 컬럼
-        row[10] // K열: 다른 날짜 컬럼
-      ];
-      
-      let activationDate = '';
-      for (const dateCol of possibleDateColumns) {
-        const date = (dateCol || '').toString().trim();
-        if (date && date.match(/^\d{4}-\d{2}-\d{2}$/)) { // YYYY-MM-DD 형식
-          activationDate = date;
-          break;
-        }
-      }
+      // CM열에서 접수일 추출
+      const receiptDate = (row[90] || '').toString().trim(); // CM열: 접수일
       
       // 날짜 필터링 (해당 날짜까지의 누적 데이터)
       const targetDateObj = new Date(targetDate);
-      const activationDateObj = new Date(activationDate);
+      const receiptDateObj = new Date(receiptDate);
       
-      if (!isNaN(activationDateObj.getTime()) && activationDateObj <= targetDateObj && csEmployee) {
+      if (!isNaN(receiptDateObj.getTime()) && receiptDateObj <= targetDateObj && 
+          csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO' &&
+          (csEmployee.includes('MIN') || csEmployee.includes('VIP') || csEmployee.includes('등록'))) {
         totalWired++;
         wiredProcessed++;
         
@@ -18457,10 +18426,10 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate) {
       
       if (index < 5) {
         console.log(`🔍 [CS개통] 유선 데이터 샘플 (행 ${index}):`, {
-          activationDate,
+          receiptDate,
           csEmployee,
-          isValidDate: !isNaN(activationDateObj.getTime()),
-          isWithinDate: activationDateObj <= targetDateObj,
+          isValidDate: !isNaN(receiptDateObj.getTime()),
+          isWithinDate: receiptDateObj <= targetDateObj,
           isValidEmployee: csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO',
           rowSample: row.slice(0, 15) // 처음 15개 컬럼 샘플
         });
