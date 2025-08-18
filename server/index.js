@@ -17877,13 +17877,16 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     }
   }
   
+  // 지원금 계산
+  const supportBonusData = calculateSupportBonus(filteredPhoneklData, excludedAgents);
+  
   // 코드별/사무실별/소속별/담당자별 데이터 집계
   console.log('🔍 [마감장표] 데이터 집계 시작');
   
-  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
-  const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
-  const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
-  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores);
+  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap);
+  const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap);
+  const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap);
+  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap);
   
   console.log('🔍 [마감장표] 집계 결과:', {
     코드별데이터수: codeData?.length || 0,
@@ -17917,8 +17920,137 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   };
 }
 
+// 지원금 계산 함수
+function calculateSupportBonus(phoneklData, excludedAgents) {
+  console.log('🔍 [지원금계산] 시작');
+  
+  // 1단계: 담당자별 총수수료 집계 (조합별)
+  const agentCombinationMap = new Map();
+  
+  phoneklData.forEach(row => {
+    const agent = (row[8] || '').toString(); // I열: 담당자
+    const code = (row[4] || '').toString(); // E열: 코드
+    const office = (row[6] || '').toString(); // G열: 사무실
+    const department = (row[7] || '').toString(); // H열: 소속
+    
+    if (!agent || excludedAgents.includes(agent)) return;
+    
+    const combinationKey = `${agent}|${code}|${office}|${department}`;
+    const fee = parseFloat(row[3] || 0);
+    
+    if (!agentCombinationMap.has(combinationKey)) {
+      agentCombinationMap.set(combinationKey, {
+        agent,
+        code,
+        office,
+        department,
+        fee: 0
+      });
+    }
+    
+    agentCombinationMap.get(combinationKey).fee += fee;
+  });
+  
+  // 2단계: 담당자별 총수수료 집계
+  const agentTotalMap = new Map();
+  
+  agentCombinationMap.forEach((data, key) => {
+    const agent = data.agent;
+    
+    if (!agentTotalMap.has(agent)) {
+      agentTotalMap.set(agent, {
+        agent,
+        totalFee: 0,
+        combinations: []
+      });
+    }
+    
+    agentTotalMap.get(agent).totalFee += data.fee;
+    agentTotalMap.get(agent).combinations.push(data);
+  });
+  
+  // 3단계: 담당자별 총수수료 기준 상위 1~5위 선정
+  const sortedAgents = Array.from(agentTotalMap.values())
+    .sort((a, b) => b.totalFee - a.totalFee)
+    .slice(0, 5);
+  
+  console.log('🔍 [지원금계산] 상위 5위 담당자:', sortedAgents.map((a, index) => ({
+    rank: index + 1,
+    agent: a.agent,
+    totalFee: a.totalFee,
+    supportRate: [10, 8, 6, 4, 2][index] + '%'
+  })));
+  
+  // 4단계: 각 조합별 지원금 계산
+  const supportRates = [0.10, 0.08, 0.06, 0.04, 0.02]; // 10%, 8%, 6%, 4%, 2%
+  
+  sortedAgents.forEach((agentData, index) => {
+    const supportRate = supportRates[index];
+    
+    agentData.combinations.forEach(combination => {
+      combination.support = combination.fee * supportRate;
+    });
+  });
+  
+  // 5단계: 그룹별 지원금 합계 계산
+  const codeSupportMap = new Map();
+  const officeSupportMap = new Map();
+  const departmentSupportMap = new Map();
+  const agentSupportMap = new Map();
+  
+  agentCombinationMap.forEach((data, key) => {
+    const support = data.support || 0;
+    
+    // 코드별 합계
+    if (data.code) {
+      if (!codeSupportMap.has(data.code)) {
+        codeSupportMap.set(data.code, 0);
+      }
+      codeSupportMap.set(data.code, codeSupportMap.get(data.code) + support);
+    }
+    
+    // 사무실별 합계
+    if (data.office) {
+      if (!officeSupportMap.has(data.office)) {
+        officeSupportMap.set(data.office, 0);
+      }
+      officeSupportMap.set(data.office, officeSupportMap.get(data.office) + support);
+    }
+    
+    // 소속별 합계
+    if (data.department) {
+      if (!departmentSupportMap.has(data.department)) {
+        departmentSupportMap.set(data.department, 0);
+      }
+      departmentSupportMap.set(data.department, departmentSupportMap.get(data.department) + support);
+    }
+    
+    // 담당자별 합계
+    if (data.agent) {
+      if (!agentSupportMap.has(data.agent)) {
+        agentSupportMap.set(data.agent, 0);
+      }
+      agentSupportMap.set(data.agent, agentSupportMap.get(data.agent) + support);
+    }
+  });
+  
+  console.log('🔍 [지원금계산] 그룹별 지원금 합계:', {
+    코드별: Object.fromEntries(codeSupportMap),
+    사무실별: Object.fromEntries(officeSupportMap),
+    소속별: Object.fromEntries(departmentSupportMap),
+    담당자별: Object.fromEntries(agentSupportMap)
+  });
+  
+  return {
+    codeSupportMap,
+    officeSupportMap,
+    departmentSupportMap,
+    agentSupportMap
+  };
+}
+
 // 코드별 집계
-function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, codeSupportMap) {
   console.log('🔍 [코드별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
   console.log('🔍 [코드별집계] 제외 담당자:', excludedAgents);
   
@@ -17948,6 +18080,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
         agent,
         performance: 0,
         fee: 0,
+        support: 0,
         target: 0,
         achievement: 0,
         expectedClosing: 0,
@@ -17984,6 +18117,9 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
   codeMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    
+    // 지원금 적용
+    data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
     
     // 등록점 계산 (폰클출고처데이터에서 해당 코드의 출고처 수)
     data.registeredStores = calculateRegisteredStores(data.code, storeData);
@@ -18024,7 +18160,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
 }
 
 // 사무실별 집계
-function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, officeSupportMap) {
   const officeMap = new Map();
   
   phoneklData.forEach(row => {
@@ -18038,6 +18174,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
         office,
         performance: 0,
         fee: 0,
+        support: 0,
         target: 0,
         achievement: 0,
         expectedClosing: 0,
@@ -18059,13 +18196,16 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
   officeMap.forEach(data => {
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    
+    // 지원금 적용
+    data.support = officeSupportMap ? (officeSupportMap.get(data.office) || 0) : 0;
   });
   
   return Array.from(officeMap.values()).sort((a, b) => b.performance - a.performance);
 }
 
 // 소속별 집계
-function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, departmentSupportMap) {
   console.log('🔍 [소속별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
   console.log('🔍 [소속별집계] 제외 담당자:', excludedAgents);
   
@@ -18092,6 +18232,7 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
         department,
         performance: 0,
         fee: 0,
+        support: 0,
         target: 0,
         achievement: 0,
         expectedClosing: 0,
@@ -18123,6 +18264,9 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
+    
+    // 지원금 적용
+    data.support = departmentSupportMap ? (departmentSupportMap.get(data.department) || 0) : 0;
   });
   
   console.log('🔍 [소속별집계] 처리 결과:', {
@@ -18201,7 +18345,7 @@ function calculateDepartmentDetails(departmentMap, storeData, inventoryData, exc
 }
 
 // 담당자별 집계
-function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores) {
+function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, agentSupportMap) {
   const agentMap = new Map();
   
   phoneklData.forEach(row => {
@@ -18214,6 +18358,7 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
         agent,
         performance: 0,
         fee: 0,
+        support: 0,
         target: 0,
         achievement: 0,
         expectedClosing: 0,
@@ -18245,6 +18390,9 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
+    
+    // 지원금 적용
+    data.support = agentSupportMap ? (agentSupportMap.get(data.agent) || 0) : 0;
   });
   
   return Array.from(agentMap.values()).sort((a, b) => b.fee - a.fee);
