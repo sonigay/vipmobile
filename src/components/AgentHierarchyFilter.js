@@ -194,7 +194,7 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
   };
 
   return (
-    <Box sx={{ position: 'absolute', top: 70, left: 200, zIndex: 1000 }}>
+    <Box sx={{ position: 'absolute', top: 70, left: 200, zIndex: 1002 }}>
       <Button
         variant="contained"
         startIcon={<FilterList />}
@@ -210,8 +210,8 @@ const AgentHierarchyFilter = ({ filters, setFilters, filterOptions }) => {
       
       {isOpen && (
         <Paper sx={{ 
-          p: 3, 
-          width: 500, 
+          p: { xs: 2, sm: 3 }, 
+          width: { xs: '280px', sm: 500 }, 
           maxHeight: '80vh', 
           overflow: 'auto',
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)'

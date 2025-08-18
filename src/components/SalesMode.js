@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef, useTransition } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, ZoomControl } from 'react-leaflet';
 import { 
   Paper, 
   Box, 
@@ -106,7 +106,7 @@ const PerformanceFilterPanel = ({ filters, setFilters }) => {
   };
 
   return (
-    <Box sx={{ position: 'absolute', top: 70, left: 390, zIndex: 1000 }}>
+    <Box sx={{ position: 'absolute', top: 70, left: 390, zIndex: 1002 }}>
       <Button
         variant="contained"
         startIcon={<FilterList />}
@@ -122,8 +122,8 @@ const PerformanceFilterPanel = ({ filters, setFilters }) => {
       
       {isOpen && (
         <Paper sx={{ 
-          p: 3, 
-          width: 300, 
+          p: { xs: 2, sm: 3 }, 
+          width: { xs: '280px', sm: 300 }, 
           maxHeight: '60vh', 
           overflow: 'auto',
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
@@ -503,7 +503,22 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
   }
 
   return (
-    <Box sx={{ height: '100vh', position: 'relative' }}>
+    <Box sx={{ 
+      height: '100vh', 
+      position: 'relative',
+      '& .leaflet-control-zoom': {
+        marginTop: '80px !important',
+        marginRight: '10px !important'
+      },
+      '& .leaflet-control-zoom a': {
+        backgroundColor: 'rgba(255, 255, 255, 0.9) !important',
+        border: '1px solid #ccc !important',
+        color: '#333 !important',
+        '&:hover': {
+          backgroundColor: 'rgba(255, 255, 255, 1) !important'
+        }
+      }
+    }}>
       {/* 헤더 */}
       <Box sx={{ 
         position: 'absolute', 
@@ -586,7 +601,7 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
           top: 60,
           left: 10,
           right: 10,
-          zIndex: 999,
+          zIndex: 1001,
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           borderRadius: 2,
           p: 2,
@@ -770,35 +785,52 @@ const SalesMode = ({ onLogout, loggedInStore, onModeChange, availableModes }) =>
         center={defaultCenter}
         zoom={7}
         style={{ height: '100%', width: '100%' }}
+        zoomControl={false}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         
+        {/* 커스텀 줌 컨트롤 */}
+        <ZoomControl position="topright" />
+        
         {/* 필터 안내 메시지 */}
         {filteredData.length === 0 && (
           <Box sx={{
             position: 'absolute',
-            top: '50%',
+            top: { xs: '60%', sm: '50%' },
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            zIndex: 1000,
+            zIndex: 998,
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             borderRadius: 2,
-            p: 3,
+            p: { xs: 2, sm: 3 },
             boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
             textAlign: 'center',
-            maxWidth: 400
+            maxWidth: { xs: '90%', sm: 400 },
+            mx: { xs: 2, sm: 0 }
           }}>
-            <Typography variant="h6" sx={{ mb: 2, color: '#2196f3', fontWeight: 'bold' }}>
+            <Typography variant="h6" sx={{ 
+              mb: 2, 
+              color: '#2196f3', 
+              fontWeight: 'bold',
+              fontSize: { xs: '1rem', sm: '1.25rem' }
+            }}>
               📍 필터를 설정해주세요
             </Typography>
-            <Typography variant="body1" sx={{ mb: 2, color: '#666' }}>
+            <Typography variant="body1" sx={{ 
+              mb: 2, 
+              color: '#666',
+              fontSize: { xs: '0.875rem', sm: '1rem' }
+            }}>
               지도에 매장을 표시하려면 상단의 필터 버튼을 클릭하여<br/>
               지역, 대리점, 실적 범위 등을 선택해주세요.
             </Typography>
-            <Typography variant="body2" sx={{ color: '#999', fontSize: '0.9rem' }}>
+            <Typography variant="body2" sx={{ 
+              color: '#999', 
+              fontSize: { xs: '0.75rem', sm: '0.9rem' }
+            }}>
               💡 성능 최적화를 위해 필터 선택 시에만 마커가 표시됩니다.
             </Typography>
           </Box>
