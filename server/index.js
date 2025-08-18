@@ -17900,7 +17900,7 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets);
   const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap, targets);
   const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap, targets);
-  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets);
+  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets, filteredPhoneklData);
   
   console.log('🔍 [마감장표] 집계 결과:', {
     코드별데이터수: codeData?.length || 0,
@@ -18403,7 +18403,7 @@ function calculateDepartmentDetails(departmentMap, storeData, inventoryData, exc
 }
 
 // 담당자별 집계
-function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, agentSupportMap, targets) {
+function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, agentSupportMap, targets, filteredPhoneklData) {
   const agentMap = new Map();
   
   phoneklData.forEach(row => {
