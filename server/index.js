@@ -18140,7 +18140,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
     
     // 지원금 적용
     data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
@@ -18236,7 +18236,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
     
     // 지원금 적용
     data.support = officeSupportMap ? (officeSupportMap.get(data.office) || 0) : 0;
@@ -18319,7 +18319,7 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
     
@@ -18455,7 +18455,7 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
     });
     data.target = totalTarget;
     
-    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.achievement = data.target > 0 ? (data.expectedClosing / data.target) * 100 : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
     data.rotation = (data.devices + data.expectedClosing) > 0 ? Math.round((data.expectedClosing / (data.devices + data.expectedClosing)) * 100) : 0;
     
