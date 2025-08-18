@@ -17896,7 +17896,7 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   });
   
     // CS 개통 요약
-  const csSummary = calculateCSSummary(phoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents);
+  const csSummary = calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents);
   
   // 매핑 실패 데이터
   const mappingFailures = findMappingFailures(filteredPhoneklData, storeData);
@@ -18452,9 +18452,9 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
 }
 
 // CS 개통 요약 계산 (무선 + 유선)
-function calculateCSSummary(phoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents) {
+function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents) {
   console.log('🔍 [CS개통] 계산 시작:', {
-    phoneklDataLength: phoneklData?.length || 0,
+    filteredPhoneklDataLength: filteredPhoneklData?.length || 0,
     phoneklHomeDataLength: phoneklHomeData?.length || 0,
     targetDate
   });
@@ -18465,7 +18465,7 @@ function calculateCSSummary(phoneklData, phoneklHomeData, targetDate, phoneModel
   
   // BZ열에서 CS 직원들 명단 추출 (고유값) - 무선
   const csEmployeeSet = new Set();
-  phoneklData.forEach(row => {
+  filteredPhoneklData.forEach(row => {
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       csEmployeeSet.add(csEmployee);
