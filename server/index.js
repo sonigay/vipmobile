@@ -18783,11 +18783,27 @@ app.post('/api/closing-chart/targets', async (req, res) => {
       return res.status(400).json({ error: '목표 데이터가 올바르지 않습니다.' });
     }
     
+    // 헤더 설정
+    const headerData = [
+      ['담당자명', '코드명', '목표값', '제외여부']
+    ];
+    
+    // 헤더 먼저 저장
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '영업사원목표!A1',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: headerData
+      }
+    });
+    
     // 영업사원목표 시트에 저장
     const targetData = targets.map(target => [
       target.agent, // A열: 담당자명
-      target.target, // B열: 목표값
-      target.excluded ? 'Y' : 'N' // C열: 제외여부
+      target.code, // B열: 코드명
+      target.target, // C열: 목표값
+      target.excluded ? 'Y' : 'N' // D열: 제외여부
     ]);
     
     await sheets.spreadsheets.values.update({
