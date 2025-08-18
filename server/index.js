@@ -18064,7 +18064,7 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
 }
 
 // 코드별 집계
-function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, codeSupportMap) {
+function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, codeSupportMap, targets) {
   console.log('🔍 [코드별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
   console.log('🔍 [코드별집계] 제외 담당자:', excludedAgents);
   
@@ -18184,7 +18184,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
 }
 
 // 사무실별 집계
-function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, officeSupportMap) {
+function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, officeSupportMap, targets) {
   const officeMap = new Map();
   
   phoneklData.forEach(row => {
@@ -18246,7 +18246,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
 }
 
 // 소속별 집계
-function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, departmentSupportMap) {
+function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, departmentSupportMap, targets) {
   console.log('🔍 [소속별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
   console.log('🔍 [소속별집계] 제외 담당자:', excludedAgents);
   
@@ -18403,7 +18403,7 @@ function calculateDepartmentDetails(departmentMap, storeData, inventoryData, exc
 }
 
 // 담당자별 집계
-function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, agentSupportMap) {
+function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, agentSupportMap, targets) {
   const agentMap = new Map();
   
   phoneklData.forEach(row => {
