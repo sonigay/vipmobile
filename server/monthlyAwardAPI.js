@@ -413,9 +413,12 @@ async function getMonthlyAwardData(req, res) {
       let denominator = 0; // 모수
       
       if (manager === '지은정보') {
-        console.error(`\n=== ${manager} 업셀기변 계산 시작 ===`);
-        console.error(`🔍 [업셀기변] ${manager} 디버깅 시작 - 전체 행 수: ${manualRows.length}`);
+        console.log(`\n=== ${manager} 업셀기변 계산 시작 ===`);
+        console.log(`🔍 [업셀기변] ${manager} 디버깅 시작 - 전체 행 수: ${manualRows.length}`);
       }
+      
+      // 모든 담당자에 대해 로그 출력 (임시)
+      console.log(`🔍 [업셀기변 함수] 담당자: "${manager}"`);
       
       manualRows.forEach(row => {
         if (row.length < 112) return; // 최소 필요한 열 수 확인 (DH열까지)
@@ -513,6 +516,9 @@ async function getMonthlyAwardData(req, res) {
         if (currentManager.includes('지은') || currentManager.includes('정보')) {
           console.log(`🔍 [지은정보 찾기] 담당자명 발견: "${currentManager}" (원본: "${row[8]}")`);
         }
+        
+        // 모든 담당자명 로그 출력 (임시 - 지은정보 찾기용)
+        console.log(`🔍 [모든 담당자] 담당자명: "${currentManager}"`);
         
         if (manager === '지은정보') {
           console.log(`🔍 [지은정보] 담당자 매칭 확인: "${currentManager}" vs "${manager}"`);
