@@ -412,8 +412,10 @@ async function getMonthlyAwardData(req, res) {
       let numerator = 0; // 자수
       let denominator = 0; // 모수
       
-      console.log(`\n=== ${manager} 업셀기변 계산 시작 ===`);
-      console.log(`🔍 [업셀기변] ${manager} 디버깅 시작 - 전체 행 수: ${manualRows.length}`);
+      if (manager === '지은정보') {
+        console.error(`\n=== ${manager} 업셀기변 계산 시작 ===`);
+        console.error(`🔍 [업셀기변] ${manager} 디버깅 시작 - 전체 행 수: ${manualRows.length}`);
+      }
       
       manualRows.forEach(row => {
         if (row.length < 112) return; // 최소 필요한 열 수 확인 (DH열까지)
@@ -499,13 +501,18 @@ async function getMonthlyAwardData(req, res) {
       let numerator = 0;
       let denominator = 0;
       
-      console.log(`\n🔍 [기변105이상] ${manager} 계산 시작 (전체 행 수: ${manualRows.length})`);
+      if (manager === '지은정보') {
+        console.error(`\n🔍 [기변105이상] ${manager} 계산 시작 (전체 행 수: ${manualRows.length})`);
+      }
       
       manualRows.forEach(row => {
         if (row.length < 100) return; // CV열(99번 인덱스) 사용을 위해 100 이상 필요
         
         // 담당자 매칭 확인
         const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
+        if (manager === '지은정보') {
+          console.error(`🔍 [지은정보] 담당자 매칭 확인: "${currentManager}" vs "${manager}"`);
+        }
         if (currentManager !== manager) {
           if (manager === '지은정보') {
             console.error(`❌ [지은정보] 담당자 불일치: "${currentManager}" vs "${manager}"`);
@@ -863,15 +870,10 @@ async function getMonthlyAwardData(req, res) {
           // 특별 조건: 105군, 115군이면 무조건 인정
           if (planGroup === '105군' || planGroup === '115군') {
             agent.upsellChange.numerator++;
-            console.log(`✅ [업셀기변] ${manager} 인정: 105군/115군 조건 (${planGroup})`);
           }
           // 일반 조건: 업셀대상이 'Y'인 경우
           else if (upsellTarget === 'Y') {
             agent.upsellChange.numerator++;
-            console.log(`✅ [업셀기변] ${manager} 인정: 업셀대상 Y 조건`);
-          }
-          else {
-            console.log(`❌ [업셀기변] ${manager} 제외: 조건 불충족 (CV: ${planGroup}, DH: ${upsellTarget})`);
           }
         }
         
@@ -880,42 +882,31 @@ async function getMonthlyAwardData(req, res) {
           const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
           const finalModel = (row[38] || '').toString().trim(); // AM열: 개통모델
           
-          console.log(`🔍 [기변105이상] ${manager} - 가입구분: "${joinType}", 요금제: "${finalPlan}", 모델: "${finalModel}"`);
-          
           // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
           if (finalPlan.includes('태블릿') || finalPlan.includes('스마트기기') || finalPlan.includes('Wearable')) {
-            console.log(`❌ [기변105이상] ${manager} 제외: 요금제 제외 조건 (${finalPlan})`);
             return;
           }
           
           if (finalPlan.includes('현역병사')) {
-            console.log(`❌ [기변105이상] ${manager} 제외: 현역병사 포함 (${finalPlan})`);
             return;
           }
           
           const excludedModels = ['LM-Y110L', 'LM-Y120L', 'SM-G160N', 'AT-M120', 'AT-M120B', 'AT-M140L'];
           if (excludedModels.includes(finalModel)) {
-            console.log(`❌ [기변105이상] ${manager} 제외: 제외 모델 (${finalModel})`);
             return;
           }
           
           agent.change105Above.denominator++;
-          console.log(`✅ [기변105이상] ${manager} 모수 추가: ${agent.change105Above.denominator}`);
           
           // CV열에서 105군/115군 직접 확인
           const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
-          console.log(`🔍 [기변105이상] ${manager} - CV열: "${planGroup}"`);
           
           if (planGroup === '105군' || planGroup === '115군') {
             if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
               agent.change105Above.numerator += 1.2;
-              console.log(`✅ [기변105이상] ${manager} 자수 추가: 1.2 (티빙/멀티팩 포함, ${planGroup})`);
             } else {
               agent.change105Above.numerator += 1.0;
-              console.log(`✅ [기변105이상] ${manager} 자수 추가: 1.0 (${planGroup})`);
             }
-          } else {
-            console.log(`❌ [기변105이상] ${manager} 자수 제외: CV열 값 불일치 (${planGroup})`);
           }
         }
         
