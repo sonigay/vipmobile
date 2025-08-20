@@ -439,19 +439,19 @@ async function getMonthlyAwardData(req, res) {
         // 모수 조건 확인 (BLANK만 제외, 나머지는 모두 모수에 포함)
         if (finalPolicy === 'BLANK') {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 제외: finalPolicy BLANK`);
+            console.log(`🔍 [지은정보] 제외: finalPolicy BLANK`);
           }
           return; // BLANK만 제외
         }
         if (modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 제외: modelType ${modelType}`);
+            console.log(`🔍 [지은정보] 제외: modelType ${modelType}`);
           }
           return; // 2nd모델 제외
         }
         if (joinType !== '정책기변' && joinType !== '재가입') {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 제외: joinType ${joinType}`);
+            console.log(`🔍 [지은정보] 제외: joinType ${joinType}`);
           }
           return; // 정책기변/재가입이 아닌 경우 제외
         }
@@ -459,7 +459,7 @@ async function getMonthlyAwardData(req, res) {
         // 모수 카운팅
         denominator++;
         if (manager === '지은정보') {
-          console.error(`🔍 [지은정보] 모수 추가: ${denominator} (finalPolicy: ${finalPolicy}, modelType: ${modelType}, joinType: ${joinType})`);
+          console.log(`🔍 [지은정보] 모수 추가: ${denominator} (finalPolicy: ${finalPolicy}, modelType: ${modelType}, joinType: ${joinType})`);
         }
         
         // 자수 조건 확인
@@ -470,24 +470,22 @@ async function getMonthlyAwardData(req, res) {
         if (planGroup === '105군' || planGroup === '115군') {
           numerator++;
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 자수 추가: ${numerator} (planGroup: ${planGroup})`);
+            console.log(`🔍 [지은정보] 자수 추가: ${numerator} (planGroup: ${planGroup})`);
           }
         }
         // 일반 조건: 업셀대상이 'Y'인 경우
         else if (upsellTarget === 'Y') {
           numerator++;
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 자수 추가: ${numerator} (upsellTarget: ${upsellTarget})`);
+            console.log(`🔍 [지은정보] 자수 추가: ${numerator} (upsellTarget: ${upsellTarget})`);
           }
         }
       });
       
       if (manager === '지은정보') {
-        console.error(`🔍 [지은정보] 업셀기변 최종 결과: numerator=${numerator}, denominator=${denominator}, percentage=${denominator > 0 ? (numerator / denominator * 100).toFixed(2) : 0}%`);
+        console.log(`🔍 [지은정보] 업셀기변 최종 결과: numerator=${numerator}, denominator=${denominator}, percentage=${denominator > 0 ? (numerator / denominator * 100).toFixed(2) : 0}%`);
       }
-      if (manager !== '지은정보') {
-        console.log(`${manager} 업셀기변 결과: numerator=${numerator}, denominator=${denominator}`);
-      }
+
       return {
         numerator,
         denominator,
@@ -502,7 +500,7 @@ async function getMonthlyAwardData(req, res) {
       let denominator = 0;
       
       if (manager === '지은정보') {
-        console.error(`\n🔍 [기변105이상] ${manager} 계산 시작 (전체 행 수: ${manualRows.length})`);
+        console.log(`\n🔍 [기변105이상] ${manager} 계산 시작 (전체 행 수: ${manualRows.length})`);
       }
       
       manualRows.forEach(row => {
@@ -510,14 +508,25 @@ async function getMonthlyAwardData(req, res) {
         
         // 담당자 매칭 확인
         const currentManager = (row[8] || '').toString().trim(); // I열: 담당자
+        
+        // 지은정보 찾기 위해 모든 담당자명 로그 출력 (임시)
+        if (currentManager.includes('지은') || currentManager.includes('정보')) {
+          console.log(`🔍 [지은정보 찾기] 담당자명 발견: "${currentManager}" (원본: "${row[8]}")`);
+        }
+        
         if (manager === '지은정보') {
-          console.error(`🔍 [지은정보] 담당자 매칭 확인: "${currentManager}" vs "${manager}"`);
+          console.log(`🔍 [지은정보] 담당자 매칭 확인: "${currentManager}" vs "${manager}"`);
         }
         if (currentManager !== manager) {
           if (manager === '지은정보') {
-            console.error(`❌ [지은정보] 담당자 불일치: "${currentManager}" vs "${manager}"`);
+            console.log(`❌ [지은정보] 담당자 불일치: "${currentManager}" vs "${manager}"`);
           }
           return; // 해당 담당자가 아닌 경우 제외
+        }
+        
+        // 지은정보 담당자만 디버깅 로그 출력
+        if (manager === '지은정보') {
+          console.log(`🔍 [지은정보] 행 처리 시작 - 담당자 매칭 성공`);
         }
         
         // 기본조건 확인 (컬럼 인덱스 수정)
@@ -530,19 +539,19 @@ async function getMonthlyAwardData(req, res) {
         // 기본조건 검증 (BLANK만 제외, 나머지는 모두 모수에 포함)
         if (finalPolicy === 'BLANK') {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 기변105이상 제외: 최종영업정책 BLANK`);
+            console.log(`🔍 [지은정보] 기변105이상 제외: 최종영업정책 BLANK`);
           }
           return;
         }
         if (modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 기변105이상 제외: 모델유형 ${modelType}`);
+            console.log(`🔍 [지은정보] 기변105이상 제외: 모델유형 ${modelType}`);
           }
           return;
         }
         if (joinType !== '정책기변' && joinType !== '재가입') {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 기변105이상 제외: 가입구분 ${joinType} (정책기변/재가입 아님)`);
+            console.log(`🔍 [지은정보] 기변105이상 제외: 가입구분 ${joinType} (정책기변/재가입 아님)`);
           }
           return;
         }
@@ -550,7 +559,7 @@ async function getMonthlyAwardData(req, res) {
         // 요금제 제외 조건 (태블릿, 스마트기기, Wearable 포함된 요금제 제외)
         if (finalPlan.includes('태블릿') || finalPlan.includes('스마트기기') || finalPlan.includes('Wearable')) {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 기변105이상 제외: 요금제 ${finalPlan} (태블릿/스마트기기/Wearable 포함)`);
+            console.log(`🔍 [지은정보] 기변105이상 제외: 요금제 ${finalPlan} (태블릿/스마트기기/Wearable 포함)`);
           }
           return;
         }
@@ -558,7 +567,7 @@ async function getMonthlyAwardData(req, res) {
         // 요금제명 제외 (현역병사 포함)
         if (finalPlan.includes('현역병사')) {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 기변105이상 제외: 요금제 ${finalPlan} (현역병사 포함)`);
+            console.log(`🔍 [지은정보] 기변105이상 제외: 요금제 ${finalPlan} (현역병사 포함)`);
           }
           return;
         }
@@ -567,7 +576,7 @@ async function getMonthlyAwardData(req, res) {
         const excludedModels = ['LM-Y110L', 'LM-Y120L', 'SM-G160N', 'AT-M120', 'AT-M120B', 'AT-M140L'];
         if (excludedModels.includes(finalModel)) {
           if (manager === '지은정보') {
-            console.error(`🔍 [지은정보] 기변105이상 제외: 모델 ${finalModel} (제외 모델)`);
+            console.log(`🔍 [지은정보] 기변105이상 제외: 모델 ${finalModel} (제외 모델)`);
           }
           return;
         }
@@ -575,44 +584,41 @@ async function getMonthlyAwardData(req, res) {
         // 모수 카운팅
         denominator++;
         if (manager === '지은정보') {
-          console.error(`🔍 [지은정보] 기변105이상 모수 추가: ${denominator}`);
+          console.log(`🔍 [지은정보] 기변105이상 모수 추가: ${denominator}`);
         }
         
         // 자수 카운팅 (CV열에서 105군/115군 직접 확인)
         const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
         if (manager === '지은정보') {
-          console.error(`🔍 [지은정보] 기변105이상 CV열 값: "${planGroup}" (요금제: ${finalPlan})`);
+          console.log(`🔍 [지은정보] 기변105이상 CV열 값: "${planGroup}" (요금제: ${finalPlan})`);
         }
         if (planGroup === '105군' || planGroup === '115군') {
           // 특별 조건: 티빙, 멀티팩 포함 시 1.2 카운트
           if (finalPlan.includes('티빙') || finalPlan.includes('멀티팩')) {
             numerator += 1.2;
             if (manager === '지은정보') {
-              console.error(`✅ [지은정보] 기변105이상 인정: ${planGroup}, 티빙/멀티팩 포함`);
+              console.log(`✅ [지은정보] 기변105이상 인정: ${planGroup}, 티빙/멀티팩 포함`);
             }
           } else {
             numerator += 1.0;
             if (manager === '지은정보') {
-              console.error(`✅ [지은정보] 기변105이상 인정: ${planGroup}`);
+              console.log(`✅ [지은정보] 기변105이상 인정: ${planGroup}`);
             }
           }
         } else if (planGroup) {
           if (manager === '지은정보') {
-            console.error(`❌ [지은정보] 기변105이상 제외: ${planGroup} (105군/115군 아님)`);
+            console.log(`❌ [지은정보] 기변105이상 제외: ${planGroup} (105군/115군 아님)`);
           }
         } else {
           if (manager === '지은정보') {
-            console.error(`❌ [지은정보] 기변105이상 제외: CV열 값 없음`);
+            console.log(`❌ [지은정보] 기변105이상 제외: CV열 값 없음`);
           }
         }
       });
       
-      if (manager === '지은정보') {
-        console.error(`🔍 [지은정보] 기변105이상 최종 결과: numerator=${numerator}, denominator=${denominator}, percentage=${denominator > 0 ? (numerator / denominator * 100).toFixed(2) : 0}%`);
-      }
-      if (manager !== '지은정보') {
-        console.log(`${manager} 기변105이상 결과: numerator=${numerator}, denominator=${denominator}`);
-      }
+              if (manager === '지은정보') {
+          console.log(`🔍 [지은정보] 기변105이상 최종 결과: numerator=${numerator}, denominator=${denominator}, percentage=${denominator > 0 ? (numerator / denominator * 100).toFixed(2) : 0}%`);
+        }
       return {
         numerator,
         denominator,
@@ -865,7 +871,7 @@ async function getMonthlyAwardData(req, res) {
           const planGroup = (row[99] || '').toString().trim(); // CV열: 105군/115군 확인
           const upsellTarget = (row[111] || '').toString().trim(); // DH열: 업셀대상
           
-          console.log(`🔍 [업셀기변] ${manager} - CV열: "${planGroup}", DH열: "${upsellTarget}"`);
+
           
           // 특별 조건: 105군, 115군이면 무조건 인정
           if (planGroup === '105군' || planGroup === '115군') {
