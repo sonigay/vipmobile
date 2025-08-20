@@ -8157,10 +8157,13 @@ app.get('/api/inspection-data', async (req, res) => {
       }
     }
 
-    // 처리자 이름에서 괄호 제거하는 함수
+    // 처리자 이름에서 괄호와 접두사 제거하는 함수
     function cleanAgentName(agentName) {
       if (!agentName) return '';
       let cleaned = agentName.toString();
+      
+      // VIP│, MIN│ 접두사 제거 (예: "VIP│최은진" → "최은진")
+      cleaned = cleaned.replace(/^(VIP│|MIN│)/, '');
       
       // 괄호와 괄호 안의 내용 제거 (예: "홍길동 (RM)" → "홍길동")
       cleaned = cleaned.replace(/\s*\([^)]*\)/g, '');
