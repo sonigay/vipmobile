@@ -18158,27 +18158,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     const agentStores = new Map(); // 담당자별 고유 출고처 목록
     const agentInventory = new Map(); // 담당자별 재고 데이터
     
-    // 1단계: 해당 코드의 담당자들의 비례 계산을 위한 데이터 수집
-    const agentCodePerformance = new Map(); // 담당자별 코드별 실적
-    const agentTotalPerformance = new Map(); // 담당자별 전체 실적
-    
-    // 먼저 각 담당자의 전체 실적과 코드별 실적을 계산
-    phoneklData.forEach(row => {
-      const rowCode = (row[4] || '').toString(); // E열: 코드
-      const rowAgent = (row[8] || '').toString(); // I열: 담당자
-      
-      if (!excludedAgents.includes(rowAgent)) {
-        // 전체 실적 카운트
-        agentTotalPerformance.set(rowAgent, (agentTotalPerformance.get(rowAgent) || 0) + 1);
-        
-        // 해당 코드 실적 카운트
-        if (rowCode === data.code) {
-          agentCodePerformance.set(rowAgent, (agentCodePerformance.get(rowAgent) || 0) + 1);
-        }
-      }
-    });
-    
-    console.log(`🔍 [코드별집계] ${data.code} 담당자별 실적:`, Object.fromEntries(agentCodePerformance));
+    // 1단계: 해당 코드의 담당자들의 고유 출고처 수집
     
     if (storeData) {
       storeData.forEach(storeRow => {
@@ -18186,8 +18166,14 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
           const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
           const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
           
-          // 해당 코드에 실적이 있는 담당자인지 확인
-          if (agentCodePerformance.has(storeAgent) && storeCode) {
+          // 해당 코드의 담당자인지 확인
+          const isCodeAgent = phoneklData.some(row => {
+            const rowCode = (row[4] || '').toString(); // E열: 코드
+            const rowAgent = (row[8] || '').toString(); // I열: 담당자
+            return rowCode === data.code && rowAgent === storeAgent && !excludedAgents.includes(rowAgent);
+          });
+          
+          if (isCodeAgent && storeCode) {
             // 제외 조건들
             if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
@@ -18210,8 +18196,14 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
           const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
           const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
           
-          // 해당 코드에 실적이 있는 담당자인지 확인
-          if (agentCodePerformance.has(inventoryAgent) && !excludedStores.includes(inventoryStore)) {
+          // 해당 코드의 담당자인지 확인
+          const isCodeAgent = phoneklData.some(row => {
+            const rowCode = (row[4] || '').toString(); // E열: 코드
+            const rowAgent = (row[8] || '').toString(); // I열: 담당자
+            return rowCode === data.code && rowAgent === inventoryAgent && !excludedAgents.includes(rowAgent);
+          });
+          
+          if (isCodeAgent && !excludedStores.includes(inventoryStore)) {
             if (!agentInventory.has(inventoryAgent)) {
               agentInventory.set(inventoryAgent, { devices: 0, sims: 0 });
             }
@@ -18225,13 +18217,10 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
       });
     }
     
-    // 3단계: 등록점, 가동점, 재고 계산
+    // 3단계: 등록점, 가동점, 재고 계산 (담당자별과 동일한 방식)
     agentStores.forEach((stores, agent) => {
-      const codePerformance = agentCodePerformance.get(agent) || 0;
-      const totalPerformance = agentTotalPerformance.get(agent) || 0;
-      const ratio = totalPerformance > 0 ? codePerformance / totalPerformance : 0;
-      
-      totalRegisteredStores += Math.round(stores.size * ratio);  // 비례 계산
+      // 등록점: 실제 출고처 수 그대로 합산 (비례 계산 제거)
+      totalRegisteredStores += stores.size;
       
       // 가동점 계산 (각 출고처별로 실적 확인)
       stores.forEach(storeCode => {
@@ -18247,14 +18236,11 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
       });
     });
     
-    // 4단계: 재고 합계
+    // 4단계: 재고 합계 (담당자별과 동일한 방식)
     agentInventory.forEach((inventory, agent) => {
-      const codePerformance = agentCodePerformance.get(agent) || 0;
-      const totalPerformance = agentTotalPerformance.get(agent) || 0;
-      const ratio = totalPerformance > 0 ? codePerformance / totalPerformance : 0;
-      
-      totalDevices += Math.round(inventory.devices * ratio);  // 비례 계산
-      totalSims += Math.round(inventory.sims * ratio);        // 비례 계산
+      // 재고: 실제 값 그대로 합산 (비례 계산 제거)
+      totalDevices += inventory.devices;
+      totalSims += inventory.sims;
     });
     
     data.registeredStores = totalRegisteredStores;
