@@ -428,11 +428,15 @@ async function getMonthlyAwardData(req, res) {
         const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
         const joinType = (row[19] || '').toString().trim(); // T열: 가입구분
         
-        // 모수 조건 확인
-        if (finalPolicy === 'BLANK' || 
-            modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델' ||
-            (joinType !== '정책기변' && joinType !== '재가입')) {
-          return;
+        // 모수 조건 확인 (BLANK만 제외, 나머지는 모두 모수에 포함)
+        if (finalPolicy === 'BLANK') {
+          return; // BLANK만 제외
+        }
+        if (modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
+          return; // 2nd모델 제외
+        }
+        if (joinType !== '정책기변' && joinType !== '재가입') {
+          return; // 정책기변/재가입이 아닌 경우 제외
         }
         
         // 모수 카운팅
@@ -485,7 +489,7 @@ async function getMonthlyAwardData(req, res) {
         const finalPlan = (row[45] || '').toString().trim(); // AT열: 개통요금제
         const finalModel = (row[38] || '').toString().trim(); // AM열: 개통모델
         
-        // 기본조건 검증 (가입번호 조건 제거)
+        // 기본조건 검증 (BLANK만 제외, 나머지는 모두 모수에 포함)
         if (finalPolicy === 'BLANK') {
           console.log(`${manager} 기변105이상 제외: 최종영업정책 BLANK`);
           return;
@@ -573,10 +577,12 @@ async function getMonthlyAwardData(req, res) {
         const finalPolicy = (row[48] || '').toString().trim(); // AW열: 최종영업정책
         const modelType = (row[98] || '').toString().trim(); // CU열: 모델유형
         
-        // 기본조건 검증 (가입번호 조건 제거)
-        if (finalPolicy === 'BLANK' || 
-            modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
-          return;
+        // 기본조건 검증 (BLANK만 제외, 나머지는 모두 모수에 포함)
+        if (finalPolicy === 'BLANK') {
+          return; // BLANK만 제외
+        }
+        if (modelType === 'LTE_2nd모델' || modelType === '5G_2nd모델') {
+          return; // 2nd모델 제외
         }
         
         // 모수 카운팅
