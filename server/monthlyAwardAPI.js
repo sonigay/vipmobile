@@ -430,8 +430,8 @@ async function getMonthlyAwardData(req, res) {
         }
         
         // 기본조건 확인
-        const finalPolicy = (row[48] || '').toString().trim(); // AV열: 최종영업정책
-        const modelType = (row[76] || '').toString().trim(); // CU열: 모델유형
+        const finalPolicy = (row[48] || '').toString().trim(); // AW열: 최종영업정책
+        const modelType = (row[98] || '').toString().trim(); // CU열: 모델유형
         const joinType = (row[19] || '').toString().trim(); // T열: 가입구분
         
         // 모수 조건 확인 (BLANK만 제외, 나머지는 모두 모수에 포함)
