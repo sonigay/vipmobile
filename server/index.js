@@ -890,10 +890,14 @@ async function saveInspectionMemoData(completionStatus, notes) {
       }
     }
     
-    // 시트 전체 삭제 후 새 데이터로 업데이트
-    await sheets.spreadsheets.values.clear({
+    // 시트 전체 삭제 후 새 데이터로 업데이트 (clear 대신 빈 값으로 덮어쓰기)
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${INSPECTION_MEMO_SHEET_NAME}!A:Z`
+      range: `${INSPECTION_MEMO_SHEET_NAME}!A:Z`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: []
+      }
     });
     
     if (dataRows.length > 0) {
@@ -933,10 +937,14 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
       }
     }
     
-    // 시트 업데이트 (유효한 데이터만 유지)
-    await sheets.spreadsheets.values.clear({
+    // 시트 업데이트 (유효한 데이터만 유지) (clear 대신 빈 값으로 덮어쓰기)
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${INSPECTION_MEMO_SHEET_NAME}!A:Z`
+      range: `${INSPECTION_MEMO_SHEET_NAME}!A:Z`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: []
+      }
     });
     
     if (validRows.length > 1) { // 헤더 외에 데이터가 있는 경우
