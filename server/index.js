@@ -850,36 +850,62 @@ async function loadInspectionMemoData() {
 
 async function saveInspectionMemoData(completionStatus, notes) {
   try {
-    // 헤더 행
     const headerRow = ['가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분'];
     
-    // 데이터 행들 생성
-    const dataRows = [];
+    // 기존 데이터 읽기
+    const existingData = await getSheetValues(INSPECTION_MEMO_SHEET_NAME);
+    const existingRows = existingData && existingData.length > 1 ? existingData.slice(1) : [];
     
-    // 완료상태 데이터
+    // 기존 데이터를 Map으로 변환 (가입번호를 키로 사용)
+    const existingDataMap = new Map();
+    existingRows.forEach(row => {
+      if (row && row.length > 0) {
+        const subscriptionNumber = (row[0] || '').toString().trim();
+        if (subscriptionNumber) {
+          existingDataMap.set(subscriptionNumber, row);
+        }
+      }
+    });
+    
+    // 업데이트된 데이터 Map 생성
+    const updatedDataMap = new Map(existingDataMap);
+    
+    // 완료상태 처리
     for (const [subscriptionNumber, status] of completionStatus) {
       if (status.isCompleted) {
-        dataRows.push([
-          subscriptionNumber,
-          status.userId,
-          '완료',
-          '', // 메모는 별도로 처리
-          status.timestamp,
-          '전체'
-        ]);
+        // 완료 상태인 경우: 기존 행 업데이트 또는 새 행 생성
+        const existingRow = updatedDataMap.get(subscriptionNumber);
+        if (existingRow) {
+          // 기존 행 업데이트
+          existingRow[2] = '완료'; // 완료상태
+          existingRow[4] = status.timestamp; // 업데이트시간
+        } else {
+          // 새 행 생성
+          updatedDataMap.set(subscriptionNumber, [
+            subscriptionNumber,
+            status.userId,
+            '완료',
+            '', // 메모내용
+            status.timestamp,
+            '전체'
+          ]);
+        }
+      } else {
+        // 대기 상태인 경우: 해당 가입번호 삭제
+        updatedDataMap.delete(subscriptionNumber);
       }
     }
     
-    // 메모내용 데이터
+    // 메모내용 처리
     for (const [subscriptionNumber, noteData] of notes) {
-      const existingRowIndex = dataRows.findIndex(row => row[0] === subscriptionNumber);
-      if (existingRowIndex >= 0) {
-        // 기존 행에 메모 추가
-        dataRows[existingRowIndex][3] = noteData.notes;
-        dataRows[existingRowIndex][4] = noteData.timestamp;
+      const existingRow = updatedDataMap.get(subscriptionNumber);
+      if (existingRow) {
+        // 기존 행에 메모 업데이트
+        existingRow[3] = noteData.notes; // 메모내용
+        existingRow[4] = noteData.timestamp; // 업데이트시간
       } else {
-        // 새 행 생성
-        dataRows.push([
+        // 새 행 생성 (대기 상태)
+        updatedDataMap.set(subscriptionNumber, [
           subscriptionNumber,
           noteData.userId,
           '대기',
@@ -890,28 +916,31 @@ async function saveInspectionMemoData(completionStatus, notes) {
       }
     }
     
-    // 시트 전체 삭제 후 새 데이터로 업데이트 (clear 대신 빈 값으로 덮어쓰기)
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${INSPECTION_MEMO_SHEET_NAME}!A:Z`,
-      valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: []
-      }
-    });
+    // 최종 데이터 행 생성
+    const finalDataRows = Array.from(updatedDataMap.values());
     
-    if (dataRows.length > 0) {
+    // 시트 업데이트
+    if (finalDataRows.length > 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
         valueInputOption: 'USER_ENTERED',
         resource: {
-          values: [headerRow, ...dataRows]
+          values: [headerRow, ...finalDataRows]
+        }
+      });
+    } else {
+      // 데이터가 없는 경우 헤더만 유지
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [headerRow]
         }
       });
     }
     
-
   } catch (error) {
     console.error('여직원검수데이터메모 시트 저장 실패:', error);
   }
@@ -937,16 +966,7 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
       }
     }
     
-    // 시트 업데이트 (유효한 데이터만 유지) (clear 대신 빈 값으로 덮어쓰기)
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${INSPECTION_MEMO_SHEET_NAME}!A:Z`,
-      valueInputOption: 'USER_ENTERED',
-      resource: {
-        values: []
-      }
-    });
-    
+    // 시트 업데이트 (유효한 데이터만 유지)
     if (validRows.length > 1) { // 헤더 외에 데이터가 있는 경우
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -956,9 +976,18 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
           values: validRows
         }
       });
+    } else {
+      // 데이터가 없는 경우 헤더만 유지
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [memoData[0]]
+        }
+      });
     }
     
-
   } catch (error) {
     console.error('여직원검수데이터메모 시트 정리 실패:', error);
   }
@@ -18162,93 +18191,80 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     let totalDevices = 0;
     let totalSims = 0;
     
-    // 해당 코드의 모든 담당자들의 고유 출고처 목록 생성
-    const agentStores = new Map(); // 담당자별 고유 출고처 목록
-    const agentInventory = new Map(); // 담당자별 재고 데이터
+    // 해당 코드의 담당자들 목록 생성
+    const codeAgents = new Set();
+    phoneklData.forEach(row => {
+      const rowCode = (row[4] || '').toString(); // E열: 코드
+      const rowAgent = (row[8] || '').toString(); // I열: 담당자
+      if (rowCode === data.code && !excludedAgents.includes(rowAgent)) {
+        codeAgents.add(rowAgent);
+      }
+    });
     
-    // 1단계: 해당 코드의 담당자들의 고유 출고처 수집
-    
-    if (storeData) {
-      storeData.forEach(storeRow => {
-        if (storeRow.length > 21) {
-          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
-          const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-          
-          // 해당 코드의 담당자인지 확인
-          const isCodeAgent = phoneklData.some(row => {
-            const rowCode = (row[4] || '').toString(); // E열: 코드
-            const rowAgent = (row[8] || '').toString(); // I열: 담당자
-            return rowCode === data.code && rowAgent === storeAgent && !excludedAgents.includes(rowAgent);
-          });
-          
-          if (isCodeAgent && storeCode) {
+    // 각 담당자별로 등록점, 가동점, 재고 계산 (담당자별과 동일한 방식)
+    codeAgents.forEach(agent => {
+      // 등록점 계산
+      if (storeData) {
+        storeData.forEach(storeRow => {
+          if (storeRow.length > 21) {
+            const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
+            const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+            
             // 제외 조건들
             if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
-            if (!agentStores.has(storeAgent)) {
-              agentStores.set(storeAgent, new Set());
-            }
-            agentStores.get(storeAgent).add(storeCode);
-          }
-        }
-      });
-    }
-    
-    // 2단계: 재고 데이터 수집
-    if (inventoryData) {
-      inventoryData.forEach(inventoryRow => {
-        if (inventoryRow.length > 8) {
-          const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
-          const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
-          
-          // 해당 코드의 담당자인지 확인
-          const isCodeAgent = phoneklData.some(row => {
-            const rowCode = (row[4] || '').toString(); // E열: 코드
-            const rowAgent = (row[8] || '').toString(); // I열: 담당자
-            return rowCode === data.code && rowAgent === inventoryAgent && !excludedAgents.includes(rowAgent);
-          });
-          
-          if (isCodeAgent && !excludedStores.includes(inventoryStore)) {
-            if (!agentInventory.has(inventoryAgent)) {
-              agentInventory.set(inventoryAgent, { devices: 0, sims: 0 });
-            }
-            if (inventoryType === '유심') {
-              agentInventory.get(inventoryAgent).sims++;
-            } else {
-              agentInventory.get(inventoryAgent).devices++;
+            if (storeAgent === agent && storeCode) {
+              totalRegisteredStores++;
             }
           }
-        }
-      });
-    }
-    
-    // 3단계: 등록점, 가동점, 재고 계산 (담당자별과 동일한 방식)
-    agentStores.forEach((stores, agent) => {
-      // 등록점: 실제 출고처 수 그대로 합산 (비례 계산 제거)
-      totalRegisteredStores += stores.size;
-      
-      // 가동점 계산 (각 출고처별로 실적 확인)
-      stores.forEach(storeCode => {
-        const hasPerformance = filteredPhoneklData.some(performanceRow => {
-          const performanceStoreCode = (performanceRow[14] || '').toString();
-          const performanceAgent = (performanceRow[8] || '').toString();
-          return performanceStoreCode === storeCode && performanceAgent === agent;
         });
-        
-        if (hasPerformance) {
-          totalActiveStores++;
-        }
-      });
-    });
-    
-    // 4단계: 재고 합계 (담당자별과 동일한 방식)
-    agentInventory.forEach((inventory, agent) => {
-      // 재고: 실제 값 그대로 합산 (비례 계산 제거)
-      totalDevices += inventory.devices;
-      totalSims += inventory.sims;
+      }
+      
+      // 가동점 계산
+      if (storeData) {
+        storeData.forEach(storeRow => {
+          if (storeRow.length > 21 && storeRow[21] === agent) {
+            const storeCode = (storeRow[14] || '').toString();
+            
+            // 제외 조건들 (등록점과 동일)
+            if (storeCode.includes('사무실')) return;
+            if (storeCode === agent) return;
+            if (agent.includes('거래종료')) return;
+            
+            // 해당 출고처에서 당월실적이 있는지 확인
+            const hasPerformance = filteredPhoneklData.some(performanceRow => {
+              const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처코드
+              const performanceAgent = (performanceRow[8] || '').toString(); // I열: 담당자
+              return performanceStoreCode === storeCode && performanceAgent === agent;
+            });
+            
+            if (storeCode && hasPerformance) {
+              totalActiveStores++;
+            }
+          }
+        });
+      }
+      
+      // 보유단말, 보유유심 계산
+      if (inventoryData) {
+        inventoryData.forEach(inventoryRow => {
+          if (inventoryRow.length > 8) {
+            const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+            const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+            const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+            
+            if (inventoryAgent === agent && !excludedStores.includes(inventoryStore)) {
+              if (inventoryType === '유심') {
+                totalSims++;
+              } else {
+                totalDevices++;
+              }
+            }
+          }
+        });
+      }
     });
     
     data.registeredStores = totalRegisteredStores;
