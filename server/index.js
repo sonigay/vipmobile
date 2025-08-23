@@ -808,21 +808,22 @@ async function loadInspectionMemoData() {
     const completionStatus = new Map();
     const notes = new Map();
     
-    // 헤더 제외하고 데이터 처리
+    // 헤더 제외하고 데이터 처리 (새로운 구조: 고유키, 가입번호, 사용자ID, 완료상태, 메모내용, 업데이트시간, 필드구분)
     for (let i = 1; i < memoData.length; i++) {
       const row = memoData[i];
-      if (row && row.length >= 6) {
-        const subscriptionNumber = (row[0] || '').toString().trim(); // A열: 가입번호
-        const userId = (row[1] || '').toString().trim(); // B열: 사용자ID
-        const isCompleted = (row[2] || '').toString().trim() === '완료'; // C열: 완료상태
-        const memoContent = (row[3] || '').toString().trim(); // D열: 메모내용
-        const updateTime = (row[4] || '').toString().trim(); // E열: 업데이트시간
-        const fieldType = (row[5] || '').toString().trim(); // F열: 필드구분
+      if (row && row.length >= 7) {
+        const uniqueKey = (row[0] || '').toString().trim(); // A열: 고유키
+        const subscriptionNumber = (row[1] || '').toString().trim(); // B열: 가입번호
+        const userId = (row[2] || '').toString().trim(); // C열: 사용자ID
+        const isCompleted = (row[3] || '').toString().trim() === '완료'; // D열: 완료상태
+        const memoContent = (row[4] || '').toString().trim(); // E열: 메모내용
+        const updateTime = (row[5] || '').toString().trim(); // F열: 업데이트시간
+        const fieldType = (row[6] || '').toString().trim(); // G열: 필드구분
         
-        if (subscriptionNumber && userId) {
+        if (uniqueKey && userId) {
           // 완료상태 저장
           if (isCompleted) {
-            completionStatus.set(subscriptionNumber, {
+            completionStatus.set(uniqueKey, {
               userId,
               isCompleted: true,
               timestamp: updateTime || new Date().toISOString()
@@ -831,7 +832,7 @@ async function loadInspectionMemoData() {
           
           // 메모내용 저장
           if (memoContent) {
-            notes.set(subscriptionNumber, {
+            notes.set(uniqueKey, {
               userId,
               notes: memoContent,
               timestamp: updateTime || new Date().toISOString()
@@ -850,19 +851,19 @@ async function loadInspectionMemoData() {
 
 async function saveInspectionMemoData(completionStatus, notes) {
   try {
-    const headerRow = ['가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분'];
+    const headerRow = ['고유키', '가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분'];
     
     // 기존 데이터 읽기
     const existingData = await getSheetValues(INSPECTION_MEMO_SHEET_NAME);
     const existingRows = existingData && existingData.length > 1 ? existingData.slice(1) : [];
     
-    // 기존 데이터를 Map으로 변환 (가입번호를 키로 사용)
+    // 기존 데이터를 Map으로 변환 (고유키를 키로 사용)
     const existingDataMap = new Map();
     existingRows.forEach(row => {
       if (row && row.length > 0) {
-        const subscriptionNumber = (row[0] || '').toString().trim();
-        if (subscriptionNumber) {
-          existingDataMap.set(subscriptionNumber, row);
+        const uniqueKey = (row[0] || '').toString().trim();
+        if (uniqueKey) {
+          existingDataMap.set(uniqueKey, row);
         }
       }
     });
@@ -871,17 +872,19 @@ async function saveInspectionMemoData(completionStatus, notes) {
     const updatedDataMap = new Map(existingDataMap);
     
     // 완료상태 처리
-    for (const [subscriptionNumber, status] of completionStatus) {
+    for (const [uniqueKey, status] of completionStatus) {
       if (status.isCompleted) {
         // 완료 상태인 경우: 기존 행 업데이트 또는 새 행 생성
-        const existingRow = updatedDataMap.get(subscriptionNumber);
+        const existingRow = updatedDataMap.get(uniqueKey);
         if (existingRow) {
           // 기존 행 업데이트
-          existingRow[2] = '완료'; // 완료상태
-          existingRow[4] = status.timestamp; // 업데이트시간
+          existingRow[3] = '완료'; // 완료상태
+          existingRow[5] = status.timestamp; // 업데이트시간
         } else {
-          // 새 행 생성
-          updatedDataMap.set(subscriptionNumber, [
+          // 새 행 생성 (고유키, 가입번호, 사용자ID, 완료상태, 메모내용, 업데이트시간, 필드구분)
+          const subscriptionNumber = uniqueKey.split('_')[0]; // 고유키에서 가입번호 추출
+          updatedDataMap.set(uniqueKey, [
+            uniqueKey,
             subscriptionNumber,
             status.userId,
             '완료',
@@ -891,21 +894,23 @@ async function saveInspectionMemoData(completionStatus, notes) {
           ]);
         }
       } else {
-        // 대기 상태인 경우: 해당 가입번호 삭제
-        updatedDataMap.delete(subscriptionNumber);
+        // 대기 상태인 경우: 해당 고유키 삭제
+        updatedDataMap.delete(uniqueKey);
       }
     }
     
     // 메모내용 처리
-    for (const [subscriptionNumber, noteData] of notes) {
-      const existingRow = updatedDataMap.get(subscriptionNumber);
+    for (const [uniqueKey, noteData] of notes) {
+      const existingRow = updatedDataMap.get(uniqueKey);
       if (existingRow) {
         // 기존 행에 메모 업데이트
-        existingRow[3] = noteData.notes; // 메모내용
-        existingRow[4] = noteData.timestamp; // 업데이트시간
+        existingRow[4] = noteData.notes; // 메모내용
+        existingRow[5] = noteData.timestamp; // 업데이트시간
       } else {
         // 새 행 생성 (대기 상태)
-        updatedDataMap.set(subscriptionNumber, [
+        const subscriptionNumber = uniqueKey.split('_')[0]; // 고유키에서 가입번호 추출
+        updatedDataMap.set(uniqueKey, [
+          uniqueKey,
           subscriptionNumber,
           noteData.userId,
           '대기',
@@ -923,7 +928,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
     if (finalDataRows.length > 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [headerRow, ...finalDataRows]
@@ -933,7 +938,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
       // 데이터가 없는 경우 헤더만 유지
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [headerRow]
@@ -953,14 +958,14 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
       return;
     }
     
-    // 현재 검수 대상에 있는 가입번호만 필터링
+    // 현재 검수 대상에 있는 고유키만 필터링
     const validRows = [memoData[0]]; // 헤더 유지
     
     for (let i = 1; i < memoData.length; i++) {
       const row = memoData[i];
       if (row && row.length > 0) {
-        const subscriptionNumber = (row[0] || '').toString().trim();
-        if (currentInspectionKeys.has(subscriptionNumber)) {
+        const uniqueKey = (row[0] || '').toString().trim();
+        if (uniqueKey && currentInspectionKeys.has(uniqueKey)) {
           validRows.push(row);
         }
       }
@@ -970,7 +975,7 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
     if (validRows.length > 1) { // 헤더 외에 데이터가 있는 경우
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: validRows
@@ -980,7 +985,7 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
       // 데이터가 없는 경우 헤더만 유지
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${INSPECTION_MEMO_SHEET_NAME}!A:F`,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [memoData[0]]
@@ -7727,14 +7732,29 @@ app.post('/api/inspection/columns', async (req, res) => {
 });
 
 // 수정완료 상태를 시트에서 관리 (서버 재시작시에도 유지)
-let modificationCompletionStatus = new Map(); // itemId -> {userId, isCompleted, timestamp}
-let modificationNotes = new Map(); // itemId -> {userId, notes, timestamp}
+let modificationCompletionStatus = new Map(); // uniqueKey -> {userId, isCompleted, timestamp}
+let modificationNotes = new Map(); // uniqueKey -> {userId, notes, timestamp}
+
+// 고유키 생성 함수
+function generateUniqueKey(subscriptionNumber, incorrectValue, correctValue) {
+  // 가입번호 + 수기초값 + 폰클데이터값 조합으로 고유키 생성
+  const sanitizedIncorrect = (incorrectValue || '').toString().replace(/[^a-zA-Z0-9가-힣]/g, '');
+  const sanitizedCorrect = (correctValue || '').toString().replace(/[^a-zA-Z0-9가-힣]/g, '');
+  return `${subscriptionNumber}_${sanitizedIncorrect}_${sanitizedCorrect}`;
+}
 
 // 서버 시작 시 시트에서 데이터 로드
 async function initializeInspectionMemoData() {
   try {
     console.log('여직원검수데이터메모 시트에서 데이터 로드 중...');
     const { completionStatus, notes } = await loadInspectionMemoData();
+    
+    // 기존 데이터가 있는 경우 마이그레이션 수행
+    if (completionStatus.size > 0 || notes.size > 0) {
+      console.log('기존 데이터 마이그레이션 수행 중...');
+      await migrateExistingData(completionStatus, notes);
+    }
+    
     modificationCompletionStatus = completionStatus;
     modificationNotes = notes;
     console.log(`여직원검수데이터메모 로드 완료: 완료상태 ${completionStatus.size}개, 메모 ${notes.size}개`);
@@ -7742,6 +7762,65 @@ async function initializeInspectionMemoData() {
     console.error('여직원검수데이터메모 초기화 실패:', error);
     modificationCompletionStatus = new Map();
     modificationNotes = new Map();
+  }
+}
+
+// 기존 데이터 마이그레이션 함수
+async function migrateExistingData(completionStatus, notes) {
+  try {
+    const memoData = await getSheetValues(INSPECTION_MEMO_SHEET_NAME);
+    if (!memoData || memoData.length <= 1) {
+      return;
+    }
+    
+    // 기존 구조인지 확인 (6개 컬럼이면 기존 구조)
+    const firstDataRow = memoData[1];
+    if (firstDataRow && firstDataRow.length === 6) {
+      console.log('기존 데이터 구조 감지, 마이그레이션 수행...');
+      
+      const newRows = [['고유키', '가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분']];
+      
+      for (let i = 1; i < memoData.length; i++) {
+        const row = memoData[i];
+        if (row && row.length >= 6) {
+          const subscriptionNumber = (row[0] || '').toString().trim();
+          const userId = (row[1] || '').toString().trim();
+          const isCompleted = (row[2] || '').toString().trim();
+          const memoContent = (row[3] || '').toString().trim();
+          const updateTime = (row[4] || '').toString().trim();
+          const fieldType = (row[5] || '').toString().trim();
+          
+          if (subscriptionNumber && userId) {
+            // 고유키 생성 (기존 데이터는 가입번호만으로 고유키 생성)
+            const uniqueKey = `${subscriptionNumber}_${Date.now()}_${i}`;
+            
+            newRows.push([
+              uniqueKey,
+              subscriptionNumber,
+              userId,
+              isCompleted,
+              memoContent,
+              updateTime,
+              fieldType
+            ]);
+          }
+        }
+      }
+      
+      // 새로운 구조로 시트 업데이트
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: newRows
+        }
+      });
+      
+      console.log('기존 데이터 마이그레이션 완료');
+    }
+  } catch (error) {
+    console.error('기존 데이터 마이그레이션 실패:', error);
   }
 }
 
@@ -7767,30 +7846,30 @@ app.get('/api/inspection/modification-completion-status', async (req, res) => {
     const notesData = {};
     
     // 완료 상태 조회 (개인현황에서는 해당 사용자의 완료 항목만)
-    for (const [itemId, status] of modificationCompletionStatus) {
+    for (const [uniqueKey, status] of modificationCompletionStatus) {
       if (status.isCompleted) {
         if (view === 'personal') {
           // 개인현황: 해당 사용자의 항목만
           if (status.userId === userId) {
-            completedItems.push(itemId);
+            completedItems.push(uniqueKey);
           }
         } else {
           // 전체현황: 모든 사용자의 항목
-          completedItems.push(itemId);
+          completedItems.push(uniqueKey);
         }
       }
     }
     
     // 메모 내용 조회 (개인현황에서는 해당 사용자의 메모만)
-    for (const [itemId, notes] of modificationNotes) {
+    for (const [uniqueKey, notes] of modificationNotes) {
       if (view === 'personal') {
         // 개인현황: 해당 사용자의 메모만
         if (notes.userId === userId) {
-          notesData[itemId] = notes.notes;
+          notesData[uniqueKey] = notes.notes;
         }
       } else {
         // 전체현황: 모든 사용자의 메모
-        notesData[itemId] = notes.notes;
+        notesData[uniqueKey] = notes.notes;
       }
     }
 
@@ -7812,7 +7891,7 @@ app.get('/api/inspection/modification-completion-status', async (req, res) => {
 // 수정완료 상태 업데이트 API
 app.post('/api/inspection/modification-complete', async (req, res) => {
   try {
-    const { itemId, userId, isCompleted } = req.body;
+    const { itemId, userId, isCompleted, subscriptionNumber, incorrectValue, correctValue } = req.body;
     
     if (!itemId || !userId) {
       return res.status(400).json({ 
@@ -7821,21 +7900,24 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
       });
     }
 
+    // 고유키 생성
+    const uniqueKey = generateUniqueKey(subscriptionNumber, incorrectValue, correctValue);
+
     // 메모리에 상태 저장
     if (isCompleted) {
-      modificationCompletionStatus.set(itemId, {
+      modificationCompletionStatus.set(uniqueKey, {
         userId,
         isCompleted,
         timestamp: new Date().toISOString()
       });
     } else {
-      modificationCompletionStatus.delete(itemId);
+      modificationCompletionStatus.delete(uniqueKey);
     }
 
     // 시트에 저장
     await saveInspectionMemoData(modificationCompletionStatus, modificationNotes);
 
-    console.log(`수정완료 상태 업데이트: ${itemId} - ${userId} - ${isCompleted ? '완료' : '대기'}`);
+    console.log(`수정완료 상태 업데이트: ${uniqueKey} - ${userId} - ${isCompleted ? '완료' : '대기'}`);
 
     res.json({ 
       success: true, 
@@ -7854,7 +7936,7 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
 // 수정완료 내용 업데이트 API
 app.post('/api/inspection/modification-notes', async (req, res) => {
   try {
-    const { itemId, userId, notes } = req.body;
+    const { itemId, userId, notes, subscriptionNumber, incorrectValue, correctValue } = req.body;
     
     if (!itemId || !userId) {
       return res.status(400).json({ 
@@ -7863,21 +7945,24 @@ app.post('/api/inspection/modification-notes', async (req, res) => {
       });
     }
 
+    // 고유키 생성
+    const uniqueKey = generateUniqueKey(subscriptionNumber, incorrectValue, correctValue);
+
     // 메모리에 내용 저장
     if (notes && notes.trim()) {
-      modificationNotes.set(itemId, {
+      modificationNotes.set(uniqueKey, {
         userId,
         notes: notes.trim(),
         timestamp: new Date().toISOString()
       });
     } else {
-      modificationNotes.delete(itemId);
+      modificationNotes.delete(uniqueKey);
     }
 
     // 시트에 저장
     await saveInspectionMemoData(modificationCompletionStatus, modificationNotes);
 
-    console.log(`수정완료 내용 업데이트: ${itemId} - ${userId} - ${notes}`);
+    console.log(`수정완료 내용 업데이트: ${uniqueKey} - ${userId} - ${notes}`);
 
     res.json({ 
       success: true, 

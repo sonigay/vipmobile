@@ -258,7 +258,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     // 완료 상태를 포함한 데이터 (수정완료 상태도 포함)
     const differencesWithCompletion = inspectionData.differences.map(diff => ({
       ...diff,
-      completed: completedItems.has(diff.id || diff.originalKey) || modificationCompletedItems.has(diff.originalKey || diff.key)
+              completed: completedItems.has(diff.id || diff.originalKey) || modificationCompletedItems.has(`${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`)
     }));
     
     let filtered = filterDifferences(differencesWithCompletion, filters);
@@ -285,7 +285,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     // 완료 상태를 포함한 통계 계산 (수정완료 상태도 포함)
     const differencesWithCompletion = inspectionData.differences.map(diff => ({
       ...diff,
-      completed: completedItems.has(diff.key) || modificationCompletedItems.has(diff.originalKey || diff.key)
+              completed: completedItems.has(diff.key) || modificationCompletedItems.has(`${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`)
     }));
     
     return calculateStatistics(differencesWithCompletion);
@@ -302,21 +302,26 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     if (!loggedInStore?.contactId) return;
     
     try {
+      // 고유키 생성
+      const uniqueKey = `${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`;
+      
       // 서버에 상태 업데이트
       await updateModificationComplete(
         item.originalKey || item.key, 
         loggedInStore.contactId, 
-        isCompleted
+        isCompleted,
+        item.subscriptionNumber || item.originalKey || item.key,
+        item.incorrectValue || '',
+        item.correctValue || ''
       );
       
       // 로컬 상태 업데이트
       setModificationCompletedItems(prev => {
         const newSet = new Set(prev);
-        const itemKey = item.originalKey || item.key;
         if (isCompleted) {
-          newSet.add(itemKey);
+          newSet.add(uniqueKey);
         } else {
-          newSet.delete(itemKey);
+          newSet.delete(uniqueKey);
         }
         return newSet;
       });
@@ -351,7 +356,10 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       await updateModificationNotes(
         item.originalKey || item.key, 
         loggedInStore.contactId, 
-        item.notes || ''
+        item.notes || '',
+        item.subscriptionNumber || item.originalKey || item.key,
+        item.incorrectValue || '',
+        item.correctValue || ''
       );
       
       // 편집 모드 종료
@@ -1009,7 +1017,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                         <FormControlLabel
                           control={
                             <Switch
-                              checked={modificationCompletedItems.has(item.originalKey || item.key)}
+                              checked={modificationCompletedItems.has(`${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`)}
                               onChange={(e) => handleModificationComplete(item, e.target.checked)}
                               size="small"
                             />
@@ -1018,7 +1026,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
                         />
                       </TableCell>
                       <TableCell>
-                        {modificationCompletedItems.has(item.originalKey || item.key) ? (
+                        {modificationCompletedItems.has(`${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`) ? (
                           <Chip
                             icon={<CheckCircleIcon />}
                             label="완료"

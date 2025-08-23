@@ -315,7 +315,7 @@ export async function updateColumnSettings(settings) {
 }
 
 // 수정완료 상태 업데이트
-export async function updateModificationComplete(itemId, userId, isCompleted) {
+export async function updateModificationComplete(itemId, userId, isCompleted, subscriptionNumber, incorrectValue, correctValue) {
   try {
     const API_URL = process.env.REACT_APP_API_URL;
     const response = await fetch(`${API_URL}/api/inspection/modification-complete`, {
@@ -323,7 +323,14 @@ export async function updateModificationComplete(itemId, userId, isCompleted) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ itemId, userId, isCompleted }),
+      body: JSON.stringify({ 
+        itemId, 
+        userId, 
+        isCompleted, 
+        subscriptionNumber, 
+        incorrectValue, 
+        correctValue 
+      }),
     });
     
     const data = await response.json();
@@ -340,7 +347,7 @@ export async function updateModificationComplete(itemId, userId, isCompleted) {
 }
 
 // 수정완료 내용 업데이트
-export async function updateModificationNotes(itemId, userId, notes) {
+export async function updateModificationNotes(itemId, userId, notes, subscriptionNumber, incorrectValue, correctValue) {
   try {
     const API_URL = process.env.REACT_APP_API_URL;
     const response = await fetch(`${API_URL}/api/inspection/modification-notes`, {
@@ -348,7 +355,14 @@ export async function updateModificationNotes(itemId, userId, notes) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ itemId, userId, notes }),
+      body: JSON.stringify({ 
+        itemId, 
+        userId, 
+        notes, 
+        subscriptionNumber, 
+        incorrectValue, 
+        correctValue 
+      }),
     });
     
     const data = await response.json();
@@ -358,6 +372,7 @@ export async function updateModificationNotes(itemId, userId, notes) {
     }
     
     return data;
+    
   } catch (error) {
     console.error('수정완료 내용 업데이트 오류:', error);
     throw error;
