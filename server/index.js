@@ -853,72 +853,35 @@ async function saveInspectionMemoData(completionStatus, notes) {
   try {
     const headerRow = ['고유키', '가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분'];
     
-    // 기존 데이터 읽기
-    const existingData = await getSheetValues(INSPECTION_MEMO_SHEET_NAME);
-    const existingRows = existingData && existingData.length > 1 ? existingData.slice(1) : [];
+    // 최종 데이터 행 생성 (완료 상태인 항목만)
+    const finalDataRows = [];
     
-    // 기존 데이터를 Map으로 변환 (고유키를 키로 사용)
-    const existingDataMap = new Map();
-    existingRows.forEach(row => {
-      if (row && row.length > 0) {
-        const uniqueKey = (row[0] || '').toString().trim();
-        if (uniqueKey) {
-          existingDataMap.set(uniqueKey, row);
-        }
-      }
-    });
-    
-    // 업데이트된 데이터 Map 생성
-    const updatedDataMap = new Map(existingDataMap);
-    
-    // 완료상태 처리
+    // 완료 상태인 항목들만 처리
     for (const [uniqueKey, status] of completionStatus) {
       if (status.isCompleted) {
-        // 완료 상태인 경우: 기존 행 업데이트 또는 새 행 생성
-        const existingRow = updatedDataMap.get(uniqueKey);
-        if (existingRow) {
-          // 기존 행 업데이트
-          existingRow[3] = '완료'; // 완료상태
-          existingRow[5] = status.timestamp; // 업데이트시간
-        } else {
-          // 새 행 생성 (고유키, 가입번호, 사용자ID, 완료상태, 메모내용, 업데이트시간, 필드구분)
-          const subscriptionNumber = uniqueKey.split('_')[0]; // 고유키에서 가입번호 추출
-          updatedDataMap.set(uniqueKey, [
-            uniqueKey,
-            subscriptionNumber,
-            status.userId,
-            '완료',
-            '', // 메모내용
-            status.timestamp,
-            '전체'
-          ]);
-        }
-      } else {
-        // 대기 상태인 경우: 해당 고유키 완전 삭제
-        updatedDataMap.delete(uniqueKey);
+        // 메모 내용 가져오기
+        const noteData = notes.get(uniqueKey);
+        const memoContent = noteData ? noteData.notes : '';
+        
+        // 고유키에서 가입번호 추출
+        const subscriptionNumber = uniqueKey.split('_')[0];
+        
+        // 행 데이터 생성
+        const rowData = [
+          uniqueKey,                    // 고유키
+          subscriptionNumber,           // 가입번호
+          status.userId,               // 사용자ID
+          '완료',                      // 완료상태
+          memoContent,                 // 메모내용
+          status.timestamp,            // 업데이트시간
+          '전체'                       // 필드구분
+        ];
+        
+        finalDataRows.push(rowData);
       }
     }
     
-    // 메모내용 처리 (완료 상태인 경우만)
-    for (const [uniqueKey, noteData] of notes) {
-      // 해당 고유키가 완료 상태인지 확인
-      const isCompleted = completionStatus.has(uniqueKey) && completionStatus.get(uniqueKey).isCompleted;
-      
-      if (isCompleted) {
-        const existingRow = updatedDataMap.get(uniqueKey);
-        if (existingRow) {
-          // 기존 행에 메모 업데이트
-          existingRow[4] = noteData.notes; // 메모내용
-          existingRow[5] = noteData.timestamp; // 업데이트시간
-        }
-      }
-      // 대기 상태인 경우는 처리하지 않음 (이미 삭제됨)
-    }
-    
-    // 최종 데이터 행 생성
-    const finalDataRows = Array.from(updatedDataMap.values());
-    
-    // 시트 업데이트
+    // 시트 업데이트 (완료 상태인 항목만)
     if (finalDataRows.length > 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -928,6 +891,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
           values: [headerRow, ...finalDataRows]
         }
       });
+      console.log(`여직원검수데이터메모 시트 업데이트 완료: ${finalDataRows.length}개 행`);
     } else {
       // 데이터가 없는 경우 헤더만 유지
       await sheets.spreadsheets.values.update({
@@ -938,6 +902,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
           values: [headerRow]
         }
       });
+      console.log('여직원검수데이터메모 시트 헤더만 유지');
     }
     
   } catch (error) {
@@ -17759,8 +17724,8 @@ app.get('/api/closing-chart', async (req, res) => {
       excludedStores
     });
     
-    // 캐시 저장 (5분)
-    cache.set(cacheKey, processedData, 300);
+    // 캐시 저장 (1분으로 단축 - 빠른 업데이트를 위해)
+    cache.set(cacheKey, processedData, 60);
     
     console.log('마감장표 데이터 처리 완료');
     res.json(processedData);
@@ -18255,97 +18220,75 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     // 지원금 적용
     data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
     
-    // 등록점, 가동점, 보유단말, 보유유심 계산 (사무실별/소속별과 동일한 방식으로 통일)
+    // 등록점, 가동점, 보유단말, 보유유심 계산 (새로운 방식: 코드명으로 직접 매칭)
     let totalRegisteredStores = 0;
     let totalActiveStores = 0;
     let totalDevices = 0;
     let totalSims = 0;
     
-    // 해당 코드의 모든 담당자들의 고유 출고처 목록 생성 (사무실별과 동일한 방식)
-    const agentStores = new Map(); // 담당자별 고유 출고처 목록
-    const agentInventory = new Map(); // 담당자별 재고 데이터
-    
-    // 1단계: 해당 코드의 담당자들의 고유 출고처 수집
+    // 새로운 방식: 폰클출고처데이터에서 코드명으로 직접 매칭
     if (storeData) {
+      const codeStores = new Set(); // 해당 코드의 고유 출고처 목록
+      
       storeData.forEach(storeRow => {
-        if (storeRow.length > 21) {
-          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
+        if (storeRow.length > 15) {
           const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+          const storeCodeName = (storeRow[4] || '').toString(); // E열: 코드명 (VIP(경수), VIP(경인) 등)
           
-          // 해당 코드의 담당자인지 확인
-          const isCodeAgent = phoneklData.some(row => {
-            const rowCode = (row[4] || '').toString(); // E열: 코드
-            const rowAgent = (row[8] || '').toString(); // I열: 담당자
-            return rowCode === data.code && rowAgent === storeAgent && !excludedAgents.includes(rowAgent);
-          });
-          
-          if (isCodeAgent && storeCode) {
+          // 해당 코드명과 일치하는 출고처만 처리
+          if (storeCodeName === data.code && storeCode) {
             // 제외 조건들 (사무실별과 동일)
             if (storeCode.includes('사무실')) return;
-            if (storeCode === storeAgent) return;
-            if (storeAgent.includes('거래종료')) return;
+            if (storeCode.includes('거래종료')) return;
             
-            if (!agentStores.has(storeAgent)) {
-              agentStores.set(storeAgent, new Set());
-            }
-            agentStores.get(storeAgent).add(storeCode);
+            codeStores.add(storeCode);
           }
         }
       });
-    }
-    
-    // 2단계: 재고 데이터 수집
-    if (inventoryData) {
-      inventoryData.forEach(inventoryRow => {
-        if (inventoryRow.length > 8) {
-          const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
-          const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
-          
-          // 해당 코드의 담당자인지 확인
-          const isCodeAgent = phoneklData.some(row => {
-            const rowCode = (row[4] || '').toString(); // E열: 코드
-            const rowAgent = (row[8] || '').toString(); // I열: 담당자
-            return rowCode === data.code && rowAgent === inventoryAgent && !excludedAgents.includes(rowAgent);
-          });
-          
-          if (isCodeAgent && !excludedStores.includes(inventoryStore)) {
-            if (!agentInventory.has(inventoryAgent)) {
-              agentInventory.set(inventoryAgent, { devices: 0, sims: 0 });
-            }
-            if (inventoryType === '유심') {
-              agentInventory.get(inventoryAgent).sims++;
-            } else {
-              agentInventory.get(inventoryAgent).devices++;
-            }
-          }
-        }
-      });
-    }
-    
-    // 3단계: 등록점, 가동점, 재고 계산 (사무실별과 동일한 방식)
-    agentStores.forEach((stores, agent) => {
-      totalRegisteredStores += stores.size;
+      
+      // 등록점 계산
+      totalRegisteredStores = codeStores.size;
       
       // 가동점 계산 (각 출고처별로 실적 확인)
-      stores.forEach(storeCode => {
+      codeStores.forEach(storeCode => {
         const hasPerformance = filteredPhoneklData.some(performanceRow => {
-          const performanceStoreCode = (performanceRow[14] || '').toString();
-          const performanceAgent = (performanceRow[8] || '').toString();
-          return performanceStoreCode === storeCode && performanceAgent === agent;
+          const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처코드
+          return performanceStoreCode === storeCode;
         });
         
         if (hasPerformance) {
           totalActiveStores++;
         }
       });
-    });
+      
+      console.log(`🔍 [코드별집계] ${data.code} 새로운 방식 계산 결과:`, {
+        등록점: totalRegisteredStores,
+        가동점: totalActiveStores,
+        가동율: totalRegisteredStores > 0 ? Math.round((totalActiveStores / totalRegisteredStores) * 100) : 0,
+        출고처목록: Array.from(codeStores)
+      });
+    }
     
-    // 4단계: 재고 합계
-    agentInventory.forEach((inventory) => {
-      totalDevices += inventory.devices;
-      totalSims += inventory.sims;
-    });
+    // 재고 데이터도 코드명으로 직접 매칭 (D열: 코드명 사용)
+    if (inventoryData) {
+      inventoryData.forEach(inventoryRow => {
+        if (inventoryRow.length > 21) {
+          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+          const inventoryCodeName = (inventoryRow[3] || '').toString(); // D열: 코드명
+          
+          // 해당 코드명과 일치하고, 제외되지 않은 출고처만 계산
+          if (inventoryCodeName === data.code && inventoryStore && !excludedStores.includes(inventoryStore)) {
+            const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+            
+            if (inventoryType === '유심') {
+              totalSims++;
+            } else {
+              totalDevices++;
+            }
+          }
+        }
+      });
+    }
     
     data.registeredStores = totalRegisteredStores;
     data.activeStores = totalActiveStores;
