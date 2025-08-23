@@ -821,23 +821,19 @@ async function loadInspectionMemoData() {
         const fieldType = (row[6] || '').toString().trim(); // G열: 필드구분
         
         if (uniqueKey && userId) {
-          // 완료상태 저장
-          if (isCompleted) {
-            completionStatus.set(uniqueKey, {
-              userId,
-              isCompleted: true,
-              timestamp: updateTime || new Date().toISOString()
-            });
-          }
+          // 완료상태 저장 (완료와 대기 모두 처리)
+          completionStatus.set(uniqueKey, {
+            userId,
+            isCompleted: isCompleted,  // true 또는 false
+            timestamp: updateTime || new Date().toISOString()
+          });
           
-          // 메모내용 저장
-          if (memoContent) {
-            notes.set(uniqueKey, {
-              userId,
-              notes: memoContent,
-              timestamp: updateTime || new Date().toISOString()
-            });
-          }
+          // 메모내용 저장 (빈 문자열도 포함)
+          notes.set(uniqueKey, {
+            userId,
+            notes: memoContent || '',  // 빈 문자열도 저장
+            timestamp: updateTime || new Date().toISOString()
+          });
         }
       }
     }
@@ -853,32 +849,33 @@ async function saveInspectionMemoData(completionStatus, notes) {
   try {
     const headerRow = ['고유키', '가입번호', '사용자ID', '완료상태', '메모내용', '업데이트시간', '필드구분'];
     
-    // 최종 데이터 행 생성 (완료 상태인 항목만)
+    // 최종 데이터 행 생성 (완료 상태와 대기 상태 모두 처리)
     const finalDataRows = [];
     
-    // 완료 상태인 항목들만 처리
+    // 모든 상태의 항목들 처리
     for (const [uniqueKey, status] of completionStatus) {
-      if (status.isCompleted) {
-        // 메모 내용 가져오기
-        const noteData = notes.get(uniqueKey);
-        const memoContent = noteData ? noteData.notes : '';
-        
-        // 고유키에서 가입번호 추출
-        const subscriptionNumber = uniqueKey.split('_')[0];
-        
-        // 행 데이터 생성
-        const rowData = [
-          uniqueKey,                    // 고유키
-          subscriptionNumber,           // 가입번호
-          status.userId,               // 사용자ID
-          '완료',                      // 완료상태
-          memoContent,                 // 메모내용
-          status.timestamp,            // 업데이트시간
-          '전체'                       // 필드구분
-        ];
-        
-        finalDataRows.push(rowData);
-      }
+      // 메모 내용 가져오기
+      const noteData = notes.get(uniqueKey);
+      const memoContent = noteData ? noteData.notes : '';
+      
+      // 고유키에서 가입번호 추출
+      const subscriptionNumber = uniqueKey.split('_')[0];
+      
+      // 상태에 따른 완료상태 텍스트 결정
+      const statusText = status.isCompleted ? '완료' : '대기';
+      
+      // 행 데이터 생성
+      const rowData = [
+        uniqueKey,                    // 고유키
+        subscriptionNumber,           // 가입번호
+        status.userId,               // 사용자ID
+        statusText,                   // 완료상태 (완료/대기)
+        memoContent,                  // 메모내용
+        status.timestamp,             // 업데이트시간
+        '전체'                        // 필드구분
+      ];
+      
+      finalDataRows.push(rowData);
     }
     
     // 시트 업데이트 (완료 상태인 항목만)
@@ -7873,15 +7870,20 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
 
     // 메모리에 상태 저장
     if (isCompleted) {
+      // 완료 체크 시
       modificationCompletionStatus.set(uniqueKey, {
         userId,
-        isCompleted,
+        isCompleted: true,
         timestamp: new Date().toISOString()
       });
     } else {
-      // 완료체크 해제 시 완전 삭제
-      modificationCompletionStatus.delete(uniqueKey);
-      modificationNotes.delete(uniqueKey); // 메모도 함께 삭제
+      // 완료체크 해제 시 "대기" 상태로 변경
+      modificationCompletionStatus.set(uniqueKey, {
+        userId,
+        isCompleted: false,  // false = 대기 상태
+        timestamp: new Date().toISOString()
+      });
+      // 메모는 유지 (사용자가 다시 체크할 수 있도록)
     }
 
     // 시트에 저장
@@ -7920,22 +7922,33 @@ app.post('/api/inspection/modification-notes', async (req, res) => {
 
     // 메모리에 내용 저장
     if (notes && notes.trim()) {
+      // 메모가 있는 경우
       modificationNotes.set(uniqueKey, {
         userId,
         notes: notes.trim(),
         timestamp: new Date().toISOString()
       });
       
-      // 완료 상태도 함께 설정 (메모가 있으면 완료로 간주)
+      // 완료 상태 설정
       modificationCompletionStatus.set(uniqueKey, {
         userId,
         isCompleted: true,
         timestamp: new Date().toISOString()
       });
     } else {
-      modificationNotes.delete(uniqueKey);
-      // 메모가 없으면 완료 상태도 제거
-      modificationCompletionStatus.delete(uniqueKey);
+      // 메모가 없는 경우 (공백으로 변경)
+      modificationNotes.set(uniqueKey, {
+        userId,
+        notes: '',  // 빈 문자열로 설정
+        timestamp: new Date().toISOString()
+      });
+      
+      // 완료 상태는 유지
+      modificationCompletionStatus.set(uniqueKey, {
+        userId,
+        isCompleted: true,
+        timestamp: new Date().toISOString()
+      });
     }
 
     // 시트에 저장
@@ -18248,6 +18261,17 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     if (storeData) {
       const codeStores = new Set(); // 해당 코드의 고유 출고처 목록
       
+      // 🔍 담당자별에 실제로 존재하는 담당자 목록 생성
+      const validAgents = new Set();
+      phoneklData.forEach(row => {
+        const agent = (row[8] || '').toString(); // I열: 담당자
+        if (agent && !excludedAgents.includes(agent)) {
+          validAgents.add(agent);
+        }
+      });
+      
+      console.log(`🔍 [코드별집계] ${data.code} 유효한 담당자 수: ${validAgents.size}`);
+      
       // 🔍 디버깅: 코드명 매칭 확인
       console.log(`🔍 [코드별집계] ${data.code} 코드명 직접 매칭 시작`);
       
@@ -18255,15 +18279,22 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
         if (storeRow.length > 15) {
           const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
           const storeCodeName = (storeRow[4] || '').toString(); // E열: 코드명 (VIP(경수), VIP(경인) 등)
+          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
           
           // 🔍 디버깅: 각 행의 코드명 확인
           if (storeCodeName && storeCode) {
-            console.log(`🔍 [코드별집계] 출고처: ${storeCode}, 코드명: ${storeCodeName}, 매칭여부: ${storeCodeName === data.code}`);
+            console.log(`🔍 [코드별집계] 출고처: ${storeCode}, 코드명: ${storeCodeName}, 담당자: ${storeAgent}, 매칭여부: ${storeCodeName === data.code}`);
           }
           
           // 해당 코드명과 일치하는 출고처만 처리
           if (storeCodeName === data.code && storeCode) {
-            // 제외 조건들 (사무실별과 동일)
+            // 🆕 새로운 제외 조건: 담당자별 테이블에 없는 담당자랑 매칭된 출고처 제외
+            if (!validAgents.has(storeAgent)) {
+              console.log(`🔍 [코드별집계] ${storeAgent} 제외: 담당자별에 존재하지 않음 (출고처: ${storeCode})`);
+              return;
+            }
+            
+            // 기존 제외 조건들 (사무실별과 동일)
             if (storeCode.includes('사무실')) {
               console.log(`🔍 [코드별집계] ${storeCode} 제외: 사무실 포함`);
               return;
@@ -18274,14 +18305,13 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
             }
             
             // ⚠️ 빠진 제외 조건 추가: 출고처코드와 담당자가 동일한 경우 제외
-            const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
             if (storeCode === storeAgent) {
               console.log(`🔍 [코드별집계] ${storeCode} 제외: 출고처코드와 담당자 동일`);
               return;
             }
             
             codeStores.add(storeCode);
-            console.log(`🔍 [코드별집계] ${storeCode} 추가됨`);
+            console.log(`🔍 [코드별집계] ${storeCode} 추가됨 (담당자: ${storeAgent})`);
           }
         }
       });
