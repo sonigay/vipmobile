@@ -905,6 +905,15 @@ async function saveInspectionMemoData(completionStatus, notes) {
       console.log('여직원검수데이터메모 시트 헤더만 유지');
     }
     
+    // 🔍 디버깅: 현재 상태 로그
+    console.log('🔍 [saveInspectionMemoData] 현재 상태:', {
+      completionStatusSize: completionStatus.size,
+      notesSize: notes.size,
+      finalDataRowsCount: finalDataRows.length,
+      completionStatusKeys: Array.from(completionStatus.keys()),
+      notesKeys: Array.from(notes.keys())
+    });
+    
   } catch (error) {
     console.error('여직원검수데이터메모 시트 저장 실패:', error);
   }
@@ -7916,8 +7925,17 @@ app.post('/api/inspection/modification-notes', async (req, res) => {
         notes: notes.trim(),
         timestamp: new Date().toISOString()
       });
+      
+      // 완료 상태도 함께 설정 (메모가 있으면 완료로 간주)
+      modificationCompletionStatus.set(uniqueKey, {
+        userId,
+        isCompleted: true,
+        timestamp: new Date().toISOString()
+      });
     } else {
       modificationNotes.delete(uniqueKey);
+      // 메모가 없으면 완료 상태도 제거
+      modificationCompletionStatus.delete(uniqueKey);
     }
 
     // 시트에 저장
@@ -18230,18 +18248,40 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     if (storeData) {
       const codeStores = new Set(); // 해당 코드의 고유 출고처 목록
       
+      // 🔍 디버깅: 코드명 매칭 확인
+      console.log(`🔍 [코드별집계] ${data.code} 코드명 직접 매칭 시작`);
+      
       storeData.forEach(storeRow => {
         if (storeRow.length > 15) {
           const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
           const storeCodeName = (storeRow[4] || '').toString(); // E열: 코드명 (VIP(경수), VIP(경인) 등)
           
+          // 🔍 디버깅: 각 행의 코드명 확인
+          if (storeCodeName && storeCode) {
+            console.log(`🔍 [코드별집계] 출고처: ${storeCode}, 코드명: ${storeCodeName}, 매칭여부: ${storeCodeName === data.code}`);
+          }
+          
           // 해당 코드명과 일치하는 출고처만 처리
           if (storeCodeName === data.code && storeCode) {
             // 제외 조건들 (사무실별과 동일)
-            if (storeCode.includes('사무실')) return;
-            if (storeCode.includes('거래종료')) return;
+            if (storeCode.includes('사무실')) {
+              console.log(`🔍 [코드별집계] ${storeCode} 제외: 사무실 포함`);
+              return;
+            }
+            if (storeCode.includes('거래종료')) {
+              console.log(`🔍 [코드별집계] ${storeCode} 제외: 거래종료 포함`);
+              return;
+            }
+            
+            // ⚠️ 빠진 제외 조건 추가: 출고처코드와 담당자가 동일한 경우 제외
+            const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
+            if (storeCode === storeAgent) {
+              console.log(`🔍 [코드별집계] ${storeCode} 제외: 출고처코드와 담당자 동일`);
+              return;
+            }
             
             codeStores.add(storeCode);
+            console.log(`🔍 [코드별집계] ${storeCode} 추가됨`);
           }
         }
       });
@@ -18258,14 +18298,18 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
         
         if (hasPerformance) {
           totalActiveStores++;
+          console.log(`🔍 [코드별집계] ${storeCode} 가동점 인정`);
+        } else {
+          console.log(`🔍 [코드별집계] ${storeCode} 가동점 미인정`);
         }
       });
       
-      console.log(`🔍 [코드별집계] ${data.code} 새로운 방식 계산 결과:`, {
+      console.log(`🔍 [코드별집계] ${data.code} 코드명 직접 매칭 결과:`, {
         등록점: totalRegisteredStores,
         가동점: totalActiveStores,
         가동율: totalRegisteredStores > 0 ? Math.round((totalActiveStores / totalRegisteredStores) * 100) : 0,
-        출고처목록: Array.from(codeStores)
+        출고처목록: Array.from(codeStores),
+        총출고처수: storeData.length - 1 // 헤더 제외
       });
     }
     
