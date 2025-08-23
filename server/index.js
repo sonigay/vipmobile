@@ -7766,42 +7766,31 @@ app.get('/api/inspection/modification-completion-status', async (req, res) => {
     const completedItems = [];
     const notesData = {};
     
+    // 완료 상태 조회 (개인현황에서는 해당 사용자의 완료 항목만)
     for (const [itemId, status] of modificationCompletionStatus) {
       if (status.isCompleted) {
         if (view === 'personal') {
           // 개인현황: 해당 사용자의 항목만
           if (status.userId === userId) {
             completedItems.push(itemId);
-            // 해당 항목의 내용도 함께 조회
-            const notes = modificationNotes.get(itemId);
-            if (notes && notes.userId === userId) {
-              notesData[itemId] = notes.notes;
-            }
           }
         } else {
           // 전체현황: 모든 사용자의 항목
           completedItems.push(itemId);
-          // 해당 항목의 내용도 함께 조회 (모든 사용자의 내용)
-          const notes = modificationNotes.get(itemId);
-          if (notes) {
-            notesData[itemId] = notes.notes;
-          }
         }
       }
     }
     
-    // 수정완료 상태가 없어도 내용이 있는 경우 포함
+    // 메모 내용 조회 (개인현황에서는 해당 사용자의 메모만)
     for (const [itemId, notes] of modificationNotes) {
-      if (!notesData[itemId]) {
-        if (view === 'personal') {
-          // 개인현황: 해당 사용자의 내용만
-          if (notes.userId === userId) {
-            notesData[itemId] = notes.notes;
-          }
-        } else {
-          // 전체현황: 모든 사용자의 내용
+      if (view === 'personal') {
+        // 개인현황: 해당 사용자의 메모만
+        if (notes.userId === userId) {
           notesData[itemId] = notes.notes;
         }
+      } else {
+        // 전체현황: 모든 사용자의 메모
+        notesData[itemId] = notes.notes;
       }
     }
 
@@ -18201,28 +18190,30 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
       }
     });
     
-    // 각 담당자별로 등록점, 가동점, 재고 계산 (담당자별과 동일한 방식)
+    // 각 담당자별로 calculateAgentDetails와 동일한 방식으로 계산 후 합산
     codeAgents.forEach(agent => {
-      // 등록점 계산
+      // 담당자별 등록점 계산 (calculateAgentDetails와 동일한 방식)
+      let agentRegisteredStores = 0;
       if (storeData) {
         storeData.forEach(storeRow => {
           if (storeRow.length > 21) {
             const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
             const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
             
-            // 제외 조건들
+            // 제외 조건들 (calculateAgentDetails와 동일)
             if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
             if (storeAgent === agent && storeCode) {
-              totalRegisteredStores++;
+              agentRegisteredStores++;
             }
           }
         });
       }
       
-      // 가동점 계산
+      // 담당자별 가동점 계산 (calculateAgentDetails와 동일한 방식)
+      let agentActiveStores = 0;
       if (storeData) {
         storeData.forEach(storeRow => {
           if (storeRow.length > 21 && storeRow[21] === agent) {
@@ -18241,13 +18232,15 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
             });
             
             if (storeCode && hasPerformance) {
-              totalActiveStores++;
+              agentActiveStores++;
             }
           }
         });
       }
       
-      // 보유단말, 보유유심 계산
+      // 담당자별 보유단말, 보유유심 계산 (calculateAgentDetails와 동일한 방식)
+      let agentDevices = 0;
+      let agentSims = 0;
       if (inventoryData) {
         inventoryData.forEach(inventoryRow => {
           if (inventoryRow.length > 8) {
@@ -18257,14 +18250,20 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
             
             if (inventoryAgent === agent && !excludedStores.includes(inventoryStore)) {
               if (inventoryType === '유심') {
-                totalSims++;
+                agentSims++;
               } else {
-                totalDevices++;
+                agentDevices++;
               }
             }
           }
         });
       }
+      
+      // 담당자별 결과를 코드별 합계에 추가
+      totalRegisteredStores += agentRegisteredStores;
+      totalActiveStores += agentActiveStores;
+      totalDevices += agentDevices;
+      totalSims += agentSims;
     });
     
     data.registeredStores = totalRegisteredStores;

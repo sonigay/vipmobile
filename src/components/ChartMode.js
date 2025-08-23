@@ -2894,10 +2894,11 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
   return (
     <TableContainer sx={{ 
       borderRadius: 1, 
-      overflow: 'hidden',
+      overflow: 'auto',
+      maxWidth: '100%',
       '& .MuiTable-root': {
         tableLayout: 'fixed',
-        width: '100%'
+        minWidth: { xs: '1200px', sm: '100%' }
       }
     }}>
       <Table size="small">

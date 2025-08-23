@@ -312,10 +312,11 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       // 로컬 상태 업데이트
       setModificationCompletedItems(prev => {
         const newSet = new Set(prev);
+        const itemKey = item.originalKey || item.key;
         if (isCompleted) {
-          newSet.add(item.originalKey || item.key);
+          newSet.add(itemKey);
         } else {
-          newSet.delete(item.originalKey || item.key);
+          newSet.delete(itemKey);
         }
         return newSet;
       });
