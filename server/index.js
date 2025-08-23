@@ -18259,96 +18259,96 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     // 지원금 적용
     data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
     
-    // 등록점, 가동점, 보유단말, 보유유심 계산 (담당자별 방식으로 통일)
+    // 등록점, 가동점, 보유단말, 보유유심 계산 (사무실별/소속별과 동일한 방식으로 통일)
     let totalRegisteredStores = 0;
     let totalActiveStores = 0;
     let totalDevices = 0;
     let totalSims = 0;
     
-    // 해당 코드의 담당자들 목록 생성
-    const codeAgents = new Set();
-    phoneklData.forEach(row => {
-      const rowCode = (row[4] || '').toString(); // E열: 코드
-      const rowAgent = (row[8] || '').toString(); // I열: 담당자
-      if (rowCode === data.code && !excludedAgents.includes(rowAgent)) {
-        codeAgents.add(rowAgent);
-      }
-    });
+    // 해당 코드의 모든 담당자들의 고유 출고처 목록 생성 (사무실별과 동일한 방식)
+    const agentStores = new Map(); // 담당자별 고유 출고처 목록
+    const agentInventory = new Map(); // 담당자별 재고 데이터
     
-    // 각 담당자별로 calculateAgentDetails와 동일한 방식으로 계산 후 합산
-    codeAgents.forEach(agent => {
-      // 담당자별 등록점 계산 (calculateAgentDetails와 동일한 방식)
-      let agentRegisteredStores = 0;
-      if (storeData) {
-        storeData.forEach(storeRow => {
-          if (storeRow.length > 21) {
-            const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
-            const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-            
-            // 제외 조건들 (calculateAgentDetails와 동일)
+    // 1단계: 해당 코드의 담당자들의 고유 출고처 수집
+    if (storeData) {
+      storeData.forEach(storeRow => {
+        if (storeRow.length > 21) {
+          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
+          const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+          
+          // 해당 코드의 담당자인지 확인
+          const isCodeAgent = phoneklData.some(row => {
+            const rowCode = (row[4] || '').toString(); // E열: 코드
+            const rowAgent = (row[8] || '').toString(); // I열: 담당자
+            return rowCode === data.code && rowAgent === storeAgent && !excludedAgents.includes(rowAgent);
+          });
+          
+          if (isCodeAgent && storeCode) {
+            // 제외 조건들 (사무실별과 동일)
             if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
-            if (storeAgent === agent && storeCode) {
-              agentRegisteredStores++;
+            if (!agentStores.has(storeAgent)) {
+              agentStores.set(storeAgent, new Set());
+            }
+            agentStores.get(storeAgent).add(storeCode);
+          }
+        }
+      });
+    }
+    
+    // 2단계: 재고 데이터 수집
+    if (inventoryData) {
+      inventoryData.forEach(inventoryRow => {
+        if (inventoryRow.length > 8) {
+          const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+          const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+          
+          // 해당 코드의 담당자인지 확인
+          const isCodeAgent = phoneklData.some(row => {
+            const rowCode = (row[4] || '').toString(); // E열: 코드
+            const rowAgent = (row[8] || '').toString(); // I열: 담당자
+            return rowCode === data.code && rowAgent === inventoryAgent && !excludedAgents.includes(rowAgent);
+          });
+          
+          if (isCodeAgent && !excludedStores.includes(inventoryStore)) {
+            if (!agentInventory.has(inventoryAgent)) {
+              agentInventory.set(inventoryAgent, { devices: 0, sims: 0 });
+            }
+            if (inventoryType === '유심') {
+              agentInventory.get(inventoryAgent).sims++;
+            } else {
+              agentInventory.get(inventoryAgent).devices++;
             }
           }
-        });
-      }
+        }
+      });
+    }
+    
+    // 3단계: 등록점, 가동점, 재고 계산 (사무실별과 동일한 방식)
+    agentStores.forEach((stores, agent) => {
+      totalRegisteredStores += stores.size;
       
-      // 담당자별 가동점 계산 (calculateAgentDetails와 동일한 방식)
-      let agentActiveStores = 0;
-      if (storeData) {
-        storeData.forEach(storeRow => {
-          if (storeRow.length > 21 && storeRow[21] === agent) {
-            const storeCode = (storeRow[14] || '').toString();
-            
-            // 제외 조건들 (등록점과 동일)
-            if (storeCode.includes('사무실')) return;
-            if (storeCode === agent) return;
-            if (agent.includes('거래종료')) return;
-            
-            // 해당 출고처에서 당월실적이 있는지 확인
-            const hasPerformance = filteredPhoneklData.some(performanceRow => {
-              const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처코드
-              const performanceAgent = (performanceRow[8] || '').toString(); // I열: 담당자
-              return performanceStoreCode === storeCode && performanceAgent === agent;
-            });
-            
-            if (storeCode && hasPerformance) {
-              agentActiveStores++;
-            }
-          }
+      // 가동점 계산 (각 출고처별로 실적 확인)
+      stores.forEach(storeCode => {
+        const hasPerformance = filteredPhoneklData.some(performanceRow => {
+          const performanceStoreCode = (performanceRow[14] || '').toString();
+          const performanceAgent = (performanceRow[8] || '').toString();
+          return performanceStoreCode === storeCode && performanceAgent === agent;
         });
-      }
-      
-      // 담당자별 보유단말, 보유유심 계산 (calculateAgentDetails와 동일한 방식)
-      let agentDevices = 0;
-      let agentSims = 0;
-      if (inventoryData) {
-        inventoryData.forEach(inventoryRow => {
-          if (inventoryRow.length > 8) {
-            const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
-            const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-            const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
-            
-            if (inventoryAgent === agent && !excludedStores.includes(inventoryStore)) {
-              if (inventoryType === '유심') {
-                agentSims++;
-              } else {
-                agentDevices++;
-              }
-            }
-          }
-        });
-      }
-      
-      // 담당자별 결과를 코드별 합계에 추가
-      totalRegisteredStores += agentRegisteredStores;
-      totalActiveStores += agentActiveStores;
-      totalDevices += agentDevices;
-      totalSims += agentSims;
+        
+        if (hasPerformance) {
+          totalActiveStores++;
+        }
+      });
+    });
+    
+    // 4단계: 재고 합계
+    agentInventory.forEach((inventory) => {
+      totalDevices += inventory.devices;
+      totalSims += inventory.sims;
     });
     
     data.registeredStores = totalRegisteredStores;
