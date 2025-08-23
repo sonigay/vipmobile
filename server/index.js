@@ -894,31 +894,27 @@ async function saveInspectionMemoData(completionStatus, notes) {
           ]);
         }
       } else {
-        // 대기 상태인 경우: 해당 고유키 삭제
+        // 대기 상태인 경우: 해당 고유키 완전 삭제 (메모내용도 함께)
         updatedDataMap.delete(uniqueKey);
+        // notes에서도 해당 고유키 삭제
+        notes.delete(uniqueKey);
       }
     }
     
-    // 메모내용 처리
+    // 메모내용 처리 (완료 상태인 경우만)
     for (const [uniqueKey, noteData] of notes) {
-      const existingRow = updatedDataMap.get(uniqueKey);
-      if (existingRow) {
-        // 기존 행에 메모 업데이트
-        existingRow[4] = noteData.notes; // 메모내용
-        existingRow[5] = noteData.timestamp; // 업데이트시간
-      } else {
-        // 새 행 생성 (대기 상태)
-        const subscriptionNumber = uniqueKey.split('_')[0]; // 고유키에서 가입번호 추출
-        updatedDataMap.set(uniqueKey, [
-          uniqueKey,
-          subscriptionNumber,
-          noteData.userId,
-          '대기',
-          noteData.notes,
-          noteData.timestamp,
-          '전체'
-        ]);
+      // 해당 고유키가 완료 상태인지 확인
+      const isCompleted = completionStatus.has(uniqueKey) && completionStatus.get(uniqueKey).isCompleted;
+      
+      if (isCompleted) {
+        const existingRow = updatedDataMap.get(uniqueKey);
+        if (existingRow) {
+          // 기존 행에 메모 업데이트
+          existingRow[4] = noteData.notes; // 메모내용
+          existingRow[5] = noteData.timestamp; // 업데이트시간
+        }
       }
+      // 대기 상태인 경우는 처리하지 않음 (이미 삭제됨)
     }
     
     // 최종 데이터 행 생성

@@ -336,13 +336,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     setInspectionData(prev => {
       if (!prev?.differences) return prev;
       
+      // 고유키 생성
+      const itemUniqueKey = `${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`;
+      
       return {
         ...prev,
-        differences: prev.differences.map(diff => 
-          (diff.originalKey || diff.key) === (item.originalKey || item.key)
+        differences: prev.differences.map(diff => {
+          const diffUniqueKey = `${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`;
+          return diffUniqueKey === itemUniqueKey
             ? { ...diff, isEditingNotes: true }
-            : diff
-        )
+            : diff;
+        })
       };
     });
   };
@@ -366,13 +370,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
       setInspectionData(prev => {
         if (!prev?.differences) return prev;
         
+        // 고유키 생성
+        const itemUniqueKey = `${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`;
+        
         return {
           ...prev,
-          differences: prev.differences.map(diff => 
-            (diff.originalKey || diff.key) === (item.originalKey || item.key)
+          differences: prev.differences.map(diff => {
+            const diffUniqueKey = `${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`;
+            return diffUniqueKey === itemUniqueKey
               ? { ...diff, isEditingNotes: false }
-              : diff
-          )
+              : diff;
+          })
         };
       });
     } catch (error) {
@@ -386,13 +394,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     setInspectionData(prev => {
       if (!prev?.differences) return prev;
       
+      // 고유키 생성
+      const itemUniqueKey = `${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`;
+      
       return {
         ...prev,
-        differences: prev.differences.map(diff => 
-          (diff.originalKey || diff.key) === (item.originalKey || item.key)
+        differences: prev.differences.map(diff => {
+          const diffUniqueKey = `${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`;
+          return diffUniqueKey === itemUniqueKey
             ? { ...diff, isEditingNotes: false }
-            : diff
-        )
+            : diff;
+        })
       };
     });
   };
@@ -402,13 +414,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     setInspectionData(prev => {
       if (!prev?.differences) return prev;
       
+      // 고유키 생성
+      const itemUniqueKey = `${item.originalKey || item.key}_${item.incorrectValue || ''}_${item.correctValue || ''}`;
+      
       return {
         ...prev,
-        differences: prev.differences.map(diff => 
-          (diff.originalKey || diff.key) === (item.originalKey || item.key)
+        differences: prev.differences.map(diff => {
+          const diffUniqueKey = `${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`;
+          return diffUniqueKey === itemUniqueKey
             ? { ...diff, notes }
-            : diff
-        )
+            : diff;
+        })
       };
     });
   };
