@@ -894,10 +894,8 @@ async function saveInspectionMemoData(completionStatus, notes) {
           ]);
         }
       } else {
-        // 대기 상태인 경우: 해당 고유키 완전 삭제 (메모내용도 함께)
+        // 대기 상태인 경우: 해당 고유키 완전 삭제
         updatedDataMap.delete(uniqueKey);
-        // notes에서도 해당 고유키 삭제
-        notes.delete(uniqueKey);
       }
     }
     
@@ -7907,7 +7905,9 @@ app.post('/api/inspection/modification-complete', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } else {
+      // 완료체크 해제 시 완전 삭제
       modificationCompletionStatus.delete(uniqueKey);
+      modificationNotes.delete(uniqueKey); // 메모도 함께 삭제
     }
 
     // 시트에 저장
@@ -18007,7 +18007,7 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     });
   }
   
-  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets);
+  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets, filteredPhoneklData);
   const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap, targets, filteredPhoneklData);
   const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap, targets, filteredPhoneklData);
   const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets, filteredPhoneklData);
