@@ -823,17 +823,17 @@ async function loadInspectionMemoData() {
         if (uniqueKey && userId) {
           // 완료상태 저장 (완료와 대기 모두 처리)
           completionStatus.set(uniqueKey, {
-            userId,
+              userId,
             isCompleted: isCompleted,  // true 또는 false
-            timestamp: updateTime || new Date().toISOString()
-          });
+              timestamp: updateTime || new Date().toISOString()
+            });
           
           // 메모내용 저장 (빈 문자열도 포함)
           notes.set(uniqueKey, {
-            userId,
+              userId,
             notes: memoContent || '',  // 빈 문자열도 저장
-            timestamp: updateTime || new Date().toISOString()
-          });
+              timestamp: updateTime || new Date().toISOString()
+            });
         }
       }
     }
@@ -881,7 +881,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
     // 시트 업데이트 (완료 상태인 항목만)
     if (finalDataRows.length > 0) {
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: SPREADSHEET_ID,
         range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
         resource: {
@@ -910,7 +910,7 @@ async function saveInspectionMemoData(completionStatus, notes) {
       completionStatusKeys: Array.from(completionStatus.keys()),
       notesKeys: Array.from(notes.keys())
     });
-    
+
   } catch (error) {
     console.error('여직원검수데이터메모 시트 저장 실패:', error);
   }
@@ -957,7 +957,7 @@ async function cleanupInspectionMemoData(currentInspectionKeys) {
         }
       });
     }
-    
+
   } catch (error) {
     console.error('여직원검수데이터메모 시트 정리 실패:', error);
   }
@@ -7827,12 +7827,12 @@ app.get('/api/inspection/modification-completion-status', async (req, res) => {
     
     // 메모 내용 조회 (개인현황에서는 해당 사용자의 메모만)
     for (const [uniqueKey, notes] of modificationNotes) {
-      if (view === 'personal') {
+        if (view === 'personal') {
         // 개인현황: 해당 사용자의 메모만
-        if (notes.userId === userId) {
+          if (notes.userId === userId) {
           notesData[uniqueKey] = notes.notes;
-        }
-      } else {
+          }
+        } else {
         // 전체현황: 모든 사용자의 메모
         notesData[uniqueKey] = notes.notes;
       }
@@ -18239,7 +18239,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
           (row[6] || '').toString() === data.office
         );
         if (agentData) {
-          totalTarget += targetInfo.target;
+        totalTarget += targetInfo.target;
         }
       }
     });
