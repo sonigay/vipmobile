@@ -18205,19 +18205,9 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
     data.fee += fee;
   });
   
-  // 인천사무실 디버깅 로그
-  if (incheonDebug.length > 0) {
-    console.log('🔍 [사무실별집계] 인천사무실 디버깅 데이터:', {
-      총데이터수: incheonDebug.length,
-      상세데이터: incheonDebug.slice(0, 10), // 처음 10개만
-      수수료합계: incheonDebug.reduce((sum, item) => sum + item.fee, 0),
-      제외된담당자수: incheonDebug.filter(item => item.excluded).length
-    });
-  }
+
   
   console.log('🔍 [사무실별집계] 처리 결과:', {
-    사무실없음제외: noOfficeCount,
-    제외담당자제외: excludedCount,
     최종사무실수: officeMap.size,
     사무실목록: Array.from(officeMap.keys())
   });
