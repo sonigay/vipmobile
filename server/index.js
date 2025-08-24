@@ -17943,21 +17943,22 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     matchingKeyMap.forEach((data, key) => {
       const matchingStores = new Set();
       
-      storeData.forEach(storeRow => {
-        if (storeRow.length > 21) {
-          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
-          const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+      // 폰클개통데이터에서 해당 매칭키에 해당하는 출고처 찾기
+      phoneklData.forEach(phoneklRow => {
+        if (phoneklRow.length > 14) {
+          const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
+          const phoneklDepartment = (phoneklRow[7] || '').toString(); // H열: 소속
+          const phoneklOffice = (phoneklRow[6] || '').toString(); // G열: 사무실
+          const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
+          const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
           
-          if (excludedAgents.includes(storeAgent)) return;
-          
-          // 제외 조건들
-          if (storeCode.includes('사무실')) return;
-          if (storeCode === storeAgent) return;
-          if (storeAgent.includes('거래종료')) return;
-          
-          // 해당 매칭키와 정확히 매칭되는 출고처만 추가
-          if (storeAgent === data.agent) {
-            matchingStores.add(storeCode);
+          // 해당 매칭키와 정확히 매칭되는 데이터만 처리
+          if (phoneklAgent === data.agent && 
+              phoneklDepartment === data.department && 
+              phoneklOffice === data.office && 
+              phoneklCode === data.code &&
+              phoneklStore) {
+            matchingStores.add(phoneklStore);
           }
         }
       });
@@ -17970,7 +17971,15 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
         const hasPerformance = phoneklData.some(performanceRow => {
           const performanceStoreCode = (performanceRow[14] || '').toString();
           const performanceAgent = (performanceRow[8] || '').toString();
-          return performanceStoreCode === storeCode && performanceAgent === data.agent;
+          const performanceDepartment = (performanceRow[7] || '').toString();
+          const performanceOffice = (performanceRow[6] || '').toString();
+          const performanceCode = (performanceRow[4] || '').toString();
+          
+          return performanceStoreCode === storeCode && 
+                 performanceAgent === data.agent &&
+                 performanceDepartment === data.department &&
+                 performanceOffice === data.office &&
+                 performanceCode === data.code;
         });
         
         if (hasPerformance) {
@@ -17999,22 +18008,42 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
       let devices = 0;
       let sims = 0;
       
-      inventoryData.forEach(inventoryRow => {
-        if (inventoryRow.length > 8) {
-          const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
-          const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+      // 폰클개통데이터에서 해당 매칭키에 해당하는 재고 찾기
+      phoneklData.forEach(phoneklRow => {
+        if (phoneklRow.length > 14) {
+          const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
+          const phoneklDepartment = (phoneklRow[7] || '').toString(); // H열: 소속
+          const phoneklOffice = (phoneklRow[6] || '').toString(); // G열: 사무실
+          const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
+          const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
           
-          if (excludedAgents.includes(inventoryAgent)) return;
-          if (excludedStores.includes(inventoryStore)) return;
-          
-          // 해당 매칭키와 정확히 매칭되는 재고만 추가
-          if (inventoryAgent === data.agent) {
-            if (inventoryType === '유심') {
-              sims++;
-            } else {
-              devices++;
-            }
+          // 해당 매칭키와 정확히 매칭되는 데이터만 처리
+          if (phoneklAgent === data.agent && 
+              phoneklDepartment === data.department && 
+              phoneklOffice === data.office && 
+              phoneklCode === data.code &&
+              phoneklStore) {
+            
+            // 해당 출고처의 재고 찾기
+            inventoryData.forEach(inventoryRow => {
+              if (inventoryRow.length > 8) {
+                const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+                const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+                const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+                
+                if (excludedAgents.includes(inventoryAgent)) return;
+                if (excludedStores.includes(inventoryStore)) return;
+                
+                // 해당 매칭키와 정확히 매칭되는 재고만 추가
+                if (inventoryAgent === data.agent && inventoryStore === phoneklStore) {
+                  if (inventoryType === '유심') {
+                    sims++;
+                  } else {
+                    devices++;
+                  }
+                }
+              }
+            });
           }
         }
       });
