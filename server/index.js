@@ -18003,6 +18003,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
         if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
           console.log('🔍 [통합매칭키] 특정담당자 출고처:', {
             담당자: data.agent,
+            매칭키: key,
             등록점: data.registeredStores,
             가동점: data.activeStores,
             출고처목록: Array.from(agentStores)
@@ -18048,6 +18049,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
         if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
           console.log('🔍 [통합매칭키] 특정담당자 재고:', {
             담당자: data.agent,
+            매칭키: key,
             보유단말: data.devices,
             보유유심: data.sims
           });
