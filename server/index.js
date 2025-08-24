@@ -17937,107 +17937,132 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     });
   });
   
-  // 3단계: 출고처 데이터로 등록점 계산 (담당자별로 한 번만 계산)
+  // 3단계: 출고처 데이터로 등록점 계산 (각 매칭키별로 정확한 출고처 매칭)
   if (storeData) {
-    // 담당자별로 출고처 계산
-    const agentStoreMap = new Map(); // 담당자별 출고처 목록
-    
-    storeData.forEach(storeRow => {
-      if (storeRow.length > 21) {
-        const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
-        const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-        
-        if (excludedAgents.includes(storeAgent)) return;
-        
-        // 제외 조건들
-        if (storeCode.includes('사무실')) return;
-        if (storeCode === storeAgent) return;
-        if (storeAgent.includes('거래종료')) return;
-        
-        if (!agentStoreMap.has(storeAgent)) {
-          agentStoreMap.set(storeAgent, new Set());
-        }
-        agentStoreMap.get(storeAgent).add(storeCode);
-      }
-    });
-    
-    // 각 매칭키에 담당자별 출고처 정보 할당
+    // 각 매칭키별로 정확한 출고처 찾기
     matchingKeyMap.forEach((data, key) => {
-      const agentStores = agentStoreMap.get(data.agent);
-      if (agentStores) {
-        data.registeredStores = agentStores.size;
-        
-        // 가동점 계산 (해당 담당자의 개통 실적이 있는 출고처)
-        let activeCount = 0;
-        agentStores.forEach(storeCode => {
-          const hasPerformance = phoneklData.some(performanceRow => {
-            const performanceStoreCode = (performanceRow[14] || '').toString();
-            const performanceAgent = (performanceRow[8] || '').toString();
-            return performanceStoreCode === storeCode && performanceAgent === data.agent;
-          });
+      const matchingStores = new Set();
+      
+      // 폰클개통데이터에서 해당 매칭키에 해당하는 출고처 찾기
+      phoneklData.forEach(phoneklRow => {
+        if (phoneklRow.length > 14) {
+          const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
+          const phoneklDepartment = (phoneklRow[7] || '').toString(); // H열: 소속
+          const phoneklOffice = (phoneklRow[6] || '').toString(); // G열: 사무실
+          const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
+          const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
           
-          if (hasPerformance) {
-            activeCount++;
+          // 해당 매칭키와 정확히 매칭되는 데이터만 처리
+          if (phoneklAgent === data.agent && 
+              phoneklDepartment === data.department && 
+              phoneklOffice === data.office && 
+              phoneklCode === data.code &&
+              phoneklStore) {
+            matchingStores.add(phoneklStore);
           }
-        });
-        data.activeStores = activeCount;
-        
-        // 특정 담당자 디버깅 (중요한 로그만 유지)
-        if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
-          console.log('🔍 [통합매칭키] 특정담당자 출고처:', {
-            담당자: data.agent,
-            매칭키: key,
-            등록점: data.registeredStores,
-            가동점: data.activeStores,
-            출고처목록: Array.from(agentStores)
-          });
         }
+      });
+      
+      data.registeredStores = matchingStores.size;
+      
+      // 가동점 계산 (해당 매칭키의 개통 실적이 있는 출고처)
+      let activeCount = 0;
+      matchingStores.forEach(storeCode => {
+        const hasPerformance = phoneklData.some(performanceRow => {
+          const performanceStoreCode = (performanceRow[14] || '').toString();
+          const performanceAgent = (performanceRow[8] || '').toString();
+          const performanceDepartment = (performanceRow[7] || '').toString();
+          const performanceOffice = (performanceRow[6] || '').toString();
+          const performanceCode = (performanceRow[4] || '').toString();
+          
+          return performanceStoreCode === storeCode && 
+                 performanceAgent === data.agent &&
+                 performanceDepartment === data.department &&
+                 performanceOffice === data.office &&
+                 performanceCode === data.code;
+        });
+        
+        if (hasPerformance) {
+          activeCount++;
+        }
+      });
+      data.activeStores = activeCount;
+      
+      // 특정 담당자 디버깅 (중요한 로그만 유지)
+      if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
+        console.log('🔍 [통합매칭키] 특정담당자 출고처:', {
+          담당자: data.agent,
+          매칭키: key,
+          등록점: data.registeredStores,
+          가동점: data.activeStores,
+          출고처목록: Array.from(matchingStores)
+        });
       }
     });
   }
   
-  // 4단계: 재고 데이터로 보유단말/유심 계산 (담당자별로 한 번만 계산)
+  // 4단계: 재고 데이터로 보유단말/유심 계산 (각 매칭키별로 정확한 재고 매칭)
   if (inventoryData) {
-    // 담당자별로 재고 계산
-    const agentInventoryMap = new Map(); // 담당자별 재고 데이터
-    
-    inventoryData.forEach(inventoryRow => {
-      if (inventoryRow.length > 8) {
-        const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
-        const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-        const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
-        
-        if (excludedAgents.includes(inventoryAgent)) return;
-        if (excludedStores.includes(inventoryStore)) return;
-        
-        if (!agentInventoryMap.has(inventoryAgent)) {
-          agentInventoryMap.set(inventoryAgent, { devices: 0, sims: 0 });
-        }
-        
-        if (inventoryType === '유심') {
-          agentInventoryMap.get(inventoryAgent).sims++;
-        } else {
-          agentInventoryMap.get(inventoryAgent).devices++;
-        }
-      }
-    });
-    
-    // 각 매칭키에 담당자별 재고 정보 할당
+    // 각 매칭키별로 정확한 재고 찾기
     matchingKeyMap.forEach((data, key) => {
-      const agentInventory = agentInventoryMap.get(data.agent);
-      if (agentInventory) {
-        data.devices = agentInventory.devices;
-        data.sims = agentInventory.sims;
-        
-        // 특정 담당자 디버깅 (중요한 로그만 유지)
-        if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
-          console.log('🔍 [통합매칭키] 특정담당자 재고:', {
-            담당자: data.agent,
-            매칭키: key,
-            보유단말: data.devices,
-            보유유심: data.sims
-          });
+      let devices = 0;
+      let sims = 0;
+      
+      // 폰클개통데이터에서 해당 매칭키에 해당하는 출고처 찾기
+      const matchingStores = new Set();
+      phoneklData.forEach(phoneklRow => {
+        if (phoneklRow.length > 14) {
+          const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
+          const phoneklDepartment = (phoneklRow[7] || '').toString(); // H열: 소속
+          const phoneklOffice = (phoneklRow[6] || '').toString(); // G열: 사무실
+          const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
+          const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
+          
+          // 해당 매칭키와 정확히 매칭되는 데이터만 처리
+          if (phoneklAgent === data.agent && 
+              phoneklDepartment === data.department && 
+              phoneklOffice === data.office && 
+              phoneklCode === data.code &&
+              phoneklStore) {
+            matchingStores.add(phoneklStore);
+          }
         }
+      });
+      
+      // 해당 출고처들의 재고 찾기
+      matchingStores.forEach(storeCode => {
+        inventoryData.forEach(inventoryRow => {
+          if (inventoryRow.length > 8) {
+            const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+            const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+            const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+            
+            if (excludedAgents.includes(inventoryAgent)) return;
+            if (excludedStores.includes(inventoryStore)) return;
+            
+            // 해당 매칭키와 정확히 매칭되는 재고만 추가
+            if (inventoryAgent === data.agent && inventoryStore === storeCode) {
+              if (inventoryType === '유심') {
+                sims++;
+              } else {
+                devices++;
+              }
+            }
+          }
+        });
+      });
+      
+      data.devices = devices;
+      data.sims = sims;
+      
+      // 특정 담당자 디버깅 (중요한 로그만 유지)
+      if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
+        console.log('🔍 [통합매칭키] 특정담당자 재고:', {
+          담당자: data.agent,
+          매칭키: key,
+          보유단말: data.devices,
+          보유유심: data.sims
+        });
       }
     });
   }
