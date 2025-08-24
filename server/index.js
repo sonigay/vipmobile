@@ -17962,6 +17962,17 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
           
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
           if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
+            
+            // 김수빈 전용 상세 디버깅
+            if (data.agent === '김수빈') {
+              console.log('🔍 [김수빈] 거래처정보 매칭 성공:', {
+                거래처담당자,
+                거래처코드,
+                거래처출고처,
+                매칭키: key
+              });
+            }
+            
             // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인 (코드명까지 매칭)
             const isRegistered = storeData.some(storeRow => {
               if (storeRow.length > 21) {
@@ -17974,6 +17985,21 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
                                    storeAgent.includes(거래처담당자) || 
                                    거래처담당자.includes(storeAgent);
                 
+                // 김수빈 전용 디버깅: 매칭 과정 상세 추적
+                if (data.agent === '김수빈') {
+                  console.log('🔍 [김수빈] 매칭 과정 상세:', {
+                    출고처: 거래처출고처,
+                    거래처담당자,
+                    거래처코드,
+                    storeCode,
+                    storeAgent,
+                    storeCodeName,
+                    agentMatches,
+                    codeMatches: storeCode === 거래처출고처,
+                    nameMatches: storeCodeName === 거래처코드
+                  });
+                }
+                
                 return storeCode === 거래처출고처 && agentMatches && storeCodeName === 거래처코드;
               }
               return false;
@@ -17981,6 +18007,15 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
             
             if (isRegistered) {
               matchingStores.add(거래처출고처);
+              
+              // 김수빈 전용 디버깅: 매칭 성공
+              if (data.agent === '김수빈') {
+                console.log('🔍 [김수빈] 폰클출고처데이터 매칭 성공:', {
+                  출고처: 거래처출고처,
+                  거래처담당자,
+                  거래처코드
+                });
+              }
             } else {
               // 매칭 불일치 데이터 수집
               const storeMismatch = storeData.find(row => 
