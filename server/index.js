@@ -17958,18 +17958,32 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
           
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
           if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
-            // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인
+            // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인 (코드명까지 매칭)
             const isRegistered = storeData.some(storeRow => {
               if (storeRow.length > 21) {
                 const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
                 const storeAgent = (storeRow[21] || '').toString().replace(/[()]/g, ''); // V열: 담당자 (괄호 제거)
-                return storeCode === 거래처출고처 && storeAgent === 거래처담당자;
+                const storeCodeName = (storeRow[7] || '').toString(); // H열: 코드명
+                return storeCode === 거래처출고처 && storeAgent === 거래처담당자 && storeCodeName === 거래처코드;
               }
               return false;
             });
             
             if (isRegistered) {
               matchingStores.add(거래처출고처);
+            } else {
+              // 디버깅: 매칭되지 않는 이유 확인
+              if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
+                console.log('🔍 [디버깅] 출고처 매칭 실패:', {
+                  담당자: data.agent,
+                  코드: data.code,
+                  거래처출고처: 거래처출고처,
+                  거래처담당자: 거래처담당자,
+                  폰클출고처데이터_담당자들: storeData
+                    .filter(row => row.length > 21 && (row[14] || '').toString() === 거래처출고처)
+                    .map(row => (row[21] || '').toString())
+                });
+              }
             }
           }
         }
@@ -18036,18 +18050,19 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
           
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
           if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
-            // 폰클재고데이터에서 해당 출고처의 재고 찾기
+            // 폰클재고데이터에서 해당 출고처의 재고 찾기 (코드명까지 매칭)
             inventoryData.forEach(inventoryRow => {
               if (inventoryRow.length > 8) {
                 const inventoryAgent = (inventoryRow[8] || '').toString().replace(/[()]/g, ''); // I열: 담당자 (괄호 제거)
+                const inventoryCodeName = (inventoryRow[3] || '').toString(); // D열: 코드명
                 const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
                 const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
                 
                 if (excludedAgents.includes(inventoryAgent)) return;
                 if (excludedStores.includes(inventoryStore)) return;
                 
-                // 해당 매칭키와 정확히 매칭되는 재고만 추가
-                if (inventoryAgent === 거래처담당자 && inventoryStore === 거래처출고처) {
+                // 해당 매칭키와 정확히 매칭되는 재고만 추가 (코드명까지 확인)
+                if (inventoryAgent === 거래처담당자 && inventoryStore === 거래처출고처 && inventoryCodeName === 거래처코드) {
                   if (inventoryType === '유심') {
                     sims++;
                   } else {
