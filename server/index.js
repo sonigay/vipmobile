@@ -17846,7 +17846,7 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   }
   
   // 통합 매칭 키 데이터 생성
-  const unifiedData = createUnifiedMatchingKeyData(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets);
+      const unifiedData = createUnifiedMatchingKeyData(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets, customerData);
   
   // 각 집계별로 데이터 추출
   const codeData = aggregateByCodeFromUnified(unifiedData, supportBonusData.codeSupportMap);
@@ -17888,7 +17888,7 @@ function createMatchingKey(row) {
 }
 
 // 통합 매칭 키 데이터 생성
-function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets) {
+function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets, customerData) {
   const matchingKeyMap = new Map();
   
   // 1단계: 개통 데이터로 기본 정보 생성
@@ -17938,7 +17938,13 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
   });
   
   // 3단계: 출고처 데이터로 등록점 계산 (거래처정보 기반)
-  if (storeData && customerData) {
+  console.log('🔍 [디버깅] customerData 확인:', {
+    customerDataExists: !!customerData,
+    customerDataLength: customerData ? customerData.length : 'undefined',
+    customerDataSample: customerData && customerData.length > 0 ? customerData[0] : 'empty'
+  });
+  
+  if (storeData && customerData && customerData.length > 0) {
     // 각 매칭키별로 정확한 출고처 찾기
     matchingKeyMap.forEach((data, key) => {
       const matchingStores = new Set();
@@ -18009,7 +18015,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
   }
   
   // 4단계: 재고 데이터로 보유단말/유심 계산 (거래처정보 기반)
-  if (inventoryData && customerData) {
+  if (inventoryData && customerData && customerData.length > 0) {
     // 각 매칭키별로 정확한 재고 찾기
     matchingKeyMap.forEach((data, key) => {
       let devices = 0;
