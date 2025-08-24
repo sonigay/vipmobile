@@ -17987,8 +17987,8 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   // 지원금 계산
   const supportBonusData = calculateSupportBonus(filteredPhoneklData, excludedAgents);
   
-  // 코드별/사무실별/소속별/담당자별 데이터 집계
-  console.log('🔍 [마감장표] 데이터 집계 시작');
+  // 통합 매칭 키 시스템으로 데이터 집계
+  console.log('🔍 [마감장표] 통합 매칭 키 시스템 시작');
   
   // 목표값 데이터 처리
   const targets = new Map();
@@ -18003,11 +18003,14 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     });
   }
   
-
-  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets, filteredPhoneklData);
-  const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap, targets, filteredPhoneklData);
-  const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap, targets, filteredPhoneklData);
-  const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets, filteredPhoneklData);
+  // 통합 매칭 키 데이터 생성
+  const unifiedData = createUnifiedMatchingKeyData(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets);
+  
+  // 각 집계별로 데이터 추출
+  const codeData = aggregateByCodeFromUnified(unifiedData, supportBonusData.codeSupportMap);
+  const officeData = aggregateByOfficeFromUnified(unifiedData, supportBonusData.officeSupportMap);
+  const departmentData = aggregateByDepartmentFromUnified(unifiedData, supportBonusData.departmentSupportMap);
+  const agentData = aggregateByAgentFromUnified(unifiedData, supportBonusData.agentSupportMap);
   
   console.log('🔍 [마감장표] 집계 결과:', {
     코드별데이터수: codeData?.length || 0,
@@ -18039,6 +18042,164 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     excludedAgents,
     excludedStores
   };
+}
+
+// 통합 매칭 키 생성 함수
+function createMatchingKey(row) {
+  const agent = (row[8] || '').toString();        // I열: 담당자
+  const department = (row[7] || '').toString();   // H열: 소속
+  const office = (row[6] || '').toString();       // G열: 사무실
+  const code = (row[4] || '').toString();         // E열: 코드명
+  
+  return `${agent}|${department}|${office}|${code}`;
+}
+
+// 통합 매칭 키 데이터 생성
+function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets) {
+  console.log('🔍 [통합매칭키] 데이터 생성 시작');
+  
+  const matchingKeyMap = new Map();
+  
+  // 1단계: 개통 데이터로 기본 정보 생성
+  phoneklData.forEach(row => {
+    if (excludedAgents.includes((row[8] || '').toString())) return;
+    
+    const key = createMatchingKey(row);
+    
+    if (!matchingKeyMap.has(key)) {
+      matchingKeyMap.set(key, {
+        agent: row[8],           // I열: 담당자
+        department: row[7],      // H열: 소속
+        office: row[6],          // G열: 사무실
+        code: row[4],            // E열: 코드
+        performance: 0,           // 개통 건수
+        fee: 0,                  // 수수료
+        registeredStores: 0,     // 등록점
+        activeStores: 0,         // 가동점
+        devices: 0,              // 보유단말
+        sims: 0,                 // 보유유심
+        target: 0,               // 목표값
+        support: 0               // 지원금
+      });
+    }
+    
+    const data = matchingKeyMap.get(key);
+    data.performance++;
+    
+    // 수수료 처리
+    const rawFee = row[3];
+    if (rawFee && rawFee !== '#N/A' && rawFee !== 'N/A') {
+      data.fee += parseFloat(rawFee) || 0;
+    }
+  });
+  
+  // 2단계: 목표값 적용
+  targets.forEach((targetInfo, targetKey) => {
+    if (targetInfo.excluded) return;
+    
+    // 해당 담당자-코드 조합에 목표값 적용
+    matchingKeyMap.forEach((data, key) => {
+      if (data.agent === targetInfo.agent && data.code === targetInfo.code) {
+        data.target += targetInfo.target;
+      }
+    });
+  });
+  
+  // 3단계: 출고처 데이터로 등록점 계산
+  if (storeData) {
+    const agentStoreMap = new Map(); // 담당자별 출고처 목록
+    
+    storeData.forEach(storeRow => {
+      if (storeRow.length > 21) {
+        const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
+        const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+        
+        if (excludedAgents.includes(storeAgent)) return;
+        
+        // 제외 조건들
+        if (storeCode.includes('사무실')) return;
+        if (storeCode === storeAgent) return;
+        if (storeAgent.includes('거래종료')) return;
+        
+        if (!agentStoreMap.has(storeAgent)) {
+          agentStoreMap.set(storeAgent, new Set());
+        }
+        agentStoreMap.get(storeAgent).add(storeCode);
+      }
+    });
+    
+    // 등록점을 매칭 키별로 분배
+    matchingKeyMap.forEach((data, key) => {
+      const agentStores = agentStoreMap.get(data.agent);
+      if (agentStores) {
+        data.registeredStores = agentStores.size;
+        
+        // 가동점 계산 (해당 매칭 키의 개통 실적이 있는 출고처)
+        let activeCount = 0;
+        agentStores.forEach(storeCode => {
+          const hasPerformance = phoneklData.some(performanceRow => {
+            const performanceStoreCode = (performanceRow[14] || '').toString();
+            const performanceAgent = (performanceRow[8] || '').toString();
+            return performanceStoreCode === storeCode && performanceAgent === data.agent;
+          });
+          
+          if (hasPerformance) {
+            activeCount++;
+          }
+        });
+        data.activeStores = activeCount;
+      }
+    });
+  }
+  
+  // 4단계: 재고 데이터로 보유단말/유심 계산
+  if (inventoryData) {
+    const agentInventoryMap = new Map(); // 담당자별 재고 데이터
+    
+    inventoryData.forEach(inventoryRow => {
+      if (inventoryRow.length > 8) {
+        const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+        const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+        const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+        
+        if (excludedAgents.includes(inventoryAgent)) return;
+        if (excludedStores.includes(inventoryStore)) return;
+        
+        if (!agentInventoryMap.has(inventoryAgent)) {
+          agentInventoryMap.set(inventoryAgent, { devices: 0, sims: 0 });
+        }
+        
+        if (inventoryType === '유심') {
+          agentInventoryMap.get(inventoryAgent).sims++;
+        } else {
+          agentInventoryMap.get(inventoryAgent).devices++;
+        }
+      }
+    });
+    
+    // 재고를 매칭 키별로 분배
+    matchingKeyMap.forEach((data, key) => {
+      const agentInventory = agentInventoryMap.get(data.agent);
+      if (agentInventory) {
+        data.devices = agentInventory.devices;
+        data.sims = agentInventory.sims;
+      }
+    });
+  }
+  
+  // 5단계: 추가 계산
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  
+  matchingKeyMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+  });
+  
+  console.log('🔍 [통합매칭키] 데이터 생성 완료:', matchingKeyMap.size);
+  return matchingKeyMap;
 }
 
 // 지원금 계산 함수
@@ -18557,6 +18718,194 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
   });
   
   return Array.from(codeMap.values()).sort((a, b) => b.fee - a.fee);
+}
+
+// 통합 데이터에서 코드별 집계 추출
+function aggregateByCodeFromUnified(unifiedData, codeSupportMap) {
+  const codeMap = new Map();
+  
+  unifiedData.forEach((data, key) => {
+    const code = data.code;
+    
+    if (!codeMap.has(code)) {
+      codeMap.set(code, {
+        code,
+        performance: 0,
+        fee: 0,
+        support: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0,
+        registeredStores: 0,
+        activeStores: 0,
+        devices: 0,
+        sims: 0,
+        utilization: 0
+      });
+    }
+    
+    const codeData = codeMap.get(code);
+    codeData.performance += data.performance;
+    codeData.fee += data.fee;
+    codeData.target += data.target;
+    codeData.registeredStores += data.registeredStores;
+    codeData.activeStores += data.activeStores;
+    codeData.devices += data.devices;
+    codeData.sims += data.sims;
+  });
+  
+  // 추가 계산
+  codeMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
+  });
+  
+  return Array.from(codeMap.values()).sort((a, b) => b.fee - a.fee);
+}
+
+// 통합 데이터에서 사무실별 집계 추출
+function aggregateByOfficeFromUnified(unifiedData, officeSupportMap) {
+  const officeMap = new Map();
+  
+  unifiedData.forEach((data, key) => {
+    const office = data.office;
+    
+    if (!officeMap.has(office)) {
+      officeMap.set(office, {
+        office,
+        performance: 0,
+        fee: 0,
+        support: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0,
+        registeredStores: 0,
+        activeStores: 0,
+        devices: 0,
+        sims: 0,
+        utilization: 0
+      });
+    }
+    
+    const officeData = officeMap.get(office);
+    officeData.performance += data.performance;
+    officeData.fee += data.fee;
+    officeData.target += data.target;
+    officeData.registeredStores += data.registeredStores;
+    officeData.activeStores += data.activeStores;
+    officeData.devices += data.devices;
+    officeData.sims += data.sims;
+  });
+  
+  // 추가 계산
+  officeMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.support = officeSupportMap ? (officeSupportMap.get(data.office) || 0) : 0;
+  });
+  
+  return Array.from(officeMap.values()).sort((a, b) => b.performance - a.performance);
+}
+
+// 통합 데이터에서 소속별 집계 추출
+function aggregateByDepartmentFromUnified(unifiedData, departmentSupportMap) {
+  const departmentMap = new Map();
+  
+  unifiedData.forEach((data, key) => {
+    const department = data.department;
+    
+    if (!departmentMap.has(department)) {
+      departmentMap.set(department, {
+        department,
+        performance: 0,
+        fee: 0,
+        support: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0,
+        registeredStores: 0,
+        activeStores: 0,
+        devices: 0,
+        sims: 0,
+        utilization: 0
+      });
+    }
+    
+    const deptData = departmentMap.get(department);
+    deptData.performance += data.performance;
+    deptData.fee += data.fee;
+    deptData.target += data.target;
+    deptData.registeredStores += data.registeredStores;
+    deptData.activeStores += data.activeStores;
+    deptData.devices += data.devices;
+    deptData.sims += data.sims;
+  });
+  
+  // 추가 계산
+  departmentMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.support = departmentSupportMap ? (departmentSupportMap.get(data.department) || 0) : 0;
+  });
+  
+  return Array.from(departmentMap.values()).sort((a, b) => b.fee - a.fee);
+}
+
+// 통합 데이터에서 담당자별 집계 추출
+function aggregateByAgentFromUnified(unifiedData, agentSupportMap) {
+  const agentMap = new Map();
+  
+  unifiedData.forEach((data, key) => {
+    const agent = data.agent;
+    
+    if (!agentMap.has(agent)) {
+      agentMap.set(agent, {
+        agent,
+        performance: 0,
+        fee: 0,
+        support: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0,
+        registeredStores: 0,
+        activeStores: 0,
+        devices: 0,
+        sims: 0,
+        utilization: 0
+      });
+    }
+    
+    const agentData = agentMap.get(agent);
+    agentData.performance += data.performance;
+    agentData.fee += data.fee;
+    agentData.target += data.target;
+    agentData.registeredStores += data.registeredStores;
+    agentData.activeStores += data.activeStores;
+    agentData.devices += data.devices;
+    agentData.sims += data.sims;
+  });
+  
+  // 추가 계산
+  agentMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.support = agentSupportMap ? (agentSupportMap.get(data.agent) || 0) : 0;
+  });
+  
+  return Array.from(agentMap.values()).sort((a, b) => b.fee - a.fee);
 }
 
 // 소속별 집계
