@@ -17938,13 +17938,13 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
   });
   
   // 3단계: 출고처 데이터로 등록점 계산 (거래처정보 기반)
-  if (storeData && 거래처정보) {
+  if (storeData && customerData) {
     // 각 매칭키별로 정확한 출고처 찾기
     matchingKeyMap.forEach((data, key) => {
       const matchingStores = new Set();
       
       // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
-      거래처정보.forEach(거래처Row => {
+      customerData.forEach(거래처Row => {
         if (거래처Row.length > 3) {
           const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
           const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
@@ -18009,14 +18009,14 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
   }
   
   // 4단계: 재고 데이터로 보유단말/유심 계산 (거래처정보 기반)
-  if (inventoryData && 거래처정보) {
+  if (inventoryData && customerData) {
     // 각 매칭키별로 정확한 재고 찾기
     matchingKeyMap.forEach((data, key) => {
       let devices = 0;
       let sims = 0;
       
       // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
-      거래처정보.forEach(거래처Row => {
+      customerData.forEach(거래처Row => {
         if (거래처Row.length > 3) {
           const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
           const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
