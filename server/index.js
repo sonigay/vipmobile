@@ -18003,13 +18003,12 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     });
   }
   
-  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets, filteredPhoneklData);
+
   const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap, targets, filteredPhoneklData);
   const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap, targets, filteredPhoneklData);
   const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets, filteredPhoneklData);
   
   console.log('🔍 [마감장표] 집계 결과:', {
-    코드별데이터수: codeData?.length || 0,
     사무실별데이터수: officeData?.length || 0,
     소속별데이터수: departmentData?.length || 0,
     담당자별데이터수: agentData?.length || 0
@@ -18029,7 +18028,6 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   
   return {
     date: targetDate,
-    codeData,
     officeData,
     departmentData,
     agentData,
@@ -18056,7 +18054,14 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
     if (!agent || excludedAgents.includes(agent)) return;
     
     const combinationKey = `${agent}|${code}|${office}|${department}`;
-    const fee = parseFloat(row[3] || 0);
+    
+    // #N/A 값 처리
+    const rawFee = row[3];
+    let fee = 0;
+    
+    if (rawFee && rawFee !== '#N/A' && rawFee !== 'N/A') {
+      fee = parseFloat(rawFee) || 0;
+    }
     
     if (!agentCombinationMap.has(combinationKey)) {
       agentCombinationMap.set(combinationKey, {
@@ -18113,21 +18118,12 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
   });
   
   // 5단계: 그룹별 지원금 합계 계산
-  const codeSupportMap = new Map();
   const officeSupportMap = new Map();
   const departmentSupportMap = new Map();
   const agentSupportMap = new Map();
   
   agentCombinationMap.forEach((data, key) => {
     const support = data.support || 0;
-    
-    // 코드별 합계
-    if (data.code) {
-      if (!codeSupportMap.has(data.code)) {
-        codeSupportMap.set(data.code, 0);
-      }
-      codeSupportMap.set(data.code, codeSupportMap.get(data.code) + support);
-    }
     
     // 사무실별 합계
     if (data.office) {
@@ -18155,14 +18151,12 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
   });
   
   console.log('🔍 [지원금계산] 그룹별 지원금 합계:', {
-    코드별: Object.fromEntries(codeSupportMap),
     사무실별: Object.fromEntries(officeSupportMap),
     소속별: Object.fromEntries(departmentSupportMap),
     담당자별: Object.fromEntries(agentSupportMap)
   });
   
   return {
-    codeSupportMap,
     officeSupportMap,
     departmentSupportMap,
     agentSupportMap
@@ -18170,228 +18164,12 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
 }
 
 // 코드별 집계
-function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, codeSupportMap, targets, filteredPhoneklData) {
-  console.log('🔍 [코드별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
-  console.log('🔍 [코드별집계] 제외 담당자:', excludedAgents);
-  
-  const codeMap = new Map();
-  let excludedCount = 0;
-  let noCodeCount = 0;
-  
-  phoneklData.forEach(row => {
-    const code = (row[4] || '').toString(); // E열: 코드명
-    const office = (row[6] || '').toString(); // G열: 사무실
-    const agent = (row[8] || '').toString(); // I열: 담당자
-    
-    if (!code) {
-      noCodeCount++;
-      return;
-    }
-    
-    if (excludedAgents.includes(agent)) {
-      excludedCount++;
-      return;
-    }
-    
-    if (!codeMap.has(code)) {
-      codeMap.set(code, {
-        code,
-        office,
-        agent,
-        performance: 0,
-        fee: 0,
-        support: 0,
-        target: 0,
-        achievement: 0,
-        expectedClosing: 0,
-        rotation: 0
-      });
-    }
-    
-    const data = codeMap.get(code);
-    data.performance++;
-    
-    // 수수료 계산 (D열)
-    const fee = parseFloat(row[3] || 0);
-    data.fee += fee;
-  });
-  
-  console.log('🔍 [코드별집계] 처리 결과:', {
-    코드없음제외: noCodeCount,
-    제외담당자제외: excludedCount,
-    최종코드수: codeMap.size,
-    코드목록: Array.from(codeMap.keys())
-  });
-  
-  // 목표값 및 추가 계산
-  const today = new Date();
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  
-  console.log('🔍 [코드별집계] 계산 정보:', {
-    today: today.toISOString(),
-    daysInMonth,
-    currentDay: today.getDate()
-  });
-  
-  // 등록점, 가동점, 보유단말, 보유유심 계산
-  codeMap.forEach(data => {
-    data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
-    
-    // 목표값 적용 (해당 코드의 모든 담당자 목표값 합계)
-    let totalTarget = 0;
-    targets.forEach((targetInfo, key) => {
-      if (!targetInfo.excluded && targetInfo.code === data.code) {
-        totalTarget += targetInfo.target;
-      }
-    });
-    data.target = totalTarget;
-    
-    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
-    
-    // 지원금 적용
-    data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
-    
-    // 등록점, 가동점, 보유단말, 보유유심 계산 (새로운 방식: 코드명으로 직접 매칭)
-    let totalRegisteredStores = 0;
-    let totalActiveStores = 0;
-    let totalDevices = 0;
-    let totalSims = 0;
-    
-    // 새로운 방식: 폰클출고처데이터에서 코드명으로 직접 매칭
-    if (storeData) {
-      const codeStores = new Set(); // 해당 코드의 고유 출고처 목록
-      
-      // 🔍 담당자별에 실제로 존재하는 담당자 목록 생성
-      const validAgents = new Set();
-      phoneklData.forEach(row => {
-        const agent = (row[8] || '').toString(); // I열: 담당자
-        if (agent && !excludedAgents.includes(agent)) {
-          validAgents.add(agent);
-        }
-      });
-      
-      console.log(`🔍 [코드별집계] ${data.code} 유효한 담당자 수: ${validAgents.size}`);
-      
-      // 🔍 디버깅: 코드명 매칭 확인
-      console.log(`🔍 [코드별집계] ${data.code} 코드명 직접 매칭 시작`);
-      
-      storeData.forEach(storeRow => {
-        if (storeRow.length > 15) {
-          const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-          const storeCodeName = (storeRow[4] || '').toString(); // E열: 코드명 (VIP(경수), VIP(경인) 등)
-          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
-          
-          // 🔍 디버깅: 각 행의 코드명 확인
-          if (storeCodeName && storeCode) {
-            console.log(`🔍 [코드별집계] 출고처: ${storeCode}, 코드명: ${storeCodeName}, 담당자: ${storeAgent}, 매칭여부: ${storeCodeName === data.code}`);
-          }
-          
-          // 해당 코드명과 일치하는 출고처만 처리
-          if (storeCodeName === data.code && storeCode) {
-            // 🆕 새로운 제외 조건: 담당자별 테이블에 없는 담당자랑 매칭된 출고처 제외
-            if (!validAgents.has(storeAgent)) {
-              console.log(`🔍 [코드별집계] ${storeAgent} 제외: 담당자별에 존재하지 않음 (출고처: ${storeCode})`);
-              return;
-            }
-            
-            // 기존 제외 조건들 (사무실별과 동일)
-            if (storeCode.includes('사무실')) {
-              console.log(`🔍 [코드별집계] ${storeCode} 제외: 사무실 포함`);
-              return;
-            }
-            if (storeCode.includes('거래종료')) {
-              console.log(`🔍 [코드별집계] ${storeCode} 제외: 거래종료 포함`);
-              return;
-            }
-            
-            // ⚠️ 빠진 제외 조건 추가: 출고처코드와 담당자가 동일한 경우 제외
-            if (storeCode === storeAgent) {
-              console.log(`🔍 [코드별집계] ${storeCode} 제외: 출고처코드와 담당자 동일`);
-              return;
-            }
-            
-            codeStores.add(storeCode);
-            console.log(`🔍 [코드별집계] ${storeCode} 추가됨 (담당자: ${storeAgent})`);
-          }
-        }
-      });
-      
-      // 등록점 계산
-      totalRegisteredStores = codeStores.size;
-      
-      // 가동점 계산 (각 출고처별로 실적 확인)
-      codeStores.forEach(storeCode => {
-        const hasPerformance = filteredPhoneklData.some(performanceRow => {
-          const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처코드
-          return performanceStoreCode === storeCode;
-        });
-        
-        if (hasPerformance) {
-          totalActiveStores++;
-          console.log(`🔍 [코드별집계] ${storeCode} 가동점 인정`);
-        } else {
-          console.log(`🔍 [코드별집계] ${storeCode} 가동점 미인정`);
-        }
-      });
-      
-      console.log(`🔍 [코드별집계] ${data.code} 코드명 직접 매칭 결과:`, {
-        등록점: totalRegisteredStores,
-        가동점: totalActiveStores,
-        가동율: totalRegisteredStores > 0 ? Math.round((totalActiveStores / totalRegisteredStores) * 100) : 0,
-        출고처목록: Array.from(codeStores),
-        총출고처수: storeData.length - 1 // 헤더 제외
-      });
-    }
-    
-    // 재고 데이터도 코드명으로 직접 매칭 (D열: 코드명 사용)
-    if (inventoryData) {
-      inventoryData.forEach(inventoryRow => {
-        if (inventoryRow.length > 21) {
-          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
-          const inventoryCodeName = (inventoryRow[3] || '').toString(); // D열: 코드명
-          
-          // 해당 코드명과 일치하고, 제외되지 않은 출고처만 계산
-          if (inventoryCodeName === data.code && inventoryStore && !excludedStores.includes(inventoryStore)) {
-            const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-            
-            if (inventoryType === '유심') {
-              totalSims++;
-            } else {
-              totalDevices++;
-            }
-          }
-        }
-      });
-    }
-    
-    data.registeredStores = totalRegisteredStores;
-    data.activeStores = totalActiveStores;
-    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
-    data.inactiveStores = data.registeredStores - data.activeStores;
-    data.devices = totalDevices;
-    data.sims = totalSims;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
-    
-    console.log(`🔍 [코드별집계] ${data.code} 상세 계산:`, {
-      performance: data.performance,
-      expectedClosing: data.expectedClosing,
-      target: data.target,
-      achievement: data.achievement,
-      registeredStores: data.registeredStores,
-      activeStores: data.activeStores,
-      utilization: data.utilization,
-      inactiveStores: data.inactiveStores,
-      devices: data.devices,
-      sims: data.sims,
-      rotation: data.rotation
-    });
-  });
-  
-  return Array.from(codeMap.values()).sort((a, b) => b.performance - a.performance);
-}
+
 
 // 사무실별 집계
 function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, officeSupportMap, targets, filteredPhoneklData) {
+
+  
   const officeMap = new Map();
   
   phoneklData.forEach(row => {
@@ -18416,8 +18194,32 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
     const data = officeMap.get(office);
     data.performance++;
     
-    const fee = parseFloat(row[3] || 0);
+    // #N/A 값 처리
+    const rawFee = row[3];
+    let fee = 0;
+    
+    if (rawFee && rawFee !== '#N/A' && rawFee !== 'N/A') {
+      fee = parseFloat(rawFee) || 0;
+    }
+    
     data.fee += fee;
+  });
+  
+  // 인천사무실 디버깅 로그
+  if (incheonDebug.length > 0) {
+    console.log('🔍 [사무실별집계] 인천사무실 디버깅 데이터:', {
+      총데이터수: incheonDebug.length,
+      상세데이터: incheonDebug.slice(0, 10), // 처음 10개만
+      수수료합계: incheonDebug.reduce((sum, item) => sum + item.fee, 0),
+      제외된담당자수: incheonDebug.filter(item => item.excluded).length
+    });
+  }
+  
+  console.log('🔍 [사무실별집계] 처리 결과:', {
+    사무실없음제외: noOfficeCount,
+    제외담당자제외: excludedCount,
+    최종사무실수: officeMap.size,
+    사무실목록: Array.from(officeMap.keys())
   });
   
   // 추가 계산
@@ -18596,7 +18398,14 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
     const data = departmentMap.get(department);
     data.performance++;
     
-    const fee = parseFloat(row[3] || 0);
+    // #N/A 값 처리
+    const rawFee = row[3];
+    let fee = 0;
+    
+    if (rawFee && rawFee !== '#N/A' && rawFee !== 'N/A') {
+      fee = parseFloat(rawFee) || 0;
+    }
+    
     data.fee += fee;
   });
   
@@ -18836,7 +18645,14 @@ function aggregateByAgent(phoneklData, storeData, inventoryData, excludedAgents,
     const data = agentMap.get(agent);
     data.performance++;
     
-    const fee = parseFloat(row[3] || 0);
+    // #N/A 값 처리
+    const rawFee = row[3];
+    let fee = 0;
+    
+    if (rawFee && rawFee !== '#N/A' && rawFee !== 'N/A') {
+      fee = parseFloat(rawFee) || 0;
+    }
+    
     data.fee += fee;
   });
   
