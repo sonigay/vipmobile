@@ -17962,7 +17962,8 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
             const isRegistered = storeData.some(storeRow => {
               if (storeRow.length > 21) {
                 const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-                return storeCode === 거래처출고처;
+                const storeAgent = (storeRow[21] || '').toString().replace(/[()]/g, ''); // V열: 담당자 (괄호 제거)
+                return storeCode === 거래처출고처 && storeAgent === 거래처담당자;
               }
               return false;
             });
@@ -18038,7 +18039,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
             // 폰클재고데이터에서 해당 출고처의 재고 찾기
             inventoryData.forEach(inventoryRow => {
               if (inventoryRow.length > 8) {
-                const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+                const inventoryAgent = (inventoryRow[8] || '').toString().replace(/[()]/g, ''); // I열: 담당자 (괄호 제거)
                 const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
                 const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
                 
@@ -18046,7 +18047,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
                 if (excludedStores.includes(inventoryStore)) return;
                 
                 // 해당 매칭키와 정확히 매칭되는 재고만 추가
-                if (inventoryAgent === data.agent && inventoryStore === 거래처출고처) {
+                if (inventoryAgent === 거래처담당자 && inventoryStore === 거래처출고처) {
                   if (inventoryType === '유심') {
                     sims++;
                   } else {
