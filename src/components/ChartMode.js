@@ -65,6 +65,7 @@ import { createWorker } from 'tesseract.js';
 
 import AppUpdatePopup from './AppUpdatePopup';
 import InventoryStatusScreen from './screens/InventoryStatusScreen';
+import MatchingMismatchModal from './MatchingMismatchModal';
 
 // 합계 계산 유틸리티 함수
 const calculateTotal = (dataArray, field) => {
@@ -79,6 +80,10 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 매칭 불일치 모달 상태
+  const [showMismatchModal, setShowMismatchModal] = useState(false);
+  const [matchingMismatches, setMatchingMismatches] = useState([]);
   
   // 장표모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -2332,6 +2337,13 @@ function ClosingChartTab() {
 
       const result = await response.json();
       setData(result);
+      
+      // 매칭 불일치 데이터 처리
+      if (result.matchingMismatches && result.matchingMismatches.length > 0) {
+        setMatchingMismatches(result.matchingMismatches);
+        setShowMismatchModal(true);
+      }
+      
       setLastUpdate(new Date());
       setProgress(100);
 
@@ -2868,6 +2880,13 @@ function ClosingChartTab() {
         open={showMappingModal}
         onClose={() => setShowMappingModal(false)}
         failures={mappingFailures}
+      />
+
+      {/* 매칭 불일치 모달 */}
+      <MatchingMismatchModal
+        visible={showMismatchModal}
+        onClose={() => setShowMismatchModal(false)}
+        matchingMismatches={matchingMismatches}
       />
     </Box>
   );

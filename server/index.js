@@ -17873,7 +17873,8 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     csSummary,
     mappingFailures,
     excludedAgents,
-    excludedStores
+    excludedStores,
+    matchingMismatches // 매칭 불일치 데이터 추가
   };
 }
 
@@ -17944,6 +17945,9 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     customerDataSample: customerData && customerData.length > 0 ? customerData[0] : 'empty'
   });
   
+  // 매칭 불일치 데이터 수집
+  const matchingMismatches = [];
+  
   if (storeData && customerData && customerData.length > 0) {
     // 각 매칭키별로 정확한 출고처 찾기
     matchingKeyMap.forEach((data, key) => {
@@ -17961,9 +17965,9 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
             // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인 (코드명까지 매칭)
             const isRegistered = storeData.some(storeRow => {
               if (storeRow.length > 21) {
-                const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
                 const storeAgent = (storeRow[21] || '').toString().replace(/[()]/g, ''); // V열: 담당자 (괄호 제거)
                 const storeCodeName = (storeRow[7] || '').toString(); // H열: 코드명
+                const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
                 return storeCode === 거래처출고처 && storeAgent === 거래처담당자 && storeCodeName === 거래처코드;
               }
               return false;
@@ -17972,6 +17976,30 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
             if (isRegistered) {
               matchingStores.add(거래처출고처);
             } else {
+              // 매칭 불일치 데이터 수집
+              const storeMismatch = storeData.find(row => 
+                row.length > 21 && (row[14] || '').toString() === 거래처출고처
+              );
+              
+              if (storeMismatch) {
+                const storeAgent = (storeMismatch[21] || '').toString();
+                const storeCodeName = (storeMismatch[7] || '').toString();
+                
+                matchingMismatches.push({
+                  type: '출고처',
+                  거래처정보: {
+                    담당자: 거래처담당자,
+                    코드: 거래처코드,
+                    출고처: 거래처출고처
+                  },
+                  폰클출고처데이터: {
+                    담당자: storeAgent,
+                    코드: storeCodeName,
+                    출고처: (storeMismatch[14] || '').toString()
+                  }
+                });
+              }
+              
               // 디버깅: 매칭되지 않는 이유 확인
               if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
                 console.log('🔍 [디버깅] 출고처 매칭 실패:', {
@@ -18032,6 +18060,11 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
         });
       }
     });
+  }
+  
+  // 매칭 불일치 데이터 로그 출력
+  if (matchingMismatches.length > 0) {
+    console.log('🔍 [매칭불일치] 출고처 매칭 불일치 데이터:', matchingMismatches);
   }
   
   // 4단계: 재고 데이터로 보유단말/유심 계산 (거래처정보 기반)
