@@ -17937,13 +17937,41 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     });
   });
   
-  // 3단계: 출고처 데이터로 등록점 계산 (각 매칭키별로 정확한 출고처 매칭)
-  if (storeData) {
+  // 3단계: 출고처 데이터로 등록점 계산 (거래처정보 기반)
+  if (storeData && 거래처정보) {
     // 각 매칭키별로 정확한 출고처 찾기
     matchingKeyMap.forEach((data, key) => {
       const matchingStores = new Set();
       
-      // 폰클개통데이터에서 해당 매칭키에 해당하는 출고처 찾기
+      // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
+      거래처정보.forEach(거래처Row => {
+        if (거래처Row.length > 3) {
+          const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
+          const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
+          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/[()]/g, ''); // D열: 담당자명 (괄호 제거)
+          
+          // 해당 매칭키와 정확히 매칭되는 데이터만 처리
+          if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
+            // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인
+            const isRegistered = storeData.some(storeRow => {
+              if (storeRow.length > 21) {
+                const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+                return storeCode === 거래처출고처;
+              }
+              return false;
+            });
+            
+            if (isRegistered) {
+              matchingStores.add(거래처출고처);
+            }
+          }
+        }
+      });
+      
+      data.registeredStores = matchingStores.size;
+      
+      // 가동점 계산 (폰클개통데이터에서 해당 매칭키의 개통 실적이 있는 출고처)
+      let activeCount = 0;
       phoneklData.forEach(phoneklRow => {
         if (phoneklRow.length > 14) {
           const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
@@ -17952,38 +17980,17 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
           const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
           const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
           
+          // 코드가 비어있거나 담당자가 비어있으면 제외
+          if (!phoneklCode.trim() || !phoneklAgent.trim()) return;
+          
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
           if (phoneklAgent === data.agent && 
               phoneklDepartment === data.department && 
               phoneklOffice === data.office && 
               phoneklCode === data.code &&
               phoneklStore) {
-            matchingStores.add(phoneklStore);
+            activeCount++;
           }
-        }
-      });
-      
-      data.registeredStores = matchingStores.size;
-      
-      // 가동점 계산 (해당 매칭키의 개통 실적이 있는 출고처)
-      let activeCount = 0;
-      matchingStores.forEach(storeCode => {
-        const hasPerformance = phoneklData.some(performanceRow => {
-          const performanceStoreCode = (performanceRow[14] || '').toString();
-          const performanceAgent = (performanceRow[8] || '').toString();
-          const performanceDepartment = (performanceRow[7] || '').toString();
-          const performanceOffice = (performanceRow[6] || '').toString();
-          const performanceCode = (performanceRow[4] || '').toString();
-          
-          return performanceStoreCode === storeCode && 
-                 performanceAgent === data.agent &&
-                 performanceDepartment === data.department &&
-                 performanceOffice === data.office &&
-                 performanceCode === data.code;
-        });
-        
-        if (hasPerformance) {
-          activeCount++;
         }
       });
       data.activeStores = activeCount;
@@ -18001,55 +18008,44 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     });
   }
   
-  // 4단계: 재고 데이터로 보유단말/유심 계산 (각 매칭키별로 정확한 재고 매칭)
-  if (inventoryData) {
+  // 4단계: 재고 데이터로 보유단말/유심 계산 (거래처정보 기반)
+  if (inventoryData && 거래처정보) {
     // 각 매칭키별로 정확한 재고 찾기
     matchingKeyMap.forEach((data, key) => {
       let devices = 0;
       let sims = 0;
       
-      // 폰클개통데이터에서 해당 매칭키에 해당하는 출고처 찾기
-      const matchingStores = new Set();
-      phoneklData.forEach(phoneklRow => {
-        if (phoneklRow.length > 14) {
-          const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
-          const phoneklDepartment = (phoneklRow[7] || '').toString(); // H열: 소속
-          const phoneklOffice = (phoneklRow[6] || '').toString(); // G열: 사무실
-          const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
-          const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
+      // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
+      거래처정보.forEach(거래처Row => {
+        if (거래처Row.length > 3) {
+          const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
+          const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
+          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/[()]/g, ''); // D열: 담당자명 (괄호 제거)
           
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
-          if (phoneklAgent === data.agent && 
-              phoneklDepartment === data.department && 
-              phoneklOffice === data.office && 
-              phoneklCode === data.code &&
-              phoneklStore) {
-            matchingStores.add(phoneklStore);
+          if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
+            // 폰클재고데이터에서 해당 출고처의 재고 찾기
+            inventoryData.forEach(inventoryRow => {
+              if (inventoryRow.length > 8) {
+                const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+                const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+                const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+                
+                if (excludedAgents.includes(inventoryAgent)) return;
+                if (excludedStores.includes(inventoryStore)) return;
+                
+                // 해당 매칭키와 정확히 매칭되는 재고만 추가
+                if (inventoryAgent === data.agent && inventoryStore === 거래처출고처) {
+                  if (inventoryType === '유심') {
+                    sims++;
+                  } else {
+                    devices++;
+                  }
+                }
+              }
+            });
           }
         }
-      });
-      
-      // 해당 출고처들의 재고 찾기
-      matchingStores.forEach(storeCode => {
-        inventoryData.forEach(inventoryRow => {
-          if (inventoryRow.length > 8) {
-            const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
-            const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-            const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
-            
-            if (excludedAgents.includes(inventoryAgent)) return;
-            if (excludedStores.includes(inventoryStore)) return;
-            
-            // 해당 매칭키와 정확히 매칭되는 재고만 추가
-            if (inventoryAgent === data.agent && inventoryStore === storeCode) {
-              if (inventoryType === '유심') {
-                sims++;
-              } else {
-                devices++;
-              }
-            }
-          }
-        });
       });
       
       data.devices = devices;
