@@ -17848,11 +17848,11 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     // 통합 매칭 키 데이터 생성
   const { matchingKeyMap, matchingMismatches } = createUnifiedMatchingKeyData(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets, customerData);
   
-  // 각 집계별로 데이터 추출
-  const codeData = aggregateByCodeFromUnified(matchingKeyMap, supportBonusData.codeSupportMap);
-  const officeData = aggregateByOfficeFromUnified(matchingKeyMap, supportBonusData.officeSupportMap);
-  const departmentData = aggregateByDepartmentFromUnified(matchingKeyMap, supportBonusData.departmentSupportMap);
-  const agentData = aggregateByAgentFromUnified(matchingKeyMap, supportBonusData.agentSupportMap);
+  // 각 집계별로 데이터 추출 (Map.values()로 배열 변환)
+  const codeData = aggregateByCodeFromUnified(Array.from(matchingKeyMap.values()), supportBonusData.codeSupportMap);
+  const officeData = aggregateByOfficeFromUnified(Array.from(matchingKeyMap.values()), supportBonusData.officeSupportMap);
+  const departmentData = aggregateByDepartmentFromUnified(Array.from(matchingKeyMap.values()), supportBonusData.departmentSupportMap);
+  const agentData = aggregateByAgentFromUnified(Array.from(matchingKeyMap.values()), supportBonusData.agentSupportMap);
   
 
   
