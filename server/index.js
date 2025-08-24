@@ -18067,11 +18067,9 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
                 });
               }
               
-              // 디버깅: 매칭되지 않는 이유 확인
-              if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
-                console.log('🔍 [디버깅] 출고처 매칭 실패:', {
-                  담당자: data.agent,
-                  코드: data.code,
+              // 김수빈 전용 디버깅: 매칭 실패 원인 확인
+              if (data.agent === '김수빈') {
+                console.log('🔍 [김수빈] 출고처 매칭 실패:', {
                   거래처출고처: 거래처출고처,
                   거래처담당자: 거래처담당자,
                   폰클출고처데이터_담당자들: storeData
@@ -18116,10 +18114,9 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
       });
       data.activeStores = activeCount;
       
-      // 특정 담당자 디버깅 (중요한 로그만 유지)
-      if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
-        console.log('🔍 [통합매칭키] 특정담당자 출고처:', {
-          담당자: data.agent,
+      // 김수빈 전용 디버깅: 출고처 결과 확인
+      if (data.agent === '김수빈') {
+        console.log('🔍 [김수빈] 출고처 결과:', {
           매칭키: key,
           등록점: data.registeredStores,
           가동점: data.activeStores,
@@ -18131,7 +18128,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
   
   // 매칭 불일치 데이터 로그 출력
   if (matchingMismatches.length > 0) {
-    console.log('🔍 [매칭불일치] 출고처 매칭 불일치 데이터:', matchingMismatches);
+    // 매칭 불일치 데이터 수집 완료 (로그 제거)
   }
   
   // 4단계: 재고 데이터로 보유단말/유심 계산 (거래처정보 기반)
@@ -18183,10 +18180,9 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
       data.devices = devices;
       data.sims = sims;
       
-      // 특정 담당자 디버깅 (중요한 로그만 유지)
-      if (data.agent === '김수빈' || data.agent === '김윤섭' || data.agent === '윤태균') {
-        console.log('🔍 [통합매칭키] 특정담당자 재고:', {
-          담당자: data.agent,
+      // 김수빈 전용 디버깅: 재고 결과 확인
+      if (data.agent === '김수빈') {
+        console.log('🔍 [김수빈] 재고 결과:', {
           매칭키: key,
           보유단말: data.devices,
           보유유심: data.sims
@@ -19684,11 +19680,7 @@ app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
       };
     });
     
-    console.log('🔍 [담당자-코드조합] 추출 결과:', {
-      총조합수: result.length,
-      기존목표값수: existingTargets.size,
-      샘플: result.slice(0, 5)
-    });
+    // 담당자-코드조합 추출 완료 (로그 제거)
     
     res.json({ combinations: result });
     
