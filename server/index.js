@@ -17976,27 +17976,32 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
       
       data.registeredStores = matchingStores.size;
       
-      // 가동점 계산 (폰클개통데이터에서 해당 매칭키의 개통 실적이 있는 출고처)
+      // 가동점 계산 (등록점 중에서 개통 실적이 있는 출고처)
       let activeCount = 0;
-      phoneklData.forEach(phoneklRow => {
-        if (phoneklRow.length > 14) {
-          const phoneklAgent = (phoneklRow[8] || '').toString(); // I열: 담당자
-          const phoneklDepartment = (phoneklRow[7] || '').toString(); // H열: 소속
-          const phoneklOffice = (phoneklRow[6] || '').toString(); // G열: 사무실
-          const phoneklCode = (phoneklRow[4] || '').toString(); // E열: 코드
-          const phoneklStore = (phoneklRow[14] || '').toString(); // O열: 출고처
-          
-          // 코드가 비어있거나 담당자가 비어있으면 제외
-          if (!phoneklCode.trim() || !phoneklAgent.trim()) return;
-          
-          // 해당 매칭키와 정확히 매칭되는 데이터만 처리
-          if (phoneklAgent === data.agent && 
-              phoneklDepartment === data.department && 
-              phoneklOffice === data.office && 
-              phoneklCode === data.code &&
-              phoneklStore) {
-            activeCount++;
+      matchingStores.forEach(storeCode => {
+        const hasPerformance = phoneklData.some(performanceRow => {
+          if (performanceRow.length > 14) {
+            const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처
+            const performanceAgent = (performanceRow[8] || '').toString(); // I열: 담당자
+            const performanceDepartment = (performanceRow[7] || '').toString(); // H열: 소속
+            const performanceOffice = (performanceRow[6] || '').toString(); // G열: 사무실
+            const performanceCode = (performanceRow[4] || '').toString(); // E열: 코드
+            
+            // 코드가 비어있거나 담당자가 비어있으면 제외
+            if (!performanceCode.trim() || !performanceAgent.trim()) return false;
+            
+            // 해당 매칭키와 정확히 매칭되고, 등록점에 포함된 출고처인지 확인
+            return performanceStoreCode === storeCode && 
+                   performanceAgent === data.agent &&
+                   performanceDepartment === data.department &&
+                   performanceOffice === data.office &&
+                   performanceCode === data.code;
           }
+          return false;
+        });
+        
+        if (hasPerformance) {
+          activeCount++;
         }
       });
       data.activeStores = activeCount;
