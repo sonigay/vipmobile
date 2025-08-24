@@ -18004,11 +18004,13 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   }
   
 
+  const codeData = aggregateByCode(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.codeSupportMap, targets, filteredPhoneklData);
   const officeData = aggregateByOffice(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.officeSupportMap, targets, filteredPhoneklData);
   const departmentData = aggregateByDepartment(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.departmentSupportMap, targets, filteredPhoneklData);
   const agentData = aggregateByAgent(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, supportBonusData.agentSupportMap, targets, filteredPhoneklData);
   
   console.log('🔍 [마감장표] 집계 결과:', {
+    코드별데이터수: codeData?.length || 0,
     사무실별데이터수: officeData?.length || 0,
     소속별데이터수: departmentData?.length || 0,
     담당자별데이터수: agentData?.length || 0
@@ -18028,6 +18030,7 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   
   return {
     date: targetDate,
+    codeData,
     officeData,
     departmentData,
     agentData,
@@ -18121,9 +18124,18 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
   const officeSupportMap = new Map();
   const departmentSupportMap = new Map();
   const agentSupportMap = new Map();
+  const codeSupportMap = new Map();
   
   agentCombinationMap.forEach((data, key) => {
     const support = data.support || 0;
+    
+    // 코드별 합계
+    if (data.code) {
+      if (!codeSupportMap.has(data.code)) {
+        codeSupportMap.set(data.code, 0);
+      }
+      codeSupportMap.set(data.code, codeSupportMap.get(data.code) + support);
+    }
     
     // 사무실별 합계
     if (data.office) {
@@ -18151,12 +18163,14 @@ function calculateSupportBonus(phoneklData, excludedAgents) {
   });
   
   console.log('🔍 [지원금계산] 그룹별 지원금 합계:', {
+    코드별: Object.fromEntries(codeSupportMap),
     사무실별: Object.fromEntries(officeSupportMap),
     소속별: Object.fromEntries(departmentSupportMap),
     담당자별: Object.fromEntries(agentSupportMap)
   });
   
   return {
+    codeSupportMap,
     officeSupportMap,
     departmentSupportMap,
     agentSupportMap
@@ -18342,6 +18356,207 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
   });
   
   return Array.from(officeMap.values()).sort((a, b) => b.performance - a.performance);
+}
+
+// 코드별 집계
+function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, excludedStores, codeSupportMap, targets, filteredPhoneklData) {
+  console.log('🔍 [코드별집계] 시작 - 입력 데이터 수:', phoneklData?.length || 0);
+  console.log('🔍 [코드별집계] 제외 담당자:', excludedAgents);
+  
+  const codeMap = new Map();
+  let excludedCount = 0;
+  let noCodeCount = 0;
+  
+  phoneklData.forEach(row => {
+    const code = (row[4] || '').toString(); // E열: 코드
+    const agent = (row[8] || '').toString(); // I열: 담당자
+    
+    if (!code) {
+      noCodeCount++;
+      return;
+    }
+    
+    if (excludedAgents.includes(agent)) {
+      excludedCount++;
+      return;
+    }
+    
+    if (!codeMap.has(code)) {
+      codeMap.set(code, {
+        code,
+        performance: 0,
+        fee: 0,
+        support: 0,
+        target: 0,
+        achievement: 0,
+        expectedClosing: 0,
+        rotation: 0,
+        registeredStores: 0,
+        activeStores: 0,
+        devices: 0,
+        sims: 0,
+        utilization: 0
+      });
+    }
+    
+    const data = codeMap.get(code);
+    data.performance++;
+    
+    // #N/A 값 처리
+    const rawFee = row[3];
+    let fee = 0;
+    
+    if (rawFee && rawFee !== '#N/A' && rawFee !== 'N/A') {
+      fee = parseFloat(rawFee) || 0;
+    }
+    
+    data.fee += fee;
+  });
+  
+  console.log('🔍 [코드별집계] 기본 집계 완료:', {
+    코드없음제외: noCodeCount,
+    제외담당자제외: excludedCount,
+    최종코드수: codeMap.size,
+    코드목록: Array.from(codeMap.keys())
+  });
+  
+  // 추가 계산
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  
+  codeMap.forEach(data => {
+    data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
+    
+    // 목표값 적용 (해당 코드의 모든 담당자-코드 조합 목표값 합계)
+    let totalTarget = 0;
+    targets.forEach((targetInfo, key) => {
+      if (!targetInfo.excluded) {
+        // 해당 코드의 담당자인지 확인
+        const agentData = phoneklData.find(row => 
+          (row[8] || '').toString() === targetInfo.agent && 
+          (row[4] || '').toString() === data.code
+        );
+        if (agentData) {
+          totalTarget += targetInfo.target;
+        }
+      }
+    });
+    data.target = totalTarget;
+    
+    data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
+    
+    // 등록점, 가동점, 보유단말, 보유유심 계산 (담당자별 방식으로 통일)
+    let totalRegisteredStores = 0;
+    let totalActiveStores = 0;
+    let totalDevices = 0;
+    let totalSims = 0;
+    
+    // 해당 코드의 모든 담당자들의 고유 출고처 목록 생성
+    const agentStores = new Map(); // 담당자별 고유 출고처 목록
+    const agentInventory = new Map(); // 담당자별 재고 데이터
+    
+    // 1단계: 해당 코드의 담당자들의 고유 출고처 수집
+    if (storeData) {
+      storeData.forEach(storeRow => {
+        if (storeRow.length > 21) {
+          const storeAgent = (storeRow[21] || '').toString(); // V열: 담당자
+          const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
+          
+          // 해당 코드의 담당자인지 확인
+          const isCodeAgent = phoneklData.some(row => {
+            const rowCode = (row[4] || '').toString(); // E열: 코드
+            const rowAgent = (row[8] || '').toString(); // I열: 담당자
+            return rowCode === data.code && rowAgent === storeAgent && !excludedAgents.includes(rowAgent);
+          });
+          
+          if (isCodeAgent && storeCode) {
+            // 제외 조건들
+            if (storeCode.includes('사무실')) return;
+            if (storeCode === storeAgent) return;
+            if (storeAgent.includes('거래종료')) return;
+            
+            if (!agentStores.has(storeAgent)) {
+              agentStores.set(storeAgent, new Set());
+            }
+            agentStores.get(storeAgent).add(storeCode);
+          }
+        }
+      });
+    }
+    
+    // 2단계: 재고 데이터 수집
+    if (inventoryData) {
+      inventoryData.forEach(inventoryRow => {
+        if (inventoryRow.length > 8) {
+          const inventoryAgent = (inventoryRow[8] || '').toString(); // I열: 담당자
+          const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
+          const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+          
+          // 해당 코드의 담당자인지 확인
+          const isCodeAgent = phoneklData.some(row => {
+            const rowCode = (row[4] || '').toString(); // E열: 코드
+            const rowAgent = (row[8] || '').toString(); // I열: 담당자
+            return rowCode === data.code && rowAgent === inventoryAgent && !excludedAgents.includes(rowAgent);
+          });
+          
+          if (isCodeAgent && !excludedStores.includes(inventoryStore)) {
+            if (!agentInventory.has(inventoryAgent)) {
+              agentInventory.set(inventoryAgent, { devices: 0, sims: 0 });
+            }
+            if (inventoryType === '유심') {
+              agentInventory.get(inventoryAgent).sims++;
+            } else {
+              agentInventory.get(inventoryAgent).devices++;
+            }
+          }
+        }
+      });
+    }
+    
+    // 3단계: 등록점, 가동점, 재고 계산
+    agentStores.forEach((stores, agent) => {
+      totalRegisteredStores += stores.size;
+      
+      // 가동점 계산 (각 출고처별로 실적 확인)
+      stores.forEach(storeCode => {
+        const hasPerformance = filteredPhoneklData.some(performanceRow => {
+          const performanceStoreCode = (performanceRow[14] || '').toString();
+          const performanceAgent = (performanceRow[8] || '').toString();
+          return performanceStoreCode === storeCode && performanceAgent === agent;
+        });
+        
+        if (hasPerformance) {
+          totalActiveStores++;
+        }
+      });
+    });
+    
+    // 4단계: 재고 합계
+    agentInventory.forEach((inventory) => {
+      totalDevices += inventory.devices;
+      totalSims += inventory.sims;
+    });
+    
+    data.registeredStores = totalRegisteredStores;
+    data.activeStores = totalActiveStores;
+    data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
+    data.inactiveStores = data.registeredStores - totalActiveStores;
+    data.devices = totalDevices;
+    data.sims = totalSims;
+    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    
+    // 지원금 적용
+    data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
+  });
+  
+  console.log('🔍 [코드별집계] 처리 결과:', {
+    코드없음제외: noCodeCount,
+    제외담당자제외: excludedCount,
+    최종코드수: codeMap.size,
+    코드목록: Array.from(codeMap.keys())
+  });
+  
+  return Array.from(codeMap.values()).sort((a, b) => b.fee - a.fee);
 }
 
 // 소속별 집계

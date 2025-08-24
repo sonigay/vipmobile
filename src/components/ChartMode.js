@@ -2415,9 +2415,10 @@ function ClosingChartTab() {
     
     const codeTotal = calculateTotal(data?.codeData, 'performance');
     const officeTotal = calculateTotal(data?.officeData, 'performance');
+    const departmentTotal = calculateTotal(data?.departmentData, 'performance');
     const agentTotal = calculateTotal(data?.agentData, 'performance');
     
-    return codeTotal === officeTotal && officeTotal === agentTotal;
+    return codeTotal === officeTotal && officeTotal === departmentTotal && departmentTotal === agentTotal;
   };
 
   if (loading && progress > 0) {
@@ -2607,7 +2608,7 @@ function ClosingChartTab() {
         {!checkTotalConsistency() && (
           <Alert severity="warning" sx={{ mt: 2 }}>
             <AlertTitle>주의</AlertTitle>
-            코드별, 사무실별, 담당자별 실적 합계가 일치하지 않습니다.
+            코드별, 사무실별, 소속별, 담당자별 실적 합계가 일치하지 않습니다.
           </Alert>
         )}
       </Paper>
