@@ -2339,9 +2339,18 @@ function ClosingChartTab() {
       setData(result);
       
       // 매칭 불일치 데이터 처리
+      console.log('🔍 [프론트엔드] API 응답 확인:', {
+        hasMatchingMismatches: !!result.matchingMismatches,
+        matchingMismatchesLength: result.matchingMismatches ? result.matchingMismatches.length : 0,
+        matchingMismatchesSample: result.matchingMismatches ? result.matchingMismatches.slice(0, 2) : 'none'
+      });
+      
       if (result.matchingMismatches && result.matchingMismatches.length > 0) {
+        console.log('🔍 [프론트엔드] 매칭 불일치 모달 표시:', result.matchingMismatches.length, '건');
         setMatchingMismatches(result.matchingMismatches);
         setShowMismatchModal(true);
+      } else {
+        console.log('🔍 [프론트엔드] 매칭 불일치 데이터 없음');
       }
       
       setLastUpdate(new Date());
