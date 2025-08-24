@@ -17968,7 +17968,13 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
                 const storeAgent = (storeRow[21] || '').toString().replace(/[()]/g, ''); // V열: 담당자 (괄호 제거)
                 const storeCodeName = (storeRow[7] || '').toString(); // H열: 코드명
                 const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-                return storeCode === 거래처출고처 && storeAgent === 거래처담당자 && storeCodeName === 거래처코드;
+                
+                // 담당자명 매칭: 정확히 일치하거나 포함 관계
+                const agentMatches = storeAgent === 거래처담당자 || 
+                                   storeAgent.includes(거래처담당자) || 
+                                   거래처담당자.includes(storeAgent);
+                
+                return storeCode === 거래처출고처 && agentMatches && storeCodeName === 거래처코드;
               }
               return false;
             });
@@ -18095,7 +18101,12 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
                 if (excludedStores.includes(inventoryStore)) return;
                 
                 // 해당 매칭키와 정확히 매칭되는 재고만 추가 (코드명까지 확인)
-                if (inventoryAgent === 거래처담당자 && inventoryStore === 거래처출고처 && inventoryCodeName === 거래처코드) {
+                // 담당자명 매칭: 정확히 일치하거나 포함 관계
+                const agentMatches = inventoryAgent === 거래처담당자 || 
+                                   inventoryAgent.includes(거래처담당자) || 
+                                   거래처담당자.includes(inventoryAgent);
+                
+                if (agentMatches && inventoryStore === 거래처출고처 && inventoryCodeName === 거래처코드) {
                   if (inventoryType === '유심') {
                     sims++;
                   } else {
