@@ -17845,14 +17845,14 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     });
   }
   
-  // 통합 매칭 키 데이터 생성
-      const unifiedData = createUnifiedMatchingKeyData(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets, customerData);
+    // 통합 매칭 키 데이터 생성
+  const { matchingKeyMap, matchingMismatches } = createUnifiedMatchingKeyData(filteredPhoneklData, storeData, inventoryData, excludedAgents, excludedStores, targets, customerData);
   
   // 각 집계별로 데이터 추출
-  const codeData = aggregateByCodeFromUnified(unifiedData, supportBonusData.codeSupportMap);
-  const officeData = aggregateByOfficeFromUnified(unifiedData, supportBonusData.officeSupportMap);
-  const departmentData = aggregateByDepartmentFromUnified(unifiedData, supportBonusData.departmentSupportMap);
-  const agentData = aggregateByAgentFromUnified(unifiedData, supportBonusData.agentSupportMap);
+  const codeData = aggregateByCodeFromUnified(matchingKeyMap, supportBonusData.codeSupportMap);
+  const officeData = aggregateByOfficeFromUnified(matchingKeyMap, supportBonusData.officeSupportMap);
+  const departmentData = aggregateByDepartmentFromUnified(matchingKeyMap, supportBonusData.departmentSupportMap);
+  const agentData = aggregateByAgentFromUnified(matchingKeyMap, supportBonusData.agentSupportMap);
   
 
   
@@ -18135,7 +18135,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
   });
   
 
-  return matchingKeyMap;
+  return { matchingKeyMap, matchingMismatches };
 }
 
 // 지원금 계산 함수
