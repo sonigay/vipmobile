@@ -17953,12 +17953,38 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     matchingKeyMap.forEach((data, key) => {
       const matchingStores = new Set();
       
+      // 김수빈 전용 디버깅: customerData 전체 확인
+      if (data.agent === '김수빈') {
+        console.log('🔍 [김수빈] customerData 전체 확인:', {
+          customerDataLength: customerData.length,
+          customerDataSample: customerData.slice(0, 5).map(row => ({
+            담당자: row[3] || 'undefined',
+            코드: row[1] || 'undefined',
+            출고처: row[2] || 'undefined'
+          }))
+        });
+      }
+      
       // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
       customerData.forEach(거래처Row => {
         if (거래처Row.length > 3) {
           const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
           const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
           const 거래처담당자 = (거래처Row[3] || '').toString().replace(/[()]/g, ''); // D열: 담당자명 (괄호 제거)
+          
+          // 김수빈 전용 디버깅: 매칭 조건 확인
+          if (data.agent === '김수빈') {
+            console.log('🔍 [김수빈] 매칭 조건 확인:', {
+              거래처담당자,
+              dataAgent: data.agent,
+              거래처코드,
+              dataCode: data.code,
+              거래처출고처,
+              담당자매칭: 거래처담당자 === data.agent,
+              코드매칭: 거래처코드 === data.code,
+              출고처존재: !!거래처출고처
+            });
+          }
           
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
           if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
