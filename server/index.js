@@ -3865,7 +3865,7 @@ app.post('/api/inventory/manual-assignment', async (req, res) => {
 // 실시간 개통 상태 확인 API
 app.get('/api/inventory/activation-status', async (req, res) => {
   try {
-    console.log('📱 [개통상태 디버깅] 개통 상태 확인 시작');
+
     
     // 캐시 키 생성
     const cacheKey = 'inventory_activation_status';
@@ -3904,20 +3904,12 @@ app.get('/api/inventory/activation-status', async (req, res) => {
           activatedCustomers.add(activationKey);
           activationCount++;
           
-          // 디버깅: 처음 5개만 로그
-          if (index < 5) {
-            console.log(`📱 [개통상태 디버깅] 개통 고객 발견! 행 ${index + 2}:`, {
-              customerName,
-              activationNumber,
-              lastFourDigits,
-              activationKey
-            });
-          }
+
         }
       }
     });
     
-    console.log(`📱 [개통상태 디버깅] 개통 데이터 처리 완료: ${activationCount}개 개통된 고객`);
+
     
     // 사전예약사이트에서 고객명 + 전화번호 끝 4자리로 매칭
     const reservationSiteValues = await getSheetValues('사전예약사이트');
@@ -3941,17 +3933,7 @@ app.get('/api/inventory/activation-status', async (req, res) => {
         const reservationKey = `${customerName}_${lastFourDigits}`;
         const isActivated = activatedCustomers.has(reservationKey);
         
-        // 디버깅: 처음 5개만 로그
-        if (index < 5) {
-          console.log(`📱 [개통상태 디버깅] 사전예약 고객 확인! 행 ${index + 2}:`, {
-            reservationNumber,
-            customerName,
-            phoneNumber,
-            lastFourDigits,
-            reservationKey,
-            isActivated
-          });
-        }
+
         
         activationResults.push({
           reservationNumber,
@@ -5057,7 +5039,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 주소 업데이트 함수 호출 (비동기로 처리하여 배정 로직을 방해하지 않도록)
     console.log('🔍 [서버시작] 주소 업데이트 함수 시작 (비동기 처리)');
     checkAndUpdateAddresses().then(() => {
-      console.log('✅ [서버시작] 주소 업데이트 함수 완료');
+  
     }).catch(error => {
       console.error('❌ [서버시작] 주소 업데이트 함수 실패:', error.message);
     });
@@ -5065,7 +5047,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // SALES_SHEET_ID 주소 업데이트 함수 호출 (비동기로 처리)
     console.log('🔍 [서버시작] SALES_SHEET_ID 주소 업데이트 함수 시작 (비동기 처리)');
     checkAndUpdateSalesAddresses().then(() => {
-      console.log('✅ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 완료');
+  
     }).catch(error => {
       console.error('❌ [서버시작] SALES_SHEET_ID 주소 업데이트 함수 실패:', error.message);
     });
@@ -5073,7 +5055,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     // 영업 데이터 미리 로드 (비동기로 처리)
     console.log('🔍 [서버시작] 영업 데이터 미리 로드 시작 (비동기 처리)');
     preloadSalesData().then(() => {
-      console.log('✅ [서버시작] 영업 데이터 미리 로드 완료');
+  
     }).catch(error => {
       console.error('❌ [서버시작] 영업 데이터 미리 로드 실패:', error.message);
     });
@@ -5085,7 +5067,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('🔍 [서버시작] Git 히스토리 업데이트 시작');
     try {
       await updateGoogleSheetWithGitHistory();
-      console.log('✅ [서버시작] Git 히스토리 업데이트 완료');
+  
     } catch (error) {
       console.error('❌ [서버시작] Git 히스토리 업데이트 실패:', error.message);
     }
@@ -5094,7 +5076,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
     console.log('🔍 [서버시작] 푸시 구독 초기화 시작');
     try {
       await initializePushSubscriptions();
-      console.log('✅ [서버시작] 푸시 구독 초기화 완료');
+  
     } catch (error) {
       console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
     }
@@ -5121,7 +5103,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
             if (activationResponse.ok) {
               const activationResult = await activationResponse.json();
               if (activationResult.success) {
-                console.log(`✅ [서버시작] 개통완료 상태 확인 완료: ${activationResult.data?.length || 0}개 고객 처리`);
+            
               } else {
                 console.error('❌ [서버시작] 개통완료 상태 확인 실패:', activationResult.error);
               }
@@ -5258,7 +5240,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
         }
       }
       
-      console.log(`✅ [서버시작] 중복 배정 정리 완료: ${cleanedCount}개 배정 해제`);
+  
       
       // 사전예약사이트 데이터 처리 시작
       
@@ -5403,7 +5385,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
               updatedCount++;
               
               if (index < 5) {
-                console.log(`✅ [서버시작] 행 ${index + 2}: 일련번호 업데이트 "${currentSerialNumber}" → "${assignedSerialNumber}" (새로운 배정)`);
+            
               }
               
               assignments.push({
@@ -5472,7 +5454,7 @@ const server = app.listen(port, '0.0.0.0', async () => {
               resource: { values }
             });
             
-            console.log(`✅ [서버시작] Google Sheets 업데이트 완료: ${updatedCount}개 저장, ${cleanedCount}개 중복정리`);
+        
           } catch (error) {
             console.error('❌ [서버시작] Google Sheets 업데이트 실패:', error.message);
             console.error('❌ [서버시작] 환경변수 확인 필요: GOOGLE_SHEET_ID');
@@ -19150,11 +19132,7 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
 
 // CS 개통 요약 계산 (무선 + 유선)
 function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents) {
-  console.log('🔍 [CS개통] 계산 시작:', {
-    filteredPhoneklDataLength: filteredPhoneklData?.length || 0,
-    phoneklHomeDataLength: phoneklHomeData?.length || 0,
-    targetDate
-  });
+
   
   const csAgents = new Map();
   let totalWireless = 0;
@@ -19169,26 +19147,18 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
     }
   });
   
-  console.log('🔍 [CS개통] 무선 CS 직원 목록:', Array.from(csEmployeeSet));
+
   
   // CN열에서 CS 직원들 명단 추출 (고유값) - 유선
   const wiredCSEmployees = new Set();
   if (phoneklHomeData) {
-    console.log('🔍 [CS개통] 폰클홈데이터 샘플:', phoneklHomeData.slice(0, 3));
+
     
     // 헤더 제외 (3행까지 제외, 4행부터 데이터)
     const dataRows = phoneklHomeData.slice(3);
-    console.log('🔍 [CS개통] 헤더 제외 후 데이터 수:', dataRows.length);
+
     
-    // 실제 데이터 구조 파악을 위한 상세 로그
-    dataRows.slice(0, 5).forEach((row, index) => {
-      console.log(`🔍 [CS개통] 폰클홈데이터 데이터 행 ${index}:`, {
-        rowLength: row.length,
-        csColumn: row[91] || '없음', // CN열: CS 직원
-        receiptDate: row[90] || '없음', // CM열: 접수일
-        sample: row.slice(0, 20) // 처음 20개 컬럼만
-      });
-    });
+
     
     // CN열에서 CS 직원 추출
     dataRows.forEach((row, index) => {
@@ -19196,20 +19166,18 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
       if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO' && 
           (csEmployee.includes('MIN') || csEmployee.includes('VIP') || csEmployee.includes('등록'))) {
         wiredCSEmployees.add(csEmployee);
-        if (index < 5) {
-          console.log(`🔍 [CS개통] 유선 CS 직원 발견 (행 ${index}):`, csEmployee);
-        }
+
       }
     });
     
-    console.log('🔍 [CS개통] 유선 CS 직원 목록:', Array.from(wiredCSEmployees));
+
   } else {
-    console.log('🔍 [CS개통] 폰클홈데이터가 없습니다!');
+
   }
   
   // 모든 CS 직원 통합
   csEmployeeSet.forEach(employee => wiredCSEmployees.add(employee));
-  console.log('🔍 [CS개통] 통합 CS 직원 목록:', Array.from(wiredCSEmployees));
+  
   
   // 각 CS 직원별로 실적 계산 초기화
   wiredCSEmployees.forEach(csEmployee => {
@@ -19236,12 +19204,7 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
     }
   });
   
-  console.log('🔍 [CS개통] 무선 개통 처리 결과:', {
-    필터링된데이터수: filteredPhoneklData?.length || 0,
-    최종처리결과: wirelessProcessed
-  });
-  
-  console.log('🔍 [CS개통] 무선 개통 처리 결과:', { totalWireless, wirelessProcessed });
+
   
   // 유선 개통 데이터 처리 (폰클홈데이터)
   let wiredProcessed = 0;
@@ -19272,19 +19235,10 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
         }
       }
       
-      if (index < 5) {
-        console.log(`🔍 [CS개통] 유선 데이터 샘플 (행 ${index}):`, {
-          receiptDate,
-          csEmployee,
-          isValidDate: !isNaN(receiptDateObj.getTime()),
-          isWithinDate: receiptDateObj <= targetDateObj,
-          isValidEmployee: csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO',
-          rowSample: row.slice(0, 15) // 처음 15개 컬럼 샘플
-        });
-      }
+
     });
     
-    console.log('🔍 [CS개통] 유선 개통 처리 결과:', { totalWired, wiredProcessed });
+
   }
   
   return {
