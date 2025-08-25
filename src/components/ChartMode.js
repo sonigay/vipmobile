@@ -2303,6 +2303,10 @@ function ClosingChartTab() {
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [mappingFailures, setMappingFailures] = useState([]);
   
+  // 매칭 불일치 모달 상태
+  const [showMismatchModal, setShowMismatchModal] = useState(false);
+  const [matchingMismatches, setMatchingMismatches] = useState([]);
+  
   // 테이블 접기/펼치기 상태
   const [codeTableOpen, setCodeTableOpen] = useState(false);
   const [officeTableOpen, setOfficeTableOpen] = useState(false);
@@ -2891,12 +2895,7 @@ function ClosingChartTab() {
         failures={mappingFailures}
       />
 
-      {/* 매칭 불일치 모달 */}
-      <MatchingMismatchModal
-        open={showMismatchModal}
-        onClose={() => setShowMismatchModal(false)}
-        matchingMismatches={matchingMismatches}
-      />
+
     </Box>
   );
 }
