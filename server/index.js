@@ -19355,7 +19355,7 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
     }
   });
   
-
+  
   
   // 유선 개통 데이터 처리 (폰클홈데이터)
   let wiredProcessed = 0;
