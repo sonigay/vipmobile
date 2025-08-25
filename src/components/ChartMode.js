@@ -2893,7 +2893,7 @@ function ClosingChartTab() {
 
       {/* 매칭 불일치 모달 */}
       <MatchingMismatchModal
-        visible={showMismatchModal}
+        open={showMismatchModal}
         onClose={() => setShowMismatchModal(false)}
         matchingMismatches={matchingMismatches}
       />
