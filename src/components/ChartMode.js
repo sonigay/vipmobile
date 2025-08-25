@@ -2903,6 +2903,12 @@ function ClosingChartTab() {
         failures={mappingFailures}
       />
 
+      {/* 매칭 불일치 모달 */}
+      <MatchingMismatchModal
+        visible={showMismatchModal}
+        onClose={() => setShowMismatchModal(false)}
+        matchingMismatches={matchingMismatches}
+      />
 
     </Box>
   );
