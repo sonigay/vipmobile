@@ -2521,6 +2521,14 @@ function ClosingChartTab() {
             </Button>
             <Button
               variant="outlined"
+              onClick={() => setShowMismatchModal(true)}
+              startIcon={<WarningIcon />}
+              color="warning"
+            >
+              매칭 불일치 ({matchingMismatches.length})
+            </Button>
+            <Button
+              variant="outlined"
               onClick={() => {
                 loadMappingFailures();
                 setShowMappingModal(true);
