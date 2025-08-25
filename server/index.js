@@ -8776,11 +8776,6 @@ const COLUMN_MATCHING_CONFIG = [
     description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '전환지원금상이', key: 'conversion_support', column: 73 }, // BV열 (기존 BM열에서 +9)
-    systemField: { name: '전환지원금상이', key: 'conversion_support', column: 38 }, // AM열 (기존 AE열에서 +8)
-    description: '전환지원금상이 비교 (더하기 방식 정규화, AN열 BLANK 제외)'
-  },
-  {
     manualField: { name: '프리할부상이', key: 'pre_installment', column: 56 }, // BD열 (기존 AV열에서 +9)
     systemField: { name: '프리할부상이', key: 'pre_installment', column: 35 }, // AJ열 (기존 AB열에서 +8)
     description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)'
@@ -9149,36 +9144,6 @@ function normalizeSupportContract(manualRow, systemRow) {
   }
   
   return { manualSupport, systemSupport };
-}
-
-// 전환지원금상이 정규화 함수
-function normalizeConversionSupport(manualRow, systemRow) {
-  // 수기초 데이터 정규화 (BM열+BN열)
-  let manualConversion = '';
-  if (manualRow.length > 65) { // 최소 BN열(65)은 있어야 함
-            const bmValue = (manualRow[73] || '').toString().trim(); // BM열 (64+9)
-        const bnValue = (manualRow[74] || '').toString().trim(); // BN열 (65+9)
-        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
-    
-    // AN열에 "BLANK" 포함되어있으면 대상에서 제외
-    if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
-      return { manualConversion: '', systemConversion: '' }; // 검수 대상에서 제외
-    }
-    
-    // 숫자 더하기 연산으로 정규화
-    const values = [bmValue, bnValue].filter(v => v);
-    const sum = addNumbers(values);
-    manualConversion = normalizeNumberFormat(sum);
-  }
-  
-  // 폰클 데이터 정규화 (AE열)
-  let systemConversion = '';
-  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
-    const aeValue = (systemRow[38] || '').toString().trim(); // AE열: 전환지원금상이 (30+8)
-    systemConversion = normalizeNumberFormat(aeValue);
-  }
-  
-  return { manualConversion, systemConversion };
 }
 
 // 프리할부상이 정규화 함수
@@ -9552,41 +9517,6 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           correctValue: manualSupport || '정규화 불가',
           incorrectValue: systemSupport || '정규화 불가',
           description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)',
-          manualRow: null,
-          systemRow: null,
-          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
-        });
-      }
-      return;
-    }
-    
-    // 전환지원금상이 비교 로직
-    if (manualField.key === 'conversion_support') {
-      // 배열 범위 체크 (BM=64, BN=63, AN=39, AE=30)
-      if (manualRow.length <= 63 || systemRow.length <= 30) {
-        return;
-      }
-      
-      // 전환지원금상이 정규화
-      const { manualConversion, systemConversion } = normalizeConversionSupport(manualRow, systemRow);
-      
-      // AN열 BLANK 제외 조건으로 인해 빈 값이 반환된 경우 비교 제외
-      if (!manualConversion && !systemConversion) {
-        return;
-      }
-      
-      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
-      if (manualConversion !== systemConversion && 
-          (manualConversion || systemConversion)) {
-
-        differences.push({
-          key,
-          type: 'mismatch',
-          field: '전환지원금상이',
-          fieldKey: 'conversion_support',
-          correctValue: manualConversion || '정규화 불가',
-          incorrectValue: systemConversion || '정규화 불가',
-          description: '전환지원금상이 비교 (더하기 방식 정규화, AN열 BLANK 제외)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)

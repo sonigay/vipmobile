@@ -53,6 +53,7 @@ import {
   Info as InfoIcon,
   Update as UpdateIcon
 } from '@mui/icons-material';
+import { Tabs, Tab } from '@mui/material';
 import {
   fetchInspectionData,
   updateInspectionCompletion,
@@ -73,6 +74,21 @@ import {
 
 import AppUpdatePopup from './AppUpdatePopup';
 
+// 탭별 검수 항목 정의
+const INSPECTION_TABS = {
+  GENERAL: {
+    label: '일반검수항목',
+    items: ['출고가상이', '지원금 및 약정상이', '프리할부상이']
+  },
+  ADDITIONAL: {
+    label: '추가검수항목', 
+    items: ['유플레이 유치검수']
+  },
+  DEDUCTION: {
+    label: '차감검수항목',
+    items: ['유플레이 미유치 검수']
+  }
+};
 
 function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 상태 관리
@@ -156,7 +172,8 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
 
 
 
-  // 비교 컬럼 상태
+  // 탭 기반 검수 항목 상태
+  const [selectedTab, setSelectedTab] = useState(0); // 0: 일반검수항목, 1: 추가검수항목, 2: 차감검수항목
   const [fieldOptions, setFieldOptions] = useState([]);
   const [selectedField, setSelectedField] = useState('all');
   
@@ -232,7 +249,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     loadInspectionData();
     loadCompletionStatus();
     loadModificationCompletionStatus();
-  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField]);
+  }, [loadInspectionData, loadCompletionStatus, loadModificationCompletionStatus, selectedField, selectedTab]);
 
   // 검수모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -263,6 +280,16 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     
     let filtered = filterDifferences(differencesWithCompletion, filters);
     
+    // 탭별 필터링 적용
+    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+    if (currentTabItems.length > 0) {
+      const beforeFilterCount = filtered.length;
+      filtered = filtered.filter(diff => 
+        currentTabItems.includes(diff.field)
+      );
+      console.log(`탭 필터링: ${beforeFilterCount}개 → ${filtered.length}개 (${currentTabItems.join(', ')})`);
+    }
+    
     // 가입번호 기준 정렬
     filtered.sort((a, b) => {
       const keyA = (a.originalKey || a.key || '').toString();
@@ -276,7 +303,7 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     });
     
     return filtered;
-  }, [inspectionData, filters, completedItems, modificationCompletedItems, sortOrder]);
+  }, [inspectionData, filters, completedItems, modificationCompletedItems, sortOrder, selectedTab]);
 
   // 통계 계산
   const statistics = useMemo(() => {
@@ -288,8 +315,17 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
               completed: completedItems.has(diff.key) || modificationCompletedItems.has(`${diff.originalKey || diff.key}_${diff.incorrectValue || ''}_${diff.correctValue || ''}`)
     }));
     
-    return calculateStatistics(differencesWithCompletion);
-  }, [inspectionData, completedItems, modificationCompletedItems]);
+    // 탭별 필터링 적용
+    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+    let filteredDifferences = differencesWithCompletion;
+    if (currentTabItems.length > 0) {
+      filteredDifferences = differencesWithCompletion.filter(diff => 
+        currentTabItems.includes(diff.field)
+      );
+    }
+    
+    return calculateStatistics(filteredDifferences);
+  }, [inspectionData, completedItems, modificationCompletedItems, selectedTab]);
 
   // 처리자 목록
   const assignedAgents = useMemo(() => {
@@ -581,6 +617,13 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
     });
   };
 
+  // 탭 변경 핸들러
+  const handleTabChange = (event, newValue) => {
+    console.log('탭 변경:', newValue, INSPECTION_TABS[Object.keys(INSPECTION_TABS)[newValue]]?.label);
+    setSelectedTab(newValue);
+    setSelectedField('all'); // 탭 변경 시 필드 선택 초기화
+  };
+
   // 중복 타입 관련 함수들
   const getDuplicateTypeLabel = (duplicateType) => {
     switch (duplicateType) {
@@ -750,36 +793,81 @@ function InspectionMode({ onLogout, loggedInStore, onModeChange, availableModes 
           </Box>
         )}
 
-        {/* 검수대상항목 선택 */}
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>검수대상항목</InputLabel>
-            <Select
-              value={selectedField}
-              label="검수대상항목"
-              onChange={e => setSelectedField(e.target.value)}
+        {/* 검수 항목 탭 */}
+        {!isLoading && inspectionData && inspectionData.differences && (
+          <Paper sx={{ mb: 2 }}>
+            <Tabs 
+              value={selectedTab} 
+              onChange={handleTabChange}
+              sx={{ 
+                borderBottom: 1, 
+                borderColor: 'divider',
+                backgroundColor: '#fafafa'
+              }}
             >
-              {fieldOptions.map(option => (
-                <MenuItem key={option.key} value={option.key}>
-                  <Box>
-                    <Typography variant="body2">{option.name}</Typography>
-                    {option.description && (
-                      <Typography variant="caption" color="text.secondary">
-                        {option.description}
-                      </Typography>
-                    )}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          
-          {selectedField !== 'all' && (
-            <Typography variant="body2" color="text.secondary">
-              {fieldOptions.find(f => f.key === selectedField)?.description}
-            </Typography>
-          )}
-        </Box>
+              <Tab 
+                label={INSPECTION_TABS.GENERAL.label}
+                sx={{ 
+                  fontWeight: 'bold',
+                  '&.Mui-selected': { color: '#1976d2' }
+                }}
+              />
+              <Tab 
+                label={INSPECTION_TABS.ADDITIONAL.label}
+                sx={{ 
+                  fontWeight: 'bold',
+                  '&.Mui-selected': { color: '#2e7d32' }
+                }}
+              />
+              <Tab 
+                label={INSPECTION_TABS.DEDUCTION.label}
+                sx={{ 
+                  fontWeight: 'bold',
+                  '&.Mui-selected': { color: '#d32f2f' }
+                }}
+              />
+            </Tabs>
+          </Paper>
+        )}
+
+        {/* 세부 필터 (탭 내에서 특정 항목 선택) */}
+        {!isLoading && inspectionData && inspectionData.differences && (
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>세부 항목</InputLabel>
+              <Select
+                value={selectedField}
+                label="세부 항목"
+                onChange={e => setSelectedField(e.target.value)}
+              >
+                <MenuItem value="all">모든 항목</MenuItem>
+                {fieldOptions
+                  .filter(option => {
+                    const currentTabItems = Object.values(INSPECTION_TABS)[selectedTab]?.items || [];
+                    return currentTabItems.includes(option.name);
+                  })
+                  .map(option => (
+                    <MenuItem key={option.key} value={option.key}>
+                      <Box>
+                        <Typography variant="body2">{option.name}</Typography>
+                        {option.description && (
+                          <Typography variant="caption" color="text.secondary">
+                            {option.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+            
+            {selectedField !== 'all' && (
+              <Typography variant="body2" color="text.secondary">
+                {fieldOptions.find(f => f.key === selectedField)?.description}
+              </Typography>
+            )}
+          </Box>
+        )}
 
         {/* 통계 카드 */}
         {!isLoading && statistics && (
