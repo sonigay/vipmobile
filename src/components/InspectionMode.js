@@ -78,7 +78,17 @@ import AppUpdatePopup from './AppUpdatePopup';
 const INSPECTION_TABS = {
   GENERAL: {
     label: '일반검수항목',
-    items: ['출고가상이', '지원금 및 약정상이', '프리할부상이']
+    items: [
+      '대리점코드',
+      '개통일시분', 
+      '모델명(일련번호)',
+      '개통유형',
+      '실판매POS',
+      '요금제',
+      '출고가상이', 
+      '지원금 및 약정상이', 
+      '프리할부상이'
+    ]
   },
   ADDITIONAL: {
     label: '추가검수항목', 
