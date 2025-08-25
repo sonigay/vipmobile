@@ -17970,7 +17970,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
         if (거래처Row.length > 3) {
           const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
           const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
-          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/[()]/g, ''); // D열: 담당자명 (괄호 제거)
+          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, ''); // D열: 담당자명 (괄호와 내용 모두 제거)
           
           // 김수빈 전용 디버깅: 지우모바일 관련만 로그 출력
           if (data.agent === '김수빈' && 거래처출고처.includes('지우모바일')) {
@@ -18002,7 +18002,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
             // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인 (코드명까지 매칭)
             const isRegistered = storeData.some(storeRow => {
               if (storeRow.length > 21) {
-                const storeAgent = (storeRow[21] || '').toString().replace(/[()]/g, ''); // V열: 담당자 (괄호 제거)
+                const storeAgent = (storeRow[21] || '').toString().replace(/\([^)]*\)/g, ''); // V열: 담당자 (괄호와 내용 모두 제거)
                 const storeCodeName = (storeRow[7] || '').toString(); // H열: 코드명
                 const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
                 
@@ -18143,14 +18143,14 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
         if (거래처Row.length > 3) {
           const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
           const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
-          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/[()]/g, ''); // D열: 담당자명 (괄호 제거)
+          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, ''); // D열: 담당자명 (괄호와 내용 모두 제거)
           
           // 해당 매칭키와 정확히 매칭되는 데이터만 처리
           if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
             // 폰클재고데이터에서 해당 출고처의 재고 찾기 (코드명까지 매칭)
             inventoryData.forEach(inventoryRow => {
               if (inventoryRow.length > 8) {
-                const inventoryAgent = (inventoryRow[8] || '').toString().replace(/[()]/g, ''); // I열: 담당자 (괄호 제거)
+                const inventoryAgent = (inventoryRow[8] || '').toString().replace(/\([^)]*\)/g, ''); // I열: 담당자 (괄호와 내용 모두 제거)
                 const inventoryCodeName = (inventoryRow[3] || '').toString(); // D열: 코드명
                 const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
                 const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
