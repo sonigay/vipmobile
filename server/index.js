@@ -8776,14 +8776,24 @@ const COLUMN_MATCHING_CONFIG = [
     description: '지원금 및 약정상이 비교 (선택방식 정규화, AN열 BLANK 제외)'
   },
   {
-    manualField: { name: '프리할부상이', key: 'pre_installment', column: 56 }, // BD열 (기존 AV열에서 +9)
-    systemField: { name: '프리할부상이', key: 'pre_installment', column: 35 }, // AJ열 (기존 AB열에서 +8)
-    description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)'
+    manualField: { name: '프리할부상이', key: 'pre_installment', column: 56 }, // BE열
+    systemField: { name: '프리할부상이', key: 'pre_installment', column: 39 }, // AN열
+    description: '프리할부상이 비교 (직접 비교, AN열 BLANK 제외)'
+  },
+  {
+    manualField: { name: '유통망지원금 상이', key: 'distribution_support', column: 75 }, // BX열
+    systemField: { name: '유통망지원금 상이', key: 'distribution_support', column: 37 }, // AL열
+    description: '유통망지원금 상이 비교 (숫자 서식 정규화)'
   },
   {
     manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 127 }, // DX열 (기존 DO열에서 +9)
     systemField: { name: '유플레이 유치검수', key: 'uplay_check', column: 30 }, // AE열 (기존 W열에서 +8)
     description: '유플레이 유치검수 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: 'V컬러링 음악감상 플러스 유치', key: 'vcoloring_music_plus', column: 125 }, // DP열
+    systemField: { name: 'V컬러링 음악감상 플러스 유치', key: 'vcoloring_music_plus', column: 30 }, // AE열
+    description: 'V컬러링 음악감상 플러스 유치 (단어 포함 여부 비교)'
   },
   {
     manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 127 }, // DX열 (기존 DO열에서 +9)
@@ -9148,40 +9158,50 @@ function normalizeSupportContract(manualRow, systemRow) {
 
 // 프리할부상이 정규화 함수
 function normalizePreInstallment(manualRow, systemRow) {
-  // 수기초 데이터 정규화 (AV열+BL열)
+  // 수기초 데이터 정규화 (BE열)
   let manualPreInstallment = '';
-  if (manualRow.length > 63) { // 최소 BL열(63)은 있어야 함
-            const avValue = (manualRow[56] || '').toString().trim(); // AV열: 프리할부상이 (47+9)
-        const blValue = (manualRow[72] || '').toString().trim(); // BL열 (63+9)
-        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
+  if (manualRow.length > 56) { // 최소 BE열(56)은 있어야 함
+    const beValue = (manualRow[56] || '').toString().trim(); // BE열: 프리할부상이
+    const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
       return { manualPreInstallment: '', systemPreInstallment: '' }; // 검수 대상에서 제외
     }
     
-    // 숫자 더하기 연산으로 정규화: AV + BL
-    const values = [avValue, blValue].filter(v => v);
-    const sum = addNumbers(values);
-    manualPreInstallment = normalizeNumberFormat(sum);
+    // BE열에서 직접 가져오기
+    manualPreInstallment = normalizeNumberFormat(beValue);
   }
   
-  // 폰클 데이터 정규화 (AB열-AS열-AC열-AE열)
+  // 폰클 데이터 정규화 (AN열)
   let systemPreInstallment = '';
-  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
-    const abValue = (systemRow[35] || '').toString().trim(); // AB열 (27+8)
-    const asValue = (systemRow[52] || '').toString().trim(); // AS열 (44+8)
-    const acValue = (systemRow[36] || '').toString().trim(); // AC열 (28+8)
-    const aeValue = (systemRow[38] || '').toString().trim(); // AE열 (30+8)
+  if (systemRow.length > 39) { // 최소 AN열(39)은 있어야 함
+    const anValue = (systemRow[39] || '').toString().trim(); // AN열: 프리할부상이
     
-    // 숫자 빼기 연산으로 정규화: AB - AS - AC - AE
-    let result = subtractNumbers(abValue, asValue);
-    result = subtractNumbers(result, acValue);
-    result = subtractNumbers(result, aeValue);
-    systemPreInstallment = normalizeNumberFormat(result);
+    // AN열에서 직접 가져오기
+    systemPreInstallment = normalizeNumberFormat(anValue);
   }
   
   return { manualPreInstallment, systemPreInstallment };
+}
+
+// 유통망지원금 상이 정규화 함수
+function normalizeDistributionSupport(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (BX열)
+  let manualDistribution = '';
+  if (manualRow.length > 75) { // 최소 BX열(75)은 있어야 함
+    const bxValue = (manualRow[75] || '').toString().trim(); // BX열: 유통망지원금액
+    manualDistribution = normalizeNumberFormat(bxValue);
+  }
+  
+  // 폰클 데이터 정규화 (AL열)
+  let systemDistribution = '';
+  if (systemRow.length > 37) { // 최소 AL열(37)은 있어야 함
+    const alValue = (systemRow[37] || '').toString().trim(); // AL열: 유통망지원금
+    systemDistribution = normalizeNumberFormat(alValue);
+  }
+  
+  return { manualDistribution, systemDistribution };
 }
 
 // 유플레이 유치검수 정규화 함수
@@ -9209,6 +9229,37 @@ function normalizeUplayCheck(manualRow, systemRow) {
       systemValue = '유플레이 포함';
     } else {
       systemValue = '유플레이 미포함';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// V컬러링 음악감상 플러스 유치 정규화 함수
+function normalizeVcoloringMusicPlus(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DP열)
+  let manualValue = 'V컬러링 음악감상 플러스 미유치'; // 기본값 설정
+  if (manualRow.length > 125) { // 최소 DP열(125)은 있어야 함
+    const musicValue = (manualRow[125] || '').toString().trim(); // DP열: 뮤직류
+    
+    // "V컬러링 음악감상 플러스" 단어 포함 여부로 정규화
+    if (musicValue && musicValue.includes('V컬러링 음악감상 플러스')) {
+      manualValue = 'V컬러링 음악감상 플러스 유치';
+    } else {
+      manualValue = 'V컬러링 음악감상 플러스 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = 'V컬러링 음악감상 플러스 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "V컬러링 음악감상 플러스" 단어 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('V컬러링 음악감상 플러스')) {
+      systemValue = 'V컬러링 음악감상 플러스 유치';
+    } else {
+      systemValue = 'V컬러링 음악감상 플러스 미유치';
     }
   }
   
@@ -9527,8 +9578,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
     
     // 프리할부상이 비교 로직
     if (manualField.key === 'pre_installment') {
-      // 배열 범위 체크 (AV=47, AN=39, AB=27, AS=44)
-      if (manualRow.length <= 47 || systemRow.length <= 44) {
+      // 배열 범위 체크 (BE=56, AN=39)
+      if (manualRow.length <= 56 || systemRow.length <= 39) {
         return;
       }
       
@@ -9551,7 +9602,37 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'pre_installment',
           correctValue: manualPreInstallment || '정규화 불가',
           incorrectValue: systemPreInstallment || '정규화 불가',
-          description: '프리할부상이 비교 (빼기 방식 정규화, AN열 BLANK 제외)',
+          description: '프리할부상이 비교 (직접 비교, AN열 BLANK 제외)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 유통망지원금 상이 비교 로직
+    if (manualField.key === 'distribution_support') {
+      // 배열 범위 체크 (BX=75, AL=37)
+      if (manualRow.length <= 75 || systemRow.length <= 37) {
+        return;
+      }
+      
+      // 유통망지원금 상이 정규화
+      const { manualDistribution, systemDistribution } = normalizeDistributionSupport(manualRow, systemRow);
+      
+      // 값이 다르고 둘 다 비어있지 않은 경우만 차이점으로 기록
+      if (manualDistribution !== systemDistribution && 
+          (manualDistribution || systemDistribution)) {
+
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '유통망지원금 상이',
+          fieldKey: 'distribution_support',
+          correctValue: manualDistribution || '정규화 불가',
+          incorrectValue: systemDistribution || '정규화 불가',
+          description: '유통망지원금 상이 비교 (숫자 서식 정규화)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
@@ -9589,6 +9670,29 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
         });
       } else {
         console.log(`[유플레이 유치검수] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
+      }
+      return;
+    }
+    
+    // V컬러링 음악감상 플러스 유치 비교 로직
+    if (manualField.key === 'vcoloring_music_plus') {
+      // V컬러링 음악감상 플러스 유치 정규화
+      const { manualValue, systemValue } = normalizeVcoloringMusicPlus(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: 'V컬러링 음악감상 플러스 유치',
+          fieldKey: 'vcoloring_music_plus',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: 'V컬러링 음악감상 플러스 유치 (단어 포함 여부 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
       }
       return;
     }
