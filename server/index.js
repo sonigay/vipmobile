@@ -8791,9 +8791,54 @@ const COLUMN_MATCHING_CONFIG = [
     description: '유플레이 유치검수 (단어 포함 여부 비교)'
   },
   {
-    manualField: { name: 'V컬러링 음악감상 플러스 유치', key: 'vcoloring_music_plus', column: 125 }, // DP열
+    manualField: { name: 'V컬러링 음악감상 플러스 유치', key: 'vcoloring_music_plus', column: 119 }, // DP열
     systemField: { name: 'V컬러링 음악감상 플러스 유치', key: 'vcoloring_music_plus', column: 30 }, // AE열
     description: 'V컬러링 음악감상 플러스 유치 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: '폰교체 패스 유치', key: 'phone_exchange_pass', column: 124 }, // DU열
+    systemField: { name: '폰교체 패스 유치', key: 'phone_exchange_pass', column: 30 }, // AE열
+    description: '폰교체 패스 유치 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: '폰교체 슬림 유치', key: 'phone_exchange_slim', column: 124 }, // DU열
+    systemField: { name: '폰교체 슬림 유치', key: 'phone_exchange_slim', column: 30 }, // AE열
+    description: '폰교체 슬림 유치 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: '폰 안심패스 유치', key: 'phone_safe_pass', column: 124 }, // DU열
+    systemField: { name: '폰 안심패스 유치', key: 'phone_safe_pass', column: 30 }, // AE열
+    description: '폰 안심패스 유치 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: '보험 미유치', key: 'insurance_no', column: 124 }, // DU열
+    systemField: { name: '보험 미유치', key: 'insurance_no', column: 31 }, // AF열
+    description: '보험 미유치 (반대 로직: 수기초 미포함, 폰클 포함시 불일치)'
+  },
+  {
+    manualField: { name: '통화연결음 유치', key: 'call_ringtone', column: 131 }, // EB열
+    systemField: { name: '통화연결음 유치', key: 'call_ringtone', column: 30 }, // AE열
+    description: '통화연결음 유치 (단어 포함 여부 비교)'
+  },
+  {
+    manualField: { name: '통화연결음 미유치', key: 'call_ringtone_no', column: 119 }, // DP열 또는 EB열
+    systemField: { name: '통화연결음 미유치', key: 'call_ringtone_no', column: 31 }, // AF열
+    description: '통화연결음 미유치 (반대 로직: 수기초 미포함, 폰클 포함시 불일치)'
+  },
+  {
+    manualField: { name: '청소년요금제추가정책(1)유치', key: 'youth_plan_policy_1', column: 19 }, // T열, AX열, CV열
+    systemField: { name: '청소년요금제추가정책(1)유치', key: 'youth_plan_policy_1', column: 30 }, // AE열
+    description: '청소년요금제추가정책(1)유치 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: '청소년요금제추가정책(2)유치', key: 'youth_plan_policy_2', column: 19 }, // T열, AM열, CV열
+    systemField: { name: '청소년요금제추가정책(2)유치', key: 'youth_plan_policy_2', column: 30 }, // AE열
+    description: '청소년요금제추가정책(2)유치 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: '유통망지원금 활성화정책', key: 'distribution_support_activation', column: 19 }, // T열, AX열, AM열, BX열
+    systemField: { name: '유통망지원금 활성화정책', key: 'distribution_support_activation', column: 30 }, // AE열
+    description: '유통망지원금 활성화정책 (복합 조건 비교)'
   },
   {
     manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 127 }, // DX열 (기존 DO열에서 +9)
@@ -9239,8 +9284,8 @@ function normalizeUplayCheck(manualRow, systemRow) {
 function normalizeVcoloringMusicPlus(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DP열)
   let manualValue = 'V컬러링 음악감상 플러스 미유치'; // 기본값 설정
-  if (manualRow.length > 125) { // 최소 DP열(125)은 있어야 함
-    const musicValue = (manualRow[125] || '').toString().trim(); // DP열: 뮤직류
+  if (manualRow.length > 119) { // 최소 DP열(119)은 있어야 함
+    const musicValue = (manualRow[119] || '').toString().trim(); // DP열: 뮤직류
     
     // "V컬러링 음악감상 플러스" 단어 포함 여부로 정규화
     if (musicValue && musicValue.includes('V컬러링 음악감상 플러스')) {
@@ -9260,6 +9305,349 @@ function normalizeVcoloringMusicPlus(manualRow, systemRow) {
       systemValue = 'V컬러링 음악감상 플러스 유치';
     } else {
       systemValue = 'V컬러링 음악감상 플러스 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 폰교체 패스 유치 정규화 함수
+function normalizePhoneExchangePass(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DU열)
+  let manualValue = '폰교체 패스 미유치'; // 기본값 설정
+  if (manualRow.length > 124) { // 최소 DU열(124)은 있어야 함
+    const insuranceValue = (manualRow[124] || '').toString().trim(); // DU열: 보험(폰교체)
+    
+    // "폰교체 패스" 단어 포함 여부로 정규화
+    if (insuranceValue && insuranceValue.includes('폰교체 패스')) {
+      manualValue = '폰교체 패스 유치';
+    } else {
+      manualValue = '폰교체 패스 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '폰교체 패스 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "폰교체패스" 단어 포함 여부로 정규화 (공백 없음)
+    if (serviceValue && serviceValue.includes('폰교체패스')) {
+      systemValue = '폰교체 패스 유치';
+    } else {
+      systemValue = '폰교체 패스 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 폰교체 슬림 유치 정규화 함수
+function normalizePhoneExchangeSlim(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DU열)
+  let manualValue = '폰교체 슬림 미유치'; // 기본값 설정
+  if (manualRow.length > 124) { // 최소 DU열(124)은 있어야 함
+    const insuranceValue = (manualRow[124] || '').toString().trim(); // DU열: 보험(폰교체)
+    
+    // "폰교체 슬림" 단어 포함 여부로 정규화
+    if (insuranceValue && insuranceValue.includes('폰교체 슬림')) {
+      manualValue = '폰교체 슬림 유치';
+    } else {
+      manualValue = '폰교체 슬림 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '폰교체 슬림 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "폰교체슬림" 단어 포함 여부로 정규화 (공백 없음)
+    if (serviceValue && serviceValue.includes('폰교체슬림')) {
+      systemValue = '폰교체 슬림 유치';
+    } else {
+      systemValue = '폰교체 슬림 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 폰 안심패스 유치 정규화 함수
+function normalizePhoneSafePass(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DU열)
+  let manualValue = '폰 안심패스 미유치'; // 기본값 설정
+  if (manualRow.length > 124) { // 최소 DU열(124)은 있어야 함
+    const insuranceValue = (manualRow[124] || '').toString().trim(); // DU열: 보험(폰교체)
+    
+    // "폰 안심패스" 단어 포함 여부로 정규화
+    if (insuranceValue && insuranceValue.includes('폰 안심패스')) {
+      manualValue = '폰 안심패스 유치';
+    } else {
+      manualValue = '폰 안심패스 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '폰 안심패스 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "폰 안심패스" 단어 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('폰 안심패스')) {
+      systemValue = '폰 안심패스 유치';
+    } else {
+      systemValue = '폰 안심패스 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 보험 미유치 정규화 함수
+function normalizeInsuranceNo(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DU열)
+  let manualValue = '보험 미유치'; // 기본값 설정
+  if (manualRow.length > 124) { // 최소 DU열(124)은 있어야 함
+    const insuranceValue = (manualRow[124] || '').toString().trim(); // DU열: 보험(폰교체)
+    
+    // "폰 안심패스" 또는 "폰교체 패스" 또는 "폰교체 슬림" 포함 여부로 정규화
+    if (insuranceValue && (
+      insuranceValue.includes('폰 안심패스') || 
+      insuranceValue.includes('폰교체 패스') || 
+      insuranceValue.includes('폰교체 슬림')
+    )) {
+      manualValue = '보험 유치';
+    } else {
+      manualValue = '보험 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '보험 미유치'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "보험" 단어 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('보험')) {
+      systemValue = '보험 유치';
+    } else {
+      systemValue = '보험 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 통화연결음 유치 정규화 함수
+function normalizeCallRingtone(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (EB열)
+  let manualValue = '통화연결음 미유치'; // 기본값 설정
+  if (manualRow.length > 131) { // 최소 EB열(131)은 있어야 함
+    const ringtoneValue = (manualRow[131] || '').toString().trim(); // EB열: 통화연결음
+    
+    // "V컬러링 기본" 또는 "지정번호 필터링" 포함 여부로 정규화
+    if (ringtoneValue && (
+      ringtoneValue.includes('V컬러링 기본') || 
+      ringtoneValue.includes('지정번호 필터링')
+    )) {
+      manualValue = '통화연결음 유치';
+    } else {
+      manualValue = '통화연결음 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '통화연결음 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "V컬러링 기본" 또는 "지정번호필터링" 포함 여부로 정규화 (공백 없음)
+    if (serviceValue && (
+      serviceValue.includes('V컬러링 기본') || 
+      serviceValue.includes('지정번호필터링')
+    )) {
+      systemValue = '통화연결음 유치';
+    } else {
+      systemValue = '통화연결음 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 통화연결음 미유치 정규화 함수
+function normalizeCallRingtoneNo(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (DP열 또는 EB열)
+  let manualValue = '통화연결음 미유치'; // 기본값 설정
+  if (manualRow.length > 119) { // 최소 DP열(119)은 있어야 함
+    const musicValue = (manualRow[119] || '').toString().trim(); // DP열: 뮤직류
+    const ringtoneValue = (manualRow.length > 131 ? (manualRow[131] || '').toString().trim() : ''); // EB열: 통화연결음
+    
+    // "V컬러링 기본" 또는 "지정번호 필터링" 또는 "V컬러링 음악감상 플러스" 포함 여부로 정규화
+    const combinedValue = musicValue + ' ' + ringtoneValue;
+    if (combinedValue && (
+      combinedValue.includes('V컬러링 기본') || 
+      combinedValue.includes('지정번호 필터링') ||
+      combinedValue.includes('V컬러링 음악감상 플러스')
+    )) {
+      manualValue = '통화연결음 유치';
+    } else {
+      manualValue = '통화연결음 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '통화연결음 미유치'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "V컬러링 기본" 또는 "지정번호필터링" 또는 "V컬러링 음악감상 플러스" 포함 여부로 정규화
+    if (serviceValue && (
+      serviceValue.includes('V컬러링 기본') || 
+      serviceValue.includes('지정번호필터링') ||
+      serviceValue.includes('V컬러링 음악감상 플러스')
+    )) {
+      systemValue = '통화연결음 유치';
+    } else {
+      systemValue = '통화연결음 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 청소년요금제추가정책(1)유치 정규화 함수
+function normalizeYouthPlanPolicy1(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, CV열)
+  let manualValue = '청소년요금제추가정책(1) 미유치'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // 복합 조건: 가입구분이 "신규" 포함, 이전사업자가 "일반개통" 포함, 요금제유형명이 "청소년" 또는 "키즈" 포함
+    if (joinType && joinType.includes('신규') && 
+        prevCarrier && prevCarrier.includes('일반개통') && 
+        planType && (planType.includes('청소년') || planType.includes('키즈'))) {
+      manualValue = '청소년요금제추가정책(1) 유치';
+    } else {
+      manualValue = '청소년요금제추가정책(1) 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '청소년요금제추가정책(1) 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "청소년추가①" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('청소년추가①')) {
+      systemValue = '청소년요금제추가정책(1) 유치';
+    } else {
+      systemValue = '청소년요금제추가정책(1) 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 청소년요금제추가정책(2)유치 정규화 함수
+function normalizeYouthPlanPolicy2(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AM열, CV열)
+  let manualValue = '청소년요금제추가정책(2) 미유치'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // 허용된 모델 목록
+    const allowedModels = [
+      'UIP16-128', 'UIP16-256', 'UIP16-512',
+      'UIP16PL-128', 'UIP16PL-256', 'UIP16PL-512',
+      'UIP16PR-128', 'UIP16PR-256', 'UIP16PR-512', 'UIP16PR-1T',
+      'UIP16PM-256', 'UIP16PM-512', 'UIP16PM-1T'
+    ];
+    
+    // 복합 조건: 가입구분이 "재가입" 또는 "정책기변" 포함, 개통모델이 허용된 모델 중 하나, 요금제유형명이 "청소년 Ⅱ군" 또는 "청소년 Ⅲ군" 포함
+    const isJoinTypeValid = joinType && (joinType.includes('재가입') || joinType.includes('정책기변'));
+    const isModelValid = model && allowedModels.some(allowedModel => model.includes(allowedModel));
+    const isPlanTypeValid = planType && (planType.includes('청소년 Ⅱ군') || planType.includes('청소년 Ⅲ군'));
+    
+    if (isJoinTypeValid && isModelValid && isPlanTypeValid) {
+      manualValue = '청소년요금제추가정책(2) 유치';
+    } else {
+      manualValue = '청소년요금제추가정책(2) 미유치';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '청소년요금제추가정책(2) 미유치'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "청소년추가②" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('청소년추가②')) {
+      systemValue = '청소년요금제추가정책(2) 유치';
+    } else {
+      systemValue = '청소년요금제추가정책(2) 미유치';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 유통망지원금 활성화정책 정규화 함수
+function normalizeDistributionSupportActivation(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, AM열, BX열)
+  let manualValue = '유통망지원금 활성화정책 비대상'; // 기본값 설정
+  if (manualRow.length > 75) { // 최소 BX열(75)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const supportAmount = (manualRow[75] || '').toString().trim(); // BX열: 유통망지원금
+    
+    // 허용된 모델 목록
+    const allowedModels = [
+      'SM-F761N256', 'SM-F766N256', 'SM-F766N512',
+      'SM-F966N256', 'SM-F966N512', 'SM-F966N1TB',
+      'SM-S937N256', 'SM-S937N512', 'SM-S931N256', 'SM-S931N512',
+      'SM-S936N256', 'SM-S936N512', 'SM-S938N256', 'SM-S938N512', 'SM-S938N1TB',
+      'UIP16-128', 'UIP16-256', 'UIP16-512',
+      'UIP16PL-128', 'UIP16PL-256', 'UIP16PL-512',
+      'UIP16PR-128', 'UIP16PR-256', 'UIP16PR-512', 'UIP16PR-1T',
+      'UIP16PM-256', 'UIP16PM-512', 'UIP16PM-1T'
+    ];
+    
+    // 복합 조건: 가입구분이 "신규" 포함, 이전사업자가 "일반개통" 제외 모두 포함, 개통모델이 허용된 모델 중 하나, 유통망지원금이 200000 이상
+    const isJoinTypeValid = joinType && joinType.includes('신규');
+    const isPrevCarrierValid = prevCarrier && !prevCarrier.includes('일반개통'); // "일반개통" 제외 모두 포함
+    const isModelValid = model && allowedModels.some(allowedModel => model.includes(allowedModel));
+    
+    // 유통망지원금 숫자 변환 및 비교
+    let isSupportAmountValid = false;
+    const numericSupportAmount = parseFloat(supportAmount.replace(/[^\d.-]/g, ''));
+    if (!isNaN(numericSupportAmount)) {
+      isSupportAmountValid = numericSupportAmount >= 200000;
+    }
+    
+    if (isJoinTypeValid && isPrevCarrierValid && isModelValid && isSupportAmountValid) {
+      manualValue = '유통망지원금 활성화정책 대상';
+    } else {
+      manualValue = '유통망지원금 활성화정책 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '유통망지원금 활성화정책 비대상'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const serviceValue = (systemRow[30] || '').toString().trim(); // AE열: 부가서비스
+    
+    // "유통망지원금 활성화정책" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('유통망지원금 활성화정책')) {
+      systemValue = '유통망지원금 활성화정책 대상';
+    } else {
+      systemValue = '유통망지원금 활성화정책 비대상';
     }
   }
   
@@ -9697,6 +10085,213 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       return;
     }
     
+    // 폰교체 패스 유치 비교 로직
+    if (manualField.key === 'phone_exchange_pass') {
+      // 폰교체 패스 유치 정규화
+      const { manualValue, systemValue } = normalizePhoneExchangePass(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '폰교체 패스 유치',
+          fieldKey: 'phone_exchange_pass',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '폰교체 패스 유치 (단어 포함 여부 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 폰교체 슬림 유치 비교 로직
+    if (manualField.key === 'phone_exchange_slim') {
+      // 폰교체 슬림 유치 정규화
+      const { manualValue, systemValue } = normalizePhoneExchangeSlim(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '폰교체 슬림 유치',
+          fieldKey: 'phone_exchange_slim',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '폰교체 슬림 유치 (단어 포함 여부 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 폰 안심패스 유치 비교 로직
+    if (manualField.key === 'phone_safe_pass') {
+      // 폰 안심패스 유치 정규화
+      const { manualValue, systemValue } = normalizePhoneSafePass(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '폰 안심패스 유치',
+          fieldKey: 'phone_safe_pass',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '폰 안심패스 유치 (단어 포함 여부 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 보험 미유치 비교 로직
+    if (manualField.key === 'insurance_no') {
+      // 보험 미유치 정규화
+      const { manualValue, systemValue } = normalizeInsuranceNo(manualRow, systemRow);
+      
+      // 보험 미유치는 반대 로직: 값이 같으면 불일치, 다르면 일치
+      if (manualValue.trim() === systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '보험 미유치',
+          fieldKey: 'insurance_no',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '보험 미유치 (반대 로직: 둘 다 같으면 불일치)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 통화연결음 유치 비교 로직
+    if (manualField.key === 'call_ringtone') {
+      // 통화연결음 유치 정규화
+      const { manualValue, systemValue } = normalizeCallRingtone(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '통화연결음 유치',
+          fieldKey: 'call_ringtone',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '통화연결음 유치 (단어 포함 여부 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 통화연결음 미유치 비교 로직
+    if (manualField.key === 'call_ringtone_no') {
+      // 통화연결음 미유치 정규화
+      const { manualValue, systemValue } = normalizeCallRingtoneNo(manualRow, systemRow);
+      
+      // 통화연결음 미유치는 반대 로직: 값이 같으면 불일치, 다르면 일치
+      if (manualValue.trim() === systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '통화연결음 미유치',
+          fieldKey: 'call_ringtone_no',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '통화연결음 미유치 (반대 로직: 둘 다 같으면 불일치)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+    
+    // 청소년요금제추가정책(1)유치 비교 로직
+    if (manualField.key === 'youth_plan_policy_1') {
+      // 청소년요금제추가정책(1)유치 정규화
+      const { manualValue, systemValue } = normalizeYouthPlanPolicy1(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '청소년요금제추가정책(1)유치',
+          fieldKey: 'youth_plan_policy_1',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '청소년요금제추가정책(1)유치 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 청소년요금제추가정책(2)유치 비교 로직
+    if (manualField.key === 'youth_plan_policy_2') {
+      // 청소년요금제추가정책(2)유치 정규화
+      const { manualValue, systemValue } = normalizeYouthPlanPolicy2(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '청소년요금제추가정책(2)유치',
+          fieldKey: 'youth_plan_policy_2',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '청소년요금제추가정책(2)유치 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 유통망지원금 활성화정책 비교 로직
+    if (manualField.key === 'distribution_support_activation') {
+      // 유통망지원금 활성화정책 정규화
+      const { manualValue, systemValue } = normalizeDistributionSupportActivation(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '유통망지원금 활성화정책',
+          fieldKey: 'distribution_support_activation',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '유통망지원금 활성화정책 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
     // 유플레이 미유치 검수 비교 로직
     if (manualField.key === 'uplay_no_check') {
       // 유플레이 미유치 검수 정규화
