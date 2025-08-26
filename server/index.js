@@ -9243,7 +9243,12 @@ function normalizeDistributionSupport(manualRow, systemRow) {
   let systemDistribution = '';
   if (systemRow.length > 37) { // 최소 AL열(37)은 있어야 함
     const alValue = (systemRow[37] || '').toString().trim(); // AL열: 유통망지원금
-    systemDistribution = normalizeNumberFormat(alValue);
+    // 공백이면 0으로 표기
+    if (!alValue || alValue === '') {
+      systemDistribution = '0';
+    } else {
+      systemDistribution = normalizeNumberFormat(alValue);
+    }
   }
   
   return { manualDistribution, systemDistribution };
