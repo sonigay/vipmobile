@@ -8841,6 +8841,56 @@ const COLUMN_MATCHING_CONFIG = [
     description: '유통망지원금 활성화정책 (복합 조건 비교)'
   },
   {
+    manualField: { name: '115군 선택약정 차감', key: '115_group_contract_deduction', column: 19 }, // T열, AX열, BQ열, CU열, CV열
+    systemField: { name: '115군 선택약정 차감', key: '115_group_contract_deduction', column: 31 }, // AF열
+    description: '115군 선택약정 차감 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: '선택약정 S721(010신규) 차감', key: 's721_contract_deduction', column: 19 }, // T열, AX열, AM열, BQ열, CV열
+    systemField: { name: '선택약정 S721(010신규) 차감', key: 's721_contract_deduction', column: 31 }, // AF열
+    description: '선택약정 S721(010신규) 차감 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: '선택약정 S931,S938,S937(MNP) 차감', key: 's931_s938_s937_contract_deduction', column: 19 }, // T열, AX열, AM열, BQ열, CV열
+    systemField: { name: '선택약정 S931,S938,S937(MNP) 차감', key: 's931_s938_s937_contract_deduction', column: 31 }, // AF열
+    description: '선택약정 S931,S938,S937(MNP) 차감 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: '선택약정 아이폰16류전체(MNP) 차감', key: 'iphone16_contract_deduction', column: 19 }, // T열, AX열, AM열, BQ열, CV열
+    systemField: { name: '선택약정 아이폰16류전체(MNP) 차감', key: 'iphone16_contract_deduction', column: 31 }, // AF열
+    description: '선택약정 아이폰16류전체(MNP) 차감 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: 'A166 44군 대상외요금제(MNP) 차감', key: 'a166_44group_excluded_plan_deduction', column: 19 }, // T열, AX열, AM열, BQ열, CV열, AT열
+    systemField: { name: 'A166 44군 대상외요금제(MNP) 차감', key: 'a166_44group_excluded_plan_deduction', column: 31 }, // AF열
+    description: 'A166 44군 대상외요금제(MNP) 차감 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: 'A166 44군 대상외요금제(기변) 차감', key: 'a166_44group_excluded_plan_change_deduction', column: 19 }, // T열, AM열, BQ열, CV열, AT열
+    systemField: { name: 'A166 44군 대상외요금제(기변) 차감', key: 'a166_44group_excluded_plan_change_deduction', column: 31 }, // AF열
+    description: 'A166 44군 대상외요금제(기변) 차감 (복합 조건 비교)'
+  },
+  {
+    manualField: { name: '정책기변 차감', key: 'policy_change_deduction', column: 19 }, // T열
+    systemField: { name: '정책기변 차감', key: 'policy_change_deduction', column: 31 }, // AF열
+    description: '정책기변 차감 (단순 조건 비교)'
+  },
+  {
+    manualField: { name: '기변 C타겟 차감', key: 'change_c_target_deduction', column: 89 }, // CL열
+    systemField: { name: '기변 C타겟 차감', key: 'change_c_target_deduction', column: 31 }, // AF열
+    description: '기변 C타겟 차감 (단순 조건 비교)'
+  },
+  {
+    manualField: { name: '33군미만, 시니어1군시 차감', key: '33group_senior1_deduction', column: 99 }, // CV열
+    systemField: { name: '33군미만, 시니어1군시 차감', key: '33group_senior1_deduction', column: 31 }, // AF열
+    description: '33군미만, 시니어1군시 차감 (단순 조건 비교)'
+  },
+  {
+    manualField: { name: '온세일 전략온라인POS 차감', key: 'onsale_strategy_online_pos_deduction', column: 82 }, // CE열
+    systemField: { name: '온세일 전략온라인POS 차감', key: 'onsale_strategy_online_pos_deduction', column: 31 }, // AF열
+    description: '온세일 전략온라인POS 차감 (복합 조건 비교)'
+  },
+  {
     manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 127 }, // DX열 (기존 DO열에서 +9)
     systemField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 31 }, // AF열 (기존 X열에서 +8)
     description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)'
@@ -9659,6 +9709,442 @@ function normalizeDistributionSupportActivation(manualRow, systemRow) {
   return { manualValue, systemValue };
 }
 
+// 115군 선택약정 차감 정규화 함수
+function normalize115GroupContractDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, BQ열, CU열, CV열)
+  let manualValue = '115군 선택약정 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const contractDetail = (manualRow[68] || '').toString().trim(); // BQ열: 약정상세구분
+    const modelType = (manualRow[98] || '').toString().trim(); // CU열: 모델유형
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // 복합 조건: 가입구분이 "신규"이면서 이전사업자가 "일반개통"이면 제외, 약정상세구분이 "선택약정" 포함, 모델유형이 "5G모델" 포함, 요금제유형명이 "115군" 포함
+    const isJoinTypeValid = joinType && joinType.includes('신규');
+    const isPrevCarrierExcluded = prevCarrier && prevCarrier.includes('일반개통'); // 제외 조건
+    const isContractDetailValid = contractDetail && contractDetail.includes('선택약정');
+    const isModelTypeValid = modelType && modelType.includes('5G모델');
+    const isPlanTypeValid = planType && planType.includes('115군');
+    
+    // 신규이면서 일반개통이면 제외, 그 외의 경우 조건 만족 시 대상
+    if (isJoinTypeValid && isPrevCarrierExcluded) {
+      manualValue = '115군 선택약정 차감 비대상'; // 신규 + 일반개통 조합은 제외
+    } else if (isContractDetailValid && isModelTypeValid && isPlanTypeValid) {
+      manualValue = '115군 선택약정 차감 대상';
+    } else {
+      manualValue = '115군 선택약정 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '115군 선택약정 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "5G전모델 115군이상 선택약정" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('5G전모델 115군이상 선택약정')) {
+      systemValue = '115군 선택약정 차감 대상';
+    } else {
+      systemValue = '115군 선택약정 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 선택약정 S721(010신규) 차감 정규화 함수
+function normalizeS721ContractDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, AM열, BQ열, CV열)
+  let manualValue = '선택약정 S721(010신규) 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const contractDetail = (manualRow[68] || '').toString().trim(); // BQ열: 약정상세구분
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // 허용된 요금제 유형 목록
+    const allowedPlanTypes = [
+      '청소년 Ⅰ군', '청소년 Ⅱ군', '청소년 Ⅲ군',
+      '시니어 Ⅰ군', '시니어 Ⅱ군', '키즈군', '33군 미만'
+    ];
+    
+    // 복합 조건: 가입구분이 "신규" 포함, 이전사업자가 "일반개통" 포함, 개통모델이 "SM-S721N" 포함, 약정상세구분이 "선택약정" 포함, 요금제유형명이 허용된 유형 중 하나
+    const isJoinTypeValid = joinType && joinType.includes('신규');
+    const isPrevCarrierValid = prevCarrier && prevCarrier.includes('일반개통');
+    const isModelValid = model && model.includes('SM-S721N');
+    const isContractDetailValid = contractDetail && contractDetail.includes('선택약정');
+    const isPlanTypeValid = planType && allowedPlanTypes.some(allowedType => planType.includes(allowedType));
+    
+    if (isJoinTypeValid && isPrevCarrierValid && isModelValid && isContractDetailValid && isPlanTypeValid) {
+      manualValue = '선택약정 S721(010신규) 차감 대상';
+    } else {
+      manualValue = '선택약정 S721(010신규) 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '선택약정 S721(010신규) 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "S721 키즈군/청소년/시니어/33미만 유치시 그리고 010신규선택약정 개통시 차감" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('S721 키즈군/청소년/시니어/33미만 유치시 그리고 010신규선택약정 개통시 차감')) {
+      systemValue = '선택약정 S721(010신규) 차감 대상';
+    } else {
+      systemValue = '선택약정 S721(010신규) 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 선택약정 S931,S938,S937(MNP) 차감 정규화 함수
+function normalizeS931S938S937ContractDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, AM열, BQ열, CV열)
+  let manualValue = '선택약정 S931,S938,S937(MNP) 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const contractDetail = (manualRow[68] || '').toString().trim(); // BQ열: 약정상세구분
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // 허용된 모델 목록
+    const allowedModels = [
+      'SM-S937N256', 'SM-S937N512',
+      'SM-S931N256', 'SM-S931N512',
+      'SM-S938N256', 'SM-S938N512', 'SM-S938N1TB'
+    ];
+    
+    // 허용된 요금제 유형 목록
+    const allowedPlanTypes = [
+      '청소년 Ⅲ군', '75군', '85군', '95군', '105군', '115군'
+    ];
+    
+    // 복합 조건: 가입구분이 "신규"이면서 이전사업자가 "일반개통" 아닌 경우, 개통모델이 허용된 모델 중 하나, 약정상세구분이 "선택약정" 포함, 요금제유형명이 허용된 유형 중 하나
+    const isJoinTypeValid = joinType && joinType.includes('신규');
+    const isPrevCarrierValid = prevCarrier && !prevCarrier.includes('일반개통'); // "일반개통" 아닌 경우
+    const isModelValid = model && allowedModels.some(allowedModel => model.includes(allowedModel));
+    const isContractDetailValid = contractDetail && contractDetail.includes('선택약정');
+    const isPlanTypeValid = planType && allowedPlanTypes.some(allowedType => planType.includes(allowedType));
+    
+    if (isJoinTypeValid && isPrevCarrierValid && isModelValid && isContractDetailValid && isPlanTypeValid) {
+      manualValue = '선택약정 S931,S938,S937(MNP) 차감 대상';
+    } else {
+      manualValue = '선택약정 S931,S938,S937(MNP) 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '선택약정 S931,S938,S937(MNP) 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "S931, S938, S937 75군/청소년 3군이상/ 선택약정 MNP 개통시 차감" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('S931, S938, S937 75군/청소년 3군이상/ 선택약정 MNP 개통시 차감')) {
+      systemValue = '선택약정 S931,S938,S937(MNP) 차감 대상';
+    } else {
+      systemValue = '선택약정 S931,S938,S937(MNP) 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 선택약정 아이폰16류전체(MNP) 차감 정규화 함수
+function normalizeIphone16ContractDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, AM열, BQ열, CV열)
+  let manualValue = '선택약정 아이폰16류전체(MNP) 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const contractDetail = (manualRow[68] || '').toString().trim(); // BQ열: 약정상세구분
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // 허용된 모델 목록
+    const allowedModels = [
+      'UIP16-128', 'UIP16-256', 'UIP16-512',
+      'UIP16PL-128', 'UIP16PL-256', 'UIP16PL-512',
+      'UIP16PR-128', 'UIP16PR-256', 'UIP16PR-512', 'UIP16PR-1T',
+      'UIP16PM-256', 'UIP16PM-512', 'UIP16PM-1T'
+    ];
+    
+    // 허용된 요금제 유형 목록
+    const allowedPlanTypes = [
+      '청소년 Ⅲ군', '75군', '85군', '95군', '105군', '115군'
+    ];
+    
+    // 복합 조건: 가입구분이 "신규"이면서 이전사업자가 "일반개통" 아닌 경우, 개통모델이 허용된 모델 중 하나, 약정상세구분이 "선택약정" 포함, 요금제유형명이 허용된 유형 중 하나
+    const isJoinTypeValid = joinType && joinType.includes('신규');
+    const isPrevCarrierValid = prevCarrier && !prevCarrier.includes('일반개통'); // "일반개통" 아닌 경우
+    const isModelValid = model && allowedModels.some(allowedModel => model.includes(allowedModel));
+    const isContractDetailValid = contractDetail && contractDetail.includes('선택약정');
+    const isPlanTypeValid = planType && allowedPlanTypes.some(allowedType => planType.includes(allowedType));
+    
+    if (isJoinTypeValid && isPrevCarrierValid && isModelValid && isContractDetailValid && isPlanTypeValid) {
+      manualValue = '선택약정 아이폰16류전체(MNP) 차감 대상';
+    } else {
+      manualValue = '선택약정 아이폰16류전체(MNP) 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '선택약정 아이폰16류전체(MNP) 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "UIP16류전체(UIP16E제외) 75군/청소년 3군이상/ 선택약정 MNP 개통시 차감" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('UIP16류전체(UIP16E제외) 75군/청소년 3군이상/ 선택약정 MNP 개통시 차감')) {
+      systemValue = '선택약정 아이폰16류전체(MNP) 차감 대상';
+    } else {
+      systemValue = '선택약정 아이폰16류전체(MNP) 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// A166 44군 대상외요금제(MNP) 차감 정규화 함수
+function normalizeA16644GroupExcludedPlanDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AX열, AM열, BQ열, CV열, AT열)
+  let manualValue = 'A166 44군 대상외요금제(MNP) 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const prevCarrier = (manualRow[49] || '').toString().trim(); // AX열: 이전사업자
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const contractDetail = (manualRow[68] || '').toString().trim(); // BQ열: 약정상세구분
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    const planName = (manualRow[45] || '').toString().trim(); // AT열: 개통요금제명
+    
+    // 허용된 모델 목록
+    const allowedModels = [
+      'SM-A166L', 'SM-A156L'
+    ];
+    
+    // 제외할 요금제명 목록
+    const excludedPlanNames = [
+      '5G 슬림+', '유쓰 5G 슬림+', '추가 요금 걱정 없는 데이터 49'
+    ];
+    
+    // 복합 조건: 가입구분이 "신규"이면서 이전사업자가 "일반개통" 아닌 경우, 개통모델이 허용된 모델 중 하나, 약정상세구분이 "선택약정" 포함, 요금제유형명이 "44군" 포함, 개통요금제명이 제외 목록에 없는 경우
+    const isJoinTypeValid = joinType && joinType.includes('신규');
+    const isPrevCarrierValid = prevCarrier && !prevCarrier.includes('일반개통'); // "일반개통" 아닌 경우
+    const isModelValid = model && allowedModels.some(allowedModel => model.includes(allowedModel));
+    const isContractDetailValid = contractDetail && contractDetail.includes('선택약정');
+    const isPlanTypeValid = planType && planType.includes('44군');
+    const isPlanNameValid = planName && !excludedPlanNames.some(excludedPlan => planName.includes(excludedPlan)); // 제외 목록에 없는 경우
+    
+    if (isJoinTypeValid && isPrevCarrierValid && isModelValid && isContractDetailValid && isPlanTypeValid && isPlanNameValid) {
+      manualValue = 'A166 44군 대상외요금제(MNP) 차감 대상';
+    } else {
+      manualValue = 'A166 44군 대상외요금제(MNP) 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = 'A166 44군 대상외요금제(MNP) 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "44군 대상외 요금제 차감- D군중 (55,청소년Ⅱ,시니어Ⅱ)차감제외 MNP" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('44군 대상외 요금제 차감- D군중 (55,청소년Ⅱ,시니어Ⅱ)차감제외 MNP')) {
+      systemValue = 'A166 44군 대상외요금제(MNP) 차감 대상';
+    } else {
+      systemValue = 'A166 44군 대상외요금제(MNP) 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// A166 44군 대상외요금제(기변) 차감 정규화 함수
+function normalizeA16644GroupExcludedPlanChangeDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열, AM열, BQ열, CV열, AT열)
+  let manualValue = 'A166 44군 대상외요금제(기변) 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    const model = (manualRow[38] || '').toString().trim(); // AM열: 개통모델
+    const contractDetail = (manualRow[68] || '').toString().trim(); // BQ열: 약정상세구분
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    const planName = (manualRow[45] || '').toString().trim(); // AT열: 개통요금제명
+    
+    // 허용된 모델 목록
+    const allowedModels = [
+      'SM-A166L', 'SM-A156L'
+    ];
+    
+    // 제외할 요금제명 목록
+    const excludedPlanNames = [
+      '5G 슬림+', '유쓰 5G 슬림+', '추가 요금 걱정 없는 데이터 49'
+    ];
+    
+    // 복합 조건: 가입구분이 "재가입" 또는 "정책기변"인 경우, 개통모델이 허용된 모델 중 하나, 약정상세구분이 "선택약정" 포함, 요금제유형명이 "44군" 포함, 개통요금제명이 제외 목록에 없는 경우
+    const isJoinTypeValid = joinType && (joinType.includes('재가입') || joinType.includes('정책기변'));
+    const isModelValid = model && allowedModels.some(allowedModel => model.includes(allowedModel));
+    const isContractDetailValid = contractDetail && contractDetail.includes('선택약정');
+    const isPlanTypeValid = planType && planType.includes('44군');
+    const isPlanNameValid = planName && !excludedPlanNames.some(excludedPlan => planName.includes(excludedPlan)); // 제외 목록에 없는 경우
+    
+    if (isJoinTypeValid && isModelValid && isContractDetailValid && isPlanTypeValid && isPlanNameValid) {
+      manualValue = 'A166 44군 대상외요금제(기변) 차감 대상';
+    } else {
+      manualValue = 'A166 44군 대상외요금제(기변) 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = 'A166 44군 대상외요금제(기변) 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "44군 대상외 요금제 차감- D군중 (55,청소년Ⅱ,시니어Ⅱ)차감제외 기변" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('44군 대상외 요금제 차감- D군중 (55,청소년Ⅱ,시니어Ⅱ)차감제외 기변')) {
+      systemValue = 'A166 44군 대상외요금제(기변) 차감 대상';
+    } else {
+      systemValue = 'A166 44군 대상외요금제(기변) 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 정책기변 차감 정규화 함수
+function normalizePolicyChangeDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (T열)
+  let manualValue = '정책기변 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 19) { // 최소 T열(19)은 있어야 함
+    const joinType = (manualRow[19] || '').toString().trim(); // T열: 가입구분
+    
+    // "정책기변" 포함 여부로 정규화
+    if (joinType && joinType.includes('정책기변')) {
+      manualValue = '정책기변 차감 대상';
+    } else {
+      manualValue = '정책기변 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '정책기변 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "정책기변" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('정책기변')) {
+      systemValue = '정책기변 차감 대상';
+    } else {
+      systemValue = '정책기변 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 기변 C타겟 차감 정규화 함수
+function normalizeChangeCTargetDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (CL열)
+  let manualValue = '기변 C타겟 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 89) { // 최소 CL열(89)은 있어야 함
+    const joinType = (manualRow[89] || '').toString().trim(); // CL열: 가입구분
+    
+    // "기변C" 포함 여부로 정규화
+    if (joinType && joinType.includes('기변C')) {
+      manualValue = '기변 C타겟 차감 대상';
+    } else {
+      manualValue = '기변 C타겟 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '기변 C타겟 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "기변 C타겟" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('기변 C타겟')) {
+      systemValue = '기변 C타겟 차감 대상';
+    } else {
+      systemValue = '기변 C타겟 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 33군미만, 시니어1군시 차감 정규화 함수
+function normalize33GroupSenior1Deduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (CV열)
+  let manualValue = '33군미만, 시니어1군시 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 99) { // 최소 CV열(99)은 있어야 함
+    const planType = (manualRow[99] || '').toString().trim(); // CV열: 요금제유형명
+    
+    // "시니어 Ⅰ군" 또는 "33군 미만" 포함 여부로 정규화
+    if (planType && (planType.includes('시니어 Ⅰ군') || planType.includes('33군 미만'))) {
+      manualValue = '33군미만, 시니어1군시 차감 대상';
+    } else {
+      manualValue = '33군미만, 시니어1군시 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '33군미만, 시니어1군시 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "33군 미만/ LTE 시니어1군 유치시" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('33군 미만/ LTE 시니어1군 유치시')) {
+      systemValue = '33군미만, 시니어1군시 차감 대상';
+    } else {
+      systemValue = '33군미만, 시니어1군시 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
+// 온세일 전략온라인POS 차감 정규화 함수
+function normalizeOnsaleStrategyOnlinePosDeduction(manualRow, systemRow) {
+  // 수기초 데이터 정규화 (CE열, AW열, CU열)
+  let manualValue = '온세일 전략온라인POS 차감 비대상'; // 기본값 설정
+  
+  if (manualRow.length > 98) { // 최소 CU열(98)은 있어야 함
+    const reservationSystem = (manualRow[82] || '').toString().trim(); // CE열: 예약가입시스템
+    const finalPolicy = (manualRow[48] || '').toString().trim(); // AW열: 최종영업정책
+    const modelType = (manualRow[98] || '').toString().trim(); // CU열: 모델유형
+    
+    // 복합 조건 확인:
+    // 1. CE열에 "온세일" 포함
+    // 2. AW열에 "BLANK" 미포함
+    // 3. CU열에 "LTE_2nd모델" 또는 "5G_2nd모델" 미포함
+    const hasOnsale = reservationSystem && reservationSystem.includes('온세일');
+    const notBlank = finalPolicy && !finalPolicy.includes('BLANK');
+    const notSecondModel = modelType && !modelType.includes('LTE_2nd모델') && !modelType.includes('5G_2nd모델');
+    
+    if (hasOnsale && notBlank && notSecondModel) {
+      manualValue = '온세일 전략온라인POS 차감 대상';
+    } else {
+      manualValue = '온세일 전략온라인POS 차감 비대상';
+    }
+  }
+  
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '온세일 전략온라인POS 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
+    
+    // "온세일 전략온라인POS 개통시" 포함 여부로 정규화
+    if (serviceValue && serviceValue.includes('온세일 전략온라인POS 개통시')) {
+      systemValue = '온세일 전략온라인POS 차감 대상';
+    } else {
+      systemValue = '온세일 전략온라인POS 차감 비대상';
+    }
+  }
+  
+  return { manualValue, systemValue };
+}
+
 // 유플레이 미유치 검수 정규화 함수
 function normalizeUplayNoCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DO열)
@@ -10289,6 +10775,236 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           correctValue: manualValue,
           incorrectValue: systemValue,
           description: '유통망지원금 활성화정책 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 115군 선택약정 차감 비교 로직
+    if (manualField.key === '115_group_contract_deduction') {
+      // 115군 선택약정 차감 정규화
+      const { manualValue, systemValue } = normalize115GroupContractDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '115군 선택약정 차감',
+          fieldKey: '115_group_contract_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '115군 선택약정 차감 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 선택약정 S721(010신규) 차감 비교 로직
+    if (manualField.key === 's721_contract_deduction') {
+      // 선택약정 S721(010신규) 차감 정규화
+      const { manualValue, systemValue } = normalizeS721ContractDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '선택약정 S721(010신규) 차감',
+          fieldKey: 's721_contract_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '선택약정 S721(010신규) 차감 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 선택약정 S931,S938,S937(MNP) 차감 비교 로직
+    if (manualField.key === 's931_s938_s937_contract_deduction') {
+      // 선택약정 S931,S938,S937(MNP) 차감 정규화
+      const { manualValue, systemValue } = normalizeS931S938S937ContractDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '선택약정 S931,S938,S937(MNP) 차감',
+          fieldKey: 's931_s938_s937_contract_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '선택약정 S931,S938,S937(MNP) 차감 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 선택약정 아이폰16류전체(MNP) 차감 비교 로직
+    if (manualField.key === 'iphone16_contract_deduction') {
+      // 선택약정 아이폰16류전체(MNP) 차감 정규화
+      const { manualValue, systemValue } = normalizeIphone16ContractDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '선택약정 아이폰16류전체(MNP) 차감',
+          fieldKey: 'iphone16_contract_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '선택약정 아이폰16류전체(MNP) 차감 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // A166 44군 대상외요금제(MNP) 차감 비교 로직
+    if (manualField.key === 'a166_44group_excluded_plan_deduction') {
+      // A166 44군 대상외요금제(MNP) 차감 정규화
+      const { manualValue, systemValue } = normalizeA16644GroupExcludedPlanDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: 'A166 44군 대상외요금제(MNP) 차감',
+          fieldKey: 'a166_44group_excluded_plan_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: 'A166 44군 대상외요금제(MNP) 차감 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // A166 44군 대상외요금제(기변) 차감 비교 로직
+    if (manualField.key === 'a166_44group_excluded_plan_change_deduction') {
+      // A166 44군 대상외요금제(기변) 차감 정규화
+      const { manualValue, systemValue } = normalizeA16644GroupExcludedPlanChangeDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: 'A166 44군 대상외요금제(기변) 차감',
+          fieldKey: 'a166_44group_excluded_plan_change_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: 'A166 44군 대상외요금제(기변) 차감 (복합 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 정책기변 차감 비교 로직
+    if (manualField.key === 'policy_change_deduction') {
+      // 정책기변 차감 정규화
+      const { manualValue, systemValue } = normalizePolicyChangeDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '정책기변 차감',
+          fieldKey: 'policy_change_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '정책기변 차감 (단순 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 기변 C타겟 차감 비교 로직
+    if (manualField.key === 'change_c_target_deduction') {
+      // 기변 C타겟 차감 정규화
+      const { manualValue, systemValue } = normalizeChangeCTargetDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '기변 C타겟 차감',
+          fieldKey: 'change_c_target_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '기변 C타겟 차감 (단순 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 33군미만, 시니어1군시 차감 비교 로직
+    if (manualField.key === '33group_senior1_deduction') {
+      // 33군미만, 시니어1군시 차감 정규화
+      const { manualValue, systemValue } = normalize33GroupSenior1Deduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '33군미만, 시니어1군시 차감',
+          fieldKey: '33group_senior1_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '33군미만, 시니어1군시 차감 (단순 조건 비교)',
+          manualRow: null,
+          systemRow: null,
+          assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
+        });
+      }
+      return;
+    }
+
+    // 온세일 전략온라인POS 차감 비교 로직
+    if (manualField.key === 'onsale_strategy_online_pos_deduction') {
+      // 온세일 전략온라인POS 차감 정규화
+      const { manualValue, systemValue } = normalizeOnsaleStrategyOnlinePosDeduction(manualRow, systemRow);
+      
+      // 값이 다르면 차이점으로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
+        differences.push({
+          key,
+          type: 'mismatch',
+          field: '온세일 전략온라인POS 차감',
+          fieldKey: 'onsale_strategy_online_pos_deduction',
+          correctValue: manualValue,
+          incorrectValue: systemValue,
+          description: '온세일 전략온라인POS 차감 (복합 조건 비교)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
