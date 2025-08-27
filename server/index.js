@@ -4335,7 +4335,6 @@ async function getUserSheetName(userName, budgetType) {
 // 예산 매칭 계산 함수 (기존 로직 기반으로 정확히 구현)
 async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyGroups, dateRange, budgetType) {
   console.log(`🧮 [performBudgetMatching] 시작: 정책그룹=${selectedPolicyGroups.join(',')}, 예산타입=${budgetType}`);
-  console.log(`🧮 [performBudgetMatching] dateRange 확인:`, JSON.stringify(dateRange, null, 2));
   
   const calculationResults = [];
   const dataMapping = {};
@@ -4363,6 +4362,9 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
         const budgetCategoryType = (budgetRow[7] || '').toString().trim(); // H열: 유형
         const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산
         const budgetSecuredAmount = parseFloat(budgetRow[8]) || 40000; // I열: 확보 예산 (기본값 40000)
+        
+        // 사용자 시트 입력값 디버깅 로그
+        console.log(`📋 [사용자시트 Row ${i}] 모델명=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
         
         // 사용자 시트의 모델명이 비어있으면 건너뛰기
         if (!budgetModelName) {
@@ -4392,8 +4394,14 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
           const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
           
+          // 액면예산 입력값 디버깅 로그 (정책그룹이 선택된 것에 포함되어 있을 때만 출력)
+          if (selectedPolicyGroups.includes(policyGroup)) {
+            console.log(`📊 [액면예산 Row ${actualRowNumber}] 정책그룹=${policyGroup}, 정책군=${armyType}, 유형=${categoryType}, 모델명=${modelName}`);
+          }
+          
           // 1. 정책그룹 매칭 확인
           if (!selectedPolicyGroups.includes(policyGroup)) {
+            console.log(`❌ [정책그룹] 매칭 실패: 정책그룹=${policyGroup}, 선택된정책그룹=[${selectedPolicyGroups.join(',')}]`);
             continue;
           }
           
@@ -4477,7 +4485,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
               }
             });
             
-            console.log(`🎯 [Row ${actualRowNumber}] 매칭 성공! 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${policyGroup}, 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
             break;
           }
         }
@@ -4485,7 +4493,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
         // 매칭되지 않은 경우 로그
         if (!matchFound) {
           modelMismatch++;
-          console.log(`❌ [사용자시트] 매칭 실패: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
+          console.log(`❌ [매칭실패] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
         }
       }
     }
@@ -4494,7 +4502,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   }
   
   console.log(`📈 [performBudgetMatching] 완료: 처리=${processedRows}, 매칭=${matchedItems}, 모델불일치=${modelMismatch}`);
-  console.log(`📋 [CRITICAL] dataMapping 생성 완료: ${Object.keys(dataMapping).length}개 행`);
+  console.log(`📋 [dataMapping] 생성 완료: ${Object.keys(dataMapping).length}개 행`);
   
   return {
     dataMapping,
@@ -4524,15 +4532,12 @@ async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRan
     const userSheetName = await getUserSheetName(userName, budgetType);
     const userSheetRange = `${userSheetName}!A2:L`;
     
-    console.log(`🧮 [DRY-RUN] 사용자 시트 읽기: ${userSheetName}`);
-    
     const userSheetResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: userSheetRange
     });
     
     const userSheetData = userSheetResponse.data.values || [];
-    console.log(`🧮 [DRY-RUN] 사용자 시트 데이터: ${userSheetData.length}행`);
     
     // 2. 액면예산 읽기 (AG열까지 필요)
     const phoneklRange = '액면예산!A:AG';
@@ -4542,10 +4547,8 @@ async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRan
     });
     
     const phoneklData = phoneklResponse.data.values || [];
-    console.log(`🧮 [DRY-RUN] 액면예산: ${phoneklData.length}행`);
     
     // 3. 계산 수행 (dateRange 명시적 전달)
-    console.log('🧮 [DRY-RUN] performBudgetMatching 호출 전 dateRange:', JSON.stringify(dateRange, null, 2));
     const calculationResult = await performBudgetMatching(
       userSheetData, 
       phoneklData, 
@@ -4553,8 +4556,6 @@ async function calculateUsageBudgetDryRun(sheetId, selectedPolicyGroups, dateRan
       dateRange, 
       budgetType
     );
-    
-    console.log('✅ [DRY-RUN] 계산 완료 - 업데이트 없이 결과만 반환');
     return calculationResult;
     
   } catch (error) {
@@ -4568,7 +4569,6 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
   const sheets = google.sheets({ version: 'v4', auth });
   
   console.log('🔍 [calculateUsageBudget] 시작 - 사용자:', userName);
-  console.log('🚨 [TRACE] calculateUsageBudget 함수 시작:', new Date().toISOString());
   
   // 사용자별 예산 데이터 가져오기 - 시트 목록에서 해당 사용자의 시트 찾기
   const baseUserName = userName.replace(/\([^)]+\)/, '').trim(); // 모든 괄호 내용 제거
@@ -4585,8 +4585,6 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       if (userAgent) {
         userQualification = userAgent[1] || '이사'; // B열: 자격
         console.log(`📋 [calculateUsageBudget] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
-      } else {
-        console.log(`⚠️ [calculateUsageBudget] 대리점아이디관리에서 ${baseUserName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
       }
     }
   } catch (error) {
@@ -17743,7 +17741,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
         // 실제 정책그룹별 정확한 계산 수행
-        console.log(`📊 [NEW-API] ${sheet.sheetName} 정책그룹별 계산 시작`);
+        console.log(`📊 [NEW-API] ${sheet.sheetName} 계산 시작`);
         
         try {
           // 사용자 시트 데이터 읽기 
