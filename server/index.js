@@ -8786,9 +8786,9 @@ const COLUMN_MATCHING_CONFIG = [
     description: '유통망지원금 상이 비교 (숫자 서식 정규화)'
   },
   {
-    manualField: { name: '유플레이 유치검수', key: 'uplay_check', column: 127 }, // DX열 (기존 DO열에서 +9)
-    systemField: { name: '유플레이 유치검수', key: 'uplay_check', column: 30 }, // AE열 (기존 W열에서 +8)
-    description: '유플레이 유치검수 (단어 포함 여부 비교)'
+    manualField: { name: '유플레이 유치 추가', key: 'uplay_check', column: 127 }, // DX열 (기존 DO열에서 +9)
+    systemField: { name: '유플레이 유치 추가', key: 'uplay_check', column: 30 }, // AE열 (기존 W열에서 +8)
+    description: '유플레이 유치 추가 (단어 포함 여부 비교)'
   },
   {
     manualField: { name: 'V컬러링 음악감상 플러스 유치', key: 'vcoloring_music_plus', column: 119 }, // DP열
@@ -8891,9 +8891,9 @@ const COLUMN_MATCHING_CONFIG = [
     description: '온세일 전략온라인POS 차감 (복합 조건 비교)'
   },
   {
-    manualField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 127 }, // DX열 (기존 DO열에서 +9)
-    systemField: { name: '유플레이 미유치 검수', key: 'uplay_no_check', column: 31 }, // AF열 (기존 X열에서 +8)
-    description: '유플레이 미유치 검수 (단어 미포함/포함 여부 비교)'
+    manualField: { name: '유플레이 미유치 차감', key: 'uplay_no_check', column: 127 }, // DX열 (기존 DO열에서 +9)
+    systemField: { name: '유플레이 미유치 차감', key: 'uplay_no_check', column: 31 }, // AF열 (기존 X열에서 +8)
+    description: '유플레이 미유치 차감 (단어 미포함/포함 여부 비교)'
   }
 ];
 
@@ -9304,31 +9304,31 @@ function normalizeDistributionSupport(manualRow, systemRow) {
   return { manualDistribution, systemDistribution };
 }
 
-// 유플레이 유치검수 정규화 함수
+// 유플레이 유치 추가 정규화 함수
 function normalizeUplayCheck(manualRow, systemRow) {
-  // 수기초 데이터 정규화 (DO열)
-  let manualValue = '유플레이 미포함'; // 기본값 설정
-  if (manualRow.length > 127) { // 최소 DO열(127)은 있어야 함 (118+9)
-    const uplayValue = (manualRow[127] || '').toString().trim(); // DO열: 유플레이 (118+9)
+  // 수기초 데이터 정규화 (DX열)
+  let manualValue = '유플레이 유치 추가 비대상'; // 기본값 설정
+  if (manualRow.length > 127) { // 최소 DX열(127)은 있어야 함
+    const uplayValue = (manualRow[127] || '').toString().trim(); // DX열: 유플레이
     
-    // "유플레이" 단어 포함 여부로 정규화
+    // "유플레이" 포함 시 "유플레이 유치 추가" 표기
     if (uplayValue && uplayValue.includes('유플레이')) {
-      manualValue = '유플레이 포함';
+      manualValue = '유플레이 유치 추가 대상';
     } else {
-      manualValue = '유플레이 미포함';
+      manualValue = '유플레이 유치 추가 비대상';
     }
   }
   
-  // 폰클 데이터 정규화 (W열)
-  let systemValue = '유플레이 미포함'; // 기본값 설정
-  if (systemRow.length > 21) { // 최소 W열(21)은 있어야 함
-    const uplayValue = (systemRow[30] || '').toString().trim(); // W열: 유플레이 (22+8)
+  // 폰클 데이터 정규화 (AE열)
+  let systemValue = '유플레이 유치 추가 비대상'; // 기본값 설정
+  if (systemRow.length > 30) { // 최소 AE열(30)은 있어야 함
+    const uplayValue = (systemRow[30] || '').toString().trim(); // AE열: 유플레이
     
-    // "유플레이" 단어 포함 여부로 정규화
+    // "유플레이" 포함 시 "유플레이 유치 추가" 표기
     if (uplayValue && uplayValue.includes('유플레이')) {
-      systemValue = '유플레이 포함';
+      systemValue = '유플레이 유치 추가 대상';
     } else {
-      systemValue = '유플레이 미포함';
+      systemValue = '유플레이 유치 추가 비대상';
     }
   }
   
@@ -10145,31 +10145,31 @@ function normalizeOnsaleStrategyOnlinePosDeduction(manualRow, systemRow) {
   return { manualValue, systemValue };
 }
 
-// 유플레이 미유치 검수 정규화 함수
+// 유플레이 미유치 차감 정규화 함수
 function normalizeUplayNoCheck(manualRow, systemRow) {
-  // 수기초 데이터 정규화 (DO열)
-  let manualValue = '유플레이 미포함'; // 기본값 설정
-  if (manualRow.length > 127) { // 최소 DO열(127)은 있어야 함 (118+9)
-    const uplayValue = (manualRow[127] || '').toString().trim(); // DO열: 유플레이 (118+9)
+  // 수기초 데이터 정규화 (DX열)
+  let manualValue = '유플레이 미유치 차감 비대상'; // 기본값 설정
+  if (manualRow.length > 127) { // 최소 DX열(127)은 있어야 함
+    const uplayValue = (manualRow[127] || '').toString().trim(); // DX열: 유플레이
     
-    // "유플레이" 단어 포함 여부로 정규화 (미유치 검수용)
+    // "유플레이" 미포함 시 "유플레이 미유치 차감" 표기
     if (uplayValue && uplayValue.includes('유플레이')) {
-      manualValue = '유플레이 포함';
+      manualValue = '유플레이 미유치 차감 비대상';
     } else {
-      manualValue = '유플레이 미포함';
+      manualValue = '유플레이 미유치 차감 대상';
     }
   }
   
-  // 폰클 데이터 정규화 (X열)
-  let systemValue = '유플레이 미포함'; // 기본값 설정
-  if (systemRow.length > 22) { // 최소 X열(22)은 있어야 함
-    const uplayNoValue = (systemRow[31] || '').toString().trim(); // X열: 유플레이 미유치 (23+8)
+  // 폰클 데이터 정규화 (AF열)
+  let systemValue = '유플레이 미유치 차감 비대상'; // 기본값 설정
+  if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
+    const uplayNoValue = (systemRow[31] || '').toString().trim(); // AF열: 유플레이 미유치
     
-    // "유플레이" 단어 포함 여부로 정규화 (미유치 검수용)
+    // "유플레이" 포함 시 "유플레이 미유치 차감" 표기
     if (uplayNoValue && uplayNoValue.includes('유플레이')) {
-      systemValue = '유플레이 포함';
+      systemValue = '유플레이 미유치 차감 대상';
     } else {
-      systemValue = '유플레이 미포함';
+      systemValue = '유플레이 미유치 차감 비대상';
     }
   }
   
@@ -10520,35 +10520,33 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       return;
     }
     
-    // 유플레이 유치검수 비교 로직
+    // 유플레이 유치 추가 비교 로직
     if (manualField.key === 'uplay_check') {
-      // 유플레이 유치검수 정규화
+      // 유플레이 유치 추가 정규화
       const { manualValue, systemValue } = normalizeUplayCheck(manualRow, systemRow);
       
       // 디버깅 로그 추가
-      console.log(`[유플레이 유치검수] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
-      
-      // 이제 빈 값이 없으므로 이 조건 제거
+      console.log(`[유플레이 유치 추가] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
       
       // 값이 다르면 차이점으로 기록
       if (manualValue.trim() !== systemValue.trim()) {
         
-        console.log(`[유플레이 유치검수] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
+        console.log(`[유플레이 유치 추가] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
 
         differences.push({
           key,
           type: 'mismatch',
-          field: '유플레이 유치검수',
+          field: '유플레이 유치 추가',
           fieldKey: 'uplay_check',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '유플레이 유치검수 (단어 포함 여부 비교)',
+          description: '유플레이 유치 추가 (단어 포함 여부 비교)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       } else {
-        console.log(`[유플레이 유치검수] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
+        console.log(`[유플레이 유치 추가] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
       }
       return;
     }
@@ -11013,35 +11011,33 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       return;
     }
 
-    // 유플레이 미유치 검수 비교 로직
+    // 유플레이 미유치 차감 비교 로직
     if (manualField.key === 'uplay_no_check') {
-      // 유플레이 미유치 검수 정규화
+      // 유플레이 미유치 차감 정규화
       const { manualValue, systemValue } = normalizeUplayNoCheck(manualRow, systemRow);
       
       // 디버깅 로그 추가
-      console.log(`[유플레이 미유치 검수] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
+      console.log(`[유플레이 미유치 차감] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
       
-      // 이제 빈 값이 없으므로 이 조건 제거
-      
-      // 유플레이 미유치 검수는 반대 로직: 값이 같으면 불일치, 다르면 일치
-      if (manualValue.trim() === systemValue.trim()) {
+      // 값이 다르면 불일치로 기록
+      if (manualValue.trim() !== systemValue.trim()) {
         
-        console.log(`[유플레이 미유치 검수] 불일치 발견: manualValue="${manualValue}" === systemValue="${systemValue}" (둘 다 같음)`);
+        console.log(`[유플레이 미유치 차감] 불일치 발견: manualValue="${manualValue}" !== systemValue="${systemValue}"`);
 
         differences.push({
           key,
           type: 'mismatch',
-          field: '유플레이 미유치 검수',
+          field: '유플레이 미유치 차감',
           fieldKey: 'uplay_no_check',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '유플레이 미유치 검수 (반대 로직: 둘 다 같으면 불일치)',
+          description: '유플레이 미유치 차감 (일반 로직: 값이 다르면 불일치)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
         });
       } else {
-        console.log(`[유플레이 미유치 검수] 일치: manualValue="${manualValue}" !== systemValue="${systemValue}" (서로 다름)`);
+        console.log(`[유플레이 미유치 차감] 일치: manualValue="${manualValue}" === systemValue="${systemValue}"`);
       }
       return;
     }
