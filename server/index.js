@@ -17943,65 +17943,12 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
-        // 실제 정책그룹별 정확한 계산 수행
-        console.log(`📊 [NEW-API] ${sheet.sheetName} 계산 시작`);
-        
-        try {
-          // 사용자 시트 데이터 읽기 
-          const userSheetRange = `${sheet.sheetName}!A2:L`;
-          const userSheetResponse = await sheets_api.spreadsheets.values.get({
-            spreadsheetId: sheet.sheetId,
-            range: userSheetRange
-          });
-          const userSheetData = userSheetResponse.data.values || [];
-          
-          // 액면예산 읽기
-          const phoneklResponse = await sheets_api.spreadsheets.values.get({
-            spreadsheetId: sheet.sheetId,
-            range: '액면예산!A:AG'
-          });
-          const phoneklData = phoneklResponse.data.values || [];
-          
-          // 저장된 정책그룹 파싱 (안전하게 처리)
-          let selectedPolicyGroups = [];
-          if (sheet.selectedPolicyGroups) {
-            if (Array.isArray(sheet.selectedPolicyGroups)) {
-              // 이미 배열인 경우
-              selectedPolicyGroups = sheet.selectedPolicyGroups;
-            } else if (typeof sheet.selectedPolicyGroups === 'string') {
-              // 문자열인 경우
-              selectedPolicyGroups = sheet.selectedPolicyGroups.split(',').map(g => g.trim()).filter(g => g);
-            } else {
-              console.warn(`⚠️ [NEW-API] ${sheet.sheetName} 예상치 못한 정책그룹 타입:`, typeof sheet.selectedPolicyGroups, sheet.selectedPolicyGroups);
-            }
-          }
-          
-          console.log(`📊 [NEW-API] ${sheet.sheetName} 정책그룹: [${selectedPolicyGroups.join(', ')}]`);
-          
-          if (selectedPolicyGroups.length > 0 && userSheetData.length > 0) {
-            // 정확한 매칭 계산 수행
-            const calculationResult = await performBudgetMatching(
-              userSheetData,
-              phoneklData,
-              selectedPolicyGroups,
-              sheet.dateRange,
-              budgetType
-            );
-            
-            summary.totalRemainingBudget = calculationResult.totalRemainingBudget;
-            summary.totalSecuredBudget = calculationResult.totalSecuredBudget;
-            summary.totalUsedBudget = calculationResult.totalUsedBudget;
-            summary.itemCount = calculationResult.matchedItems;
-            
-            console.log(`✅ [NEW-API] ${sheet.sheetName} 계산 완료: 확보=${calculationResult.totalSecuredBudget}, 사용=${calculationResult.totalUsedBudget}, 잔액=${calculationResult.totalRemainingBudget}, 매칭=${calculationResult.matchedItems}개`);
-          } else {
-            console.log(`⚠️ [NEW-API] ${sheet.sheetName} 정책그룹 또는 사용자 데이터 없음`);
-            // 기본값 유지 (0, 0, 0)
-          }
-        } catch (calcError) {
-          console.error(`❌ [NEW-API] ${sheet.sheetName} 계산 실패:`, calcError);
-          // 기본값 유지 (0, 0, 0)
-        }
+        // 시트 목록 조회 시에는 계산을 수행하지 않고 기본값 사용 (성능 최적화)
+        // 실제 계산은 시트 데이터 로드 시에만 수행
+        summary.totalRemainingBudget = 0;
+        summary.totalSecuredBudget = 0;
+        summary.totalUsedBudget = 0;
+        summary.itemCount = 0;
         
         // 날짜 범위 설정
         if (sheet.dateRange.receiptStartDate) {
