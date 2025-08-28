@@ -18127,7 +18127,32 @@ app.get('/api/budget/user-sheets', async (req, res) => {
             
             const metadata = metadataResponse.data.values || [];
             if (metadata.length >= 2 && metadata[1].length >= 2) {
-              lastModifiedDate = metadata[1][1] || ''; // 마지막수정일시
+              const rawDate = metadata[1][1] || ''; // 마지막수정일시
+              
+              // 한국 시간 형식을 서버 시간 형식으로 변환
+              if (rawDate && rawDate.includes('오후')) {
+                // "2025. 8. 28. 오후 11:48:16" → "2025-08-28 23:48:16"
+                const match = rawDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(오전|오후)\s*(\d{1,2}):(\d{2}):(\d{2})/);
+                if (match) {
+                  const [, year, month, day, ampm, hour, minute, second] = match;
+                  let adjustedHour = parseInt(hour);
+                  
+                  // 오후인 경우 12를 더함 (단, 12시는 제외)
+                  if (ampm === '오후' && hour !== '12') {
+                    adjustedHour += 12;
+                  }
+                  // 오전 12시는 0시로 변환
+                  if (ampm === '오전' && hour === '12') {
+                    adjustedHour = 0;
+                  }
+                  
+                  lastModifiedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${adjustedHour.toString().padStart(2, '0')}:${minute}:${second}`;
+                } else {
+                  lastModifiedDate = rawDate; // 변환 실패시 원본 사용
+                }
+              } else {
+                lastModifiedDate = rawDate; // 이미 서버 형식이거나 다른 형식
+              }
             }
           } catch (metadataError) {
             console.log('메타데이터 조회 실패:', metadataError.message);
@@ -18152,7 +18177,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               }
               
               // D열: "홍기현 (팀장)(Ⅰ)" 형식에서 "홍기현" 부분 매칭
-              // E열: "2025. 8. 28. 오후 10:38:15" 형식과 정확히 일치
+              // E열: 시간 정확히 일치
               if (inputUser && inputUser.includes(ownerName) && inputDate === lastModifiedDate) {
                 if (budgetType === 'Ⅱ') {
                   // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
