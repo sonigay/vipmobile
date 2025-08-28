@@ -8875,7 +8875,7 @@ const COLUMN_MATCHING_CONFIG = [
   {
     manualField: { name: '보험 미유치', key: 'insurance_no', column: 124 }, // DU열
     systemField: { name: '보험 미유치', key: 'insurance_no', column: 31 }, // AF열
-    description: '보험 미유치 (일반 로직: 값이 다르면 불일치)'
+    description: '보험 미유치 (폰클: 보험 포함시 미유치, 미포함시 유치)'
   },
   {
     manualField: { name: '통화연결음 유치', key: 'call_ringtone', column: 131 }, // EB열
@@ -9545,11 +9545,11 @@ function normalizeInsuranceNo(manualRow, systemRow) {
   if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
     const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
     
-    // "보험" 단어 포함 여부로 정규화
+    // "보험" 단어 포함 여부로 정규화 (포함시 미유치, 미포함시 유치)
     if (serviceValue && serviceValue.includes('보험')) {
-      systemValue = '보험 유치';
-    } else {
       systemValue = '보험 미유치';
+    } else {
+      systemValue = '보험 유치';
     }
   }
   
@@ -10719,7 +10719,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'insurance_no',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '보험 미유치 (일반 로직: 값이 다르면 불일치)',
+          description: '보험 미유치 (폰클: 보험 포함시 미유치, 미포함시 유치)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
