@@ -4478,94 +4478,101 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           continue;
         }
         
-        // 복합 키로 정확한 매칭 시도
-        const userCompositeKey = `${budgetModelName}&${budgetArmyType}&${budgetCategoryType}`;
-        const matchingPhoneklData = phoneklIndex.get(userCompositeKey);
-        
-        if (matchingPhoneklData && matchingPhoneklData.length > 0) {
-          // 매칭 성공!
-          matchedItems++;
-          processedRows++;
+        // 실제 데이터가 있는 경우만 매칭 시도 (사용 예산이 0이 아닌 경우)
+        if (budgetUsedAmount !== 0) {
+          // 복합 키로 정확한 매칭 시도
+          const userCompositeKey = `${budgetModelName}&${budgetArmyType}&${budgetCategoryType}`;
+          const matchingPhoneklData = phoneklIndex.get(userCompositeKey);
           
-          // 첫 번째 매칭 데이터 사용 (여러 개가 있을 경우 첫 번째)
-          const matchData = matchingPhoneklData[0];
-          const actualRowNumber = matchData.actualRowNumber;
-          
-          // 6. 계산 결과 저장
-          const remainingBudget = budgetSecuredAmount - budgetUsedAmount;
-          
-          totalSecuredBudget += budgetSecuredAmount;
-          totalUsedBudget += budgetUsedAmount;
-          totalRemainingBudget += remainingBudget;
-          
-          dataMapping[actualRowNumber] = {
-            remainingBudget,
-            securedBudget: budgetSecuredAmount,
-            usedBudget: budgetUsedAmount
-          };
-          
-          calculationResults.push({
-            rowIndex: matchData.rowIndex + dataStartRow,
-            actualRowNumber,
-            calculatedBudgetValue: remainingBudget,
-            securedBudgetValue: budgetSecuredAmount,
-            usedBudgetValue: budgetUsedAmount,
-            matchingData: {
-              policyGroup: matchData.policyGroup,
-              armyType: matchData.armyType,
-              categoryType: matchData.categoryType,
-              modelName: matchData.modelName
-            }
-          });
-          
-          // 매칭 성공 로그 (배치 단위로만 출력하여 로그 스팸 방지)
-          if (batchCount % 10 === 0) {
-            console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${matchData.policyGroup}, 모델=${matchData.modelName}, 군=${matchData.armyType}, 유형=${matchData.categoryType}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
-            console.log(`💾 [시트저장성공] Row ${actualRowNumber}: 잔액=${remainingBudget}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
-          }
-          
-          // 배치 처리 후 메모리 정리
-          batchCount++;
-          if (batchCount % BATCH_SIZE === 0) {
-            const currentMemory = process.memoryUsage();
-            console.log(`📦 [배치처리] ${batchCount}개 매칭 완료 - 메모리: RSS=${Math.round(currentMemory.rss / 1024 / 1024)}MB, Heap=${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB`);
+          if (matchingPhoneklData && matchingPhoneklData.length > 0) {
+            // 매칭 성공!
+            matchedItems++;
+            processedRows++;
             
-            // 메모리 정리 유도
-            if (global.gc) {
-              global.gc();
-              console.log(`🧹 [메모리] 가비지 컬렉션 실행`);
+            // 첫 번째 매칭 데이터 사용 (여러 개가 있을 경우 첫 번째)
+            const matchData = matchingPhoneklData[0];
+            const actualRowNumber = matchData.actualRowNumber;
+            
+            // 6. 계산 결과 저장
+            const remainingBudget = budgetSecuredAmount - budgetUsedAmount;
+            
+            totalSecuredBudget += budgetSecuredAmount;
+            totalUsedBudget += budgetUsedAmount;
+            totalRemainingBudget += remainingBudget;
+            
+            dataMapping[actualRowNumber] = {
+              remainingBudget,
+              securedBudget: budgetSecuredAmount,
+              usedBudget: budgetUsedAmount
+            };
+            
+            calculationResults.push({
+              rowIndex: matchData.rowIndex + dataStartRow,
+              actualRowNumber,
+              calculatedBudgetValue: remainingBudget,
+              securedBudgetValue: budgetSecuredAmount,
+              usedBudgetValue: budgetUsedAmount,
+              matchingData: {
+                policyGroup: matchData.policyGroup,
+                armyType: matchData.armyType,
+                categoryType: matchData.categoryType,
+                modelName: matchData.modelName
+              }
+            });
+            
+            // 매칭 성공 로그 (배치 단위로만 출력하여 로그 스팸 방지)
+            if (batchCount % 10 === 0) {
+              console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${matchData.policyGroup}, 모델=${matchData.modelName}, 군=${matchData.armyType}, 유형=${matchData.categoryType}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
+              console.log(`💾 [시트저장성공] Row ${actualRowNumber}: 잔액=${remainingBudget}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
+            }
+            
+            // 배치 처리 후 메모리 정리
+            batchCount++;
+            if (batchCount % BATCH_SIZE === 0) {
+              const currentMemory = process.memoryUsage();
+              console.log(`📦 [배치처리] ${batchCount}개 매칭 완료 - 메모리: RSS=${Math.round(currentMemory.rss / 1024 / 1024)}MB, Heap=${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB`);
+              
+              // 메모리 정리 유도
+              if (global.gc) {
+                global.gc();
+                console.log(`🧹 [메모리] 가비지 컬렉션 실행`);
+              }
+            }
+          } else {
+            // 매칭 실패 - 로그 스팸 방지를 위해 실제 데이터가 있는 경우만 로그 출력
+            modelMismatch++;
+            
+            // 액면예산에서 해당 모델명으로만 검색하여 유사 데이터 확인
+            let foundInPhonekl = false;
+            let phoneklMatchDetails = [];
+            
+            for (const [compositeKey, dataArray] of phoneklIndex.entries()) {
+              const [modelName, armyType, categoryType] = compositeKey.split('&');
+              
+              // 모델명이 일치하는 경우만 확인
+              if (modelName === budgetModelName) {
+                foundInPhonekl = true;
+                phoneklMatchDetails.push(...dataArray.map(data => ({
+                  row: data.actualRowNumber,
+                  policyGroup: data.policyGroup,
+                  armyType: data.armyType,
+                  categoryType: data.categoryType,
+                  modelName: data.modelName
+                })));
+              }
+            }
+            
+            // 로그 스팸 방지: 실제 데이터가 있는 경우만 상세 로그 출력
+            if (foundInPhonekl) {
+              console.log(`❌ [매칭실패-상세] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType} (사용예산: ${budgetUsedAmount})`);
+              console.log(`   📊 액면예산에서 발견된 유사 데이터:`, phoneklMatchDetails);
+            } else {
+              console.log(`❌ [매칭실패-모델없음] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType} (사용예산: ${budgetUsedAmount})`);
             }
           }
         } else {
-          // 매칭 실패 - 상세 로그
-          modelMismatch++;
-          
-          // 액면예산에서 해당 모델명으로만 검색하여 유사 데이터 확인
-          let foundInPhonekl = false;
-          let phoneklMatchDetails = [];
-          
-          for (const [compositeKey, dataArray] of phoneklIndex.entries()) {
-            const [modelName, armyType, categoryType] = compositeKey.split('&');
-            
-            // 모델명이 일치하는 경우만 확인
-            if (modelName === budgetModelName) {
-              foundInPhonekl = true;
-              phoneklMatchDetails.push(...dataArray.map(data => ({
-                row: data.actualRowNumber,
-                policyGroup: data.policyGroup,
-                armyType: data.armyType,
-                categoryType: data.categoryType,
-                modelName: data.modelName
-              })));
-            }
-          }
-          
-          if (foundInPhonekl) {
-            console.log(`❌ [매칭실패-상세] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
-            console.log(`   📊 액면예산에서 발견된 유사 데이터:`, phoneklMatchDetails);
-          } else {
-            console.log(`❌ [매칭실패-모델없음] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
-          }
+          // 사용 예산이 0인 경우는 매칭 시도하지 않음 (로그 스팸 방지)
+          // console.log(`⏭️ [건너뛰기] 사용예산 0: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
         }
       }
     }
