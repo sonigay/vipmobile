@@ -18145,6 +18145,12 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               const inputUser = row[inputUserCol];
               const inputDate = row[inputDateCol];
               
+              // 디버깅: 조건 매칭 확인
+              if (inputUser && inputUser !== '') {
+                console.log(`🔍 [${sheetName}] Row ${index + 5}: inputUser="${inputUser}", ownerName="${ownerName}", includes=${inputUser.includes(ownerName)}`);
+                console.log(`🔍 [${sheetName}] Row ${index + 5}: inputDate="${inputDate}", lastModifiedDate="${lastModifiedDate}", match=${inputDate === lastModifiedDate}`);
+              }
+              
               // D열: "홍기현 (팀장)(Ⅰ)" 형식에서 "홍기현" 부분 매칭
               // E열: "2025. 8. 28. 오후 10:38:15" 형식과 정확히 일치
               if (inputUser && inputUser.includes(ownerName) && inputDate === lastModifiedDate) {
@@ -18152,23 +18158,29 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                   // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
                   if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
                     totalRemainingBudget += parseFloat(row[7]) || 0; // I열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): I열=${row[7]}, 누적잔액=${totalRemainingBudget}`);
                   }
                   if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
                     totalSecuredBudget += parseFloat(row[8]) || 0; // J열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): J열=${row[8]}, 누적확보=${totalSecuredBudget}`);
                   }
                   if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
                     totalUsedBudget += parseFloat(row[9]) || 0; // K열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): K열=${row[9]}, 누적사용=${totalUsedBudget}`);
                   }
                 } else {
                   // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
                   if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
                     totalRemainingBudget += parseFloat(row[8]) || 0; // L열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): L열=${row[8]}, 누적잔액=${totalRemainingBudget}`);
                   }
                   if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
                     totalSecuredBudget += parseFloat(row[9]) || 0; // M열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): M열=${row[9]}, 누적확보=${totalSecuredBudget}`);
                   }
                   if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
                     totalUsedBudget += parseFloat(row[10]) || 0; // N열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): N열=${row[10]}, 누적사용=${totalUsedBudget}`);
                   }
                 }
               }
