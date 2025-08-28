@@ -8046,6 +8046,81 @@ app.get('/api/inspection-data', async (req, res) => {
     const manualRows = manualValues.slice(1);
     const systemRows = systemValues.slice(3);
 
+    // 수기초 데이터의 최대 일시 계산
+    function getMaxManualDateTime(manualRows) {
+      let maxDateTime = null;
+      
+      manualRows.forEach(row => {
+        if (row.length > 30) { // AD열(29) + AE열(30) 최소 필요
+          const date = (row[29] || '').toString().trim(); // AD열: 가입일자
+          const time = (row[30] || '').toString().trim(); // AE열: 개통시간
+          
+          if (date && time && time.length >= 4) {
+            const hour = time.substring(0, 2);
+            const minute = time.substring(2, 4);
+            
+            // 5분 단위로 내림차순 처리 (기존 정규화 로직과 동일)
+            const minuteNum = parseInt(minute, 10);
+            const normalizedMinute = Math.floor(minuteNum / 5) * 5;
+            const normalizedMinuteStr = normalizedMinute.toString().padStart(2, '0');
+            
+            const dateTimeStr = `${date} ${hour}:${normalizedMinuteStr}`;
+            const dateTime = new Date(dateTimeStr);
+            
+            if (!isNaN(dateTime.getTime()) && (!maxDateTime || dateTime > maxDateTime)) {
+              maxDateTime = dateTime;
+            }
+          }
+        }
+      });
+      
+      return maxDateTime;
+    }
+
+    // 폰클 데이터를 수기초 최대 일시로 필터링
+    function filterSystemRowsByDateTime(systemRows, maxManualDateTime) {
+      if (!maxManualDateTime) {
+        return systemRows; // 최대 일시가 없으면 모든 데이터 반환
+      }
+      
+      return systemRows.filter(row => {
+        if (row.length > 11) { // J열(9) + K열(10) + L열(11) 최소 필요
+          const date = (row[9] || '').toString().trim(); // J열: 개통일
+          const hour = (row[10] || '').toString().replace('시', '').trim(); // K열: 개통시
+          const minute = (row[11] || '').toString().replace('분', '').trim(); // L열: 개통분
+          
+          if (date && hour && minute) {
+            const hourNum = parseInt(hour, 10);
+            const minuteNum = parseInt(minute, 10);
+            const normalizedHourStr = hourNum.toString().padStart(2, '0');
+            const normalizedMinuteStr = minuteNum.toString().padStart(2, '0');
+            
+            const dateTimeStr = `${date} ${normalizedHourStr}:${normalizedMinuteStr}`;
+            const dateTime = new Date(dateTimeStr);
+            
+            // 수기초 최대 일시 이전 또는 같은 데이터만 포함
+            return !isNaN(dateTime.getTime()) && dateTime <= maxManualDateTime;
+          }
+        }
+        return true; // 날짜 정보가 없으면 포함
+      });
+    }
+
+    // 수기초 최대 일시 계산
+    const maxManualDateTime = getMaxManualDateTime(manualRows);
+    console.log(`📅 [일시필터링] 수기초 최대 일시: ${maxManualDateTime ? maxManualDateTime.toISOString() : '없음'}`);
+    
+    // 폰클 데이터 필터링
+    const originalSystemRowsCount = systemRows.length;
+    const filteredSystemRows = filterSystemRowsByDateTime(systemRows, maxManualDateTime);
+    const filteredSystemRowsCount = filteredSystemRows.length;
+    const excludedCount = originalSystemRowsCount - filteredSystemRowsCount;
+    
+    console.log(`📅 [일시필터링] 폰클 데이터 필터링 결과: 전체 ${originalSystemRowsCount}개 → 필터링 후 ${filteredSystemRowsCount}개 (제외: ${excludedCount}개)`);
+    
+    // 필터링된 데이터로 계속 진행
+    const filteredSystemRowsForComparison = filteredSystemRows;
+
     // 데이터 비교 및 차이점 찾기
     const differences = [];
     const manualMap = new Map();
@@ -8165,8 +8240,8 @@ app.get('/api/inspection-data', async (req, res) => {
       }
     });
     
-    // 모든 폰클 데이터 추가
-    systemRows.forEach((row, index) => {
+    // 모든 폰클 데이터 추가 (필터링된 데이터 사용)
+    filteredSystemRowsForComparison.forEach((row, index) => {
       if (row.length > 74 && row[74]) { // BW열은 75번째 컬럼 (0-based)
         const key = row[74].toString().trim();
         allRows.push({
