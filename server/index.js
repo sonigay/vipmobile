@@ -4478,8 +4478,8 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           continue;
         }
         
-        // 실제 데이터가 있는 경우만 매칭 시도 (사용 예산이 0이 아닌 경우)
-        if (budgetUsedAmount !== 0) {
+        // 모든 데이터에 대해 매칭 시도 (사용 예산이 0이어도 정확한 예산 정보이므로 처리 필요)
+        if (budgetModelName && budgetArmyType && budgetCategoryType) {
           // 복합 키로 정확한 매칭 시도
           const userCompositeKey = `${budgetModelName}&${budgetArmyType}&${budgetCategoryType}`;
           const matchingPhoneklData = phoneklIndex.get(userCompositeKey);
@@ -4570,10 +4570,10 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
               console.log(`❌ [매칭실패-모델없음] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType} (사용예산: ${budgetUsedAmount})`);
             }
           }
-        } else {
-          // 사용 예산이 0인 경우는 매칭 시도하지 않음 (로그 스팸 방지)
-          // console.log(`⏭️ [건너뛰기] 사용예산 0: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
-        }
+                 } else {
+           // 필수 데이터가 없는 경우만 건너뛰기
+           console.log(`⏭️ [건너뛰기] 필수데이터 없음: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
+         }
       }
     }
   } else {
