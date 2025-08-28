@@ -18176,9 +18176,8 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                 console.log(`🔍 [${sheetName}] Row ${index + 5}: inputDate="${inputDate}", lastModifiedDate="${lastModifiedDate}", match=${inputDate === lastModifiedDate}`);
               }
               
-              // D열: "홍기현 (팀장)(Ⅰ)" 형식에서 "홍기현" 부분 매칭
-              // E열: 시간 정확히 일치
-              if (inputUser && inputUser.includes(ownerName) && inputDate === lastModifiedDate) {
+              // 모든 데이터 합계 (조건 매칭 제거)
+              if (true) {
                 if (budgetType === 'Ⅱ') {
                   // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
                   if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
