@@ -4418,10 +4418,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
           const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
           
-          // 액면예산 입력값 디버깅 로그 (모든 매칭 성공 케이스 출력)
-          if (selectedPolicyGroups.includes(policyGroup)) {
-            console.log(`📊 [액면예산 Row ${actualRowNumber}] 정책그룹=${policyGroup}, 정책군=${armyType}, 유형=${categoryType}, 모델명=${modelName}`);
-          }
+          // 액면예산 입력값 디버깅 로그는 매칭 성공 시에만 출력하도록 이동
           
           // 1. 정책그룹 매칭 확인
           if (!selectedPolicyGroups.includes(policyGroup)) {
@@ -4509,8 +4506,11 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
               }
             });
             
-            console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${policyGroup}, 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
-            console.log(`💾 [시트저장성공] Row ${actualRowNumber}: 잔액=${remainingBudget}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            // 매칭 성공 로그 (배치 단위로만 출력하여 로그 스팸 방지)
+            if (batchCount % 10 === 0) {
+              console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${policyGroup}, 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+              console.log(`💾 [시트저장성공] Row ${actualRowNumber}: 잔액=${remainingBudget}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            }
             
             // 배치 처리 후 메모리 정리
             batchCount++;
