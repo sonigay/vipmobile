@@ -8885,7 +8885,7 @@ const COLUMN_MATCHING_CONFIG = [
   {
     manualField: { name: '통화연결음 미유치', key: 'call_ringtone_no', column: 119 }, // DP열 또는 EB열
     systemField: { name: '통화연결음 미유치', key: 'call_ringtone_no', column: 31 }, // AF열
-    description: '통화연결음 미유치 (일반 로직: 값이 다르면 불일치)'
+    description: '통화연결음 미유치 (폰클: 통화연결음 포함시 미유치, 미포함시 유치)'
   },
   {
     manualField: { name: '청소년요금제추가정책(1)유치', key: 'youth_plan_policy_1', column: 19 }, // T열, AX열, CV열
@@ -9619,15 +9619,11 @@ function normalizeCallRingtoneNo(manualRow, systemRow) {
   if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
     const serviceValue = (systemRow[31] || '').toString().trim(); // AF열: 환수서비스
     
-    // "V컬러링 기본" 또는 "지정번호필터링" 또는 "V컬러링 음악감상 플러스" 포함 여부로 정규화
-    if (serviceValue && (
-      serviceValue.includes('V컬러링 기본') || 
-      serviceValue.includes('지정번호필터링') ||
-      serviceValue.includes('V컬러링 음악감상 플러스')
-    )) {
-      systemValue = '통화연결음 유치';
-    } else {
+    // "통화연결음" 포함 여부로 정규화 (포함시 미유치, 미포함시 유치)
+    if (serviceValue && serviceValue.includes('통화연결음')) {
       systemValue = '통화연결음 미유치';
+    } else {
+      systemValue = '통화연결음 유치';
     }
   }
   
@@ -10765,7 +10761,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'call_ringtone_no',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '통화연결음 미유치 (일반 로직: 값이 다르면 불일치)',
+          description: '통화연결음 미유치 (폰클: 통화연결음 포함시 미유치, 미포함시 유치)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
