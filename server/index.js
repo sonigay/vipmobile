@@ -27,8 +27,10 @@ app.use(cors({
     // 허용할 도메인 목록
     const allowedOrigins = [
       'https://vipmobile.netlify.app',
+      'https://vipmobile.netlify.app/',
       'http://localhost:3000',
-      'http://localhost:3001'
+      'http://localhost:3001',
+      'http://localhost:4000'
     ];
     
     // origin이 없거나 허용된 도메인에 포함되어 있으면 허용
@@ -40,17 +42,20 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept', 'X-API-Key'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 
 // OPTIONS 요청 명시적 처리
 app.options('*', (req, res) => {
   const allowedOrigins = [
     'https://vipmobile.netlify.app',
+    'https://vipmobile.netlify.app/',
     'http://localhost:3000',
-    'http://localhost:3001'
+    'http://localhost:3001',
+    'http://localhost:4000'
   ];
   
   const origin = req.headers.origin;
@@ -58,9 +63,20 @@ app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', origin);
   }
   
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
+  res.status(200).end();
+});
+
+// 특정 API 엔드포인트에 대한 OPTIONS 요청 처리
+app.options('/api/budget/user-sheets-v2', (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24시간 캐시
   res.status(200).end();
 });
 
@@ -4969,6 +4985,23 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
     console.error('사용예산 계산 오류:', error);
     res.status(500).json({ error: '사용예산 계산 중 오류가 발생했습니다.' });
   }
+});
+
+// 에러 핸들링 미들웨어 (CORS 헤더 포함)
+app.use((error, req, res, next) => {
+  console.error('🚨 [서버에러]', error);
+  
+  // CORS 헤더 설정
+  res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  res.status(500).json({ 
+    error: '서버 내부 오류가 발생했습니다.',
+    message: error.message,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // 서버 시작
@@ -17748,6 +17781,12 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
 
 // 새로운 사용자 시트 조회 API (UserSheetManager 사용)
 app.get('/api/budget/user-sheets-v2', async (req, res) => {
+  // CORS 헤더 명시적 설정
+  res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   console.log('🔍 [NEW-API] GET /api/budget/user-sheets-v2 호출됨!', req.query);
   try {
     const { userId, targetMonth, showAllUsers, budgetType } = req.query;
