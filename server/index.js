@@ -8875,7 +8875,7 @@ const COLUMN_MATCHING_CONFIG = [
   {
     manualField: { name: '보험 미유치', key: 'insurance_no', column: 124 }, // DU열
     systemField: { name: '보험 미유치', key: 'insurance_no', column: 31 }, // AF열
-    description: '보험 미유치 (반대 로직: 수기초 미포함, 폰클 포함시 불일치)'
+    description: '보험 미유치 (일반 로직: 값이 다르면 불일치)'
   },
   {
     manualField: { name: '통화연결음 유치', key: 'call_ringtone', column: 131 }, // EB열
@@ -8885,7 +8885,7 @@ const COLUMN_MATCHING_CONFIG = [
   {
     manualField: { name: '통화연결음 미유치', key: 'call_ringtone_no', column: 119 }, // DP열 또는 EB열
     systemField: { name: '통화연결음 미유치', key: 'call_ringtone_no', column: 31 }, // AF열
-    description: '통화연결음 미유치 (반대 로직: 수기초 미포함, 폰클 포함시 불일치)'
+    description: '통화연결음 미유치 (일반 로직: 값이 다르면 불일치)'
   },
   {
     manualField: { name: '청소년요금제추가정책(1)유치', key: 'youth_plan_policy_1', column: 19 }, // T열, AX열, CV열
@@ -10710,8 +10710,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 보험 미유치 정규화
       const { manualValue, systemValue } = normalizeInsuranceNo(manualRow, systemRow);
       
-      // 보험 미유치는 반대 로직: 값이 같으면 불일치, 다르면 일치
-      if (manualValue.trim() === systemValue.trim()) {
+      // 보험 미유치: 값이 다르면 불일치, 같으면 일치
+      if (manualValue.trim() !== systemValue.trim()) {
         differences.push({
           key,
           type: 'mismatch',
@@ -10719,7 +10719,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'insurance_no',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '보험 미유치 (반대 로직: 둘 다 같으면 불일치)',
+          description: '보험 미유치 (일반 로직: 값이 다르면 불일치)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
@@ -10756,8 +10756,8 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       // 통화연결음 미유치 정규화
       const { manualValue, systemValue } = normalizeCallRingtoneNo(manualRow, systemRow);
       
-      // 통화연결음 미유치는 반대 로직: 값이 같으면 불일치, 다르면 일치
-      if (manualValue.trim() === systemValue.trim()) {
+      // 통화연결음 미유치: 값이 다르면 불일치, 같으면 일치
+      if (manualValue.trim() !== systemValue.trim()) {
         differences.push({
           key,
           type: 'mismatch',
@@ -10765,7 +10765,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
           fieldKey: 'call_ringtone_no',
           correctValue: manualValue,
           incorrectValue: systemValue,
-          description: '통화연결음 미유치 (반대 로직: 둘 다 같으면 불일치)',
+          description: '통화연결음 미유치 (일반 로직: 값이 다르면 불일치)',
           manualRow: null,
           systemRow: null,
           assignedAgent: systemRow[77] || '' // BR열: 등록직원 (69+8)
