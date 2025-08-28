@@ -30,9 +30,9 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "node --max-old-space-size=1024 --expose-gc server/index.js",
-    "monitor": "node --max-old-space-size=512 --expose-gc server/monitor.js",
-    "dev": "nodemon --max-old-space-size=1024 --expose-gc server/index.js",
+    "start": "node --max-old-space-size=2048 --expose-gc server/index.js",
+    "monitor": "node --max-old-space-size=1024 --expose-gc server/monitor.js",
+    "dev": "nodemon --max-old-space-size=2048 --expose-gc server/index.js",
     "both": "concurrently \"npm run start\" \"npm run monitor\"",
     "build": "CI=false GENERATE_SOURCEMAP=false react-scripts build",
     "build:analyze": "CI=false GENERATE_SOURCEMAP=true react-scripts build",

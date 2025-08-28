@@ -4418,14 +4418,14 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
           const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
           
-          // 액면예산 입력값 디버깅 로그 (정책그룹이 선택된 것에 포함되어 있을 때만 출력, 배치 단위로만 출력)
-          if (selectedPolicyGroups.includes(policyGroup) && batchCount % 10 === 0) {
+          // 액면예산 입력값 디버깅 로그 (모든 매칭 성공 케이스 출력)
+          if (selectedPolicyGroups.includes(policyGroup)) {
             console.log(`📊 [액면예산 Row ${actualRowNumber}] 정책그룹=${policyGroup}, 정책군=${armyType}, 유형=${categoryType}, 모델명=${modelName}`);
           }
           
           // 1. 정책그룹 매칭 확인
           if (!selectedPolicyGroups.includes(policyGroup)) {
-            console.log(`❌ [정책그룹] 매칭 실패: 정책그룹=${policyGroup}, 선택된정책그룹=[${selectedPolicyGroups.join(',')}]`);
+            // console.log(`❌ [정책그룹] 매칭 실패: 정책그룹=${policyGroup}, 선택된정책그룹=[${selectedPolicyGroups.join(',')}]`);
             continue;
           }
           
@@ -4510,7 +4510,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
             });
             
             console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${policyGroup}, 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
-            console.log(`💾 [시트저장] Row ${actualRowNumber} 계산결과 저장됨: 잔액=${remainingBudget}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            console.log(`💾 [시트저장성공] Row ${actualRowNumber}: 잔액=${remainingBudget}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
             
             // 배치 처리 후 메모리 정리
             batchCount++;
@@ -8046,11 +8046,15 @@ app.get('/api/inspection-data', async (req, res) => {
     const manualRows = manualValues.slice(1);
     const systemRows = systemValues.slice(3);
 
-    // 수기초 데이터의 최대 일시 계산
+    // 수기초 데이터의 최대 일시 계산 (메모리 최적화)
     function getMaxManualDateTime(manualRows) {
       let maxDateTime = null;
+      let processedCount = 0;
+      const BATCH_SIZE = 1000;
       
-      manualRows.forEach(row => {
+      for (let i = 0; i < manualRows.length; i++) {
+        const row = manualRows[i];
+        
         if (row.length > 30) { // AD열(29) + AE열(30) 최소 필요
           const date = (row[29] || '').toString().trim(); // AD열: 가입일자
           const time = (row[30] || '').toString().trim(); // AE열: 개통시간
@@ -8072,18 +8076,35 @@ app.get('/api/inspection-data', async (req, res) => {
             }
           }
         }
-      });
+        
+        processedCount++;
+        
+        // 배치 단위로 메모리 정리
+        if (processedCount % BATCH_SIZE === 0) {
+          if (global.gc) {
+            global.gc();
+          }
+          console.log(`🧠 [일시필터링] 최대일시 계산 진행률: ${processedCount}/${manualRows.length} (${Math.round(processedCount/manualRows.length*100)}%)`);
+        }
+      }
       
       return maxDateTime;
     }
 
-    // 폰클 데이터를 수기초 최대 일시로 필터링
+    // 폰클 데이터를 수기초 최대 일시로 필터링 (메모리 최적화)
     function filterSystemRowsByDateTime(systemRows, maxManualDateTime) {
       if (!maxManualDateTime) {
         return systemRows; // 최대 일시가 없으면 모든 데이터 반환
       }
       
-      return systemRows.filter(row => {
+      const filteredRows = [];
+      let processedCount = 0;
+      const BATCH_SIZE = 1000;
+      
+      for (let i = 0; i < systemRows.length; i++) {
+        const row = systemRows[i];
+        let shouldInclude = true;
+        
         if (row.length > 11) { // J열(9) + K열(10) + L열(11) 최소 필요
           const date = (row[9] || '').toString().trim(); // J열: 개통일
           const hour = (row[10] || '').toString().replace('시', '').trim(); // K열: 개통시
@@ -8099,13 +8120,32 @@ app.get('/api/inspection-data', async (req, res) => {
             const dateTime = new Date(dateTimeStr);
             
             // 수기초 최대 일시 이전 또는 같은 데이터만 포함
-            return !isNaN(dateTime.getTime()) && dateTime <= maxManualDateTime;
+            shouldInclude = !isNaN(dateTime.getTime()) && dateTime <= maxManualDateTime;
           }
         }
-        return true; // 날짜 정보가 없으면 포함
-      });
+        
+        if (shouldInclude) {
+          filteredRows.push(row);
+        }
+        
+        processedCount++;
+        
+        // 배치 단위로 메모리 정리
+        if (processedCount % BATCH_SIZE === 0) {
+          if (global.gc) {
+            global.gc();
+          }
+          console.log(`🧠 [일시필터링] 폰클필터링 진행률: ${processedCount}/${systemRows.length} (${Math.round(processedCount/systemRows.length*100)}%)`);
+        }
+      }
+      
+      return filteredRows;
     }
 
+    // 메모리 사용량 모니터링
+    const startMemory = process.memoryUsage();
+    console.log(`🧠 [메모리] 일시필터링 시작: ${Math.round(startMemory.heapUsed / 1024 / 1024)}MB`);
+    
     // 수기초 최대 일시 계산
     const maxManualDateTime = getMaxManualDateTime(manualRows);
     console.log(`📅 [일시필터링] 수기초 최대 일시: ${maxManualDateTime ? maxManualDateTime.toISOString() : '없음'}`);
@@ -8117,6 +8157,17 @@ app.get('/api/inspection-data', async (req, res) => {
     const excludedCount = originalSystemRowsCount - filteredSystemRowsCount;
     
     console.log(`📅 [일시필터링] 폰클 데이터 필터링 결과: 전체 ${originalSystemRowsCount}개 → 필터링 후 ${filteredSystemRowsCount}개 (제외: ${excludedCount}개)`);
+    
+    // 메모리 사용량 모니터링
+    const endMemory = process.memoryUsage();
+    console.log(`🧠 [메모리] 일시필터링 완료: ${Math.round(endMemory.heapUsed / 1024 / 1024)}MB (증가: ${Math.round((endMemory.heapUsed - startMemory.heapUsed) / 1024 / 1024)}MB)`);
+    
+    // 강제 가비지 컬렉션
+    if (global.gc) {
+      global.gc();
+      const afterGCMemory = process.memoryUsage();
+      console.log(`🧠 [메모리] GC 후: ${Math.round(afterGCMemory.heapUsed / 1024 / 1024)}MB`);
+    }
     
     // 필터링된 데이터로 계속 진행
     const filteredSystemRowsForComparison = filteredSystemRows;
