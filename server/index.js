@@ -18091,13 +18091,21 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           const budgetTypeMatch = sheetName.match(/액면_.*?\(([ⅠⅡ])\)/);
           const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
           
-          // 액면예산 타입에 따른 액면예산 컬럼 결정
-          let phoneklRange = '액면예산!L:N'; // 기본값: 액면예산(Ⅰ)
+          // 액면예산 타입에 따른 범위 결정
+          let phoneklRange, inputUserCol, inputDateCol;
           if (budgetType === 'Ⅱ') {
-            phoneklRange = '액면예산!I:K'; // 액면예산(Ⅱ)
+            // 액면예산(Ⅱ): B열(입력자), C열(입력일시), I열(잔액), J열(확보), K열(사용)
+            phoneklRange = '액면예산!B:K';
+            inputUserCol = 0; // B열 (첫 번째 컬럼)
+            inputDateCol = 1; // C열 (두 번째 컬럼)
+          } else {
+            // 액면예산(Ⅰ): D열(입력자), E열(입력일시), L열(잔액), M열(확보), N열(사용)
+            phoneklRange = '액면예산!D:N';
+            inputUserCol = 0; // D열 (첫 번째 컬럼)
+            inputDateCol = 1; // E열 (두 번째 컬럼)
           }
           
-          // 액면예산에서 해당 컬럼들 가져오기
+          // 액면예산에서 해당 범위 가져오기
           const activationDataResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: phoneklRange
@@ -18105,37 +18113,69 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           
           const activationData = activationDataResponse.data.values || [];
           
-          // L열, M열, N열의 계산된 값 합계 계산 (헤더 제외, 공백 제외)
+          // 자가업자 정보 추출 (시트 이름에서)
+          const ownerMatch = sheetName.match(/액면_(.+?)\(/);
+          const ownerName = ownerMatch ? ownerMatch[1] : '';
+          
+          // 마지막수정일시 가져오기 (메타데이터에서)
+          let lastModifiedDate = '';
+          try {
+            const metadataResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: `${sheetName}!O1:R2`
+            });
+            
+            const metadata = metadataResponse.data.values || [];
+            if (metadata.length >= 2 && metadata[1].length >= 2) {
+              lastModifiedDate = metadata[1][1] || ''; // 마지막수정일시
+            }
+          } catch (metadataError) {
+            console.log('메타데이터 조회 실패:', metadataError.message);
+          }
+          
+          console.log(`🔍 [${sheetName}] 조건 매칭: 자가업자=${ownerName}, 마지막수정일시=${lastModifiedDate}`);
+          
+          // 조건에 맞는 행들의 합계 계산
           let totalRemainingBudget = 0;
           let totalSecuredBudget = 0;
           let totalUsedBudget = 0;
           
-          console.log(`🔍 [${sheetName}] 액면예산 합계 계산 시작`);
-          
-          activationData.slice(4).forEach((row, index) => { // C5행부터 시작
-            if (row.length >= 3) {
-              // L열: 예산잔액 (공백이 아닌 경우만)
-              if (row[0] !== '' && row[0] !== undefined && row[0] !== null) {
-                const value = parseFloat(row[0]) || 0;
-                totalRemainingBudget += value;
-                // L열 데이터 처리
-              }
-              // M열: 확보예산 (공백이 아닌 경우만)
-              if (row[1] !== '' && row[1] !== undefined && row[1] !== null) {
-                const value = parseFloat(row[1]) || 0;
-                totalSecuredBudget += value;
-                // M열 데이터 처리
-              }
-              // N열: 사용예산 (공백이 아닌 경우만)
-              if (row[2] !== '' && row[2] !== undefined && row[2] !== null) {
-                const value = parseFloat(row[2]) || 0;
-                totalUsedBudget += value;
-                // N열 데이터 처리
+          activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
+            if (row.length >= (budgetType === 'Ⅱ' ? 11 : 11)) { // B:K 또는 D:N 범위
+              const inputUser = row[inputUserCol];
+              const inputDate = row[inputDateCol];
+              
+              // D열: "홍기현 (팀장)(Ⅰ)" 형식에서 "홍기현" 부분 매칭
+              // E열: "2025. 8. 28. 오후 10:38:15" 형식과 정확히 일치
+              if (inputUser && inputUser.includes(ownerName) && inputDate === lastModifiedDate) {
+                if (budgetType === 'Ⅱ') {
+                  // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
+                  if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
+                    totalRemainingBudget += parseFloat(row[7]) || 0; // I열
+                  }
+                  if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                    totalSecuredBudget += parseFloat(row[8]) || 0; // J열
+                  }
+                  if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                    totalUsedBudget += parseFloat(row[9]) || 0; // K열
+                  }
+                } else {
+                  // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
+                  if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                    totalRemainingBudget += parseFloat(row[8]) || 0; // L열
+                  }
+                  if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                    totalSecuredBudget += parseFloat(row[9]) || 0; // M열
+                  }
+                  if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                    totalUsedBudget += parseFloat(row[10]) || 0; // N열
+                  }
+                }
               }
             }
           });
           
-          console.log(`📊 [${sheetName}] 최종 합계: L열=${totalRemainingBudget}, M열=${totalSecuredBudget}, N열=${totalUsedBudget}`);
+          console.log(`📊 [${sheetName}] 최종 합계: 예산잔액=${totalRemainingBudget}, 확보예산=${totalSecuredBudget}, 사용예산=${totalUsedBudget}`);
           
           // 원 단위 그대로 표시 (액면예산에서 직접 읽은 값)
           summary.totalRemainingBudget = totalRemainingBudget;
