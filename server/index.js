@@ -4529,10 +4529,63 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           }
         }
         
-        // 매칭되지 않은 경우 로그
+        // 매칭되지 않은 경우 상세 로그
         if (!matchFound) {
           modelMismatch++;
-          console.log(`❌ [매칭실패] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
+          
+          // 액면예산에서 해당 조건에 맞는 데이터가 있는지 확인
+          let foundInPhonekl = false;
+          let phoneklMatchDetails = [];
+          
+          for (let j = dataStartRow; j < phoneklData.length; j++) {
+            const row = phoneklData[j];
+            if (row.length < 33) continue; // AG열(32) 최소 필요
+            
+            const policyGroup = (row[15] || '').toString().trim(); // P열: 정책그룹
+            const armyType = (row[14] || '').toString().trim(); // O열: 정책군
+            const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
+            const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
+            
+            // 정책그룹이 선택된 것에 포함되어 있는지 확인
+            if (!selectedPolicyGroups.includes(policyGroup)) continue;
+            
+            // 정책군 매핑
+            let mappedArmyType = '';
+            if (armyType === 'S') mappedArmyType = 'S군';
+            else if (armyType === 'A') mappedArmyType = 'A군';
+            else if (armyType === 'B') mappedArmyType = 'B군';
+            else if (armyType === 'C') mappedArmyType = 'C군';
+            else if (armyType === 'D') mappedArmyType = 'D군';
+            else if (armyType === 'E') mappedArmyType = 'E군';
+            else mappedArmyType = armyType;
+            
+            // 유형 매핑
+            let mappedCategoryType = '';
+            if (categoryType === '신규') mappedCategoryType = '신규';
+            else if (categoryType === 'MNP') mappedCategoryType = 'MNP';
+            else if (categoryType === '보상') mappedCategoryType = '보상';
+            else if (categoryType === '기변') mappedCategoryType = '보상';
+            else mappedCategoryType = categoryType;
+            
+            // 모델명이 일치하는지 확인
+            if (budgetModelName === modelName) {
+              foundInPhonekl = true;
+              phoneklMatchDetails.push({
+                row: j + 1,
+                policyGroup,
+                armyType: mappedArmyType,
+                categoryType: mappedCategoryType,
+                modelName
+              });
+            }
+          }
+          
+          if (foundInPhonekl) {
+            console.log(`❌ [매칭실패-상세] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
+            console.log(`   📊 액면예산에서 발견된 유사 데이터:`, phoneklMatchDetails);
+          } else {
+            console.log(`❌ [매칭실패-모델없음] 사용자시트: 모델=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}`);
+          }
         }
       }
     }
