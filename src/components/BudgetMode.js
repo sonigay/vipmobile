@@ -1753,8 +1753,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                </TableHead>
               
                              <TableBody>
-                 {/* 데이터 행들 (최대 40행) */}
-                 {Array.from({ length: 40 }, (_, rowIndex) => (
+                 {/* 데이터 행들 (최대 60행) */}
+                 {Array.from({ length: 60 }, (_, rowIndex) => (
                   <TableRow key={rowIndex}>
                     {/* 모델명 셀 */}
                     <TableCell 
