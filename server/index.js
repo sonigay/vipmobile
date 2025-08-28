@@ -4433,7 +4433,7 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     const policyGroup = (phoneklRow[15] || '').toString().trim(); // P열: 정책그룹
     const armyType = (phoneklRow[14] || '').toString().trim(); // O열: 정책군 (S, A, B, C, D, E)
     const categoryType = (phoneklRow[30] || '').toString().trim(); // AE열: 유형
-    const modelName = (phoneklRow[32] || '').toString().trim(); // AG열: 모델명
+           const modelName = (phoneklRow[0] || '').toString().trim(); // A열: 모델명
     
     // 정책그룹 필터링
     if (!selectedPolicyGroups.includes(policyGroup)) {
@@ -4469,10 +4469,10 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     // 액면예산 복합 키 생성: 모델명&정책군&유형
     const phoneklCompositeKey = `${modelName}&${armyType}&${categoryType}`;
     
-    // VLOOKUP: 사용자시트에서 매칭 데이터 검색
-    const matchingUserData = userSheetIndex.get(phoneklCompositeKey);
-    
-    if (matchingUserData) {
+         // VLOOKUP: 사용자시트에서 매칭 데이터 검색
+     const matchingUserData = userSheetIndex.get(phoneklCompositeKey);
+     
+     if (matchingUserData) {
       // 매칭 성공! 사용자시트 데이터를 액면예산에 복사
       matchedItems++;
       processedRows++;
@@ -4778,8 +4778,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                 const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산 (기존 G열에서 3열 밀림)
                 const budgetSecuredAmount = parseFloat(budgetRow[8]) || 0; // I열: 확보 예산 (기존 F열에서 3열 밀림)
                 
-                // 액면예산 AG열의 모델명과 비교
-                const activationModelName = row[32]; // AG열: 모델명 (기존 V열에서 +11)
+                // 액면예산 A열의 모델명과 비교
+                const activationModelName = row[0]; // A열: 모델명
                 
                 // 모델명, 군, 유형이 모두 일치하는 경우
                 if (budgetModelName === activationModelName && 
@@ -4798,7 +4798,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           if (!matchFound) {
             // 매칭 실패 원인 분석
-            const activationModelName = row[32]; // AG열: 모델명 (기존 V열에서 +11)
+            const activationModelName = row[0]; // A열: 모델명
             // 매칭 실패
             
             // 액면_홍남옥에서 해당 모델명이 있는지 확인
