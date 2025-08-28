@@ -4336,6 +4336,10 @@ async function getUserSheetName(userName, budgetType) {
 async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyGroups, dateRange, budgetType) {
   console.log(`🧮 [performBudgetMatching] 시작: 정책그룹=${selectedPolicyGroups.join(',')}, 예산타입=${budgetType}`);
   
+  // 메모리 사용량 모니터링
+  const startMemory = process.memoryUsage();
+  console.log(`🧠 [메모리] 시작: RSS=${Math.round(startMemory.rss / 1024 / 1024)}MB, Heap=${Math.round(startMemory.heapUsed / 1024 / 1024)}MB`);
+  
   const calculationResults = [];
   const dataMapping = {};
   
@@ -4347,6 +4351,10 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
   let policyGroupFiltered = 0;
   let dateRangeFiltered = 0;
   let modelMismatch = 0;
+  
+  // 배치 처리 설정
+  const BATCH_SIZE = 50; // 배치 크기 (메모리 사용량 조절)
+  let batchCount = 0;
   
   // 헤더 확인 (5행부터 시작) - 기존 로직과 동일
   const dataStartRow = 4; // 0-based index (실제 5행)
@@ -4363,8 +4371,10 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
         const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산
         const budgetSecuredAmount = parseFloat(budgetRow[8]) || 40000; // I열: 확보 예산 (기본값 40000)
         
-        // 사용자 시트 입력값 디버깅 로그
-        console.log(`📋 [사용자시트 Row ${i}] 모델명=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
+        // 사용자 시트 입력값 디버깅 로그 (배치 단위로만 출력)
+        if (i % 10 === 0) {
+          console.log(`📋 [사용자시트 Row ${i}] 모델명=${budgetModelName}, 군=${budgetArmyType}, 유형=${budgetCategoryType}, 확보=${budgetSecuredAmount}, 사용=${budgetUsedAmount}`);
+        }
         
         // 사용자 시트의 모델명이 비어있으면 건너뛰기
         if (!budgetModelName) {
@@ -4376,12 +4386,10 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
         let calculatedBudgetValue = budgetUsedAmount;
         let securedBudgetValue = budgetSecuredAmount;
         
-        // C5행부터 액면예산 데이터 처리
-        const activationRows = phoneklData.slice(dataStartRow);
-        
-        for (let j = 0; j < activationRows.length; j++) {
-          const row = activationRows[j];
-          const actualRowNumber = 5 + j; // C5, C6, C7, C8...
+        // C5행부터 액면예산 데이터 처리 (메모리 효율성을 위해 인덱스만 사용)
+        for (let j = dataStartRow; j < phoneklData.length; j++) {
+          const row = phoneklData[j];
+          const actualRowNumber = j + 1; // 실제 행 번호
           
           // 행이 존재하고 AG열(32번 인덱스)까지 접근할 수 있는지 확인
           if (!row || row.length < 33) {
@@ -4394,8 +4402,8 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
           const categoryType = (row[30] || '').toString().trim(); // AE열: 유형
           const modelName = (row[32] || '').toString().trim(); // AG열: 모델명
           
-          // 액면예산 입력값 디버깅 로그 (정책그룹이 선택된 것에 포함되어 있을 때만 출력)
-          if (selectedPolicyGroups.includes(policyGroup)) {
+          // 액면예산 입력값 디버깅 로그 (정책그룹이 선택된 것에 포함되어 있을 때만 출력, 배치 단위로만 출력)
+          if (selectedPolicyGroups.includes(policyGroup) && batchCount % 10 === 0) {
             console.log(`📊 [액면예산 Row ${actualRowNumber}] 정책그룹=${policyGroup}, 정책군=${armyType}, 유형=${categoryType}, 모델명=${modelName}`);
           }
           
@@ -4486,6 +4494,21 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
             });
             
             console.log(`✅ [매칭성공] Row ${actualRowNumber}: 정책그룹=${policyGroup}, 모델=${modelName}, 군=${mappedArmyType}, 유형=${mappedCategoryType}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            console.log(`💾 [시트저장] Row ${actualRowNumber} 계산결과 저장됨: 잔액=${remainingBudget}, 확보=${securedBudgetValue}, 사용=${calculatedBudgetValue}`);
+            
+            // 배치 처리 후 메모리 정리
+            batchCount++;
+            if (batchCount % BATCH_SIZE === 0) {
+              const currentMemory = process.memoryUsage();
+              console.log(`📦 [배치처리] ${batchCount}개 매칭 완료 - 메모리: RSS=${Math.round(currentMemory.rss / 1024 / 1024)}MB, Heap=${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB`);
+              
+              // 메모리 정리 유도
+              if (global.gc) {
+                global.gc();
+                console.log(`🧹 [메모리] 가비지 컬렉션 실행`);
+              }
+            }
+            
             break;
           }
         }
@@ -4501,8 +4524,16 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
     console.log(`🚫 사용자 시트 데이터가 비어있음 (헤더만 존재)`);
   }
   
+  // 최종 메모리 사용량 로그
+  const endMemory = process.memoryUsage();
+  const memoryDiff = {
+    rss: Math.round((endMemory.rss - startMemory.rss) / 1024 / 1024),
+    heap: Math.round((endMemory.heapUsed - startMemory.heapUsed) / 1024 / 1024)
+  };
+  
   console.log(`📈 [performBudgetMatching] 완료: 처리=${processedRows}, 매칭=${matchedItems}, 모델불일치=${modelMismatch}`);
   console.log(`📋 [dataMapping] 생성 완료: ${Object.keys(dataMapping).length}개 행`);
+  console.log(`🧠 [메모리] 완료: RSS=${Math.round(endMemory.rss / 1024 / 1024)}MB (${memoryDiff.rss > 0 ? '+' : ''}${memoryDiff.rss}MB), Heap=${Math.round(endMemory.heapUsed / 1024 / 1024)}MB (${memoryDiff.heap > 0 ? '+' : ''}${memoryDiff.heap}MB)`);
   
   return {
     dataMapping,
@@ -17677,19 +17708,30 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
             range: `K${index + 2}`,
             values: [[remainingBudget]]
           });
+          
+          console.log(`💾 [사용자시트] Row ${index + 2} 업데이트: 사용예산=${matchingData.budgetValue}, 잔액=${remainingBudget}`);
         }
       }
     });
     
     // 사용자 시트 업데이트
     if (updateRequests.length > 0) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: sheetId,
-        resource: {
-          valueInputOption: 'RAW',
-          data: updateRequests
-        }
-      });
+      console.log(`🚀 [사용자시트] 배치 업데이트 실행: ${updateRequests.length}개 셀`);
+      
+      try {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: sheetId,
+          resource: {
+            valueInputOption: 'RAW',
+            data: updateRequests
+          }
+        });
+        
+        console.log(`✅ [사용자시트] 배치 업데이트 성공: ${updateRequests.length}개 셀`);
+      } catch (error) {
+        console.error(`❌ [사용자시트] 배치 업데이트 실패:`, error);
+        throw error;
+      }
     }
     
     res.json({

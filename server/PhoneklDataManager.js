@@ -61,21 +61,29 @@ class PhoneklDataManager {
   /**
    * 안전한 데이터 업데이트 (기존 데이터 보존)
    */
-  async safeUpdateData(sheetId, budgetType, newDataMap, userInfo, dateRange = null) {
+    async safeUpdateData(sheetId, budgetType, newDataMap, userInfo, dateRange = null) {
     console.log(`🔒 [PhoneklDataManager] 안전 업데이트 시작: ${budgetType}, 사용자: ${userInfo.userName}`);
+    
+    // 메모리 사용량 모니터링
+    const startMemory = process.memoryUsage();
+    console.log(`🧠 [PhoneklDataManager] 시작: RSS=${Math.round(startMemory.rss / 1024 / 1024)}MB, Heap=${Math.round(startMemory.heapUsed / 1024 / 1024)}MB`);
     
     try {
       // 1. 현재 데이터 읽기
       const currentData = await this.readCurrentData(sheetId, budgetType);
       const columns = this.getColumnMapping(budgetType);
       
-             // 날짜 필터링 제거로 인해 전체 데이터 읽기 불필요
+      // 날짜 필터링 제거로 인해 전체 데이터 읽기 불필요
       
       // 3. 업데이트할 요청들 준비
       const updateRequests = [];
-             let preservedCount = 0;
-       let updatedCount = 0;
-       let skippedCount = 0;
+      let preservedCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+      
+      // 배치 처리 설정
+      const BATCH_SIZE = 100; // 배치 크기
+      let batchCount = 0;
       
       // 4. 헤더 행 건너뛰고 데이터 시작 행부터 처리 (5행부터)
       const dataStartRow = 4; // 0-based index로 4 (실제 5행)
@@ -126,33 +134,36 @@ class PhoneklDataManager {
           const sameOwner = existingOwner === currentOwnerWithType;
           const canUpdate = budgetCellsEmpty || sameOwner;
           
-          if (canUpdate) {
-            const updates = [];
-            const currentTime = new Date().toISOString();
-            
-            // 예산잔액 업데이트
-            if (!this.isEmpty(newData.remainingBudget)) {
-              updates.push({
-                range: `${this.phoneklSheetName}!${columns.remainingBudget}${actualRowNumber}`,
-                values: [[newData.remainingBudget]]
-              });
-            }
-            
-            // 확보예산 업데이트
-            if (!this.isEmpty(newData.securedBudget)) {
-              updates.push({
-                range: `${this.phoneklSheetName}!${columns.securedBudget}${actualRowNumber}`,
-                values: [[newData.securedBudget]]
-              });
-            }
-            
-            // 사용예산 업데이트
-            if (!this.isEmpty(newData.usedBudget)) {
-              updates.push({
-                range: `${this.phoneklSheetName}!${columns.usedBudget}${actualRowNumber}`,
-                values: [[newData.usedBudget]]
-              });
-            }
+                      if (canUpdate) {
+              const updates = [];
+              const currentTime = new Date().toISOString();
+              
+              // 예산잔액 업데이트
+              if (!this.isEmpty(newData.remainingBudget)) {
+                updates.push({
+                  range: `${this.phoneklSheetName}!${columns.remainingBudget}${actualRowNumber}`,
+                  values: [[newData.remainingBudget]]
+                });
+                console.log(`💾 [시트저장] Row ${actualRowNumber} 예산잔액 저장: ${newData.remainingBudget}`);
+              }
+              
+              // 확보예산 업데이트
+              if (!this.isEmpty(newData.securedBudget)) {
+                updates.push({
+                  range: `${this.phoneklSheetName}!${columns.securedBudget}${actualRowNumber}`,
+                  values: [[newData.securedBudget]]
+                });
+                console.log(`💾 [시트저장] Row ${actualRowNumber} 확보예산 저장: ${newData.securedBudget}`);
+              }
+              
+              // 사용예산 업데이트
+              if (!this.isEmpty(newData.usedBudget)) {
+                updates.push({
+                  range: `${this.phoneklSheetName}!${columns.usedBudget}${actualRowNumber}`,
+                  values: [[newData.usedBudget]]
+                });
+                console.log(`💾 [시트저장] Row ${actualRowNumber} 사용예산 저장: ${newData.usedBudget}`);
+              }
             
             // 소유권 정보 업데이트 (사용자명+예산타입)
             if (updates.length > 0) {
@@ -169,6 +180,19 @@ class PhoneklDataManager {
               
               updateRequests.push(...updates);
               updatedCount += updates.length;
+              
+              // 배치 처리 후 메모리 정리
+              batchCount++;
+              if (batchCount % BATCH_SIZE === 0) {
+                const currentMemory = process.memoryUsage();
+                console.log(`📦 [PhoneklDataManager] ${batchCount}개 행 처리 완료 - 메모리: RSS=${Math.round(currentMemory.rss / 1024 / 1024)}MB, Heap=${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB`);
+                
+                // 메모리 정리 유도
+                if (global.gc) {
+                  global.gc();
+                  console.log(`🧹 [PhoneklDataManager] 가비지 컬렉션 실행`);
+                }
+              }
             }
           } else {
             // 다른 사용자 또는 다른 예산타입의 데이터이므로 보존
@@ -188,15 +212,20 @@ class PhoneklDataManager {
       if (updateRequests.length > 0) {
         console.log(`🚀 [PhoneklDataManager] 배치 업데이트 실행: ${updateRequests.length}개 셀`);
         
-        await this.sheets.spreadsheets.values.batchUpdate({
-          spreadsheetId: sheetId,
-          resource: {
-            valueInputOption: 'RAW',
-            data: updateRequests
-          }
-        });
-        
-        console.log(`✅ [PhoneklDataManager] 업데이트 완료!`);
+        try {
+          await this.sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: sheetId,
+            resource: {
+              valueInputOption: 'RAW',
+              data: updateRequests
+            }
+          });
+          
+          console.log(`✅ [PhoneklDataManager] 배치 업데이트 성공: ${updateRequests.length}개 셀`);
+        } catch (error) {
+          console.error(`❌ [PhoneklDataManager] 배치 업데이트 실패:`, error);
+          throw error;
+        }
       } else {
         console.log(`📋 [PhoneklDataManager] 업데이트할 데이터 없음 (모든 셀이 이미 채워짐)`);
       }
@@ -204,15 +233,24 @@ class PhoneklDataManager {
       // 5. 결과 반환
       const result = {
         success: true,
-                 updatedCells: updateRequests.length,
-         preservedCells: preservedCount,
-         skippedRows: skippedCount,
-         budgetType,
-         userInfo,
-         message: `업데이트: ${updateRequests.length}개 셀, 보존: ${preservedCount}개 셀, 건너뜀: ${skippedCount}행`
+        updatedCells: updateRequests.length,
+        preservedCells: preservedCount,
+        skippedRows: skippedCount,
+        budgetType,
+        userInfo,
+        message: `업데이트: ${updateRequests.length}개 셀, 보존: ${preservedCount}개 셀, 건너뜀: ${skippedCount}행`
+      };
+      
+      // 최종 메모리 사용량 로그
+      const endMemory = process.memoryUsage();
+      const memoryDiff = {
+        rss: Math.round((endMemory.rss - startMemory.rss) / 1024 / 1024),
+        heap: Math.round((endMemory.heapUsed - startMemory.heapUsed) / 1024 / 1024)
       };
       
       console.log(`📊 [PhoneklDataManager] 최종 결과:`, result);
+      console.log(`🧠 [PhoneklDataManager] 완료: RSS=${Math.round(endMemory.rss / 1024 / 1024)}MB (${memoryDiff.rss > 0 ? '+' : ''}${memoryDiff.rss}MB), Heap=${Math.round(endMemory.heapUsed / 1024 / 1024)}MB (${memoryDiff.heap > 0 ? '+' : ''}${memoryDiff.heap}MB)`);
+      
       return result;
       
     } catch (error) {
