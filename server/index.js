@@ -17978,12 +17978,174 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
-        // 시트 목록 조회 시에는 계산을 수행하지 않고 기본값 사용 (성능 최적화)
-        // 실제 계산은 시트 데이터 로드 시에만 수행
-        summary.totalRemainingBudget = 0;
-        summary.totalSecuredBudget = 0;
-        summary.totalUsedBudget = 0;
-        summary.itemCount = 0;
+        // 실제 계산 수행 (성능 최적화 제거)
+        console.log(`🔍 [${sheet.sheetName}] 계산 시작!`);
+        
+        // 액면예산에서 해당 범위 가져오기
+        const activationDataResponse = await sheets_api.spreadsheets.values.get({
+          spreadsheetId: sheet.sheetId,
+          range: '액면예산!A:ZZ'
+        });
+        
+        const activationData = activationDataResponse.data.values || [];
+        console.log(`📊 [${sheet.sheetName}] 데이터 로드: ${activationData.length}행`);
+        
+        if (activationData.length > 4) {
+          // 조건부 합계 계산 - 날짜 범위와 생성한 저장값에 맞는 금액만 합산
+          let totalRemainingBudget = 0;
+          let totalSecuredBudget = 0;
+          let totalUsedBudget = 0;
+          
+          // 메타데이터에서 날짜 범위와 생성자 정보 가져오기
+          let receiptStartDate = '';
+          let receiptEndDate = '';
+          let activationStartDate = '';
+          let activationEndDate = '';
+          let creatorName = '';
+          
+          console.log(`🔍 [${sheet.sheetName}] 메타데이터 조회 시작: O1:R2`);
+          
+          try {
+            const metadataResponse = await sheets_api.spreadsheets.values.get({
+              spreadsheetId: sheet.sheetId,
+              range: `${sheet.sheetName}!O1:R2`
+            });
+            
+            const metadata = metadataResponse.data.values || [];
+            console.log(`🔍 [${sheet.sheetName}] 메타데이터 원본:`, JSON.stringify(metadata));
+            
+            if (metadata.length >= 2 && metadata[1].length >= 4) {
+              const receiptRange = metadata[1][1] || ''; // 접수일 범위
+              const activationRange = metadata[1][2] || ''; // 개통일 범위
+              creatorName = metadata[1][0] || ''; // 생성자 이름
+              
+              console.log(`🔍 [${sheet.sheetName}] 파싱 전: receiptRange="${receiptRange}", activationRange="${activationRange}", creatorName="${creatorName}"`);
+              
+              // 접수일 범위 파싱 (예: "2025.08.01~2025.08.31")
+              if (receiptRange && receiptRange.includes('~')) {
+                const [start, end] = receiptRange.split('~');
+                receiptStartDate = start.trim();
+                receiptEndDate = end.trim();
+              }
+              
+              // 개통일 범위 파싱 (예: "2025.08.01~2025.08.31")
+              if (activationRange && activationRange.includes('~')) {
+                const [start, end] = activationRange.split('~');
+                activationStartDate = start.trim();
+                activationEndDate = end.trim();
+              }
+            } else {
+              console.log(`❌ [${sheet.sheetName}] 메타데이터 형식 오류: length=${metadata.length}, row1.length=${metadata[1]?.length}`);
+            }
+          } catch (metadataError) {
+            console.log(`❌ [${sheet.sheetName}] 메타데이터 조회 실패:`, metadataError.message);
+          }
+          
+          console.log(`📅 [${sheet.sheetName}] 파싱 후 조건: 생성자="${creatorName}", 접수일="${receiptStartDate}~${receiptEndDate}", 개통일="${activationStartDate}~${activationEndDate}"`);
+          
+          // 액면예산 타입에 따른 컬럼 매핑
+          const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
+          const inputDateCol = budgetType === 'Ⅱ' ? 2 : 4; // C열 또는 E열
+          
+          activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
+            if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) { // 충분한 열이 있는지 확인
+              const inputUser = row[inputUserCol];
+              const inputDate = row[inputDateCol];
+              
+              // 조건 매칭 체크
+              let isMatched = true;
+              let matchReason = [];
+              
+              console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 매칭 체크: inputUser="${inputUser}", inputDate="${inputDate}"`);
+              
+              // 1. 생성자 매칭 (생성자가 설정된 경우에만)
+              if (creatorName && inputUser) {
+                const creatorMatch = inputUser.includes(creatorName);
+                isMatched = isMatched && creatorMatch;
+                matchReason.push(`생성자: ${creatorMatch ? '성공' : '실패'} (${inputUser} vs ${creatorName})`);
+              } else {
+                matchReason.push(`생성자: 조건없음`);
+              }
+              
+              // 2. 날짜 범위 매칭 (범위가 설정된 경우에만)
+              if (inputDate) {
+                const inputDateStr = inputDate.toString().trim();
+                
+                // 접수일 범위 체크
+                if (receiptStartDate && receiptEndDate) {
+                  const receiptMatch = (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
+                  isMatched = isMatched && receiptMatch;
+                  matchReason.push(`접수일: ${receiptMatch ? '성공' : '실패'} (${inputDateStr} vs ${receiptStartDate}~${receiptEndDate})`);
+                } else {
+                  matchReason.push(`접수일: 조건없음`);
+                }
+                
+                // 개통일 범위 체크
+                if (activationStartDate && activationEndDate) {
+                  const activationMatch = (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
+                  isMatched = isMatched && activationMatch;
+                  matchReason.push(`개통일: ${activationMatch ? '성공' : '실패'} (${inputDateStr} vs ${activationStartDate}~${activationEndDate})`);
+                } else {
+                  matchReason.push(`개통일: 조건없음`);
+                }
+              } else {
+                matchReason.push(`입력일: 데이터없음`);
+              }
+              
+              console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 매칭 결과: ${isMatched ? '성공' : '실패'} - ${matchReason.join(', ')}`);
+              
+              // 조건에 맞는 데이터만 합계
+              if (isMatched) {
+                if (budgetType === 'Ⅱ') {
+                  // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
+                  if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                    const value = parseFloat(row[8]) || 0;
+                    totalRemainingBudget += value;
+                    console.log(`💰 [${sheet.sheetName}] Row ${index + 5} 매칭성공(Ⅱ): I열=${row[8]} → 잔액 누적=${totalRemainingBudget}`);
+                  }
+                  if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                    const value = parseFloat(row[9]) || 0;
+                    totalSecuredBudget += value;
+                    console.log(`💰 [${sheet.sheetName}] Row ${index + 5} 매칭성공(Ⅱ): J열=${row[9]} → 확보 누적=${totalSecuredBudget}`);
+                  }
+                  if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                    const value = parseFloat(row[10]) || 0;
+                    totalUsedBudget += value;
+                    console.log(`💰 [${sheet.sheetName}] Row ${index + 5} 매칭성공(Ⅱ): K열=${row[10]} → 사용 누적=${totalUsedBudget}`);
+                  }
+                } else {
+                  // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
+                  if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
+                    const value = parseFloat(row[11]) || 0;
+                    totalRemainingBudget += value;
+                    console.log(`💰 [${sheet.sheetName}] Row ${index + 5} 매칭성공(Ⅰ): L열=${row[11]} → 잔액 누적=${totalRemainingBudget}`);
+                  }
+                  if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
+                    const value = parseFloat(row[12]) || 0;
+                    totalSecuredBudget += value;
+                    console.log(`💰 [${sheet.sheetName}] Row ${index + 5} 매칭성공(Ⅰ): M열=${row[12]} → 확보 누적=${totalSecuredBudget}`);
+                  }
+                  if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
+                    const value = parseFloat(row[13]) || 0;
+                    totalUsedBudget += value;
+                    console.log(`💰 [${sheet.sheetName}] Row ${index + 5} 매칭성공(Ⅰ): N열=${row[13]} → 사용 누적=${totalUsedBudget}`);
+                  }
+                }
+              } else {
+                console.log(`❌ [${sheet.sheetName}] Row ${index + 5} 매칭실패 - ${matchReason.join(', ')}`);
+              }
+            }
+          });
+          
+          console.log(`📊 [${sheet.sheetName}] 조건부 합계 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
+          
+          summary.totalRemainingBudget = totalRemainingBudget;
+          summary.totalSecuredBudget = totalSecuredBudget;
+          summary.totalUsedBudget = totalUsedBudget;
+          summary.itemCount = activationData.length - 4; // 헤더 4행 제외
+        } else {
+          console.log(`❌ [${sheet.sheetName}] 데이터 부족: ${activationData.length}행`);
+        }
         
         // 날짜 범위 설정
         if (sheet.dateRange.receiptStartDate) {
