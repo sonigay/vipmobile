@@ -18218,31 +18218,31 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               if (true) {
                 if (budgetType === 'Ⅱ') {
                   // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
-                  if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
-                    totalRemainingBudget += parseFloat(row[7]) || 0; // I열
-                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): I열=${row[7]}, 누적잔액=${totalRemainingBudget}`);
-                  }
                   if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
-                    totalSecuredBudget += parseFloat(row[8]) || 0; // J열
-                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): J열=${row[8]}, 누적확보=${totalSecuredBudget}`);
+                    totalRemainingBudget += parseFloat(row[8]) || 0; // I열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): I열=${row[8]}, 누적잔액=${totalRemainingBudget}`);
                   }
                   if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
-                    totalUsedBudget += parseFloat(row[9]) || 0; // K열
-                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): K열=${row[9]}, 누적사용=${totalUsedBudget}`);
+                    totalSecuredBudget += parseFloat(row[9]) || 0; // J열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): J열=${row[9]}, 누적확보=${totalSecuredBudget}`);
+                  }
+                  if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                    totalUsedBudget += parseFloat(row[10]) || 0; // K열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): K열=${row[10]}, 누적사용=${totalUsedBudget}`);
                   }
                 } else {
                   // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
-                  if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
-                    totalRemainingBudget += parseFloat(row[8]) || 0; // L열
-                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): L열=${row[8]}, 누적잔액=${totalRemainingBudget}`);
+                  if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
+                    totalRemainingBudget += parseFloat(row[11]) || 0; // L열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): L열=${row[11]}, 누적잔액=${totalRemainingBudget}`);
                   }
-                  if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
-                    totalSecuredBudget += parseFloat(row[9]) || 0; // M열
-                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): M열=${row[9]}, 누적확보=${totalSecuredBudget}`);
+                  if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
+                    totalSecuredBudget += parseFloat(row[12]) || 0; // M열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): M열=${row[12]}, 누적확보=${totalSecuredBudget}`);
                   }
-                  if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
-                    totalUsedBudget += parseFloat(row[10]) || 0; // N열
-                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): N열=${row[10]}, 누적사용=${totalUsedBudget}`);
+                  if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
+                    totalUsedBudget += parseFloat(row[13]) || 0; // N열
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅰ): N열=${row[13]}, 누적사용=${totalUsedBudget}`);
                   }
                 }
               }
