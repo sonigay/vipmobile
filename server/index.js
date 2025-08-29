@@ -17983,7 +17983,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         
         // 액면예산에서 해당 범위 가져오기
         const activationDataResponse = await sheets_api.spreadsheets.values.get({
-          spreadsheetId: sheet.sheetId,
+            spreadsheetId: sheet.sheetId,
           range: '액면예산!A:ZZ'
         });
         
@@ -18007,7 +18007,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
           
           try {
             const metadataResponse = await sheets_api.spreadsheets.values.get({
-              spreadsheetId: sheet.sheetId,
+            spreadsheetId: sheet.sheetId,
               range: `${sheet.sheetName}!O1:R2`
             });
             
@@ -18063,7 +18063,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                 const creatorMatch = inputUser.includes(creatorName);
                 isMatched = isMatched && creatorMatch;
                 matchReason.push(`생성자: ${creatorMatch ? '성공' : '실패'} (${inputUser} vs ${creatorName})`);
-              } else {
+          } else {
                 matchReason.push(`생성자: 조건없음`);
               }
               
@@ -18465,17 +18465,17 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                   // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
                   if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
                     const value = parseFloat(row[8]) || 0;
-                    totalRemainingBudget += value;
+                totalRemainingBudget += value;
                     console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): I열=${row[8]} → 잔액 누적=${totalRemainingBudget}`);
-                  }
+              }
                   if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
                     const value = parseFloat(row[9]) || 0;
-                    totalSecuredBudget += value;
+                totalSecuredBudget += value;
                     console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): J열=${row[9]} → 확보 누적=${totalSecuredBudget}`);
-                  }
+              }
                   if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
                     const value = parseFloat(row[10]) || 0;
-                    totalUsedBudget += value;
+                totalUsedBudget += value;
                     console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): K열=${row[10]} → 사용 누적=${totalUsedBudget}`);
                   }
                 } else {
