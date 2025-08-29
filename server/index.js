@@ -18210,6 +18210,8 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           let activationEndDate = '';
           let creatorName = '';
           
+          console.log(`🔍 [${sheetName}] 메타데이터 조회 시작: O1:R2`);
+          
           try {
             const metadataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
@@ -18217,10 +18219,14 @@ app.get('/api/budget/user-sheets', async (req, res) => {
             });
             
             const metadata = metadataResponse.data.values || [];
+            console.log(`🔍 [${sheetName}] 메타데이터 원본:`, JSON.stringify(metadata));
+            
             if (metadata.length >= 2 && metadata[1].length >= 4) {
               const receiptRange = metadata[1][1] || ''; // 접수일 범위
               const activationRange = metadata[1][2] || ''; // 개통일 범위
               creatorName = metadata[1][0] || ''; // 생성자 이름
+              
+              console.log(`🔍 [${sheetName}] 파싱 전: receiptRange="${receiptRange}", activationRange="${activationRange}", creatorName="${creatorName}"`);
               
               // 접수일 범위 파싱 (예: "2025.08.01~2025.08.31")
               if (receiptRange && receiptRange.includes('~')) {
@@ -18235,12 +18241,14 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                 activationStartDate = start.trim();
                 activationEndDate = end.trim();
               }
+            } else {
+              console.log(`❌ [${sheetName}] 메타데이터 형식 오류: length=${metadata.length}, row1.length=${metadata[1]?.length}`);
             }
           } catch (metadataError) {
-            console.log('메타데이터 조회 실패:', metadataError.message);
+            console.log(`❌ [${sheetName}] 메타데이터 조회 실패:`, metadataError.message);
           }
           
-          console.log(`📅 [${sheetName}] 조건: 생성자=${creatorName}, 접수일=${receiptStartDate}~${receiptEndDate}, 개통일=${activationStartDate}~${activationEndDate}`);
+          console.log(`📅 [${sheetName}] 파싱 후 조건: 생성자="${creatorName}", 접수일="${receiptStartDate}~${receiptEndDate}", 개통일="${activationStartDate}~${activationEndDate}"`);
           
           activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
             if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) { // 충분한 열이 있는지 확인
@@ -18249,10 +18257,17 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               
               // 조건 매칭 체크
               let isMatched = true;
+              let matchReason = [];
+              
+              console.log(`🔍 [${sheetName}] Row ${index + 5} 매칭 체크: inputUser="${inputUser}", inputDate="${inputDate}"`);
               
               // 1. 생성자 매칭 (생성자가 설정된 경우에만)
               if (creatorName && inputUser) {
-                isMatched = isMatched && inputUser.includes(creatorName);
+                const creatorMatch = inputUser.includes(creatorName);
+                isMatched = isMatched && creatorMatch;
+                matchReason.push(`생성자: ${creatorMatch ? '성공' : '실패'} (${inputUser} vs ${creatorName})`);
+              } else {
+                matchReason.push(`생성자: 조건없음`);
               }
               
               // 2. 날짜 범위 매칭 (범위가 설정된 경우에만)
@@ -18261,14 +18276,26 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                 
                 // 접수일 범위 체크
                 if (receiptStartDate && receiptEndDate) {
-                  isMatched = isMatched && (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
+                  const receiptMatch = (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
+                  isMatched = isMatched && receiptMatch;
+                  matchReason.push(`접수일: ${receiptMatch ? '성공' : '실패'} (${inputDateStr} vs ${receiptStartDate}~${receiptEndDate})`);
+                } else {
+                  matchReason.push(`접수일: 조건없음`);
                 }
                 
                 // 개통일 범위 체크
                 if (activationStartDate && activationEndDate) {
-                  isMatched = isMatched && (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
+                  const activationMatch = (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
+                  isMatched = isMatched && activationMatch;
+                  matchReason.push(`개통일: ${activationMatch ? '성공' : '실패'} (${inputDateStr} vs ${activationStartDate}~${activationEndDate})`);
+                } else {
+                  matchReason.push(`개통일: 조건없음`);
                 }
+              } else {
+                matchReason.push(`입력일: 데이터없음`);
               }
+              
+              console.log(`🔍 [${sheetName}] Row ${index + 5} 매칭 결과: ${isMatched ? '성공' : '실패'} - ${matchReason.join(', ')}`);
               
               // 조건에 맞는 데이터만 합계
               if (isMatched) {
@@ -18308,7 +18335,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                   }
                 }
               } else {
-                console.log(`❌ [${sheetName}] Row ${index + 5} 매칭실패: inputUser="${inputUser}", inputDate="${inputDate}"`);
+                console.log(`❌ [${sheetName}] Row ${index + 5} 매칭실패 - ${matchReason.join(', ')}`);
               }
             }
           });
