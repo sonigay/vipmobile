@@ -10330,14 +10330,14 @@ function normalizeOnsaleStrategyOnlinePosDeduction(manualRow, systemRow) {
 function normalizeUplayNoCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DX열)
   let manualValue = '유플레이 미유치 차감 비대상'; // 기본값 설정
-  if (manualRow.length > 127) { // 최소 DX열(127)은 있어야 함
+  if (manualRow.length > 130) { // 최소 DX열(127)은 있어야 함
     const uplayValue = (manualRow[127] || '').toString().trim(); // DX열: 유플레이
     
     // "유플레이" 미포함 시 "유플레이 미유치 차감" 표기
-    if (uplayValue && uplayValue.includes('유플레이')) {
-      manualValue = '유플레이 미유치 차감 비대상';
-    } else {
+    if (uplayValue && !uplayValue.includes('유플레이')) {
       manualValue = '유플레이 미유치 차감 대상';
+    } else {
+      manualValue = '유플레이 미유치 차감 비대상';
     }
   }
   
@@ -10347,10 +10347,10 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
     const uplayNoValue = (systemRow[31] || '').toString().trim(); // AF열: 유플레이 미유치
     
     // "유플레이" 포함 시 "유플레이 미유치 차감" 표기
-    if (uplayNoValue && uplayNoValue.includes('유플레이')) {
-      systemValue = '유플레이 미유치 차감 대상';
-    } else {
+    if (uplayNoValue && !uplayNoValue.includes('유플레이')) {
       systemValue = '유플레이 미유치 차감 비대상';
+    } else {
+      systemValue = '유플레이 미유치 차감 대상';
     }
   }
   
