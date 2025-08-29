@@ -4436,36 +4436,36 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
            const modelName = (phoneklRow[0] || '').toString().trim(); // A열: 모델명
     
     // 정책그룹 필터링
-    if (!selectedPolicyGroups.includes(policyGroup)) {
+          if (!selectedPolicyGroups.includes(policyGroup)) {
       policyGroupFiltered++;
-      continue;
-    }
-    
+            continue;
+          }
+          
     // 날짜 범위 필터링
-    let isInDateRange = true;
-    if (dateRange) {
+          let isInDateRange = true;
+          if (dateRange) {
       const receptionDate = normalizeReceptionDate(phoneklRow[16]); // Q열: 접수일
       const activationDate = normalizeActivationDate(phoneklRow[20], phoneklRow[21], phoneklRow[22]); // U, V, W열: 개통일
-      
-      if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
-        const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
-        isInDateRange = isInDateRange && receptionInRange;
-      }
-      
-      const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
-      const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
-      
-      if (activationStartDate && activationEndDate) {
-        const activationInRange = activationDate ? isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
-        isInDateRange = isInDateRange && activationInRange;
-      }
-    }
-    
-    if (!isInDateRange) {
+            
+            if (dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate) {
+              const receptionInRange = receptionDate ? isDateInRange(receptionDate, dateRange.receiptStartDate, dateRange.receiptEndDate) : false;
+              isInDateRange = isInDateRange && receptionInRange;
+            }
+            
+            const activationStartDate = dateRange.activationStartDate || dateRange.startDate;
+            const activationEndDate = dateRange.activationEndDate || dateRange.endDate;
+            
+            if (activationStartDate && activationEndDate) {
+              const activationInRange = activationDate ? isDateInRange(activationDate, activationStartDate, activationEndDate) : false;
+              isInDateRange = isInDateRange && activationInRange;
+            }
+          }
+          
+          if (!isInDateRange) {
       dateRangeFiltered++;
-      continue;
-    }
-    
+            continue;
+          }
+          
     // 액면예산 복합 키 생성: 모델명&정책군&유형
     const phoneklCompositeKey = `${modelName}&${armyType}&${categoryType}`;
     
@@ -4474,32 +4474,32 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
      
      if (matchingUserData) {
       // 매칭 성공! 사용자시트 데이터를 액면예산에 복사
-      matchedItems++;
-      processedRows++;
-      
+            matchedItems++;
+            processedRows++;
+            
       const actualRowNumber = j + 1; // Google Sheets 행 번호 (1-based)
-      
+            
       // 사용자시트 데이터를 액면예산에 복사
-      dataMapping[actualRowNumber] = {
+            dataMapping[actualRowNumber] = {
         remainingBudget: matchingUserData.remainingBudget, // K열 → L열
         securedBudget: matchingUserData.securedBudget,     // I열 → M열
         usedBudget: matchingUserData.usedBudget            // J열 → N열
-      };
-      
-      calculationResults.push({
-        rowIndex: j + dataStartRow,
-        actualRowNumber,
+            };
+            
+            calculationResults.push({
+              rowIndex: j + dataStartRow,
+              actualRowNumber,
         calculatedBudgetValue: matchingUserData.remainingBudget,
         securedBudgetValue: matchingUserData.securedBudget,
         usedBudgetValue: matchingUserData.usedBudget,
-        matchingData: {
-          policyGroup,
+              matchingData: {
+                policyGroup,
           armyType,
           categoryType,
-          modelName
-        }
-      });
-      
+                modelName
+              }
+            });
+            
       totalSecuredBudget += matchingUserData.securedBudget;
       totalUsedBudget += matchingUserData.usedBudget;
       totalRemainingBudget += matchingUserData.remainingBudget;
@@ -4523,14 +4523,14 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
       }
     } else {
       // 매칭 실패
-      modelMismatch++;
+          modelMismatch++;
       
       // 로그 스팸 방지를 위해 간단한 로그만 출력
       if (modelMismatch % 50 === 0) {
         console.log(`❌ [VLOOKUP실패] 액면예산 Row ${j + 1}: 모델=${modelName}, 군=${armyType}, 유형=${categoryType} (매칭 실패)`);
+        }
       }
     }
-  }
   
   // 사용자시트 데이터가 비어있는 경우 처리
   if (userSheetData.length <= 1) {
@@ -8043,14 +8043,34 @@ app.get('/api/inspection-data', async (req, res) => {
     const manualRows = manualValues.slice(1);
     const systemRows = systemValues.slice(3);
 
+    // 수기초 데이터를 동일한 열 구조로 맞춰주는 함수
+    function normalizeManualRows(manualRows) {
+      const REQUIRED_COLUMNS = 150; // DX열(127) + 여유분을 위해 150개로 설정
+      
+      return manualRows.map(row => {
+        if (row.length < REQUIRED_COLUMNS) {
+          // 부족한 열만큼 빈 문자열로 채우기
+          const normalizedRow = [...row];
+          while (normalizedRow.length < REQUIRED_COLUMNS) {
+            normalizedRow.push('');
+          }
+          return normalizedRow;
+        }
+        return row;
+      });
+    }
+
+    // 수기초 데이터 정규화 적용
+    const normalizedManualRows = normalizeManualRows(manualRows);
+
     // 수기초 데이터의 최대 일시 계산 (메모리 최적화)
-    function getMaxManualDateTime(manualRows) {
+    function getMaxManualDateTime(normalizedManualRows) {
       let maxDateTime = null;
       let processedCount = 0;
       const BATCH_SIZE = 1000;
       
-      for (let i = 0; i < manualRows.length; i++) {
-        const row = manualRows[i];
+      for (let i = 0; i < normalizedManualRows.length; i++) {
+        const row = normalizedManualRows[i];
         
         if (row.length > 30) { // AD열(29) + AE열(30) 최소 필요
           const date = (row[29] || '').toString().trim(); // AD열: 가입일자
@@ -8081,7 +8101,7 @@ app.get('/api/inspection-data', async (req, res) => {
           if (global.gc) {
             global.gc();
           }
-          console.log(`🧠 [일시필터링] 최대일시 계산 진행률: ${processedCount}/${manualRows.length} (${Math.round(processedCount/manualRows.length*100)}%)`);
+          console.log(`🧠 [일시필터링] 최대일시 계산 진행률: ${processedCount}/${normalizedManualRows.length} (${Math.round(processedCount/normalizedManualRows.length*100)}%)`);
         }
       }
       
@@ -8144,7 +8164,7 @@ app.get('/api/inspection-data', async (req, res) => {
     console.log(`🧠 [메모리] 일시필터링 시작: ${Math.round(startMemory.heapUsed / 1024 / 1024)}MB`);
     
     // 수기초 최대 일시 계산
-    const maxManualDateTime = getMaxManualDateTime(manualRows);
+    const maxManualDateTime = getMaxManualDateTime(normalizedManualRows);
     console.log(`📅 [일시필터링] 수기초 최대 일시: ${maxManualDateTime ? maxManualDateTime.toISOString() : '없음'}`);
     
     // 폰클 데이터 필터링
@@ -8175,7 +8195,7 @@ app.get('/api/inspection-data', async (req, res) => {
     const systemMap = new Map();
 
     // 수기초 데이터 인덱싱 (U열: 가입번호 기준)
-    manualRows.forEach((row, index) => {
+    normalizedManualRows.forEach((row, index) => {
       if (row.length > 20 && row[20]) {
         const key = row[20].toString().trim();
         manualMap.set(key, { row, index: index + 2 }); // +2는 헤더와 1-based 인덱스 때문
@@ -8276,7 +8296,7 @@ app.get('/api/inspection-data', async (req, res) => {
     const allRows = [];
     
     // 모든 수기초 데이터 추가
-    manualRows.forEach((row, index) => {
+    normalizedManualRows.forEach((row, index) => {
       if (row.length > 20 && row[20]) {
         const key = row[20].toString().trim();
         allRows.push({
@@ -9442,7 +9462,7 @@ function normalizePreInstallment(manualRow, systemRow) {
   let manualPreInstallment = '';
   if (manualRow.length > 56) { // 최소 BE열(56)은 있어야 함
     const beValue = (manualRow[56] || '').toString().trim(); // BE열: 프리할부상이
-    const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
+        const finalPolicy = (manualRow[48] || '').toString().trim(); // AN열: 최종영업정책 (39+9)
     
     // AN열에 "BLANK" 포함되어있으면 대상에서 제외
     if (finalPolicy && finalPolicy.toUpperCase().includes('BLANK')) {
@@ -11213,11 +11233,11 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       const { manualValue, systemValue } = normalizeUplayNoCheck(manualRow, systemRow);
       
       // 500280760172 가번 디버깅 로그 추가
-
+      
       
       // 디버깅 로그 추가
       console.log(`[유플레이 미유치 차감] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
-      
+        
       // 값이 다르면 불일치로 기록
       if (manualValue.trim() !== systemValue.trim()) {
         
@@ -17889,13 +17909,13 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
       console.log(`🚀 [사용자시트] 배치 업데이트 실행: ${updateRequests.length}개 셀`);
       
       try {
-        await sheets.spreadsheets.values.batchUpdate({
-          spreadsheetId: sheetId,
-          resource: {
-            valueInputOption: 'RAW',
-            data: updateRequests
-          }
-        });
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: sheetId,
+        resource: {
+          valueInputOption: 'RAW',
+          data: updateRequests
+        }
+      });
         
         console.log(`✅ [사용자시트] 배치 업데이트 성공: ${updateRequests.length}개 셀`);
       } catch (error) {
