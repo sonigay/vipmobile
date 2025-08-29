@@ -18215,6 +18215,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
               }
               
               // 모든 데이터 합계 (조건 매칭 제거)
+              console.log(`🔍 [${sheetName}] Row ${index + 5}: inputUser="${inputUser}", ownerName="${ownerName}", inputDate="${inputDate}", lastModifiedDate="${lastModifiedDate}"`);
               if (true) {
                 if (budgetType === 'Ⅱ') {
                   // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
