@@ -17978,148 +17978,50 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
-        // 실제 계산 수행 - 입력 API와 동일한 로직
-        console.log(`🔍 [${sheet.sheetName}] 계산 시작!`);
+        // 단순히 저장된 금액 합계 - 이미 입력 과정에서 매칭 완료됨
+        console.log(`🔍 [${sheet.sheetName}] 저장된 금액 합계 시작!`);
         
-        // 액면예산에서 해당 범위 가져오기
-        const activationDataResponse = await sheets_api.spreadsheets.values.get({
+        // 사용자 시트에서 저장된 금액 가져오기
+        const userSheetDataResponse = await sheets_api.spreadsheets.values.get({
           spreadsheetId: sheet.sheetId,
-          range: '액면예산!A:ZZ'
+          range: `${sheet.sheetName}!A:L`
         });
         
-        const activationData = activationDataResponse.data.values || [];
-        console.log(`📊 [${sheet.sheetName}] 데이터 로드: ${activationData.length}행`);
+        const userSheetData = userSheetDataResponse.data.values || [];
+        console.log(`📊 [${sheet.sheetName}] 사용자 시트 데이터 로드: ${userSheetData.length}행`);
         
-        if (activationData.length > 4) {
-          // 조건부 합계 계산 - 날짜 범위와 생성한 저장값에 맞는 금액만 합산
+        if (userSheetData.length > 1) { // 헤더 제외
           let totalRemainingBudget = 0;
           let totalSecuredBudget = 0;
           let totalUsedBudget = 0;
           
-          // 메타데이터에서 날짜 범위와 생성자 정보 가져오기
-          let receiptStartDate = '';
-          let receiptEndDate = '';
-          let activationStartDate = '';
-          let activationEndDate = '';
-          let creatorName = '';
-          
-          try {
-            const metadataResponse = await sheets_api.spreadsheets.values.get({
-              spreadsheetId: sheet.sheetId,
-              range: `${sheet.sheetName}!O1:R2`
-            });
-            
-            const metadata = metadataResponse.data.values || [];
-            
-            if (metadata.length >= 2 && metadata[1].length >= 4) {
-              const receiptRange = metadata[1][1] || ''; // 접수일 범위
-              const activationRange = metadata[1][2] || ''; // 개통일 범위
-              creatorName = metadata[1][3] || ''; // 생성자 이름 (R열)
-              
-              // 접수일 범위 파싱
-              if (receiptRange && receiptRange.includes('~') && receiptRange !== '미적용') {
-                const [start, end] = receiptRange.split('~');
-                receiptStartDate = start.trim();
-                receiptEndDate = end.trim();
+          // 헤더 제외하고 데이터 행들만 처리
+          userSheetData.slice(1).forEach((row, index) => {
+            if (row.length >= 12) { // 충분한 열이 있는지 확인
+              // I열(확보), J열(사용), K열(잔액)
+              if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                const value = parseFloat(row[8]) || 0;
+                totalSecuredBudget += value;
               }
-              
-              // 개통일 범위 파싱
-              if (activationRange && activationRange.includes('~') && activationRange !== '미적용') {
-                const [start, end] = activationRange.split('~');
-                activationStartDate = start.trim();
-                activationEndDate = end.trim();
+              if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                const value = parseFloat(row[9]) || 0;
+                totalUsedBudget += value;
               }
-            }
-          } catch (metadataError) {
-            console.log(`❌ [${sheet.sheetName}] 메타데이터 조회 실패:`, metadataError.message);
-          }
-          
-          // 액면예산 타입에 따른 컬럼 매핑
-          const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
-          const inputDateCol = budgetType === 'Ⅱ' ? 2 : 4; // C열 또는 E열
-          
-          activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
-            if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) { // 충분한 열이 있는지 확인
-              const inputUser = row[inputUserCol];
-              const inputDate = row[inputDateCol];
-              
-              // 조건 매칭 체크
-              let isMatched = true;
-              
-              // 1. 생성자 매칭 (생성자가 설정된 경우에만)
-              if (creatorName && inputUser && creatorName !== '미적용') {
-                const creatorMatch = inputUser.includes(creatorName);
-                isMatched = isMatched && creatorMatch;
-              }
-              
-              // 2. 날짜 범위 매칭 (범위가 설정된 경우에만)
-              if (inputDate) {
-                let inputDateStr = inputDate.toString().trim();
-                
-                // (Ⅰ) 접미사 제거
-                if (inputDateStr.includes('(Ⅰ)')) {
-                  inputDateStr = inputDateStr.replace('(Ⅰ)', '').trim();
-                }
-                if (inputDateStr.includes('(Ⅱ)')) {
-                  inputDateStr = inputDateStr.replace('(Ⅱ)', '').trim();
-                }
-                
-                // 접수일 범위 체크 (접수일이 설정된 경우에만)
-                if (receiptStartDate && receiptEndDate && receiptStartDate !== '미적용') {
-                  const receiptMatch = (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
-                  isMatched = isMatched && receiptMatch;
-                }
-                
-                // 개통일 범위 체크 (개통일이 설정된 경우에만)
-                if (activationStartDate && activationEndDate && activationStartDate !== '미적용') {
-                  const activationMatch = (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
-                  isMatched = isMatched && activationMatch;
-                }
-              }
-              
-              // 조건에 맞는 데이터만 합계
-              if (isMatched) {
-                if (budgetType === 'Ⅱ') {
-                  // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
-                  if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
-                    const value = parseFloat(row[8]) || 0;
-                    totalRemainingBudget += value;
-                  }
-                  if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
-                    const value = parseFloat(row[9]) || 0;
-                    totalSecuredBudget += value;
-                  }
-                  if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
-                    const value = parseFloat(row[10]) || 0;
-                    totalUsedBudget += value;
-                  }
-                } else {
-                  // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
-                  if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
-                    const value = parseFloat(row[11]) || 0;
-                    totalRemainingBudget += value;
-                  }
-                  if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
-                    const value = parseFloat(row[12]) || 0;
-                    totalSecuredBudget += value;
-                  }
-                  if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
-                    const value = parseFloat(row[13]) || 0;
-                    totalUsedBudget += value;
-                  }
-                }
+              if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                const value = parseFloat(row[10]) || 0;
+                totalRemainingBudget += value;
               }
             }
           });
           
-          console.log(`📊 [${sheet.sheetName}] 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
+          console.log(`📊 [${sheet.sheetName}] 저장된 금액 합계 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
           
           summary.totalRemainingBudget = totalRemainingBudget;
           summary.totalSecuredBudget = totalSecuredBudget;
           summary.totalUsedBudget = totalUsedBudget;
-          summary.itemCount = activationData.length - 4; // 헤더 4행 제외
+          summary.itemCount = userSheetData.length - 1; // 헤더 제외
         } else {
-          console.log(`❌ [${sheet.sheetName}] 데이터 부족: ${activationData.length}행`);
+          console.log(`❌ [${sheet.sheetName}] 사용자 시트 데이터 부족: ${userSheetData.length}행`);
         }
         
         // 날짜 범위 설정
