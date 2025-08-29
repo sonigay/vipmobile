@@ -10333,8 +10333,8 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   if (manualRow.length > 130) { // 최소 DX열(127)은 있어야 함
     const uplayValue = (manualRow[127] || '').toString().trim(); // DX열: 유플레이
     
-    // "유플레이" 미포함 시 "유플레이 미유치 차감" 표기
-    if (uplayValue && !uplayValue.includes('유플레이')) {
+    // "유플레이" 문구가 없거나 공백이면 "유플레이 미유치 차감 대상"
+    if (!uplayValue || !uplayValue.includes('유플레이')) {
       manualValue = '유플레이 미유치 차감 대상';
     } else {
       manualValue = '유플레이 미유치 차감 비대상';
@@ -10342,15 +10342,15 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   }
   
   // 폰클 데이터 정규화 (AF열)
-  let systemValue = '유플레이 미유치 차감 대상'; // 기본값 설정
+  let systemValue = '유플레이 미유치 차감 비대상'; // 기본값 설정
   if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
     const uplayNoValue = (systemRow[31] || '').toString().trim(); // AF열: 유플레이 미유치
     
-    // "유플레이" 포함 시 "유플레이 미유치 차감" 표기
-    if (uplayNoValue && !uplayNoValue.includes('유플레이')) {
-      systemValue = '유플레이 미유치 차감 비대상';
-    } else {
+    // "유플레이" 문구가 있다면 "유플레이 미유치 차감 대상"
+    if (uplayNoValue && uplayNoValue.includes('유플레이')) {
       systemValue = '유플레이 미유치 차감 대상';
+    } else {
+      systemValue = '유플레이 미유치 차감 비대상';
     }
   }
   
