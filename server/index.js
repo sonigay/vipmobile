@@ -17936,7 +17936,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
   }
 });
 
-// 새로운 사용자 시트 조회 API (UserSheetManager 사용)
+// 새로운 사용자 시트 조회 API (UserSheetManager 사용) - 계산 로직 제거
 app.get('/api/budget/user-sheets-v2', async (req, res) => {
   // CORS 헤더 명시적 설정
   res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
@@ -19080,7 +19080,153 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       }
     });
 
-    res.json({ message: '예산 데이터가 저장되었습니다.' });
+    // 데이터 저장 후 바로 계산 수행
+    console.log(`📊 [데이터저장] ${userSheetName} 계산 시작`);
+    
+    // 액면예산에서 해당 범위 가져오기
+    const activationDataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: '액면예산!A:ZZ'
+    });
+    
+    const activationData = activationDataResponse.data.values || [];
+    console.log(`📊 [데이터저장] 액면예산 데이터 로드: ${activationData.length}행`);
+    
+    // 계산 결과 초기화
+    let totalRemainingBudget = 0;
+    let totalSecuredBudget = 0;
+    let totalUsedBudget = 0;
+    
+    if (activationData.length > 4) {
+      // 메타데이터에서 날짜 범위와 생성자 정보 가져오기
+      let receiptStartDate = '';
+      let receiptEndDate = '';
+      let activationStartDate = '';
+      let activationEndDate = '';
+      let creatorName = '';
+      
+      // 메타데이터 조회
+      try {
+        const metadataResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!O1:R2`
+        });
+        
+        const metadata = metadataResponse.data.values || [];
+        if (metadata.length >= 2 && metadata[1].length >= 4) {
+          const receiptRange = metadata[1][1] || ''; // 접수일 범위
+          const activationRange = metadata[1][2] || ''; // 개통일 범위
+          creatorName = metadata[1][3] || ''; // 생성자 이름 (R열)
+          
+          // 접수일 범위 파싱
+          if (receiptRange && receiptRange.includes('~') && receiptRange !== '미적용') {
+            const [start, end] = receiptRange.split('~');
+            receiptStartDate = start.trim();
+            receiptEndDate = end.trim();
+          }
+          
+          // 개통일 범위 파싱
+          if (activationRange && activationRange.includes('~') && activationRange !== '미적용') {
+            const [start, end] = activationRange.split('~');
+            activationStartDate = start.trim();
+            activationEndDate = end.trim();
+          }
+        }
+      } catch (metadataError) {
+        console.log(`❌ [데이터저장] 메타데이터 조회 실패:`, metadataError.message);
+      }
+      
+      console.log(`📅 [데이터저장] 조건: 생성자="${creatorName}", 접수일="${receiptStartDate}~${receiptEndDate}", 개통일="${activationStartDate}~${activationEndDate}"`);
+      
+      // 액면예산 타입에 따른 컬럼 매핑
+      const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
+      const inputDateCol = budgetType === 'Ⅱ' ? 2 : 4; // C열 또는 E열
+      
+      activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
+        if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) { // 충분한 열이 있는지 확인
+          const inputUser = row[inputUserCol];
+          const inputDate = row[inputDateCol];
+          
+          // 조건 매칭 체크
+          let isMatched = true;
+          
+          // 1. 생성자 매칭 (생성자가 설정된 경우에만)
+          if (creatorName && inputUser && creatorName !== '미적용') {
+            const creatorMatch = inputUser.includes(creatorName);
+            isMatched = isMatched && creatorMatch;
+          }
+          
+          // 2. 날짜 범위 매칭 (범위가 설정된 경우에만)
+          if (inputDate) {
+            let inputDateStr = inputDate.toString().trim();
+            
+            // (Ⅰ) 접미사 제거
+            if (inputDateStr.includes('(Ⅰ)')) {
+              inputDateStr = inputDateStr.replace('(Ⅰ)', '').trim();
+            }
+            if (inputDateStr.includes('(Ⅱ)')) {
+              inputDateStr = inputDateStr.replace('(Ⅱ)', '').trim();
+            }
+            
+            // 접수일 범위 체크 (접수일이 설정된 경우에만)
+            if (receiptStartDate && receiptEndDate && receiptStartDate !== '미적용') {
+              const receiptMatch = (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
+              isMatched = isMatched && receiptMatch;
+            }
+            
+            // 개통일 범위 체크 (개통일이 설정된 경우에만)
+            if (activationStartDate && activationEndDate && activationStartDate !== '미적용') {
+              const activationMatch = (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
+              isMatched = isMatched && activationMatch;
+            }
+          }
+          
+          // 조건에 맞는 데이터만 합계
+          if (isMatched) {
+            if (budgetType === 'Ⅱ') {
+              // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
+              if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                const value = parseFloat(row[8]) || 0;
+                totalRemainingBudget += value;
+              }
+              if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                const value = parseFloat(row[9]) || 0;
+                totalSecuredBudget += value;
+              }
+              if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                const value = parseFloat(row[10]) || 0;
+                totalUsedBudget += value;
+              }
+            } else {
+              // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
+              if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
+                const value = parseFloat(row[11]) || 0;
+                totalRemainingBudget += value;
+              }
+              if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
+                const value = parseFloat(row[12]) || 0;
+                totalSecuredBudget += value;
+              }
+              if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
+                const value = parseFloat(row[13]) || 0;
+                totalUsedBudget += value;
+              }
+            }
+          }
+        }
+      });
+      
+      console.log(`📊 [데이터저장] ${userSheetName} 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
+    }
+    
+    res.json({ 
+      message: '예산 데이터가 저장되었습니다.',
+      summary: {
+        totalRemainingBudget,
+        totalSecuredBudget,
+        totalUsedBudget
+      }
+    });
   } catch (error) {
     console.error('예산 데이터 저장 오류:', error);
     res.status(500).json({ error: '예산 데이터 저장 중 오류가 발생했습니다.' });
@@ -19099,138 +19245,13 @@ function getCategoryType(columnIndex) {
   return categoryTypes[columnIndex - 1] || 'Unknown';
 }
 
-// 액면예산 종합 계산 API
+// 액면예산 종합 계산 API (비활성화 - 입력 API에서 통합 처리)
 app.get('/api/budget/summary/:targetMonth', async (req, res) => {
-  try {
-    const { targetMonth } = req.params;
-    const { userId } = req.query;
-    const sheets = google.sheets({ version: 'v4', auth });
-    
-    if (!targetMonth || !userId) {
-      return res.status(400).json({ error: '대상월과 사용자 ID가 필요합니다.' });
-    }
-    
-    console.log(`📊 [예산종합] ${targetMonth}월 ${userId} 사용자 종합 계산 시작`);
-    
-    // 대상월의 시트 ID 조회
-    const monthSheetsData = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: '예산_대상월관리!A:D',
-    });
+  res.status(410).json({ 
+    error: '이 API는 더 이상 사용되지 않습니다. 데이터 입력 시 자동으로 계산됩니다.',
+    message: '액면예산 데이터 입력 API에서 계산 결과를 함께 반환합니다.'
+  });
 
-    const monthRows = monthSheetsData.data.values || [];
-    const targetMonthRow = monthRows.find(row => row[0] === targetMonth);
-    
-    if (!targetMonthRow || !targetMonthRow[1]) {
-      return res.status(400).json({ error: '해당 월의 시트 ID를 찾을 수 없습니다.' });
-    }
-
-    const targetSheetId = targetMonthRow[1];
-    console.log(`📊 [예산종합] ${targetMonth}월 시트ID: ${targetSheetId}`);
-    
-    // 액면예산에서 D~H열 (owner, timestamp, F, G, H) 가져오기
-    const summaryDataResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: targetSheetId,
-      range: '액면예산!D:H'
-    });
-    
-    const summaryData = summaryDataResponse.data.values || [];
-    
-    // F, G, H열의 합계 계산 (5행부터, 본인이 입력한 데이터만)
-    let totalRemainingBudget = 0; // F열: 예산잔액
-    let totalSecuredBudget = 0;   // G열: 확보예산
-    let totalUsedBudget = 0;      // H열: 사용예산
-    let processedRows = 0;
-    let ownRows = 0;
-    
-    // 대리점아이디관리에서 userId에 해당하는 실제 사용자명 조회
-    let actualUserName = '';
-    try {
-      const agentResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${AGENT_SHEET_NAME}!A:R`,
-      });
-      
-      const agentValues = agentResponse.data.values || [];
-      const agentRows = agentValues.slice(1); // 헤더 제외
-      const userAgent = agentRows.find(row => row[2] === userId); // C열: 연락처(아이디)
-      
-      if (userAgent) {
-        actualUserName = userAgent[0] || ''; // A열: 이름
-        console.log(`📊 [예산종합] 사용자명 조회: ${userId} → ${actualUserName}`);
-      } else {
-        console.log(`⚠️ [예산종합] 사용자명 조회 실패: ${userId}`);
-      }
-    } catch (error) {
-      console.error('📊 [예산종합] 사용자명 조회 오류:', error);
-    }
-    
-    console.log(`📊 [예산종합] 사용자 필터링 시작: ${userId} (${actualUserName})`);
-    
-    summaryData.slice(4).forEach((row, index) => { // 5행부터 시작
-      if (row.length >= 5) { // D, E, F, G, H 열이 모두 있는지 확인
-        processedRows++;
-        
-        const owner = (row[0] || '').toString().trim(); // D열: 입력자
-        const timestamp = (row[1] || '').toString().trim(); // E열: 입력일시
-        const remainingValue = row[2]; // F열: 예산잔액
-        const securedValue = row[3]; // G열: 확보예산
-        const usedValue = row[4]; // H열: 사용예산
-        
-        // 본인이 입력한 데이터인지 확인
-        // owner 형식: "사용자명 (직급)(예산타입)" 예: "홍남옥 (이사)(Ⅰ)"
-        let isOwnData = false;
-        
-        if (owner !== '' && actualUserName !== '') {
-          // 정확한 사용자명으로 매칭
-          isOwnData = owner.includes(actualUserName);
-        } else if (owner !== '' && userId !== '') {
-          // Fallback: userId로 매칭 (전화번호 일부 매칭)
-          isOwnData = owner.includes(userId) || 
-                     owner.includes(userId.slice(-4)) || // 전화번호 뒷자리 4자리
-                     owner.includes(userId.slice(0, 3)); // 전화번호 앞자리 3자리
-        }
-        
-        if (isOwnData) {
-          ownRows++;
-          
-          // F열: 예산잔액 (공백이 아닌 경우만)
-          if (remainingValue !== '' && remainingValue !== undefined && remainingValue !== null) {
-            const value = parseFloat(remainingValue) || 0;
-            totalRemainingBudget += value;
-          }
-          // G열: 확보예산 (공백이 아닌 경우만)
-          if (securedValue !== '' && securedValue !== undefined && securedValue !== null) {
-            const value = parseFloat(securedValue) || 0;
-            totalSecuredBudget += value;
-          }
-          // H열: 사용예산 (공백이 아닌 경우만)
-          if (usedValue !== '' && usedValue !== undefined && usedValue !== null) {
-            const value = parseFloat(usedValue) || 0;
-            totalUsedBudget += value;
-          }
-        }
-      }
-    });
-    
-    console.log(`📊 [예산종합] 필터링 결과: 전체=${processedRows}행, 본인=${ownRows}행, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
-    
-    console.log(`📊 [예산종합] F,G,H열 합계: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
-    
-    res.json({
-      success: true,
-      summary: {
-        totalRemainingBudget,
-        totalSecuredBudget,
-        totalUsedBudget,
-        targetMonth
-      }
-    });
-    
-  } catch (error) {
-    console.error('액면예산 종합 계산 오류:', error);
-    res.status(500).json({ error: '액면예산 종합 계산 중 오류가 발생했습니다.' });
-  }
 });
 
 // 예산 데이터 불러오기 API
