@@ -18012,12 +18012,15 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             });
             
             const metadata = metadataResponse.data.values || [];
-            console.log(`🔍 [${sheet.sheetName}] 메타데이터 원본:`, JSON.stringify(metadata));
+                      console.log(`🔍 [${sheet.sheetName}] 메타데이터 원본:`, JSON.stringify(metadata));
+          
+          if (metadata.length >= 2 && metadata[1].length >= 4) {
+            const receiptRange = metadata[1][1] || ''; // 접수일 범위
+            const activationRange = metadata[1][2] || ''; // 개통일 범위
+            creatorName = metadata[1][3] || ''; // 생성자 이름 (R열)
             
-            if (metadata.length >= 2 && metadata[1].length >= 4) {
-              const receiptRange = metadata[1][1] || ''; // 접수일 범위
-              const activationRange = metadata[1][2] || ''; // 개통일 범위
-              creatorName = metadata[1][0] || ''; // 생성자 이름
+            console.log(`🔍 [${sheet.sheetName}] 메타데이터 컬럼 확인: O=${metadata[1][0]}, P=${metadata[1][1]}, Q=${metadata[1][2]}, R=${metadata[1][3]}`);
+            console.log(`🔍 [${sheet.sheetName}] 메타데이터 헤더 확인: O=${metadata[0]?.[0]}, P=${metadata[0]?.[1]}, Q=${metadata[0]?.[2]}, R=${metadata[0]?.[3]}`);
               
               console.log(`🔍 [${sheet.sheetName}] 파싱 전: receiptRange="${receiptRange}", activationRange="${activationRange}", creatorName="${creatorName}"`);
               
@@ -18056,20 +18059,30 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
               let isMatched = true;
               let matchReason = [];
               
-              console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 매칭 체크: inputUser="${inputUser}", inputDate="${inputDate}"`);
+                            console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 매칭 체크: inputUser="${inputUser}", inputDate="${inputDate}"`);
               
               // 1. 생성자 매칭 (생성자가 설정된 경우에만)
               if (creatorName && inputUser) {
                 const creatorMatch = inputUser.includes(creatorName);
                 isMatched = isMatched && creatorMatch;
                 matchReason.push(`생성자: ${creatorMatch ? '성공' : '실패'} (${inputUser} vs ${creatorName})`);
-          } else {
+              } else {
                 matchReason.push(`생성자: 조건없음`);
               }
               
               // 2. 날짜 범위 매칭 (범위가 설정된 경우에만)
               if (inputDate) {
-                const inputDateStr = inputDate.toString().trim();
+                let inputDateStr = inputDate.toString().trim();
+                
+                // (Ⅰ) 접미사 제거
+                if (inputDateStr.includes('(Ⅰ)')) {
+                  inputDateStr = inputDateStr.replace('(Ⅰ)', '').trim();
+                }
+                if (inputDateStr.includes('(Ⅱ)')) {
+                  inputDateStr = inputDateStr.replace('(Ⅱ)', '').trim();
+                }
+                
+                console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 정제된 날짜: "${inputDateStr}"`);
                 
                 // 접수일 범위 체크
                 if (receiptStartDate && receiptEndDate) {
