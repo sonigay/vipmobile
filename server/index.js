@@ -10330,15 +10330,30 @@ function normalizeOnsaleStrategyOnlinePosDeduction(manualRow, systemRow) {
 function normalizeUplayNoCheck(manualRow, systemRow) {
   // 수기초 데이터 정규화 (DX열)
   let manualValue = '유플레이 미유치 차감 비대상'; // 기본값 설정
+  
+  // 디버깅 로그 추가
+  console.log(`🔍 [유플레이 미유치] 수기초 배열 길이: ${manualRow.length}`);
+  console.log(`🔍 [유플레이 미유치] DX열(127) 원본값: "${manualRow[127]}"`);
+  console.log(`🔍 [유플레이 미유치] DX열(127) 타입: ${typeof manualRow[127]}`);
+  
   if (manualRow.length > 130) { // 최소 DX열(127)은 있어야 함
     const uplayValue = (manualRow[127] || '').toString().trim(); // DX열: 유플레이
+    
+    console.log(`🔍 [유플레이 미유치] uplayValue: "${uplayValue}"`);
+    console.log(`🔍 [유플레이 미유치] !uplayValue: ${!uplayValue}`);
+    console.log(`🔍 [유플레이 미유치] !uplayValue.includes('유플레이'): ${!uplayValue.includes('유플레이')}`);
+    console.log(`🔍 [유플레이 미유치] 조건문 결과: ${!uplayValue || !uplayValue.includes('유플레이')}`);
     
     // "유플레이" 문구가 없거나 공백이면 "유플레이 미유치 차감 대상"
     if (!uplayValue || !uplayValue.includes('유플레이')) {
       manualValue = '유플레이 미유치 차감 대상';
+      console.log(`🔍 [유플레이 미유치] 조건문 통과 - manualValue를 "대상"으로 설정`);
     } else {
       manualValue = '유플레이 미유치 차감 비대상';
+      console.log(`🔍 [유플레이 미유치] 조건문 실패 - manualValue를 "비대상"으로 설정`);
     }
+  } else {
+    console.log(`🔍 [유플레이 미유치] 배열 길이 부족 (${manualRow.length} <= 130) - 기본값 "비대상" 유지`);
   }
   
   // 폰클 데이터 정규화 (AF열)
