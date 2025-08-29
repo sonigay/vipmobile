@@ -10336,7 +10336,7 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   console.log(`🔍 [유플레이 미유치] DX열(127) 원본값: "${manualRow[127]}"`);
   console.log(`🔍 [유플레이 미유치] DX열(127) 타입: ${typeof manualRow[127]}`);
   
-  if (manualRow.length > 130) { // 최소 DX열(127)은 있어야 함
+  if (manualRow.length > 127) { // 최소 DX열(127)은 있어야 함 (128 이상)
     const uplayValue = (manualRow[127] || '').toString().trim(); // DX열: 유플레이
     
     console.log(`🔍 [유플레이 미유치] uplayValue: "${uplayValue}"`);
@@ -10353,7 +10353,7 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
       console.log(`🔍 [유플레이 미유치] 조건문 실패 - manualValue를 "비대상"으로 설정`);
     }
   } else {
-    console.log(`🔍 [유플레이 미유치] 배열 길이 부족 (${manualRow.length} <= 130) - 기본값 "비대상" 유지`);
+    console.log(`🔍 [유플레이 미유치] 배열 길이 부족 (${manualRow.length} <= 127) - 기본값 "비대상" 유지`);
   }
   
   // 폰클 데이터 정규화 (AF열)
