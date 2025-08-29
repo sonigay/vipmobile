@@ -18013,6 +18013,8 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             
             const metadata = metadataResponse.data.values || [];
                       console.log(`🔍 [${sheet.sheetName}] 메타데이터 원본:`, JSON.stringify(metadata));
+            console.log(`🔍 [${sheet.sheetName}] 메타데이터 헤더:`, metadata[0]);
+            console.log(`🔍 [${sheet.sheetName}] 메타데이터 데이터:`, metadata[1]);
           
           if (metadata.length >= 2 && metadata[1].length >= 4) {
             const receiptRange = metadata[1][1] || ''; // 접수일 범위
@@ -18062,12 +18064,12 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                             console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 매칭 체크: inputUser="${inputUser}", inputDate="${inputDate}"`);
               
               // 1. 생성자 매칭 (생성자가 설정된 경우에만)
-              if (creatorName && inputUser) {
+              if (creatorName && inputUser && creatorName !== '미적용') {
                 const creatorMatch = inputUser.includes(creatorName);
                 isMatched = isMatched && creatorMatch;
                 matchReason.push(`생성자: ${creatorMatch ? '성공' : '실패'} (${inputUser} vs ${creatorName})`);
               } else {
-                matchReason.push(`생성자: 조건없음`);
+                matchReason.push(`생성자: 조건없음 (creatorName="${creatorName}")`);
               }
               
               // 2. 날짜 범위 매칭 (범위가 설정된 경우에만)
@@ -18085,21 +18087,21 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                 console.log(`🔍 [${sheet.sheetName}] Row ${index + 5} 정제된 날짜: "${inputDateStr}"`);
                 
                 // 접수일 범위 체크
-                if (receiptStartDate && receiptEndDate) {
+                if (receiptStartDate && receiptEndDate && receiptStartDate !== '미적용') {
                   const receiptMatch = (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
                   isMatched = isMatched && receiptMatch;
                   matchReason.push(`접수일: ${receiptMatch ? '성공' : '실패'} (${inputDateStr} vs ${receiptStartDate}~${receiptEndDate})`);
                 } else {
-                  matchReason.push(`접수일: 조건없음`);
+                  matchReason.push(`접수일: 조건없음 (receiptStartDate="${receiptStartDate}")`);
                 }
                 
                 // 개통일 범위 체크
-                if (activationStartDate && activationEndDate) {
+                if (activationStartDate && activationEndDate && activationStartDate !== '미적용') {
                   const activationMatch = (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
                   isMatched = isMatched && activationMatch;
                   matchReason.push(`개통일: ${activationMatch ? '성공' : '실패'} (${inputDateStr} vs ${activationStartDate}~${activationEndDate})`);
                 } else {
-                  matchReason.push(`개통일: 조건없음`);
+                  matchReason.push(`개통일: 조건없음 (activationStartDate="${activationStartDate}")`);
                 }
               } else {
                 matchReason.push(`입력일: 데이터없음`);
