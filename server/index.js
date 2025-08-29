@@ -696,7 +696,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: safeSheetName
+      range: `${safeSheetName}!A:ZZ` // A열부터 ZZ열까지 모든 열 가져오기
     });
     
     const data = response.data.values || [];
@@ -726,7 +726,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
-      range: safeSheetName
+      range: `${safeSheetName}!A:ZZ` // A열부터 ZZ열까지 모든 열 가져오기
     });
     
     const data = response.data.values || [];
@@ -753,7 +753,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
         
         const retryResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: spreadsheetId,
-          range: safeSheetName
+          range: `${safeSheetName}!A:ZZ` // A열부터 ZZ열까지 모든 열 가져오기
         });
         
         const data = retryResponse.data.values || [];
@@ -11198,17 +11198,7 @@ function compareDynamicColumns(manualRow, systemRow, key, targetField = null, st
       const { manualValue, systemValue } = normalizeUplayNoCheck(manualRow, systemRow);
       
       // 500280760172 가번 디버깅 로그 추가
-      if (key === '500280760172') {
-        console.log(`🔍 [500280760172] 수기초 배열 길이: ${manualRow.length}`);
-        console.log(`🔍 [500280760172] 수기초 DX열(127) 원본값: "${manualRow[127]}"`);
-        console.log(`🔍 [500280760172] 수기초 DX열(127) 타입: ${typeof manualRow[127]}`);
-        console.log(`🔍 [500280760172] uplayValue: "${(manualRow[127] || '').toString().trim()}"`);
-        console.log(`🔍 [500280760172] !uplayValue: ${!(manualRow[127] || '').toString().trim()}`);
-        console.log(`🔍 [500280760172] !uplayValue.includes('유플레이'): ${!(manualRow[127] || '').toString().trim().includes('유플레이')}`);
-        console.log(`🔍 [500280760172] 조건문 결과: ${!(manualRow[127] || '').toString().trim() || !(manualRow[127] || '').toString().trim().includes('유플레이')}`);
-        console.log(`🔍 [500280760172] 폰클 AF열(31) 원본값: "${systemRow[31]}"`);
-        console.log(`🔍 [500280760172] 정규화 결과: manualValue="${manualValue}", systemValue="${systemValue}"`);
-      }
+
       
       // 디버깅 로그 추가
       console.log(`[유플레이 미유치 차감] key=${key}, manualValue="${manualValue}", systemValue="${systemValue}"`);
