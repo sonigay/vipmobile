@@ -10342,7 +10342,7 @@ function normalizeUplayNoCheck(manualRow, systemRow) {
   }
   
   // 폰클 데이터 정규화 (AF열)
-  let systemValue = '유플레이 미유치 차감 비대상'; // 기본값 설정
+  let systemValue = '유플레이 미유치 차감 대상'; // 기본값 설정
   if (systemRow.length > 31) { // 최소 AF열(31)은 있어야 함
     const uplayNoValue = (systemRow[31] || '').toString().trim(); // AF열: 유플레이 미유치
     
