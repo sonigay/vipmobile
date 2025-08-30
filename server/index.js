@@ -17950,6 +17950,46 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
           }
         });
         console.log(`✅ [SAFE-UPDATE] 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
+        
+        // 빈 행 제거 (헤더 다음 빈 행 문제 해결)
+        try {
+          const cleanMetadataResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: `${userSheetName}!O:X`
+          });
+          
+          const allMetadata = cleanMetadataResponse.data.values || [];
+          if (allMetadata.length > 1) {
+            // 헤더는 유지하고 데이터 행만 필터링 (빈 행 제거)
+            const header = allMetadata[0];
+            const dataRows = allMetadata.slice(1).filter(row => 
+              row.length >= 10 && row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+            );
+            
+            // 빈 행이 제거된 메타데이터로 다시 저장
+            if (dataRows.length !== allMetadata.length - 1) {
+              const cleanMetadata = [header, ...dataRows];
+              await sheets.spreadsheets.values.clear({
+                spreadsheetId: sheetId,
+                range: `${userSheetName}!O:X`
+              });
+              
+              if (cleanMetadata.length > 0) {
+                await sheets.spreadsheets.values.update({
+                  spreadsheetId: sheetId,
+                  range: `${userSheetName}!O1:X${cleanMetadata.length}`,
+                  valueInputOption: 'RAW',
+                  resource: {
+                    values: cleanMetadata
+                  }
+                });
+                console.log(`🧹 [SAFE-UPDATE] ${userSheetName}: 메타데이터 빈 행 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책)`);
+              }
+            }
+          }
+        } catch (cleanError) {
+          console.log(`⚠️ [SAFE-UPDATE] ${userSheetName}: 메타데이터 정리 실패:`, cleanError.message);
+        }
       }
     } catch (metadataError) {
       console.error(`❌ [SAFE-UPDATE] 메타데이터 저장 실패:`, metadataError.message);

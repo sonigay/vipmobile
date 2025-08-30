@@ -187,6 +187,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       loadUserSheets(faceValueSubMenu);
     }
   }, [faceValueSubMenu]);
+  
+  // 컴포넌트 마운트 시 S군 기본값 강제 설정
+  useEffect(() => {
+    if (faceValueSubMenu === 'Ⅰ') {
+      setBudgetAmounts(prev => ({
+        ...prev,
+        S군: 50000 // S군 첫 번째 예산금액 기본값 강제 설정
+      }));
+    }
+  }, [faceValueSubMenu]);
 
   // 대상월 변경 시 시트 목록 새로고침
   useEffect(() => {
