@@ -21785,82 +21785,22 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료`);
             
-            // 9-1. 액면예산 시트 완전 초기화 후 새로 입력 (전체 재계산 목적)
-            console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 시트 완전 초기화 및 새로 입력 시작`);
+            // 9-1. 액면예산 시트 부분 영역 초기화 (B5:E열, I5:N열만)
+            console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 시트 부분 영역 초기화 시작`);
             
-            // 액면예산 시트에서 데이터 가져오기
-            const activationDataResponse = await sheets.spreadsheets.values.get({
+            // B열5행부터 E열까지 지우기 (입력자/입력일시)
+            await sheets.spreadsheets.values.clear({
               spreadsheetId: sheetId,
-              range: '액면예산!A:ZZ'
+              range: '액면예산!B5:E'
             });
             
-            const activationData = activationDataResponse.data.values || [];
-            console.log(`📊 [전체재계산] ${sheetName}: 액면예산 데이터 로드: ${activationData.length}행`);
+            // I열5행부터 N열까지 지우기 (예산 관련)
+            await sheets.spreadsheets.values.clear({
+              spreadsheetId: sheetId,
+              range: '액면예산!I5:N'
+            });
             
-            // 헤더 4행은 유지하고, 5행부터 모든 데이터 완전 초기화
-            if (activationData.length > 4) {
-              // 5행부터 모든 데이터 지우기 (헤더 제외)
-              await sheets.spreadsheets.values.clear({
-                spreadsheetId: sheetId,
-                range: '액면예산!A5:ZZ'
-              });
-              
-              console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 5행부터 모든 데이터 초기화 완료`);
-              
-              // 새로운 데이터 입력 요청
-              const newDataRequests = [];
-              const currentDate = new Date().toLocaleDateString('ko-KR');
-              
-              // 5행부터 새로 입력할 데이터 생성
-              activationData.slice(4).forEach((row, index) => {
-                const actualRowNumber = 5 + index; // C5, C6, C7, C8...
-                
-                if (row.length >= 14) { // 충분한 열이 있는지 확인
-                  // 액면예산 타입에 따른 컬럼 매핑
-                  if (budgetType === 'Ⅱ') {
-                    // 액면예산(Ⅱ): B열(입력자), C열(입력일시)
-                    newDataRequests.push({
-                      range: `액면예산!B${actualRowNumber}`,
-                      values: [[inputUserName]]
-                    });
-                    newDataRequests.push({
-                      range: `액면예산!C${actualRowNumber}`,
-                      values: [[currentDate]]
-                    });
-                  } else {
-                    // 액면예산(Ⅰ): D열(입력자), E열(입력일시)
-                    newDataRequests.push({
-                      range: `액면예산!D${actualRowNumber}`,
-                      values: [[inputUserName]]
-                    });
-                    newDataRequests.push({
-                      range: `액면예산!E${actualRowNumber}`,
-                      values: [[currentDate]]
-                    });
-                  }
-                }
-              });
-              
-              // 새로운 데이터 일괄 입력
-              if (newDataRequests.length > 0) {
-                console.log(`🚀 [전체재계산] ${sheetName}: 새로운 데이터 배치 입력 실행: ${newDataRequests.length}개 셀`);
-                
-                try {
-                  await sheets.spreadsheets.values.batchUpdate({
-                    spreadsheetId: sheetId,
-                    resource: {
-                      valueInputOption: 'RAW',
-                      data: newDataRequests
-                    }
-                  });
-                  
-                  console.log(`✅ [전체재계산] ${sheetName}: 새로운 데이터 배치 입력 성공: ${newDataRequests.length}개 셀`);
-                } catch (error) {
-                  console.error(`❌ [전체재계산] ${sheetName}: 새로운 데이터 배치 입력 실패:`, error);
-                  throw error;
-                }
-              }
-            }
+            console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 B5:E열, I5:N열 초기화 완료`);
             
             // 9-2. 기존 저장 버튼과 동일하게 사용자 시트 업데이트 수행
             console.log(`🔄 [전체재계산] ${sheetName}: 사용자 시트 업데이트 시작`);
