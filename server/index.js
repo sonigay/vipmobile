@@ -21703,6 +21703,22 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             // 사용자 시트에 데이터 저장 (기존 저장 버튼과 동일)
             if (rowsToSave.length > 0) {
+              // 헤더 업데이트 (기존 저장 버튼과 동일)
+              const headerRow = [
+                '접수시작일', '접수종료일', '개통시작일', '개통종료일', 
+                '입력자(권한레벨)', '모델명', '군', '유형', 
+                '확보된 예산', '사용된 예산', '예산 잔액', '상태'
+              ];
+              
+              await sheets.spreadsheets.values.update({
+                spreadsheetId: sheetId,
+                range: `${sheetName}!A1:L1`,
+                valueInputOption: 'RAW',
+                resource: {
+                  values: [headerRow]
+                }
+              });
+              
               // 기존 데이터 지우기 (헤더 제외)
               await sheets.spreadsheets.values.clear({
                 spreadsheetId: sheetId,
@@ -21721,6 +21737,29 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               
               console.log(`✅ [전체재계산] ${sheetName}: 사용자 시트 데이터 저장 완료 (${rowsToSave.length}행)`);
             }
+            
+            // 8-1. 메타데이터 저장 (기존 저장 버튼과 동일)
+            const metadataRange = `${sheetName}!O1:R2`;
+            const metadata = [
+              ['저장일시', '접수일범위', '개통일범위', '접수일적용여부'],
+              [
+                new Date().toISOString(),
+                `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}`,
+                `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`,
+                '적용'
+              ]
+            ];
+            
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: sheetId,
+              range: metadataRange,
+              valueInputOption: 'RAW',
+              resource: {
+                values: metadata
+              }
+            });
+            
+            console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 저장 완료`);
             
             // 9. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
