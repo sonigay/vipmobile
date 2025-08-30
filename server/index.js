@@ -17818,6 +17818,102 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
     
     console.log(`✅ [SAFE-UPDATE] 완료: ${updateResult.message}`);
     
+    // 계산 결과를 메타데이터에 누적 저장 (O열~X열)
+    try {
+      console.log(`💾 [SAFE-UPDATE] 메타데이터 누적 저장 시작`);
+      
+      const sheets = google.sheets({ version: 'v4', auth });
+      
+      // 사용자 자격 정보를 대리점아이디관리에서 가져오기
+      let userQualification = '이사'; // 기본값
+      try {
+        const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+        const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+        if (agentValues) {
+          const agentRows = agentValues.slice(1);
+          const userAgent = agentRows.find(row => row[0] === baseUserName); // A열: 이름으로 검색
+          if (userAgent) {
+            userQualification = userAgent[1] || '이사'; // B열: 자격
+            console.log(`📋 [SAFE-UPDATE] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
+          } else {
+            console.log(`⚠️ [SAFE-UPDATE] 대리점아이디관리에서 ${baseUserName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+          }
+        }
+      } catch (error) {
+        console.error('사용자 자격 정보 조회 실패:', error);
+      }
+      
+      // 사용자 시트 이름 가져오기 (동적 자격 사용)
+      const userSheetName = `액면_${userName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+      
+      // 기존 메타데이터 읽기 (O열~X열)
+      let existingMetadata = [];
+      try {
+        const metadataResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!O:X`
+        });
+        existingMetadata = metadataResponse.data.values || [];
+      } catch (error) {
+        console.log(`📋 [SAFE-UPDATE] 기존 메타데이터 없음, 새로 생성`);
+      }
+      
+      // 헤더 설정 (O열~X열)
+      const metadataHeader = [
+        '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
+        '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
+      ];
+      
+      // 새 정책 데이터 행 생성
+      const newPolicyRow = [
+        new Date().toISOString(),           // O열: 저장일시
+        dateRange.startDate && dateRange.endDate 
+          ? `${dateRange.startDate} ~ ${dateRange.endDate}` 
+          : '미설정',                       // P열: 접수일범위
+        `${dateRange.startDate} ~ ${dateRange.endDate}`, // Q열: 개통일범위
+        dateRange.startDate && dateRange.endDate 
+          ? '적용' 
+          : '미적용',                       // R열: 접수일적용여부
+        new Date().toISOString(),           // S열: 계산일시
+        userName,                           // T열: 계산자
+        selectedPolicyGroups.join(','),     // U열: 정책그룹
+        calculatedResult.totalRemainingBudget, // V열: 잔액
+        calculatedResult.totalSecuredBudget,   // W열: 확보
+        calculatedResult.totalUsedBudget       // X열: 사용
+      ];
+      
+      // 메타데이터 업데이트 (기존 데이터 유지하고 새 행 추가)
+      const metadataUpdateRequests = [];
+      
+      // 헤더가 없으면 헤더 추가
+      if (existingMetadata.length === 0) {
+        metadataUpdateRequests.push({
+          range: `${userSheetName}!O1:X1`,
+          values: [metadataHeader]
+        });
+      }
+      
+      // 새 정책 데이터 행 추가
+      metadataUpdateRequests.push({
+        range: `${userSheetName}!O${existingMetadata.length + 2}:X${existingMetadata.length + 2}`,
+        values: [newPolicyRow]
+      });
+      
+      // 메타데이터 업데이트 실행
+      if (metadataUpdateRequests.length > 0) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: sheetId,
+          resource: {
+            valueInputOption: 'RAW',
+            data: metadataUpdateRequests
+          }
+        });
+        console.log(`✅ [SAFE-UPDATE] 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
+      }
+    } catch (metadataError) {
+      console.error(`❌ [SAFE-UPDATE] 메타데이터 저장 실패:`, metadataError.message);
+    }
+    
     res.json({
       message: '액면예산이 안전하게 업데이트되었습니다.',
       result: updateResult,
@@ -17933,6 +18029,100 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
       }
     }
     
+    // 계산 결과를 메타데이터에 누적 저장 (O열~X열)
+    try {
+      console.log(`💾 [updateUserSheetUsage] 메타데이터 누적 저장 시작`);
+      
+      // 사용자 자격 정보를 대리점아이디관리에서 가져오기
+      let userQualification = '이사'; // 기본값
+      try {
+        const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+        const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+        if (agentValues) {
+          const agentRows = agentValues.slice(1);
+          const userAgent = agentRows.find(row => row[0] === baseUserName); // A열: 이름으로 검색
+          if (userAgent) {
+            userQualification = userAgent[1] || '이사'; // B열: 자격
+            console.log(`📋 [updateUserSheetUsage] 사용자 자격 확인: ${baseUserName} → ${userQualification}`);
+          } else {
+            console.log(`⚠️ [updateUserSheetUsage] 대리점아이디관리에서 ${baseUserName} 정보를 찾을 수 없어 기본값 '이사' 사용`);
+          }
+        }
+      } catch (error) {
+        console.error('사용자 자격 정보 조회 실패:', error);
+      }
+      
+      // 사용자 시트 이름 가져오기 (동적 자격 사용)
+      const userSheetName = `액면_${userName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+      
+      // 기존 메타데이터 읽기 (O열~X열)
+      let existingMetadata = [];
+      try {
+        const metadataResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!O:X`
+        });
+        existingMetadata = metadataResponse.data.values || [];
+      } catch (error) {
+        console.log(`📋 [updateUserSheetUsage] 기존 메타데이터 없음, 새로 생성`);
+      }
+      
+      // 헤더 설정 (O열~X열)
+      const metadataHeader = [
+        '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
+        '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
+      ];
+      
+      // 새 정책 데이터 행 생성
+      const newPolicyRow = [
+        new Date().toISOString(),           // O열: 저장일시
+        dateRange.startDate && dateRange.endDate 
+          ? `${dateRange.startDate} ~ ${dateRange.endDate}` 
+          : '미설정',                       // P열: 접수일범위
+        `${dateRange.startDate} ~ ${dateRange.endDate}`, // Q열: 개통일범위
+        dateRange.startDate && dateRange.endDate 
+          ? '적용' 
+          : '미적용',                       // R열: 접수일적용여부
+        new Date().toISOString(),           // S열: 계산일시
+        userName,                           // T열: 계산자
+        selectedPolicyGroups.join(','),     // U열: 정책그룹
+        calculateResult.totalRemainingBudget, // V열: 잔액
+        calculateResult.totalSecuredBudget,   // W열: 확보
+        calculateResult.totalUsedBudget       // X열: 사용
+      ];
+      
+      // 메타데이터 업데이트 (기존 데이터 유지하고 새 행 추가)
+      const metadataUpdateRequests = [];
+      
+      // 헤더가 없으면 헤더 추가
+      if (existingMetadata.length === 0) {
+        metadataUpdateRequests.push({
+          range: `${userSheetName}!O1:X1`,
+          values: [metadataHeader]
+        });
+      }
+      
+      // 새 정책 데이터 행 추가
+      metadataUpdateRequests.push({
+        range: `${userSheetName}!O${existingMetadata.length + 2}:X${existingMetadata.length + 2}`,
+        values: [newPolicyRow]
+      });
+      
+      // 메타데이터 업데이트 실행
+      if (metadataUpdateRequests.length > 0) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: sheetId,
+          resource: {
+            valueInputOption: 'RAW',
+            data: metadataUpdateRequests
+          }
+        });
+        console.log(`✅ [updateUserSheetUsage] 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
+      }
+    } catch (metadataError) {
+      console.error(`❌ [updateUserSheetUsage] 메타데이터 저장 실패:`, metadataError.message);
+    }
+    
     res.json({
       message: '사용자 시트의 사용예산이 업데이트되었습니다.',
       updatedRows: updateRequests.length,
@@ -17991,10 +18181,10 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         console.log(`🔍 [${sheet.sheetName}] 메타데이터에서 계산 결과 불러오기 시작!`);
         
         try {
-          // 사용자 시트 메타데이터에서 계산 결과 가져오기 (O열~W열)
+          // 사용자 시트 메타데이터에서 계산 결과 가져오기 (O열~X열)
           const metadataResponse = await sheets_api.spreadsheets.values.get({
             spreadsheetId: sheet.sheetId,
-            range: `${sheet.sheetName}!O:W`
+            range: `${sheet.sheetName}!O:X`
           });
           
           const metadata = metadataResponse.data.values || [];
@@ -18642,6 +18832,16 @@ app.post('/api/budget/user-sheets-v2', async (req, res) => {
         values: [['적용일', '입력자(권한레벨)', '모델명', '군', '유형', '확보된 예산', '사용된 예산', '예산 잔액', '상태']]
       }
     });
+    
+    // 4-1. 메타데이터 헤더 설정 (O열~X열)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: targetSheetId,
+      range: `${userSheetName}!O1:X1`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['저장일시', '접수일범위', '개통일범위', '접수일적용여부', '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용']]
+      }
+    });
 
     // 5. UserSheetManager를 사용하여 예산_사용자시트관리에 레코드 추가
     await userSheetManager.ensureSheetExists();
@@ -19280,6 +19480,47 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       });
       
       console.log(`📊 [데이터저장] ${userSheetName} 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
+      
+      // 계산 결과를 메타데이터에 업데이트 (마지막 행의 V, W, X열)
+      try {
+        const metadataUpdateResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!O:X`
+        });
+        
+        const metadata = metadataUpdateResponse.data.values || [];
+        if (metadata.length > 1) { // 헤더 1행 + 데이터 1행 이상
+          const lastRowIndex = metadata.length; // 마지막 행 인덱스
+          
+          // V열(잔액), W열(확보), X열(사용) 업데이트
+          const updateRequests = [
+            {
+              range: `${userSheetName}!V${lastRowIndex}`,
+              values: [[totalRemainingBudget]]
+            },
+            {
+              range: `${userSheetName}!W${lastRowIndex}`,
+              values: [[totalSecuredBudget]]
+            },
+            {
+              range: `${userSheetName}!X${lastRowIndex}`,
+              values: [[totalUsedBudget]]
+            }
+          ];
+          
+          await sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: sheetId,
+            resource: {
+              valueInputOption: 'RAW',
+              data: updateRequests
+            }
+          });
+          
+          console.log(`✅ [데이터저장] ${userSheetName}: 메타데이터 계산 결과 업데이트 완료 (잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget})`);
+        }
+      } catch (updateError) {
+        console.error(`❌ [데이터저장] ${userSheetName}: 메타데이터 업데이트 실패:`, updateError.message);
+      }
     }
     
     res.json({ 
@@ -22032,22 +22273,22 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             const userSheetUpdateRows = userSheetUpdateResponse.data.values || [];
             
-            // 9-3. 계산 결과를 사용자 시트 메타데이터에 누적 저장 (O열~W열)
+            // 9-3. 계산 결과를 사용자 시트 메타데이터에 누적 저장 (O열~X열)
             console.log(`💾 [전체재계산] ${sheetName}: 계산 결과 메타데이터 누적 저장 시작`);
             
-            // 기존 메타데이터 읽기 (O열~W열)
+            // 기존 메타데이터 읽기 (O열~X열)
             let existingMetadata = [];
             try {
               const metadataResponse = await sheets.spreadsheets.values.get({
                 spreadsheetId: sheetId,
-                range: `${sheetName}!O:W`
+                range: `${sheetName}!O:X`
               });
               existingMetadata = metadataResponse.data.values || [];
             } catch (error) {
               console.log(`📋 [전체재계산] ${sheetName}: 기존 메타데이터 없음, 새로 생성`);
             }
             
-            // 헤더 설정 (O열~W열)
+            // 헤더 설정 (O열~X열)
             const metadataHeader = [
               '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
               '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
@@ -22077,14 +22318,14 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             // 헤더가 없으면 헤더 추가
             if (existingMetadata.length === 0) {
               metadataUpdateRequests.push({
-                range: `${sheetName}!O1:W1`,
+                range: `${sheetName}!O1:X1`,
                 values: [metadataHeader]
               });
             }
             
             // 새 정책 데이터 행 추가
             metadataUpdateRequests.push({
-              range: `${sheetName}!O${existingMetadata.length + 2}:W${existingMetadata.length + 2}`,
+              range: `${sheetName}!O${existingMetadata.length + 2}:X${existingMetadata.length + 2}`,
               values: [newPolicyRow]
             });
             
