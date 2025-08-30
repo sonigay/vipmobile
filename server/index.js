@@ -21726,8 +21726,6 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
             
             // 기존 저장 버튼과 동일한 매개변수로 calculateUsageBudget 호출
-            // selectedPolicyGroups: 매칭용 정책그룹 (userRow[6]에서 가져옴)
-            // budgetType: 예산 타입 ('Ⅰ', 'Ⅱ', '종합')
             const selectedPolicyGroups = [userRow[6] || '홍기현직영,홍기현별도,홍기현,평택사무실,임재욱별도,임재욱,이은록,양진영별도,양진영,이덕제,김일환,김일환별도']; // G열: 선택된정책그룹
             
             const calculationResult = await calculateUsageBudget(
@@ -21735,12 +21733,12 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               selectedPolicyGroups, 
               dateRange, 
               inputUserName, 
-              budgetType // 'Ⅰ', 'Ⅱ', '종합' 중 하나
+              budgetType
             );
             
-            console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료 - ${calculationResult.message}`);
+            console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료`);
             
-            // 10. 결과 저장
+            // 10. 결과 저장 (기존 저장 버튼과 동일한 방식)
             results.push({
               month: targetMonth,
               sheetName,
