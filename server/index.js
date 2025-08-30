@@ -4308,14 +4308,16 @@ async function getUserSheetName(userName, budgetType) {
     
     const userSheetManagementData = userSheetManagementResponse.data.values || [];
     if (userSheetManagementData.length > 1) {
-      const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim();
+      // 사용자명에서 괄호와 공백을 완전히 제거
+      const actualSheetOwner = userName.replace(/\([^)]+\)/g, '').trim();
       // 헤더 제외하고 해당 사용자의 예산타입별 시트명 찾기
       for (let i = 1; i < userSheetManagementData.length; i++) {
         const row = userSheetManagementData[i];
         if (row.length >= 3) {
           const sheetName = row[2]; // C열: 시트명
-          // 시트명 패턴 매칭: 액면_김기송(Ⅰ) (이사)
-          const pattern = new RegExp(`^액면_${actualSheetOwner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\(${budgetType}\\)\\s*\\([^)]+\\)$`);
+          // 시트명 패턴 매칭: 액면_김기송(Ⅰ)(이사) - 공백 제거로 일관성 확보
+          const pattern = new RegExp(`^액면_${actualSheetOwner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\(${budgetType}\\)\\([^)]+\\)$`);
+          console.log(`🔍 [getUserSheetName] 패턴 매칭 시도: 시트명="${sheetName}", 패턴="${pattern.source}", actualSheetOwner="${actualSheetOwner}"`);
           if (pattern.test(sheetName)) {
             console.log(`🎯 [getUserSheetName] 실제 시트명 발견: ${sheetName}`);
             return sheetName;
@@ -4335,7 +4337,8 @@ async function getUserSheetName(userName, budgetType) {
     });
     
     const agentValues = agentResponse.data.values || [];
-    const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim();
+    // 사용자명에서 괄호와 공백을 완전히 제거
+    const actualSheetOwner = userName.replace(/\([^)]+\)/g, '').trim();
     const agentRow = agentValues.find(row => row[0] === actualSheetOwner); // A열에서 이름 찾기 (수정됨)
     const userQualification = agentRow ? agentRow[1] : '이사'; // B열의 qualification
     
@@ -4344,7 +4347,8 @@ async function getUserSheetName(userName, budgetType) {
     return fallbackSheetName;
   } catch (error) {
     console.error('[getUserSheetName] 대리점아이디관리 조회 실패:', error);
-    const actualSheetOwner = userName.replace(/\s*\(.*?\)\s*$/, '').trim();
+    // 사용자명에서 괄호와 공백을 완전히 제거
+    const actualSheetOwner = userName.replace(/\([^)]+\)/g, '').trim();
     return `액면_${actualSheetOwner}(${budgetType}) (이사)`;
   }
 }
@@ -4645,9 +4649,10 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
     
     // 시트 목록에서 사용자 시트 찾기
     
-    // budgetType을 사용하여 정확한 시트 이름 매칭
-    const expectedSheetName = `액면_${baseUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
-    console.log(`🧭 [calculateUsageBudget] budgetType=${budgetType || 'Ⅰ'}, expectedSheetName=${expectedSheetName}`);
+    // 사용자명에서 괄호와 공백을 완전히 제거하여 시트명 생성
+    const cleanUserName = baseUserName.replace(/\([^)]+\)/g, '').trim();
+    const expectedSheetName = `액면_${cleanUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+    console.log(`🧭 [calculateUsageBudget] budgetType=${budgetType || 'Ⅰ'}, expectedSheetName=${expectedSheetName} (원본: "${baseUserName}")`);
     const userSheet = sheetsList.find(sheet => 
       sheet.properties.title === expectedSheetName
     );
@@ -17827,7 +17832,10 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
       // 사용자 자격 정보를 대리점아이디관리에서 가져오기
       let userQualification = '이사'; // 기본값
       try {
-        const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+        // 사용자명에서 괄호와 공백을 완전히 제거
+        const baseUserName = userName.replace(/\([^)]+\)/g, '').trim();
+        console.log(`🔍 [SAFE-UPDATE] 사용자명 정리: "${userName}" → "${baseUserName}"`);
+        
         const agentValues = await getSheetValues(AGENT_SHEET_NAME);
         if (agentValues) {
           const agentRows = agentValues.slice(1);
@@ -17843,8 +17851,10 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
         console.error('사용자 자격 정보 조회 실패:', error);
       }
       
-      // 사용자 시트 이름 가져오기 (동적 자격 사용)
-      const userSheetName = `액면_${userName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+      // 사용자 시트 이름 가져오기 (동적 자격 사용, 중복 방지)
+      const cleanUserName = userName.replace(/\([^)]+\)/g, '').trim(); // 괄호 완전 제거
+      const userSheetName = `액면_${cleanUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+      console.log(`📝 [SAFE-UPDATE] 시트명 생성: "${userSheetName}"`);
       
       // 기존 메타데이터 읽기 (O열~X열)
       let existingMetadata = [];
@@ -18036,7 +18046,10 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
       // 사용자 자격 정보를 대리점아이디관리에서 가져오기
       let userQualification = '이사'; // 기본값
       try {
-        const baseUserName = userName.replace(/\([^)]+\)/, '').trim();
+        // 사용자명에서 괄호와 공백을 완전히 제거
+        const baseUserName = userName.replace(/\([^)]+\)/g, '').trim();
+        console.log(`🔍 [updateUserSheetUsage] 사용자명 정리: "${userName}" → "${baseUserName}"`);
+        
         const agentValues = await getSheetValues(AGENT_SHEET_NAME);
         if (agentValues) {
           const agentRows = agentValues.slice(1);
@@ -18052,8 +18065,10 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
         console.error('사용자 자격 정보 조회 실패:', error);
       }
       
-      // 사용자 시트 이름 가져오기 (동적 자격 사용)
-      const userSheetName = `액면_${userName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+      // 사용자 시트 이름 가져오기 (동적 자격 사용, 중복 방지)
+      const cleanUserName = userName.replace(/\([^)]+\)/g, '').trim(); // 괄호 완전 제거
+      const userSheetName = `액면_${cleanUserName}(${budgetType || 'Ⅰ'}) (${userQualification})`;
+      console.log(`📝 [updateUserSheetUsage] 시트명 생성: "${userSheetName}"`);
       
       // 기존 메타데이터 읽기 (O열~X열)
       let existingMetadata = [];
@@ -18198,7 +18213,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             
             // 메타데이터의 각 정책 행에서 예산 데이터 합계
             metadata.slice(1).forEach((row, index) => { // 2행부터 시작 (헤더 1행 제외)
-              if (row.length >= 8) { // O~W열 (8개 컬럼)
+              if (row.length >= 10) { // O~X열 (10개 컬럼) - 수정됨!
                 // V열: 잔액, W열: 확보, X열: 사용
                 const remainingBudget = parseFloat(row[7]) || 0; // V열 (0-based index 7)
                 const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
@@ -18484,9 +18499,9 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           
           const activationData = activationDataResponse.data.values || [];
           
-          // 자가업자 정보 추출 (시트 이름에서)
+          // 자가업자 정보 추출 (시트 이름에서) - 괄호와 공백 제거
           const ownerMatch = sheetName.match(/액면_(.+?)\(/);
-          const ownerName = ownerMatch ? ownerMatch[1] : '';
+          const ownerName = ownerMatch ? ownerMatch[1].replace(/\([^)]+\)/g, '').trim() : '';
           
           // 마지막수정일시 가져오기 (메타데이터에서)
           let lastModifiedDate = '';
@@ -18794,7 +18809,10 @@ app.post('/api/budget/user-sheets-v2', async (req, res) => {
       console.error('[NEW-API] 사용자 자격 정보 조회 실패:', error);
     }
 
-    const userSheetName = `액면_${baseUserName}(${budgetType}) (${userQualification})`;
+    // 사용자명에서 괄호와 공백을 완전히 제거하여 시트명 생성
+    const cleanUserName = baseUserName.replace(/\([^)]+\)/g, '').trim();
+    const userSheetName = `액면_${cleanUserName}(${budgetType}) (${userQualification})`;
+    console.log(`📝 [NEW-API] 시트명 생성: "${userSheetName}" (원본: "${baseUserName}")`);
 
     // 3. 사용자 시트 생성 (이미 존재하면 무시)
     try {
@@ -18947,7 +18965,10 @@ app.post('/api/budget/user-sheets', async (req, res) => {
       console.error('사용자 자격 정보 조회 실패:', error);
     }
     
-    const userSheetName = `액면_${baseUserName}(${budgetType}) (${userQualification})`;
+    // 사용자명에서 괄호와 공백을 완전히 제거하여 시트명 생성
+    const cleanUserName = baseUserName.replace(/\([^)]+\)/g, '').trim();
+    const userSheetName = `액면_${cleanUserName}(${budgetType}) (${userQualification})`;
+    console.log(`📝 [시트생성] 시트명 생성: "${userSheetName}" (원본: "${baseUserName}")`);
     
     // 기존 시트에 새로운 시트 추가
     try {
