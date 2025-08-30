@@ -21529,8 +21529,8 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
     const monthRows = monthSheetsData.data.values || [];
     const results = [];
     
-    // 2. 각 대상월별로 처리
-    for (const monthRow of monthRows) {
+    // 2. 각 대상월별로 처리 (헤더 제외)
+    for (const monthRow of monthRows.slice(1)) { // 첫 번째 행(헤더) 제외
       if (!monthRow[0] || !monthRow[1]) continue; // 빈 행 스킵
       
       const targetMonth = monthRow[0];
@@ -21559,8 +21559,8 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
         for (const userRow of targetMonthUserSheets) {
           if (!userRow[0] || !userRow[1]) continue; // 빈 행 스킵
           
-          const sheetName = userRow[0];
-          const budgetType = userRow[1]; // Ⅰ, Ⅱ, 종합
+          const sheetName = userRow[2]; // C열: 시트명
+          const budgetType = userRow[6] || 'Ⅰ'; // G열: 선택된정책그룹 (기본값: Ⅰ)
           
           console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 전체 재입력 및 재계산 시작`);
           
