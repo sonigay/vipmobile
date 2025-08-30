@@ -21848,7 +21848,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               
               try {
                 await sheets.spreadsheets.values.batchUpdate({
-                  spreadsheetId: sheetId,
+              spreadsheetId: sheetId,
                   resource: {
                     valueInputOption: 'RAW',
                     data: updateRequests
