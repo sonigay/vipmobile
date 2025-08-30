@@ -153,6 +153,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     });
     setCanEditSheetId(userRole === 'SS');
     
+    // S군 기본값 강제 설정 (컴포넌트 마운트 시)
+    if (faceValueSubMenu === 'Ⅰ') {
+      setBudgetAmounts(prev => ({
+        ...prev,
+        S군: 50000 // S군 첫 번째 예산금액 기본값 강제 설정
+      }));
+      console.log('💰 [Frontend] S군 기본값 50000으로 강제 설정 완료');
+    }
+    
     // 구글시트에서 월별 시트 ID 매핑 불러오기
     loadMonthSheetMappings();
     
@@ -164,7 +173,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     
     // 정책그룹 설정 목록 불러오기
     loadPolicyGroupSettings();
-  }, [loggedInStore]);
+  }, [loggedInStore, faceValueSubMenu]);
 
   // 액면예산 타입 변경 시 예산금액 초기화 및 시트 목록 재로드
   useEffect(() => {
