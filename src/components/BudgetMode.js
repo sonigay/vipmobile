@@ -379,16 +379,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       const result = await response.json();
       
-      if (result.success) {
+      if (result.message) {
         setSnackbar({ 
           open: true, 
-          message: `전체 재계산이 완료되었습니다. (${result.results?.length || 0}개 시트 처리)`, 
+          message: `전체 재계산이 완료되었습니다. (${result.processedSheets || 0}개 시트 처리)`, 
           severity: 'success' 
         });
         
         // 성공한 시트들의 결과 로그
-        const successResults = result.results?.filter(r => r.success) || [];
-        console.log('✅ [Frontend] 재계산 성공 결과:', successResults);
+        console.log('✅ [Frontend] 재계산 성공 결과:', result);
         
         // 목록 새로고침
         if (showSheetList) {
@@ -1753,6 +1752,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                  {/* 세 번째 헤더 행: 카테고리 헤더 */}
                  <TableRow>
                    <TableCell 
+
                      sx={{ 
                        backgroundColor: '#795548', 
                        color: 'white', 
