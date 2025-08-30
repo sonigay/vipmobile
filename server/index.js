@@ -21843,6 +21843,54 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             const userSheetUpdateRows = userSheetUpdateResponse.data.values || [];
             
+            // 9-3. 계산 결과를 사용자 시트 메타데이터에 저장 (프론트엔드 표시용)
+            console.log(`💾 [전체재계산] ${sheetName}: 계산 결과 메타데이터 저장 시작`);
+            
+            const metadataUpdateRequests = [];
+            
+            // 액면예산(Ⅰ): O1:R2 범위에 메타데이터 저장
+            if (budgetType === 'Ⅱ') {
+              // 액면예산(Ⅱ): O1:R2 범위
+              metadataUpdateRequests.push({
+                range: `${sheetName}!O1:R2`,
+                values: [
+                  ['생성일시', '생성자', '정책그룹', '생성자이름'],
+                  [
+                    new Date().toISOString(),
+                    inputUserName,
+                    selectedPolicyGroups.join(','),
+                    inputUserName
+                  ]
+                ]
+              });
+            } else {
+              // 액면예산(Ⅰ): O1:R2 범위
+              metadataUpdateRequests.push({
+                range: `${sheetName}!O1:R2`,
+                values: [
+                  ['생성일시', '생성자', '정책그룹', '생성자이름'],
+                  [
+                    new Date().toISOString(),
+                    inputUserName,
+                    selectedPolicyGroups.join(','),
+                    inputUserName
+                  ]
+                ]
+              });
+            }
+            
+            // 메타데이터 업데이트 실행
+            if (metadataUpdateRequests.length > 0) {
+              await sheets.spreadsheets.values.batchUpdate({
+                spreadsheetId: sheetId,
+                resource: {
+                  valueInputOption: 'RAW',
+                  data: metadataUpdateRequests
+                }
+              });
+              console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 저장 완료`);
+            }
+            
             // 액면예산 타입에 따른 액면예산 매핑 컬럼 결정
             const currentBudgetType = budgetType || 'Ⅰ';
             let phoneklColumns = {};
