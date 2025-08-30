@@ -21542,7 +21542,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
         // 3. 해당 월의 모든 사용자 시트 조회
         const userSheetsResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
-          range: '사용자시트목록!A:Z',
+          range: '예산_사용자시트관리!A:Z',
         });
         
         const userSheetRows = userSheetsResponse.data.values || [];
