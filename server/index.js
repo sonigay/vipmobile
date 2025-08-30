@@ -5,6 +5,7 @@ const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
 const ExcelJS = require('exceljs');
+const cron = require('node-cron');
 const monthlyAwardAPI = require('./monthlyAwardAPI');
 const setupTeamRoutes = require('./teamRoutes');
 const UserSheetManager = require('./UserSheetManager');
@@ -18402,6 +18403,23 @@ app.get('/api/budget/user-sheets', async (req, res) => {
                 totalUsedBudget += value;
                     console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(Ⅱ): K열=${row[10]} → 사용 누적=${totalUsedBudget}`);
                   }
+                } else if (budgetType === '종합') {
+                  // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
+                  if (row[5] !== '' && row[5] !== undefined && row[5] !== null) {
+                    const value = parseFloat(row[5]) || 0;
+                    totalRemainingBudget += value;
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(종합): F열=${row[5]} → 잔액 누적=${totalRemainingBudget}`);
+                  }
+                  if (row[6] !== '' && row[6] !== undefined && row[6] !== null) {
+                    const value = parseFloat(row[6]) || 0;
+                    totalSecuredBudget += value;
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(종합): G열=${row[6]} → 확보 누적=${totalSecuredBudget}`);
+                  }
+                  if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
+                    const value = parseFloat(row[7]) || 0;
+                    totalUsedBudget += value;
+                    console.log(`💰 [${sheetName}] Row ${index + 5} 매칭성공(종합): H열=${row[7]} → 사용 누적=${totalUsedBudget}`);
+                  }
                 } else {
                   // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
                   if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
@@ -21493,4 +21511,291 @@ app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
     console.error('담당자-코드 조합 추출 오류:', error);
     res.status(500).json({ error: '담당자-코드 조합 추출 중 오류가 발생했습니다.' });
   }
+});
+
+// 전체 재계산 API - 액면예산(Ⅰ), (Ⅱ), (종합) 모두 지원
+app.post('/api/budget/recalculate-all', async (req, res) => {
+  try {
+    console.log('🔄 [전체재계산] 시작');
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // 1. 모든 대상월 시트 조회
+    const monthSheetsData = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_대상월관리!A:D',
+    });
+
+    const monthRows = monthSheetsData.data.values || [];
+    const results = [];
+    
+    // 2. 각 대상월별로 처리
+    for (const monthRow of monthRows) {
+      if (!monthRow[0] || !monthRow[1]) continue; // 빈 행 스킵
+      
+      const targetMonth = monthRow[0];
+      const sheetId = monthRow[1];
+      
+      console.log(`🔄 [전체재계산] ${targetMonth}월 처리 시작 (시트ID: ${sheetId})`);
+      
+      try {
+        // 3. 해당 월의 모든 사용자 시트 조회
+        const userSheetsResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: '사용자시트목록!A:Z',
+        });
+        
+        const userSheetRows = userSheetsResponse.data.values || [];
+        
+        // 4. 각 사용자 시트별로 재계산
+        for (const userRow of userSheetRows) {
+          if (!userRow[0] || !userRow[1]) continue; // 빈 행 스킵
+          
+          const sheetName = userRow[0];
+          const budgetType = userRow[1]; // Ⅰ, Ⅱ, 종합
+          
+          console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 처리`);
+          
+          try {
+            // 5. 액면예산 시트에서 최신 데이터 로드
+            const activationDataResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: '액면예산!A:ZZ'
+            });
+            
+            const activationData = activationDataResponse.data.values || [];
+            
+            if (activationData.length <= 4) {
+              console.log(`⚠️ [전체재계산] ${sheetName}: 액면예산 데이터 부족`);
+              continue;
+            }
+            
+            // 6. 사용자 시트의 메타데이터 조회 (생성자, 날짜 범위)
+            let creatorName = '';
+            let receiptStartDate = '';
+            let receiptEndDate = '';
+            let activationStartDate = '';
+            let activationEndDate = '';
+            
+            try {
+              const metadataResponse = await sheets.spreadsheets.values.get({
+                spreadsheetId: sheetId,
+                range: `${sheetName}!O1:R2`
+              });
+              
+              const metadata = metadataResponse.data.values || [];
+              if (metadata.length >= 2 && metadata[1].length >= 4) {
+                const receiptRange = metadata[1][1] || '';
+                const activationRange = metadata[1][2] || '';
+                creatorName = metadata[1][3] || '';
+                
+                // 접수일 범위 파싱
+                if (receiptRange && receiptRange.includes('~') && receiptRange !== '미적용') {
+                  const [start, end] = receiptRange.split('~');
+                  receiptStartDate = start.trim();
+                  receiptEndDate = end.trim();
+                }
+                
+                // 개통일 범위 파싱
+                if (activationRange && activationRange.includes('~') && activationRange !== '미적용') {
+                  const [start, end] = activationRange.split('~');
+                  activationStartDate = start.trim();
+                  activationEndDate = end.trim();
+                }
+              }
+            } catch (metadataError) {
+              console.log(`⚠️ [전체재계산] ${sheetName}: 메타데이터 조회 실패`);
+            }
+            
+            // 7. 조건에 맞는 데이터만 필터링하여 액면예산에 재입력
+            const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
+            const inputDateCol = budgetType === 'Ⅱ' ? 2 : 4; // C열 또는 E열
+            
+            let totalRemainingBudget = 0;
+            let totalSecuredBudget = 0;
+            let totalUsedBudget = 0;
+            let matchedRows = 0;
+            
+            // 8. 액면예산 데이터를 순회하며 조건에 맞는 데이터 찾기
+            activationData.slice(4).forEach((row, index) => {
+              if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) {
+                const inputUser = row[inputUserCol];
+                const inputDate = row[inputDateCol];
+                
+                // 조건 매칭 체크
+                let isMatched = true;
+                
+                // 생성자 매칭
+                if (creatorName && inputUser && creatorName !== '미적용') {
+                  isMatched = isMatched && inputUser.includes(creatorName);
+                }
+                
+                // 날짜 범위 매칭
+                if (inputDate) {
+                  let inputDateStr = inputDate.toString().trim();
+                  
+                  // 접미사 제거
+                  if (inputDateStr.includes('(Ⅰ)')) {
+                    inputDateStr = inputDateStr.replace('(Ⅰ)', '').trim();
+                  }
+                  if (inputDateStr.includes('(Ⅱ)')) {
+                    inputDateStr = inputDateStr.replace('(Ⅱ)', '').trim();
+                  }
+                  
+                  // 접수일 범위 체크
+                  if (receiptStartDate && receiptEndDate && receiptStartDate !== '미적용') {
+                    isMatched = isMatched && (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
+                  }
+                  
+                  // 개통일 범위 체크
+                  if (activationStartDate && activationEndDate && activationStartDate !== '미적용') {
+                    isMatched = isMatched && (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
+                  }
+                }
+                
+                // 조건에 맞는 데이터만 합계
+                if (isMatched) {
+                  matchedRows++;
+                  if (budgetType === 'Ⅱ') {
+                    // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
+                    if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                      totalRemainingBudget += parseFloat(row[8]) || 0;
+                    }
+                    if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                      totalSecuredBudget += parseFloat(row[9]) || 0;
+                    }
+                    if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                      totalUsedBudget += parseFloat(row[10]) || 0;
+                    }
+                  } else if (budgetType === '종합') {
+                    // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
+                    if (row[5] !== '' && row[5] !== undefined && row[5] !== null) {
+                      totalRemainingBudget += parseFloat(row[5]) || 0;
+                    }
+                    if (row[6] !== '' && row[6] !== undefined && row[6] !== null) {
+                      totalSecuredBudget += parseFloat(row[6]) || 0;
+                    }
+                    if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
+                      totalUsedBudget += parseFloat(row[7]) || 0;
+                    }
+                  } else {
+                    // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
+                    if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
+                      totalRemainingBudget += parseFloat(row[11]) || 0;
+                    }
+                    if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
+                      totalSecuredBudget += parseFloat(row[12]) || 0;
+                    }
+                    if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
+                      totalUsedBudget += parseFloat(row[13]) || 0;
+                    }
+                  }
+                }
+              }
+            });
+            
+            // 9. 계산 결과를 사용자 시트에 업데이트
+            const summaryData = [
+              ['계산결과'],
+              ['예산잔액', totalRemainingBudget],
+              ['확보예산', totalSecuredBudget],
+              ['사용예산', totalUsedBudget],
+              ['매칭된 행 수', matchedRows],
+              ['계산일시', new Date().toLocaleString('ko-KR')]
+            ];
+            
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: sheetId,
+              range: `${sheetName}!A1`,
+              valueInputOption: 'USER_ENTERED',
+              resource: { values: summaryData }
+            });
+            
+            console.log(`✅ [전체재계산] ${sheetName} 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 매칭행=${matchedRows}`);
+            
+            results.push({
+              month: targetMonth,
+              sheetName,
+              budgetType,
+              totalRemainingBudget,
+              totalSecuredBudget,
+              totalUsedBudget,
+              matchedRows,
+              success: true
+            });
+            
+          } catch (userSheetError) {
+            console.error(`❌ [전체재계산] ${sheetName} 처리 실패:`, userSheetError.message);
+            results.push({
+              month: targetMonth,
+              sheetName,
+              budgetType,
+              success: false,
+              error: userSheetError.message
+            });
+          }
+        }
+        
+      } catch (monthError) {
+        console.error(`❌ [전체재계산] ${targetMonth}월 처리 실패:`, monthError.message);
+        results.push({
+          month: targetMonth,
+          success: false,
+          error: monthError.message
+        });
+      }
+    }
+    
+    console.log(`🔄 [전체재계산] 완료 - 총 ${results.length}개 시트 처리`);
+    
+    res.json({
+      success: true,
+      message: '전체 재계산이 완료되었습니다.',
+      results
+    });
+    
+  } catch (error) {
+    console.error('❌ [전체재계산] 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '전체 재계산 중 오류가 발생했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 스케줄러 설정 - 매일 새벽 2시에 자동 재계산
+cron.schedule('0 2 * * *', async () => {
+  try {
+    console.log('🕐 [스케줄러] 자동 재계산 시작');
+    
+    // 전체 재계산 API 호출
+    const response = await fetch('http://localhost:4000/api/budget/recalculate-all', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ [스케줄러] 자동 재계산 완료:', result.message);
+    } else {
+      console.error('❌ [스케줄러] 자동 재계산 실패:', response.status);
+    }
+    
+  } catch (error) {
+    console.error('❌ [스케줄러] 자동 재계산 오류:', error);
+  }
+}, {
+  timezone: 'Asia/Seoul'
+});
+
+console.log('🕐 [스케줄러] 매일 새벽 2시 자동 재계산 설정 완료');
+
+// 서버 시작
+app.listen(port, () => {
+  console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
+  console.log(`📊 예산 관리 시스템이 준비되었습니다.`);
+  console.log(`🕐 자동 재계산 스케줄러가 활성화되었습니다.`);
 });

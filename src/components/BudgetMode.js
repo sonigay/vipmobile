@@ -98,6 +98,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [userSheets, setUserSheets] = useState([]);
   const [showSheetList, setShowSheetList] = useState(false);
   const [showMonthSheetList, setShowMonthSheetList] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
@@ -353,6 +354,58 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('정책그룹 설정 삭제 실패:', error);
       setSnackbar({ open: true, message: '정책그룹 설정 삭제에 실패했습니다.', severity: 'error' });
+    }
+  };
+
+  // 전체 재계산 함수
+  const handleRecalculateAll = async () => {
+    if (isRecalculating) return;
+    
+    setIsRecalculating(true);
+    try {
+      console.log('🔄 [Frontend] 전체 재계산 시작');
+      
+      const response = await fetch('/api/budget/recalculate-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setSnackbar({ 
+          open: true, 
+          message: `전체 재계산이 완료되었습니다. (${result.results?.length || 0}개 시트 처리)`, 
+          severity: 'success' 
+        });
+        
+        // 성공한 시트들의 결과 로그
+        const successResults = result.results?.filter(r => r.success) || [];
+        console.log('✅ [Frontend] 재계산 성공 결과:', successResults);
+        
+        // 목록 새로고침
+        if (showSheetList) {
+          loadUserSheets();
+        }
+      } else {
+        throw new Error(result.error || '재계산 중 오류가 발생했습니다.');
+      }
+      
+    } catch (error) {
+      console.error('❌ [Frontend] 전체 재계산 실패:', error);
+      setSnackbar({ 
+        open: true, 
+        message: `전체 재계산 실패: ${error.message}`, 
+        severity: 'error' 
+      });
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -1880,19 +1933,35 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             <Typography variant="h6" sx={{ color: '#795548' }}>
               📋 저장된 데이터 목록
             </Typography>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                setShowSheetList(!showSheetList);
-                if (!showSheetList) {
-                  loadUserSheets();
-                }
-              }}
-              sx={{ borderColor: '#795548', color: '#795548' }}
-            >
-              {showSheetList ? '숨기기' : '보기'}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setShowSheetList(!showSheetList);
+                  if (!showSheetList) {
+                    loadUserSheets();
+                  }
+                }}
+                sx={{ borderColor: '#795548', color: '#795548' }}
+              >
+                {showSheetList ? '숨기기' : '보기'}
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                color="primary"
+                onClick={handleRecalculateAll}
+                disabled={isRecalculating}
+                startIcon={isRecalculating ? <CircularProgress size={16} /> : <CalculateIcon />}
+                sx={{ 
+                  backgroundColor: '#1976D2',
+                  '&:hover': { backgroundColor: '#1565C0' }
+                }}
+              >
+                {isRecalculating ? '재계산 중...' : '전체 재계산'}
+              </Button>
+            </Box>
           </Box>
           
           {showSheetList && (
