@@ -21848,32 +21848,32 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             const metadataUpdateRequests = [];
             
-            // 액면예산(Ⅰ): O1:R2 범위에 메타데이터 저장
+            // 기존 O1:R2 데이터 보존하고, 새로운 위치 S1:V2에 계산 결과 저장
             if (budgetType === 'Ⅱ') {
-              // 액면예산(Ⅱ): O1:R2 범위
+              // 액면예산(Ⅱ): S1:V2 범위에 계산 결과 저장 (기존 O1:R2 보존)
               metadataUpdateRequests.push({
-                range: `${sheetName}!O1:R2`,
+                range: `${sheetName}!S1:V2`,
                 values: [
-                  ['생성일시', '생성자', '정책그룹', '생성자이름'],
+                  ['계산일시', '계산자', '정책그룹', '계산결과'],
                   [
                     new Date().toISOString(),
                     inputUserName,
                     selectedPolicyGroups.join(','),
-                    inputUserName
+                    `잔액:${calculationResult.totalRemainingBudget}, 확보:${calculationResult.totalSecuredBudget}, 사용:${calculationResult.totalUsedBudget}`
                   ]
                 ]
               });
             } else {
-              // 액면예산(Ⅰ): O1:R2 범위
+              // 액면예산(Ⅰ): S1:V2 범위에 계산 결과 저장 (기존 O1:R2 보존)
               metadataUpdateRequests.push({
-                range: `${sheetName}!O1:R2`,
+                range: `${sheetName}!S1:V2`,
                 values: [
-                  ['생성일시', '생성자', '정책그룹', '생성자이름'],
+                  ['계산일시', '계산자', '정책그룹', '계산결과'],
                   [
                     new Date().toISOString(),
                     inputUserName,
                     selectedPolicyGroups.join(','),
-                    inputUserName
+                    `잔액:${calculationResult.totalRemainingBudget}, 확보:${calculationResult.totalSecuredBudget}, 사용:${calculationResult.totalUsedBudget}`
                   ]
                 ]
               });
