@@ -17885,13 +17885,24 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
         });
         
         const userSheetRows = userSheetData.data.values || [];
-        if (userSheetRows.length > 0) {
-          // 첫 번째 행의 A열(접수시작일), B열(접수종료일) 확인
-          const firstRow = userSheetRows[0];
-          if (firstRow && firstRow[0] && firstRow[1]) {
-            receiptDateRange = `${firstRow[0]} ~ ${firstRow[1]}`;
-            receiptDateApplied = '적용';
-            console.log(`📅 [SAFE-UPDATE] 사용자시트 접수일 범위 확인: ${receiptDateRange}`);
+        if (userSheetRows.length > 1) { // 헤더 제외하고 데이터 행 확인
+          // 첫 번째 데이터 행 (헤더 다음 행)의 A열(접수시작일), B열(접수종료일) 확인
+          const firstDataRow = userSheetRows[1]; // 인덱스 1 = 두 번째 행 (헤더 제외)
+          if (firstDataRow && firstDataRow[0] && firstDataRow[1]) {
+            // 실제 날짜 데이터인지 확인 (헤더 텍스트가 아닌)
+            const startDate = firstDataRow[0];
+            const endDate = firstDataRow[1];
+            
+            // 헤더 텍스트가 아닌 실제 날짜 데이터인 경우만 적용
+            if (startDate !== '접수시작일' && endDate !== '접수종료일' && 
+                startDate !== '시작일' && endDate !== '종료일' &&
+                startDate.trim() !== '' && endDate.trim() !== '') {
+              receiptDateRange = `${startDate} ~ ${endDate}`;
+              receiptDateApplied = '적용';
+              console.log(`📅 [SAFE-UPDATE] 사용자시트 접수일 범위 확인: ${receiptDateRange}`);
+            } else {
+              console.log(`⚠️ [SAFE-UPDATE] 사용자시트 첫 번째 행이 헤더입니다: ${startDate}, ${endDate}`);
+            }
           }
         }
       } catch (error) {
@@ -18119,13 +18130,24 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
         });
         
         const userSheetRows = userSheetData.data.values || [];
-        if (userSheetRows.length > 0) {
-          // 첫 번째 행의 A열(접수시작일), B열(접수종료일) 확인
-          const firstRow = userSheetRows[0];
-          if (firstRow && firstRow[0] && firstRow[1]) {
-            receiptDateRange = `${firstRow[0]} ~ ${firstRow[1]}`;
-            receiptDateApplied = '적용';
-            console.log(`📅 [updateUserSheetUsage] 사용자시트 접수일 범위 확인: ${receiptDateRange}`);
+        if (userSheetRows.length > 1) { // 헤더 제외하고 데이터 행 확인
+          // 첫 번째 데이터 행 (헤더 다음 행)의 A열(접수시작일), B열(접수종료일) 확인
+          const firstDataRow = userSheetRows[1]; // 인덱스 1 = 두 번째 행 (헤더 제외)
+          if (firstDataRow && firstDataRow[0] && firstDataRow[1]) {
+            // 실제 날짜 데이터인지 확인 (헤더 텍스트가 아닌)
+            const startDate = firstDataRow[0];
+            const endDate = firstDataRow[1];
+            
+            // 헤더 텍스트가 아닌 실제 날짜 데이터인 경우만 적용
+            if (startDate !== '접수시작일' && endDate !== '접수종료일' && 
+                startDate !== '시작일' && endDate !== '종료일' &&
+                startDate.trim() !== '' && endDate.trim() !== '') {
+              receiptDateRange = `${startDate} ~ ${endDate}`;
+              receiptDateApplied = '적용';
+              console.log(`📅 [updateUserSheetUsage] 사용자시트 접수일 범위 확인: ${receiptDateRange}`);
+            } else {
+              console.log(`⚠️ [updateUserSheetUsage] 사용자시트 첫 번째 행이 헤더입니다: ${startDate}, ${endDate}`);
+            }
           }
         }
       } catch (error) {
@@ -19314,12 +19336,12 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       });
     }
 
-    // 메타데이터 누적 저장 (O열~W열)
+    // 메타데이터 누적 저장 (O열~X열)
     let existingMetadata = [];
     try {
       const metadataResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${userSheetName}!O:W`
+        range: `${userSheetName}!O:X`
       });
       existingMetadata = metadataResponse.data.values || [];
     } catch (error) {
@@ -19407,6 +19429,46 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
         values: [newPolicyRow]
       }
     });
+    
+    // 메타데이터에서 빈 행 제거 (정책 1 문제 해결)
+    try {
+      const cleanMetadataResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!O:X`
+      });
+      
+      const allMetadata = cleanMetadataResponse.data.values || [];
+      if (allMetadata.length > 1) {
+        // 헤더는 유지하고 데이터 행만 필터링
+        const header = allMetadata[0];
+        const dataRows = allMetadata.slice(1).filter(row => 
+          row.length >= 10 && row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+        );
+        
+        // 빈 행이 제거된 메타데이터로 다시 저장
+        if (dataRows.length !== allMetadata.length - 1) {
+          const cleanMetadata = [header, ...dataRows];
+          await sheets.spreadsheets.values.clear({
+            spreadsheetId: sheetId,
+            range: `${userSheetName}!O:X`
+          });
+          
+          if (cleanMetadata.length > 0) {
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: sheetId,
+              range: `${userSheetName}!O1:X${cleanMetadata.length}`,
+              valueInputOption: 'RAW',
+              resource: {
+                values: cleanMetadata
+              }
+            });
+            console.log(`🧹 [데이터저장] ${userSheetName}: 메타데이터 빈 행 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책)`);
+          }
+        }
+      }
+    } catch (cleanError) {
+      console.log(`⚠️ [데이터저장] ${userSheetName}: 메타데이터 정리 실패:`, cleanError.message);
+    }
 
     // 데이터 저장 후 바로 계산 수행
     console.log(`📊 [데이터저장] ${userSheetName} 계산 시작`);
