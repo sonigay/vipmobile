@@ -21513,10 +21513,10 @@ app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
   }
 });
 
-// 전체 재계산 API - 액면예산(Ⅰ), (Ⅱ), (종합) 모두 지원
+// 전체 재계산 API - 액면예산(Ⅰ), (Ⅱ), (종합) 모두 지원 - 전체 재입력 및 재계산
 app.post('/api/budget/recalculate-all', async (req, res) => {
   try {
-    console.log('🔄 [전체재계산] 시작');
+    console.log('🔄 [전체재계산] 시작 - 전체 재입력 및 재계산 모드');
     
     const sheets = google.sheets({ version: 'v4', auth });
     
@@ -21554,19 +21554,19 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
           const sheetName = userRow[0];
           const budgetType = userRow[1]; // Ⅰ, Ⅱ, 종합
           
-          console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 처리`);
+          console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 전체 재입력 및 재계산 시작`);
           
           try {
-            // 5. 액면예산 시트에서 최신 데이터 로드
-            const activationDataResponse = await sheets.spreadsheets.values.get({
+            // 5. 사용자 시트에서 입력 데이터 로드 (A열부터 시작)
+            const userSheetDataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: '액면예산!A:ZZ'
+              range: `${sheetName}!A:ZZ`
             });
             
-            const activationData = activationDataResponse.data.values || [];
+            const userSheetData = userSheetDataResponse.data.values || [];
             
-            if (activationData.length <= 4) {
-              console.log(`⚠️ [전체재계산] ${sheetName}: 액면예산 데이터 부족`);
+            if (userSheetData.length <= 1) {
+              console.log(`⚠️ [전체재계산] ${sheetName}: 사용자 시트 데이터 부족`);
               continue;
             }
             
@@ -21607,94 +21607,123 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               console.log(`⚠️ [전체재계산] ${sheetName}: 메타데이터 조회 실패`);
             }
             
-            // 7. 조건에 맞는 데이터만 필터링하여 액면예산에 재입력
-            const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
-            const inputDateCol = budgetType === 'Ⅱ' ? 2 : 4; // C열 또는 E열
+            // 7. 액면예산 시트에서 기존 데이터 로드
+            const activationDataResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: '액면예산!A:ZZ'
+            });
             
+            const activationData = activationDataResponse.data.values || [];
+            
+            // 8. 액면예산 시트 초기화 (헤더 4행은 유지)
+            const headerRows = activationData.slice(0, 4);
+            
+            // 9. 사용자 시트의 입력 데이터를 액면예산에 재입력
+            const newActivationData = [...headerRows];
             let totalRemainingBudget = 0;
             let totalSecuredBudget = 0;
             let totalUsedBudget = 0;
             let matchedRows = 0;
             
-            // 8. 액면예산 데이터를 순회하며 조건에 맞는 데이터 찾기
-            activationData.slice(4).forEach((row, index) => {
-              if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) {
-                const inputUser = row[inputUserCol];
-                const inputDate = row[inputDateCol];
+            // 10. 사용자 시트의 데이터를 순회하며 액면예산에 재입력
+            userSheetData.slice(1).forEach((row, index) => { // 헤더 제외
+              if (row.length >= 3 && row[0] && row[1] && row[2]) { // 최소 3개 컬럼 필요
+                const modelName = row[0]; // A열: 모델명
+                const quantity = row[1]; // B열: 수량
+                const unitPrice = row[2]; // C열: 단가
                 
-                // 조건 매칭 체크
-                let isMatched = true;
-                
-                // 생성자 매칭
-                if (creatorName && inputUser && creatorName !== '미적용') {
-                  isMatched = isMatched && inputUser.includes(creatorName);
-                }
-                
-                // 날짜 범위 매칭
-                if (inputDate) {
-                  let inputDateStr = inputDate.toString().trim();
+                // 수량과 단가가 유효한 경우만 처리
+                if (quantity && unitPrice && !isNaN(parseFloat(quantity)) && !isNaN(parseFloat(unitPrice))) {
+                  const qty = parseFloat(quantity);
+                  const price = parseFloat(unitPrice);
+                  const totalAmount = qty * price;
                   
-                  // 접미사 제거
-                  if (inputDateStr.includes('(Ⅰ)')) {
-                    inputDateStr = inputDateStr.replace('(Ⅰ)', '').trim();
-                  }
-                  if (inputDateStr.includes('(Ⅱ)')) {
-                    inputDateStr = inputDateStr.replace('(Ⅱ)', '').trim();
-                  }
-                  
-                  // 접수일 범위 체크
-                  if (receiptStartDate && receiptEndDate && receiptStartDate !== '미적용') {
-                    isMatched = isMatched && (inputDateStr >= receiptStartDate && inputDateStr <= receiptEndDate);
-                  }
-                  
-                  // 개통일 범위 체크
-                  if (activationStartDate && activationEndDate && activationStartDate !== '미적용') {
-                    isMatched = isMatched && (inputDateStr >= activationStartDate && inputDateStr <= activationEndDate);
-                  }
-                }
-                
-                // 조건에 맞는 데이터만 합계
-                if (isMatched) {
-                  matchedRows++;
+                  // 액면예산 타입에 따른 컬럼 매핑
                   if (budgetType === 'Ⅱ') {
-                    // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
-                    if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
-                      totalRemainingBudget += parseFloat(row[8]) || 0;
-                    }
-                    if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
-                      totalSecuredBudget += parseFloat(row[9]) || 0;
-                    }
-                    if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
-                      totalUsedBudget += parseFloat(row[10]) || 0;
-                    }
+                    // 액면예산(Ⅱ): B열(입력자), C열(입력일시), I열(잔액), J열(확보), K열(사용)
+                    const newRow = new Array(11).fill(''); // 11개 컬럼
+                    newRow[0] = modelName; // A열: 모델명
+                    newRow[1] = creatorName || '미적용'; // B열: 입력자
+                    newRow[2] = new Date().toLocaleDateString('ko-KR'); // C열: 입력일시
+                    newRow[3] = qty; // D열: 수량
+                    newRow[4] = price; // E열: 단가
+                    newRow[5] = totalAmount; // F열: 총액
+                    newRow[6] = ''; // G열: 비고
+                    newRow[7] = ''; // H열: 비고2
+                    newRow[8] = totalAmount; // I열: 잔액 (초기값)
+                    newRow[9] = totalAmount; // J열: 확보 (초기값)
+                    newRow[10] = 0; // K열: 사용 (초기값)
+                    
+                    newActivationData.push(newRow);
+                    totalRemainingBudget += totalAmount;
+                    totalSecuredBudget += totalAmount;
+                    totalUsedBudget += 0;
+                    matchedRows++;
                   } else if (budgetType === '종합') {
-                    // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
-                    if (row[5] !== '' && row[5] !== undefined && row[5] !== null) {
-                      totalRemainingBudget += parseFloat(row[5]) || 0;
-                    }
-                    if (row[6] !== '' && row[6] !== undefined && row[6] !== null) {
-                      totalSecuredBudget += parseFloat(row[6]) || 0;
-                    }
-                    if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
-                      totalUsedBudget += parseFloat(row[7]) || 0;
-                    }
+                    // 액면예산(종합): D열(입력자), E열(입력일시), F열(잔액), G열(확보), H열(사용)
+                    const newRow = new Array(14).fill(''); // 11개 컬럼
+                    newRow[0] = modelName; // A열: 모델명
+                    newRow[1] = ''; // B열: 비고
+                    newRow[2] = ''; // C열: 비고2
+                    newRow[3] = creatorName || '미적용'; // D열: 입력자
+                    newRow[4] = new Date().toLocaleDateString('ko-KR'); // E열: 입력일시
+                    newRow[5] = totalAmount; // F열: 잔액 (초기값)
+                    newRow[6] = totalAmount; // G열: 확보 (초기값)
+                    newRow[7] = 0; // H열: 사용 (초기값)
+                    newRow[8] = ''; // I열: 비고3
+                    newRow[9] = ''; // J열: 비고4
+                    newRow[10] = ''; // K열: 비고5
+                    newRow[11] = totalAmount; // L열: 잔액 (초기값)
+                    newRow[12] = totalAmount; // M열: 확보 (초기값)
+                    newRow[13] = 0; // N열: 사용 (초기값)
+                    
+                    newActivationData.push(newRow);
+                    totalRemainingBudget += totalAmount;
+                    totalSecuredBudget += totalAmount;
+                    totalUsedBudget += 0;
+                    matchedRows++;
                   } else {
-                    // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
-                    if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
-                      totalRemainingBudget += parseFloat(row[11]) || 0;
-                    }
-                    if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
-                      totalSecuredBudget += parseFloat(row[12]) || 0;
-                    }
-                    if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
-                      totalUsedBudget += parseFloat(row[13]) || 0;
-                    }
+                    // 액면예산(Ⅰ): D열(입력자), E열(입력일시), L열(잔액), M열(확보), N열(사용)
+                    const newRow = new Array(14).fill(''); // 14개 컬럼
+                    newRow[0] = modelName; // A열: 모델명
+                    newRow[1] = ''; // B열: 비고
+                    newRow[2] = ''; // C열: 비고2
+                    newRow[3] = creatorName || '미적용'; // D열: 입력자
+                    newRow[4] = new Date().toLocaleDateString('ko-KR'); // E열: 입력일시
+                    newRow[5] = ''; // F열: 비고3
+                    newRow[6] = ''; // G열: 비고4
+                    newRow[7] = ''; // H열: 비고5
+                    newRow[8] = ''; // I열: 비고6
+                    newRow[9] = ''; // J열: 비고7
+                    newRow[10] = ''; // K열: 비고8
+                    newRow[11] = totalAmount; // L열: 잔액 (초기값)
+                    newRow[12] = totalAmount; // M열: 확보 (초기값)
+                    newRow[13] = 0; // N열: 사용 (초기값)
+                    
+                    newActivationData.push(newRow);
+                    totalRemainingBudget += totalAmount;
+                    totalSecuredBudget += totalAmount;
+                    totalUsedBudget += 0;
+                    matchedRows++;
                   }
                 }
               }
             });
             
-            // 9. 계산 결과를 사용자 시트에 업데이트
+            // 11. 액면예산 시트를 새로운 데이터로 완전히 교체
+            await sheets.spreadsheets.values.clear({
+              spreadsheetId: sheetId,
+              range: '액면예산!A:ZZ'
+            });
+            
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: sheetId,
+              range: '액면예산!A1',
+              valueInputOption: 'USER_ENTERED',
+              resource: { values: newActivationData }
+            });
+            
+            // 12. 계산 결과를 사용자 시트에 업데이트
             const summaryData = [
               ['계산결과'],
               ['예산잔액', totalRemainingBudget],
