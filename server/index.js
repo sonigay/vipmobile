@@ -21704,7 +21704,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                     totalRemainingBudget += totalAmount;
                     totalSecuredBudget += totalAmount;
                     totalUsedBudget += 0;
-                    matchedRows++;
+                  matchedRows++;
                   }
                 }
               }
@@ -21823,6 +21823,6 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
 // console.log('🕐 [스케줄러] 매일 새벽 2시 자동 재계산 설정 완료');
 
 // 서버 시작 (이미 위에서 처리됨)
-console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
-console.log(`📊 예산 관리 시스템이 준비되었습니다.`);
-console.log(`🕐 자동 재계산 스케줄러가 임시 비활성화되었습니다. (클라우드타입 패키지 문제)`);
+  console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
+  console.log(`📊 예산 관리 시스템이 준비되었습니다.`);
+  console.log(`🕐 자동 재계산 스케줄러가 임시 비활성화되었습니다. (클라우드타입 패키지 문제)`);
