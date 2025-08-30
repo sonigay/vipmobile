@@ -79,7 +79,7 @@ class UserSheetManager {
                     title: this.sheetName,
                     gridProperties: {
                       rowCount: 1000,
-                      columnCount: 12 // L열까지
+                      columnCount: 24 // X열까지
                     }
                   }
                 }

@@ -18617,7 +18617,7 @@ app.post('/api/budget/user-sheets-v2', async (req, res) => {
                 title: userSheetName,
                 gridProperties: {
                   rowCount: 1000,
-                  columnCount: 20
+                  columnCount: 24
                 }
               }
             }
@@ -18761,7 +18761,7 @@ app.post('/api/budget/user-sheets', async (req, res) => {
                   title: userSheetName,
                   gridProperties: {
                     rowCount: 1000,
-                    columnCount: 20
+                    columnCount: 24
                   }
                 }
               }
