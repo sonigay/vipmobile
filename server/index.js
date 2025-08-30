@@ -4896,10 +4896,10 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           // 사용예산 업데이트
           if (!existingUsedValue || existingUsedValue.toString().trim() === '') {
-            updateRequests.push({
+          updateRequests.push({
               range: `액면예산!${usedCol}${actualRowNumber}`,
               values: [[calculatedBudgetValue]]
-            });
+          });
             // 사용예산 업데이트
           } else {
             // 사용예산 유지
@@ -21797,7 +21797,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             // 9. 액면예산 시트 부분 영역 초기화 (올바른 컬럼 범위)
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 시트 부분 영역 초기화 시작`);
             
-            if (budgetType === 'Ⅱ') {
+                  if (budgetType === 'Ⅱ') {
               // 액면예산(Ⅱ): B5:C열(입력자/입력일시), I5:K열(예산 관련)
               await sheets.spreadsheets.values.clear({
                 spreadsheetId: sheetId,
@@ -21821,7 +21821,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 D5:E열, L5:N열 초기화 완료`);
             }
             
-            // 10. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
+                        // 10. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
             
             // 기존 저장 버튼과 동일한 매개변수로 calculateUsageBudget 호출
@@ -21837,18 +21837,18 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             const selectedPolicyGroups = policyGroupString.split(',').map(group => group.trim());
             console.log(`🔍 [전체재계산] ${sheetName}: 파싱된 정책그룹:`, selectedPolicyGroups);
             
-                          const calculationResult = await calculateUsageBudget(
-                sheetId, 
-                selectedPolicyGroups, 
-                calculateDateRange, 
-                inputUserName, 
-                budgetType
-              );
+            const calculationResult = await calculateUsageBudget(
+              sheetId, 
+              selectedPolicyGroups, 
+              calculateDateRange, 
+              inputUserName, 
+              budgetType
+            );
             
             console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료`);
             
-            // 9-1. 액면예산 시트 부분 영역 초기화 (B5:E열, I5:N열만)
-            // calculateUsageBudget에서 이미 업데이트했으므로 초기화는 불필요
+            // 9-1. 액면예산 시트 부분 영역 초기화 (올바른 순서로 수정)
+            // calculateUsageBudget 호출 후 초기화는 불필요 (이미 데이터 입력됨)
             console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 업데이트 완료 (calculateUsageBudget에서 처리됨)`);
             
             // 9-2. 기존 저장 버튼과 동일하게 사용자 시트 업데이트 수행
@@ -21920,7 +21920,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                   });
                   
                   console.log(`💾 [전체재계산] ${sheetName} Row ${index + 2} 업데이트: 사용예산=${matchingData.budgetValue}, 잔액=${remainingBudget}`);
-                } else {
+                  } else {
                   console.log(`⚠️ [전체재계산] ${sheetName} Row ${index + 2} 매칭 실패: 군=${armyType}, 유형=${categoryType}`);
                 }
               }
