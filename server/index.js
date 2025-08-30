@@ -17874,16 +17874,36 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
         '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
       ];
       
+      // 사용자시트의 A열(접수시작일), B열(접수종료일) 데이터 읽기
+      let receiptDateRange = '미설정';
+      let receiptDateApplied = '미적용';
+      
+      try {
+        const userSheetData = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!A:B`
+        });
+        
+        const userSheetRows = userSheetData.data.values || [];
+        if (userSheetRows.length > 0) {
+          // 첫 번째 행의 A열(접수시작일), B열(접수종료일) 확인
+          const firstRow = userSheetRows[0];
+          if (firstRow && firstRow[0] && firstRow[1]) {
+            receiptDateRange = `${firstRow[0]} ~ ${firstRow[1]}`;
+            receiptDateApplied = '적용';
+            console.log(`📅 [SAFE-UPDATE] 사용자시트 접수일 범위 확인: ${receiptDateRange}`);
+          }
+        }
+      } catch (error) {
+        console.log(`⚠️ [SAFE-UPDATE] 사용자시트 접수일 데이터 읽기 실패:`, error.message);
+      }
+      
       // 새 정책 데이터 행 생성
       const newPolicyRow = [
         new Date().toISOString(),           // O열: 저장일시
-        dateRange.startDate && dateRange.endDate 
-          ? `${dateRange.startDate} ~ ${dateRange.endDate}` 
-          : '미설정',                       // P열: 접수일범위
+        receiptDateRange,                   // P열: 접수일범위 (사용자시트 데이터 기반)
         `${dateRange.startDate} ~ ${dateRange.endDate}`, // Q열: 개통일범위
-        dateRange.startDate && dateRange.endDate 
-          ? '적용' 
-          : '미적용',                       // R열: 접수일적용여부
+        receiptDateApplied,                 // R열: 접수일적용여부 (사용자시트 데이터 기반)
         new Date().toISOString(),           // S열: 계산일시
         userName,                           // T열: 계산자
         selectedPolicyGroups.join(','),     // U열: 정책그룹
@@ -18088,16 +18108,36 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage', async (req, res) => {
         '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
       ];
       
+      // 사용자시트의 A열(접수시작일), B열(접수종료일) 데이터 읽기
+      let receiptDateRange = '미설정';
+      let receiptDateApplied = '미적용';
+      
+      try {
+        const userSheetData = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!A:B`
+        });
+        
+        const userSheetRows = userSheetData.data.values || [];
+        if (userSheetRows.length > 0) {
+          // 첫 번째 행의 A열(접수시작일), B열(접수종료일) 확인
+          const firstRow = userSheetRows[0];
+          if (firstRow && firstRow[0] && firstRow[1]) {
+            receiptDateRange = `${firstRow[0]} ~ ${firstRow[1]}`;
+            receiptDateApplied = '적용';
+            console.log(`📅 [updateUserSheetUsage] 사용자시트 접수일 범위 확인: ${receiptDateRange}`);
+          }
+        }
+      } catch (error) {
+        console.log(`⚠️ [updateUserSheetUsage] 사용자시트 접수일 데이터 읽기 실패:`, error.message);
+      }
+      
       // 새 정책 데이터 행 생성
       const newPolicyRow = [
         new Date().toISOString(),           // O열: 저장일시
-        dateRange.startDate && dateRange.endDate 
-          ? `${dateRange.startDate} ~ ${dateRange.endDate}` 
-          : '미설정',                       // P열: 접수일범위
+        receiptDateRange,                   // P열: 접수일범위 (사용자시트 데이터 기반)
         `${dateRange.startDate} ~ ${dateRange.endDate}`, // Q열: 개통일범위
-        dateRange.startDate && dateRange.endDate 
-          ? '적용' 
-          : '미적용',                       // R열: 접수일적용여부
+        receiptDateApplied,                 // R열: 접수일적용여부 (사용자시트 데이터 기반)
         new Date().toISOString(),           // S열: 계산일시
         userName,                           // T열: 계산자
         selectedPolicyGroups.join(','),     // U열: 정책그룹
@@ -18211,8 +18251,12 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             let totalUsedBudget = 0;
             let policyCount = 0;
             
-            // 메타데이터의 각 정책 행에서 예산 데이터 합계
-            metadata.slice(1).forEach((row, index) => { // 2행부터 시작 (헤더 1행 제외)
+            // 메타데이터의 각 정책 행에서 예산 데이터 합계 (빈 행 제외)
+            const validRows = metadata.slice(1).filter(row => 
+              row.length >= 10 && row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+            );
+            
+            validRows.forEach((row, index) => { // 유효한 행만 처리
               if (row.length >= 10) { // O~X열 (10개 컬럼) - 수정됨!
                 // V열: 잔액, W열: 확보, X열: 사용
                 const remainingBudget = parseFloat(row[7]) || 0; // V열 (0-based index 7)
@@ -19263,7 +19307,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
         spreadsheetId: sheetId,
         range: `${userSheetName}!A:L`,
         valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
+        // insertDataOption 제거로 빈 행 생성 방지
         resource: {
           values: rowsToSave
         }
@@ -19358,7 +19402,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       spreadsheetId: sheetId,
       range: `${userSheetName}!O:X`,
       valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
+      // insertDataOption 제거로 빈 행 생성 방지
       resource: {
         values: [newPolicyRow]
       }
