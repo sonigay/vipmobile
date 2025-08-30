@@ -17934,14 +17934,22 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
         });
       }
       
-      // 새 정책 데이터 행 추가
+      // 기존 메타데이터 백업 (문제 진단용)
+      console.log(`💾 [SAFE-UPDATE] 기존 메타데이터 백업:`, existingMetadata);
+      
+      // 새 정책 데이터 행 추가 (상세 로깅)
+      const targetRow = existingMetadata.length + 2;
+      console.log(`📝 [SAFE-UPDATE] 메타데이터 저장 위치: ${userSheetName}!O${targetRow}:X${targetRow}`);
+      console.log(`📊 [SAFE-UPDATE] 기존 메타데이터 행 수: ${existingMetadata.length}, 새 정책 저장 행: ${targetRow}`);
+      
       metadataUpdateRequests.push({
-        range: `${userSheetName}!O${existingMetadata.length + 2}:X${existingMetadata.length + 2}`,
+        range: `${userSheetName}!O${targetRow}:X${targetRow}`,
         values: [newPolicyRow]
       });
       
       // 메타데이터 업데이트 실행
       if (metadataUpdateRequests.length > 0) {
+        console.log(`🔄 [SAFE-UPDATE] 메타데이터 업데이트 시작: ${metadataUpdateRequests.length}개 요청`);
         await sheets.spreadsheets.values.batchUpdate({
           spreadsheetId: sheetId,
           resource: {
@@ -17951,7 +17959,20 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
         });
         console.log(`✅ [SAFE-UPDATE] 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
         
-        // 빈 행 제거 (헤더 다음 빈 행 문제 해결)
+        // 저장 후 검증 (문제 진단용)
+        try {
+          const verificationResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: `${userSheetName}!O:X`
+          });
+          const finalMetadata = verificationResponse.data.values || [];
+          console.log(`🔍 [SAFE-UPDATE] 저장 후 메타데이터 검증: ${finalMetadata.length}행`);
+          console.log(`📊 [SAFE-UPDATE] 최종 메타데이터:`, finalMetadata);
+        } catch (verificationError) {
+          console.log(`⚠️ [SAFE-UPDATE] 메타데이터 검증 실패:`, verificationError.message);
+        }
+        
+        // 정교한 빈 행 제거 - 실제 정책 데이터는 보존하고 진짜 빈 행만 제거
         try {
           const cleanMetadataResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
@@ -17960,13 +17981,20 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
           
           const allMetadata = cleanMetadataResponse.data.values || [];
           if (allMetadata.length > 1) {
-            // 헤더는 유지하고 데이터 행만 필터링 (빈 행 제거)
+            // 헤더는 유지하고 데이터 행만 필터링
             const header = allMetadata[0];
-            const dataRows = allMetadata.slice(1).filter(row => 
-              row.length >= 10 && row.some(cell => cell !== '' && cell !== null && cell !== undefined)
-            );
+            const dataRows = allMetadata.slice(1).filter(row => {
+              // 행이 충분한 컬럼을 가지고 있는지 확인
+              if (row.length < 10) return false;
+              
+              // 핵심 정책 정보 컬럼들이 모두 있는지 확인 (O, P, Q, R, S, T, U, V, W, X)
+              const hasEssentialData = row[0] && row[1] && row[2] && row[3] && row[4] && row[5] && row[6];
+              
+              // 핵심 데이터가 있으면 보존 (일부 빈 셀은 허용)
+              return hasEssentialData;
+            });
             
-            // 빈 행이 제거된 메타데이터로 다시 저장
+            // 진짜 빈 행만 제거된 경우에만 정리
             if (dataRows.length !== allMetadata.length - 1) {
               const cleanMetadata = [header, ...dataRows];
               await sheets.spreadsheets.values.clear({
@@ -17983,7 +18011,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
                     values: cleanMetadata
                   }
                 });
-                console.log(`🧹 [SAFE-UPDATE] ${userSheetName}: 메타데이터 빈 행 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책)`);
+                console.log(`🧹 [SAFE-UPDATE] ${userSheetName}: 정교한 빈 행 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책)`);
               }
             }
           }
