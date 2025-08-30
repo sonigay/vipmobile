@@ -21805,16 +21805,16 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               });
               console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 B5:C열, I5:K열 초기화 완료`);
             } else {
-              // 액면예산(Ⅰ): B5:E열(입력자/입력일시), I5:N열(예산 관련) - 모든 데이터 제거
+              // 액면예산(Ⅰ): D5:E열(입력자/입력일시), L5:N열(예산 관련)
               await sheets.spreadsheets.values.clear({
                 spreadsheetId: sheetId,
-                range: '액면예산!B5:E'
+                range: '액면예산!D5:E'
               });
               await sheets.spreadsheets.values.clear({
                 spreadsheetId: sheetId,
-                range: '액면예산!I5:N'
+                range: '액면예산!L5:N'
               });
-              console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 B5:E열, I5:N열 초기화 완료 (모든 데이터 제거)`);
+              console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 D5:E열, L5:N열 초기화 완료`);
             }
             
             // 10. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
