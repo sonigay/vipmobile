@@ -17987,97 +17987,145 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
-        // 액면예산 시트에서 계산 - 사용자 시트는 입력 데이터만 저장
-        console.log(`🔍 [${sheet.sheetName}] 액면예산 시트 계산 시작!`);
+        // 사용자 시트 메타데이터에서 계산 결과 불러오기 (O열~W열)
+        console.log(`🔍 [${sheet.sheetName}] 메타데이터에서 계산 결과 불러오기 시작!`);
         
-        // 액면예산 시트에서 해당 범위 가져오기
-        const activationDataResponse = await sheets_api.spreadsheets.values.get({
-          spreadsheetId: sheet.sheetId,
-          range: '액면예산!A:ZZ'
-        });
-        
-        const activationData = activationDataResponse.data.values || [];
-        console.log(`📊 [${sheet.sheetName}] 액면예산 데이터 로드: ${activationData.length}행`);
-        
-        if (activationData.length > 4) { // 헤더 4행 제외
-          let totalRemainingBudget = 0;
-          let totalSecuredBudget = 0;
-          let totalUsedBudget = 0;
+        try {
+          // 사용자 시트 메타데이터에서 계산 결과 가져오기 (O열~W열)
+          const metadataResponse = await sheets_api.spreadsheets.values.get({
+            spreadsheetId: sheet.sheetId,
+            range: `${sheet.sheetName}!O:W`
+          });
           
-          // 액면예산 타입에 따른 컬럼 매핑
-          const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
-          const inputDateCol = budgetType === 'Ⅱ' ? 2 : 4; // C열 또는 E열
+          const metadata = metadataResponse.data.values || [];
+          console.log(`📊 [${sheet.sheetName}] 메타데이터 데이터 로드: ${metadata.length}행`);
           
-          // 메타데이터에서 생성자 정보 가져오기
-          let creatorName = '';
-          try {
-            const metadataResponse = await sheets_api.spreadsheets.values.get({
-              spreadsheetId: sheet.sheetId,
-              range: `${sheet.sheetName}!O1:R2`
+          if (metadata.length > 1) { // 헤더 1행 제외
+            let totalRemainingBudget = 0;
+            let totalSecuredBudget = 0;
+            let totalUsedBudget = 0;
+            let policyCount = 0;
+            
+            // 메타데이터의 각 정책 행에서 예산 데이터 합계
+            metadata.slice(1).forEach((row, index) => { // 2행부터 시작 (헤더 1행 제외)
+              if (row.length >= 8) { // O~W열 (8개 컬럼)
+                // V열: 잔액, W열: 확보, X열: 사용
+                const remainingBudget = parseFloat(row[7]) || 0; // V열 (0-based index 7)
+                const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
+                const usedBudget = parseFloat(row[9]) || 0;      // X열 (0-based index 9)
+                
+                totalRemainingBudget += remainingBudget;
+                totalSecuredBudget += securedBudget;
+                totalUsedBudget += usedBudget;
+                policyCount++;
+                
+                console.log(`📋 [${sheet.sheetName}] 정책 ${index + 1}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
+              }
             });
             
-            const metadata = metadataResponse.data.values || [];
-            if (metadata.length >= 2 && metadata[1].length >= 4) {
-              creatorName = metadata[1][3] || ''; // 생성자 이름 (R열)
-              console.log(`🔍 [${sheet.sheetName}] 생성자: ${creatorName}`);
-            }
-          } catch (metadataError) {
-            console.log(`❌ [${sheet.sheetName}] 메타데이터 조회 실패:`, metadataError.message);
+            console.log(`📊 [${sheet.sheetName}] 메타데이터 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 정책수=${policyCount}`);
+            
+            summary.totalRemainingBudget = totalRemainingBudget;
+            summary.totalSecuredBudget = totalSecuredBudget;
+            summary.totalUsedBudget = totalUsedBudget;
+            summary.itemCount = policyCount;
+          } else {
+            console.log(`📋 [${sheet.sheetName}] 메타데이터에 정책 데이터 없음`);
           }
+        } catch (metadataError) {
+          console.log(`❌ [${sheet.sheetName}] 메타데이터 조회 실패:`, metadataError.message);
           
-          activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
-            if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) { // 충분한 열이 있는지 확인
-              const inputUser = row[inputUserCol];
+          // 메타데이터 조회 실패 시 액면예산 시트에서 계산 (기존 방식)
+          console.log(`🔍 [${sheet.sheetName}] 액면예산 시트에서 계산 시작!`);
+          
+          // 액면예산 시트에서 해당 범위 가져오기
+          const activationDataResponse = await sheets_api.spreadsheets.values.get({
+            spreadsheetId: sheet.sheetId,
+            range: '액면예산!A:ZZ'
+          });
+          
+          const activationData = activationDataResponse.data.values || [];
+          console.log(`📊 [${sheet.sheetName}] 액면예산 데이터 로드: ${activationData.length}행`);
+          
+          if (activationData.length > 4) { // 헤더 4행 제외
+            let totalRemainingBudget = 0;
+            let totalSecuredBudget = 0;
+            let totalUsedBudget = 0;
+            
+            // 액면예산 타입에 따른 컬럼 매핑
+            const inputUserCol = budgetType === 'Ⅱ' ? 1 : 3; // B열 또는 D열
+            
+            // 메타데이터에서 생성자 정보 가져오기
+            let creatorName = '';
+            try {
+              const creatorResponse = await sheets_api.spreadsheets.values.get({
+                spreadsheetId: sheet.sheetId,
+                range: `${sheet.sheetName}!O1:R2`
+              });
               
-              // 생성자 매칭 (생성자가 설정된 경우에만)
-              let isMatched = true;
-              if (creatorName && inputUser && creatorName !== '미적용') {
-                isMatched = inputUser.includes(creatorName);
+              const creatorData = creatorResponse.data.values || [];
+              if (creatorData.length >= 2 && creatorData[1].length >= 4) {
+                creatorName = creatorData[1][3] || ''; // 생성자 이름 (R열)
+                console.log(`🔍 [${sheet.sheetName}] 생성자: ${creatorName}`);
               }
-              
-              // 조건에 맞는 데이터만 합계
-              if (isMatched) {
-                if (budgetType === 'Ⅱ') {
-                  // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
-                  if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
-                    const value = parseFloat(row[8]) || 0;
-                    totalRemainingBudget += value;
-                  }
-                  if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
-                    const value = parseFloat(row[9]) || 0;
-                    totalSecuredBudget += value;
-                  }
-                  if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
-                    const value = parseFloat(row[10]) || 0;
-                    totalUsedBudget += value;
-                  }
-                } else {
-                  // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
-                  if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
-                    const value = parseFloat(row[11]) || 0;
-                    totalRemainingBudget += value;
-                  }
-                  if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
-                    const value = parseFloat(row[12]) || 0;
-                    totalSecuredBudget += value;
-                  }
-                  if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
-                    const value = parseFloat(row[13]) || 0;
-                    totalUsedBudget += value;
+            } catch (creatorError) {
+              console.log(`❌ [${sheet.sheetName}] 생성자 정보 조회 실패:`, creatorError.message);
+            }
+            
+            activationData.slice(4).forEach((row, index) => { // 5행부터 시작 (헤더 4행 제외)
+              if (row.length >= (budgetType === 'Ⅱ' ? 11 : 14)) { // 충분한 열이 있는지 확인
+                const inputUser = row[inputUserCol];
+                
+                // 생성자 매칭 (생성자가 설정된 경우에만)
+                let isMatched = true;
+                if (creatorName && inputUser && creatorName !== '미적용') {
+                  isMatched = inputUser.includes(creatorName);
+                }
+                
+                // 조건에 맞는 데이터만 합계
+                if (isMatched) {
+                  if (budgetType === 'Ⅱ') {
+                    // 액면예산(Ⅱ): I열(잔액), J열(확보), K열(사용)
+                    if (row[8] !== '' && row[8] !== undefined && row[8] !== null) {
+                      const value = parseFloat(row[8]) || 0;
+                      totalRemainingBudget += value;
+                    }
+                    if (row[9] !== '' && row[9] !== undefined && row[9] !== null) {
+                      const value = parseFloat(row[9]) || 0;
+                      totalSecuredBudget += value;
+                    }
+                    if (row[10] !== '' && row[10] !== undefined && row[10] !== null) {
+                      const value = parseFloat(row[10]) || 0;
+                      totalUsedBudget += value;
+                    }
+                  } else {
+                    // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
+                    if (row[11] !== '' && row[11] !== undefined && row[11] !== null) {
+                      const value = parseFloat(row[11]) || 0;
+                      totalRemainingBudget += value;
+                    }
+                    if (row[12] !== '' && row[12] !== undefined && row[12] !== null) {
+                      const value = parseFloat(row[12]) || 0;
+                      totalSecuredBudget += value;
+                    }
+                    if (row[13] !== '' && row[13] !== undefined && row[13] !== null) {
+                      const value = parseFloat(row[13]) || 0;
+                      totalUsedBudget += value;
+                    }
                   }
                 }
               }
-            }
-          });
-          
-          console.log(`📊 [${sheet.sheetName}] 액면예산 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
-          
-          summary.totalRemainingBudget = totalRemainingBudget;
-          summary.totalSecuredBudget = totalSecuredBudget;
-          summary.totalUsedBudget = totalUsedBudget;
-          summary.itemCount = activationData.length - 4; // 헤더 4행 제외
-        } else {
-          console.log(`❌ [${sheet.sheetName}] 액면예산 데이터 부족: ${activationData.length}행`);
+            });
+            
+            console.log(`📊 [${sheet.sheetName}] 액면예산 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
+            
+            summary.totalRemainingBudget = totalRemainingBudget;
+            summary.totalSecuredBudget = totalSecuredBudget;
+            summary.totalUsedBudget = totalUsedBudget;
+            summary.itemCount = activationData.length - 4; // 헤더 4행 제외
+          } else {
+            console.log(`❌ [${sheet.sheetName}] 액면예산 데이터 부족: ${activationData.length}행`);
+          }
         } 
         
         // 날짜 범위 설정
@@ -18976,42 +19024,86 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       }
     });
 
-    // 기존 데이터 지우기 (헤더 제외)
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: sheetId,
-      range: `${userSheetName}!A2:L`
-    });
-
-    // 새 데이터 추가
-    if (rowsToSave.length > 0) {
-      await sheets.spreadsheets.values.update({
+    // 기존 데이터 유지하고 새 데이터 누적 저장 (append 방식)
+    let existingData = [];
+    try {
+      const existingResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${userSheetName}!A2`,
+        range: `${userSheetName}!A:L`
+      });
+      existingData = existingResponse.data.values || [];
+    } catch (error) {
+      console.log(`📋 [데이터저장] ${userSheetName}: 기존 데이터 없음, 새로 생성`);
+    }
+
+    // 새 데이터를 기존 데이터 아래에 추가 (append 방식)
+    if (rowsToSave.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!A:L`,
         valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
         resource: {
           values: rowsToSave
         }
       });
     }
 
-    // 메타데이터 시트에 저장 정보 추가 (O1:R2로 이동)
-    const metadataRange = `${userSheetName}!O1:R2`;
-    const metadata = [
-      ['저장일시', '접수일범위', '개통일범위', '접수일적용여부'],
-      [
-        new Date().toISOString(),
-        dateRange.applyReceiptDate ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` : '미적용',
-        `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`,
-        dateRange.applyReceiptDate ? '적용' : '미적용'
-      ]
+    // 메타데이터 누적 저장 (O열~W열)
+    let existingMetadata = [];
+    try {
+      const metadataResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!O:W`
+      });
+      existingMetadata = metadataResponse.data.values || [];
+    } catch (error) {
+      console.log(`📋 [데이터저장] ${userSheetName}: 기존 메타데이터 없음, 새로 생성`);
+    }
+
+    // 헤더가 없으면 헤더 추가
+    if (existingMetadata.length === 0) {
+      const metadataHeader = [
+        '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
+        '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
+      ];
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!O1:W1`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [metadataHeader]
+        }
+      });
+    }
+
+    // 새 정책 데이터 행 생성
+    const newPolicyRow = [
+      new Date().toISOString(),           // O열: 저장일시
+      dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
+        ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` 
+        : '미설정',                       // P열: 접수일범위
+      `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`, // Q열: 개통일범위
+      dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
+        ? '적용' 
+        : '미적용',                       // R열: 접수일적용여부
+      new Date().toISOString(),           // S열: 계산일시
+      userName,                           // T열: 계산자
+      '저장버튼',                         // U열: 정책그룹 (저장버튼으로 구분)
+      0,                                 // V열: 잔액 (저장 시점에는 계산 안됨)
+      0,                                 // W열: 확보 (저장 시점에는 계산 안됨)
+      0                                  // X열: 사용 (저장 시점에는 계산 안됨)
     ];
 
-    await sheets.spreadsheets.values.update({
+    // 새 메타데이터 행 추가
+    await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: metadataRange,
+      range: `${userSheetName}!O:W`,
       valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
       resource: {
-        values: metadata
+        values: [newPolicyRow]
       }
     });
 
@@ -21715,41 +21807,50 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               }
             });
             
-            // 사용자 시트에 데이터 저장 (기존 저장 버튼과 동일)
+            // 사용자 시트에 데이터 누적 저장 (기존 데이터 유지하고 새 데이터 추가)
             if (rowsToSave.length > 0) {
-              // 헤더 업데이트 (기존 저장 버튼과 동일)
-              const headerRow = [
-                '접수시작일', '접수종료일', '개통시작일', '개통종료일', 
-                '입력자(권한레벨)', '모델명', '군', '유형', 
-                '확보된 예산', '사용된 예산', '예산 잔액', '상태'
-              ];
+              // 헤더가 없으면 헤더 추가
+              let existingData = [];
+              try {
+                const existingResponse = await sheets.spreadsheets.values.get({
+                  spreadsheetId: sheetId,
+                  range: `${sheetName}!A:L`
+                });
+                existingData = existingResponse.data.values || [];
+              } catch (error) {
+                console.log(`📋 [전체재계산] ${sheetName}: 기존 데이터 없음, 새로 생성`);
+              }
               
-              await sheets.spreadsheets.values.update({
+              // 헤더가 없으면 헤더 추가
+              if (existingData.length === 0) {
+                const headerRow = [
+                  '접수시작일', '접수종료일', '개통시작일', '개통종료일', 
+                  '입력자(권한레벨)', '모델명', '군', '유형', 
+                  '확보된 예산', '사용된 예산', '예산 잔액', '상태'
+                ];
+                
+                await sheets.spreadsheets.values.update({
+                  spreadsheetId: sheetId,
+                  range: `${sheetName}!A1:L1`,
+                  valueInputOption: 'RAW',
+                  resource: {
+                    values: [headerRow]
+                  }
+                });
+              }
+              
+              // 새 데이터를 기존 데이터 아래에 추가 (append 방식)
+              await sheets.spreadsheets.values.append({
                 spreadsheetId: sheetId,
-                range: `${sheetName}!A1:L1`,
+                range: `${sheetName}!A:L`,
                 valueInputOption: 'RAW',
-                resource: {
-                  values: [headerRow]
-                }
-              });
-              
-              // 기존 데이터 지우기 (헤더 제외)
-              await sheets.spreadsheets.values.clear({
-                spreadsheetId: sheetId,
-                range: `${sheetName}!A2:L`
-              });
-              
-              // 새 데이터 추가
-              await sheets.spreadsheets.values.update({
-                spreadsheetId: sheetId,
-                range: `${sheetName}!A2`,
-                valueInputOption: 'RAW',
+                insertDataOption: 'INSERT_ROWS',
                 resource: {
                   values: rowsToSave
                 }
               });
               
-              console.log(`✅ [전체재계산] ${sheetName}: 사용자 시트 데이터 저장 완료 (${rowsToSave.length}행)`);
+              console.log(`✅ [전체재계산] ${sheetName}: 사용자 시트 데이터 누적 저장 완료 (기존 ${existingData.length}행 + 새 ${rowsToSave.length}행)`);
             }
             
             // 8-1. 메타데이터 저장 (기존 저장 버튼과 동일)
@@ -21843,41 +21944,61 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             const userSheetUpdateRows = userSheetUpdateResponse.data.values || [];
             
-            // 9-3. 계산 결과를 사용자 시트 메타데이터에 저장 (프론트엔드 표시용)
-            console.log(`💾 [전체재계산] ${sheetName}: 계산 결과 메타데이터 저장 시작`);
+            // 9-3. 계산 결과를 사용자 시트 메타데이터에 누적 저장 (O열~W열)
+            console.log(`💾 [전체재계산] ${sheetName}: 계산 결과 메타데이터 누적 저장 시작`);
             
+            // 기존 메타데이터 읽기 (O열~W열)
+            let existingMetadata = [];
+            try {
+              const metadataResponse = await sheets.spreadsheets.values.get({
+                spreadsheetId: sheetId,
+                range: `${sheetName}!O:W`
+              });
+              existingMetadata = metadataResponse.data.values || [];
+            } catch (error) {
+              console.log(`📋 [전체재계산] ${sheetName}: 기존 메타데이터 없음, 새로 생성`);
+            }
+            
+            // 헤더 설정 (O열~W열)
+            const metadataHeader = [
+              '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
+              '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
+            ];
+            
+            // 새 정책 데이터 행 생성
+            const newPolicyRow = [
+              new Date().toISOString(),           // O열: 저장일시
+              calculateDateRange.receiptStartDate && calculateDateRange.receiptEndDate 
+                ? `${calculateDateRange.receiptStartDate} ~ ${calculateDateRange.receiptEndDate}` 
+                : '미설정',                       // P열: 접수일범위
+              `${calculateDateRange.activationStartDate} ~ ${calculateDateRange.activationEndDate}`, // Q열: 개통일범위
+              calculateDateRange.receiptStartDate && calculateDateRange.receiptEndDate 
+                ? '적용' 
+                : '미적용',                       // R열: 접수일적용여부
+              new Date().toISOString(),           // S열: 계산일시
+              inputUserName,                      // T열: 계산자
+              selectedPolicyGroups.join(','),     // U열: 정책그룹
+              calculationResult.totalRemainingBudget, // V열: 잔액
+              calculationResult.totalSecuredBudget,   // W열: 확보
+              calculationResult.totalUsedBudget       // X열: 사용
+            ];
+            
+            // 메타데이터 업데이트 (기존 데이터 유지하고 새 행 추가)
             const metadataUpdateRequests = [];
             
-            // 기존 O1:R2 데이터 보존하고, 새로운 위치 S1:V2에 계산 결과 저장
-            if (budgetType === 'Ⅱ') {
-              // 액면예산(Ⅱ): S1:V2 범위에 계산 결과 저장 (기존 O1:R2 보존)
+            // 헤더가 없으면 헤더 추가
+            if (existingMetadata.length === 0) {
               metadataUpdateRequests.push({
-                range: `${sheetName}!S1:V2`,
-                values: [
-                  ['계산일시', '계산자', '정책그룹', '계산결과'],
-                  [
-                    new Date().toISOString(),
-                    inputUserName,
-                    selectedPolicyGroups.join(','),
-                    `잔액:${calculationResult.totalRemainingBudget}, 확보:${calculationResult.totalSecuredBudget}, 사용:${calculationResult.totalUsedBudget}`
-                  ]
-                ]
-              });
-            } else {
-              // 액면예산(Ⅰ): S1:V2 범위에 계산 결과 저장 (기존 O1:R2 보존)
-              metadataUpdateRequests.push({
-                range: `${sheetName}!S1:V2`,
-                values: [
-                  ['계산일시', '계산자', '정책그룹', '계산결과'],
-                  [
-                    new Date().toISOString(),
-                    inputUserName,
-                    selectedPolicyGroups.join(','),
-                    `잔액:${calculationResult.totalRemainingBudget}, 확보:${calculationResult.totalSecuredBudget}, 사용:${calculationResult.totalUsedBudget}`
-                  ]
-                ]
+                range: `${sheetName}!O1:W1`,
+                values: [metadataHeader]
               });
             }
+            
+            // 새 정책 데이터 행 추가
+            metadataUpdateRequests.push({
+              range: `${sheetName}!O${existingMetadata.length + 2}:W${existingMetadata.length + 2}`,
+              values: [newPolicyRow]
+            });
             
             // 메타데이터 업데이트 실행
             if (metadataUpdateRequests.length > 0) {
@@ -21888,7 +22009,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                   data: metadataUpdateRequests
                 }
               });
-              console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 저장 완료`);
+              console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
             }
             
             // 액면예산 타입에 따른 액면예산 매핑 컬럼 결정
