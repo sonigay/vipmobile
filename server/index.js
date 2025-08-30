@@ -21836,7 +21836,15 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             // 액면예산에서 계산된 데이터를 사용자 시트의 사용예산에 반영
             const updateRequests = [];
             
-            userSheetRows.forEach((row, index) => {
+            // calculateUsageBudget 결과에서 calculatedData 확인
+            console.log(`🔍 [전체재계산] ${sheetName}: calculationResult 확인:`, {
+              calculatedDataLength: calculationResult.calculatedData?.length || 0,
+              totalRemainingBudget: calculationResult.totalRemainingBudget,
+              totalSecuredBudget: calculationResult.totalSecuredBudget,
+              totalUsedBudget: calculationResult.totalUsedBudget
+            });
+            
+            userSheetUpdateRows.forEach((row, index) => {
               if (row.length >= 12) {
                 const armyType = row[6]; // 군 (G열)
                 const categoryType = row[7]; // 유형 (H열)
@@ -21863,6 +21871,8 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                   });
                   
                   console.log(`💾 [전체재계산] ${sheetName} Row ${index + 2} 업데이트: 사용예산=${matchingData.budgetValue}, 잔액=${remainingBudget}`);
+                } else {
+                  console.log(`⚠️ [전체재계산] ${sheetName} Row ${index + 2} 매칭 실패: 군=${armyType}, 유형=${categoryType}`);
                 }
               }
             });
