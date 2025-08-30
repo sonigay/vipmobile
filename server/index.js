@@ -19401,74 +19401,11 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       });
     }
 
-    // 새 정책 데이터 행 생성
-    const newPolicyRow = [
-      new Date().toISOString(),           // O열: 저장일시
-      dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
-        ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` 
-        : '미설정',                       // P열: 접수일범위
-      `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`, // Q열: 개통일범위
-      dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
-        ? '적용' 
-        : '미적용',                       // R열: 접수일적용여부
-      new Date().toISOString(),           // S열: 계산일시
-      userName,                           // T열: 계산자
-      '저장버튼',                         // U열: 정책그룹 (저장버튼으로 구분)
-      0,                                 // V열: 잔액 (저장 시점에는 계산 안됨)
-      0,                                 // W열: 확보 (저장 시점에는 계산 안됨)
-      0                                  // X열: 사용 (저장 시점에는 계산 안됨)
-    ];
-
-    // 새 메타데이터 행 추가
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: sheetId,
-      range: `${userSheetName}!O:X`,
-      valueInputOption: 'RAW',
-      // insertDataOption 제거로 빈 행 생성 방지
-      resource: {
-        values: [newPolicyRow]
-      }
-    });
+    // 일반 저장버튼에서는 메타데이터 헤더만 추가하고 실제 데이터는 생성하지 않음
+    // (SAFE-UPDATE에서 실제 계산된 값으로 메타데이터 생성)
+    console.log(`📝 [데이터저장] ${userSheetName}: 메타데이터 헤더만 설정, 실제 데이터는 SAFE-UPDATE에서 생성`);
     
-    // 메타데이터에서 빈 행 제거 (정책 1 문제 해결)
-    try {
-      const cleanMetadataResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: `${userSheetName}!O:X`
-      });
-      
-      const allMetadata = cleanMetadataResponse.data.values || [];
-      if (allMetadata.length > 1) {
-        // 헤더는 유지하고 데이터 행만 필터링
-        const header = allMetadata[0];
-        const dataRows = allMetadata.slice(1).filter(row => 
-          row.length >= 10 && row.some(cell => cell !== '' && cell !== null && cell !== undefined)
-        );
-        
-        // 빈 행이 제거된 메타데이터로 다시 저장
-        if (dataRows.length !== allMetadata.length - 1) {
-          const cleanMetadata = [header, ...dataRows];
-          await sheets.spreadsheets.values.clear({
-            spreadsheetId: sheetId,
-            range: `${userSheetName}!O:X`
-          });
-          
-          if (cleanMetadata.length > 0) {
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: sheetId,
-              range: `${userSheetName}!O1:X${cleanMetadata.length}`,
-              valueInputOption: 'RAW',
-              resource: {
-                values: cleanMetadata
-              }
-            });
-            console.log(`🧹 [데이터저장] ${userSheetName}: 메타데이터 빈 행 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책)`);
-          }
-        }
-      }
-    } catch (cleanError) {
-      console.log(`⚠️ [데이터저장] ${userSheetName}: 메타데이터 정리 실패:`, cleanError.message);
-    }
+    // 일반 저장버튼에서는 메타데이터 데이터를 생성하지 않으므로 빈 행 제거 로직 불필요
 
     // 데이터 저장 후 바로 계산 수행
     console.log(`📊 [데이터저장] ${userSheetName} 계산 시작`);
