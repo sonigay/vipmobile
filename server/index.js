@@ -4867,43 +4867,24 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
             remainingIdx = 11; securedIdx = 12; usedIdx = 13; // L=12번째(11), M=13번째(12), N=14번째(13)
           }
           
-          // 기존 값이 있는지 확인 후 공백인 경우만 업데이트
-          const existingRemainingValue = row[remainingIdx] || '';
-          const existingSecuredValue = row[securedIdx] || '';
-          const existingUsedValue = row[usedIdx] || '';
-          
+          // 전체 재계산에서는 기존 값과 관계없이 항상 업데이트 (데이터 위치 변경 대응)
           // 예산잔액 업데이트
-          if (!existingRemainingValue || existingRemainingValue.toString().trim() === '') {
           updateRequests.push({
-              range: `액면예산!${remainingCol}${actualRowNumber}`,
-              values: [[securedBudgetValue - calculatedBudgetValue]]
-            });
-            // 예산잔액 업데이트
-          } else {
-            // 예산잔액 유지
-          }
+            range: `액면예산!${remainingCol}${actualRowNumber}`,
+            values: [[securedBudgetValue - calculatedBudgetValue]]
+          });
           
           // 확보예산 업데이트
-          if (!existingSecuredValue || existingSecuredValue.toString().trim() === '') {
           updateRequests.push({
-              range: `액면예산!${securedCol}${actualRowNumber}`,
-              values: [[securedBudgetValue]]
-            });
-            // 확보예산 업데이트
-          } else {
-            // 확보예산 유지
-          }
+            range: `액면예산!${securedCol}${actualRowNumber}`,
+            values: [[securedBudgetValue]]
+          });
           
           // 사용예산 업데이트
-          if (!existingUsedValue || existingUsedValue.toString().trim() === '') {
           updateRequests.push({
-              range: `액면예산!${usedCol}${actualRowNumber}`,
-              values: [[calculatedBudgetValue]]
+            range: `액면예산!${usedCol}${actualRowNumber}`,
+            values: [[calculatedBudgetValue]]
           });
-            // 사용예산 업데이트
-          } else {
-            // 사용예산 유지
-          }
           
           // 입력자/입력일시 컬럼 업데이트 (기존 저장 버튼과 동일한 형식)
           if (budgetType === 'Ⅱ') {
