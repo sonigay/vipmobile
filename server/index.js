@@ -21513,10 +21513,10 @@ app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
   }
 });
 
-// 전체 재계산 API - 액면예산(Ⅰ), (Ⅱ), (종합) 모두 지원 - 전체 재입력 및 재계산
+// 전체 재계산 API - 기존 저장 버튼 로직을 배치로 재실행
 app.post('/api/budget/recalculate-all', async (req, res) => {
   try {
-    console.log('🔄 [전체재계산] 시작 - 전체 재입력 및 재계산 모드');
+    console.log('🔄 [전체재계산] 시작 - 기존 저장 버튼 로직 배치 실행');
     
     const sheets = google.sheets({ version: 'v4', auth });
     
@@ -21562,7 +21562,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
           const sheetName = userRow[2]; // C열: 시트명
           const budgetType = userRow[6] || 'Ⅰ'; // G열: 선택된정책그룹 (기본값: Ⅰ)
           
-          console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 전체 재입력 및 재계산 시작`);
+          console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 기존 저장 버튼 로직 재실행`);
           
           try {
             // 5. 사용자 시트에서 입력 데이터 로드 (기존 저장 버튼과 동일한 방식)
@@ -21620,7 +21620,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               continue;
             }
             
-            // 7. 사용자 시트의 메타데이터 조회 (기존 저장 버튼과 동일한 방식)
+            // 7. 메타데이터 추출 (기존 저장 버튼과 동일)
             let dateRange = {
               receiptStartDate: '',
               receiptEndDate: '',
@@ -21640,22 +21640,22 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             }
             
             // 입력자 정보 추출
-            let userName = '';
+            let inputUserName = '';
             if (userSheetData.length > 1) {
               const firstDataRow = userSheetData[1];
               if (firstDataRow.length >= 5) {
                 const inputUser = firstDataRow[4]; // E열: 입력자(권한레벨)
                 if (inputUser) {
                   // "홍기현(레벨SS)" 형태에서 "홍기현" 추출
-                  userName = inputUser.replace(/\(레벨[^)]+\)/, '').trim();
+                  inputUserName = inputUser.replace(/\(레벨[^)]+\)/, '').trim();
                 }
               }
             }
             
-                        // 8. 기존 저장 버튼의 액면예산 입력 로직 재사용
-            console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 입력 시작 (${data.length}개 모델)`);
+            // 8. 기존 저장 버튼과 동일한 방식으로 사용자 시트에 데이터 저장
+            console.log(`🔄 [전체재계산] ${sheetName}: 사용자 시트 데이터 저장 시작`);
             
-            // 기존 저장 버튼과 동일한 방식으로 액면예산에 데이터 입력
+            // 기존 저장 버튼과 동일한 방식으로 데이터 변환
             const rowsToSave = [];
             
             data.forEach(item => {
@@ -21681,7 +21681,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                     dateRange.receiptEndDate || '', // B열: 접수일 종료
                     dateRange.activationStartDate || '', // C열: 개통일 시작
                     dateRange.activationEndDate || '', // D열: 개통일 종료
-                    `${userName}(레벨SS)`, // E열: 입력자(권한레벨)
+                    `${inputUserName}(레벨SS)`, // E열: 입력자(권한레벨)
                     item.modelName, // F열: 모델명
                     armyType, // G열: 군
                     categoryType, // H열: 유형
@@ -21694,37 +21694,53 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               }
             });
             
-            // 액면예산 시트에 데이터 입력 (덮어쓰기)
+            // 사용자 시트에 데이터 저장 (기존 저장 버튼과 동일)
             if (rowsToSave.length > 0) {
               // 기존 데이터 지우기 (헤더 제외)
               await sheets.spreadsheets.values.clear({
                 spreadsheetId: sheetId,
-                range: '액면예산!A2:L'
+                range: `${sheetName}!A2:L`
               });
               
               // 새 데이터 추가
               await sheets.spreadsheets.values.update({
                 spreadsheetId: sheetId,
-                range: '액면예산!A2',
+                range: `${sheetName}!A2`,
                 valueInputOption: 'RAW',
                 resource: {
                   values: rowsToSave
                 }
               });
               
-              console.log(`✅ [전체재계산] ${sheetName}: 액면예산 입력 완료 (${rowsToSave.length}행)`);
+              console.log(`✅ [전체재계산] ${sheetName}: 사용자 시트 데이터 저장 완료 (${rowsToSave.length}행)`);
             }
             
-            // 9. 계산 결과 계산
-            let totalRemainingBudget = 0;
-            let totalSecuredBudget = 0;
-            let totalUsedBudget = 0;
-            let matchedRows = rowsToSave.length;
+            // 9. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
+            console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
             
-            rowsToSave.forEach(row => {
-              totalSecuredBudget += parseFloat(row[8]) || 0; // I열: 확보된 예산
-              totalUsedBudget += parseFloat(row[9]) || 0; // J열: 사용된 예산
-              totalRemainingBudget += parseFloat(row[10]) || 0; // K열: 예산 잔액
+            // 기존 저장 버튼과 동일한 매개변수로 calculateUsageBudget 호출
+            const selectedPolicyGroups = [budgetType]; // 예산 타입을 정책그룹으로 사용
+            
+            const calculationResult = await calculateUsageBudget(
+              sheetId, 
+              selectedPolicyGroups, 
+              dateRange, 
+              inputUserName, 
+              budgetType
+            );
+            
+            console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료 - ${calculationResult.message}`);
+            
+            // 10. 결과 저장
+            results.push({
+              month: targetMonth,
+              sheetName,
+              budgetType,
+              totalRemainingBudget: calculationResult.totalRemainingBudget,
+              totalSecuredBudget: calculationResult.totalSecuredBudget,
+              totalUsedBudget: calculationResult.totalUsedBudget,
+              updatedRows: calculationResult.updatedRows,
+              success: true
             });
             
             // 12. 계산 결과를 사용자 시트에 업데이트
