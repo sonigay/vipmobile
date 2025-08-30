@@ -21646,6 +21646,12 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               }
             }
             
+            // calculateUsageBudget 함수가 기대하는 형식으로 변환
+            const calculateDateRange = {
+              startDate: dateRange.receiptStartDate || dateRange.activationStartDate,
+              endDate: dateRange.receiptEndDate || dateRange.activationEndDate
+            };
+            
             // 입력자 정보 추출
             let inputUserName = '';
             if (userSheetData.length > 1) {
@@ -21770,7 +21776,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             const calculationResult = await calculateUsageBudget(
               sheetId, 
               selectedPolicyGroups, 
-              dateRange, 
+              calculateDateRange, 
               inputUserName, 
               budgetType
             );
