@@ -17972,7 +17972,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
           console.log(`⚠️ [SAFE-UPDATE] 메타데이터 검증 실패:`, verificationError.message);
         }
         
-        // 정교한 빈 행 제거 - 실제 정책 데이터는 보존하고 진짜 빈 행만 제거
+        // 메타데이터 정리 - 0값 정책과 빈 행 제거, 실제 계산된 값만 유지
         try {
           const cleanMetadataResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
@@ -17987,14 +17987,20 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
               // 행이 충분한 컬럼을 가지고 있는지 확인
               if (row.length < 10) return false;
               
-              // 핵심 정책 정보 컬럼들이 모두 있는지 확인 (O, P, Q, R, S, T, U, V, W, X)
+              // 핵심 정책 정보 컬럼들이 모두 있는지 확인
               const hasEssentialData = row[0] && row[1] && row[2] && row[3] && row[4] && row[5] && row[6];
               
-              // 핵심 데이터가 있으면 보존 (일부 빈 셀은 허용)
-              return hasEssentialData;
+              // 0값 정책 제거 (잔액, 확보, 사용이 모두 0인 경우)
+              const remainingBudget = parseFloat(row[7]) || 0;
+              const securedBudget = parseFloat(row[8]) || 0;
+              const usedBudget = parseFloat(row[9]) || 0;
+              const isZeroPolicy = remainingBudget === 0 && securedBudget === 0 && usedBudget === 0;
+              
+              // 핵심 데이터가 있고, 0값 정책이 아닌 경우만 보존
+              return hasEssentialData && !isZeroPolicy;
             });
             
-            // 진짜 빈 행만 제거된 경우에만 정리
+            // 정리된 메타데이터로 다시 저장
             if (dataRows.length !== allMetadata.length - 1) {
               const cleanMetadata = [header, ...dataRows];
               await sheets.spreadsheets.values.clear({
@@ -18011,7 +18017,7 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
                     values: cleanMetadata
                   }
                 });
-                console.log(`🧹 [SAFE-UPDATE] ${userSheetName}: 정교한 빈 행 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책)`);
+                console.log(`🧹 [SAFE-UPDATE] ${userSheetName}: 메타데이터 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책, 0값 정책 제거)`);
               }
             }
           }
@@ -19469,11 +19475,71 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       });
     }
 
-    // 일반 저장버튼에서는 메타데이터 헤더만 추가하고 실제 데이터는 생성하지 않음
-    // (SAFE-UPDATE에서 실제 계산된 값으로 메타데이터 생성)
-    console.log(`📝 [데이터저장] ${userSheetName}: 메타데이터 헤더만 설정, 실제 데이터는 SAFE-UPDATE에서 생성`);
-    
-    // 일반 저장버튼에서는 메타데이터 데이터를 생성하지 않으므로 빈 행 제거 로직 불필요
+    // 메타데이터 헤더와 정책 데이터를 한 번에 생성 (빈 행 방지)
+    try {
+      // 기존 메타데이터 확인
+      let existingMetadata = [];
+      try {
+        const metadataResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!O:X`
+        });
+        existingMetadata = metadataResponse.data.values || [];
+      } catch (error) {
+        console.log(`📋 [데이터저장] ${userSheetName}: 기존 메타데이터 없음, 새로 생성`);
+      }
+      
+      // 헤더가 없으면 헤더 추가
+      if (existingMetadata.length === 0) {
+        const metadataHeader = [
+          '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
+          '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
+        ];
+        
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `${userSheetName}!O1:X1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [metadataHeader]
+          }
+        });
+        console.log(`📝 [데이터저장] ${userSheetName}: 메타데이터 헤더 생성 완료`);
+      }
+      
+      // 새 정책 데이터 생성 (빈 행 없이 바로 추가)
+      const newPolicyRow = [
+        new Date().toISOString(),           // O열: 저장일시
+        dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
+          ? `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}` 
+          : '미설정',                       // P열: 접수일범위
+        `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`, // Q열: 개통일범위
+        dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
+          ? '적용' 
+          : '미적용',                       // R열: 접수일적용여부
+        new Date().toISOString(),           // S열: 계산일시
+        userName,                           // T열: 계산자
+        '저장버튼',                         // U열: 정책그룹
+        0,                                 // V열: 잔액 (저장 시점에는 계산 안됨)
+        0,                                 // W열: 확보 (저장 시점에는 계산 안됨)
+        0                                  // X열: 사용 (저장 시점에는 계산 안됨)
+      ];
+      
+      // 새 정책 데이터를 빈 행 없이 바로 추가
+      const targetRow = existingMetadata.length + 1;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!O${targetRow}:X${targetRow}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [newPolicyRow]
+        }
+      });
+      
+      console.log(`✅ [데이터저장] ${userSheetName}: 메타데이터 정책 데이터 생성 완료 (${targetRow}행, 빈 행 없음)`);
+    } catch (metadataError) {
+      console.log(`⚠️ [데이터저장] ${userSheetName}: 메타데이터 생성 실패:`, metadataError.message);
+    }
 
     // 데이터 저장 후 바로 계산 수행
     console.log(`📊 [데이터저장] ${userSheetName} 계산 시작`);
