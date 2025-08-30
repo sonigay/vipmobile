@@ -17923,108 +17923,51 @@ app.post('/api/budget/user-sheets/:sheetId/update-usage-safe', async (req, res) 
         calculatedResult.totalUsedBudget       // X열: 사용
       ];
       
-      // 메타데이터 업데이트 (기존 데이터 유지하고 새 행 추가)
-      const metadataUpdateRequests = [];
+      // 메타데이터 저장 - 헤더가 없으면 헤더 추가, 새 정책은 append로 추가
       
       // 헤더가 없으면 헤더 추가
       if (existingMetadata.length === 0) {
-        metadataUpdateRequests.push({
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
           range: `${userSheetName}!O1:X1`,
-          values: [metadataHeader]
+          valueInputOption: 'RAW',
+          resource: {
+            values: [metadataHeader]
+          }
         });
+        console.log(`📝 [SAFE-UPDATE] ${userSheetName}: 메타데이터 헤더 생성 완료`);
       }
       
       // 기존 메타데이터 백업 (문제 진단용)
       console.log(`💾 [SAFE-UPDATE] 기존 메타데이터 백업:`, existingMetadata);
       
-      // 새 정책 데이터 행 추가 (상세 로깅)
-      const targetRow = existingMetadata.length + 2;
-      console.log(`📝 [SAFE-UPDATE] 메타데이터 저장 위치: ${userSheetName}!O${targetRow}:X${targetRow}`);
-      console.log(`📊 [SAFE-UPDATE] 기존 메타데이터 행 수: ${existingMetadata.length}, 새 정책 저장 행: ${targetRow}`);
-      
-      metadataUpdateRequests.push({
-        range: `${userSheetName}!O${targetRow}:X${targetRow}`,
-        values: [newPolicyRow]
+      // 새 정책 데이터를 append로 추가 (기존 데이터 덮어쓰지 않음)
+      console.log(`📝 [SAFE-UPDATE] ${userSheetName}: 새 정책 데이터 append로 추가`);
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: `${userSheetName}!O:X`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [newPolicyRow]
+        }
       });
+      console.log(`✅ [SAFE-UPDATE] 메타데이터 새 정책 추가 완료 (${existingMetadata.length + 1}번째 정책)`);
       
-      // 메타데이터 업데이트 실행
-      if (metadataUpdateRequests.length > 0) {
-        console.log(`🔄 [SAFE-UPDATE] 메타데이터 업데이트 시작: ${metadataUpdateRequests.length}개 요청`);
-        await sheets.spreadsheets.values.batchUpdate({
+      // 저장 후 검증 (문제 진단용)
+      try {
+        const verificationResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
-          resource: {
-            valueInputOption: 'RAW',
-            data: metadataUpdateRequests
-          }
+          range: `${userSheetName}!O:X`
         });
-        console.log(`✅ [SAFE-UPDATE] 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
-        
-        // 저장 후 검증 (문제 진단용)
-        try {
-          const verificationResponse = await sheets.spreadsheets.values.get({
-            spreadsheetId: sheetId,
-            range: `${userSheetName}!O:X`
-          });
-          const finalMetadata = verificationResponse.data.values || [];
-          console.log(`🔍 [SAFE-UPDATE] 저장 후 메타데이터 검증: ${finalMetadata.length}행`);
-          console.log(`📊 [SAFE-UPDATE] 최종 메타데이터:`, finalMetadata);
-        } catch (verificationError) {
-          console.log(`⚠️ [SAFE-UPDATE] 메타데이터 검증 실패:`, verificationError.message);
-        }
-        
-        // 메타데이터 정리 - 0값 정책과 빈 행 제거, 실제 계산된 값만 유지
-        try {
-          const cleanMetadataResponse = await sheets.spreadsheets.values.get({
-            spreadsheetId: sheetId,
-            range: `${userSheetName}!O:X`
-          });
-          
-          const allMetadata = cleanMetadataResponse.data.values || [];
-          if (allMetadata.length > 1) {
-            // 헤더는 유지하고 데이터 행만 필터링
-            const header = allMetadata[0];
-            const dataRows = allMetadata.slice(1).filter(row => {
-              // 행이 충분한 컬럼을 가지고 있는지 확인
-              if (row.length < 10) return false;
-              
-              // 핵심 정책 정보 컬럼들이 모두 있는지 확인
-              const hasEssentialData = row[0] && row[1] && row[2] && row[3] && row[4] && row[5] && row[6];
-              
-              // 0값 정책 제거 (잔액, 확보, 사용이 모두 0인 경우)
-              const remainingBudget = parseFloat(row[7]) || 0;
-              const securedBudget = parseFloat(row[8]) || 0;
-              const usedBudget = parseFloat(row[9]) || 0;
-              const isZeroPolicy = remainingBudget === 0 && securedBudget === 0 && usedBudget === 0;
-              
-              // 핵심 데이터가 있고, 0값 정책이 아닌 경우만 보존
-              return hasEssentialData && !isZeroPolicy;
-            });
-            
-            // 정리된 메타데이터로 다시 저장
-            if (dataRows.length !== allMetadata.length - 1) {
-              const cleanMetadata = [header, ...dataRows];
-              await sheets.spreadsheets.values.clear({
-                spreadsheetId: sheetId,
-                range: `${userSheetName}!O:X`
-              });
-              
-              if (cleanMetadata.length > 0) {
-                await sheets.spreadsheets.values.update({
-                  spreadsheetId: sheetId,
-                  range: `${userSheetName}!O1:X${cleanMetadata.length}`,
-                  valueInputOption: 'RAW',
-                  resource: {
-                    values: cleanMetadata
-                  }
-                });
-                console.log(`🧹 [SAFE-UPDATE] ${userSheetName}: 메타데이터 정리 완료 (${allMetadata.length - 1} → ${dataRows.length}개 정책, 0값 정책 제거)`);
-              }
-            }
-          }
-        } catch (cleanError) {
-          console.log(`⚠️ [SAFE-UPDATE] ${userSheetName}: 메타데이터 정리 실패:`, cleanError.message);
-        }
+        const finalMetadata = verificationResponse.data.values || [];
+        console.log(`🔍 [SAFE-UPDATE] 저장 후 메타데이터 검증: ${finalMetadata.length}행`);
+        console.log(`📊 [SAFE-UPDATE] 최종 메타데이터:`, finalMetadata);
+      } catch (verificationError) {
+        console.log(`⚠️ [SAFE-UPDATE] 메타데이터 검증 실패:`, verificationError.message);
       }
+      
+      // 메타데이터 정리 로직 제거 - 기존 정책을 보존하고 새 정책만 추가
+      console.log(`✅ [SAFE-UPDATE] ${userSheetName}: 메타데이터 정리 로직 제거, 기존 정책 보존`);
     } catch (metadataError) {
       console.error(`❌ [SAFE-UPDATE] 메타데이터 저장 실패:`, metadataError.message);
     }
