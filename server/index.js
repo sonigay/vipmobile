@@ -4892,13 +4892,36 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
           
           // 사용예산 업데이트
           if (!existingUsedValue || existingUsedValue.toString().trim() === '') {
-          updateRequests.push({
+            updateRequests.push({
               range: `액면예산!${usedCol}${actualRowNumber}`,
               values: [[calculatedBudgetValue]]
-          });
+            });
             // 사용예산 업데이트
           } else {
             // 사용예산 유지
+          }
+          
+          // 입력자/입력일시 컬럼 업데이트 (B-E열 또는 D-E열)
+          if (budgetType === 'Ⅱ') {
+            // 액면예산(Ⅱ): D열(입력자), E열(입력일시)
+            updateRequests.push({
+              range: `액면예산!D${actualRowNumber}`,
+              values: [[userName]]
+            });
+            updateRequests.push({
+              range: `액면예산!E${actualRowNumber}`,
+              values: [[new Date().toISOString().split('T')[0]]]
+            });
+          } else {
+            // 액면예산(Ⅰ): B열(입력자), C열(입력일시)
+            updateRequests.push({
+              range: `액면예산!B${actualRowNumber}`,
+              values: [[userName]]
+            });
+            updateRequests.push({
+              range: `액면예산!C${actualRowNumber}`,
+              values: [[new Date().toISOString().split('T')[0]]]
+            });
           }
         } else {
           // 날짜 범위에 포함되지 않는 경우 공백으로 설정 (데이터 손상 방지)
@@ -21767,7 +21790,24 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 저장 완료`);
             
-            // 9. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
+            // 9. 액면예산 시트 부분 영역 초기화 (B5:E열, I5:N열만)
+            console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 시트 부분 영역 초기화 시작`);
+            
+            // B열5행부터 E열까지 지우기 (입력자/입력일시)
+            await sheets.spreadsheets.values.clear({
+              spreadsheetId: sheetId,
+              range: '액면예산!B5:E'
+            });
+            
+            // I열5행부터 N열까지 지우기 (예산 관련)
+            await sheets.spreadsheets.values.clear({
+              spreadsheetId: sheetId,
+              range: '액면예산!I5:N'
+            });
+            
+            console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 B5:E열, I5:N열 초기화 완료`);
+            
+            // 10. 기존 calculateUsageBudget 함수 호출 (액면예산 계산 + 입력)
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
             
             // 기존 저장 버튼과 동일한 매개변수로 calculateUsageBudget 호출
@@ -21786,21 +21826,8 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료`);
             
             // 9-1. 액면예산 시트 부분 영역 초기화 (B5:E열, I5:N열만)
-            console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 시트 부분 영역 초기화 시작`);
-            
-            // B열5행부터 E열까지 지우기 (입력자/입력일시)
-            await sheets.spreadsheets.values.clear({
-              spreadsheetId: sheetId,
-              range: '액면예산!B5:E'
-            });
-            
-            // I열5행부터 N열까지 지우기 (예산 관련)
-            await sheets.spreadsheets.values.clear({
-              spreadsheetId: sheetId,
-              range: '액면예산!I5:N'
-            });
-            
-            console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 B5:E열, I5:N열 초기화 완료`);
+            // calculateUsageBudget에서 이미 업데이트했으므로 초기화는 불필요
+            console.log(`🧹 [전체재계산] ${sheetName}: 액면예산 시트 업데이트 완료 (calculateUsageBudget에서 처리됨)`);
             
             // 9-2. 기존 저장 버튼과 동일하게 사용자 시트 업데이트 수행
             console.log(`🔄 [전체재계산] ${sheetName}: 사용자 시트 업데이트 시작`);
@@ -21897,7 +21924,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               }
             }
             
-            // 10. 결과 저장 (기존 저장 버튼과 동일한 방식)
+            // 11. 결과 저장 (기존 저장 버튼과 동일한 방식)
             results.push({
               month: targetMonth,
               sheetName,
