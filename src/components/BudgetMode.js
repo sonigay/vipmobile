@@ -2039,13 +2039,49 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
-                          {(sheet.summary?.totalSecuredBudget || 0).toLocaleString()}원
+                          {sheet.policies && sheet.policies.length > 0 ? (
+                            <Box>
+                              {sheet.policies.map((policy, policyIndex) => (
+                                <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
+                                  정책 {policyIndex + 1}: {policy.securedBudget?.toLocaleString() || 0}원
+                                </Typography>
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography variant="caption" color="textSecondary">
+                              정책 정보 없음
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-                          {(sheet.summary?.totalUsedBudget || 0).toLocaleString()}원
+                          {sheet.policies && sheet.policies.length > 0 ? (
+                            <Box>
+                              {sheet.policies.map((policy, policyIndex) => (
+                                <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
+                                  정책 {policyIndex + 1}: {policy.usedBudget?.toLocaleString() || 0}원
+                                </Typography>
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography variant="caption" color="textSecondary">
+                              정책 정보 없음
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
-                          {(sheet.summary?.totalRemainingBudget || 0).toLocaleString()}원
+                          {sheet.policies && sheet.policies.length > 0 ? (
+                            <Box>
+                              {sheet.policies.map((policy, policyIndex) => (
+                                <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
+                                  정책 {policyIndex + 1}: {policy.remainingBudget?.toLocaleString() || 0}원
+                                </Typography>
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography variant="caption" color="textSecondary">
+                              정책 정보 없음
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
                           {sheet.createdBy || 'Unknown'}
