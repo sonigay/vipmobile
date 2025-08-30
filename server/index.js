@@ -21539,16 +21539,24 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
       console.log(`🔄 [전체재계산] ${targetMonth}월 처리 시작 (시트ID: ${sheetId})`);
       
       try {
-        // 3. 해당 월의 모든 사용자 시트 조회
+        // 3. 메인 스프레드시트에서 해당 월의 모든 사용자 시트 조회
         const userSheetsResponse = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
+          spreadsheetId: SPREADSHEET_ID,
           range: '예산_사용자시트관리!A:Z',
         });
         
         const userSheetRows = userSheetsResponse.data.values || [];
         
-        // 4. 각 사용자 시트별로 재계산
-        for (const userRow of userSheetRows) {
+        // 4. 해당 월의 사용자 시트만 필터링
+        const targetMonthUserSheets = userSheetRows.filter(row => {
+          if (!row[0] || !row[1] || !row[5]) return false; // 사용자ID, 시트ID, 대상월이 있는지 확인
+          return row[5] === targetMonth; // 대상월이 일치하는지 확인
+        });
+        
+        console.log(`🔄 [전체재계산] ${targetMonth}월 - ${targetMonthUserSheets.length}개 사용자 시트 발견`);
+        
+        // 5. 각 사용자 시트별로 재계산
+        for (const userRow of targetMonthUserSheets) {
           if (!userRow[0] || !userRow[1]) continue; // 빈 행 스킵
           
           const sheetName = userRow[0];
