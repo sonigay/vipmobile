@@ -19507,7 +19507,24 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
         console.log(`📝 [데이터저장] ${userSheetName}: 메타데이터 헤더 생성 완료`);
       }
       
-      // 새 정책 데이터 생성 (빈 행 없이 바로 추가)
+      // 새 정책 데이터 생성 (실제 계산된 값으로 바로 생성)
+      // 사용자시트 데이터에서 실제 예산 값 계산
+      let totalSecuredBudget = 0;
+      let totalUsedBudget = 0;
+      let totalRemainingBudget = 0;
+      
+      if (rowsToSave.length > 0) {
+        rowsToSave.forEach(row => {
+          const securedBudget = parseFloat(row[8]) || 0; // I열: 확보된 예산
+          const usedBudget = parseFloat(row[9]) || 0;    // J열: 사용된 예산
+          const remainingBudget = parseFloat(row[10]) || 0; // K열: 예산 잔액
+          
+          totalSecuredBudget += securedBudget;
+          totalUsedBudget += usedBudget;
+          totalRemainingBudget += remainingBudget;
+        });
+      }
+      
       const newPolicyRow = [
         new Date().toISOString(),           // O열: 저장일시
         dateRange.applyReceiptDate && dateRange.receiptStartDate && dateRange.receiptEndDate
@@ -19520,9 +19537,9 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
         new Date().toISOString(),           // S열: 계산일시
         userName,                           // T열: 계산자
         '저장버튼',                         // U열: 정책그룹
-        0,                                 // V열: 잔액 (저장 시점에는 계산 안됨)
-        0,                                 // W열: 확보 (저장 시점에는 계산 안됨)
-        0                                  // X열: 사용 (저장 시점에는 계산 안됨)
+        totalRemainingBudget,               // V열: 잔액 (실제 계산된 값)
+        totalSecuredBudget,                 // W열: 확보 (실제 계산된 값)
+        totalUsedBudget                     // X열: 사용 (실제 계산된 값)
       ];
       
       // 새 정책 데이터를 빈 행 없이 바로 추가
