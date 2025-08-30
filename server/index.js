@@ -5,7 +5,7 @@ const { google } = require('googleapis');
 const NodeGeocoder = require('node-geocoder');
 const webpush = require('web-push');
 const ExcelJS = require('exceljs');
-const cron = require('node-cron');
+// const cron = require('node-cron'); // 클라우드타입에서 패키지 설치 문제로 임시 비활성화
 const monthlyAwardAPI = require('./monthlyAwardAPI');
 const setupTeamRoutes = require('./teamRoutes');
 const UserSheetManager = require('./UserSheetManager');
@@ -21764,38 +21764,38 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
   }
 });
 
-// 스케줄러 설정 - 매일 새벽 2시에 자동 재계산
-cron.schedule('0 2 * * *', async () => {
-  try {
-    console.log('🕐 [스케줄러] 자동 재계산 시작');
-    
-    // 전체 재계산 API 호출
-    const response = await fetch('http://localhost:4000/api/budget/recalculate-all', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (response.ok) {
-      const result = await response.json();
-      console.log('✅ [스케줄러] 자동 재계산 완료:', result.message);
-    } else {
-      console.error('❌ [스케줄러] 자동 재계산 실패:', response.status);
-    }
-    
-  } catch (error) {
-    console.error('❌ [스케줄러] 자동 재계산 오류:', error);
-  }
-}, {
-  timezone: 'Asia/Seoul'
-});
+// 스케줄러 설정 - 매일 새벽 2시에 자동 재계산 (클라우드타입 패키지 문제로 임시 비활성화)
+// cron.schedule('0 2 * * *', async () => {
+//   try {
+//     console.log('🕐 [스케줄러] 자동 재계산 시작');
+//     
+//     // 전체 재계산 API 호출
+//     const response = await fetch('http://localhost:4000/api/budget/recalculate-all', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json'
+//       }
+//     });
+//     
+//     if (response.ok) {
+//       const result = await response.json();
+//       console.log('✅ [스케줄러] 자동 재계산 완료:', result.message);
+//     } else {
+//       console.error('❌ [스케줄러] 자동 재계산 실패:', response.status);
+//     }
+//     
+//   } catch (error) {
+//     console.error('❌ [스케줄러] 자동 재계산 오류:', error);
+//   }
+// }, {
+//   timezone: 'Asia/Seoul'
+// });
 
-console.log('🕐 [스케줄러] 매일 새벽 2시 자동 재계산 설정 완료');
+// console.log('🕐 [스케줄러] 매일 새벽 2시 자동 재계산 설정 완료');
 
 // 서버 시작
 app.listen(port, () => {
   console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
   console.log(`📊 예산 관리 시스템이 준비되었습니다.`);
-  console.log(`🕐 자동 재계산 스케줄러가 활성화되었습니다.`);
+  console.log(`🕐 자동 재계산 스케줄러가 임시 비활성화되었습니다. (클라우드타입 패키지 문제)`);
 });
