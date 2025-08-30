@@ -19063,6 +19063,42 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
 
     // 헤더가 없으면 헤더 추가
     if (existingMetadata.length === 0) {
+      // 헤더 추가 전 기존 시트 컬럼 확장 확인 및 확장 (X열까지)
+      try {
+        const sheetInfo = await sheets.spreadsheets.get({
+          spreadsheetId: sheetId
+        });
+        
+        const targetSheet = sheetInfo.data.sheets.find(s => s.properties.title === userSheetName);
+        if (targetSheet && targetSheet.properties.gridProperties.columnCount < 24) {
+          console.log(`🔄 [데이터저장] ${userSheetName}: 컬럼 수 확장 필요 (현재: ${targetSheet.properties.gridProperties.columnCount}, 목표: 24)`);
+          
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: sheetId,
+            resource: {
+              requests: [{
+                updateDimensionProperties: {
+                  range: {
+                    sheetId: targetSheet.properties.sheetId,
+                    dimension: 'COLUMNS',
+                    startIndex: 0,
+                    endIndex: 24
+                  },
+                  properties: {
+                    pixelSize: 100
+                  },
+                  fields: 'pixelSize'
+                }
+              }]
+            }
+          });
+          
+          console.log(`✅ [데이터저장] ${userSheetName}: 컬럼 수 확장 완료 (24개)`);
+        }
+      } catch (expandError) {
+        console.log(`⚠️ [데이터저장] ${userSheetName}: 컬럼 확장 실패 (무시하고 진행):`, expandError.message);
+      }
+      
       const metadataHeader = [
         '저장일시', '접수일범위', '개통일범위', '접수일적용여부', 
         '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'
@@ -19070,7 +19106,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${userSheetName}!O1:W1`,
+        range: `${userSheetName}!O1:X1`,
         valueInputOption: 'RAW',
         resource: {
           values: [metadataHeader]
@@ -19099,7 +19135,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 새 메타데이터 행 추가
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!O:W`,
+      range: `${userSheetName}!O:X`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
@@ -21863,7 +21899,43 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               console.log(`✅ [전체재계산] ${sheetName}: 사용자 시트 데이터 누적 저장 완료 (기존 ${existingData.length}행 + 새 ${rowsToSave.length}행)`);
             }
             
-            // 8-1. 메타데이터 저장 (기존 저장 버튼과 동일)
+            // 8-1. 기존 시트 컬럼 확장 확인 및 확장 (X열까지)
+            try {
+              const sheetInfo = await sheets.spreadsheets.get({
+                spreadsheetId: sheetId
+              });
+              
+              const targetSheet = sheetInfo.data.sheets.find(s => s.properties.title === sheetName);
+              if (targetSheet && targetSheet.properties.gridProperties.columnCount < 24) {
+                console.log(`🔄 [전체재계산] ${sheetName}: 컬럼 수 확장 필요 (현재: ${targetSheet.properties.gridProperties.columnCount}, 목표: 24)`);
+                
+                await sheets.spreadsheets.batchUpdate({
+                  spreadsheetId: sheetId,
+                  resource: {
+                    requests: [{
+                      updateDimensionProperties: {
+                        range: {
+                          sheetId: targetSheet.properties.sheetId,
+                          dimension: 'COLUMNS',
+                          startIndex: 0,
+                          endIndex: 24
+                        },
+                        properties: {
+                          pixelSize: 100
+                        },
+                        fields: 'pixelSize'
+                      }
+                    }]
+                  }
+                });
+                
+                console.log(`✅ [전체재계산] ${sheetName}: 컬럼 수 확장 완료 (24개)`);
+              }
+            } catch (expandError) {
+              console.log(`⚠️ [전체재계산] ${sheetName}: 컬럼 확장 실패 (무시하고 진행):`, expandError.message);
+            }
+            
+            // 8-2. 메타데이터 저장 (기존 저장 버튼과 동일)
             const metadataRange = `${sheetName}!O1:X2`;
             const metadata = [
               ['저장일시', '접수일범위', '개통일범위', '접수일적용여부', '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'],
