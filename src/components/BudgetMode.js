@@ -76,7 +76,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const getDefaultBudgetAmounts = () => {
     const defaultAmount = faceValueSubMenu === 'Ⅱ' ? 0 : 40000;
     return {
-      S군: defaultAmount,
+      S군: faceValueSubMenu === 'Ⅱ' ? 0 : 50000, // S군 첫 번째 예산금액 기본값 50000
       A군: defaultAmount,
       B군: defaultAmount,
       C군: defaultAmount,
@@ -171,7 +171,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // 명시적으로 현재 faceValueSubMenu 값에 따른 기본값 설정
     const defaultAmount = faceValueSubMenu === 'Ⅱ' ? 0 : 40000;
     const newBudgetAmounts = {
-      S군: defaultAmount,
+      S군: faceValueSubMenu === 'Ⅱ' ? 0 : 50000, // S군 첫 번째 예산금액 기본값 50000
       A군: defaultAmount,
       B군: defaultAmount,
       C군: defaultAmount,
