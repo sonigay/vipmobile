@@ -19560,45 +19560,49 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       
       console.log(`📊 [데이터저장] ${userSheetName} 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}`);
       
-      // 계산 결과를 메타데이터에 업데이트 (마지막 행의 V, W, X열)
-      try {
-        const metadataUpdateResponse = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: `${userSheetName}!O:X`
-        });
-        
-        const metadata = metadataUpdateResponse.data.values || [];
-        if (metadata.length > 1) { // 헤더 1행 + 데이터 1행 이상
-          const lastRowIndex = metadata.length; // 마지막 행 인덱스
-          
-          // V열(잔액), W열(확보), X열(사용) 업데이트
-          const updateRequests = [
-            {
-              range: `${userSheetName}!V${lastRowIndex}`,
-              values: [[totalRemainingBudget]]
-            },
-            {
-              range: `${userSheetName}!W${lastRowIndex}`,
-              values: [[totalSecuredBudget]]
-            },
-            {
-              range: `${userSheetName}!X${lastRowIndex}`,
-              values: [[totalUsedBudget]]
-            }
-          ];
-          
-          await sheets.spreadsheets.values.batchUpdate({
+      // 계산 결과가 0이 아닌 경우에만 메타데이터 업데이트 (0값 정책 생성 방지)
+      if (totalRemainingBudget > 0 || totalSecuredBudget > 0 || totalUsedBudget > 0) {
+        try {
+          const metadataUpdateResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            resource: {
-              valueInputOption: 'RAW',
-              data: updateRequests
-            }
+            range: `${userSheetName}!O:X`
           });
           
-          console.log(`✅ [데이터저장] ${userSheetName}: 메타데이터 계산 결과 업데이트 완료 (잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget})`);
+          const metadata = metadataUpdateResponse.data.values || [];
+          if (metadata.length > 1) { // 헤더 1행 + 데이터 1행 이상
+            const lastRowIndex = metadata.length; // 마지막 행 인덱스
+            
+            // V열(잔액), W열(확보), X열(사용) 업데이트
+            const updateRequests = [
+              {
+                range: `${userSheetName}!V${lastRowIndex}`,
+                values: [[totalRemainingBudget]]
+              },
+              {
+                range: `${userSheetName}!W${lastRowIndex}`,
+                values: [[totalSecuredBudget]]
+              },
+              {
+                range: `${userSheetName}!X${lastRowIndex}`,
+                values: [[totalUsedBudget]]
+              }
+            ];
+            
+            await sheets.spreadsheets.values.batchUpdate({
+              spreadsheetId: sheetId,
+              resource: {
+                valueInputOption: 'RAW',
+                data: updateRequests
+              }
+            });
+            
+            console.log(`✅ [데이터저장] ${userSheetName}: 메타데이터 계산 결과 업데이트 완료 (잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget})`);
+          }
+        } catch (updateError) {
+          console.error(`❌ [데이터저장] ${userSheetName}: 메타데이터 업데이트 실패:`, updateError.message);
         }
-      } catch (updateError) {
-        console.error(`❌ [데이터저장] ${userSheetName}: 메타데이터 업데이트 실패:`, updateError.message);
+      } else {
+        console.log(`⚠️ [데이터저장] ${userSheetName}: 계산 결과가 모두 0이므로 메타데이터 업데이트 건너뜀 (0값 정책 생성 방지)`);
       }
     }
     
