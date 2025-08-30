@@ -21560,7 +21560,14 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
           if (!userRow[0] || !userRow[1]) continue; // 빈 행 스킵
           
           const sheetName = userRow[2]; // C열: 시트명
-          const budgetType = userRow[6] || 'Ⅰ'; // G열: 선택된정책그룹 (기본값: Ⅰ)
+          // 시트 이름에서 예산 타입 추출 (예: "액면_홍기현(Ⅰ) (팀장)" → "Ⅰ")
+          let budgetType = 'Ⅰ'; // 기본값
+          if (sheetName && sheetName.includes('(') && sheetName.includes(')')) {
+            const match = sheetName.match(/\(([ⅠⅡ종합]+)\)/);
+            if (match) {
+              budgetType = match[1];
+            }
+          }
           
           console.log(`🔄 [전체재계산] ${targetMonth}월 - ${sheetName} (${budgetType}) 기존 저장 버튼 로직 재실행`);
           
@@ -21719,6 +21726,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
             
             // 기존 저장 버튼과 동일한 매개변수로 calculateUsageBudget 호출
+            // budgetType이 'Ⅰ', 'Ⅱ', '종합' 중 하나여야 함
             const selectedPolicyGroups = [budgetType]; // 예산 타입을 정책그룹으로 사용
             
             const calculationResult = await calculateUsageBudget(
@@ -21726,7 +21734,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               selectedPolicyGroups, 
               dateRange, 
               inputUserName, 
-              budgetType
+              budgetType // 'Ⅰ', 'Ⅱ', '종합' 중 하나
             );
             
             console.log(`✅ [전체재계산] ${sheetName}: 액면예산 계산 완료 - ${calculationResult.message}`);
@@ -21743,35 +21751,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               success: true
             });
             
-            // 12. 계산 결과를 사용자 시트에 업데이트
-            const summaryData = [
-              ['계산결과'],
-              ['예산잔액', totalRemainingBudget],
-              ['확보예산', totalSecuredBudget],
-              ['사용예산', totalUsedBudget],
-              ['매칭된 행 수', matchedRows],
-              ['계산일시', new Date().toLocaleString('ko-KR')]
-            ];
-            
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: sheetId,
-              range: `${sheetName}!A1`,
-              valueInputOption: 'USER_ENTERED',
-              resource: { values: summaryData }
-            });
-            
-            console.log(`✅ [전체재계산] ${sheetName} 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 매칭행=${matchedRows}`);
-            
-            results.push({
-              month: targetMonth,
-              sheetName,
-              budgetType,
-              totalRemainingBudget,
-              totalSecuredBudget,
-              totalUsedBudget,
-              matchedRows,
-              success: true
-            });
+            console.log(`✅ [전체재계산] ${sheetName} 완료: 잔액=${calculationResult.totalRemainingBudget}, 확보=${calculationResult.totalSecuredBudget}, 사용=${calculationResult.totalUsedBudget}, 매칭행=${calculationResult.updatedRows}`);
             
           } catch (userSheetError) {
             console.error(`❌ [전체재계산] ${sheetName} 처리 실패:`, userSheetError.message);
