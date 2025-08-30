@@ -365,7 +365,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       console.log('🔄 [Frontend] 전체 재계산 시작');
       
-      const response = await fetch('/api/budget/recalculate-all', {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://jegomap2-server.onrender.com';
+      const response = await fetch(`${API_BASE_URL}/api/budget/recalculate-all`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
