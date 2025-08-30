@@ -4727,9 +4727,13 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일 (기존 F열에서 +11)
       const activationDate = normalizeActivationDate(row[20], row[21], row[22]); // U, V, W열: 개통일 (기존 J, K, L열에서 +11)
       
-      // 정책그룹 매칭
+      // 정책그룹 매칭 (디버깅 로그 추가)
       if (!selectedPolicyGroups.includes(policyGroup)) {
         // 정책그룹 불일치로 제외
+        policyGroupFiltered++;
+        if (policyGroupFiltered <= 5) { // 처음 5개만 로그 출력
+          console.log(`🚫 [calculateUsageBudget] 정책그룹 불일치: ${policyGroup} (선택된 정책그룹: ${selectedPolicyGroups.join(', ')})`);
+        }
       }
       if (selectedPolicyGroups.includes(policyGroup)) {
         // 날짜 범위 필터링 - 새로운 4개 날짜 컬럼 사용
@@ -21821,9 +21825,17 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 계산 시작`);
             
             // 기존 저장 버튼과 동일한 매개변수로 calculateUsageBudget 호출
-            // 정책그룹 문자열을 배열로 분리
-            const policyGroupString = userRow[6] || '홍기현직영,홍기현별도,홍기현,평택사무실,임재욱별도,임재욱,이은록,양진영별도,양진영,이덕제,김일환,김일환별도';
-            const selectedPolicyGroups = policyGroupString.split(',').map(group => group.trim()); // G열: 선택된정책그룹
+            // 정책그룹을 실제 사용자 시트에서 읽어오기
+            let policyGroupString = userRow[6]; // G열: 선택된정책그룹
+            if (!policyGroupString) {
+              // 정책그룹이 없으면 기본값 사용 (디버깅용)
+              policyGroupString = '홍기현직영,홍기현별도,홍기현,평택사무실,임재욱별도,임재욱,이은록,양진영별도,양진영,이덕제,김일환,김일환별도';
+              console.log(`⚠️ [전체재계산] ${sheetName}: 정책그룹 정보 없음, 기본값 사용: ${policyGroupString}`);
+            } else {
+              console.log(`📋 [전체재계산] ${sheetName}: 정책그룹 정보: ${policyGroupString}`);
+            }
+            const selectedPolicyGroups = policyGroupString.split(',').map(group => group.trim());
+            console.log(`🔍 [전체재계산] ${sheetName}: 파싱된 정책그룹:`, selectedPolicyGroups);
             
                           const calculationResult = await calculateUsageBudget(
                 sheetId, 
