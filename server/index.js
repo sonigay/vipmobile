@@ -18060,7 +18060,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             try {
               const creatorResponse = await sheets_api.spreadsheets.values.get({
                 spreadsheetId: sheet.sheetId,
-                range: `${sheet.sheetName}!O1:R2`
+                range: `${sheet.sheetName}!O1:X2`
               });
               
               const creatorData = creatorResponse.data.values || [];
@@ -18303,7 +18303,7 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           try {
             const metadataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: `${sheetName}!O1:R2`
+              range: `${sheetName}!O1:X2`
             });
             
             const metadata = metadataResponse.data.values || [];
@@ -18353,12 +18353,12 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           let activationEndDate = '';
           let creatorName = '';
           
-          console.log(`🔍 [${sheetName}] 메타데이터 조회 시작: O1:R2`);
+          console.log(`🔍 [${sheetName}] 메타데이터 조회 시작: O1:X2`);
           
           try {
             const metadataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: `${sheetName}!O1:R2`
+              range: `${sheetName}!O1:X2`
             });
             
             const metadata = metadataResponse.data.values || [];
@@ -18511,11 +18511,11 @@ app.get('/api/budget/user-sheets', async (req, res) => {
           
           console.log(`📋 [${sheetName}] 📋 저장된 데이터 목록 표시값: 확보예산=${totalSecuredBudget}, 사용예산=${totalUsedBudget}, 예산잔액=${totalRemainingBudget}`);
           
-          // 메타데이터에서 마지막 업데이트 시간과 날짜 범위 가져오기 (O1:R2로 이동)
+          // 메타데이터에서 마지막 업데이트 시간과 날짜 범위 가져오기 (O1:X2로 이동)
           try {
             const metadataResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: `${sheetName}!O1:R2`
+              range: `${sheetName}!O1:X2`
             });
             
             const metadata = metadataResponse.data.values || [];
@@ -19136,7 +19136,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       try {
         const metadataResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
-          range: `${userSheetName}!O1:R2`
+          range: `${userSheetName}!O1:X2`
         });
         
         const metadata = metadataResponse.data.values || [];
@@ -19394,10 +19394,10 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       range: `${userSheetName}!A2:L`
     });
     
-    // 메타데이터 불러오기 (O1:R1) - 메타데이터 위치 변경
+    // 메타데이터 불러오기 (O1:X1) - 새로운 10개 컬럼 구조
     const metadataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${userSheetName}!O1:R1`
+      range: `${userSheetName}!O1:X1`
     });
     
     const data = dataResponse.data.values || [];
@@ -19448,7 +19448,7 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       return null;
     }).filter(item => item !== null);
     
-    // 메타데이터 파싱
+    // 메타데이터 파싱 - 새로운 10개 컬럼 구조
     let dateRange = {
       receiptStartDate: '',
       receiptEndDate: '',
@@ -19456,9 +19456,17 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
       activationEndDate: ''
     };
     
-    if (metadata.length >= 2 && metadata[1].length >= 3) {
-      const receiptRange = metadata[1][1] || '';
-      const activationRange = metadata[1][2] || '';
+    if (metadata.length >= 2 && metadata[1].length >= 10) {
+      // 새로운 메타데이터 구조: [저장일시, 접수일범위, 개통일범위, 접수일적용여부, 계산일시, 계산자, 정책그룹, 잔액, 확보, 사용]
+      const receiptRange = metadata[1][1] || ''; // P열: 접수일범위
+      const activationRange = metadata[1][2] || ''; // Q열: 개통일범위
+      const applyReceiptDate = metadata[1][3] || ''; // R열: 접수일적용여부
+      const calculationDate = metadata[1][4] || ''; // S열: 계산일시
+      const calculator = metadata[1][5] || ''; // T열: 계산자
+      const policyGroups = metadata[1][6] || ''; // U열: 정책그룹
+      const totalRemaining = metadata[1][7] || ''; // V열: 잔액
+      const totalSecured = metadata[1][8] || ''; // W열: 확보
+      const totalUsed = metadata[1][9] || ''; // X열: 사용
       
       // "2024-01-01 ~ 2024-01-31" 형식 파싱
       const receiptMatch = receiptRange.match(/^(.+?)\s*~\s*(.+)$/);
@@ -19473,6 +19481,8 @@ app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
         dateRange.activationStartDate = activationMatch[1].trim();
         dateRange.activationEndDate = activationMatch[2].trim();
       }
+      
+      console.log(`📋 [메타데이터파싱] 새로운 구조: 접수일=${receiptRange}, 개통일=${activationRange}, 적용여부=${applyReceiptDate}, 계산자=${calculator}, 정책그룹=${policyGroups}`);
     }
     
     // 정책그룹 정보 가져오기 - "예산_사용자시트관리" 시트에서
@@ -21854,14 +21864,20 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             }
             
             // 8-1. 메타데이터 저장 (기존 저장 버튼과 동일)
-            const metadataRange = `${sheetName}!O1:R2`;
+            const metadataRange = `${sheetName}!O1:X2`;
             const metadata = [
-              ['저장일시', '접수일범위', '개통일범위', '접수일적용여부'],
+              ['저장일시', '접수일범위', '개통일범위', '접수일적용여부', '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'],
               [
                 new Date().toISOString(),
                 `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}`,
                 `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`,
-                '적용'
+                '적용',
+                '', // 계산일시
+                '', // 계산자
+                '', // 정책그룹
+                '', // 잔액
+                '', // 확보
+                ''  // 사용
               ]
             ];
             
