@@ -2020,122 +2020,101 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    userSheets.map((sheet, index) => (
-                      <TableRow key={index} hover>
-                        <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                          <div 
-                            dangerouslySetInnerHTML={{
-                              __html: sheet.summary?.dateRange || '날짜 미설정'
-                            }}
-                            style={{ 
-                              whiteSpace: 'pre-line',
-                              lineHeight: '1.4'
-                            }}
-                          />
-                          {sheet.summary?.applyReceiptDate && (
-                            <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
-                              (접수일 적용)
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
-                          {sheet.policies && sheet.policies.length > 0 ? (
-                            <Box>
-                              {sheet.policies.map((policy, policyIndex) => (
-                                <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
-                                  {policy.securedBudget?.toLocaleString() || 0}원
+                    (() => {
+                      const flatList = userSheets.flatMap(sheet => (
+                        sheet.policies && sheet.policies.length > 0
+                          ? sheet.policies.map((policy, policyIndex) => ({ sheet, policy, key: `${sheet.uuid || sheet.id}-${policyIndex}` }))
+                          : [{ sheet, policy: null, key: `${sheet.uuid || sheet.id}-empty` }]
+                      ));
+                      return flatList.map(({ sheet, policy, key }) => {
+                        const dateRangeHtml = policy
+                          ? `${policy.receiptDateRange === '미설정' || policy.receiptDateRange === '' ? '접수일 미설정~미설정' : `접수일 ${policy.receiptDateRange}`}<br/>개통일 ${policy.activationDateRange || ''}`
+                          : (sheet.summary?.dateRange || '날짜 미설정');
+                        const applyReceipt = policy ? (policy.receiptApplied === '적용') : sheet.summary?.applyReceiptDate;
+                        const creator = policy?.calculator || sheet.createdBy || 'Unknown';
+                        const lastUpdated = policy?.calculatedAt || sheet.summary?.lastUpdated || sheet.createdAt;
+                        return (
+                          <TableRow key={key} hover>
+                            <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                              <div
+                                dangerouslySetInnerHTML={{ __html: dateRangeHtml }}
+                                style={{ whiteSpace: 'pre-line', lineHeight: '1.4' }}
+                              />
+                              {applyReceipt && (
+                                <Typography variant="caption" sx={{ display: 'block', color: '#666' }}>
+                                  (접수일 적용)
                                 </Typography>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Typography variant="caption" color="textSecondary">
-                              정책 정보 없음
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-                          {sheet.policies && sheet.policies.length > 0 ? (
-                            <Box>
-                              {sheet.policies.map((policy, policyIndex) => (
-                                <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
-                                  {policy.usedBudget?.toLocaleString() || 0}원
-                                </Typography>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Typography variant="caption" color="textSecondary">
-                              정책 정보 없음
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
-                          {sheet.policies && sheet.policies.length > 0 ? (
-                            <Box>
-                              {sheet.policies.map((policy, policyIndex) => (
-                                <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
-                                  {policy.remainingBudget?.toLocaleString() || 0}원
-                                </Typography>
-                              ))}
-                            </Box>
-                          ) : (
-                            <Typography variant="caption" color="textSecondary">
-                              정책 정보 없음
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                          {sheet.createdBy || 'Unknown'}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.8rem' }}>
-                          {sheet.summary?.lastUpdated ? 
-                            new Date(sheet.summary.lastUpdated).toLocaleString('ko-KR') : 
-                            new Date(sheet.createdAt).toLocaleString('ko-KR')
-                          }
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {faceValueSubMenu === 'Ⅰ' && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => openPreview(sheet)}
-                                sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
-                              >
-                                미리보기
-                              </Button>
-                            )}
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => handleLoadUserSheet(sheet)}
-                              sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
-                            >
-                              불러오기
-                            </Button>
-                            {/* 작성자 본인만 삭제 가능 */}
-                            {sheet.uuid && isOwnSheet(sheet) && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => handleDeleteUserSheet(sheet)}
-                                sx={{ 
-                                  fontSize: '0.7rem', 
-                                  borderColor: '#d32f2f', 
-                                  color: '#d32f2f',
-                                  '&:hover': {
-                                    backgroundColor: '#ffebee',
-                                    borderColor: '#d32f2f'
-                                  }
-                                }}
-                              >
-                                삭제
-                              </Button>
-                            )}
-                          </Box>
-                        </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', color: '#2E7D32' }}>
+                              {policy ? (
+                                <Typography variant="caption">{(policy.securedBudget || 0).toLocaleString()}원</Typography>
+                              ) : (
+                                <Typography variant="caption" color="textSecondary">정책 정보 없음</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', color: '#D32F2F' }}>
+                              {policy ? (
+                                <Typography variant="caption">{(policy.usedBudget || 0).toLocaleString()}원</Typography>
+                              ) : (
+                                <Typography variant="caption" color="textSecondary">정책 정보 없음</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', color: '#1976D2' }}>
+                              {policy ? (
+                                <Typography variant="caption">{(policy.remainingBudget || 0).toLocaleString()}원</Typography>
+                              ) : (
+                                <Typography variant="caption" color="textSecondary">정책 정보 없음</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
+                              {creator}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {new Date(lastUpdated).toLocaleString('ko-KR')}
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                {faceValueSubMenu === 'Ⅰ' && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => openPreview(sheet)}
+                                    sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
+                                  >
+                                    미리보기
+                                  </Button>
+                                )}
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => handleLoadUserSheet(sheet)}
+                                  sx={{ fontSize: '0.7rem', borderColor: '#795548', color: '#795548' }}
+                                >
+                                  불러오기
+                                </Button>
+                                {sheet.uuid && isOwnSheet(sheet) && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => handleDeleteUserSheet(sheet)}
+                                    sx={{ 
+                                      fontSize: '0.7rem', 
+                                      borderColor: '#d32f2f', 
+                                      color: '#d32f2f',
+                                      '&:hover': { backgroundColor: '#ffebee', borderColor: '#d32f2f' }
+                                    }}
+                                  >
+                                    삭제
+                                  </Button>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()
+                  )}
                  </TableBody>
                </Table>
              </TableContainer>

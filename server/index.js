@@ -18252,8 +18252,22 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
     
     const userSheets = await userSheetManager.getUserSheets(options);
     
+    // 디버깅: 중복 확인
+    console.log(`🔍 [NEW-API] userSheets 배열 내용:`, userSheets.map(sheet => ({
+      sheetName: sheet.sheetName,
+      sheetId: sheet.sheetId,
+      uuid: sheet.uuid
+    })));
+    
+    // 중복 제거 (UUID 기준)
+    const uniqueSheets = userSheets.filter((sheet, index, self) => 
+      index === self.findIndex(s => s.uuid === sheet.uuid)
+    );
+    
+    console.log(`🔍 [NEW-API] 중복 제거 후: ${uniqueSheets.length}개`);
+    
     // 각 시트의 요약 정보 가져오기
-    const enrichedSheets = await Promise.all(userSheets.map(async (sheet) => {
+    const enrichedSheets = await Promise.all(uniqueSheets.map(async (sheet) => {
       let summary = {
         totalSecuredBudget: 0,
         totalUsedBudget: 0,
@@ -18306,6 +18320,15 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                 const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
                 const usedBudget = parseFloat(row[9]) || 0;      // X열 (0-based index 9)
                 
+                // 메타데이터 부가정보 (표시용)
+                const savedAt = row[0] || '';
+                const receiptDateRange = row[1] || '';
+                const activationDateRange = row[2] || '';
+                const receiptApplied = row[3] || '';
+                const calculatedAt = row[4] || '';
+                const calculator = row[5] || '';
+                const policyGroups = row[6] || '';
+                
                 // 각 정책을 개별적으로 처리 (중복 제거하지 않음)
                 totalRemainingBudget += remainingBudget;
                 totalSecuredBudget += securedBudget;
@@ -18316,7 +18339,14 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                 policies.push({
                   securedBudget,
                   usedBudget,
-                  remainingBudget
+                  remainingBudget,
+                  savedAt,
+                  receiptDateRange,
+                  activationDateRange,
+                  receiptApplied,
+                  calculatedAt,
+                  calculator,
+                  policyGroups
                 });
                 
                 console.log(`📋 [${sheet.sheetName}] 정책 ${policyCount}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
