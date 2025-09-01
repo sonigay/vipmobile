@@ -18259,9 +18259,9 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
       uuid: sheet.uuid
     })));
     
-    // 중복 제거 (sheetId 기준) - 동일 시트가 여러 UUID로 등록된 경우 방지
+    // 중복 제거 (sheetId + sheetName 기준) - 각 사용자별 시트를 개별적으로 표시
     const uniqueSheets = userSheets.filter((sheet, index, self) => 
-      index === self.findIndex(s => s.sheetId === sheet.sheetId)
+      index === self.findIndex(s => s.sheetId === sheet.sheetId && s.sheetName === sheet.sheetName)
     );
     
     console.log(`🔍 [NEW-API] 중복 제거 후: ${uniqueSheets.length}개`);
@@ -19731,7 +19731,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     // 사용자별 예산 데이터 저장
     const userBudgets = {};
     
-    // 중복 제거: 같은 sheetId는 한 번만 처리
+    // 중복 제거: 같은 sheetId는 한 번만 처리 (액면예산(종합)에서는 구글 시트 기준)
     const processedSheetIds = new Set();
     
     // 헤더 제외하고 각 시트의 액면예산 시트에서 사용자별 타입별 컬럼 합계
@@ -19741,7 +19741,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         const sheetId = row[1]; // B열: 시트ID
         const sheetName = row[2]; // C열: 시트명
         
-        // 이미 처리된 sheetId는 건너뛰기
+        // 이미 처리된 sheetId는 건너뛰기 (같은 구글 시트는 한 번만 처리)
         if (processedSheetIds.has(sheetId)) {
           console.log(`⚠️ [액면예산종합] ${sheetName} (${sheetId}) 이미 처리됨, 건너뛰기`);
           continue;

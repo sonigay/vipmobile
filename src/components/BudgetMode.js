@@ -72,6 +72,27 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   });
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   
+  // 시트와 개통일 범위 일치성 검증 함수
+  const validateDateRange = () => {
+    if (!targetMonth || !dateRange.activationStartDate || !dateRange.activationEndDate) {
+      return { isValid: false, message: '시트와 개통일 범위를 모두 설정해주세요.' };
+    }
+    
+    // 시트 월과 개통일 범위 월 비교
+    const sheetMonth = targetMonth; // 예: "2025-08"
+    const activationStartMonth = dateRange.activationStartDate.substring(0, 7); // 예: "2025-09"
+    const activationEndMonth = dateRange.activationEndDate.substring(0, 7); // 예: "2025-09"
+    
+    if (sheetMonth !== activationStartMonth || sheetMonth !== activationEndMonth) {
+      return { 
+        isValid: false, 
+        message: `시트(${sheetMonth})와 개통일 범위(${activationStartMonth} ~ ${activationEndMonth})가 일치하지 않습니다.\n\n다시 설정해주세요.` 
+      };
+    }
+    
+    return { isValid: true };
+  };
+  
   // 예산금액 설정 상태 (예산 타입에 따라 다른 기본값)
   const getDefaultBudgetAmounts = () => {
     const defaultAmount = faceValueSubMenu === 'Ⅱ' ? 0 : 40000;
@@ -98,6 +119,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [userSheets, setUserSheets] = useState([]);
   const [showSheetList, setShowSheetList] = useState(false);
   const [showMonthSheetList, setShowMonthSheetList] = useState(false);
+  
+  // 검증 모달 상태
+  const [validationModal, setValidationModal] = useState({
+    open: false,
+    title: '',
+    message: ''
+  });
   const [isRecalculating, setIsRecalculating] = useState(false);
   
   // 날짜/시간 입력 상태
@@ -794,6 +822,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       return;
     }
     
+    // 시트와 개통일 범위 일치성 검증
+    const validation = validateDateRange();
+    if (!validation.isValid) {
+      setValidationModal({
+        open: true,
+        title: '설정 오류',
+        message: validation.message
+      });
+      return;
+    }
+    
     if (budgetData.length === 0 || budgetData.every(row => !row || (!row.modelName && !row.budgetValue))) {
       setSnackbar({ open: true, message: '저장할 데이터가 없습니다.', severity: 'warning' });
       return;
@@ -893,6 +932,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 대상월이 선택되어 있는지 확인
       if (!targetMonth) {
         setSnackbar({ open: true, message: '대상월을 먼저 선택해주세요.', severity: 'warning' });
+        return;
+      }
+      
+      // 시트와 개통일 범위 일치성 검증
+      const validation = validateDateRange();
+      if (!validation.isValid) {
+        setValidationModal({
+          open: true,
+          title: '설정 오류',
+          message: validation.message
+        });
         return;
       }
       
@@ -2544,6 +2594,33 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             console.log('예산모드 새 업데이트가 추가되었습니다.');
           }}
         />
+
+        {/* 검증 모달 */}
+        <Dialog
+          open={validationModal.open}
+          onClose={() => setValidationModal({ ...validationModal, open: false })}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ color: '#d32f2f', fontWeight: 'bold' }}>
+            ⚠️ {validationModal.title}
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+              {validationModal.message}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setValidationModal({ ...validationModal, open: false })}
+              variant="contained"
+              color="primary"
+              sx={{ fontWeight: 'bold' }}
+            >
+              확인
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* 스낵바 */}
         <Snackbar
