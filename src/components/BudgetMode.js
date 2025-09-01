@@ -202,8 +202,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [settingsName, setSettingsName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // 기본구두 탭 전용 모달 상태
-  const [showBasicShoePolicyGroupModal, setShowBasicShoePolicyGroupModal] = useState(false);
+
   
 
 
@@ -2824,7 +2823,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Button
                       variant="outlined"
-                      onClick={() => setShowBasicShoePolicyGroupModal(true)}
+                      onClick={() => setShowPolicyGroupModal(true)}
                       sx={{ borderColor: '#795548', color: '#795548' }}
                     >
                       정책그룹 선택
