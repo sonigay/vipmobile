@@ -172,6 +172,40 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   });
   const [isLoadingBasicShoe, setIsLoadingBasicShoe] = useState(false);
   
+  // 시트 설정 관련 상태
+  const [availableMonths] = useState([
+    '2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06',
+    '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12'
+  ]);
+  const [canModifySheetId] = useState(false); // SS 레벨만 수정 가능
+  const [savedSheetIds] = useState([]); // 저장된 시트 ID 목록
+  const [newPolicyGroup, setNewPolicyGroup] = useState('');
+  
+  // 시트 설정 관련 함수들
+  const handleSaveSheetId = () => {
+    // 시트 ID 저장 로직 (권한이 있을 때만)
+    if (canModifySheetId && targetMonth && sheetId) {
+      setSnackbar({ open: true, message: '시트 ID가 저장되었습니다.', severity: 'success' });
+    }
+  };
+  
+  const handleViewSheet = (sheetId) => {
+    // 시트 보기 로직
+    setSheetId(sheetId);
+    setSnackbar({ open: true, message: '시트가 선택되었습니다.', severity: 'success' });
+  };
+  
+  const handleAddPolicyGroup = () => {
+    // 새 정책그룹 추가 로직
+    if (newPolicyGroup.trim() && !policyGroups.includes(newPolicyGroup.trim())) {
+      const newGroup = newPolicyGroup.trim();
+      setPolicyGroups(prev => [...prev, newGroup]);
+      setSelectedPolicyGroups(prev => [...prev, newGroup]);
+      setNewPolicyGroup('');
+      setSnackbar({ open: true, message: `정책그룹 "${newGroup}"이 추가되었습니다.`, severity: 'success' });
+    }
+  };
+  
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
     receiptStartDate: '',
