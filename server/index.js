@@ -19747,7 +19747,8 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         summary: {
           totalSecuredBudget: 0,
           totalUsedBudget: 0,
-          totalRemainingBudget: 0
+          totalRemainingBudget: 0,
+          basicShoeAmount: 0
         }
       });
     }
@@ -19757,6 +19758,10 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     
     // 중복 제거: 같은 sheetId는 한 번만 처리 (액면예산(종합)에서는 구글 시트 기준)
     const processedSheetIds = new Set();
+    
+    // 기본구두 데이터 수집을 위한 변수
+    let totalBasicShoeAmount = 0;
+    const processedBasicShoeSheets = new Set();
     
     // 헤더 제외하고 각 시트의 액면예산 시트에서 사용자별 타입별 컬럼 합계
     for (let i = 1; i < userSheetManagementData.length; i++) {
@@ -19773,6 +19778,35 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         
         processedSheetIds.add(sheetId);
         console.log(`🔍 [액면예산종합] ${sheetName} 처리 시작`);
+        
+        // 기본구두 데이터 읽기 (한 번만)
+        if (!processedBasicShoeSheets.has(sheetId)) {
+          try {
+            const basicShoeResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: '기본구두!A:L'
+            });
+            
+            const basicShoeData = basicShoeResponse.data.values || [];
+            if (basicShoeData.length > 1) {
+              const rows = basicShoeData.slice(1);
+              rows.forEach((basicRow) => {
+                if (basicRow.length >= 12) {
+                  const policyGroup = basicRow[11] || ''; // L열(11번인덱스): 정책그룹
+                  const amount = parseFloat(basicRow[10]) || 0; // K열(10번인덱스): 기본구두 금액
+                  
+                  if (policyGroup && amount > 0) {
+                    totalBasicShoeAmount += amount;
+                  }
+                }
+              });
+            }
+            processedBasicShoeSheets.add(sheetId);
+            console.log(`✅ [액면예산종합] ${sheetName} 기본구두 데이터 처리 완료: ${totalBasicShoeAmount.toLocaleString()}원`);
+          } catch (error) {
+            console.log(`⚠️ [액면예산종합] ${sheetName} 기본구두 시트 조회 실패:`, error.message);
+          }
+        }
         
         try {
           // 액면예산 시트에서 데이터 가져오기
@@ -19847,6 +19881,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         totalSecuredBudget,
         totalUsedBudget,
         totalRemainingBudget,
+        basicShoeAmount: totalBasicShoeAmount,
         userBudgets // 사용자별 상세 데이터 추가
       }
     });

@@ -72,6 +72,76 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   });
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   
+  // 기본구두 데이터 로드 함수
+  const loadBasicShoeData = async () => {
+    if (!targetMonth || !sheetId) {
+      setSnackbar({ open: true, message: '대상월과 시트 ID를 먼저 설정해주세요.', severity: 'warning' });
+      return;
+    }
+    
+    setIsLoadingBasicShoe(true);
+    try {
+      const sheets = google.sheets({ version: 'v4', auth });
+      
+      // "기본구두" 시트에서 데이터 읽기
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: '기본구두!A:L'
+      });
+      
+      const data = response.data.values || [];
+      if (data.length <= 1) {
+        setBasicShoeData([]);
+        setBasicShoeSummary({ totalAmount: 0, policyGroupAmounts: {} });
+        return;
+      }
+      
+      // 헤더 제외하고 데이터 처리
+      const rows = data.slice(1);
+      const processedData = [];
+      const policyGroupAmounts = {};
+      let totalAmount = 0;
+      
+      rows.forEach((row, index) => {
+        if (row.length >= 12) {
+          const policyGroup = row[11] || ''; // L열(11번인덱스): 정책그룹
+          const amount = parseFloat(row[10]) || 0; // K열(10번인덱스): 기본구두 금액
+          
+          // 선택된 정책그룹과 일치하는 경우만 처리
+          if (policyGroup && amount > 0 && selectedPolicyGroups.includes(policyGroup)) {
+            processedData.push({
+              id: index,
+              policyGroup,
+              amount,
+              row: row
+            });
+            
+            // 정책그룹별 금액 합산
+            if (!policyGroupAmounts[policyGroup]) {
+              policyGroupAmounts[policyGroup] = 0;
+            }
+            policyGroupAmounts[policyGroup] += amount;
+            totalAmount += amount;
+          }
+        }
+      });
+      
+      setBasicShoeData(processedData);
+      setBasicShoeSummary({
+        totalAmount,
+        policyGroupAmounts
+      });
+      
+      console.log('✅ [기본구두] 데이터 로드 완료:', { totalAmount, policyGroupAmounts });
+      
+    } catch (error) {
+      console.error('❌ [기본구두] 데이터 로드 실패:', error);
+      setSnackbar({ open: true, message: '기본구두 데이터 로드에 실패했습니다.', severity: 'error' });
+    } finally {
+      setIsLoadingBasicShoe(false);
+    }
+  };
+  
   // 시트와 개통일 범위 일치성 검증 함수
   const validateDateRange = () => {
     if (!targetMonth || !dateRange.activationStartDate || !dateRange.activationEndDate) {
@@ -127,6 +197,14 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     message: ''
   });
   const [isRecalculating, setIsRecalculating] = useState(false);
+  
+  // 기본구두 관련 상태
+  const [basicShoeData, setBasicShoeData] = useState([]);
+  const [basicShoeSummary, setBasicShoeSummary] = useState({
+    totalAmount: 0,
+    policyGroupAmounts: {}
+  });
+  const [isLoadingBasicShoe, setIsLoadingBasicShoe] = useState(false);
   
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
@@ -527,6 +605,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       if (result.success) {
         setSummaryData(result.summary);
+        
+        // 기본구두 금액이 있으면 기본구두 요약에 반영
+        if (result.summary.basicShoeAmount > 0) {
+          setBasicShoeSummary(prev => ({
+            ...prev,
+            totalAmount: result.summary.basicShoeAmount
+          }));
+        }
+        
         setSnackbar({ open: true, message: '액면예산 종합 데이터를 로드했습니다.', severity: 'success' });
       }
     } catch (error) {
@@ -1186,7 +1273,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             {summaryData.totalRemainingBudget.toLocaleString()}원
           </Typography>
           <Typography variant="body2" sx={{ textAlign: 'center', color: '#666', mt: 1 }}>
-            F열 합계 - (별도추가 + 부가추가지원 + 부가차감지원 사용예산)
+            F열 합계 - (기본구두 + 별도추가 + 부가추가지원 + 부가차감지원 사용예산)
           </Typography>
         </CardContent>
       </Card>
@@ -1254,7 +1341,19 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             🔮 향후 확장 예정
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={4}>
+            <Grid item xs={3}>
+              <Card sx={{ backgroundColor: '#e8f5e8' }}>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h6" color="success.main">
+                    기본구두
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    {basicShoeSummary.totalAmount.toLocaleString()}원
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={3}>
               <Card sx={{ backgroundColor: '#f3e5f5' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" color="secondary">
@@ -1266,7 +1365,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={4}>
+            <Grid item xs={3}>
               <Card sx={{ backgroundColor: '#e1f5fe' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" color="info.main">
@@ -1278,7 +1377,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={4}>
+            <Grid item xs={3}>
               <Card sx={{ backgroundColor: '#fff8e1' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" color="warning.main">
@@ -2535,6 +2634,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             }}
           >
             <Tab label="액면예산" icon={<BudgetIcon />} iconPosition="start" />
+            <Tab label="기본구두" icon={<AnalyticsIcon />} iconPosition="start" />
             <Tab label="별도추가" icon={<AnalyticsIcon />} iconPosition="start" />
             <Tab label="부가추가지원" icon={<SettingsIcon />} iconPosition="start" />
             <Tab label="부가차감지원" icon={<TimelineIcon />} iconPosition="start" />
@@ -2579,27 +2679,154 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           </Box>
         )}
         {activeTab === 1 && (
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h5" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
+              👞 기본구두 관리
+            </Typography>
+            
+            {/* 시트 설정 안내 */}
+            <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+                  ⚙️ 시트 설정 안내
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  기본구두 데이터 관리는 <strong>시트설정</strong> 탭에서 대상월과 시트 ID를 먼저 설정해주세요.
+                </Typography>
+              </CardContent>
+            </Card>
+            
+            {/* 정책그룹 선택 */}
+            <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+                  📊 정책그룹 선택
+                </Typography>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>정책그룹 선택</InputLabel>
+                  <Select
+                    multiple
+                    value={selectedPolicyGroups}
+                    onChange={(e) => setSelectedPolicyGroups(e.target.value)}
+                    label="정책그룹 선택"
+                    renderValue={(selected) => selected.join(', ')}
+                  >
+                    {policyGroups.map((group) => (
+                      <MenuItem key={group} value={group}>
+                        {group}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  onClick={loadBasicShoeData}
+                  disabled={isLoadingBasicShoe || !targetMonth || !sheetId}
+                  startIcon={isLoadingBasicShoe ? <CircularProgress size={16} /> : <CalculateIcon />}
+                  sx={{ backgroundColor: '#795548' }}
+                >
+                  {isLoadingBasicShoe ? '로딩 중...' : '기본구두 데이터 로드'}
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* 기본구두 데이터 요약 */}
+            {basicShoeSummary.totalAmount > 0 && (
+              <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+                    📊 기본구두 요약
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Card sx={{ backgroundColor: '#e8f5e8' }}>
+                        <CardContent sx={{ textAlign: 'center' }}>
+                          <Typography variant="h6" color="success.main">
+                            총 기본구두 금액
+                          </Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                            {basicShoeSummary.totalAmount.toLocaleString()}원
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card sx={{ backgroundColor: '#f3e5f5' }}>
+                        <CardContent sx={{ textAlign: 'center' }}>
+                          <Typography variant="h6" color="secondary">
+                            정책그룹 수
+                          </Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#666' }}>
+                            {Object.keys(basicShoeSummary.policyGroupAmounts).length}개
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* 정책그룹별 상세 금액 */}
+            {Object.keys(basicShoeSummary.policyGroupAmounts).length > 0 && (
+              <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+                    📋 정책그룹별 기본구두 금액
+                  </Typography>
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            정책그룹
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', textAlign: 'right' }}>
+                            기본구두 금액
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {Object.entries(basicShoeSummary.policyGroupAmounts).map(([group, amount]) => (
+                          <TableRow key={group} hover>
+                            <TableCell sx={{ fontWeight: 'bold' }}>
+                              {group}
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'right', color: '#2e7d32', fontWeight: 'bold' }}>
+                              {amount.toLocaleString()}원
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
+        )}
+        {activeTab === 2 && (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
               🚧 별도추가 준비중
             </Typography>
           </Box>
         )}
-        {activeTab === 2 && (
+        {activeTab === 3 && (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
               🚧 부가추가지원 준비중
             </Typography>
           </Box>
         )}
-        {activeTab === 3 && (
+        {activeTab === 4 && (
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h4" sx={{ color: '#795548', mb: 2 }}>
               🚧 부가차감지원 준비중
             </Typography>
           </Box>
         )}
-        {activeTab === 4 && renderSheetSettings()}
+        {activeTab === 5 && renderSheetSettings()}
 
         {/* 업데이트 팝업 */}
         <AppUpdatePopup
