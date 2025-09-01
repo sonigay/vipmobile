@@ -2809,7 +2809,12 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Button
                       variant="outlined"
-                      onClick={() => setShowPolicyGroupModal(true)}
+                      onClick={() => {
+                        // 기본구두 탭에서 모달 열기 전에 모든 모달 상태 강제 초기화
+                        setShowSaveSettingsModal(false);
+                        setShowLoadSettingsModal(false);
+                        setShowPolicyGroupModal(true);
+                      }}
                       sx={{ borderColor: '#795548', color: '#795548' }}
                     >
                       정책그룹 선택
@@ -2977,7 +2982,12 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => setShowSaveSettingsModal(true)}
+                  onClick={() => {
+                    // 기본구두 탭에서 모달 열기 전에 모든 모달 상태 강제 초기화
+                    setShowPolicyGroupModal(false);
+                    setShowLoadSettingsModal(false);
+                    setShowSaveSettingsModal(true);
+                  }}
                   sx={{ mr: 1 }}
                 >
                   저장
@@ -2986,6 +2996,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   size="small"
                   variant="outlined"
                   onClick={() => {
+                    // 기본구두 탭에서 모달 열기 전에 모든 모달 상태 강제 초기화
+                    setShowPolicyGroupModal(false);
+                    setShowSaveSettingsModal(false);
                     setShowLoadSettingsModal(true);
                     loadPolicyGroupSettings();
                   }}
