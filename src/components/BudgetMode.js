@@ -202,6 +202,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [settingsName, setSettingsName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // 기본구두 탭 전용 모달 상태
+  const [showBasicShoePolicyGroupModal, setShowBasicShoePolicyGroupModal] = useState(false);
+  
 
 
   const handleTabChange = (event, newValue) => {
@@ -210,13 +213,25 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   
   // 정책그룹 토글 함수 (액면예산용 - 기존 기능 보호)
   const handlePolicyGroupToggle = (group) => {
-    console.log('Toggling policy group:', group, 'Current selectedPolicyGroups:', selectedPolicyGroups);
+    console.log('🔍 [handlePolicyGroupToggle] 시작:', group);
+    console.log('🔍 [handlePolicyGroupToggle] 현재 상태:', selectedPolicyGroups);
+    
     setSelectedPolicyGroups(prev => {
       const currentGroups = prev || [];
-      const newState = currentGroups.includes(group) 
-        ? currentGroups.filter(g => g !== group)
-        : [...currentGroups, group];
-      console.log('New selectedPolicyGroups state:', newState);
+      const isAlreadySelected = currentGroups.includes(group);
+      
+      let newState;
+      if (isAlreadySelected) {
+        // 이미 선택된 경우 제거
+        newState = currentGroups.filter(g => g !== group);
+        console.log('✅ [handlePolicyGroupToggle] 제거됨:', group);
+      } else {
+        // 선택되지 않은 경우 추가
+        newState = [...currentGroups, group];
+        console.log('✅ [handlePolicyGroupToggle] 추가됨:', group);
+      }
+      
+      console.log('✅ [handlePolicyGroupToggle] 새로운 상태:', newState);
       return newState;
     });
   };
@@ -2809,12 +2824,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Button
                       variant="outlined"
-                      onClick={() => {
-                        // 기본구두 탭에서 모달 열기 전에 모든 모달 상태 강제 초기화
-                        setShowSaveSettingsModal(false);
-                        setShowLoadSettingsModal(false);
-                        setShowPolicyGroupModal(true);
-                      }}
+                      onClick={() => setShowBasicShoePolicyGroupModal(true)}
                       sx={{ borderColor: '#795548', color: '#795548' }}
                     >
                       정책그룹 선택
