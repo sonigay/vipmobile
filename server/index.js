@@ -18296,30 +18296,29 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             );
             
             const policies = [];
-            // 각 시트는 하나의 정책만 가짐 (마지막 정책 데이터 사용)
-            if (validRows.length > 0) {
-              const lastRow = validRows[validRows.length - 1];
-              if (lastRow.length >= 10) {
+            // 모든 정책 행을 처리
+            validRows.forEach((row, index) => {
+              if (row.length >= 10) {
                 // V열: 잔액, W열: 확보, X열: 사용
-                const remainingBudget = parseFloat(lastRow[7]) || 0; // V열 (0-based index 7)
-                const securedBudget = parseFloat(lastRow[8]) || 0;   // W열 (0-based index 8)
-                const usedBudget = parseFloat(lastRow[9]) || 0;      // X열 (0-based index 9)
+                const remainingBudget = parseFloat(row[7]) || 0; // V열 (0-based index 7)
+                const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
+                const usedBudget = parseFloat(row[9]) || 0;      // X열 (0-based index 9)
                 
-                totalRemainingBudget = remainingBudget;
-                totalSecuredBudget = securedBudget;
-                totalUsedBudget = usedBudget;
-                policyCount = 1;
+                totalRemainingBudget += remainingBudget;
+                totalSecuredBudget += securedBudget;
+                totalUsedBudget += usedBudget;
+                policyCount++;
                 
-                // 해당 시트의 정책 데이터만 추가
+                // 각 정책 데이터를 policies 배열에 추가
                 policies.push({
                   securedBudget,
                   usedBudget,
                   remainingBudget
                 });
                 
-                console.log(`📋 [${sheet.sheetName}] 정책: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
+                console.log(`📋 [${sheet.sheetName}] 정책 ${index + 1}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
               }
-            }
+            });
             
             console.log(`📊 [${sheet.sheetName}] 메타데이터 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 정책수=${policyCount}`);
             
@@ -18330,6 +18329,8 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             summary.policies = policies; // 정책별 데이터 추가
             
             console.log(`📋 [${sheet.sheetName}] policies 배열:`, JSON.stringify(policies));
+            console.log(`📋 [${sheet.sheetName}] policies 배열 길이:`, policies.length);
+            console.log(`📋 [${sheet.sheetName}] validRows 길이:`, validRows.length);
           } else {
             console.log(`📋 [${sheet.sheetName}] 메타데이터에 정책 데이터 없음`);
           }
@@ -19673,11 +19674,10 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
       });
     }
     
-    let totalSecuredBudget = 0;
-    let totalUsedBudget = 0;
-    let totalRemainingBudget = 0;
+    // 사용자별 예산 데이터 저장
+    const userBudgets = {};
     
-    // 헤더 제외하고 각 시트의 액면예산 시트에서 F열, G열, H열 합계
+    // 헤더 제외하고 각 시트의 액면예산 시트에서 사용자별 F열, G열, H열 합계
     for (let i = 1; i < userSheetManagementData.length; i++) {
       const row = userSheetManagementData[i];
       if (row.length >= 6 && row[5] === targetMonth) { // F열: 대상월
@@ -19695,15 +19695,13 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           console.log(`🔍 [액면예산종합] ${sheetName} 액면예산 데이터 로드: ${activationData.length}행`);
           
           if (activationData.length > 4) { // 헤더 4행 제외
-            let rowCount = 0;
-            
             activationData.slice(4).forEach((row, index) => { // 5행부터 시작
               if (row.length >= 8) { // F, G, H열이 있는지 확인
                 // B열과 D열에서 입력자 확인
                 const inputUserB = row[1] || ''; // B열: 입력자 (예: 홍기현 (팀장)(Ⅱ))
                 const inputUserD = row[3] || ''; // D열: 입력자 (예: 홍기현 (팀장)(Ⅰ))
                 
-                // B열이나 D열에 입력자가 있는 행만 F열, G열, H열 합계
+                // B열이나 D열에 입력자가 있는 행만 처리
                 if (inputUserB || inputUserD) {
                   // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
                   // 천 단위 구분자(,) 제거 후 숫자로 변환
@@ -19714,18 +19712,36 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
                   const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
                     parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
                   
-                  if (fValue > 0 || gValue > 0 || hValue > 0) {
-                    console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 매칭성공: B열=${inputUserB}, D열=${inputUserD}, F열=${fValue}, G열=${gValue}, H열=${hValue}`);
-                    rowCount++;
+                  // 사용자 이름 추출 (괄호 제거)
+                  const users = [];
+                  if (inputUserB) {
+                    const userB = inputUserB.replace(/\([^)]*\)/g, '').trim();
+                    if (userB) users.push(userB);
+                  }
+                  if (inputUserD) {
+                    const userD = inputUserD.replace(/\([^)]*\)/g, '').trim();
+                    if (userD) users.push(userD);
                   }
                   
-                  totalRemainingBudget += fValue;
-                  totalSecuredBudget += gValue;
-                  totalUsedBudget += hValue;
+                  // 각 사용자별로 예산 데이터 추가
+                  users.forEach(user => {
+                    if (!userBudgets[user]) {
+                      userBudgets[user] = {
+                        remainingBudget: 0,
+                        securedBudget: 0,
+                        usedBudget: 0
+                      };
+                    }
+                    
+                    userBudgets[user].remainingBudget += fValue;
+                    userBudgets[user].securedBudget += gValue;
+                    userBudgets[user].usedBudget += hValue;
+                    
+                    console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${user}: F열=${fValue}, G열=${gValue}, H열=${hValue}`);
+                  });
                 }
               }
             });
-            console.log(`📋 [액면예산종합] ${sheetName} 처리된 행: ${rowCount}개`);
           }
         } catch (error) {
           console.log(`⚠️ [액면예산종합] ${sheetName} 액면예산 시트 조회 실패:`, error.message);
@@ -19733,14 +19749,29 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
       }
     }
     
-    console.log(`📊 [액면예산종합] 완료: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
+    // 전체 합계 계산
+    let totalSecuredBudget = 0;
+    let totalUsedBudget = 0;
+    let totalRemainingBudget = 0;
+    
+    Object.keys(userBudgets).forEach(user => {
+      const budget = userBudgets[user];
+      totalRemainingBudget += budget.remainingBudget;
+      totalSecuredBudget += budget.securedBudget;
+      totalUsedBudget += budget.usedBudget;
+      
+      console.log(`📊 [액면예산종합] 사용자 ${user}: 잔액=${budget.remainingBudget}, 확보=${budget.securedBudget}, 사용=${budget.usedBudget}`);
+    });
+    
+    console.log(`📊 [액면예산종합] 전체 합계: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
     
     res.json({
       success: true,
       summary: {
         totalSecuredBudget,
         totalUsedBudget,
-        totalRemainingBudget
+        totalRemainingBudget,
+        userBudgets // 사용자별 상세 데이터 추가
       }
     });
     
