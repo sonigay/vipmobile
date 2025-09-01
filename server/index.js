@@ -19689,6 +19689,27 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     
     console.log(`🔍 [액면예산종합] 시작: ${targetMonth}, 사용자: ${userId}`);
     
+    // userId → 사용자 이름 매핑 (대리점아이디관리 C열:연락처 → A열:이름)
+    let targetUserName = '';
+    try {
+      const agentSheetResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: AGENT_SHEET_NAME + '!A:C'
+      });
+      const agentValues = agentSheetResponse.data.values || [];
+      if (agentValues.length > 1) {
+        const agentRows = agentValues.slice(1);
+        const match = agentRows.find(row => row[2] === userId); // C열: 연락처(아이디)
+        if (match) {
+          targetUserName = (match[0] || '').trim(); // A열: 이름
+        }
+      }
+    } catch (e) {
+      console.log('⚠️ [액면예산종합] 사용자 이름 매핑 실패:', e.message);
+    }
+    // 정규화된 비교용 이름 (괄호 제거)
+    const targetUserNameClean = targetUserName ? targetUserName.replace(/\([^)]*\)/g, '').trim() : '';
+    
     // 예산_사용자시트관리에서 해당 월의 모든 시트 조회
     const userSheetManagementResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -19729,15 +19750,15 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           
           if (activationData.length > 4) { // 헤더 4행 제외
             activationData.slice(4).forEach((row, index) => { // 5행부터 시작
-              if (row.length >= 8) { // F, G, H열이 있는지 확인
-                // B열과 D열에서 입력자 확인
-                const inputUserB = row[1] || ''; // B열: 입력자 (예: 홍기현 (팀장)(Ⅱ))
-                const inputUserD = row[3] || ''; // D열: 입력자 (예: 홍기현 (팀장)(Ⅰ))
+              if (row.length >= 8 && targetUserNameClean) { // F, G, H열이 있고 타겟 사용자명이 있는 경우
+                const inputUserB = row[1] || '';
+                const inputUserD = row[3] || '';
+                const cleanB = inputUserB ? inputUserB.replace(/\([^)]*\)/g, '').trim() : '';
+                const cleanD = inputUserD ? inputUserD.replace(/\([^)]*\)/g, '').trim() : '';
                 
-                // B열이나 D열에 입력자가 있는 행만 처리
-                if (inputUserB || inputUserD) {
-                  // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
-                  // 천 단위 구분자(,) 제거 후 숫자로 변환
+                // B열 또는 D열이 타겟 사용자와 일치하면 해당 행을 한 번만 합산
+                const isMatched = (cleanB && cleanB === targetUserNameClean) || (cleanD && cleanD === targetUserNameClean);
+                if (isMatched) {
                   const fValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
                     parseFloat(String(row[5]).replace(/,/g, '')) || 0 : 0;
                   const gValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
@@ -19745,33 +19766,14 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
                   const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
                     parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
                   
-                  // 사용자 이름 추출 (괄호 제거)
-                  const users = [];
-                  if (inputUserB) {
-                    const userB = inputUserB.replace(/\([^)]*\)/g, '').trim();
-                    if (userB) users.push(userB);
+                  const key = targetUserNameClean;
+                  if (!userBudgets[key]) {
+                    userBudgets[key] = { remainingBudget: 0, securedBudget: 0, usedBudget: 0 };
                   }
-                  if (inputUserD) {
-                    const userD = inputUserD.replace(/\([^)]*\)/g, '').trim();
-                    if (userD) users.push(userD);
-                  }
-                  
-                  // 각 사용자별로 예산 데이터 추가
-                  users.forEach(user => {
-                    if (!userBudgets[user]) {
-                      userBudgets[user] = {
-                        remainingBudget: 0,
-                        securedBudget: 0,
-                        usedBudget: 0
-                      };
-                    }
-                    
-                    userBudgets[user].remainingBudget += fValue;
-                    userBudgets[user].securedBudget += gValue;
-                    userBudgets[user].usedBudget += hValue;
-                    
-                    console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${user}: F열=${fValue}, G열=${gValue}, H열=${hValue}`);
-                  });
+                  userBudgets[key].remainingBudget += fValue;
+                  userBudgets[key].securedBudget += gValue;
+                  userBudgets[key].usedBudget += hValue;
+                  console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${key}: F열=${fValue}, G열=${gValue}, H열=${hValue}`);
                 }
               }
             });
