@@ -2982,12 +2982,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => {
-                    // 기본구두 탭에서 모달 열기 전에 모든 모달 상태 강제 초기화
-                    setShowPolicyGroupModal(false);
-                    setShowLoadSettingsModal(false);
-                    setShowSaveSettingsModal(true);
-                  }}
+                  onClick={() => setShowSaveSettingsModal(true)}
                   sx={{ mr: 1 }}
                 >
                   저장
@@ -2996,9 +2991,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   size="small"
                   variant="outlined"
                   onClick={() => {
-                    // 기본구두 탭에서 모달 열기 전에 모든 모달 상태 강제 초기화
-                    setShowPolicyGroupModal(false);
-                    setShowSaveSettingsModal(false);
                     setShowLoadSettingsModal(true);
                     loadPolicyGroupSettings();
                   }}
