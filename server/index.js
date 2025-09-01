@@ -19751,17 +19751,19 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           console.log(`📊 [액면예산종합] ${sheetName} 액면예산 데이터 로드: ${activationData.length}행`);
           
           if (activationData.length > 4) { // 헤더 4행 제외
+            let isUserFound = false;
             let sheetTotalRemaining = 0, sheetTotalSecured = 0, sheetTotalUsed = 0;
-            let matchedRowCount = 0;
             
-            activationData.slice(4).forEach((row, index) => { // 5행부터 시작
-              if (row.length >= 14 && targetUserNameClean) { // 충분한 열이 있는지 확인
+            // 시트에서 사용자가 포함된 첫 번째 행을 찾아서 F/G/H 값만 읽어오기
+            for (let index = 0; index < activationData.slice(4).length; index++) {
+              const row = activationData[index + 4]; // 5행부터 시작
+              if (row.length >= 14 && targetUserNameClean && !isUserFound) {
                 const inputUserB = row[1] || ''; // B열: 입력자
                 const inputUserD = row[3] || ''; // D열: 입력자
                 const cleanB = inputUserB ? inputUserB.replace(/\([^)]*\)/g, '').trim() : '';
                 const cleanD = inputUserD ? inputUserD.replace(/\([^)]*\)/g, '').trim() : '';
                 
-                // B열 또는 D열이 타겟 사용자와 일치하면 해당 행을 한 번만 합산
+                // B열 또는 D열에 타겟 사용자가 포함되어 있는지 확인
                 const isMatched = (cleanB && cleanB === targetUserNameClean) || (cleanD && cleanD === targetUserNameClean);
                 if (isMatched) {
                   // F/G/H 열에서 직접 합계 값 읽어오기 (SUMIF 방식)
@@ -19772,18 +19774,19 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
                   const usedValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
                     parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
                   
-                  sheetTotalRemaining += remainingValue;
-                  sheetTotalSecured += securedValue;
-                  sheetTotalUsed += usedValue;
-                  matchedRowCount++;
+                  sheetTotalRemaining = remainingValue;
+                  sheetTotalSecured = securedValue;
+                  sheetTotalUsed = usedValue;
+                  isUserFound = true;
                   
-                  console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${targetUserNameClean}: F/G/H열=${remainingValue}/${securedValue}/${usedValue}`);
+                  console.log(`📊 [액면예산종합] ${sheetName} 사용자 ${targetUserNameClean} 발견: F/G/H열=${remainingValue}/${securedValue}/${usedValue}`);
+                  break; // 첫 번째 매칭 행을 찾았으면 루프 종료
                 }
               }
-            });
+            }
             
-            // 시트별 합계를 사용자 예산에 추가 (시트당 한 번만)
-            if (matchedRowCount > 0) {
+            // 사용자가 발견된 시트의 F/G/H 값을 사용자 예산에 추가
+            if (isUserFound) {
               const key = targetUserNameClean;
               if (!userBudgets[key]) {
                 userBudgets[key] = { remainingBudget: 0, securedBudget: 0, usedBudget: 0 };
@@ -19792,7 +19795,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
               userBudgets[key].securedBudget += sheetTotalSecured;
               userBudgets[key].usedBudget += sheetTotalUsed;
               
-              console.log(`📊 [액면예산종합] ${sheetName} 시트 합계: 잔액=${sheetTotalRemaining}, 확보=${sheetTotalSecured}, 사용=${sheetTotalUsed} (${matchedRowCount}행 매칭)`);
+              console.log(`📊 [액면예산종합] ${sheetName} 시트 추가: 잔액=${sheetTotalRemaining}, 확보=${sheetTotalSecured}, 사용=${sheetTotalUsed}`);
             }
           }
         } catch (error) {
