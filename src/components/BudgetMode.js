@@ -3031,13 +3031,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           backgroundColor: isSelected ? '#bbdefb' : '#f5f5f5'
                         }
                       }}
-                      onClick={() => handleBasicShoePolicyGroupToggle(group)}
+                      onClick={() => handlePolicyGroupToggle(group)}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => handleBasicShoePolicyGroupToggle(group)}
+                          onChange={() => handlePolicyGroupToggle(group)}
                           style={{ marginRight: 8 }}
                         />
                         <Typography variant="body2">{group}</Typography>
