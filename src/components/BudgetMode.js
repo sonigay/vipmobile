@@ -199,9 +199,33 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [showLoadSettingsModal, setShowLoadSettingsModal] = useState(false);
   const [settingsName, setSettingsName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  
+
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+  
+  // 정책그룹 토글 함수 (액면예산용 - 기존 기능 보호)
+  const handlePolicyGroupToggle = (group) => {
+    console.log('Toggling policy group:', group, 'Current selectedPolicyGroups:', selectedPolicyGroups);
+    setSelectedPolicyGroups(prev => {
+      const currentGroups = prev || [];
+      const newState = currentGroups.includes(group) 
+        ? currentGroups.filter(g => g !== group)
+        : [...currentGroups, group];
+      console.log('New selectedPolicyGroups state:', newState);
+      return newState;
+    });
+  };
+  
+  // 기본구두용 정책그룹 토글 함수 (새로운 기능)
+  const handleBasicShoePolicyGroupToggle = (group) => {
+    if (selectedPolicyGroups.includes(group)) {
+      setSelectedPolicyGroups(prev => prev.filter(g => g !== group));
+    } else {
+      setSelectedPolicyGroups(prev => [...prev, group]);
+    }
   };
   
   // 시트 선택 함수
@@ -425,18 +449,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   };
 
-  // 정책그룹 선택/해제
-  const handlePolicyGroupToggle = (group) => {
-    console.log('Toggling policy group:', group, 'Current selectedPolicyGroups:', selectedPolicyGroups);
-    setSelectedPolicyGroups(prev => {
-      const currentGroups = prev || [];
-      const newState = currentGroups.includes(group) 
-        ? currentGroups.filter(g => g !== group)
-        : [...currentGroups, group];
-      console.log('New selectedPolicyGroups state:', newState);
-      return newState;
-    });
-  };
+
 
   // 정책그룹 설정 저장
   const handleSavePolicyGroupSettings = async () => {
@@ -2937,6 +2950,116 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             console.log('예산모드 새 업데이트가 추가되었습니다.');
           }}
         />
+
+        {/* 정책그룹 선택 모달 */}
+        <Dialog 
+          open={showPolicyGroupModal} 
+          onClose={() => setShowPolicyGroupModal(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">정책그룹 선택</Typography>
+              <Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setShowSaveSettingsModal(true)}
+                  sx={{ mr: 1 }}
+                >
+                  저장
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => {
+                    console.log('불러오기 버튼 클릭됨');
+                    setShowLoadSettingsModal(true);
+                    // 모달이 열릴 때 정책그룹 설정 목록을 로드
+                    loadPolicyGroupSettings();
+                  }}
+                >
+                  불러오기
+                </Button>
+              </Box>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="정책그룹 검색..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+            </Box>
+            
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1 }}>
+              {console.log('Current selectedPolicyGroups in dialog:', selectedPolicyGroups)}
+              {policyGroups
+                .filter(group => group.toLowerCase().includes(searchTerm.toLowerCase()))
+                .map((group) => {
+                  const isSelected = selectedPolicyGroups && selectedPolicyGroups.includes(group);
+                  return (
+                    <Box
+                      key={group}
+                      sx={{
+                        p: 1,
+                        border: '1px solid #ddd',
+                        borderRadius: 1,
+                        cursor: 'pointer',
+                        backgroundColor: isSelected ? '#e3f2fd' : 'white',
+                        '&:hover': {
+                          backgroundColor: isSelected ? '#bbdefb' : '#f5f5f5'
+                        }
+                      }}
+                      onClick={() => handleBasicShoePolicyGroupToggle(group)}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleBasicShoePolicyGroupToggle(group)}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Typography variant="body2">{group}</Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
+            </Box>
+            
+            {selectedPolicyGroups && selectedPolicyGroups.length > 0 && (
+              <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  선택된 정책그룹 ({selectedPolicyGroups.length}개):
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selectedPolicyGroups.map((group) => (
+                    <Chip
+                      key={group}
+                      label={group}
+                      size="small"
+                      sx={{ backgroundColor: '#e3f2fd', fontSize: '0.7rem' }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setShowPolicyGroupModal(false)}
+              variant="contained"
+              sx={{ backgroundColor: '#795548' }}
+            >
+              확인
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* 검증 모달 */}
         <Dialog
