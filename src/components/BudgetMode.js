@@ -408,16 +408,29 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handleRecalculateAll = async () => {
     if (isRecalculating) return;
     
+    // 권한 체크: SS 레벨 이상만 전체재계산 가능
+    const userRole = loggedInStore?.userRole || loggedInStore?.agentInfo?.userRole || loggedInStore?.level || '';
+    if (userRole !== 'SS' && userRole !== 'S') {
+      setSnackbar({ 
+        open: true, 
+        message: '전체재계산은 SS 레벨 이상만 가능합니다.', 
+        severity: 'warning' 
+      });
+      return;
+    }
+    
     setIsRecalculating(true);
     try {
       console.log('🔄 [Frontend] 전체 재계산 시작');
       
+      const currentUserId = loggedInStore?.id || loggedInStore?.agentInfo?.id || loggedInStore?.contactId;
       const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://jegomap2-server.onrender.com';
       const response = await fetch(`${API_BASE_URL}/api/budget/recalculate-all`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ userId: currentUserId })
       });
       
       if (!response.ok) {
@@ -2017,20 +2030,24 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               >
                 {showSheetList ? '숨기기' : '보기'}
               </Button>
-              <Button
-                variant="contained"
-                size="small"
-                color="primary"
-                onClick={handleRecalculateAll}
-                disabled={isRecalculating}
-                startIcon={isRecalculating ? <CircularProgress size={16} /> : <CalculateIcon />}
-                sx={{ 
-                  backgroundColor: '#1976D2',
-                  '&:hover': { backgroundColor: '#1565C0' }
-                }}
-              >
-                {isRecalculating ? '재계산 중...' : '전체 재계산'}
-              </Button>
+              {/* SS 레벨 이상만 전체재계산 버튼 표시 */}
+              {(loggedInStore?.userRole === 'SS' || loggedInStore?.agentInfo?.userRole === 'SS' || loggedInStore?.level === 'SS' ||
+                loggedInStore?.userRole === 'S' || loggedInStore?.agentInfo?.userRole === 'S' || loggedInStore?.level === 'S') && (
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="primary"
+                  onClick={handleRecalculateAll}
+                  disabled={isRecalculating}
+                  startIcon={isRecalculating ? <CircularProgress size={16} /> : <CalculateIcon />}
+                  sx={{ 
+                    backgroundColor: '#1976D2',
+                    '&:hover': { backgroundColor: '#1565C0' }
+                  }}
+                >
+                  {isRecalculating ? '재계산 중...' : '전체 재계산'}
+                </Button>
+              )}
             </Box>
           </Box>
           

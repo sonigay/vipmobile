@@ -524,6 +524,30 @@ const NORMALIZATION_WORK_SHEET_NAME = '정규화작업';  // 정규화작업 시
 const PHONEKL_HOME_DATA_SHEET_NAME = '폰클홈데이터';  // 폰클홈데이터 시트
 const MONTHLY_AWARD_SETTINGS_SHEET_NAME = '장표모드셋팅메뉴';  // 월간시상 셋팅 메뉴 시트
 
+// 사용자 권한 조회 함수
+async function getUserRole(userId) {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${AGENT_SHEET_NAME}!A:R`
+    });
+    
+    const agentValues = response.data.values || [];
+    if (agentValues.length > 1) {
+      const agentRows = agentValues.slice(1);
+      const match = agentRows.find(row => row[2] === userId); // C열: 연락처(아이디)
+      if (match) {
+        return (match[17] || '').trim(); // R열: 권한레벨
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('사용자 권한 조회 실패:', error.message);
+    return null;
+  }
+}
+
 // Kakao geocoding 함수 (개선된 버전)
 async function geocodeAddressWithKakao(address, retryCount = 0) {
   const apiKey = process.env.KAKAO_API_KEY;
@@ -22178,10 +22202,28 @@ app.get('/api/closing-chart/agent-code-combinations', async (req, res) => {
   }
 });
 
-// 전체 재계산 API - 기존 저장 버튼 로직을 배치로 재실행
+// 전체 재계산 API - 기존 저장 버튼 로직을 배치로 재실행 (SS 레벨 이상만 접근 가능)
 app.post('/api/budget/recalculate-all', async (req, res) => {
   try {
     console.log('🔄 [전체재계산] 시작 - 기존 저장 버튼 로직 배치 실행');
+    
+    // 권한 체크: SS 레벨 이상만 전체재계산 가능
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: '사용자 ID가 필요합니다.' });
+    }
+    
+    // 사용자 권한 확인
+    const userRole = await getUserRole(userId);
+    if (!userRole || (userRole !== 'SS' && userRole !== 'S')) {
+      console.log(`⚠️ [전체재계산] 권한 부족: ${userId} (${userRole})`);
+      return res.status(403).json({ 
+        error: '전체재계산은 SS 레벨 이상만 가능합니다.',
+        userRole: userRole 
+      });
+    }
+    
+    console.log(`✅ [전체재계산] 권한 확인 완료: ${userId} (${userRole})`);
     
     const sheets = google.sheets({ version: 'v4', auth });
     
