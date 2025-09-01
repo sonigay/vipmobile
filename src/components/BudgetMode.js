@@ -30,7 +30,9 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel
+  InputLabel,
+  Input,
+  FormHelperText
 } from '@mui/material';
 import {
   AccountBalance as BudgetIcon,
@@ -46,7 +48,8 @@ import {
   Calculate as CalculateIcon,
   Add as AddIcon,
   Clear as ClearIcon,
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 import { budgetMonthSheetAPI, budgetUserSheetAPI, budgetPolicyGroupAPI, budgetSummaryAPI } from '../api';
@@ -2647,15 +2650,112 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               👞 기본구두 관리
             </Typography>
             
-            {/* 시트 설정 안내 */}
-            <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
+            {/* 시트 설정 */}
+            <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-                  ⚙️ 시트 설정 안내
+                  🔗 시트 ID 설정
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#666' }}>
-                  기본구두 데이터 관리는 <strong>시트설정</strong> 탭에서 대상월과 시트 ID를 먼저 설정해주세요.
+                
+                {/* 대상월 선택 */}
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>대상월</InputLabel>
+                  <Select
+                    value={targetMonth || ''}
+                    onChange={(e) => setTargetMonth(e.target.value)}
+                    label="대상월"
+                  >
+                    {availableMonths.map((month) => (
+                      <MenuItem key={month} value={month}>
+                        {month}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                {/* 구글시트 ID 입력 */}
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>구글시트 ID</InputLabel>
+                  <Input
+                    value={sheetId || ''}
+                    onChange={(e) => setSheetId(e.target.value)}
+                    placeholder="구글시트 ID를 입력하세요"
+                    disabled={!canModifySheetId}
+                  />
+                  {!canModifySheetId && (
+                    <FormHelperText sx={{ color: 'warning.main' }}>
+                      권한이 없습니다 (SS 레벨만 수정 가능)
+                    </FormHelperText>
+                  )}
+                </FormControl>
+                
+                {/* 시트 ID 저장 버튼 */}
+                {canModifySheetId && (
+                  <Button
+                    variant="contained"
+                    onClick={handleSaveSheetId}
+                    disabled={!targetMonth || !sheetId}
+                    startIcon={<SaveIcon />}
+                    sx={{ backgroundColor: '#795548' }}
+                  >
+                    시트 ID 저장
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* 저장된 월별 시트 ID */}
+            <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+                  📋 저장된 월별 시트 ID
                 </Typography>
+                <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+                  현재 사용자 권한: {loggedInStore?.userRole || 'Unknown'} - {canModifySheetId ? '시트 ID 수정 가능' : '시트 ID 수정 권한이 없습니다.'}
+                </Typography>
+                
+                {savedSheetIds.length > 0 ? (
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            대상월
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            시트 ID
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            액면예산
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {savedSheetIds.map((item) => (
+                          <TableRow key={item.month} hover>
+                            <TableCell>{item.month}</TableCell>
+                            <TableCell sx={{ fontFamily: 'monospace' }}>{item.sheetId}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleViewSheet(item.sheetId)}
+                                startIcon={<VisibilityIcon />}
+                                sx={{ borderColor: '#795548', color: '#795548' }}
+                              >
+                                보기
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Typography variant="body2" sx={{ color: '#999', fontStyle: 'italic' }}>
+                    저장된 시트 ID가 없습니다.
+                  </Typography>
+                )}
               </CardContent>
             </Card>
             
@@ -2665,6 +2765,28 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
                   📊 정책그룹 선택
                 </Typography>
+                
+                {/* 정책그룹 추가 */}
+                <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <TextField
+                    size="small"
+                    placeholder="새 정책그룹 입력"
+                    value={newPolicyGroup}
+                    onChange={(e) => setNewPolicyGroup(e.target.value)}
+                    sx={{ flexGrow: 1 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={handleAddPolicyGroup}
+                    disabled={!newPolicyGroup.trim()}
+                    startIcon={<AddIcon />}
+                    sx={{ borderColor: '#795548', color: '#795548' }}
+                  >
+                    추가
+                  </Button>
+                </Box>
+                
+                {/* 정책그룹 선택 */}
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <InputLabel>정책그룹 선택</InputLabel>
                   <Select
@@ -2681,6 +2803,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                     ))}
                   </Select>
                 </FormControl>
+                
+                {/* 기본구두 데이터 로드 버튼 */}
                 <Button
                   variant="contained"
                   onClick={loadBasicShoeData}
