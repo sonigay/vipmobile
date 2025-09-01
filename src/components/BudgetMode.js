@@ -200,6 +200,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [showSaveSettingsModal, setShowSaveSettingsModal] = useState(false);
   const [showLoadSettingsModal, setShowLoadSettingsModal] = useState(false);
   const [settingsName, setSettingsName] = useState('');
+  const [saveSettingsName, setSaveSettingsName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
 
@@ -3096,6 +3097,101 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             >
               확인
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* 기본구두 탭용 정책그룹 설정 저장 모달 */}
+        <Dialog 
+          open={showSaveSettingsModal} 
+          onClose={() => setShowSaveSettingsModal(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>정책그룹 설정 저장 (모든 탭에서 공유)</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+              현재 선택된 정책그룹을 저장하여 액면예산과 기본구두에서 공유할 수 있습니다.
+            </Typography>
+            <TextField
+              fullWidth
+              label="설정 이름"
+              value={saveSettingsName}
+              onChange={(e) => setSaveSettingsName(e.target.value)}
+              placeholder="예: 2025년 8월 정책그룹 설정"
+              sx={{ mb: 2 }}
+            />
+            <Typography variant="body2" sx={{ color: '#666' }}>
+              선택된 정책그룹: {selectedPolicyGroups.join(', ') || '없음'}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowSaveSettingsModal(false)}>취소</Button>
+            <Button onClick={handleSavePolicyGroupSettings} variant="contained">
+              저장
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* 기본구두 탭용 정책그룹 설정 불러오기 모달 */}
+        <Dialog 
+          open={showLoadSettingsModal} 
+          onClose={() => setShowLoadSettingsModal(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>정책그룹 설정 불러오기 (모든 탭에서 공유)</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+              액면예산과 기본구두에서 저장한 모든 설정을 불러올 수 있습니다.
+            </Typography>
+            {policyGroupSettings.length === 0 ? (
+              <Typography sx={{ py: 2, textAlign: 'center', color: '#666' }}>
+                저장된 설정이 없습니다.
+              </Typography>
+            ) : (
+              <Box sx={{ mt: 1 }}>
+                {policyGroupSettings.map((setting, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      p: 2,
+                      border: '1px solid #ddd',
+                      borderRadius: 1,
+                      mb: 1,
+                      cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: '#f5f5f5'
+                      }
+                    }}
+                    onClick={() => handleLoadPolicyGroupSettings(setting)}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                          {setting.name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#666', mt: 0.5 }}>
+                          {setting.groups.join(', ')}
+                        </Typography>
+                      </Box>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePolicyGroupSettings(setting.name);
+                        }}
+                      >
+                        삭제
+                      </Button>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowLoadSettingsModal(false)}>닫기</Button>
           </DialogActions>
         </Dialog>
 
