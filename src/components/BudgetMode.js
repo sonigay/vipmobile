@@ -81,58 +81,21 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     
     setIsLoadingBasicShoe(true);
     try {
-      const sheets = google.sheets({ version: 'v4', auth });
+      // 백엔드 API 호출로 기본구두 데이터 가져오기
+      const response = await fetch(`/api/budget/basic-shoe?sheetId=${sheetId}&policyGroups=${selectedPolicyGroups.join(',')}`);
+      const data = await response.json();
       
-      // "기본구두" 시트에서 데이터 읽기
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: '기본구두!A:L'
-      });
-      
-      const data = response.data.values || [];
-      if (data.length <= 1) {
-        setBasicShoeData([]);
-        setBasicShoeSummary({ totalAmount: 0, policyGroupAmounts: {} });
-        return;
+      if (data.success) {
+        setBasicShoeData(data.basicShoeData || []);
+        setBasicShoeSummary({
+          totalAmount: data.totalAmount || 0,
+          policyGroupAmounts: data.policyGroupAmounts || {}
+        });
+        
+        console.log('✅ [기본구두] 데이터 로드 완료:', data);
+      } else {
+        setSnackbar({ open: true, message: data.error || '기본구두 데이터 로드에 실패했습니다.', severity: 'error' });
       }
-      
-      // 헤더 제외하고 데이터 처리
-      const rows = data.slice(1);
-      const processedData = [];
-      const policyGroupAmounts = {};
-      let totalAmount = 0;
-      
-      rows.forEach((row, index) => {
-        if (row.length >= 12) {
-          const policyGroup = row[11] || ''; // L열(11번인덱스): 정책그룹
-          const amount = parseFloat(row[10]) || 0; // K열(10번인덱스): 기본구두 금액
-          
-          // 선택된 정책그룹과 일치하는 경우만 처리
-          if (policyGroup && amount > 0 && selectedPolicyGroups.includes(policyGroup)) {
-            processedData.push({
-              id: index,
-              policyGroup,
-              amount,
-              row: row
-            });
-            
-            // 정책그룹별 금액 합산
-            if (!policyGroupAmounts[policyGroup]) {
-              policyGroupAmounts[policyGroup] = 0;
-            }
-            policyGroupAmounts[policyGroup] += amount;
-            totalAmount += amount;
-          }
-        }
-      });
-      
-      setBasicShoeData(processedData);
-      setBasicShoeSummary({
-        totalAmount,
-        policyGroupAmounts
-      });
-      
-      console.log('✅ [기본구두] 데이터 로드 완료:', { totalAmount, policyGroupAmounts });
       
     } catch (error) {
       console.error('❌ [기본구두] 데이터 로드 실패:', error);

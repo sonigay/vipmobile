@@ -19895,6 +19895,87 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
   }
 });
 
+// 기본구두 데이터 조회 API
+app.get('/api/budget/basic-shoe', async (req, res) => {
+  try {
+    const { sheetId, policyGroups } = req.query;
+    
+    if (!sheetId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '시트 ID가 필요합니다.' 
+      });
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // "기본구두" 시트에서 데이터 읽기
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: '기본구두!A:L'
+    });
+    
+    const data = response.data.values || [];
+    if (data.length <= 1) {
+      return res.json({
+        success: true,
+        basicShoeData: [],
+        totalAmount: 0,
+        policyGroupAmounts: {}
+      });
+    }
+    
+    // 헤더 제외하고 데이터 처리
+    const rows = data.slice(1);
+    const processedData = [];
+    const policyGroupAmounts = {};
+    let totalAmount = 0;
+    
+    // 정책그룹 필터링 (콤마로 구분된 문자열을 배열로 변환)
+    const selectedPolicyGroups = policyGroups ? policyGroups.split(',') : [];
+    
+    rows.forEach((row, index) => {
+      if (row.length >= 12) {
+        const policyGroup = row[11] || ''; // L열(11번인덱스): 정책그룹
+        const amount = parseFloat(row[10]) || 0; // K열(10번인덱스): 기본구두 금액
+        
+        // 선택된 정책그룹과 일치하는 경우만 처리
+        if (policyGroup && amount > 0 && selectedPolicyGroups.includes(policyGroup)) {
+          processedData.push({
+            id: index,
+            policyGroup,
+            amount,
+            row: row
+          });
+          
+          // 정책그룹별 금액 합산
+          if (!policyGroupAmounts[policyGroup]) {
+            policyGroupAmounts[policyGroup] = 0;
+          }
+          policyGroupAmounts[policyGroup] += amount;
+          totalAmount += amount;
+        }
+      }
+    });
+    
+    console.log(`✅ [기본구두] API 응답: 총 ${totalAmount.toLocaleString()}원, ${Object.keys(policyGroupAmounts).length}개 그룹`);
+    
+    res.json({
+      success: true,
+      basicShoeData: processedData,
+      totalAmount,
+      policyGroupAmounts
+    });
+    
+  } catch (error) {
+    console.error('❌ [기본구두] API 오류:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '기본구두 데이터 조회 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
 // 예산 데이터 불러오기 API
 app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
   try {
