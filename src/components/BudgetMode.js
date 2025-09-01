@@ -359,10 +359,18 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   }, [showLoadSettingsModal]);
 
+  // 탭 변경 시 모달 상태 초기화
+  useEffect(() => {
+    // 탭 변경 시 모든 모달 상태 강제 초기화
+    setShowPolicyGroupModal(false);
+    setShowSaveSettingsModal(false);
+    setShowLoadSettingsModal(false);
+  }, [activeTab]);
+
   // 정책그룹 선택 모달이 열릴 때 상태 확인
   useEffect(() => {
     if (showPolicyGroupModal) {
-      console.log('정책그룹 선택 모달이 열림, 현재 selectedPolicyGroups:', selectedPolicyGroups);
+      // 모달 열림 시 필요한 초기화 작업
     }
   }, [showPolicyGroupModal, selectedPolicyGroups]);
 
@@ -2799,10 +2807,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Button
                       variant="outlined"
-                      onClick={() => {
-                        console.log('Opening policy group modal, selectedPolicyGroups:', selectedPolicyGroups);
-                        setShowPolicyGroupModal(true);
-                      }}
+                      onClick={() => setShowPolicyGroupModal(true)}
                       sx={{ borderColor: '#795548', color: '#795548' }}
                     >
                       정책그룹 선택
