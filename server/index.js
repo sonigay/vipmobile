@@ -19738,11 +19738,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         const sheetId = row[1]; // B열: 시트ID
         const sheetName = row[2]; // C열: 시트명
         
-        // 시트명에서 예산 타입 추출 (Ⅰ, Ⅱ)
-        const budgetTypeMatch = sheetName.match(/\(([ⅠⅡ]+)\)/);
-        const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
-        
-        console.log(`🔍 [액면예산종합] ${sheetName} 처리 시작 (타입: ${budgetType})`);
+        console.log(`🔍 [액면예산종합] ${sheetName} 처리 시작`);
         
         try {
           // 액면예산 시트에서 데이터 가져오기
@@ -19768,32 +19764,20 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
                 // B열 또는 D열이 타겟 사용자와 일치하면 해당 행을 한 번만 합산
                 const isMatched = (cleanB && cleanB === targetUserNameClean) || (cleanD && cleanD === targetUserNameClean);
                 if (isMatched) {
-                  let remainingValue = 0, securedValue = 0, usedValue = 0;
-                  
-                  if (budgetType === 'Ⅱ') {
-                    // 액면예산(Ⅱ): I열(잔액), G열(확보), H열(사용)
-                    remainingValue = row[8] !== '' && row[8] !== undefined && row[8] !== null ? 
-                      parseFloat(String(row[8]).replace(/,/g, '')) || 0 : 0;
-                    securedValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
-                      parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
-                    usedValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
-                      parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
-                  } else {
-                    // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
-                    remainingValue = row[11] !== '' && row[11] !== undefined && row[11] !== null ? 
-                      parseFloat(String(row[11]).replace(/,/g, '')) || 0 : 0;
-                    securedValue = row[12] !== '' && row[12] !== undefined && row[12] !== null ? 
-                      parseFloat(String(row[12]).replace(/,/g, '')) || 0 : 0;
-                    usedValue = row[13] !== '' && row[13] !== undefined && row[13] !== null ? 
-                      parseFloat(String(row[13]).replace(/,/g, '')) || 0 : 0;
-                  }
+                  // F/G/H 열에서 직접 합계 값 읽어오기 (SUMIF 방식)
+                  const remainingValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
+                    parseFloat(String(row[5]).replace(/,/g, '')) || 0 : 0;
+                  const securedValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
+                    parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
+                  const usedValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
+                    parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
                   
                   sheetTotalRemaining += remainingValue;
                   sheetTotalSecured += securedValue;
                   sheetTotalUsed += usedValue;
                   matchedRowCount++;
                   
-                  console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${targetUserNameClean}: ${budgetType === 'Ⅱ' ? 'I/G/H' : 'L/M/N'}열=${remainingValue}/${securedValue}/${usedValue}`);
+                  console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${targetUserNameClean}: F/G/H열=${remainingValue}/${securedValue}/${usedValue}`);
                 }
               }
             });
