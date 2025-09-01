@@ -82,6 +82,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       return;
     }
     
+
+    
     setIsLoadingBasicShoe(true);
     try {
       // 백엔드 API 호출로 기본구두 데이터 가져오기
@@ -353,7 +355,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 정책그룹 설정 불러오기 모달이 열릴 때 데이터 로드
   useEffect(() => {
     if (showLoadSettingsModal) {
-      console.log('정책그룹 설정 불러오기 모달이 열림, 데이터 로드 시작');
       loadPolicyGroupSettings();
     }
   }, [showLoadSettingsModal]);
@@ -438,11 +439,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 정책그룹 설정 목록 불러오기
   const loadPolicyGroupSettings = async () => {
     try {
-      console.log('loadPolicyGroupSettings 호출됨');
       const data = await budgetPolicyGroupAPI.getPolicyGroupSettings();
-      console.log('정책그룹 설정 데이터:', data);
-      setPolicyGroupSettings(data.settings || []);
-      console.log('policyGroupSettings 상태 설정됨:', data.settings || []);
+      const settings = data.settings || [];
+      setPolicyGroupSettings(settings);
     } catch (error) {
       console.error('정책그룹 설정 목록 로드 실패:', error);
       setSnackbar({ open: true, message: '정책그룹 설정 목록 로드에 실패했습니다.', severity: 'error' });
@@ -2971,10 +2970,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => {
-                    console.log('기본구두 모달에서 저장 버튼 클릭됨');
-                    setShowSaveSettingsModal(true);
-                  }}
+                  onClick={() => setShowSaveSettingsModal(true)}
                   sx={{ mr: 1 }}
                 >
                   저장
@@ -2983,9 +2979,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   size="small"
                   variant="outlined"
                   onClick={() => {
-                    console.log('기본구두 모달에서 불러오기 버튼 클릭됨');
                     setShowLoadSettingsModal(true);
-                    // 모달이 열릴 때 정책그룹 설정 목록을 로드
                     loadPolicyGroupSettings();
                   }}
                 >
