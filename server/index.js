@@ -18444,6 +18444,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         createdBy: sheet.createdBy,
         month: sheet.targetMonth,
         summary,
+        policies: summary.policies || [], // 정책별 데이터를 최상위 레벨에 추가
         uuid: sheet.uuid,
         userName: sheet.createdBy,
         creator: sheet.createdBy
@@ -19687,24 +19688,36 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           });
           
           const activationData = activationResponse.data.values || [];
+          console.log(`🔍 [액면예산종합] ${sheetName} 액면예산 데이터 로드: ${activationData.length}행`);
+          
           if (activationData.length > 4) { // 헤더 4행 제외
-            activationData.slice(4).forEach(row => { // 5행부터 시작
+            let rowCount = 0;
+            
+            activationData.slice(4).forEach((row, index) => { // 5행부터 시작
               if (row.length >= 8) { // F, G, H열이 있는지 확인
-                // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
-                if (row[5] !== '' && row[5] !== undefined && row[5] !== null) {
-                  const value = parseFloat(row[5]) || 0;
-                  totalRemainingBudget += value;
-                }
-                if (row[6] !== '' && row[6] !== undefined && row[6] !== null) {
-                  const value = parseFloat(row[6]) || 0;
-                  totalSecuredBudget += value;
-                }
-                if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
-                  const value = parseFloat(row[7]) || 0;
-                  totalUsedBudget += value;
+                // B열과 D열에서 입력자 확인
+                const inputUserB = row[1] || ''; // B열: 입력자 (예: 홍기현 (팀장)(Ⅱ))
+                const inputUserD = row[3] || ''; // D열: 입력자 (예: 홍기현 (팀장)(Ⅰ))
+                
+                // B열이나 D열에 입력자가 있는 경우 해당 행의 F열, G열, H열 합계
+                if (inputUserB || inputUserD) {
+                  // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
+                  const fValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? parseFloat(row[5]) || 0 : 0;
+                  const gValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? parseFloat(row[6]) || 0 : 0;
+                  const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? parseFloat(row[7]) || 0 : 0;
+                  
+                  if (fValue > 0 || gValue > 0 || hValue > 0) {
+                    console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 매칭성공: B열=${inputUserB}, D열=${inputUserD}, F열=${fValue}, G열=${gValue}, H열=${hValue}`);
+                    rowCount++;
+                  }
+                  
+                  totalRemainingBudget += fValue;
+                  totalSecuredBudget += gValue;
+                  totalUsedBudget += hValue;
                 }
               }
             });
+            console.log(`📋 [액면예산종합] ${sheetName} 처리된 행: ${rowCount}개`);
           }
         } catch (error) {
           console.log(`⚠️ [액면예산종합] ${sheetName} 액면예산 시트 조회 실패:`, error.message);
