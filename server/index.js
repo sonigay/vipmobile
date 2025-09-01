@@ -18296,7 +18296,9 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             );
             
             const policies = [];
-            // 모든 정책 행을 처리
+            // 모든 정책 행을 처리 (중복 제거)
+            const processedPolicies = new Set(); // 중복 제거를 위한 Set
+            
             validRows.forEach((row, index) => {
               if (row.length >= 10) {
                 // V열: 잔액, W열: 확보, X열: 사용
@@ -18304,19 +18306,26 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                 const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
                 const usedBudget = parseFloat(row[9]) || 0;      // X열 (0-based index 9)
                 
-                totalRemainingBudget += remainingBudget;
-                totalSecuredBudget += securedBudget;
-                totalUsedBudget += usedBudget;
-                policyCount++;
+                // 중복 제거를 위한 키 생성
+                const policyKey = `${remainingBudget}-${securedBudget}-${usedBudget}`;
                 
-                // 각 정책 데이터를 policies 배열에 추가
-                policies.push({
-                  securedBudget,
-                  usedBudget,
-                  remainingBudget
-                });
-                
-                console.log(`📋 [${sheet.sheetName}] 정책 ${index + 1}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
+                if (!processedPolicies.has(policyKey)) {
+                  processedPolicies.add(policyKey);
+                  
+                  totalRemainingBudget += remainingBudget;
+                  totalSecuredBudget += securedBudget;
+                  totalUsedBudget += usedBudget;
+                  policyCount++;
+                  
+                  // 각 정책 데이터를 policies 배열에 추가
+                  policies.push({
+                    securedBudget,
+                    usedBudget,
+                    remainingBudget
+                  });
+                  
+                  console.log(`📋 [${sheet.sheetName}] 정책 ${policyCount}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
+                }
               }
             });
             
