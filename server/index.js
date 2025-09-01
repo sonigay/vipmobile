@@ -18271,7 +18271,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
         const budgetTypeMatch = sheet.sheetName.match(/\(([IⅠⅡ]+)\)/);
         const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
         
-        // 사용자 시트 메타데이터에서 계산 결과 불러오기 (O열~W열)
+        // 사용자 시트 메타데이터에서 계산 결과 불러오기 (O열~X열)
         console.log(`🔍 [${sheet.sheetName}] 메타데이터에서 계산 결과 불러오기 시작!`);
         
         try {
@@ -18296,36 +18296,30 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             );
             
             const policies = [];
-            // 모든 정책 행을 처리 (중복 제거)
-            const processedPolicies = new Set(); // 중복 제거를 위한 Set
+            // 모든 정책 행을 처리
             
             validRows.forEach((row, index) => {
               if (row.length >= 10) {
-                // V열: 잔액, W열: 확보, X열: 사용
+                // 각 정책별로 개별 시트에서 실제 값을 읽어오기
+                // V열: 잔액, W열: 확보, X열: 사용 (메타데이터에 저장된 값)
                 const remainingBudget = parseFloat(row[7]) || 0; // V열 (0-based index 7)
                 const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
                 const usedBudget = parseFloat(row[9]) || 0;      // X열 (0-based index 9)
                 
-                // 중복 제거를 위한 키 생성
-                const policyKey = `${remainingBudget}-${securedBudget}-${usedBudget}`;
+                // 각 정책을 개별적으로 처리 (중복 제거하지 않음)
+                totalRemainingBudget += remainingBudget;
+                totalSecuredBudget += securedBudget;
+                totalUsedBudget += usedBudget;
+                policyCount++;
                 
-                if (!processedPolicies.has(policyKey)) {
-                  processedPolicies.add(policyKey);
-                  
-                  totalRemainingBudget += remainingBudget;
-                  totalSecuredBudget += securedBudget;
-                  totalUsedBudget += usedBudget;
-                  policyCount++;
-                  
-                  // 각 정책 데이터를 policies 배열에 추가
-                  policies.push({
-                    securedBudget,
-                    usedBudget,
-                    remainingBudget
-                  });
-                  
-                  console.log(`📋 [${sheet.sheetName}] 정책 ${policyCount}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
-                }
+                // 각 정책 데이터를 policies 배열에 추가
+                policies.push({
+                  securedBudget,
+                  usedBudget,
+                  remainingBudget
+                });
+                
+                console.log(`📋 [${sheet.sheetName}] 정책 ${policyCount}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
               }
             });
             
