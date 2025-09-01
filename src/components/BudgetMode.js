@@ -172,7 +172,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   });
   const [isLoadingBasicShoe, setIsLoadingBasicShoe] = useState(false);
   
-
+  // 저장된 시트 ID 목록 (시트설정에서 설정된 것들)
+  const [savedSheetIds, setSavedSheetIds] = useState([]);
   
   // 날짜/시간 입력 상태
   const [dateRange, setDateRange] = useState({
@@ -201,6 +202,14 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+  
+  // 시트 선택 함수
+  const handleViewSheet = (sheetId, month) => {
+    // 시트 보기/선택 로직
+    setSheetId(sheetId);
+    setTargetMonth(month);
+    setSnackbar({ open: true, message: `${month} 시트가 선택되었습니다.`, severity: 'success' });
   };
 
   const handleFaceValueSubMenuChange = (subMenu) => {
@@ -2652,28 +2661,87 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               👞 기본구두 관리
             </Typography>
             
-            {/* 시트 설정 안내 */}
-            <Card sx={{ mb: 3, border: '1px solid #e0e0e0', backgroundColor: '#f8f9fa' }}>
+            {/* 저장된 월별 시트 ID 선택 */}
+            <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
-                  ⚙️ 시트 설정 안내
+                  📋 저장된 월별 시트 ID 선택
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#666' }}>
-                  기본구두 데이터 관리는 <strong>시트설정</strong> 탭에서 대상월을 선택하면 자동으로 해당 시트 주소가 연결됩니다.
+                <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+                  시트설정에서 설정된 월별 시트 주소를 선택하여 기본구두 데이터를 관리할 수 있습니다.
                 </Typography>
+                
+                {/* 현재 선택된 시트 정보 */}
                 {targetMonth && sheetId ? (
-                  <Box sx={{ mt: 2, p: 2, backgroundColor: '#e8f5e8', borderRadius: 1 }}>
+                  <Box sx={{ mb: 2, p: 2, backgroundColor: '#e8f5e8', borderRadius: 1 }}>
                     <Typography variant="body2" sx={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                      ✅ 현재 설정: {targetMonth} → {sheetId}
+                      ✅ 현재 선택: {targetMonth} → {sheetId}
                     </Typography>
                   </Box>
                 ) : (
-                  <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff3e0', borderRadius: 1 }}>
+                  <Box sx={{ mb: 2, p: 2, backgroundColor: '#fff3e0', borderRadius: 1 }}>
                     <Typography variant="body2" sx={{ color: '#f57c00' }}>
-                      ⚠️ 시트설정 탭에서 대상월을 먼저 선택해주세요.
+                      ⚠️ 아래 목록에서 시트를 선택해주세요.
                     </Typography>
                   </Box>
                 )}
+                
+                {/* 저장된 시트 ID 목록 */}
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: '#795548' }}>
+                    사용 가능한 시트 목록:
+                  </Typography>
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            대상월
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            시트 ID
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            선택
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {savedSheetIds.length > 0 ? (
+                          savedSheetIds.map((item) => (
+                            <TableRow key={item.month} hover>
+                              <TableCell>{item.month}</TableCell>
+                              <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                {item.sheetId}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant={targetMonth === item.month && sheetId === item.sheetId ? "contained" : "outlined"}
+                                  onClick={() => handleViewSheet(item.sheetId, item.month)}
+                                  startIcon={<VisibilityIcon />}
+                                  sx={{ 
+                                    borderColor: '#795548', 
+                                    color: targetMonth === item.month && sheetId === item.sheetId ? 'white' : '#795548',
+                                    backgroundColor: targetMonth === item.month && sheetId === item.sheetId ? '#795548' : 'transparent'
+                                  }}
+                                >
+                                  {targetMonth === item.month && sheetId === item.sheetId ? '선택됨' : '선택'}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={3} sx={{ textAlign: 'center', color: '#999', fontStyle: 'italic' }}>
+                              시트설정에서 설정된 시트가 없습니다.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
               </CardContent>
             </Card>
             
