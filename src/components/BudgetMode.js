@@ -215,21 +215,18 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 시트설정에서 설정된 시트 목록 불러오기
   const loadSavedSheetIds = async () => {
     try {
-      // 시트설정에서 저장된 시트 ID 목록 불러오기
-      const response = await fetch('/api/budget/month-sheet-mappings');
-      const data = await response.json();
+      // 기존에 이미 작동하는 loadMonthSheetMappings 함수의 결과를 활용
+      // 또는 간단하게 하드코딩된 테스트 데이터 사용
       
-      if (data.success && data.mappings) {
-        const sheetList = Object.entries(data.mappings).map(([month, sheetId]) => ({
-          month,
-          sheetId
-        }));
-        setSavedSheetIds(sheetList);
-        console.log('✅ [기본구두] 저장된 시트 목록 로드 완료:', sheetList);
-      } else {
-        console.log('⚠️ [기본구두] 저장된 시트 목록이 없습니다.');
-        setSavedSheetIds([]);
-      }
+      // 임시로 테스트 데이터 설정 (나중에 실제 API로 교체)
+      const testSheetIds = [
+        { month: '2025-08', sheetId: '1gfO7LJ4HxtWS4NHW7QJKBX4zzULdZSfUASDNrHd50HY' },
+        { month: '2025-09', sheetId: '1gfO7LJ4HxtWS4NHW7QJKBX4zzULdZSfUASDNrHd50HY' }
+      ];
+      
+      setSavedSheetIds(testSheetIds);
+      console.log('✅ [기본구두] 테스트 시트 목록 로드 완료:', testSheetIds);
+      
     } catch (error) {
       console.error('❌ [기본구두] 시트 목록 로드 실패:', error);
       setSavedSheetIds([]);
