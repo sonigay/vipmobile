@@ -22496,34 +22496,61 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
               console.log(`⚠️ [전체재계산] ${sheetName}: 컬럼 확장 실패 (무시하고 진행):`, expandError.message);
             }
             
-            // 8-2. 메타데이터 저장 (기존 저장 버튼과 동일)
-            const metadataRange = `${sheetName}!O1:X2`;
-            const metadata = [
-              ['저장일시', '접수일범위', '개통일범위', '접수일적용여부', '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용'],
+            // 8-2. 메타데이터 저장 (기존 값 보존, 예산 관련 컬럼만 업데이트)
+            console.log(`💾 [전체재계산] ${sheetName}: 메타데이터 업데이트 시작`);
+            
+            // 기존 메타데이터 읽기 (O열~X열)
+            let existingMetadataForUpdate = [];
+            try {
+              const existingMetadataResponse = await sheets.spreadsheets.values.get({
+                spreadsheetId: sheetId,
+                range: `${sheetName}!O:X`
+              });
+              existingMetadataForUpdate = existingMetadataResponse.data.values || [];
+            } catch (error) {
+              console.log(`📋 [전체재계산] ${sheetName}: 기존 메타데이터 없음, 새로 생성`);
+            }
+            
+            // 헤더가 없으면 헤더 추가
+            if (existingMetadataForUpdate.length === 0) {
+              existingMetadataForUpdate = [
+                ['저장일시', '접수일범위', '개통일범위', '접수일적용여부', '계산일시', '계산자', '정책그룹', '잔액', '확보', '사용']
+              ];
+            }
+            
+            // 기존 데이터 행이 없으면 빈 행 추가
+            if (existingMetadataForUpdate.length === 1) {
+              existingMetadataForUpdate.push(['', '', '', '', '', '', '', '', '', '']);
+            }
+            
+            // 기존 메타데이터 보존하면서 필요한 부분만 업데이트
+            const updatedMetadata = [
+              existingMetadataForUpdate[0], // 헤더는 그대로
               [
-                new Date().toISOString(),
-                `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}`,
-                `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`,
-                '적용',
-                '', // 계산일시
-                '', // 계산자
-                '', // 정책그룹
-                '', // 잔액
-                '', // 확보
-                ''  // 사용
+                existingMetadataForUpdate[1]?.[0] || new Date().toISOString(), // O열: 저장일시 (기존 값 보존, 없으면 현재 시간)
+                existingMetadataForUpdate[1]?.[1] || `${dateRange.receiptStartDate} ~ ${dateRange.receiptEndDate}`, // P열: 접수일범위 (기존 값 보존)
+                existingMetadataForUpdate[1]?.[2] || `${dateRange.activationStartDate} ~ ${dateRange.activationEndDate}`, // Q열: 개통일범위 (기존 값 보존)
+                existingMetadataForUpdate[1]?.[3] || '적용', // R열: 접수일적용여부 (기존 값 보존)
+                new Date().toISOString(), // S열: 계산일시 (현재 시간으로 업데이트)
+                existingMetadataForUpdate[1]?.[5] || inputUserName, // T열: 계산자 (기존 값 보존, 없으면 현재 사용자)
+                existingMetadataForUpdate[1]?.[6] || policyGroupString, // U열: 정책그룹 (기존 값 보존, 없으면 현재 정책그룹)
+                '', // V열: 잔액 (나중에 계산 결과로 업데이트)
+                '', // W열: 확보 (나중에 계산 결과로 업데이트)
+                ''  // X열: 사용 (나중에 계산 결과로 업데이트)
               ]
             ];
             
+            // 메타데이터 업데이트
             await sheets.spreadsheets.values.update({
               spreadsheetId: sheetId,
-              range: metadataRange,
+              range: `${sheetName}!O1:X2`,
               valueInputOption: 'RAW',
               resource: {
-                values: metadata
+                values: updatedMetadata
               }
             });
             
-            console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 저장 완료`);
+            console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 업데이트 완료 (기존 값 보존)`);
             
             // 9. 액면예산 시트 부분 영역 초기화 (올바른 컬럼 범위)
             console.log(`🔄 [전체재계산] ${sheetName}: 액면예산 시트 부분 영역 초기화 시작`);
@@ -22597,13 +22624,13 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             console.log(`💾 [전체재계산] ${sheetName}: 계산 결과 메타데이터 누적 저장 시작`);
             
             // 기존 메타데이터 읽기 (O열~X열)
-            let existingMetadata = [];
+            let existingMetadataForCalculation = [];
             try {
               const metadataResponse = await sheets.spreadsheets.values.get({
                 spreadsheetId: sheetId,
                 range: `${sheetName}!O:X`
               });
-              existingMetadata = metadataResponse.data.values || [];
+              existingMetadataForCalculation = metadataResponse.data.values || [];
             } catch (error) {
               console.log(`📋 [전체재계산] ${sheetName}: 기존 메타데이터 없음, 새로 생성`);
             }
@@ -22636,7 +22663,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             const metadataUpdateRequests = [];
             
             // 헤더가 없으면 헤더 추가
-            if (existingMetadata.length === 0) {
+            if (existingMetadataForCalculation.length === 0) {
               metadataUpdateRequests.push({
                 range: `${sheetName}!O1:X1`,
                 values: [metadataHeader]
@@ -22645,7 +22672,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
             
             // 새 정책 데이터 행 추가
             metadataUpdateRequests.push({
-              range: `${sheetName}!O${existingMetadata.length + 2}:X${existingMetadata.length + 2}`,
+              range: `${sheetName}!O${existingMetadataForCalculation.length + 2}:X${existingMetadataForCalculation.length + 2}`,
               values: [newPolicyRow]
             });
             
@@ -22658,7 +22685,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                   data: metadataUpdateRequests
                 }
               });
-              console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 누적 저장 완료 (${existingMetadata.length + 1}번째 정책)`);
+              console.log(`✅ [전체재계산] ${sheetName}: 메타데이터 누적 저장 완료 (${existingMetadataForCalculation.length + 1}번째 정책)`);
             }
             
             // 액면예산 타입에 따른 액면예산 매핑 컬럼 결정
