@@ -82,13 +82,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       return;
     }
     
-
-    
     setIsLoadingBasicShoe(true);
     try {
       // 백엔드 API 호출로 기본구두 데이터 가져오기
-      const response = await fetch(`/api/budget/basic-shoe?sheetId=${sheetId}&policyGroups=${selectedPolicyGroups.join(',')}`);
-      const data = await response.json();
+      const data = await budgetPolicyGroupAPI.getBasicShoeData(sheetId, selectedPolicyGroups);
       
       if (data.success) {
         setBasicShoeData(data.basicShoeData || []);

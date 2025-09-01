@@ -721,4 +721,17 @@ export const budgetPolicyGroupAPI = {
     }
     return response.json();
   },
+
+  // 기본구두 데이터 가져오기
+  getBasicShoeData: async (sheetId, policyGroups) => {
+    const params = new URLSearchParams();
+    if (sheetId) params.append('sheetId', sheetId);
+    if (policyGroups && policyGroups.length > 0) params.append('policyGroups', policyGroups.join(','));
+    
+    const response = await fetch(`${API_BASE_URL}/api/budget/basic-shoe?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('기본구두 데이터 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
 }; 
