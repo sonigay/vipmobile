@@ -18259,9 +18259,9 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
       uuid: sheet.uuid
     })));
     
-    // 중복 제거 (UUID 기준)
+    // 중복 제거 (sheetId 기준) - 동일 시트가 여러 UUID로 등록된 경우 방지
     const uniqueSheets = userSheets.filter((sheet, index, self) => 
-      index === self.findIndex(s => s.uuid === sheet.uuid)
+      index === self.findIndex(s => s.sheetId === sheet.sheetId)
     );
     
     console.log(`🔍 [NEW-API] 중복 제거 후: ${uniqueSheets.length}개`);
