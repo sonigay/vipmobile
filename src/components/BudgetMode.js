@@ -2421,14 +2421,17 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          maxWidth="sm"
          fullWidth
        >
-         <DialogTitle>정책그룹 설정 저장</DialogTitle>
+         <DialogTitle>정책그룹 설정 저장 (모든 탭에서 공유)</DialogTitle>
          <DialogContent>
+           <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+             저장된 설정은 액면예산과 기본구두 모든 탭에서 공유됩니다.
+           </Typography>
            <TextField
              fullWidth
              label="저장이름"
              value={settingsName}
              onChange={(e) => setSettingsName(e.target.value)}
-             placeholder="예: VIP고객, 일반고객 등"
+             placeholder="예: 홍기현 기본설정, VIP고객 등"
              sx={{ mt: 1 }}
            />
          </DialogContent>
@@ -2447,8 +2450,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
          maxWidth="sm"
          fullWidth
        >
-         <DialogTitle>정책그룹 설정 불러오기</DialogTitle>
+         <DialogTitle>정책그룹 설정 불러오기 (모든 탭에서 공유)</DialogTitle>
          <DialogContent>
+           <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+             액면예산과 기본구두에서 저장한 모든 설정을 불러올 수 있습니다.
+           </Typography>
            {policyGroupSettings.length === 0 ? (
              <Typography sx={{ py: 2, textAlign: 'center', color: '#666' }}>
                저장된 설정이 없습니다.
@@ -2965,7 +2971,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => setShowSaveSettingsModal(true)}
+                  onClick={() => {
+                    console.log('기본구두 모달에서 저장 버튼 클릭됨');
+                    setShowSaveSettingsModal(true);
+                  }}
                   sx={{ mr: 1 }}
                 >
                   저장
@@ -2974,7 +2983,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   size="small"
                   variant="outlined"
                   onClick={() => {
-                    console.log('불러오기 버튼 클릭됨');
+                    console.log('기본구두 모달에서 불러오기 버튼 클릭됨');
                     setShowLoadSettingsModal(true);
                     // 모달이 열릴 때 정책그룹 설정 목록을 로드
                     loadPolicyGroupSettings();
