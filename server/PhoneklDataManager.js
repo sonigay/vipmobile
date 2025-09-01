@@ -401,9 +401,9 @@ class PhoneklDataManager {
       if (row.length >= 12) {
         const armyType = row[6]; // G열: 군
         const categoryType = row[7]; // H열: 유형
-        const securedBudget = parseFloat(row[8]) || 0; // I열: 확보된 예산
-        const usedBudget = parseFloat(row[9]) || 0; // J열: 사용된 예산
-        const remainingBudget = parseFloat(row[10]) || 0; // K열: 예산 잔액
+        const securedBudget = parseFloat((row[8] || '').toString().replace(/,/g, '')) || 0; // I열: 확보된 예산
+        const usedBudget = parseFloat((row[9] || '').toString().replace(/,/g, '')) || 0; // J열: 사용된 예산
+        const remainingBudget = parseFloat((row[10] || '').toString().replace(/,/g, '')) || 0; // K열: 예산 잔액
         
         // 실제 Google Sheets 행 번호 계산 (데이터는 5행부터 시작)
         const targetRowNumber = index + 5; // 5행부터 시작

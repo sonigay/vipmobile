@@ -241,6 +241,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setSelectedPolicyGroups(prev => [...prev, group]);
     }
   };
+
+
   
   // 시트 선택 함수
   const handleViewSheet = (sheetId, month) => {
@@ -1351,18 +1353,67 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               <Card sx={{ backgroundColor: '#fce4ec' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" color="error">
-                    예산잔액
+                    🎯 최종 예산 잔액
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
                     {summaryData.totalRemainingBudget.toLocaleString()}원
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#666' }}>
-                    F열(합계계산금액)
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
+          
+          {/* 계산 내역 상세 표시 */}
+          {summaryData.basicShoeAmount > 0 && (
+            <Card sx={{ mt: 2, backgroundColor: '#fafafa', border: '1px solid #e0e0e0' }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: '#666', fontWeight: 'bold' }}>
+                  📊 계산 내역
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={4}>
+                    <Box sx={{ textAlign: 'center', p: 1, backgroundColor: '#e3f2fd', borderRadius: 1 }}>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                        예산잔액
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                        {summaryData.originalRemainingBudget ? summaryData.originalRemainingBudget.toLocaleString() : summaryData.totalRemainingBudget.toLocaleString()}원
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>
+                        F열 합계
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Box sx={{ textAlign: 'center', p: 1, backgroundColor: '#ffebee', borderRadius: 1 }}>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                        기본구두
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#d32f2f' }}>
+                        -{summaryData.basicShoeAmount.toLocaleString()}원
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>
+                        차감 금액
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Box sx={{ textAlign: 'center', p: 1, backgroundColor: '#e8f5e8', borderRadius: 1 }}>
+                      <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                        최종 잔액
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                        {summaryData.totalRemainingBudget.toLocaleString()}원
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>
+                        결과
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
 
@@ -1377,10 +1428,13 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               <Card sx={{ backgroundColor: '#e8f5e8' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" color="success.main">
-                    기본구두
+                    👞 기본구두
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                    {basicShoeSummary.totalAmount.toLocaleString()}원
+                    {summaryData.basicShoeAmount ? summaryData.basicShoeAmount.toLocaleString() : basicShoeSummary.totalAmount.toLocaleString()}원
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#666' }}>
+                    {summaryData.basicShoeAmount ? '액면예산종합 기준' : '기본구두 탭 기준'}
                   </Typography>
                 </CardContent>
               </Card>
@@ -3052,7 +3106,6 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           backgroundColor: isSelected ? '#bbdefb' : '#f5f5f5'
                         }
                       }}
-                      onClick={() => handlePolicyGroupToggle(group)}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <input
@@ -3191,6 +3244,8 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             <Button onClick={() => setShowLoadSettingsModal(false)}>닫기</Button>
           </DialogActions>
         </Dialog>
+
+
 
         {/* 검증 모달 */}
         <Dialog

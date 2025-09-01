@@ -4417,9 +4417,9 @@ async function performBudgetMatching(userSheetData, phoneklData, selectedPolicyG
         const userModelName = (userRow[5] || '').toString().trim(); // F열: 모델명
         const userArmyType = (userRow[6] || '').toString().trim(); // G열: 군 (S군, A군, B군 등)
         const userCategoryType = (userRow[7] || '').toString().trim(); // H열: 유형
-        const userSecuredAmount = parseFloat(userRow[8]) || 0; // I열: 확보예산
-        const userUsedAmount = parseFloat(userRow[9]) || 0; // J열: 사용예산
-        const userRemainingAmount = parseFloat(userRow[10]) || 0; // K열: 예산잔액
+        const userSecuredAmount = parseFloat((userRow[8] || '').toString().replace(/,/g, '')) || 0; // I열: 확보예산
+        const userUsedAmount = parseFloat((userRow[9] || '').toString().replace(/,/g, '')) || 0; // J열: 사용예산
+        const userRemainingAmount = parseFloat((userRow[10] || '').toString().replace(/,/g, '')) || 0; // K열: 예산잔액
         
         // 필수 데이터가 있는 경우만 인덱싱
         if (userModelName && userArmyType && userCategoryType) {
@@ -4750,7 +4750,7 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
       const policyGroup = row[15]; // P열: 정책그룹 (기존 E열에서 +11)
       const armyType = row[14]; // O열: 정책군 (기존 D열에서 +11)
       const categoryType = row[30]; // AE열: 유형 (기존 T열에서 +11)
-      const currentBudgetValue = parseFloat(row[13]) || 0; // N열: 현재 예산값 (기존 C열에서 +11)
+      const currentBudgetValue = parseFloat((row[13] || '').toString().replace(/,/g, '')) || 0; // N열: 현재 예산값 (기존 C열에서 +11)
       
       // 날짜 데이터 정규화
       const receptionDate = normalizeReceptionDate(row[16]); // Q열: 접수일 (기존 F열에서 +11)
@@ -4809,8 +4809,8 @@ async function calculateUsageBudget(sheetId, selectedPolicyGroups, dateRange, us
                 const budgetModelName = budgetRow[5]; // F열: 모델명 (기존 C열에서 3열 밀림)
                 const budgetArmyType = budgetRow[6]; // G열: 군 (기존 D열에서 3열 밀림)
                 const budgetCategoryType = budgetRow[7]; // H열: 유형 (기존 E열에서 3열 밀림)
-                const budgetUsedAmount = parseFloat(budgetRow[9]) || 0; // J열: 사용 예산 (기존 G열에서 3열 밀림)
-                const budgetSecuredAmount = parseFloat(budgetRow[8]) || 0; // I열: 확보 예산 (기존 F열에서 3열 밀림)
+                const budgetUsedAmount = parseFloat((budgetRow[9] || '').toString().replace(/,/g, '')) || 0; // J열: 사용 예산 (기존 G열에서 3열 밀림)
+                const budgetSecuredAmount = parseFloat((budgetRow[8] || '').toString().replace(/,/g, '')) || 0; // I열: 확보 예산 (기존 F열에서 3열 밀림)
                 
                 // 액면예산 A열의 모델명과 비교
                 const activationModelName = row[0]; // A열: 모델명
@@ -19793,7 +19793,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
               rows.forEach((basicRow) => {
                 if (basicRow.length >= 12) {
                   const policyGroup = basicRow[11] || ''; // L열(11번인덱스): 정책그룹
-                  const amount = parseFloat(basicRow[10]) || 0; // K열(10번인덱스): 기본구두 금액
+                  const amount = parseFloat((basicRow[10] || '').toString().replace(/,/g, '')) || 0; // K열(10번인덱스): 기본구두 금액
                   
                   if (policyGroup && amount > 0) {
                     totalBasicShoeAmount += amount;
@@ -19873,14 +19873,20 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
       console.log(`📊 [액면예산종합] 사용자 ${user}: 잔액=${budget.remainingBudget}, 확보=${budget.securedBudget}, 사용=${budget.usedBudget}`);
     });
     
+    // 기본구두 금액을 최종 예산 잔액에서 차감
+    const finalRemainingBudget = totalRemainingBudget - totalBasicShoeAmount;
+    
     console.log(`📊 [액면예산종합] 전체 합계: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
+    console.log(`👞 [액면예산종합] 기본구두 차감: ${totalBasicShoeAmount.toLocaleString()}원`);
+    console.log(`🎯 [액면예산종합] 최종 예산 잔액: ${finalRemainingBudget.toLocaleString()}원`);
     
     res.json({
       success: true,
       summary: {
         totalSecuredBudget,
         totalUsedBudget,
-        totalRemainingBudget,
+        totalRemainingBudget: finalRemainingBudget, // 기본구두 차감된 최종 잔액
+        originalRemainingBudget: totalRemainingBudget, // 기본구두 차감 전 원본 잔액
         basicShoeAmount: totalBasicShoeAmount,
         userBudgets // 사용자별 상세 데이터 추가
       }
@@ -19937,7 +19943,7 @@ app.get('/api/budget/basic-shoe', async (req, res) => {
     rows.forEach((row, index) => {
       if (row.length >= 12) {
         const policyGroup = row[11] || ''; // L열(11번인덱스): 정책그룹
-        const amount = parseFloat(row[10]) || 0; // K열(10번인덱스): 기본구두 금액
+        const amount = parseFloat((row[10] || '').toString().replace(/,/g, '')) || 0; // K열(10번인덱스): 기본구두 금액
         
         // 선택된 정책그룹과 일치하는 경우만 처리
         if (policyGroup && amount > 0 && selectedPolicyGroups.includes(policyGroup)) {
@@ -19975,6 +19981,8 @@ app.get('/api/budget/basic-shoe', async (req, res) => {
     });
   }
 });
+
+
 
 // 예산 데이터 불러오기 API
 app.get('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
@@ -22418,7 +22426,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
                 const modelName = row[5]; // F열: 모델명
                 const armyType = row[6]; // G열: 군
                 const categoryType = row[7]; // H열: 유형
-                const usedBudget = parseFloat(row[9]) || 0; // J열: 사용된 예산
+                const usedBudget = parseFloat((row[9] || '').toString().replace(/,/g, '')) || 0; // J열: 사용된 예산
                 
                 if (modelName && armyType && categoryType) {
                   if (!modelGroups[modelName]) {
