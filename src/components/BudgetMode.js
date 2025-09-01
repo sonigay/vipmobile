@@ -359,13 +359,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   }, [showLoadSettingsModal]);
 
-  // 탭 변경 시 모달 상태 초기화
+  // 탭 변경 시 모달 상태 초기화 (의존성 배열에서 제거)
   useEffect(() => {
     // 탭 변경 시 모든 모달 상태 강제 초기화
     setShowPolicyGroupModal(false);
     setShowSaveSettingsModal(false);
     setShowLoadSettingsModal(false);
   }, [activeTab]);
+
+
 
   // 정책그룹 선택 모달이 열릴 때 상태 확인
   useEffect(() => {
