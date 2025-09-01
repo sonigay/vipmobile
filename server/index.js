@@ -18328,6 +18328,8 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             summary.totalUsedBudget = totalUsedBudget;
             summary.itemCount = policyCount;
             summary.policies = policies; // 정책별 데이터 추가
+            
+            console.log(`📋 [${sheet.sheetName}] policies 배열:`, JSON.stringify(policies));
           } else {
             console.log(`📋 [${sheet.sheetName}] 메타데이터에 정책 데이터 없음`);
           }
@@ -19704,13 +19706,13 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
                 // B열이나 D열에 입력자가 있는 행만 F열, G열, H열 합계
                 if (inputUserB || inputUserD) {
                   // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
-                  // 천 단위 구분자(,) 제거 후 숫자로 변환하고 1000배 곱하기
+                  // 천 단위 구분자(,) 제거 후 숫자로 변환
                   const fValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
-                    (parseFloat(String(row[5]).replace(/,/g, '')) || 0) * 1000 : 0;
+                    parseFloat(String(row[5]).replace(/,/g, '')) || 0 : 0;
                   const gValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
-                    (parseFloat(String(row[6]).replace(/,/g, '')) || 0) * 1000 : 0;
+                    parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
                   const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
-                    (parseFloat(String(row[7]).replace(/,/g, '')) || 0) * 1000 : 0;
+                    parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
                   
                   if (fValue > 0 || gValue > 0 || hValue > 0) {
                     console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 매칭성공: B열=${inputUserB}, D열=${inputUserD}, F열=${fValue}, G열=${gValue}, H열=${hValue}`);
