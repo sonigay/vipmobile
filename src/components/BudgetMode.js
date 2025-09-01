@@ -211,6 +211,30 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     setTargetMonth(month);
     setSnackbar({ open: true, message: `${month} 시트가 선택되었습니다.`, severity: 'success' });
   };
+  
+  // 시트설정에서 설정된 시트 목록 불러오기
+  const loadSavedSheetIds = async () => {
+    try {
+      // 시트설정에서 저장된 시트 ID 목록 불러오기
+      const response = await fetch('/api/budget/month-sheet-mappings');
+      const data = await response.json();
+      
+      if (data.success && data.mappings) {
+        const sheetList = Object.entries(data.mappings).map(([month, sheetId]) => ({
+          month,
+          sheetId
+        }));
+        setSavedSheetIds(sheetList);
+        console.log('✅ [기본구두] 저장된 시트 목록 로드 완료:', sheetList);
+      } else {
+        console.log('⚠️ [기본구두] 저장된 시트 목록이 없습니다.');
+        setSavedSheetIds([]);
+      }
+    } catch (error) {
+      console.error('❌ [기본구두] 시트 목록 로드 실패:', error);
+      setSavedSheetIds([]);
+    }
+  };
 
   const handleFaceValueSubMenuChange = (subMenu) => {
     setFaceValueSubMenu(subMenu);
@@ -256,6 +280,9 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     
     // 정책그룹 설정 목록 불러오기
     loadPolicyGroupSettings();
+    
+    // 기본구두용 저장된 시트 목록 불러오기
+    loadSavedSheetIds();
   }, [loggedInStore, faceValueSubMenu]);
 
   // 액면예산 타입 변경 시 예산금액 초기화 및 시트 목록 재로드
