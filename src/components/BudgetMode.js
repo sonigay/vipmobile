@@ -373,13 +373,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
   }, [showLoadSettingsModal]);
 
-  // 탭 변경 시 모달 상태 초기화 (의존성 배열에서 제거)
-  useEffect(() => {
-    // 탭 변경 시 모든 모달 상태 강제 초기화
-    setShowPolicyGroupModal(false);
-    setShowSaveSettingsModal(false);
-    setShowLoadSettingsModal(false);
-  }, [activeTab]);
+
 
 
 
@@ -2991,7 +2985,16 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => setShowSaveSettingsModal(true)}
+                  onClick={() => {
+                    console.log('🔍 [기본구두] 저장 버튼 클릭됨');
+                    console.log('🔍 [기본구두] 현재 상태:', {
+                      showSaveSettingsModal,
+                      showPolicyGroupModal,
+                      activeTab
+                    });
+                    setShowSaveSettingsModal(true);
+                    console.log('✅ [기본구두] 저장 모달 열기 완료');
+                  }}
                   sx={{ mr: 1 }}
                 >
                   저장
@@ -3000,8 +3003,15 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   size="small"
                   variant="outlined"
                   onClick={() => {
+                    console.log('🔍 [기본구두] 불러오기 버튼 클릭됨');
+                    console.log('🔍 [기본구두] 현재 상태:', {
+                      showLoadSettingsModal,
+                      showPolicyGroupModal,
+                      activeTab
+                    });
                     setShowLoadSettingsModal(true);
                     loadPolicyGroupSettings();
+                    console.log('✅ [기본구두] 불러오기 모달 열기 완료');
                   }}
                 >
                   불러오기
