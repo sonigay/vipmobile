@@ -368,8 +368,11 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   // 정책그룹 설정 불러오기 모달이 열릴 때 데이터 로드
   useEffect(() => {
+    console.log('🔍 [useEffect] showLoadSettingsModal 상태 변화 감지:', showLoadSettingsModal);
     if (showLoadSettingsModal) {
+      console.log('🔍 [useEffect] 모달이 열림, 데이터 로드 시작');
       loadPolicyGroupSettings();
+      console.log('✅ [useEffect] 데이터 로드 완료');
     }
   }, [showLoadSettingsModal]);
 
@@ -3010,6 +3013,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       activeTab
                     });
                     setShowLoadSettingsModal(true);
+                    console.log('🔍 [기본구두] showLoadSettingsModal = true 설정됨');
                     loadPolicyGroupSettings();
                     console.log('✅ [기본구두] 불러오기 모달 열기 완료');
                   }}
