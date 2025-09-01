@@ -19731,6 +19731,9 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     // 사용자별 예산 데이터 저장
     const userBudgets = {};
     
+    // 중복 제거: 같은 sheetId는 한 번만 처리
+    const processedSheetIds = new Set();
+    
     // 헤더 제외하고 각 시트의 액면예산 시트에서 사용자별 타입별 컬럼 합계
     for (let i = 1; i < userSheetManagementData.length; i++) {
       const row = userSheetManagementData[i];
@@ -19738,6 +19741,13 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         const sheetId = row[1]; // B열: 시트ID
         const sheetName = row[2]; // C열: 시트명
         
+        // 이미 처리된 sheetId는 건너뛰기
+        if (processedSheetIds.has(sheetId)) {
+          console.log(`⚠️ [액면예산종합] ${sheetName} (${sheetId}) 이미 처리됨, 건너뛰기`);
+          continue;
+        }
+        
+        processedSheetIds.add(sheetId);
         console.log(`🔍 [액면예산종합] ${sheetName} 처리 시작`);
         
         try {
@@ -19748,52 +19758,43 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           });
           
           const activationData = activationResponse.data.values || [];
-          console.log(`📊 [액면예산종합] ${sheetName} 액면예산 데이터 로드: ${activationData.length}행`);
+          console.log(`📊 [액면예산종합] 액면예산 데이터 로드: ${activationData.length}행`);
           
-          if (activationData.length > 4) { // 헤더 4행 제외
-            let sheetTotalRemaining = 0, sheetTotalSecured = 0, sheetTotalUsed = 0;
-            
-            // 시트에서 사용자가 포함된 모든 행을 찾아서 F/G/H 값 합산 (SUMIF 방식)
-            for (let index = 0; index < activationData.slice(4).length; index++) {
-              const row = activationData[index + 4]; // 5행부터 시작
-              if (row.length >= 14 && targetUserNameClean) {
-                const inputUserB = row[1] || ''; // B열: 입력자
-                const inputUserD = row[3] || ''; // D열: 입력자
-                const cleanB = inputUserB ? inputUserB.replace(/\([^)]*\)/g, '').trim() : '';
-                const cleanD = inputUserD ? inputUserD.replace(/\([^)]*\)/g, '').trim() : '';
-                
-                // B열 또는 D열에 타겟 사용자가 포함되어 있는지 확인
-                const isMatched = (cleanB && cleanB.includes(targetUserNameClean)) || (cleanD && cleanD.includes(targetUserNameClean));
-                if (isMatched) {
-                  // F/G/H 열에서 직접 합계 값 읽어오기 (SUMIF 방식)
-                  const remainingValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
-                    parseFloat(String(row[5]).replace(/,/g, '')) || 0 : 0;
-                  const securedValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
-                    parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
-                  const usedValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
-                    parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
+                      if (activationData.length > 4) { // 헤더 4행 제외
+              // 시트에서 사용자가 포함된 모든 행을 찾아서 F/G/H 값 합산 (SUMIF 방식)
+              for (let index = 0; index < activationData.slice(4).length; index++) {
+                const row = activationData[index + 4]; // 5행부터 시작
+                if (row.length >= 14 && targetUserNameClean) {
+                  const inputUserB = row[1] || ''; // B열: 입력자
+                  const inputUserD = row[3] || ''; // D열: 입력자
+                  const cleanB = inputUserB ? inputUserB.replace(/\([^)]*\)/g, '').trim() : '';
+                  const cleanD = inputUserD ? inputUserD.replace(/\([^)]*\)/g, '').trim() : '';
                   
-                  // 모든 매칭 행의 값을 합산
-                  sheetTotalRemaining += remainingValue;
-                  sheetTotalSecured += securedValue;
-                  sheetTotalUsed += usedValue;
-                  
-                  console.log(`📊 [액면예산종합] ${sheetName} 사용자 ${targetUserNameClean} 발견: F/G/H열=${remainingValue}/${securedValue}/${usedValue}`);
+                  // B열 또는 D열에 타겟 사용자가 포함되어 있는지 확인
+                  const isMatched = (cleanB && cleanB.includes(targetUserNameClean)) || (cleanD && cleanD.includes(targetUserNameClean));
+                  if (isMatched) {
+                    // F/G/H 열에서 직접 합계 값 읽어오기 (SUMIF 방식)
+                    const remainingValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
+                      parseFloat(String(row[5]).replace(/,/g, '')) || 0 : 0;
+                    const securedValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
+                      parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
+                    const usedValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
+                      parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
+                    
+                    // 사용자 예산에 직접 추가 (시트별 개별 합계 없이)
+                    const key = targetUserNameClean;
+                    if (!userBudgets[key]) {
+                      userBudgets[key] = { remainingBudget: 0, securedBudget: 0, usedBudget: 0 };
+                    }
+                    userBudgets[key].remainingBudget += remainingValue;
+                    userBudgets[key].securedBudget += securedValue;
+                    userBudgets[key].usedBudget += usedValue;
+                    
+                    console.log(`📊 [액면예산종합] 사용자 ${targetUserNameClean} 발견: F/G/H열=${remainingValue}/${securedValue}/${usedValue}`);
+                  }
                 }
               }
             }
-            
-            // 시트의 F/G/H 값 합계를 사용자 예산에 추가 (매칭 행이 없어도 0으로 처리)
-            const key = targetUserNameClean;
-            if (!userBudgets[key]) {
-              userBudgets[key] = { remainingBudget: 0, securedBudget: 0, usedBudget: 0 };
-            }
-            userBudgets[key].remainingBudget += sheetTotalRemaining;
-            userBudgets[key].securedBudget += sheetTotalSecured;
-            userBudgets[key].usedBudget += sheetTotalUsed;
-            
-            console.log(`📊 [액면예산종합] ${sheetName} 시트 추가: 잔액=${sheetTotalRemaining}, 확보=${sheetTotalSecured}, 사용=${sheetTotalUsed}`);
-          }
         } catch (error) {
           console.log(`⚠️ [액면예산종합] ${sheetName} 액면예산 시트 조회 실패:`, error.message);
         }
