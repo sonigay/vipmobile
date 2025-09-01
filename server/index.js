@@ -18295,6 +18295,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
               row.length >= 10 && row.some(cell => cell !== '' && cell !== null && cell !== undefined)
             );
             
+            const policies = [];
             validRows.forEach((row, index) => { // 유효한 행만 처리
               if (row.length >= 10) { // O~X열 (10개 컬럼) - 수정됨!
                 // V열: 잔액, W열: 확보, X열: 사용
@@ -18307,6 +18308,13 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
                 totalUsedBudget += usedBudget;
                 policyCount++;
                 
+                // 정책별 데이터를 policies 배열에 추가
+                policies.push({
+                  securedBudget,
+                  usedBudget,
+                  remainingBudget
+                });
+                
                 console.log(`📋 [${sheet.sheetName}] 정책 ${index + 1}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
               }
             });
@@ -18317,6 +18325,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             summary.totalSecuredBudget = totalSecuredBudget;
             summary.totalUsedBudget = totalUsedBudget;
             summary.itemCount = policyCount;
+            summary.policies = policies; // 정책별 데이터 추가
           } else {
             console.log(`📋 [${sheet.sheetName}] 메타데이터에 정책 데이터 없음`);
           }
@@ -19632,13 +19641,95 @@ function getCategoryType(columnIndex) {
   return categoryTypes[columnIndex - 1] || 'Unknown';
 }
 
-// 액면예산 종합 계산 API (비활성화 - 입력 API에서 통합 처리)
+// 액면예산 종합 계산 API
 app.get('/api/budget/summary/:targetMonth', async (req, res) => {
-  res.status(410).json({ 
-    error: '이 API는 더 이상 사용되지 않습니다. 데이터 입력 시 자동으로 계산됩니다.',
-    message: '액면예산 데이터 입력 API에서 계산 결과를 함께 반환합니다.'
-  });
-
+  try {
+    const { targetMonth } = req.params;
+    const { userId } = req.query;
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    console.log(`🔍 [액면예산종합] 시작: ${targetMonth}, 사용자: ${userId}`);
+    
+    // 예산_사용자시트관리에서 해당 월의 모든 시트 조회
+    const userSheetManagementResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '예산_사용자시트관리!A:G'
+    });
+    
+    const userSheetManagementData = userSheetManagementResponse.data.values || [];
+    if (userSheetManagementData.length <= 1) {
+      return res.json({
+        success: true,
+        summary: {
+          totalSecuredBudget: 0,
+          totalUsedBudget: 0,
+          totalRemainingBudget: 0
+        }
+      });
+    }
+    
+    let totalSecuredBudget = 0;
+    let totalUsedBudget = 0;
+    let totalRemainingBudget = 0;
+    
+    // 헤더 제외하고 각 시트의 액면예산 시트에서 F열, G열, H열 합계
+    for (let i = 1; i < userSheetManagementData.length; i++) {
+      const row = userSheetManagementData[i];
+      if (row.length >= 6 && row[5] === targetMonth) { // F열: 대상월
+        const sheetId = row[1]; // B열: 시트ID
+        const sheetName = row[2]; // C열: 시트명
+        
+        try {
+          // 액면예산 시트에서 F열, G열, H열 데이터 가져오기
+          const activationResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: '액면예산!A:ZZ'
+          });
+          
+          const activationData = activationResponse.data.values || [];
+          if (activationData.length > 4) { // 헤더 4행 제외
+            activationData.slice(4).forEach(row => { // 5행부터 시작
+              if (row.length >= 8) { // F, G, H열이 있는지 확인
+                // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
+                if (row[5] !== '' && row[5] !== undefined && row[5] !== null) {
+                  const value = parseFloat(row[5]) || 0;
+                  totalRemainingBudget += value;
+                }
+                if (row[6] !== '' && row[6] !== undefined && row[6] !== null) {
+                  const value = parseFloat(row[6]) || 0;
+                  totalSecuredBudget += value;
+                }
+                if (row[7] !== '' && row[7] !== undefined && row[7] !== null) {
+                  const value = parseFloat(row[7]) || 0;
+                  totalUsedBudget += value;
+                }
+              }
+            });
+          }
+        } catch (error) {
+          console.log(`⚠️ [액면예산종합] ${sheetName} 액면예산 시트 조회 실패:`, error.message);
+        }
+      }
+    }
+    
+    console.log(`📊 [액면예산종합] 완료: 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 잔액=${totalRemainingBudget}`);
+    
+    res.json({
+      success: true,
+      summary: {
+        totalSecuredBudget,
+        totalUsedBudget,
+        totalRemainingBudget
+      }
+    });
+    
+  } catch (error) {
+    console.error('[액면예산종합] 오류:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '액면예산 종합 계산 중 오류가 발생했습니다.' 
+    });
+  }
 });
 
 // 예산 데이터 불러오기 API
