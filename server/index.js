@@ -19731,52 +19731,85 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     // 사용자별 예산 데이터 저장
     const userBudgets = {};
     
-    // 헤더 제외하고 각 시트의 액면예산 시트에서 사용자별 F열, G열, H열 합계
+    // 헤더 제외하고 각 시트의 액면예산 시트에서 사용자별 타입별 컬럼 합계
     for (let i = 1; i < userSheetManagementData.length; i++) {
       const row = userSheetManagementData[i];
       if (row.length >= 6 && row[5] === targetMonth) { // F열: 대상월
         const sheetId = row[1]; // B열: 시트ID
         const sheetName = row[2]; // C열: 시트명
         
+        // 시트명에서 예산 타입 추출 (Ⅰ, Ⅱ)
+        const budgetTypeMatch = sheetName.match(/\(([ⅠⅡ]+)\)/);
+        const budgetType = budgetTypeMatch ? budgetTypeMatch[1] : 'Ⅰ';
+        
+        console.log(`🔍 [액면예산종합] ${sheetName} 처리 시작 (타입: ${budgetType})`);
+        
         try {
-          // 액면예산 시트에서 F열, G열, H열 데이터 가져오기
+          // 액면예산 시트에서 데이터 가져오기
           const activationResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: '액면예산!A:ZZ'
           });
           
           const activationData = activationResponse.data.values || [];
-          console.log(`🔍 [액면예산종합] ${sheetName} 액면예산 데이터 로드: ${activationData.length}행`);
+          console.log(`📊 [액면예산종합] ${sheetName} 액면예산 데이터 로드: ${activationData.length}행`);
           
           if (activationData.length > 4) { // 헤더 4행 제외
+            let sheetTotalRemaining = 0, sheetTotalSecured = 0, sheetTotalUsed = 0;
+            let matchedRowCount = 0;
+            
             activationData.slice(4).forEach((row, index) => { // 5행부터 시작
-              if (row.length >= 8 && targetUserNameClean) { // F, G, H열이 있고 타겟 사용자명이 있는 경우
-                const inputUserB = row[1] || '';
-                const inputUserD = row[3] || '';
+              if (row.length >= 14 && targetUserNameClean) { // 충분한 열이 있는지 확인
+                const inputUserB = row[1] || ''; // B열: 입력자
+                const inputUserD = row[3] || ''; // D열: 입력자
                 const cleanB = inputUserB ? inputUserB.replace(/\([^)]*\)/g, '').trim() : '';
                 const cleanD = inputUserD ? inputUserD.replace(/\([^)]*\)/g, '').trim() : '';
                 
                 // B열 또는 D열이 타겟 사용자와 일치하면 해당 행을 한 번만 합산
                 const isMatched = (cleanB && cleanB === targetUserNameClean) || (cleanD && cleanD === targetUserNameClean);
                 if (isMatched) {
-                  const fValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
-                    parseFloat(String(row[5]).replace(/,/g, '')) || 0 : 0;
-                  const gValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
-                    parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
-                  const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
-                    parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
+                  let remainingValue = 0, securedValue = 0, usedValue = 0;
                   
-                  const key = targetUserNameClean;
-                  if (!userBudgets[key]) {
-                    userBudgets[key] = { remainingBudget: 0, securedBudget: 0, usedBudget: 0 };
+                  if (budgetType === 'Ⅱ') {
+                    // 액면예산(Ⅱ): I열(잔액), G열(확보), H열(사용)
+                    remainingValue = row[8] !== '' && row[8] !== undefined && row[8] !== null ? 
+                      parseFloat(String(row[8]).replace(/,/g, '')) || 0 : 0;
+                    securedValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
+                      parseFloat(String(row[6]).replace(/,/g, '')) || 0 : 0;
+                    usedValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
+                      parseFloat(String(row[7]).replace(/,/g, '')) || 0 : 0;
+                  } else {
+                    // 액면예산(Ⅰ): L열(잔액), M열(확보), N열(사용)
+                    remainingValue = row[11] !== '' && row[11] !== undefined && row[11] !== null ? 
+                      parseFloat(String(row[11]).replace(/,/g, '')) || 0 : 0;
+                    securedValue = row[12] !== '' && row[12] !== undefined && row[12] !== null ? 
+                      parseFloat(String(row[12]).replace(/,/g, '')) || 0 : 0;
+                    usedValue = row[13] !== '' && row[13] !== undefined && row[13] !== null ? 
+                      parseFloat(String(row[13]).replace(/,/g, '')) || 0 : 0;
                   }
-                  userBudgets[key].remainingBudget += fValue;
-                  userBudgets[key].securedBudget += gValue;
-                  userBudgets[key].usedBudget += hValue;
-                  console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${key}: F열=${fValue}, G열=${gValue}, H열=${hValue}`);
+                  
+                  sheetTotalRemaining += remainingValue;
+                  sheetTotalSecured += securedValue;
+                  sheetTotalUsed += usedValue;
+                  matchedRowCount++;
+                  
+                  console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 사용자 ${targetUserNameClean}: ${budgetType === 'Ⅱ' ? 'I/G/H' : 'L/M/N'}열=${remainingValue}/${securedValue}/${usedValue}`);
                 }
               }
             });
+            
+            // 시트별 합계를 사용자 예산에 추가 (시트당 한 번만)
+            if (matchedRowCount > 0) {
+              const key = targetUserNameClean;
+              if (!userBudgets[key]) {
+                userBudgets[key] = { remainingBudget: 0, securedBudget: 0, usedBudget: 0 };
+              }
+              userBudgets[key].remainingBudget += sheetTotalRemaining;
+              userBudgets[key].securedBudget += sheetTotalSecured;
+              userBudgets[key].usedBudget += sheetTotalUsed;
+              
+              console.log(`📊 [액면예산종합] ${sheetName} 시트 합계: 잔액=${sheetTotalRemaining}, 확보=${sheetTotalSecured}, 사용=${sheetTotalUsed} (${matchedRowCount}행 매칭)`);
+            }
           }
         } catch (error) {
           console.log(`⚠️ [액면예산종합] ${sheetName} 액면예산 시트 조회 실패:`, error.message);
