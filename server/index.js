@@ -18296,28 +18296,30 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
             );
             
             const policies = [];
-            validRows.forEach((row, index) => { // 유효한 행만 처리
-              if (row.length >= 10) { // O~X열 (10개 컬럼) - 수정됨!
+            // 각 시트는 하나의 정책만 가짐 (마지막 정책 데이터 사용)
+            if (validRows.length > 0) {
+              const lastRow = validRows[validRows.length - 1];
+              if (lastRow.length >= 10) {
                 // V열: 잔액, W열: 확보, X열: 사용
-                const remainingBudget = parseFloat(row[7]) || 0; // V열 (0-based index 7)
-                const securedBudget = parseFloat(row[8]) || 0;   // W열 (0-based index 8)
-                const usedBudget = parseFloat(row[9]) || 0;      // X열 (0-based index 9)
+                const remainingBudget = parseFloat(lastRow[7]) || 0; // V열 (0-based index 7)
+                const securedBudget = parseFloat(lastRow[8]) || 0;   // W열 (0-based index 8)
+                const usedBudget = parseFloat(lastRow[9]) || 0;      // X열 (0-based index 9)
                 
-                totalRemainingBudget += remainingBudget;
-                totalSecuredBudget += securedBudget;
-                totalUsedBudget += usedBudget;
-                policyCount++;
+                totalRemainingBudget = remainingBudget;
+                totalSecuredBudget = securedBudget;
+                totalUsedBudget = usedBudget;
+                policyCount = 1;
                 
-                // 정책별 데이터를 policies 배열에 추가
+                // 해당 시트의 정책 데이터만 추가
                 policies.push({
                   securedBudget,
                   usedBudget,
                   remainingBudget
                 });
                 
-                console.log(`📋 [${sheet.sheetName}] 정책 ${index + 1}: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
+                console.log(`📋 [${sheet.sheetName}] 정책: 잔액=${remainingBudget}, 확보=${securedBudget}, 사용=${usedBudget}`);
               }
-            });
+            }
             
             console.log(`📊 [${sheet.sheetName}] 메타데이터 계산 완료: 잔액=${totalRemainingBudget}, 확보=${totalSecuredBudget}, 사용=${totalUsedBudget}, 정책수=${policyCount}`);
             
@@ -19699,12 +19701,16 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
                 const inputUserB = row[1] || ''; // B열: 입력자 (예: 홍기현 (팀장)(Ⅱ))
                 const inputUserD = row[3] || ''; // D열: 입력자 (예: 홍기현 (팀장)(Ⅰ))
                 
-                // B열이나 D열에 입력자가 있는 경우 해당 행의 F열, G열, H열 합계
+                // B열이나 D열에 입력자가 있는 행만 F열, G열, H열 합계
                 if (inputUserB || inputUserD) {
                   // 액면예산(종합): F열(잔액), G열(확보), H열(사용)
-                  const fValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? parseFloat(row[5]) || 0 : 0;
-                  const gValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? parseFloat(row[6]) || 0 : 0;
-                  const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? parseFloat(row[7]) || 0 : 0;
+                  // 천 단위 구분자(,) 제거 후 숫자로 변환하고 1000배 곱하기
+                  const fValue = row[5] !== '' && row[5] !== undefined && row[5] !== null ? 
+                    (parseFloat(String(row[5]).replace(/,/g, '')) || 0) * 1000 : 0;
+                  const gValue = row[6] !== '' && row[6] !== undefined && row[6] !== null ? 
+                    (parseFloat(String(row[6]).replace(/,/g, '')) || 0) * 1000 : 0;
+                  const hValue = row[7] !== '' && row[7] !== undefined && row[7] !== null ? 
+                    (parseFloat(String(row[7]).replace(/,/g, '')) || 0) * 1000 : 0;
                   
                   if (fValue > 0 || gValue > 0 || hValue > 0) {
                     console.log(`📊 [액면예산종합] ${sheetName} Row ${index + 5} 매칭성공: B열=${inputUserB}, D열=${inputUserD}, F열=${fValue}, G열=${gValue}, H열=${hValue}`);

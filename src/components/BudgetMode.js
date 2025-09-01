@@ -2043,7 +2043,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <Box>
                               {sheet.policies.map((policy, policyIndex) => (
                                 <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
-                                  정책 {policyIndex + 1}: {policy.securedBudget?.toLocaleString() || 0}원
+                                  {policy.securedBudget?.toLocaleString() || 0}원
                                 </Typography>
                               ))}
                             </Box>
@@ -2058,7 +2058,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <Box>
                               {sheet.policies.map((policy, policyIndex) => (
                                 <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
-                                  정책 {policyIndex + 1}: {policy.usedBudget?.toLocaleString() || 0}원
+                                  {policy.usedBudget?.toLocaleString() || 0}원
                                 </Typography>
                               ))}
                             </Box>
@@ -2073,7 +2073,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <Box>
                               {sheet.policies.map((policy, policyIndex) => (
                                 <Typography key={policyIndex} variant="caption" sx={{ display: 'block', marginBottom: '2px' }}>
-                                  정책 {policyIndex + 1}: {policy.remainingBudget?.toLocaleString() || 0}원
+                                  {policy.remainingBudget?.toLocaleString() || 0}원
                                 </Typography>
                               ))}
                             </Box>
