@@ -94,7 +94,27 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           policyGroupAmounts: data.policyGroupAmounts || {}
         });
         
+        // 기본구두 생성 목록을 "기본구두생성목록" 시트에 저장
+        if (data.totalAmount > 0 && selectedPolicyGroups && selectedPolicyGroups.length > 0) {
+          try {
+            const userName = loggedInStore?.name || '알 수 없음';
+            await budgetPolicyGroupAPI.saveBasicShoeCreationList(
+              sheetId, 
+              selectedPolicyGroups, 
+              data.totalAmount, 
+              userName
+            );
+            console.log('✅ [기본구두] 생성 목록 저장 완료');
+          } catch (saveError) {
+            console.warn('⚠️ [기본구두] 생성 목록 저장 실패:', saveError);
+            // 저장 실패해도 기본 기능은 계속 진행
+          }
+        }
+        
         console.log('✅ [기본구두] 데이터 로드 완료:', data);
+        
+        // 기본구두 생성 목록도 함께 로드
+        await loadBasicShoeCreationList();
       } else {
         setSnackbar({ open: true, message: data.error || '기본구두 데이터 로드에 실패했습니다.', severity: 'error' });
       }
@@ -104,6 +124,28 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       setSnackbar({ open: true, message: '기본구두 데이터 로드에 실패했습니다.', severity: 'error' });
     } finally {
       setIsLoadingBasicShoe(false);
+    }
+  };
+
+  // 기본구두 생성 목록 로드 함수
+  const loadBasicShoeCreationList = async () => {
+    if (!sheetId) return;
+    
+    setIsLoadingCreationList(true);
+    try {
+      const data = await budgetPolicyGroupAPI.getBasicShoeCreationList(sheetId);
+      
+      if (data.success) {
+        setBasicShoeCreationList(data.creationList || []);
+        console.log('✅ [기본구두] 생성 목록 로드 완료:', data.creationList.length, '개 항목');
+      } else {
+        console.warn('⚠️ [기본구두] 생성 목록 로드 실패:', data.error);
+      }
+    } catch (error) {
+      console.warn('⚠️ [기본구두] 생성 목록 로드 실패:', error);
+      // 생성 목록 로드 실패해도 기본 기능은 계속 진행
+    } finally {
+      setIsLoadingCreationList(false);
     }
   };
   
@@ -170,6 +212,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     policyGroupAmounts: {}
   });
   const [isLoadingBasicShoe, setIsLoadingBasicShoe] = useState(false);
+  
+  // 기본구두 생성 목록 관련 상태
+  const [basicShoeCreationList, setBasicShoeCreationList] = useState([]);
+  const [isLoadingCreationList, setIsLoadingCreationList] = useState(false);
   
   // 저장된 시트 ID 목록 (시트설정에서 설정된 것들)
   const [savedSheetIds, setSavedSheetIds] = useState([]);
@@ -2987,6 +3033,68 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       </TableBody>
                     </Table>
                   </TableContainer>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* 기본구두 생성 목록 */}
+            {basicShoeCreationList.length > 0 && (
+              <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
+                    📝 기본구두 생성 목록
+                  </Typography>
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            생성일시
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            사용자
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            정책그룹
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold', textAlign: 'right' }}>
+                            금액
+                          </TableCell>
+                          <TableCell sx={{ backgroundColor: '#795548', color: 'white', fontWeight: 'bold' }}>
+                            비고
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {basicShoeCreationList.map((item) => (
+                          <TableRow key={item.id} hover>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              {new Date(item.timestamp).toLocaleString('ko-KR')}
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>
+                              {item.userName}
+                            </TableCell>
+                            <TableCell>
+                              {item.policyGroups}
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'right', color: '#2e7d32', fontWeight: 'bold' }}>
+                              {item.amount.toLocaleString()}원
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem', color: '#666' }}>
+                              {item.note}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Box sx={{ mt: 2, textAlign: 'right' }}>
+                    <Typography variant="subtitle2" sx={{ color: '#666' }}>
+                      총 생성 금액: <strong style={{ color: '#2e7d32' }}>
+                        {basicShoeCreationList.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}원
+                      </strong>
+                    </Typography>
+                  </Box>
                 </CardContent>
               </Card>
             )}

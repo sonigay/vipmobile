@@ -19779,32 +19779,62 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
         processedSheetIds.add(sheetId);
         console.log(`🔍 [액면예산종합] ${sheetName} 처리 시작`);
         
-        // 기본구두 데이터 읽기 (한 번만)
+        // 기본구두 생성 목록 읽기 (한 번만)
         if (!processedBasicShoeSheets.has(sheetId)) {
           try {
-            const basicShoeResponse = await sheets.spreadsheets.values.get({
+            // "기본구두생성목록" 시트에서 사용자가 생성한 기본구두만 읽기
+            const basicShoeCreationResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: '기본구두!A:L'
+              range: '기본구두생성목록!A:E'
             });
             
-            const basicShoeData = basicShoeResponse.data.values || [];
-            if (basicShoeData.length > 1) {
-              const rows = basicShoeData.slice(1);
-              rows.forEach((basicRow) => {
-                if (basicRow.length >= 12) {
-                  const policyGroup = basicRow[11] || ''; // L열(11번인덱스): 정책그룹
-                  const amount = parseFloat((basicRow[10] || '').toString().replace(/,/g, '')) || 0; // K열(10번인덱스): 기본구두 금액
+            const basicShoeCreationData = basicShoeCreationResponse.data.values || [];
+            if (basicShoeCreationData.length > 1) {
+              const rows = basicShoeCreationData.slice(1); // 헤더 제외
+              rows.forEach((creationRow) => {
+                if (creationRow.length >= 4) {
+                  const createdBy = creationRow[1] || ''; // B열: 사용자
+                  const policyGroups = creationRow[2] || ''; // C열: 정책그룹
+                  const amount = parseFloat((creationRow[3] || '').toString().replace(/,/g, '')) || 0; // D열: 금액
                   
-                  if (policyGroup && amount > 0) {
+                  // 해당 사용자가 생성한 기본구두만 합산
+                  if (createdBy && amount > 0 && createdBy.includes(targetUserNameClean)) {
                     totalBasicShoeAmount += amount;
+                    console.log(`👞 [액면예산종합] 사용자 생성 기본구두: ${createdBy} - ${amount.toLocaleString()}원`);
                   }
                 }
               });
             }
+            
+            // 기존 "기본구두" 시트도 읽기 (하위 호환성)
+            try {
+              const basicShoeResponse = await sheets.spreadsheets.values.get({
+                spreadsheetId: sheetId,
+                range: '기본구두!A:L'
+              });
+              
+              const basicShoeData = basicShoeResponse.data.values || [];
+              if (basicShoeData.length > 1) {
+                const rows = basicShoeData.slice(1);
+                rows.forEach((basicRow) => {
+                  if (basicRow.length >= 12) {
+                    const policyGroup = basicRow[11] || ''; // L열(11번인덱스): 정책그룹
+                    const amount = parseFloat((basicRow[10] || '').toString().replace(/,/g, '')) || 0; // K열(10번인덱스): 기본구두 금액
+                    
+                    if (policyGroup && amount > 0) {
+                      totalBasicShoeAmount += amount;
+                    }
+                  }
+                });
+              }
+            } catch (basicShoeError) {
+              console.log(`⚠️ [액면예산종합] ${sheetName} 기존 기본구두 시트 조회 실패:`, basicShoeError.message);
+            }
+            
             processedBasicShoeSheets.add(sheetId);
             console.log(`✅ [액면예산종합] ${sheetName} 기본구두 데이터 처리 완료: ${totalBasicShoeAmount.toLocaleString()}원`);
           } catch (error) {
-            console.log(`⚠️ [액면예산종합] ${sheetName} 기본구두 시트 조회 실패:`, error.message);
+            console.log(`⚠️ [액면예산종합] ${sheetName} 기본구두 생성 목록 조회 실패:`, error.message);
           }
         }
         
@@ -19897,6 +19927,171 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: '액면예산 종합 계산 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
+// 기본구두 생성 목록 저장 API
+app.post('/api/budget/basic-shoe/save-creation-list', async (req, res) => {
+  try {
+    const { sheetId, policyGroups, totalAmount, userName } = req.body;
+    
+    if (!sheetId || !policyGroups || !Array.isArray(policyGroups)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '시트 ID와 정책그룹 목록이 필요합니다.' 
+      });
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // "기본구두생성목록" 시트가 없으면 생성
+    try {
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: '기본구두생성목록!A:A'
+      });
+    } catch (error) {
+      // 시트가 없으면 생성
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        resource: {
+          requests: [{
+            addSheet: {
+              properties: {
+                title: '기본구두생성목록',
+                gridProperties: {
+                  rowCount: 1000,
+                  columnCount: 10
+                }
+              }
+            }
+          }]
+        }
+      });
+      
+      // 헤더 추가
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: '기본구두생성목합!A1',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [['생성일시', '사용자', '정책그룹', '금액', '비고']]
+        }
+      });
+    }
+    
+    // 새 데이터 추가
+    const currentTime = new Date().toISOString();
+    const newRow = [
+      currentTime,
+      userName || '알 수 없음',
+      policyGroups.join(', '),
+      totalAmount,
+      '사용자 생성'
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: '기본구두생성목록!A:E',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    console.log(`✅ [기본구두] 생성 목록 저장 완료: ${policyGroups.length}개 그룹, 총 ${totalAmount.toLocaleString()}원`);
+    
+    res.json({ 
+      success: true, 
+      message: '기본구두 생성 목록이 저장되었습니다.',
+      savedData: {
+        timestamp: currentTime,
+        userName,
+        policyGroups,
+        totalAmount
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ [기본구두] 생성 목록 저장 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '기본구두 생성 목록 저장 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
+// 기본구두 생성 목록 조회 API
+app.get('/api/budget/basic-shoe/creation-list', async (req, res) => {
+  try {
+    const { sheetId } = req.query;
+    
+    if (!sheetId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '시트 ID가 필요합니다.' 
+      });
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // "기본구두생성목록" 시트에서 데이터 읽기
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: '기본구두생성목록!A:E'
+    });
+    
+    const data = response.data.values || [];
+    if (data.length <= 1) {
+      return res.json({
+        success: true,
+        creationList: [],
+        totalAmount: 0
+      });
+    }
+    
+    // 헤더 제외하고 데이터 처리
+    const rows = data.slice(1);
+    const creationList = [];
+    let totalAmount = 0;
+    
+    rows.forEach((row, index) => {
+      if (row.length >= 4) {
+        const timestamp = row[0] || ''; // A열: 생성일시
+        const userName = row[1] || ''; // B열: 사용자
+        const policyGroups = row[2] || ''; // C열: 정책그룹
+        const amount = parseFloat((row[3] || '').toString().replace(/,/g, '')) || 0; // D열: 금액
+        const note = row[4] || ''; // E열: 비고
+        
+        if (amount > 0) {
+          creationList.push({
+            id: index,
+            timestamp,
+            userName,
+            policyGroups,
+            amount,
+            note
+          });
+          totalAmount += amount;
+        }
+      }
+    });
+    
+    console.log(`✅ [기본구두] 생성 목록 조회: 총 ${totalAmount.toLocaleString()}원, ${creationList.length}개 항목`);
+    
+    res.json({
+      success: true,
+      creationList,
+      totalAmount
+    });
+    
+  } catch (error) {
+    console.error('❌ [기본구두] 생성 목록 조회 오류:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '기본구두 생성 목록 조회 중 오류가 발생했습니다.' 
     });
   }
 });

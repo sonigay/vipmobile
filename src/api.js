@@ -734,4 +734,31 @@ export const budgetPolicyGroupAPI = {
     }
     return response.json();
   },
+
+  // 기본구두 생성 목록 저장
+  saveBasicShoeCreationList: async (sheetId, policyGroups, totalAmount, userName) => {
+    const response = await fetch(`${API_BASE_URL}/api/budget/basic-shoe/save-creation-list`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sheetId, policyGroups, totalAmount, userName }),
+    });
+    if (!response.ok) {
+      throw new Error('기본구두 생성 목록 저장에 실패했습니다.');
+    }
+    return response.json();
+  },
+
+  // 기본구두 생성 목록 조회
+  getBasicShoeCreationList: async (sheetId) => {
+    const params = new URLSearchParams();
+    if (sheetId) params.append('sheetId', sheetId);
+    
+    const response = await fetch(`${API_BASE_URL}/api/budget/basic-shoe/creation-list?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('기본구두 생성 목록 조회에 실패했습니다.');
+    }
+    return response.json();
+  },
 }; 
