@@ -1477,10 +1477,10 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                     👞 기본구두
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                    {summaryData.basicShoeAmount ? summaryData.basicShoeAmount.toLocaleString() : basicShoeSummary.totalAmount.toLocaleString()}원
+                    {summaryData.basicShoeAmount ? summaryData.basicShoeAmount.toLocaleString() : '0'}원
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#666' }}>
-                    {summaryData.basicShoeAmount ? '액면예산종합 기준' : '기본구두 탭 기준'}
+                    {summaryData.basicShoeAmount ? '액면예산종합 기준 (사용자별)' : '로드 전'}
                   </Typography>
                 </CardContent>
               </Card>
@@ -2964,7 +2964,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             </Card>
             
             {/* 기본구두 데이터 요약 */}
-            {basicShoeSummary.totalAmount > 0 && (
+            {(basicShoeSummary.totalAmount > 0 || isLoadingBasicShoe) && (
               <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
@@ -2978,7 +2978,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             총 기본구두 금액
                           </Typography>
                           <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                            {basicShoeSummary.totalAmount.toLocaleString()}원
+                            {isLoadingBasicShoe ? '로딩 중...' : basicShoeSummary.totalAmount.toLocaleString()}원
                           </Typography>
                         </CardContent>
                       </Card>
@@ -3001,7 +3001,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             )}
             
             {/* 정책그룹별 상세 금액 */}
-            {Object.keys(basicShoeSummary.policyGroupAmounts).length > 0 && (
+            {Object.keys(basicShoeSummary.policyGroupAmounts).length > 0 && !isLoadingBasicShoe && (
               <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>
@@ -3038,7 +3038,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             )}
             
             {/* 기본구두 생성 목록 */}
-            {basicShoeCreationList.length > 0 && (
+            {basicShoeCreationList.length > 0 && !isLoadingBasicShoe && (
               <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 2, color: '#795548' }}>

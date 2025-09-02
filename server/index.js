@@ -19806,7 +19806,9 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
               });
             }
             
-            // 기존 "기본구두" 시트도 읽기 (하위 호환성)
+            // 기존 "기본구두" 시트는 읽지 않음 (사용자가 생성한 기본구두만 계산)
+            // 하위 호환성이 필요한 경우 아래 주석을 해제
+            /*
             try {
               const basicShoeResponse = await sheets.spreadsheets.values.get({
                 spreadsheetId: sheetId,
@@ -19830,6 +19832,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
             } catch (basicShoeError) {
               console.log(`⚠️ [액면예산종합] ${sheetName} 기존 기본구두 시트 조회 실패:`, basicShoeError.message);
             }
+            */
             
             processedBasicShoeSheets.add(sheetId);
             console.log(`✅ [액면예산종합] ${sheetName} 기본구두 데이터 처리 완료: ${totalBasicShoeAmount.toLocaleString()}원`);
