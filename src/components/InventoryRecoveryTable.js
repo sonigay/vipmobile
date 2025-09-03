@@ -26,6 +26,63 @@ import {
 function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
   const [copySuccess, setCopySuccess] = useState({});
 
+  // 색상별 배경색 반환 함수
+  const getColorBackground = (color) => {
+    const colorMap = {
+      // 기본 색상
+      '검정': '#000000',
+      '흰색': '#ffffff',
+      '화이트': '#ffffff',
+      'White': '#ffffff',
+      '파랑': '#1976d2',
+      '블루': '#1976d2',
+      'Blue': '#1976d2',
+      '빨강': '#d32f2f',
+      '레드': '#d32f2f',
+      'Red': '#d32f2f',
+      '초록': '#2e7d32',
+      '그린': '#2e7d32',
+      'Green': '#2e7d32',
+      
+      // 추가 색상
+      '노랑': '#f57c00',
+      '옐로우': '#f57c00',
+      'Yellow': '#f57c00',
+      '주황': '#ff9800',
+      '오렌지': '#ff9800',
+      'Orange': '#ff9800',
+      '보라': '#9c27b0',
+      '퍼플': '#9c27b0',
+      'Purple': '#9c27b0',
+      '핑크': '#e91e63',
+      'Pink': '#e91e63',
+      '갈색': '#795548',
+      '브라운': '#795548',
+      'Brown': '#795548',
+      '회색': '#757575',
+      '그레이': '#757575',
+      'Gray': '#757575',
+      '실버': '#bdbdbd',
+      'Silver': '#bdbdbd',
+      '골드': '#ffd700',
+      'Gold': '#ffd700'
+    };
+    
+    return colorMap[color] || '#f5f5f5';
+  };
+
+  // 색상별 텍스트 색상 반환 함수
+  const getColorText = (color) => {
+    const lightColors = ['흰색', '화이트', 'White', '노랑', '옐로우', 'Yellow', '주황', '오렌지', 'Orange', '실버', 'Silver', '골드', 'Gold'];
+    return lightColors.includes(color) ? '#000000' : '#ffffff';
+  };
+
+  // 색상별 테두리 반환 함수
+  const getColorBorder = (color) => {
+    const lightColors = ['흰색', '화이트', 'White', '실버', 'Silver', '골드', 'Gold'];
+    return lightColors.includes(color) ? '1px solid #ccc' : 'none';
+  };
+
   // 담당자별로 데이터 그룹화
   const groupedData = useMemo(() => {
     const groups = {};
@@ -223,13 +280,11 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                         label={item.color} 
                         size="small" 
                         sx={{ 
-                          backgroundColor: item.color === '검정' ? '#000' : 
-                                        item.color === '흰색' ? '#fff' : 
-                                        item.color === '파랑' ? '#1976d2' : 
-                                        item.color === '빨강' ? '#d32f2f' : 
-                                        item.color === '초록' ? '#2e7d32' : '#f5f5f5',
-                          color: item.color === '흰색' ? '#000' : '#fff',
-                          border: item.color === '흰색' ? '1px solid #ccc' : 'none'
+                          backgroundColor: getColorBackground(item.color),
+                          color: getColorText(item.color),
+                          border: getColorBorder(item.color),
+                          fontWeight: 'bold',
+                          minWidth: '60px'
                         }}
                       />
                     </TableCell>

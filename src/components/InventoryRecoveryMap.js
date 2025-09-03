@@ -32,10 +32,11 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState('');
   const [markerProgress, setMarkerProgress] = useState(0);
+  const mapRef = useRef(null);
 
   // 마커 색상 정의 (Leaflet용)
   const markerColors = {
-    default: '#ffeb3b',      // 노란색 (기본)
+    default: '#ff9800',      // 주황색 (기본) - 더 잘 보임!
     selected: '#4caf50',     // 초록색 (선정된 곳)
     completed: '#9c27b0'     // 보라색 (완료된 곳)
   };
@@ -128,6 +129,29 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
     }
   }, [processedMarkers]);
 
+  // 지도 확대/축소 함수들
+  const handleZoomIn = () => {
+    if (mapRef.current) {
+      const map = mapRef.current;
+      map.setZoom(map.getZoom() + 1);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapRef.current) {
+      const map = mapRef.current;
+      map.setZoom(map.getZoom() - 1);
+    }
+  };
+
+  const handleResetView = () => {
+    if (mapRef.current && processedMarkers.length > 0) {
+      const map = mapRef.current;
+      const firstMarker = processedMarkers[0];
+      map.setView([firstMarker.latitude, firstMarker.longitude], 10);
+    }
+  };
+
   // 상태 변경 핸들러
   const handleStatusChange = async (store, action) => {
     try {
@@ -181,15 +205,15 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
     );
   }
 
-  return (
+    return (
     <Box>
       {/* 지도 헤더 */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                   {tabIndex === 0 && '📦 총 회수대상 - 지도 보기'}
-        {tabIndex === 1 && '🎯 금일 회수대상 - 지도 보기'}
-        {tabIndex === 2 && '✅ 금일 회수완료 - 지도 보기'}
-        {tabIndex === 3 && '⚠️ 위경도좌표없는곳 - 지도 보기'}
+          {tabIndex === 1 && '🎯 금일 회수대상 - 지도 보기'}
+          {tabIndex === 2 && '✅ 금일 회수완료 - 지도 보기'}
+          {tabIndex === 3 && '⚠️ 위경도좌표없는곳 - 지도 보기'}
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -244,94 +268,9 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
         </CardContent>
       </Card>
 
-             {/* 지도 컨테이너 */}
-       <Card>
-         <CardContent sx={{ p: 0, position: 'relative' }}>
-           <div style={{ width: '100%', height: '600px' }}>
-             {processedMarkers.length > 0 ? (
-               <MapContainer
-                 center={[defaultCenter.lat, defaultCenter.lng]}
-                 zoom={10}
-                 style={{ width: '100%', height: '100%' }}
-               >
-                 <TileLayer
-                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                 />
-                 
-                 {/* 마커들 */}
-                 {processedMarkers.map((store, index) => (
-                   <Marker
-                     key={index}
-                     position={[store.latitude, store.longitude]}
-                     icon={createCustomIcon(store.color)}
-                     eventHandlers={{
-                       click: () => setSelectedMarker(store)
-                     }}
-                   >
-                     <Popup>
-                       <div style={{ padding: '10px', minWidth: '200px' }}>
-                         <h3 style={{ margin: '0 0 10px 0', color: '#1976d2' }}>
-                           {store.storeName}
-                         </h3>
-                         <p style={{ margin: '5px 0' }}>
-                           <strong>총 회수대상:</strong> {store.totalCount}건
-                         </p>
-                         <p style={{ margin: '5px 0' }}>
-                           <strong>선정된 항목:</strong> {store.selectedCount}건
-                         </p>
-                         <p style={{ margin: '5px 0' }}>
-                           <strong>완료된 항목:</strong> {store.completedCount}건
-                         </p>
-                       </div>
-                     </Popup>
-                   </Marker>
-                 ))}
-               </MapContainer>
-             ) : (
-               <Box sx={{
-                 width: '100%',
-                 height: '100%',
-                 display: 'flex',
-                 justifyContent: 'center',
-                 alignItems: 'center',
-                 backgroundColor: '#f5f5f5'
-               }}>
-                 <Typography variant="body1" color="text.secondary">
-                   표시할 데이터가 없습니다.
-                 </Typography>
-               </Box>
-             )}
-           </div>
-           
-           {/* 로딩 오버레이 */}
-           {mapLoading && (
-             <Box sx={{
-               position: 'absolute',
-               top: 0,
-               left: 0,
-               right: 0,
-               bottom: 0,
-               display: 'flex',
-               justifyContent: 'center',
-               alignItems: 'center',
-               backgroundColor: 'rgba(255, 255, 255, 0.8)',
-               zIndex: 1000
-             }}>
-               <Box sx={{ textAlign: 'center' }}>
-                 <CircularProgress size={40} />
-                 <Typography variant="body2" sx={{ mt: 1 }}>
-                   지도를 불러오는 중...
-                 </Typography>
-               </Box>
-             </Box>
-           )}
-         </CardContent>
-       </Card>
-
-      {/* 선택된 마커 정보 */}
+      {/* 선택된 마커 정보 - 지도 위쪽으로 이동 */}
       {selectedMarker && (
-        <Card sx={{ mt: 2 }}>
+        <Card sx={{ mb: 2 }}>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
@@ -449,6 +388,149 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
           </CardContent>
         </Card>
       )}
+
+      {/* 지도 컨테이너 - 확대/축소 기능 추가 */}
+      <Card>
+        <CardContent sx={{ p: 0, position: 'relative' }}>
+          {/* 지도 컨트롤 버튼 */}
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 10, 
+            right: 10, 
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1
+          }}>
+            <Button
+              variant="contained"
+              size="small"
+              sx={{ 
+                minWidth: '40px', 
+                width: '40px', 
+                height: '40px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                color: '#333',
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
+              }}
+              onClick={() => handleZoomIn()}
+            >
+              +
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              sx={{ 
+                minWidth: '40px', 
+                width: '40px', 
+                height: '40px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                color: '#333',
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
+              }}
+              onClick={() => handleZoomOut()}
+            >
+              −
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              sx={{ 
+                minWidth: '40px', 
+                width: '40px', 
+                height: '40px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                color: '#333',
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
+              }}
+              onClick={() => handleResetView()}
+            >
+              ⌂
+            </Button>
+          </Box>
+
+          <div style={{ width: '100%', height: '600px' }}>
+            {processedMarkers.length > 0 ? (
+              <MapContainer
+                center={[defaultCenter.lat, defaultCenter.lng]}
+                zoom={10}
+                style={{ width: '100%', height: '100%' }}
+                ref={mapRef}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+                
+                {/* 마커들 */}
+                {processedMarkers.map((store, index) => (
+                  <Marker
+                    key={index}
+                    position={[store.latitude, store.longitude]}
+                    icon={createCustomIcon(store.color)}
+                    eventHandlers={{
+                      click: () => setSelectedMarker(store)
+                    }}
+                  >
+                    <Popup>
+                      <div style={{ padding: '10px', minWidth: '200px' }}>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#1976d2' }}>
+                          {store.storeName}
+                        </h3>
+                        <p style={{ margin: '5px 0' }}>
+                          <strong>총 회수대상:</strong> {store.totalCount}건
+                        </p>
+                        <p style={{ margin: '5px 0' }}>
+                          <strong>선정된 항목:</strong> {store.selectedCount}건
+                        </p>
+                        <p style={{ margin: '5px 0' }}>
+                          <strong>완료된 항목:</strong> {store.completedCount}건
+                        </p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+            ) : (
+              <Box sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: '#f5f5f5'
+              }}>
+                <Typography variant="body1" color="text.secondary">
+                  표시할 데이터가 없습니다.
+                </Typography>
+              </Box>
+            )}
+          </div>
+          
+          {/* 로딩 오버레이 */}
+          {mapLoading && (
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              zIndex: 1000
+            }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <CircularProgress size={40} />
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  지도를 불러오는 중...
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
     </Box>
   );
 }
