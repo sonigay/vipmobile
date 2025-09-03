@@ -333,8 +333,8 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          {isInventoryMode ? '재고 조회 시스템' : '재고 조회 시스템'}
-          {loggedInStore && !isInventoryMode && !isAgentMode && (
+          {currentMode || '재고 조회 시스템'}
+          {loggedInStore && !isInventoryMode && !isAgentMode && currentMode !== '재고회수' && (
             <Chip
               icon={<PersonIcon />}
               label={`${loggedInStore.name} : ${getStoreInventory(loggedInStore)}대`}
