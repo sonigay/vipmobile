@@ -23271,8 +23271,8 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
     
     // 회수목록 시트만 가져오기 (좌표는 "회수목록" 시트에서 직접 읽기)
     const recoveryListResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
-      range: '회수목록!A:Z'
+      spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+      range: (process.env.INVENTORY_RECOVERY_SHEET_NAME || '회수목록') + '!A:Z'
     });
 
     if (!recoveryListResponse.data.values) {
@@ -23401,7 +23401,7 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
     }
 
     await sheets.spreadsheets.values.update({
-      spreadsheetId: '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+      spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
       range,
       valueInputOption: 'RAW',
       resource: {
