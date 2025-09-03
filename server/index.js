@@ -16151,6 +16151,15 @@ app.post('/api/app-updates', async (req, res) => {
   try {
     console.log('새 어플업데이트 추가 요청:', req.body);
     
+    // 환경 변수 체크
+    if (!SPREADSHEET_ID) {
+      console.error('❌ [어플업데이트] SHEET_ID 환경 변수가 설정되지 않음');
+      return res.status(500).json({ 
+        success: false, 
+        error: '서버 설정 오류: SHEET_ID가 설정되지 않았습니다.' 
+      });
+    }
+    
     const { mode, date, content } = req.body;
     
     if (!mode || !date || !content) {
@@ -16172,7 +16181,8 @@ app.post('/api/app-updates', async (req, res) => {
       'reservation': 9, // J열: 사전예약모드
       'chart': 10,     // K열: 장표모드
       'budget': 11,    // L열: 예산모드
-      'sales': 12      // M열: 영업모드
+      'sales': 12,     // M열: 영업모드
+      'inventoryRecovery': 13 // N열: 재고회수모드 (새로 추가)
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -16184,14 +16194,14 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(13).fill(''); // A~M열 (13개 컬럼)
+    const newRow = new Array(14).fill(''); // A~N열 (14개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:M`,
+      range: `${UPDATE_SHEET_NAME}!A:N`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
