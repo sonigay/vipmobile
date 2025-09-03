@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -19,6 +19,21 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
+  // 업데이트 확인 핸들러
+  const handleUpdateCheck = () => {
+    setShowUpdatePopup(true);
+  };
+
+  // 컴포넌트 마운트 시 자동으로 업데이트 팝업 표시
+  useEffect(() => {
+    // 약간의 지연 후 업데이트 팝업 표시 (사용자 경험 개선)
+    const timer = setTimeout(() => {
+      setShowUpdatePopup(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <Box>
       <Header 
@@ -27,6 +42,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
         onModeChange={onModeChange}
         availableModes={availableModes}
         currentMode="재고회수"
+        onUpdateCheck={handleUpdateCheck}
       />
       
       {/* 메인 콘텐츠 */}
