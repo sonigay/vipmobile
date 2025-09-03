@@ -82,6 +82,36 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
     return agentStores;
   };
 
+  // 모드별 헤더 색상 반환 함수
+  const getModeHeaderColor = () => {
+    switch (currentMode) {
+      case '재고회수':
+        return '#8bc34a'; // 초록색
+      case '예산':
+        return '#795548'; // 갈색
+      case '영업':
+        return '#e91e63'; // 핑크색
+      case '정책':
+        return '#00bcd4'; // 청록색
+      case '회의':
+        return '#667eea'; // 보라파란색
+      case '사전예약':
+        return '#ff9a9e'; // 핑크색
+      case '장표':
+        return '#ff9800'; // 주황색
+      case '검수':
+        return '#7b1fa2'; // 보라색
+      case '정산':
+        return '#d32f2f'; // 빨간색
+      case '재고 관리':
+        return '#2e7d32'; // 초록색
+      case '관리자':
+        return '#1976d2'; // 파란색
+      default:
+        return '#1976d2'; // 기본 파란색
+    }
+  };
+
   // 담당자의 거래처들의 카테고리별 재고 계산 함수
   const getAgentInventoryByCategory = () => {
     if (!agentTarget) {
@@ -330,7 +360,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
   };
 
   return (
-    <AppBar position="static">
+    <AppBar position="static" sx={{ backgroundColor: getModeHeaderColor() }}>
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           {currentMode || '재고 조회 시스템'}
@@ -347,7 +377,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
               }}
             />
           )}
-          {isInventoryMode && inventoryUserName && (
+          {(isInventoryMode || currentMode === '재고회수') && inventoryUserName && (
             <Chip
               icon={<PersonIcon />}
               label={`접속자: ${inventoryUserName}`}
