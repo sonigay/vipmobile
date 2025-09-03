@@ -4,7 +4,12 @@ import {
   Typography,
   Card,
   CardContent,
-  CircularProgress
+  CircularProgress,
+  Tabs,
+  Tab,
+  Alert,
+  Snackbar,
+  Button
 } from '@mui/material';
 import {
   Inventory as InventoryIcon,
@@ -14,10 +19,29 @@ import {
 
 import Header from './Header';
 import AppUpdatePopup from './AppUpdatePopup';
+import InventoryRecoveryTable from './InventoryRecoveryTable';
+import InventoryRecoveryMap from './InventoryRecoveryMap';
+import { inventoryRecoveryAPI } from '../api';
 
 function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 탭 상태
+  const [currentTab, setCurrentTab] = useState(0);
+  const [currentView, setCurrentView] = useState('table'); // 'table' 또는 'map'
+  
+  // 데이터 상태
+  const [recoveryData, setRecoveryData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   // 업데이트 확인 핸들러
   const handleUpdateCheck = () => {
@@ -34,6 +58,134 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     return () => clearTimeout(timer);
   }, []);
 
+  // 데이터 로드
+  const loadRecoveryData = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await inventoryRecoveryAPI.getData();
+      if (response.success) {
+        setRecoveryData(response.data);
+        console.log('✅ 재고회수 데이터 로드 완료:', response.data.length, '개 항목');
+      } else {
+        throw new Error(response.error || '데이터 로드에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ 재고회수 데이터 로드 오류:', error);
+      setError(error.message);
+      setSnackbar({
+        open: true,
+        message: '데이터 로드에 실패했습니다: ' + error.message,
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    loadRecoveryData();
+  }, []);
+
+  // 상태 업데이트 핸들러
+  const handleStatusUpdate = async (rowIndex, column, value) => {
+    try {
+      const response = await inventoryRecoveryAPI.updateStatus(rowIndex, column, value);
+      if (response.success) {
+        // 데이터 새로고침
+        await loadRecoveryData();
+        setSnackbar({
+          open: true,
+          message: '상태가 성공적으로 업데이트되었습니다.',
+          severity: 'success'
+        });
+      } else {
+        throw new Error(response.error || '상태 업데이트에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ 상태 업데이트 오류:', error);
+      setSnackbar({
+        open: true,
+        message: '상태 업데이트에 실패했습니다: ' + error.message,
+        severity: 'error'
+      });
+    }
+  };
+
+  // 탭 변경 핸들러
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
+  // 뷰 변경 핸들러 (테이블/지도)
+  const handleViewChange = (view) => {
+    setCurrentView(view);
+  };
+
+  // 탭별 데이터 필터링
+  const getFilteredData = () => {
+    switch (currentTab) {
+      case 0: // 총 회수대상
+        return recoveryData;
+      case 1: // 금일 회수대상
+        return recoveryData.filter(item => item.recoveryTargetSelected);
+      case 2: // 금일 회수완료
+        return recoveryData.filter(item => item.recoveryCompleted);
+      default:
+        return recoveryData;
+    }
+  };
+
+  // 스낵바 닫기
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  if (loading) {
+    return (
+      <Box>
+        <Header 
+          onLogout={onLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={onModeChange}
+          availableModes={availableModes}
+          currentMode="재고회수"
+          onCheckUpdate={handleUpdateCheck}
+        />
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+          <CircularProgress size={60} />
+          <Typography variant="h6" sx={{ ml: 2 }}>
+            데이터를 불러오는 중...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box>
+        <Header 
+          onLogout={onLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={onModeChange}
+          availableModes={availableModes}
+          currentMode="재고회수"
+          onCheckUpdate={handleUpdateCheck}
+        />
+        
+        <Box sx={{ p: 4 }}>
+          <Alert severity="error">
+            {error}
+          </Alert>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Header 
@@ -46,108 +198,79 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       />
       
       {/* 메인 콘텐츠 */}
-      <Box sx={{ p: 4 }}>
-        {/* 준비중 안내 */}
-        <Card sx={{ mb: 4, border: '1px solid #e0e0e0', backgroundColor: '#fafafa' }}>
-          <CardContent sx={{ textAlign: 'center', py: 6 }}>
-            <Box sx={{ mb: 3 }}>
-              <InventoryIcon sx={{ fontSize: 80, color: '#795548', mb: 2 }} />
-              <RefreshIcon sx={{ fontSize: 60, color: '#ff9800', ml: -2, mb: 1 }} />
-            </Box>
-            
-            <Typography variant="h4" sx={{ color: '#795548', mb: 2, fontWeight: 'bold' }}>
-              🏪 재고회수모드
-            </Typography>
-            
-            <Typography variant="h6" sx={{ color: '#ff9800', mb: 3 }}>
-              🚧 준비 중입니다
-            </Typography>
-            
-            <Typography variant="body1" sx={{ color: '#666', mb: 4, maxWidth: 600, mx: 'auto' }}>
-              재고 회수 및 관리 기능을 위한 모드입니다.<br />
-              현재 개발 진행 중이며, 곧 서비스가 시작될 예정입니다.
-            </Typography>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-              <Card sx={{ backgroundColor: '#e3f2fd', border: '1px solid #2196f3', minWidth: 200 }}>
-                <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                  <BuildIcon sx={{ fontSize: 40, color: '#2196f3', mb: 1 }} />
-                  <Typography variant="subtitle1" sx={{ color: '#1976d2', fontWeight: 'bold' }}>
-                    개발 진행률
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
-                    <CircularProgress 
-                      variant="determinate" 
-                      value={35} 
-                      size={40}
-                      sx={{ color: '#2196f3' }}
-                    />
-                    <Typography variant="h6" sx={{ ml: 1, color: '#1976d2', fontWeight: 'bold' }}>
-                      35%
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-              
-              <Card sx={{ backgroundColor: '#fff3e0', border: '1px solid #ff9800', minWidth: 200 }}>
-                <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                  <RefreshIcon sx={{ fontSize: 40, color: '#ff9800', mb: 1 }} />
-                  <Typography variant="subtitle1" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
-                    예상 완료일
-                  </Typography>
-                  <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold', mt: 1 }}>
-                    2025년 2월
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Box>
-          </CardContent>
+      <Box sx={{ p: 2 }}>
+        {/* 탭 메뉴 */}
+        <Card sx={{ mb: 2 }}>
+          <Tabs 
+            value={currentTab} 
+            onChange={handleTabChange}
+            variant="fullWidth"
+            sx={{
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }
+            }}
+          >
+            <Tab label="📦 총 회수대상" />
+            <Tab label="🎯 금일 회수대상" />
+            <Tab label="✅ 금일 회수완료" />
+          </Tabs>
         </Card>
-        
-        {/* 기능 미리보기 */}
-        <Card sx={{ border: '1px solid #e0e0e0' }}>
+
+        {/* 뷰 선택 버튼 */}
+        <Card sx={{ mb: 2, p: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={currentView === 'table' ? 'contained' : 'outlined'}
+              onClick={() => handleViewChange('table')}
+              startIcon={<InventoryIcon />}
+            >
+              테이블 보기
+            </Button>
+            <Button
+              variant={currentView === 'map' ? 'contained' : 'outlined'}
+              onClick={() => handleViewChange('map')}
+              startIcon={<RefreshIcon />}
+            >
+              지도 보기
+            </Button>
+          </Box>
+        </Card>
+
+        {/* 콘텐츠 영역 */}
+        <Card>
           <CardContent>
-            <Typography variant="h6" sx={{ mb: 3, color: '#795548', fontWeight: 'bold' }}>
-              🔮 향후 제공 예정 기능
-            </Typography>
-            
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 3 }}>
-              <Card sx={{ backgroundColor: '#e8f5e8', border: '1px solid #4caf50' }}>
-                <CardContent>
-                  <Typography variant="subtitle1" sx={{ color: '#2e7d32', fontWeight: 'bold', mb: 1 }}>
-                    📦 재고 회수 관리
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    매장별 재고 회수 현황 추적 및 관리
-                  </Typography>
-                </CardContent>
-              </Card>
-              
-              <Card sx={{ backgroundColor: '#e3f2fd', border: '1px solid #2196f3' }}>
-                <CardContent>
-                  <Typography variant="subtitle1" sx={{ color: '#1976d2', fontWeight: 'bold', mb: 1 }}>
-                    📊 회수 통계 분석
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    회수율, 회수 패턴 등 데이터 분석
-                  </Typography>
-                </CardContent>
-              </Card>
-              
-              <Card sx={{ backgroundColor: '#fff3e0', border: '1px solid #ff9800' }}>
-                <CardContent>
-                  <Typography variant="subtitle1" sx={{ color: '#f57c00', fontWeight: 'bold', mb: 1 }}>
-                    🔄 자동화 프로세스
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    재고 회수 알림 및 자동화된 워크플로우
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Box>
+            {currentView === 'table' ? (
+              <InventoryRecoveryTable
+                data={getFilteredData()}
+                tabIndex={currentTab}
+                onStatusUpdate={handleStatusUpdate}
+                onRefresh={loadRecoveryData}
+              />
+            ) : (
+              <InventoryRecoveryMap
+                data={getFilteredData()}
+                tabIndex={currentTab}
+                onStatusUpdate={handleStatusUpdate}
+                onRefresh={loadRecoveryData}
+              />
+            )}
           </CardContent>
         </Card>
       </Box>
+
+      {/* 알림 스낵바 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* 업데이트 팝업 */}
       <AppUpdatePopup

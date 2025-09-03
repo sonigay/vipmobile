@@ -23237,6 +23237,175 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
 
 // console.log('🕐 [스케줄러] 매일 새벽 2시 자동 재계산 설정 완료');
 
+// ===== 재고회수모드 API =====
+
+// 재고회수 데이터 조회 API
+app.get('/api/inventory-recovery/data', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    console.log('🔄 [재고회수] 데이터 조회 시작');
+    
+    // 회수목록 시트와 폰클출고처데이터 시트를 병렬로 가져오기
+    const [recoveryListResponse, storeDataResponse] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId: '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+        range: '회수목록!A:Z'
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '폰클출고처데이터!A:O'
+      })
+    ]);
+
+    if (!recoveryListResponse.data.values || !storeDataResponse.data.values) {
+      throw new Error('데이터를 가져올 수 없습니다.');
+    }
+
+    // 헤더 제거
+    const recoveryData = recoveryListResponse.data.values.slice(1);
+    const storeData = storeDataResponse.data.values.slice(1);
+
+    // 업체명으로 좌표 매핑 테이블 생성
+    const coordinateMap = {};
+    storeData.forEach(row => {
+      if (row.length > 13 && row[13]) { // O열(13번인덱스): 업체명
+        const storeName = row[13].toString().trim();
+        const latitude = parseFloat(row[8] || '0'); // I열(8번인덱스): 위도
+        const longitude = parseFloat(row[9] || '0'); // J열(9번인덱스): 경도
+        
+        if (latitude && longitude) {
+          coordinateMap[storeName] = { latitude, longitude };
+        }
+      }
+    });
+
+    // 회수 데이터 처리
+    const processedData = recoveryData
+      .filter(row => row.length > 25) // 최소 컬럼 수 확인
+      .map(row => {
+        const storeName = (row[25] || '').toString().trim(); // Z열(25번인덱스): 출고처(업체명)
+        const coordinates = coordinateMap[storeName] || { latitude: 0, longitude: 0 };
+        
+        return {
+          recoveryCompleted: row[10] || '', // K열(10번인덱스): 회수완료
+          recoveryTargetSelected: row[11] || '', // L열(11번인덱스): 회수대상선정
+          manager: row[12] || '', // M열(12번인덱스): 담당자
+          entryDate: row[13] || '', // N열(13번인덱스): 입고일
+          status: row[14] || '', // O열(14번인덱스): 현황
+          serialNumber: row[15] || '', // P열(15번인덱스): 일련번호
+          category: row[16] || '', // Q열(16번인덱스): 종류
+          modelName: row[17] || '', // R열(17번인덱스): 모델명
+          color: row[18] || '', // S열(18번인덱스): 색상
+          deviceStatus: row[19] || '', // T열(19번인덱스): 상태
+          payment: row[20] || '', // U열(20번인덱스): 결제
+          entryPrice: row[21] || '', // V열(21번인덱스): 입고가
+          entrySource: row[22] || '', // W열(22번인덱스): 입고처
+          carrier: row[23] || '', // X열(23번인덱스): 통신사
+          employee: row[24] || '', // Y열(24번인덱스): 담당사원
+          storeName, // Z열(25번인덱스): 출고처(업체명)
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+          rowIndex: recoveryData.indexOf(row) + 2 // 실제 시트 행 번호 (헤더 제외)
+        };
+      })
+      .filter(item => item.storeName && item.latitude && item.longitude); // 좌표가 있는 데이터만
+
+    console.log(`✅ [재고회수] 데이터 조회 완료: ${processedData.length}개 항목`);
+    
+    res.json({
+      success: true,
+      data: processedData
+    });
+    
+  } catch (error) {
+    console.error('❌ [재고회수] 데이터 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '재고회수 데이터 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 재고회수 상태 업데이트 API
+app.post('/api/inventory-recovery/update-status', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    const { rowIndex, column, value } = req.body;
+    
+    if (!rowIndex || !column || value === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 파라미터가 누락되었습니다. (rowIndex, column, value)'
+      });
+    }
+
+    console.log(`🔄 [재고회수] 상태 업데이트: 행${rowIndex}, 열${column}, 값=${value}`);
+
+    // 구글시트 업데이트
+    let range;
+    if (column === 'recoveryCompleted') {
+      range = `회수목록!K${rowIndex}`; // K열(10번인덱스): 회수완료
+    } else if (column === 'recoveryTargetSelected') {
+      range = `회수목록!L${rowIndex}`; // L열(11번인덱스): 회수대상선정
+    } else {
+      throw new Error('유효하지 않은 컬럼입니다.');
+    }
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+      range,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[value]]
+      }
+    });
+
+    console.log(`✅ [재고회수] 상태 업데이트 완료: ${range} = ${value}`);
+    
+    res.json({
+      success: true,
+      message: '상태가 성공적으로 업데이트되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('❌ [재고회수] 상태 업데이트 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '상태 업데이트에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // 서버 시작 (이미 위에서 처리됨)
   console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
   console.log(`📊 예산 관리 시스템이 준비되었습니다.`);

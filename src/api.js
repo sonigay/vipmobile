@@ -761,4 +761,54 @@ export const budgetPolicyGroupAPI = {
     }
     return response.json();
   },
+};
+
+// 재고회수모드 API
+export const inventoryRecoveryAPI = {
+  // 재고회수 데이터 조회
+  getData: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/data`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('재고회수 데이터 조회에 실패했습니다.');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('재고회수 데이터 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 재고회수 상태 업데이트
+  updateStatus: async (rowIndex, column, value) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rowIndex,
+          column,
+          value
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('재고회수 상태 업데이트에 실패했습니다.');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('재고회수 상태 업데이트 오류:', error);
+      throw error;
+    }
+  }
 }; 
