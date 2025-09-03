@@ -29,8 +29,9 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
   // 색상별 배경색 반환 함수
   const getColorBackground = (color) => {
     const colorMap = {
-      // 기본 색상
+      // 기본 색상들
       '검정': '#000000',
+      '검은색': '#000000',
       '흰색': '#ffffff',
       '화이트': '#ffffff',
       'White': '#ffffff',
@@ -44,13 +45,21 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       '그린': '#2e7d32',
       'Green': '#2e7d32',
       
-      // 추가 색상
+      // 밝은 색상들
       '노랑': '#f57c00',
       '옐로우': '#f57c00',
       'Yellow': '#f57c00',
       '주황': '#ff9800',
       '오렌지': '#ff9800',
       'Orange': '#ff9800',
+      '골드': '#ffd700',
+      'Gold': '#ffd700',
+      '크림': '#fff8e1',
+      'Cream': '#fff8e1',
+      '베이지': '#d7ccc8',
+      'Beige': '#d7ccc8',
+      
+      // 중간 톤 색상들
       '보라': '#9c27b0',
       '퍼플': '#9c27b0',
       'Purple': '#9c27b0',
@@ -59,40 +68,58 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       '갈색': '#795548',
       '브라운': '#795548',
       'Brown': '#795548',
-      '회색': '#757575',
-      '그레이': '#757575',
-      'Gray': '#757575',
-      '실버': '#bdbdbd',
-      'Silver': '#bdbdbd',
-      '골드': '#ffd700',
-      'Gold': '#ffd700',
+      '라벤더': '#e1bee7',
+      'Lavender': '#e1bee7',
+      '코랄': '#ff5722',
+      'Coral': '#ff5722',
       
-      // 특수 색상들 (라이트그린, 아이스블루 등)
-      '라이트그린': '#4caf50',
-      'LightGreen': '#4caf50',
+      // 회색 계열
+      '회색': '#808080',
+      '그레이': '#808080',
+      'Gray': '#808080',
+      '실버': '#c0c0c0',
+      'Silver': '#c0c0c0',
+      '실버쉐도우': '#c0c0c0',
+      'SilverShadow': '#c0c0c0',
+      '다크그레이': '#424242',
+      'DarkGray': '#424242',
+      
+      // 특수 색상들
+      '라이트그린': '#90ee90',
+      'LightGreen': '#90ee90',
       '아이스블루': '#03a9f4',
       'IceBlue': '#03a9f4',
       '라이트블루': '#03a9f4',
       'LightBlue': '#03a9f4',
       '네이비': '#3f51b5',
       'Navy': '#3f51b5',
-      '다크그레이': '#424242',
-      'DarkGray': '#424242',
-      '크림': '#fff8e1',
-      'Cream': '#fff8e1',
-      '베이지': '#d7ccc8',
-      'Beige': '#d7ccc8',
       '올리브': '#827717',
       'Olive': '#827717',
       '마린': '#00695c',
       'Marine': '#00695c',
-      '코랄': '#ff5722',
-      'Coral': '#ff5722',
-      '라벤더': '#e1bee7',
-      'Lavender': '#e1bee7'
+      
+      // 티타늄 계열 색상들
+      '블랙': '#000000',
+      'Black': '#000000',
+      '티타늄': '#c0c0c0',
+      'Titanium': '#c0c0c0',
+      '블랙티타늄': '#2c2c2c',
+      'BlackTitanium': '#2c2c2c',
+      '티타늄블랙': '#2c2c2c',
+      'TitaniumBlack': '#2c2c2c',
+      '화이트티타늄': '#f0f0f0',
+      'WhiteTitanium': '#f0f0f0',
+      '티타늄화이트': '#f0f0f0',
+      'TitaniumWhite': '#f0f0f0'
     };
     
-    return colorMap[color] || '#f5f5f5';
+    // 색상이 매핑되지 않은 경우 기본값 반환
+    if (!colorMap[color]) {
+      console.log(`⚠️ 매핑되지 않은 색상: "${color}" - 기본값 사용`);
+      return '#e0e0e0'; // 밝은 회색 (검은 글씨가 잘 보임)
+    }
+    
+    return colorMap[color];
   };
 
   // 색상별 텍스트 색상 반환 함수
@@ -102,12 +129,15 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       '흰색', '화이트', 'White', 
       '노랑', '옐로우', 'Yellow', 
       '주황', '오렌지', 'Orange', 
-      '실버', 'Silver', 
+      '실버', 'Silver', '실버쉐도우', 'SilverShadow',
       '골드', 'Gold',
       '크림', 'Cream',
       '베이지', 'Beige',
       '라이트그린', 'LightGreen',
-      '아이스블루', 'IceBlue', '라이트블루', 'LightBlue'
+      '아이스블루', 'IceBlue', '라이트블루', 'LightBlue',
+      '티타늄', 'Titanium',
+      '화이트티타늄', 'WhiteTitanium',
+      '티타늄화이트', 'TitaniumWhite'
     ];
     
     // 중간 톤 색상들 (검은 글씨 필요)
@@ -116,12 +146,23 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       '코랄', 'Coral'
     ];
     
+    // 어두운 색상들 (흰 글씨 필요)
+    const darkColors = [
+      '블랙', 'Black',
+      '블랙티타늄', 'BlackTitanium',
+      '티타늄블랙', 'TitaniumBlack',
+      '검정', '검은색',
+      '그레이', 'Gray', '회색'
+    ];
+    
     if (lightColors.includes(color)) {
       return '#000000'; // 검은 글씨
     } else if (mediumColors.includes(color)) {
       return '#000000'; // 검은 글씨
-    } else {
+    } else if (darkColors.includes(color)) {
       return '#ffffff'; // 흰 글씨
+    } else {
+      return '#ffffff'; // 기본값: 흰 글씨
     }
   };
 
@@ -298,15 +339,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                         sx={{ 
                           fontWeight: 'bold',
                           textAlign: index === 0 ? 'left' : 'center',
-                                                     width: index === 0 ? '130px' : // 담당자
-                                  index === 1 ? '180px' : // 업체명
-                                  index === 2 ? '160px' : // 모델명
-                                  index === 3 ? '90px' :  // 색상
-                                  index === 4 ? '120px' : // 일련번호
-                                  index === 5 ? '120px' : // 출고일
-                                  index === 6 ? '90px' :  // 상태
-                                  index === 7 ? '250px' : // 주소 (위경도좌표없는곳)
-                                  'auto'
+                                                     width: '12.5%' // 화면 너비의 1/8 (8개 컬럼 균등 분할)
                         }}
                       >
                         {header}
@@ -336,7 +369,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                   >
                                          <TableCell sx={{ 
                        fontWeight: 'bold',
-                       width: '130px',
+                       width: '12.5%',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -345,7 +378,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '180px',
+                       width: '12.5%',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -354,7 +387,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '160px',
+                       width: '12.5%',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -363,7 +396,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '90px'
+                       width: '12.5%'
                      }}>
                        <Chip 
                          label={item.color} 
@@ -379,7 +412,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '120px',
+                       width: '12.5%',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -388,7 +421,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '120px',
+                       width: '12.5%',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -397,7 +430,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '90px'
+                       width: '12.5%'
                      }}>
                        <Chip 
                          label={item.deviceStatus} 
@@ -410,7 +443,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                                              {tabIndex === 3 && (
                          <TableCell sx={{ 
                            textAlign: 'center',
-                           width: '250px',
+                           width: '12.5%',
                            overflow: 'hidden',
                            textOverflow: 'ellipsis',
                            whiteSpace: 'nowrap'
@@ -425,11 +458,11 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       )}
                       
                                              {/* 액션 컬럼 */}
-                       {tabIndex === 0 && (
-                        <TableCell sx={{ 
-                          textAlign: 'center',
-                          width: '140px'
-                        }}>
+                                               {tabIndex === 0 && (
+                         <TableCell sx={{ 
+                           textAlign: 'center',
+                           width: '12.5%'
+                         }}>
                          <Button
                            variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
                            color={item.recoveryTargetSelected ? 'success' : 'primary'}
@@ -448,7 +481,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                                            {tabIndex === 1 && (
                         <TableCell sx={{ 
                           textAlign: 'center',
-                          width: '140px'
+                          width: '12.5%'
                         }}>
                          <Button
                            variant={item.recoveryCompleted ? 'contained' : 'outlined'}
