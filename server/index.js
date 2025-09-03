@@ -719,9 +719,12 @@ async function getSheetValuesWithoutCache(sheetName) {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:Z 범위
+    const range = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:Z`;
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${safeSheetName}!A:ZZ` // A열부터 ZZ열까지 모든 열 가져오기
+      range: range
     });
     
     const data = response.data.values || [];
@@ -749,9 +752,12 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:Z 범위
+    const range = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:Z`;
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
-      range: `${safeSheetName}!A:ZZ` // A열부터 ZZ열까지 모든 열 가져오기
+      range: range
     });
     
     const data = response.data.values || [];
@@ -776,9 +782,12 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
         console.log(`✅ [시트조회] 정확한 시트 이름 발견: '${exactSheetName}'`);
         const safeSheetName = `'${exactSheetName}'`;
         
+        // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:Z 범위
+        const retryRange = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:Z`;
+        
         const retryResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: spreadsheetId,
-          range: `${safeSheetName}!A:ZZ` // A열부터 ZZ열까지 모든 열 가져오기
+          range: retryRange
         });
         
         const data = retryResponse.data.values || [];
@@ -18460,7 +18469,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
           // 액면예산 시트에서 해당 범위 가져오기
           const activationDataResponse = await sheets_api.spreadsheets.values.get({
             spreadsheetId: sheet.sheetId,
-            range: '액면예산!A:ZZ'
+            range: '액면예산!A:Z' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
           });
           
           const activationData = activationDataResponse.data.values || [];
@@ -19560,7 +19569,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 액면예산에서 해당 범위 가져오기
     const activationDataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: '액면예산!A:ZZ'
+      range: '액면예산!A:Z' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
     });
     
     const activationData = activationDataResponse.data.values || [];
@@ -19905,7 +19914,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           // 액면예산 시트에서 데이터 가져오기
           const activationResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: '액면예산!A:ZZ'
+            range: '액면예산!A:Z' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
           });
           
           const activationData = activationResponse.data.values || [];
