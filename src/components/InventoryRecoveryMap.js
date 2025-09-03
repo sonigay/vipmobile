@@ -443,9 +443,9 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     }}
                   >
                     <Popup>
-                      <div style={{ padding: '10px', minWidth: '200px' }}>
+                      <div style={{ padding: '10px', minWidth: '250px' }}>
                         <h3 style={{ margin: '0 0 10px 0', color: '#1976d2' }}>
-                          {store.storeName}
+                          📍 {store.storeName}
                         </h3>
                         <p style={{ margin: '5px 0' }}>
                           <strong>총 회수대상:</strong> {store.totalCount}건
@@ -456,6 +456,100 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                         <p style={{ margin: '5px 0' }}>
                           <strong>완료된 항목:</strong> {store.completedCount}건
                         </p>
+                        
+                        {/* 액션 버튼들 */}
+                        <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {tabIndex === 0 && (
+                            <>
+                              {store.selectedCount === 0 ? (
+                                <button
+                                  style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#4caf50',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  onClick={() => handleStatusChange(store, 'select')}
+                                >
+                                  ✅ 회수 대상점 선정
+                                </button>
+                              ) : (
+                                <button
+                                  style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#f44336',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  onClick={() => handleStatusChange(store, 'deselect')}
+                                >
+                                  ❌ 회수 대상점 취소
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                          {tabIndex === 1 && (
+                            <>
+                              {store.completedCount === 0 ? (
+                                <button
+                                  style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#9c27b0',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  onClick={() => handleStatusChange(store, 'complete')}
+                                >
+                                  ✅ 회수 완료
+                                </button>
+                              ) : (
+                                <button
+                                  style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#f44336',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  onClick={() => handleStatusChange(store, 'uncomplete')}
+                                >
+                                  ❌ 회수 완료 취소
+                                </button>
+                              )}
+                            </>
+                          )}
+                          
+                          <button
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#2196f3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '11px'
+                            }}
+                            onClick={() => setSelectedMarker(store)}
+                          >
+                            📋 상세 정보 보기
+                          </button>
+                        </div>
                       </div>
                     </Popup>
                   </Marker>
