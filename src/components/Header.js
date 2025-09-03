@@ -22,7 +22,7 @@ import {
   debugPushNotificationStatus
 } from '../utils/pushNotificationUtils';
 
-function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null }) {
+function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPermission, setPushPermission] = useState('default');
   const [pushSubscribed, setPushSubscribed] = useState(false);
