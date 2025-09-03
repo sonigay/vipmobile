@@ -23402,22 +23402,34 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
     console.log(`🔄 [재고회수] 상태 업데이트: 행${rowIndex}, 열${column}, 값=${value}`);
 
     // 구글시트 업데이트
-    let range;
+    let ranges = [];
+    let values = [];
+    
     if (column === 'recoveryCompleted') {
-      range = `회수목록!K${rowIndex}`; // K열(10번인덱스): 회수완료
+      ranges.push(`회수목록!K${rowIndex}`); // K열(10번인덱스): 회수완료
+      values.push([value]);
     } else if (column === 'recoveryTargetSelected') {
-      range = `회수목록!L${rowIndex}`; // L열(11번인덱스): 회수대상선정
+      ranges.push(`회수목록!L${rowIndex}`); // L열(11번인덱스): 회수대상선정
+      values.push([value]);
+      
+      // 회수대상선정이 취소되면 회수완료도 자동으로 취소
+      if (!value || value === '') {
+        ranges.push(`회수목록!K${rowIndex}`); // K열(10번인덱스): 회수완료
+        values.push(['']); // 빈 값으로 설정하여 취소
+        console.log(`🔄 [재고회수] 회수대상선정 취소로 인한 회수완료 자동 취소: 행${rowIndex}`);
+      }
     } else {
       throw new Error('유효하지 않은 컬럼입니다.');
     }
 
-    await sheets.spreadsheets.values.update({
+    // 배치 업데이트로 여러 열을 한 번에 처리
+    await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
-      range,
       valueInputOption: 'RAW',
-      resource: {
-        values: [[value]]
-      }
+      data: ranges.map((range, index) => ({
+        range,
+        values: [values[index]]
+      }))
     });
 
     console.log(`✅ [재고회수] 상태 업데이트 완료: ${range} = ${value}`);

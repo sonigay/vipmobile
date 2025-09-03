@@ -160,10 +160,15 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
           }
         }
       } else if (action === 'deselect') {
-        // 모든 항목의 회수대상 선정 해제
+        // 모든 항목의 회수대상 선정 해제 및 회수완료도 함께 취소
         for (const item of store.items) {
           if (item.recoveryTargetSelected) {
+            // 회수대상선정 취소
             await onStatusUpdate(item.rowIndex, 'recoveryTargetSelected', '');
+            // 회수완료도 함께 취소
+            if (item.recoveryCompleted) {
+              await onStatusUpdate(item.rowIndex, 'recoveryCompleted', '');
+            }
           }
         }
       } else if (action === 'complete') {

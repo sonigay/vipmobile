@@ -644,11 +644,15 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                           variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
                           color={item.recoveryTargetSelected ? 'success' : 'primary'}
                           size="small"
-                          onClick={() => handleStatusChange(
-                            item, 
-                            'recoveryTargetSelected', 
-                            item.recoveryTargetSelected ? '' : 'O'
-                          )}
+                          onClick={() => {
+                            const newValue = item.recoveryTargetSelected ? '' : 'O';
+                            // 회수대상선정 취소 시 회수완료도 함께 취소
+                            if (!newValue) {
+                              // 회수대상선정 취소 시 회수완료도 취소
+                              handleStatusChange(item, 'recoveryCompleted', '');
+                            }
+                            handleStatusChange(item, 'recoveryTargetSelected', newValue);
+                          }}
                         >
                           {item.recoveryTargetSelected ? '선정됨' : '완료하기'}
                         </Button>
