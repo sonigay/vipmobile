@@ -128,6 +128,11 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
   // 탭 변경 핸들러
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
+    
+    // 위경도좌표없는곳 탭으로 이동하면 자동으로 테이블 보기로 변경
+    if (newValue === 3) {
+      setCurrentView('table');
+    }
   };
 
   // 뷰 변경 핸들러 (테이블/지도)
@@ -242,13 +247,16 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
             >
               테이블 보기
             </Button>
-            <Button
-              variant={currentView === 'map' ? 'contained' : 'outlined'}
-              onClick={() => handleViewChange('map')}
-              startIcon={<RefreshIcon />}
-            >
-              지도 보기
-            </Button>
+            {/* 위경도좌표없는곳 탭에서는 지도 보기 버튼 숨김 */}
+            {currentTab !== 3 && (
+              <Button
+                variant={currentView === 'map' ? 'contained' : 'outlined'}
+                onClick={() => handleViewChange('map')}
+                startIcon={<RefreshIcon />}
+              >
+                지도 보기
+              </Button>
+            )}
           </Box>
         </Card>
 

@@ -23272,7 +23272,7 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
     // 회수목록 시트만 가져오기 (좌표는 "회수목록" 시트에서 직접 읽기)
     const recoveryListResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
-      range: (process.env.INVENTORY_RECOVERY_SHEET_NAME || '회수목록') + '!A:Z'
+      range: (process.env.INVENTORY_RECOVERY_SHEET_NAME || '회수목록') + '!A:AA'
     });
 
     if (!recoveryListResponse.data.values) {
@@ -23302,6 +23302,7 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
           recoveryCompleted: row[10] || '', // K열(10번인덱스): 회수완료
           recoveryTargetSelected: row[11] || '', // L열(11번인덱스): 회수대상선정
           manager: row[12] || '', // M열(12번인덱스): 담당자
+          address: row[7] || '', // H열(7번인덱스): 주소
           entryDate: row[13] || '', // N열(13번인덱스): 입고일
           status: row[14] || '', // O열(14번인덱스): 현황
           serialNumber: row[15] || '', // P열(15번인덱스): 일련번호
@@ -23315,6 +23316,7 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
           carrier: row[23] || '', // X열(23번인덱스): 통신사
           employee: row[24] || '', // Y열(24번인덱스): 담당사원
           storeName, // Z열(25번인덱스): 출고처(업체명)
+          recentShipmentDate: row[26] || '', // AA열(26번인덱스): 최근출고일
           latitude: latitude,
           longitude: longitude,
           hasCoordinates: latitude !== 0 && longitude !== 0,

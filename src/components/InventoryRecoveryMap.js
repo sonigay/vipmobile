@@ -29,6 +29,15 @@ L.Icon.Default.mergeOptions({
 
 function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
+
+  // selectedMarker 상태 변화 로그
+  useEffect(() => {
+    console.log('selectedMarker 상태 변화:', selectedMarker);
+  }, [selectedMarker]);
+  
+  // 지도 높이 토글 상태
+  const [mapHeight, setMapHeight] = useState(600);
+  
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState('');
   const [markerProgress, setMarkerProgress] = useState(0);
@@ -129,26 +138,14 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
     }
   }, [processedMarkers]);
 
-  // 지도 확대/축소 함수들
-  const handleZoomIn = () => {
-    if (mapRef.current) {
-      const map = mapRef.current;
-      map.setZoom(map.getZoom() + 1);
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (mapRef.current) {
-      const map = mapRef.current;
-      map.setZoom(map.getZoom() - 1);
-    }
-  };
-
-  const handleResetView = () => {
-    if (mapRef.current && processedMarkers.length > 0) {
-      const map = mapRef.current;
-      const firstMarker = processedMarkers[0];
-      map.setView([firstMarker.latitude, firstMarker.longitude], 10);
+  // 지도 높이 토글 함수
+  const toggleMapHeight = () => {
+    if (mapHeight === 600) {
+      setMapHeight(800);      // 600px → 800px
+    } else if (mapHeight === 800) {
+      setMapHeight(1000);     // 800px → 1000px
+    } else {
+      setMapHeight(600);      // 1000px → 600px (순환)
     }
   };
 
@@ -268,6 +265,29 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
         </CardContent>
       </Card>
 
+      {/* 지도 높이 토글 버튼 */}
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ py: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+              지도 크기:
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={toggleMapHeight}
+              sx={{ minWidth: '120px' }}
+            >
+              {mapHeight === 600 ? '지도 크게' : 
+               mapHeight === 800 ? '지도 더 크게' : '지도 작게'}
+            </Button>
+            <Typography variant="body2" color="text.secondary">
+              현재: {mapHeight}px
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
       {/* 선택된 마커 정보 - 지도 위쪽으로 이동 */}
       {selectedMarker && (
         <Card sx={{ mb: 2 }}>
@@ -288,6 +308,12 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
 
             {/* 마커 정보 */}
             <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>담당자:</strong> {selectedMarker.items[0]?.manager || '담당자 미지정'}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>주소:</strong> {selectedMarker.items[0]?.address || '주소 정보 없음'}
+              </Typography>
               <Typography variant="body2" sx={{ mb: 1 }}>
                 <strong>총 회수대상:</strong> {selectedMarker.totalCount}건
               </Typography>
@@ -360,30 +386,27 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
               상세 항목:
             </Typography>
             <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-              {selectedMarker.items.map((item, index) => (
-                <Box key={index} sx={{ 
-                  p: 1, 
-                  mb: 1, 
-                  backgroundColor: '#f5f5f5', 
-                  borderRadius: 1,
-                  border: '1px solid #e0e0e0'
-                }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                    {item.modelName} - {item.color} ({item.serialNumber})
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    담당자: {item.manager} | 현황: {item.status} | 상태: {item.deviceStatus}
-                  </Typography>
-                  <Box sx={{ mt: 1 }}>
-                    {item.recoveryTargetSelected && (
-                      <Chip label="회수대상선정" size="small" color="success" sx={{ mr: 1 }} />
-                    )}
-                    {item.recoveryCompleted && (
-                      <Chip label="회수완료" size="small" color="primary" />
-                    )}
-                  </Box>
-                </Box>
-              ))}
+                             {selectedMarker.items.map((item, index) => (
+                 <Box key={index} sx={{ 
+                   p: 1, 
+                   mb: 1, 
+                   backgroundColor: '#f5f5f5', 
+                   borderRadius: 1,
+                   border: '1px solid #e0e0e0'
+                 }}>
+                   <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                     {item.modelName} - {item.color} ({item.serialNumber}) / 상태: {item.deviceStatus} / 최근출고일: {item.recentShipmentDate || '정보없음'}
+                   </Typography>
+                   <Box sx={{ mt: 1 }}>
+                     {item.recoveryTargetSelected && (
+                       <Chip label="회수대상선정" size="small" color="success" sx={{ mr: 1 }} />
+                     )}
+                     {item.recoveryCompleted && (
+                       <Chip label="회수완료" size="small" color="primary" />
+                     )}
+                   </Box>
+                 </Box>
+               ))}
             </Box>
           </CardContent>
         </Card>
@@ -392,64 +415,8 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
       {/* 지도 컨테이너 - 확대/축소 기능 추가 */}
       <Card>
         <CardContent sx={{ p: 0, position: 'relative' }}>
-          {/* 지도 컨트롤 버튼 */}
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 10, 
-            right: 10, 
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1
-          }}>
-            <Button
-              variant="contained"
-              size="small"
-              sx={{ 
-                minWidth: '40px', 
-                width: '40px', 
-                height: '40px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                color: '#333',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
-              }}
-              onClick={() => handleZoomIn()}
-            >
-              +
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              sx={{ 
-                minWidth: '40px', 
-                width: '40px', 
-                height: '40px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                color: '#333',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
-              }}
-              onClick={() => handleZoomOut()}
-            >
-              −
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              sx={{ 
-                minWidth: '40px', 
-                width: '40px', 
-                height: '40px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                color: '#333',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
-              }}
-              onClick={() => handleResetView()}
-            >
-              ⌂
-            </Button>
-          </Box>
 
-          <div style={{ width: '100%', height: '600px' }}>
+                      <div style={{ width: '100%', height: `${mapHeight}px` }}>
             {processedMarkers.length > 0 ? (
               <MapContainer
                 center={[defaultCenter.lat, defaultCenter.lng]}
@@ -469,7 +436,10 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     position={[store.latitude, store.longitude]}
                     icon={createCustomIcon(store.color)}
                     eventHandlers={{
-                      click: () => setSelectedMarker(store)
+                      click: () => {
+                        console.log('마커 클릭됨:', store);
+                        setSelectedMarker(store);
+                      }
                     }}
                   >
                     <Popup>

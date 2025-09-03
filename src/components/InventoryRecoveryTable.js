@@ -65,7 +65,31 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       '실버': '#bdbdbd',
       'Silver': '#bdbdbd',
       '골드': '#ffd700',
-      'Gold': '#ffd700'
+      'Gold': '#ffd700',
+      
+      // 특수 색상들 (라이트그린, 아이스블루 등)
+      '라이트그린': '#4caf50',
+      'LightGreen': '#4caf50',
+      '아이스블루': '#03a9f4',
+      'IceBlue': '#03a9f4',
+      '라이트블루': '#03a9f4',
+      'LightBlue': '#03a9f4',
+      '네이비': '#3f51b5',
+      'Navy': '#3f51b5',
+      '다크그레이': '#424242',
+      'DarkGray': '#424242',
+      '크림': '#fff8e1',
+      'Cream': '#fff8e1',
+      '베이지': '#d7ccc8',
+      'Beige': '#d7ccc8',
+      '올리브': '#827717',
+      'Olive': '#827717',
+      '마린': '#00695c',
+      'Marine': '#00695c',
+      '코랄': '#ff5722',
+      'Coral': '#ff5722',
+      '라벤더': '#e1bee7',
+      'Lavender': '#e1bee7'
     };
     
     return colorMap[color] || '#f5f5f5';
@@ -103,10 +127,17 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
     '모델명',
     '색상',
     '일련번호',
-    '현황',
-    '입고일',
+    '출고일',
     '상태'
   ];
+
+  // 위경도좌표없는곳 탭일 때만 주소 컬럼 추가
+  const getTableHeaders = () => {
+    if (tabIndex === 3) { // 위경도좌표없는곳
+      return [...tableHeaders, '주소'];
+    }
+    return tableHeaders;
+  };
 
   // 클립보드 복사 함수
   const handleCopyToClipboard = async (manager, items) => {
@@ -131,10 +162,14 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       copyText += `─`.repeat(50) + '\n';
     }
 
-    // 데이터 추가
-    items.forEach(item => {
-      copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
-    });
+         // 데이터 추가
+     items.forEach(item => {
+       if (tabIndex === 3) { // 위경도좌표없는곳
+         copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}/${item.address || '주소없음'}\n`;
+       } else {
+         copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
+       }
+     });
 
     try {
       await navigator.clipboard.writeText(copyText);
@@ -228,35 +263,44 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
             </Button>
           </Box>
 
-          {/* 테이블 */}
-          <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
-                  {tableHeaders.map((header, index) => (
-                    <TableCell 
-                      key={index}
-                      sx={{ 
-                        fontWeight: 'bold',
-                        textAlign: index === 0 ? 'left' : 'center'
-                      }}
-                    >
-                      {header}
-                    </TableCell>
-                  ))}
-                  {/* 액션 컬럼 */}
-                  {tabIndex === 0 && (
-                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
-                      회수대상선정
-                    </TableCell>
-                  )}
-                  {tabIndex === 1 && (
-                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
-                      회수완료
-                    </TableCell>
-                  )}
-                </TableRow>
-              </TableHead>
+                     {/* 테이블 */}
+           <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
+             <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                              <TableHead>
+                  <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
+                    {getTableHeaders().map((header, index) => (
+                      <TableCell 
+                        key={index}
+                        sx={{ 
+                          fontWeight: 'bold',
+                          textAlign: index === 0 ? 'left' : 'center',
+                          width: index === 0 ? '120px' : // 담당자
+                                 index === 1 ? '150px' : // 업체명
+                                 index === 2 ? '140px' : // 모델명
+                                 index === 3 ? '80px' :  // 색상
+                                 index === 4 ? '100px' : // 일련번호
+                                 index === 5 ? '100px' : // 출고일
+                                 index === 6 ? '80px' :  // 상태
+                                 index === 7 ? '200px' : // 주소 (위경도좌표없는곳)
+                                 'auto'
+                        }}
+                      >
+                        {header}
+                      </TableCell>
+                    ))}
+                   {/* 액션 컬럼 */}
+                   {tabIndex === 0 && (
+                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                       회수대상선정
+                     </TableCell>
+                   )}
+                   {tabIndex === 1 && (
+                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                       회수완료
+                     </TableCell>
+                   )}
+                 </TableRow>
+               </TableHead>
               <TableBody>
                 {items.map((item, itemIndex) => (
                   <TableRow 
@@ -266,83 +310,136 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       '&:hover': { backgroundColor: '#f0f8ff' }
                     }}
                   >
-                    <TableCell sx={{ fontWeight: 'bold' }}>
-                      {item.manager}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {item.storeName}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {item.modelName}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      <Chip 
-                        label={item.color} 
-                        size="small" 
-                        sx={{ 
-                          backgroundColor: getColorBackground(item.color),
-                          color: getColorText(item.color),
-                          border: getColorBorder(item.color),
-                          fontWeight: 'bold',
-                          minWidth: '60px'
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {item.serialNumber}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      <Chip 
-                        label={item.status} 
-                        size="small"
-                        color={item.status === '정상' ? 'success' : 'default'}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      {item.entryDate}
-                    </TableCell>
-                    <TableCell sx={{ textAlign: 'center' }}>
-                      <Chip 
-                        label={item.deviceStatus} 
-                        size="small"
-                        color={item.deviceStatus === '정상' ? 'success' : 'warning'}
-                      />
-                    </TableCell>
-                    
-                    {/* 액션 컬럼 */}
-                    {tabIndex === 0 && (
-                      <TableCell sx={{ textAlign: 'center' }}>
-                        <Button
-                          variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
-                          color={item.recoveryTargetSelected ? 'success' : 'primary'}
-                          size="small"
-                          onClick={() => handleStatusChange(
-                            item, 
-                            'recoveryTargetSelected', 
-                            item.recoveryTargetSelected ? '' : 'O'
-                          )}
-                        >
-                          {item.recoveryTargetSelected ? '선정됨' : '선정하기'}
-                        </Button>
-                      </TableCell>
-                    )}
-                    
-                    {tabIndex === 1 && (
-                      <TableCell sx={{ textAlign: 'center' }}>
-                        <Button
-                          variant={item.recoveryCompleted ? 'contained' : 'outlined'}
-                          color={item.recoveryCompleted ? 'success' : 'primary'}
-                          size="small"
-                          onClick={() => handleStatusChange(
-                            item, 
-                            'recoveryCompleted', 
-                            item.recoveryCompleted ? '' : 'O'
-                          )}
-                        >
-                          {item.recoveryCompleted ? '완료됨' : '완료하기'}
-                        </Button>
-                      </TableCell>
-                    )}
+                                         <TableCell sx={{ 
+                       fontWeight: 'bold',
+                       width: '120px',
+                       overflow: 'hidden',
+                       textOverflow: 'ellipsis',
+                       whiteSpace: 'nowrap'
+                     }}>
+                       {item.manager}
+                     </TableCell>
+                     <TableCell sx={{ 
+                       textAlign: 'center',
+                       width: '150px',
+                       overflow: 'hidden',
+                       textOverflow: 'ellipsis',
+                       whiteSpace: 'nowrap'
+                     }}>
+                       {item.storeName}
+                     </TableCell>
+                     <TableCell sx={{ 
+                       textAlign: 'center',
+                       width: '140px',
+                       overflow: 'hidden',
+                       textOverflow: 'ellipsis',
+                       whiteSpace: 'nowrap'
+                     }}>
+                       {item.modelName}
+                     </TableCell>
+                     <TableCell sx={{ 
+                       textAlign: 'center',
+                       width: '80px'
+                     }}>
+                       <Chip 
+                         label={item.color} 
+                         size="small" 
+                         sx={{ 
+                           backgroundColor: getColorBackground(item.color),
+                           color: getColorText(item.color),
+                           border: getColorBorder(item.color),
+                           fontWeight: 'bold',
+                           minWidth: '60px'
+                         }}
+                       />
+                     </TableCell>
+                     <TableCell sx={{ 
+                       textAlign: 'center',
+                       width: '100px',
+                       overflow: 'hidden',
+                       textOverflow: 'ellipsis',
+                       whiteSpace: 'nowrap'
+                     }}>
+                       {item.serialNumber}
+                     </TableCell>
+                     <TableCell sx={{ 
+                       textAlign: 'center',
+                       width: '100px',
+                       overflow: 'hidden',
+                       textOverflow: 'ellipsis',
+                       whiteSpace: 'nowrap'
+                     }}>
+                       {item.recentShipmentDate || '출고일 정보 없음'}
+                     </TableCell>
+                     <TableCell sx={{ 
+                       textAlign: 'center',
+                       width: '80px'
+                     }}>
+                       <Chip 
+                         label={item.deviceStatus} 
+                         size="small"
+                         color={item.deviceStatus === '정상' ? 'success' : 'warning'}
+                       />
+                     </TableCell>
+                     
+                                           {/* 주소 컬럼 - 위경도좌표없는곳 탭에서만 표시 */}
+                      {tabIndex === 3 && (
+                        <TableCell sx={{ 
+                          textAlign: 'center',
+                          width: '200px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          <Typography variant="body2" sx={{ 
+                            wordBreak: 'break-word',
+                            fontSize: '0.875rem'
+                          }}>
+                            {item.address || '주소 정보 없음'}
+                          </Typography>
+                        </TableCell>
+                      )}
+                      
+                      {/* 액션 컬럼 */}
+                      {tabIndex === 0 && (
+                       <TableCell sx={{ 
+                         textAlign: 'center',
+                         width: '120px'
+                       }}>
+                         <Button
+                           variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
+                           color={item.recoveryTargetSelected ? 'success' : 'primary'}
+                           size="small"
+                           onClick={() => handleStatusChange(
+                             item, 
+                             'recoveryTargetSelected', 
+                             item.recoveryTargetSelected ? '' : 'O'
+                           )}
+                         >
+                           {item.recoveryTargetSelected ? '선정됨' : '선정하기'}
+                         </Button>
+                       </TableCell>
+                     )}
+                     
+                     {tabIndex === 1 && (
+                       <TableCell sx={{ 
+                         textAlign: 'center',
+                         width: '120px'
+                       }}>
+                         <Button
+                           variant={item.recoveryCompleted ? 'contained' : 'outlined'}
+                           color={item.recoveryCompleted ? 'success' : 'primary'}
+                           size="small"
+                           onClick={() => handleStatusChange(
+                             item, 
+                             'recoveryCompleted', 
+                             item.recoveryCompleted ? '' : 'O'
+                           )}
+                         >
+                           {item.recoveryCompleted ? '완료됨' : '완료하기'}
+                         </Button>
+                       </TableCell>
+                     )}
                   </TableRow>
                 ))}
               </TableBody>
