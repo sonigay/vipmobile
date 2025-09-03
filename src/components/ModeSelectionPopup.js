@@ -157,7 +157,7 @@ const ModeSelectionPopup = ({
         '실시간 필터링'
       ]
     },
-    'inventory-recovery': {
+    inventoryRecovery: {
       title: '재고회수 모드',
       description: '재고 회수 및 관리 시스템',
       icon: <RefreshIcon sx={{ fontSize: 40, color: '#8bc34a' }} />,

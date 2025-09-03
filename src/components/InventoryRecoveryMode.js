@@ -137,7 +137,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       <AppUpdatePopup
         open={showUpdatePopup}
         onClose={() => setShowUpdatePopup(false)}
-        mode="inventory-recovery"
+        mode="inventoryRecovery"
         loggedInStore={loggedInStore}
         onUpdateAdded={() => {
           console.log('재고회수모드 새 업데이트가 추가되었습니다.');

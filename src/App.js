@@ -1457,10 +1457,10 @@ function AppContent() {
       loadActivationData();
     }
     // 재고회수 모드인지 확인
-    else if (store.modePermissions && store.modePermissions['inventory-recovery']) {
+    else if (store.modePermissions && store.modePermissions.inventoryRecovery) {
       console.log('로그인: 재고회수 모드');
       console.log('store.modePermissions:', store.modePermissions);
-      console.log('store.modePermissions.inventory-recovery:', store.modePermissions['inventory-recovery']);
+      console.log('store.modePermissions.inventoryRecovery:', store.modePermissions.inventoryRecovery);
       setIsInventoryRecoveryMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1576,7 +1576,7 @@ function AppContent() {
       case 'budget':
         modifiedStore.isBudget = true;
         break;
-      case 'inventory-recovery':
+      case 'inventoryRecovery':
         modifiedStore.isInventoryRecovery = true;
         break;
       default:
@@ -1675,7 +1675,7 @@ function AppContent() {
         // console.log('영업 모드로 전환');
         setIsSalesMode(true);
         break;
-      case 'inventory-recovery':
+      case 'inventoryRecovery':
         // console.log('재고회수 모드로 전환');
         setIsInventoryRecoveryMode(true);
         break;
