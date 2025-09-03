@@ -53,29 +53,29 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
 
   // 클립보드 복사 함수
   const handleCopyToClipboard = async (manager, items) => {
+    let copyText = '';
+    
+    // 탭별로 다른 형식으로 복사
+    if (tabIndex === 0) { // 총 회수대상
+      copyText = `📦 총 회수대상 - ${manager}\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `─`.repeat(50) + '\n';
+    } else if (tabIndex === 1) { // 금일 회수대상
+      copyText = `🎯 금일 회수대상 - ${manager}\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `─`.repeat(50) + '\n';
+    } else if (tabIndex === 2) { // 금일 회수완료
+      copyText = `✅ 금일 회수완료 - ${manager}\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `─`.repeat(50) + '\n';
+    }
+
+    // 데이터 추가
+    items.forEach(item => {
+      copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
+    });
+
     try {
-      let copyText = '';
-      
-      // 탭별로 다른 형식으로 복사
-      if (tabIndex === 0) { // 총 회수대상
-        copyText = `📦 총 회수대상 - ${manager}\n`;
-        copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
-        copyText += `─`.repeat(50) + '\n';
-      } else if (tabIndex === 1) { // 금일 회수대상
-        copyText = `🎯 금일 회수대상 - ${manager}\n`;
-        copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
-        copyText += `─`.repeat(50) + '\n';
-      } else if (tabIndex === 2) { // 금일 회수완료
-        copyText = `✅ 금일 회수완료 - ${manager}\n`;
-        copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
-        copyText += `─`.repeat(50) + '\n';
-      }
-
-      // 데이터 추가
-      items.forEach(item => {
-        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
-      });
-
       await navigator.clipboard.writeText(copyText);
       
       setCopySuccess(prev => ({ ...prev, [manager]: true }));
