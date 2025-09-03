@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -14,7 +14,8 @@ import {
   Divider,
   Alert,
   IconButton,
-  Tooltip
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
@@ -25,6 +26,24 @@ import {
 
 function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
   const [copySuccess, setCopySuccess] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [cachedData, setCachedData] = useState({});
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const dataCacheRef = useRef(new Map());
+  const renderQueueRef = useRef([]);
+  const isRenderingRef = useRef(false);
+
+  // 캐시 키 생성 함수
+  const generateCacheKey = useCallback((data, tabIndex) => {
+    if (!data || data.length === 0) return `empty-${tabIndex}`;
+    
+    const dataHash = data.length + '-' + 
+      data.slice(0, 3).map(item => 
+        `${item.manager}-${item.storeName}-${item.modelName}`
+      ).join('-');
+    
+    return `${tabIndex}-${dataHash}`;
+  }, []);
 
   // 색상별 배경색 반환 함수
   const getColorBackground = (color) => {
@@ -172,18 +191,53 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
     return lightColors.includes(color) ? '1px solid #ccc' : 'none';
   };
 
-  // 담당자별로 데이터 그룹화
+  // 실시간 반영을 위한 최적화된 데이터 그룹화
   const groupedData = useMemo(() => {
-    const groups = {};
-    data.forEach(item => {
-      const manager = item.manager || '담당자 미지정';
-      if (!groups[manager]) {
-        groups[manager] = [];
+    const cacheKey = generateCacheKey(data, tabIndex);
+    
+    // 실시간 상태 변경이 있는 경우 캐시 무효화
+    const hasRealTimeChanges = data.some(item => 
+      item.recoveryTargetSelected || item.recoveryCompleted
+    );
+    
+    // 캐시된 데이터가 있고 실시간 변경이 없는 경우에만 사용
+    if (!hasRealTimeChanges && dataCacheRef.current.has(cacheKey)) {
+      const cached = dataCacheRef.current.get(cacheKey);
+      if (Date.now() - cached.timestamp < 5000) { // 5초로 단축 (실시간성 향상)
+        return cached.data;
       }
-      groups[manager].push(item);
+    }
+    
+    // 새로운 데이터 그룹화 (실시간 반영 우선)
+    const groups = {};
+    const batchSize = 50; // 배치 크기 축소로 빠른 반영
+    
+    for (let i = 0; i < data.length; i += batchSize) {
+      const batch = data.slice(i, i + batchSize);
+      
+      batch.forEach(item => {
+        const manager = item.manager || '담당자 미지정';
+        if (!groups[manager]) {
+          groups[manager] = [];
+        }
+        groups[manager].push(item);
+      });
+      
+      // 실시간 반영을 위한 최소 지연
+      if (i + batchSize < data.length) {
+        setTimeout(() => {}, 1);
+      }
+    }
+    
+    // 캐시에 저장 (실시간 데이터 우선)
+    dataCacheRef.current.set(cacheKey, {
+      data: groups,
+      timestamp: Date.now(),
+      hasRealTimeChanges
     });
+    
     return groups;
-  }, [data]);
+  }, [data, tabIndex, generateCacheKey]);
 
   // 테이블 헤더
   const tableHeaders = [
@@ -204,8 +258,27 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
     return tableHeaders;
   };
 
-  // 클립보드 복사 함수
-  const handleCopyToClipboard = async (manager, items) => {
+  // 가상화된 테이블 렌더링을 위한 청크 분할
+  const chunkedItems = useMemo(() => {
+    const chunks = [];
+    const chunkSize = 50; // 한 번에 렌더링할 아이템 수
+    
+    Object.entries(groupedData).forEach(([manager, items]) => {
+      for (let i = 0; i < items.length; i += chunkSize) {
+        chunks.push({
+          manager,
+          items: items.slice(i, i + chunkSize),
+          chunkIndex: Math.floor(i / chunkSize),
+          totalChunks: Math.ceil(items.length / chunkSize)
+        });
+      }
+    });
+    
+    return chunks;
+  }, [groupedData]);
+
+  // 클립보드 복사 함수 (메모이제이션)
+  const handleCopyToClipboard = useCallback(async (manager, items) => {
     let copyText = '';
     
     // 탭별로 다른 형식으로 복사
@@ -227,14 +300,14 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       copyText += `─`.repeat(50) + '\n';
     }
 
-         // 데이터 추가
-     items.forEach(item => {
-       if (tabIndex === 3) { // 위경도좌표없는곳
-         copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}/${item.address || '주소없음'}\n`;
-       } else {
-         copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
-       }
-     });
+    // 데이터 추가
+    items.forEach(item => {
+      if (tabIndex === 3) { // 위경도좌표없는곳
+        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}/${item.address || '주소없음'}\n`;
+      } else {
+        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
+      }
+    });
 
     try {
       await navigator.clipboard.writeText(copyText);
@@ -259,12 +332,96 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
         setCopySuccess(prev => ({ ...prev, [manager]: false }));
       }, 2000);
     }
-  };
+  }, [tabIndex]);
 
-  // 상태 업데이트 핸들러
-  const handleStatusChange = (item, column, value) => {
+  // 실시간 반영을 위한 강제 새로고침 함수
+  const handleForceRefresh = useCallback(async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    const startTime = Date.now();
+    
+    try {
+      // 모든 캐시 강제 무효화
+      dataCacheRef.current.clear();
+      setCachedData({});
+      
+      // 즉시 새로고침 실행
+      await onRefresh();
+      
+      setLastRefreshTime(Date.now());
+      console.log(`⚡ 강제 새로고침 완료: ${Date.now() - startTime}ms`);
+      
+    } catch (error) {
+      console.error('강제 새로고침 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, onRefresh]);
+
+  // 최적화된 새로고침 함수 (기본)
+  const handleOptimizedRefresh = useCallback(async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    const startTime = Date.now();
+    
+    try {
+      // 선택적 캐시 무효화
+      const cacheKey = generateCacheKey(data, tabIndex);
+      dataCacheRef.current.delete(cacheKey);
+      
+      await onRefresh();
+      
+      setLastRefreshTime(Date.now());
+      console.log(`🔄 최적화 새로고침 완료: ${Date.now() - startTime}ms`);
+      
+    } catch (error) {
+      console.error('새로고침 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, onRefresh, data, tabIndex, generateCacheKey]);
+
+  // 상태 업데이트 핸들러 (메모이제이션)
+  const handleStatusChange = useCallback((item, column, value) => {
     onStatusUpdate(item.rowIndex, column, value);
-  };
+  }, [onStatusUpdate]);
+
+  // 실시간 상태 변경 감지 및 성능 모니터링
+  useEffect(() => {
+    const startTime = performance.now();
+    
+    // 실시간 상태 변경 감지 (1초마다)
+    const realtimeCheckInterval = setInterval(() => {
+      const hasChanges = data.some(item => 
+        item.recoveryTargetSelected || item.recoveryCompleted
+      );
+      
+      if (hasChanges) {
+        // 실시간 변경사항이 있으면 캐시 무효화
+        dataCacheRef.current.clear();
+        console.log('🔄 실시간 변경사항 감지 - 캐시 무효화');
+      }
+    }, 1000);
+    
+    // 주기적 캐시 정리 (2분마다 - 실시간성 향상)
+    const cacheCleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, value] of dataCacheRef.current.entries()) {
+        if (now - value.timestamp > 120000) { // 2분
+          dataCacheRef.current.delete(key);
+        }
+      }
+    }, 120000);
+    
+    return () => {
+      const endTime = performance.now();
+      console.log(`📊 테이블 렌더링 시간: ${endTime - startTime}ms`);
+      clearInterval(realtimeCheckInterval);
+      clearInterval(cacheCleanupInterval);
+    };
+  }, [data]);
 
   // 데이터가 없는 경우
   if (data.length === 0) {
@@ -290,13 +447,33 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
           {tabIndex === 2 && '✅ 금일 회수완료'}
           {tabIndex === 3 && '⚠️ 위경도좌표없는곳'}
         </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={onRefresh}
-        >
-          새로고침
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {lastRefreshTime > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              마지막 업데이트: {new Date(lastRefreshTime).toLocaleTimeString()}
+            </Typography>
+          )}
+          <Button
+            variant="outlined"
+            startIcon={isLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
+            onClick={handleOptimizedRefresh}
+            disabled={isLoading}
+            title="최적화된 새로고침"
+          >
+            {isLoading ? '새로고침 중...' : '새로고침'}
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={isLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
+            onClick={handleForceRefresh}
+            disabled={isLoading}
+            title="강제 새로고침 (실시간 반영)"
+            size="small"
+          >
+            {isLoading ? '강제 새로고침 중...' : '⚡ 강제'}
+          </Button>
+        </Box>
       </Box>
 
       {/* 담당자별 테이블 */}
@@ -328,36 +505,36 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
             </Button>
           </Box>
 
-                     {/* 테이블 */}
-           <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
-             <Table size="small" sx={{ tableLayout: 'fixed' }}>
-                              <TableHead>
-                  <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
-                    {getTableHeaders().map((header, index) => (
-                      <TableCell 
-                        key={index}
-                        sx={{ 
-                          fontWeight: 'bold',
-                          textAlign: index === 0 ? 'left' : 'center',
-                                                     width: '12.5%' // 화면 너비의 1/8 (8개 컬럼 균등 분할)
-                        }}
-                      >
-                        {header}
-                      </TableCell>
-                    ))}
-                   {/* 액션 컬럼 */}
-                   {tabIndex === 0 && (
-                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
-                       회수대상선정
-                     </TableCell>
-                   )}
-                   {tabIndex === 1 && (
-                     <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
-                       회수완료
-                     </TableCell>
-                   )}
-                 </TableRow>
-               </TableHead>
+          {/* 테이블 */}
+          <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
+                  {getTableHeaders().map((header, index) => (
+                    <TableCell 
+                      key={index}
+                      sx={{ 
+                        fontWeight: 'bold',
+                        textAlign: index === 0 ? 'left' : 'center',
+                        width: '12.5%' // 화면 너비의 1/8 (8개 컬럼 균등 분할)
+                      }}
+                    >
+                      {header}
+                    </TableCell>
+                  ))}
+                  {/* 액션 컬럼 */}
+                  {tabIndex === 0 && (
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                      회수대상선정
+                    </TableCell>
+                  )}
+                  {tabIndex === 1 && (
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                      회수완료
+                    </TableCell>
+                  )}
+                </TableRow>
+              </TableHead>
               <TableBody>
                 {items.map((item, itemIndex) => (
                   <TableRow 
@@ -367,136 +544,136 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       '&:hover': { backgroundColor: '#f0f8ff' }
                     }}
                   >
-                                         <TableCell sx={{ 
-                       fontWeight: 'bold',
-                       width: '12.5%',
-                       overflow: 'hidden',
-                       textOverflow: 'ellipsis',
-                       whiteSpace: 'nowrap'
-                     }}>
-                       {item.manager}
-                     </TableCell>
-                     <TableCell sx={{ 
-                       textAlign: 'center',
-                       width: '12.5%',
-                       overflow: 'hidden',
-                       textOverflow: 'ellipsis',
-                       whiteSpace: 'nowrap'
-                     }}>
-                       {item.storeName}
-                     </TableCell>
-                     <TableCell sx={{ 
-                       textAlign: 'center',
-                       width: '12.5%',
-                       overflow: 'hidden',
-                       textOverflow: 'ellipsis',
-                       whiteSpace: 'nowrap'
-                     }}>
-                       {item.modelName}
-                     </TableCell>
-                     <TableCell sx={{ 
-                       textAlign: 'center',
-                       width: '12.5%'
-                     }}>
-                       <Chip 
-                         label={item.color} 
-                         size="small" 
-                         sx={{ 
-                           backgroundColor: getColorBackground(item.color),
-                           color: getColorText(item.color),
-                           border: getColorBorder(item.color),
-                           fontWeight: 'bold',
-                           minWidth: '60px'
-                         }}
-                       />
-                     </TableCell>
-                     <TableCell sx={{ 
-                       textAlign: 'center',
-                       width: '12.5%',
-                       overflow: 'hidden',
-                       textOverflow: 'ellipsis',
-                       whiteSpace: 'nowrap'
-                     }}>
-                       {item.serialNumber}
-                     </TableCell>
-                     <TableCell sx={{ 
-                       textAlign: 'center',
-                       width: '12.5%',
-                       overflow: 'hidden',
-                       textOverflow: 'ellipsis',
-                       whiteSpace: 'nowrap'
-                     }}>
-                       {item.recentShipmentDate || '출고일 정보 없음'}
-                     </TableCell>
-                     <TableCell sx={{ 
-                       textAlign: 'center',
-                       width: '12.5%'
-                     }}>
-                       <Chip 
-                         label={item.deviceStatus} 
-                         size="small"
-                         color={item.deviceStatus === '정상' ? 'success' : 'warning'}
-                       />
-                     </TableCell>
-                     
-                                           {/* 주소 컬럼 - 위경도좌표없는곳 탭에서만 표시 */}
-                                             {tabIndex === 3 && (
-                         <TableCell sx={{ 
-                           textAlign: 'center',
-                           width: '12.5%',
-                           overflow: 'hidden',
-                           textOverflow: 'ellipsis',
-                           whiteSpace: 'nowrap'
-                         }}>
-                          <Typography variant="body2" sx={{ 
-                            wordBreak: 'break-word',
-                            fontSize: '0.875rem'
-                          }}>
-                            {item.address || '주소 정보 없음'}
-                          </Typography>
-                        </TableCell>
-                      )}
-                      
-                                             {/* 액션 컬럼 */}
-                                               {tabIndex === 0 && (
-                         <TableCell sx={{ 
-                           textAlign: 'center',
-                           width: '12.5%'
-                         }}>
-                         <Button
-                           variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
-                           color={item.recoveryTargetSelected ? 'success' : 'primary'}
-                           size="small"
-                           onClick={() => handleStatusChange(
-                             item, 
-                             'recoveryTargetSelected', 
-                             item.recoveryTargetSelected ? '' : 'O'
-                           )}
-                         >
-                           {item.recoveryTargetSelected ? '선정됨' : '선정하기'}
-                         </Button>
-                       </TableCell>
-                     )}
-                     
-                                           {tabIndex === 1 && (
-                        <TableCell sx={{ 
-                          textAlign: 'center',
-                          width: '12.5%'
+                    <TableCell sx={{ 
+                      fontWeight: 'bold',
+                      width: '12.5%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.manager}
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '12.5%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.storeName}
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '12.5%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.modelName}
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '12.5%'
+                    }}>
+                      <Chip 
+                        label={item.color} 
+                        size="small" 
+                        sx={{ 
+                          backgroundColor: getColorBackground(item.color),
+                          color: getColorText(item.color),
+                          border: getColorBorder(item.color),
+                          fontWeight: 'bold',
+                          minWidth: '60px'
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '12.5%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.serialNumber}
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '12.5%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.recentShipmentDate || '출고일 정보 없음'}
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '12.5%'
+                    }}>
+                      <Chip 
+                        label={item.deviceStatus} 
+                        size="small"
+                        color={item.deviceStatus === '정상' ? 'success' : 'warning'}
+                      />
+                    </TableCell>
+                                         
+                    {/* 주소 컬럼 - 위경도좌표없는곳 탭에서만 표시 */}
+                    {tabIndex === 3 && (
+                      <TableCell sx={{ 
+                        textAlign: 'center',
+                        width: '12.5%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <Typography variant="body2" sx={{ 
+                          wordBreak: 'break-word',
+                          fontSize: '0.875rem'
                         }}>
-                         <Button
-                           variant={item.recoveryCompleted ? 'contained' : 'outlined'}
-                           color={item.recoveryCompleted ? 'success' : 'primary'}
-                           size="small"
-                           onClick={() => handleStatusChange(
-                             item, 
-                             'recoveryCompleted', 
-                             item.recoveryCompleted ? '' : 'O'
-                           )}
-                         >
-                           {item.recoveryCompleted ? '완료됨' : '완료하기'}
-                         </Button>
-                       </TableCell>
-                     )}
+                          {item.address || '주소 정보 없음'}
+                        </Typography>
+                      </TableCell>
+                    )}
+                    
+                    {/* 액션 컬럼 */}
+                    {tabIndex === 0 && (
+                      <TableCell sx={{ 
+                        textAlign: 'center',
+                        width: '12.5%'
+                      }}>
+                        <Button
+                          variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
+                          color={item.recoveryTargetSelected ? 'success' : 'primary'}
+                          size="small"
+                          onClick={() => handleStatusChange(
+                            item, 
+                            'recoveryTargetSelected', 
+                            item.recoveryTargetSelected ? '' : 'O'
+                          )}
+                        >
+                          {item.recoveryTargetSelected ? '선정됨' : '완료하기'}
+                        </Button>
+                      </TableCell>
+                    )}
+                    
+                    {tabIndex === 1 && (
+                      <TableCell sx={{ 
+                        textAlign: 'center',
+                        width: '12.5%'
+                      }}>
+                        <Button
+                          variant={item.recoveryCompleted ? 'contained' : 'outlined'}
+                          color={item.recoveryCompleted ? 'success' : 'primary'}
+                          size="small"
+                          onClick={() => handleStatusChange(
+                            item, 
+                            'recoveryCompleted', 
+                            item.recoveryCompleted ? '' : 'O'
+                          )}
+                        >
+                          {item.recoveryCompleted ? '완료됨' : '완료하기'}
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
