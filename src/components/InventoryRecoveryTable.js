@@ -97,8 +97,32 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
 
   // 색상별 텍스트 색상 반환 함수
   const getColorText = (color) => {
-    const lightColors = ['흰색', '화이트', 'White', '노랑', '옐로우', 'Yellow', '주황', '오렌지', 'Orange', '실버', 'Silver', '골드', 'Gold'];
-    return lightColors.includes(color) ? '#000000' : '#ffffff';
+    // 밝은 색상들 (어두운 글씨 필요)
+    const lightColors = [
+      '흰색', '화이트', 'White', 
+      '노랑', '옐로우', 'Yellow', 
+      '주황', '오렌지', 'Orange', 
+      '실버', 'Silver', 
+      '골드', 'Gold',
+      '크림', 'Cream',
+      '베이지', 'Beige',
+      '라이트그린', 'LightGreen',
+      '아이스블루', 'IceBlue', '라이트블루', 'LightBlue'
+    ];
+    
+    // 중간 톤 색상들 (검은 글씨 필요)
+    const mediumColors = [
+      '라벤더', 'Lavender',
+      '코랄', 'Coral'
+    ];
+    
+    if (lightColors.includes(color)) {
+      return '#000000'; // 검은 글씨
+    } else if (mediumColors.includes(color)) {
+      return '#000000'; // 검은 글씨
+    } else {
+      return '#ffffff'; // 흰 글씨
+    }
   };
 
   // 색상별 테두리 반환 함수
@@ -274,15 +298,15 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                         sx={{ 
                           fontWeight: 'bold',
                           textAlign: index === 0 ? 'left' : 'center',
-                          width: index === 0 ? '120px' : // 담당자
-                                 index === 1 ? '150px' : // 업체명
-                                 index === 2 ? '140px' : // 모델명
-                                 index === 3 ? '80px' :  // 색상
-                                 index === 4 ? '100px' : // 일련번호
-                                 index === 5 ? '100px' : // 출고일
-                                 index === 6 ? '80px' :  // 상태
-                                 index === 7 ? '200px' : // 주소 (위경도좌표없는곳)
-                                 'auto'
+                                                     width: index === 0 ? '130px' : // 담당자
+                                  index === 1 ? '180px' : // 업체명
+                                  index === 2 ? '160px' : // 모델명
+                                  index === 3 ? '90px' :  // 색상
+                                  index === 4 ? '120px' : // 일련번호
+                                  index === 5 ? '120px' : // 출고일
+                                  index === 6 ? '90px' :  // 상태
+                                  index === 7 ? '250px' : // 주소 (위경도좌표없는곳)
+                                  'auto'
                         }}
                       >
                         {header}
@@ -312,7 +336,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                   >
                                          <TableCell sx={{ 
                        fontWeight: 'bold',
-                       width: '120px',
+                       width: '130px',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -321,7 +345,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '150px',
+                       width: '180px',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -330,7 +354,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '140px',
+                       width: '160px',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -339,7 +363,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '80px'
+                       width: '90px'
                      }}>
                        <Chip 
                          label={item.color} 
@@ -355,7 +379,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '100px',
+                       width: '120px',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -364,7 +388,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '100px',
+                       width: '120px',
                        overflow: 'hidden',
                        textOverflow: 'ellipsis',
                        whiteSpace: 'nowrap'
@@ -373,7 +397,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      <TableCell sx={{ 
                        textAlign: 'center',
-                       width: '80px'
+                       width: '90px'
                      }}>
                        <Chip 
                          label={item.deviceStatus} 
@@ -383,14 +407,14 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                      </TableCell>
                      
                                            {/* 주소 컬럼 - 위경도좌표없는곳 탭에서만 표시 */}
-                      {tabIndex === 3 && (
-                        <TableCell sx={{ 
-                          textAlign: 'center',
-                          width: '200px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
+                                             {tabIndex === 3 && (
+                         <TableCell sx={{ 
+                           textAlign: 'center',
+                           width: '250px',
+                           overflow: 'hidden',
+                           textOverflow: 'ellipsis',
+                           whiteSpace: 'nowrap'
+                         }}>
                           <Typography variant="body2" sx={{ 
                             wordBreak: 'break-word',
                             fontSize: '0.875rem'
@@ -400,12 +424,12 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                         </TableCell>
                       )}
                       
-                      {/* 액션 컬럼 */}
-                      {tabIndex === 0 && (
-                       <TableCell sx={{ 
-                         textAlign: 'center',
-                         width: '120px'
-                       }}>
+                                             {/* 액션 컬럼 */}
+                       {tabIndex === 0 && (
+                        <TableCell sx={{ 
+                          textAlign: 'center',
+                          width: '140px'
+                        }}>
                          <Button
                            variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
                            color={item.recoveryTargetSelected ? 'success' : 'primary'}
@@ -421,11 +445,11 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                        </TableCell>
                      )}
                      
-                     {tabIndex === 1 && (
-                       <TableCell sx={{ 
-                         textAlign: 'center',
-                         width: '120px'
-                       }}>
+                                           {tabIndex === 1 && (
+                        <TableCell sx={{ 
+                          textAlign: 'center',
+                          width: '140px'
+                        }}>
                          <Button
                            variant={item.recoveryCompleted ? 'contained' : 'outlined'}
                            color={item.recoveryCompleted ? 'success' : 'primary'}
