@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   Box,
   Typography,
@@ -16,16 +19,31 @@ import {
   LocationOn as LocationIcon
 } from '@mui/icons-material';
 
+// Leaflet 마커 아이콘 설정 (기본 아이콘 경로 문제 해결)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
 function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState('');
+  const [markerProgress, setMarkerProgress] = useState(0);
 
-  // 마커 색상 정의
+  // 마커 색상 정의 (Leaflet용)
   const markerColors = {
     default: '#ffeb3b',      // 노란색 (기본)
     selected: '#4caf50',     // 초록색 (선정된 곳)
     completed: '#9c27b0'     // 보라색 (완료된 곳)
+  };
+
+  // 기본 중심점 (한국)
+  const defaultCenter = {
+    lat: 37.5665,
+    lng: 126.9780
   };
 
   // 마커 데이터 처리
@@ -77,113 +95,38 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
     });
   }, [data]);
 
-  // 지도 초기화
+  // 데이터가 있으면 첫 번째 마커를 중심으로 설정
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.google && window.google.maps) {
-      initializeMap();
-    } else {
-      // Google Maps API 로딩 대기
-      const timer = setInterval(() => {
-        if (typeof window !== 'undefined' && window.google && window.google.maps) {
-          clearInterval(timer);
-          initializeMap();
-        }
-      }, 100);
-
-      return () => clearInterval(timer);
+    if (processedMarkers.length > 0) {
+      const firstMarker = processedMarkers[0];
+      defaultCenter.lat = firstMarker.latitude;
+      defaultCenter.lng = firstMarker.longitude;
     }
   }, [processedMarkers]);
 
-  // 지도 초기화 함수
-  const initializeMap = () => {
-    try {
-      setMapLoading(true);
-      setMapError('');
+  // 커스텀 마커 아이콘 생성
+  const createCustomIcon = (color) => {
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="
+        width: 20px; 
+        height: 20px; 
+        background-color: ${color}; 
+        border: 2px solid white; 
+        border-radius: 50%; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      "></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+  };
 
-      // 지도 컨테이너 확인
-      const mapContainer = document.getElementById('inventory-recovery-map');
-      if (!mapContainer) {
-        throw new Error('지도 컨테이너를 찾을 수 없습니다.');
-      }
-
-      // 기본 중심점 (한국)
-      const defaultCenter = { lat: 36.5, lng: 127.5 };
-      
-      // 데이터가 있으면 첫 번째 마커를 중심으로 설정
-      if (processedMarkers.length > 0) {
-        const firstMarker = processedMarkers[0];
-        defaultCenter.lat = firstMarker.latitude;
-        defaultCenter.lng = firstMarker.longitude;
-      }
-
-      // 지도 생성
-      const map = new window.google.maps.Map(mapContainer, {
-        center: defaultCenter,
-        zoom: 10,
-        mapTypeId: window.google.maps.MapTypeId.ROADMAP,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          }
-        ]
-      });
-
-      // 마커 생성
-      processedMarkers.forEach(store => {
-        const marker = new window.google.maps.Marker({
-          position: { lat: store.latitude, lng: store.longitude },
-          map: map,
-          title: `${store.storeName} (${store.totalCount}건)`,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: store.color,
-            fillOpacity: 0.8,
-            strokeColor: '#ffffff',
-            strokeWeight: 2
-          }
-        });
-
-        // 마커 클릭 이벤트
-        marker.addListener('click', () => {
-          setSelectedMarker(store);
-        });
-
-        // 정보창 생성
-        const infoWindow = new window.google.maps.InfoWindow({
-          content: `
-            <div style="padding: 10px; min-width: 200px;">
-              <h3 style="margin: 0 0 10px 0; color: #1976d2;">${store.storeName}</h3>
-              <p style="margin: 5px 0;"><strong>총 회수대상:</strong> ${store.totalCount}건</p>
-              <p style="margin: 5px 0;"><strong>선정된 항목:</strong> ${store.selectedCount}건</p>
-              <p style="margin: 5px 0;"><strong>완료된 항목:</strong> ${store.completedCount}건</p>
-              <div style="margin-top: 10px;">
-                <div style="display: inline-block; width: 12px; height: 12px; background-color: ${markerColors.default}; border-radius: 50%; margin-right: 5px;"></div>
-                <span style="font-size: 12px;">기본</span>
-                <div style="display: inline-block; width: 12px; height: 12px; background-color: ${markerColors.selected}; border-radius: 50%; margin-right: 5px; margin-left: 10px;"></div>
-                <span style="font-size: 12px;">선정</span>
-                <div style="display: inline-block; width: 12px; height: 12px; background-color: ${markerColors.completed}; border-radius: 50%; margin-right: 5px; margin-left: 10px;"></div>
-                <span style="font-size: 12px;">완료</span>
-              </div>
-            </div>
-          `
-        });
-
-        // 마커에 정보창 연결
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
-        });
-      });
-
-      setMapLoading(false);
-    } catch (error) {
-      console.error('지도 초기화 오류:', error);
-      setMapError(error.message);
+  // 지도 로딩 완료 시 처리
+  useEffect(() => {
+    if (processedMarkers.length > 0) {
       setMapLoading(false);
     }
-  };
+  }, [processedMarkers]);
 
   // 상태 변경 핸들러
   const handleStatusChange = async (store, action) => {
@@ -301,62 +244,90 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
         </CardContent>
       </Card>
 
-      {/* 지도 컨테이너 */}
-      <Card>
-        <CardContent sx={{ p: 0, position: 'relative' }}>
-          <div 
-            id="inventory-recovery-map" 
-            style={{ 
-              width: '100%', 
-              height: '600px',
-              position: 'relative'
-            }}
-          />
-          
-          {/* 로딩 오버레이 */}
-          {mapLoading && (
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-              zIndex: 1000
-            }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <CircularProgress size={40} />
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  지도를 불러오는 중...
-                </Typography>
-              </Box>
-            </Box>
-          )}
-
-          {/* 에러 오버레이 */}
-          {mapError && (
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              zIndex: 1000
-            }}>
-              <Alert severity="error">
-                지도 로딩 실패: {mapError}
-              </Alert>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+             {/* 지도 컨테이너 */}
+       <Card>
+         <CardContent sx={{ p: 0, position: 'relative' }}>
+           <div style={{ width: '100%', height: '600px' }}>
+             {processedMarkers.length > 0 ? (
+               <MapContainer
+                 center={[defaultCenter.lat, defaultCenter.lng]}
+                 zoom={10}
+                 style={{ width: '100%', height: '100%' }}
+               >
+                 <TileLayer
+                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                 />
+                 
+                 {/* 마커들 */}
+                 {processedMarkers.map((store, index) => (
+                   <Marker
+                     key={index}
+                     position={[store.latitude, store.longitude]}
+                     icon={createCustomIcon(store.color)}
+                     eventHandlers={{
+                       click: () => setSelectedMarker(store)
+                     }}
+                   >
+                     <Popup>
+                       <div style={{ padding: '10px', minWidth: '200px' }}>
+                         <h3 style={{ margin: '0 0 10px 0', color: '#1976d2' }}>
+                           {store.storeName}
+                         </h3>
+                         <p style={{ margin: '5px 0' }}>
+                           <strong>총 회수대상:</strong> {store.totalCount}건
+                         </p>
+                         <p style={{ margin: '5px 0' }}>
+                           <strong>선정된 항목:</strong> {store.selectedCount}건
+                         </p>
+                         <p style={{ margin: '5px 0' }}>
+                           <strong>완료된 항목:</strong> {store.completedCount}건
+                         </p>
+                       </div>
+                     </Popup>
+                   </Marker>
+                 ))}
+               </MapContainer>
+             ) : (
+               <Box sx={{
+                 width: '100%',
+                 height: '100%',
+                 display: 'flex',
+                 justifyContent: 'center',
+                 alignItems: 'center',
+                 backgroundColor: '#f5f5f5'
+               }}>
+                 <Typography variant="body1" color="text.secondary">
+                   표시할 데이터가 없습니다.
+                 </Typography>
+               </Box>
+             )}
+           </div>
+           
+           {/* 로딩 오버레이 */}
+           {mapLoading && (
+             <Box sx={{
+               position: 'absolute',
+               top: 0,
+               left: 0,
+               right: 0,
+               bottom: 0,
+               display: 'flex',
+               justifyContent: 'center',
+               alignItems: 'center',
+               backgroundColor: 'rgba(255, 255, 255, 0.8)',
+               zIndex: 1000
+             }}>
+               <Box sx={{ textAlign: 'center' }}>
+                 <CircularProgress size={40} />
+                 <Typography variant="body2" sx={{ mt: 1 }}>
+                   지도를 불러오는 중...
+                 </Typography>
+               </Box>
+             </Box>
+           )}
+         </CardContent>
+       </Card>
 
       {/* 선택된 마커 정보 */}
       {selectedMarker && (
