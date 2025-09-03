@@ -64,10 +64,21 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     setError('');
     
     try {
+      console.log('🔄 [재고회수] 데이터 로드 시작');
       const response = await inventoryRecoveryAPI.getData();
+      
+      console.log('🔍 [재고회수] API 응답:', response);
+      
       if (response.success) {
         setRecoveryData(response.data);
         console.log('✅ 재고회수 데이터 로드 완료:', response.data.length, '개 항목');
+        
+        // 데이터 상세 로그
+        if (response.data.length > 0) {
+          console.log('🔍 [재고회수] 첫 번째 항목:', response.data[0]);
+        } else {
+          console.log('⚠️ [재고회수] 데이터가 없습니다. 구글시트를 확인해주세요.');
+        }
       } else {
         throw new Error(response.error || '데이터 로드에 실패했습니다.');
       }

@@ -23304,13 +23304,22 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
     });
 
     // 회수 데이터 처리
+    console.log(`🔍 [재고회수] 원본 데이터: ${recoveryData.length}행`);
+    console.log(`🔍 [재고회수] 좌표 매핑: ${Object.keys(coordinateMap).length}개 업체`);
+    
     const processedData = recoveryData
-      .filter(row => row.length > 25) // 최소 컬럼 수 확인
-      .map(row => {
+      .filter(row => {
+        const hasEnoughColumns = row.length > 25;
+        if (!hasEnoughColumns) {
+          console.log(`⚠️ [재고회수] 컬럼 부족: ${row.length}개 (필요: 26개)`);
+        }
+        return hasEnoughColumns;
+      })
+      .map((row, index) => {
         const storeName = (row[25] || '').toString().trim(); // Z열(25번인덱스): 출고처(업체명)
         const coordinates = coordinateMap[storeName] || { latitude: 0, longitude: 0 };
         
-        return {
+        const item = {
           recoveryCompleted: row[10] || '', // K열(10번인덱스): 회수완료
           recoveryTargetSelected: row[11] || '', // L열(11번인덱스): 회수대상선정
           manager: row[12] || '', // M열(12번인덱스): 담당자
@@ -23331,8 +23340,23 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
           longitude: coordinates.longitude,
           rowIndex: recoveryData.indexOf(row) + 2 // 실제 시트 행 번호 (헤더 제외)
         };
+        
+        console.log(`🔍 [재고회수] 행${index + 1}: ${storeName} (${coordinates.latitude}, ${coordinates.longitude})`);
+        return item;
       })
-      .filter(item => item.storeName && item.latitude && item.longitude); // 좌표가 있는 데이터만
+      .filter(item => {
+        const hasStoreName = item.storeName && item.storeName.length > 0;
+        const hasCoordinates = item.latitude !== 0 && item.longitude !== 0;
+        
+        if (!hasStoreName) {
+          console.log(`⚠️ [재고회수] 업체명 누락: ${JSON.stringify(item)}`);
+        }
+        if (!hasCoordinates) {
+          console.log(`⚠️ [재고회수] 좌표 누락: ${item.storeName} (${item.latitude}, ${item.longitude})`);
+        }
+        
+        return hasStoreName && hasCoordinates;
+      });
 
     console.log(`✅ [재고회수] 데이터 조회 완료: ${processedData.length}개 항목`);
     
