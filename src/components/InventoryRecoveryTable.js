@@ -384,8 +384,19 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
   }, [isLoading, onRefresh, data, tabIndex, generateCacheKey]);
 
   // 상태 업데이트 핸들러 (메모이제이션)
-  const handleStatusChange = useCallback((item, column, value) => {
-    onStatusUpdate(item.rowIndex, column, value);
+  const handleStatusChange = useCallback(async (item, column, value) => {
+    try {
+      await onStatusUpdate(item.rowIndex, column, value);
+    } catch (error) {
+      console.error('❌ 상태 업데이트 실패:', error);
+      
+      // CORS 오류인 경우 사용자에게 안내
+      if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+        alert('⚠️ 서버 연결 오류가 발생했습니다.\n\n원인: CORS 정책 또는 서버 연결 문제\n\n해결방법:\n1. 페이지 새로고침\n2. 잠시 후 다시 시도\n3. 관리자에게 문의');
+      } else {
+        alert(`❌ 상태 업데이트 실패: ${error.message}`);
+      }
+    }
   }, [onStatusUpdate]);
 
   // 실시간 상태 변경 감지 및 성능 모니터링
@@ -516,7 +527,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       sx={{ 
                         fontWeight: 'bold',
                         textAlign: index === 0 ? 'left' : 'center',
-                        width: '12.5%' // 화면 너비의 1/8 (8개 컬럼 균등 분할)
+                        width: tabIndex === 3 && header === '주소' ? '25%' : '10.7%' // 위경도좌표없는곳 탭에서 주소 컬럼만 넓게
                       }}
                     >
                       {header}
@@ -546,7 +557,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                   >
                     <TableCell sx={{ 
                       fontWeight: 'bold',
-                      width: '12.5%',
+                      width: '10.7%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -555,7 +566,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '12.5%',
+                      width: '10.7%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -564,7 +575,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '12.5%',
+                      width: '10.7%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -573,7 +584,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '12.5%'
+                      width: '10.7%'
                     }}>
                       <Chip 
                         label={item.color} 
@@ -589,7 +600,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '12.5%',
+                      width: '10.7%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -598,7 +609,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '12.5%',
+                      width: '10.7%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -607,7 +618,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '12.5%'
+                      width: '10.7%'
                     }}>
                       <Chip 
                         label={item.deviceStatus} 
@@ -620,7 +631,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     {tabIndex === 3 && (
                       <TableCell sx={{ 
                         textAlign: 'center',
-                        width: '12.5%',
+                        width: '25%',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -634,50 +645,84 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       </TableCell>
                     )}
                     
-                    {/* 액션 컬럼 */}
-                    {tabIndex === 0 && (
-                      <TableCell sx={{ 
-                        textAlign: 'center',
-                        width: '12.5%'
-                      }}>
-                        <Button
-                          variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
-                          color={item.recoveryTargetSelected ? 'success' : 'primary'}
-                          size="small"
-                          onClick={() => {
-                            const newValue = item.recoveryTargetSelected ? '' : 'O';
-                            // 회수대상선정 취소 시 회수완료도 함께 취소
-                            if (!newValue) {
-                              // 회수대상선정 취소 시 회수완료도 취소
-                              handleStatusChange(item, 'recoveryCompleted', '');
-                            }
-                            handleStatusChange(item, 'recoveryTargetSelected', newValue);
-                          }}
-                        >
-                          {item.recoveryTargetSelected ? '선정됨' : '완료하기'}
-                        </Button>
-                      </TableCell>
-                    )}
+                                         {/* 액션 컬럼 */}
+                     {tabIndex === 0 && (
+                       <TableCell sx={{ 
+                         textAlign: 'center',
+                         width: '10.7%'
+                       }}>
+                         {item.recoveryCompleted ? (
+                           // 회수완료 상태일 때는 회수대상점 선정 취소 불가
+                           <Tooltip title="회수완료 상태입니다. 회수완료를 먼저 취소해주세요.">
+                             <span>
+                               <Button
+                                 variant="contained"
+                                 color="success"
+                                 size="small"
+                                 disabled
+                                 sx={{ opacity: 0.7 }}
+                               >
+                                 회수완료됨
+                               </Button>
+                             </span>
+                           </Tooltip>
+                         ) : (
+                           <Button
+                             variant={item.recoveryTargetSelected ? 'contained' : 'outlined'}
+                             color={item.recoveryTargetSelected ? 'success' : 'primary'}
+                             size="small"
+                             onClick={() => {
+                               const newValue = item.recoveryTargetSelected ? '' : 'O';
+                               // 회수대상선정 취소 시 회수완료도 함께 취소
+                               if (!newValue && item.recoveryCompleted) {
+                                 // 회수대상선정 취소 시 회수완료도 취소
+                                 handleStatusChange(item, 'recoveryCompleted', '');
+                               }
+                               handleStatusChange(item, 'recoveryTargetSelected', newValue);
+                             }}
+                           >
+                             {item.recoveryTargetSelected ? '선정됨' : '선정하기'}
+                           </Button>
+                         )}
+                       </TableCell>
+                     )}
                     
-                    {tabIndex === 1 && (
-                      <TableCell sx={{ 
-                        textAlign: 'center',
-                        width: '12.5%'
-                      }}>
-                        <Button
-                          variant={item.recoveryCompleted ? 'contained' : 'outlined'}
-                          color={item.recoveryCompleted ? 'success' : 'primary'}
-                          size="small"
-                          onClick={() => handleStatusChange(
-                            item, 
-                            'recoveryCompleted', 
-                            item.recoveryCompleted ? '' : 'O'
-                          )}
-                        >
-                          {item.recoveryCompleted ? '완료됨' : '완료하기'}
-                        </Button>
-                      </TableCell>
-                    )}
+                                         {tabIndex === 1 && (
+                       <TableCell sx={{ 
+                         textAlign: 'center',
+                         width: '10.7%'
+                       }}>
+                         {!item.recoveryTargetSelected ? (
+                           // 회수대상점 선정이 안된 상태일 때는 회수완료 불가
+                           <Tooltip title="회수대상점 선정이 필요합니다. 먼저 선정해주세요.">
+                             <span>
+                               <Button
+                                 variant="outlined"
+                                 color="default"
+                                 size="small"
+                                 disabled
+                                 sx={{ opacity: 0.7 }}
+                               >
+                                 선정 필요
+                               </Button>
+                             </span>
+                           </Tooltip>
+                         ) : (
+                           <Button
+                             variant={item.recoveryCompleted ? 'contained' : 'outlined'}
+                             color={item.recoveryCompleted ? 'success' : 'primary'}
+                             size="small"
+                             onClick={() => handleStatusChange(
+                               item, 
+                               'recoveryCompleted', 
+                               item.recoveryCompleted ? '' : 'O'
+                             )}
+                           >
+                             {item.recoveryCompleted ? '완료됨' : '완료하기'}
+                           </Button>
+                         )}
+                       </TableCell>
+                     )}
                   </TableRow>
                 ))}
               </TableBody>
