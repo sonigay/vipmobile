@@ -1925,7 +1925,7 @@ app.get('/api/sales-mode-access', async (req, res) => {
 });
 
 // 재고회수모드 접근권한 확인 API
-app.get('/api/inventory-recovery-access', async (req, res) => {
+app.get('/api/inventoryRecoveryAccess', async (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
