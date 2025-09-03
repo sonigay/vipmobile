@@ -23,7 +23,8 @@ import {
   Event as EventIcon,
   CheckCircle as CheckCircleIcon,
   AccountBalance as BudgetIcon,
-  TrendingUp as SalesIcon
+  TrendingUp as SalesIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 
 const ModeSelectionPopup = ({ 
@@ -154,6 +155,18 @@ const ModeSelectionPopup = ({
         'POS코드별 실적 집계',
         '지역별 실적 분석',
         '실시간 필터링'
+      ]
+    },
+    'inventory-recovery': {
+      title: '재고회수 모드',
+      description: '재고 회수 및 관리 시스템',
+      icon: <RefreshIcon sx={{ fontSize: 40, color: '#8bc34a' }} />,
+      color: '#8bc34a',
+      features: [
+        '재고 회수 현황 관리',
+        '회수 통계 분석',
+        '자동화 프로세스',
+        '회수 알림 시스템'
       ]
     }
   };

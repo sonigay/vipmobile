@@ -31,6 +31,7 @@ import MeetingMode from './components/MeetingMode';
 import ReservationMode from './components/ReservationMode';
 import BudgetMode from './components/BudgetMode';
 import SalesMode from './components/SalesMode';
+import InventoryRecoveryMode from './components/InventoryRecoveryMode';
 
 
 
@@ -137,6 +138,7 @@ function AppContent() {
   const [isReservationMode, setIsReservationMode] = useState(false);
   // 예산모드 관련 상태 추가
   const [isBudgetMode, setIsBudgetMode] = useState(false);
+  const [isInventoryRecoveryMode, setIsInventoryRecoveryMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1496,6 +1498,8 @@ function AppContent() {
     modifiedStore.isPolicy = false;
     modifiedStore.isMeeting = false;
     modifiedStore.isReservation = false;
+    modifiedStore.isBudget = false;
+    modifiedStore.isInventoryRecovery = false;
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1525,6 +1529,9 @@ function AppContent() {
         break;
       case 'budget':
         modifiedStore.isBudget = true;
+        break;
+      case 'inventory-recovery':
+        modifiedStore.isInventoryRecovery = true;
         break;
       default:
         break;
@@ -1570,6 +1577,7 @@ function AppContent() {
     setIsReservationMode(false);
     setIsBudgetMode(false);
     setIsSalesMode(false);
+    setIsInventoryRecoveryMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1620,6 +1628,10 @@ function AppContent() {
       case 'sales':
         // console.log('영업 모드로 전환');
         setIsSalesMode(true);
+        break;
+      case 'inventory-recovery':
+        // console.log('재고회수 모드로 전환');
+        setIsInventoryRecoveryMode(true);
         break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
@@ -2281,6 +2293,30 @@ function AppContent() {
             setIsBudgetMode(false);
             setShowModeSelection(true);
             // console.log('BudgetMode 모드 선택 팝업 열기 완료');
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 재고회수모드일 때는 별도 화면 렌더링
+  if (isInventoryRecoveryMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <InventoryRecoveryMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            // console.log('App.js InventoryRecoveryMode onModeChange 호출됨');
+            const currentModes = getCurrentUserAvailableModes();
+            // console.log('getCurrentUserAvailableModes 결과:', currentModes);
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsInventoryRecoveryMode(false);
+            setShowModeSelection(true);
+            // console.log('InventoryRecoveryMode 모드 선택 팝업 열기 완료');
           }}
           availableModes={availableModes}
         />

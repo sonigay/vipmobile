@@ -1924,6 +1924,64 @@ app.get('/api/sales-mode-access', async (req, res) => {
   }
 });
 
+// 재고회수모드 접근권한 확인 API
+app.get('/api/inventory-recovery-access', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    // 대리점아이디관리 시트에서 T열 권한 확인
+    const agentResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${AGENT_SHEET_NAME}!A:T`
+    });
+
+    if (!agentResponse.data.values || agentResponse.data.values.length === 0) {
+      throw new Error('Failed to fetch agent data');
+    }
+
+    // 헤더 제거
+    const agentRows = agentResponse.data.values.slice(1);
+    
+    // T열에서 재고회수모드 권한이 있는 대리점 찾기
+    const authorizedAgents = agentRows
+      .filter(row => row && row.length > 19 && row[19] === 'O') // T열 (19번 인덱스)
+      .map(row => ({
+        agentCode: row[0] || '', // A열: 대리점코드
+        agentName: row[1] || '', // B열: 대리점명
+        accessLevel: row[19] || '' // T열: 재고회수모드 접근권한
+      }));
+
+    res.json({
+      success: true,
+      hasAccess: authorizedAgents.length > 0,
+      authorizedAgents,
+      totalAgents: agentRows.length,
+      authorizedCount: authorizedAgents.length
+    });
+  } catch (error) {
+    console.error('Error checking inventory recovery mode access:', error);
+    res.status(500).json({
+      success: false,
+      hasAccess: false,
+      error: 'Failed to check inventory recovery mode access',
+      message: error.message
+    });
+  }
+});
+
 // 모델과 색상 데이터 가져오기 (캐싱 적용)
 app.get('/api/models', async (req, res) => {
   const cacheKey = 'processed_models_data';
