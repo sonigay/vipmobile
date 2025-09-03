@@ -1377,6 +1377,8 @@ function AppContent() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
       setCurrentMode('sales');
       
       // 영업 모드에서는 서울시청을 중심으로 전체 지역 보기
@@ -1397,6 +1399,8 @@ function AppContent() {
         isPolicy: false,
         isMeeting: false,
         isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
         store: store
       }));
     }
@@ -1411,6 +1415,8 @@ function AppContent() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
       setCurrentMode('agent');
       
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
@@ -1438,6 +1444,8 @@ function AppContent() {
         isPolicy: false,
         isMeeting: false,
         isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
         store: store,
         agentTarget: store.target,
         agentQualification: store.qualification,
@@ -1447,6 +1455,40 @@ function AppContent() {
 
       // 관리자 모드일 때 개통실적 데이터 로드
       loadActivationData();
+    }
+    // 재고회수 모드인지 확인
+    else if (store.modePermissions && store.modePermissions['inventory-recovery']) {
+      console.log('로그인: 재고회수 모드');
+      console.log('store.modePermissions:', store.modePermissions);
+      console.log('store.modePermissions.inventory-recovery:', store.modePermissions['inventory-recovery']);
+      setIsInventoryRecoveryMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsSalesMode(false);
+      setCurrentMode('inventory-recovery');
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isInventoryRecovery: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        isBudget: false,
+        isSales: false,
+        store: store
+      }));
     } else {
       // 일반 매장 모드
       // console.log('로그인: 일반 매장 모드');
@@ -1458,6 +1500,8 @@ function AppContent() {
       setIsPolicyMode(false);
       setIsMeetingMode(false);
       setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
       setCurrentMode('general');
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
@@ -1477,6 +1521,8 @@ function AppContent() {
         isPolicy: false,
         isMeeting: false,
         isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
         store: store
       }));
     }
@@ -1687,6 +1733,10 @@ function AppContent() {
     setIsMeetingMode(false);
     // 사전예약모드 상태 초기화
     setIsReservationMode(false);
+    // 예산모드 상태 초기화
+    setIsBudgetMode(false);
+    // 재고회수모드 상태 초기화
+    setIsInventoryRecoveryMode(false);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
