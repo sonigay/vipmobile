@@ -23422,17 +23422,19 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
       throw new Error('유효하지 않은 컬럼입니다.');
     }
 
-    // 배치 업데이트로 여러 열을 한 번에 처리
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
-      valueInputOption: 'RAW',
-      data: ranges.map((range, index) => ({
-        range,
-        values: [values[index]]
-      }))
-    });
+    // 각 셀을 개별적으로 업데이트
+    for (let i = 0; i < ranges.length; i++) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+        range: ranges[i],
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [values[i]]
+        }
+      });
+    }
 
-    console.log(`✅ [재고회수] 상태 업데이트 완료: ${range} = ${value}`);
+    console.log(`✅ [재고회수] 상태 업데이트 완료: 행${rowIndex}, 열${column} = ${value}`);
     
     res.json({
       success: true,
