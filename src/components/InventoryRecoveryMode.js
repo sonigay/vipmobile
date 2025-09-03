@@ -42,7 +42,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
         onModeChange={onModeChange}
         availableModes={availableModes}
         currentMode="재고회수"
-        onUpdateCheck={handleUpdateCheck}
+        onCheckUpdate={handleUpdateCheck}
       />
       
       {/* 메인 콘텐츠 */}
