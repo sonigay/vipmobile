@@ -68,6 +68,10 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
       copyText = `✅ 금일 회수완료 - ${manager}\n`;
       copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
       copyText += `─`.repeat(50) + '\n';
+    } else if (tabIndex === 3) { // 위경도좌표없는곳
+      copyText = `⚠️ 위경도좌표없는곳 - ${manager}\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `─`.repeat(50) + '\n';
     }
 
     // 데이터 추가
@@ -113,6 +117,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
           {tabIndex === 0 && '총 회수대상 데이터가 없습니다.'}
           {tabIndex === 1 && '금일 회수대상 데이터가 없습니다.'}
           {tabIndex === 2 && '금일 회수완료 데이터가 없습니다.'}
+          {tabIndex === 3 && '위경도좌표없는곳 데이터가 없습니다.'}
         </Typography>
       </Box>
     );
@@ -126,6 +131,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
           {tabIndex === 0 && '📦 총 회수대상'}
           {tabIndex === 1 && '🎯 금일 회수대상'}
           {tabIndex === 2 && '✅ 금일 회수완료'}
+          {tabIndex === 3 && '⚠️ 위경도좌표없는곳'}
         </Typography>
         <Button
           variant="outlined"

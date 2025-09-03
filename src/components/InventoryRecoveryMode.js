@@ -144,6 +144,8 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
         return recoveryData.filter(item => item.recoveryTargetSelected);
       case 2: // 금일 회수완료
         return recoveryData.filter(item => item.recoveryCompleted);
+      case 3: // 위경도좌표없는곳
+        return recoveryData.filter(item => !item.hasCoordinates);
       default:
         return recoveryData;
     }
@@ -226,6 +228,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
             <Tab label="📦 총 회수대상" />
             <Tab label="🎯 금일 회수대상" />
             <Tab label="✅ 금일 회수완료" />
+            <Tab label="⚠️ 위경도좌표없는곳" />
           </Tabs>
         </Card>
 

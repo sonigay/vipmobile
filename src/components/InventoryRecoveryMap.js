@@ -229,9 +229,10 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <Typography variant="h6" color="text.secondary">
-          {tabIndex === 0 && '총 회수대상 데이터가 없습니다.'}
-          {tabIndex === 1 && '금일 회수대상 데이터가 없습니다.'}
-          {tabIndex === 2 && '금일 회수완료 데이터가 없습니다.'}
+                  {tabIndex === 0 && '총 회수대상 데이터가 없습니다.'}
+        {tabIndex === 1 && '금일 회수대상 데이터가 없습니다.'}
+        {tabIndex === 2 && '금일 회수완료 데이터가 없습니다.'}
+        {tabIndex === 3 && '위경도좌표없는곳 데이터가 없습니다.'}
         </Typography>
       </Box>
     );
@@ -242,9 +243,10 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
       {/* 지도 헤더 */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-          {tabIndex === 0 && '📦 총 회수대상 - 지도 보기'}
-          {tabIndex === 1 && '🎯 금일 회수대상 - 지도 보기'}
-          {tabIndex === 2 && '✅ 금일 회수완료 - 지도 보기'}
+                  {tabIndex === 0 && '📦 총 회수대상 - 지도 보기'}
+        {tabIndex === 1 && '🎯 금일 회수대상 - 지도 보기'}
+        {tabIndex === 2 && '✅ 금일 회수완료 - 지도 보기'}
+        {tabIndex === 3 && '⚠️ 위경도좌표없는곳 - 지도 보기'}
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 1 }}>

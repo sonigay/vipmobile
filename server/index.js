@@ -23269,43 +23269,21 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
   try {
     console.log('🔄 [재고회수] 데이터 조회 시작');
     
-    // 회수목록 시트와 폰클출고처데이터 시트를 병렬로 가져오기
-    const [recoveryListResponse, storeDataResponse] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId: '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
-        range: '회수목록!A:Z'
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '폰클출고처데이터!A:O'
-      })
-    ]);
+    // 회수목록 시트만 가져오기 (좌표는 "회수목록" 시트에서 직접 읽기)
+    const recoveryListResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+      range: '회수목록!A:Z'
+    });
 
-    if (!recoveryListResponse.data.values || !storeDataResponse.data.values) {
+    if (!recoveryListResponse.data.values) {
       throw new Error('데이터를 가져올 수 없습니다.');
     }
 
     // 헤더 제거
     const recoveryData = recoveryListResponse.data.values.slice(1);
-    const storeData = storeDataResponse.data.values.slice(1);
-
-    // 업체명으로 좌표 매핑 테이블 생성
-    const coordinateMap = {};
-    storeData.forEach(row => {
-      if (row.length > 13 && row[13]) { // O열(13번인덱스): 업체명
-        const storeName = row[13].toString().trim();
-        const latitude = parseFloat(row[8] || '0'); // I열(8번인덱스): 위도
-        const longitude = parseFloat(row[9] || '0'); // J열(9번인덱스): 경도
-        
-        if (latitude && longitude) {
-          coordinateMap[storeName] = { latitude, longitude };
-        }
-      }
-    });
 
     // 회수 데이터 처리
     console.log(`🔍 [재고회수] 원본 데이터: ${recoveryData.length}행`);
-    console.log(`🔍 [재고회수] 좌표 매핑: ${Object.keys(coordinateMap).length}개 업체`);
     
     const processedData = recoveryData
       .filter(row => {
@@ -23317,7 +23295,8 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
       })
       .map((row, index) => {
         const storeName = (row[25] || '').toString().trim(); // Z열(25번인덱스): 출고처(업체명)
-        const coordinates = coordinateMap[storeName] || { latitude: 0, longitude: 0 };
+        const latitude = parseFloat(row[8] || '0'); // I열(8번인덱스): 위도
+        const longitude = parseFloat(row[9] || '0'); // J열(9번인덱스): 경도
         
         const item = {
           recoveryCompleted: row[10] || '', // K열(10번인덱스): 회수완료
@@ -23336,26 +23315,23 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
           carrier: row[23] || '', // X열(23번인덱스): 통신사
           employee: row[24] || '', // Y열(24번인덱스): 담당사원
           storeName, // Z열(25번인덱스): 출고처(업체명)
-          latitude: coordinates.latitude,
-          longitude: coordinates.longitude,
+          latitude: latitude,
+          longitude: longitude,
+          hasCoordinates: latitude !== 0 && longitude !== 0,
           rowIndex: recoveryData.indexOf(row) + 2 // 실제 시트 행 번호 (헤더 제외)
         };
         
-        console.log(`🔍 [재고회수] 행${index + 1}: ${storeName} (${coordinates.latitude}, ${coordinates.longitude})`);
+        console.log(`🔍 [재고회수] 행${index + 1}: ${storeName} (${latitude}, ${longitude})`);
         return item;
       })
       .filter(item => {
         const hasStoreName = item.storeName && item.storeName.length > 0;
-        const hasCoordinates = item.latitude !== 0 && item.longitude !== 0;
         
         if (!hasStoreName) {
           console.log(`⚠️ [재고회수] 업체명 누락: ${JSON.stringify(item)}`);
         }
-        if (!hasCoordinates) {
-          console.log(`⚠️ [재고회수] 좌표 누락: ${item.storeName} (${item.latitude}, ${item.longitude})`);
-        }
         
-        return hasStoreName && hasCoordinates;
+        return hasStoreName; // 좌표가 없어도 업체명만 있으면 포함
       });
 
     console.log(`✅ [재고회수] 데이터 조회 완료: ${processedData.length}개 항목`);
