@@ -1572,8 +1572,9 @@ app.get('/api/stores', async (req, res) => {
         const status = row[12];                         // M열: 거래상태 (12번째 컬럼)
         const name = row[14].toString().trim();        // G열: 업체명 (6+8)
         const storeId = row[15];                        // H열: 매장 ID (7+8)
-        const phone = row[17] || '';                    // J열: 연락처 (9+8)
-        const manager = row[21] || '';                  // N열: 담당자 (13+8)
+        const phone = row[17] || '';                    // R열: 연락처 (17번째 컬럼)
+        const storePhone = row[22] || '';               // W열: 매장연락처 (22번째 컬럼)
+        const manager = row[21] || '';                  // V열: 담당자 (21번째 컬럼)
         const address = (row[11] || '').toString();    // L열: 주소 (11번째 컬럼)
         
         // 빈 매장 ID 제외
@@ -1588,6 +1589,7 @@ app.get('/api/stores', async (req, res) => {
           name,
           address,
           phone,
+          storePhone,
           manager,
           latitude,
           longitude,

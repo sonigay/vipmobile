@@ -17,6 +17,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import CallIcon from '@mui/icons-material/Call';
 import ChatIcon from '@mui/icons-material/Chat';
 import SearchIcon from '@mui/icons-material/Search';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { fetchAgentData } from '../api';
 
 /**
@@ -109,6 +110,29 @@ function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentConta
     if (onCallButtonClick) {
       onCallButtonClick();
     }
+  };
+
+  /**
+   * 픽업지정보 복사 함수
+   */
+  const handlePickupInfoCopy = (store) => {
+    if (!store) {
+      alert('매장 정보가 없습니다.');
+      return;
+    }
+
+    const pickupInfo = `■ 픽업지정보
+매장명 : ${store.name}
+주소 : ${store.address || '주소 정보 없음'}
+연락처 : ${store.storePhone || '연락처 정보 없음'}`;
+
+    // 클립보드에 복사
+    navigator.clipboard.writeText(pickupInfo).then(() => {
+      alert('픽업지정보가 복사되었습니다!');
+    }).catch(err => {
+      console.error('클립보드 복사 실패:', err);
+      alert('클립보드 복사에 실패했습니다.');
+    });
   };
 
   /**
@@ -274,7 +298,29 @@ ${model} / ${color} 모델
               </TableRow>
               <TableRow>
                 <TableCell variant="head">주소</TableCell>
-                <TableCell>{selectedStore.address || '주소 정보 없음'}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <span>{selectedStore.address || '주소 정보 없음'}</span>
+                    </Box>
+                    <Button 
+                      variant="outlined" 
+                      color="secondary"
+                      startIcon={<ContentCopyIcon />}
+                      onClick={() => handlePickupInfoCopy(selectedStore)}
+                      size="small"
+                      sx={{ 
+                        borderRadius: '20px', 
+                        minWidth: '120px',
+                        alignSelf: 'flex-start',
+                        fontSize: '0.7rem',
+                        textTransform: 'none'
+                      }}
+                    >
+                      픽업지복사
+                    </Button>
+                  </Box>
+                </TableCell>
               </TableRow>
               {requestedStore && (
                 <TableRow>
