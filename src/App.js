@@ -2901,6 +2901,7 @@ function AppContent() {
                     selectedModel={selectedModel}
                     selectedColor={selectedColor}
                     loggedInStoreId={loggedInStore?.id}
+                    loggedInStore={loggedInStore} // 일반모드 카톡문구생성을 위해 추가
                     isAgentMode={isAgentMode}
                     currentView={currentView}
                     forceZoomToStore={forceZoomToStore}
