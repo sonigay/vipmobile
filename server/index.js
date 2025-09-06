@@ -713,14 +713,28 @@ async function getSheetValues(sheetName, spreadsheetId = SPREADSHEET_ID) {
   return await fetchSheetValuesDirectly(sheetName, spreadsheetId);
 }
 
+// 폰클개통데이터 캐시 무효화 함수
+function invalidatePhoneklActivationCache() {
+  const cacheKey = `sheet_폰클개통데이터_${SPREADSHEET_ID}`;
+  cacheUtils.delete(cacheKey);
+  console.log('🗑️ [캐시 무효화] 폰클개통데이터 캐시 삭제됨');
+}
+
 // 캐시를 무시하고 직접 시트에서 데이터를 가져오는 함수
 async function getSheetValuesWithoutCache(sheetName) {
   try {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:Z 범위
-    const range = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:Z`;
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:Z 범위
+    let range;
+    if (sheetName === 'raw데이터') {
+      range = `${safeSheetName}!A:AB`;
+    } else if (sheetName === '폰클개통데이터') {
+      range = `${safeSheetName}!A:BZ`;
+    } else {
+      range = `${safeSheetName}!A:Z`;
+    }
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -728,6 +742,13 @@ async function getSheetValuesWithoutCache(sheetName) {
     });
     
     const data = response.data.values || [];
+    
+    // 폰클개통데이터의 경우 캐시에 저장 (5분 TTL)
+    if (sheetName === '폰클개통데이터') {
+      const cacheKey = `sheet_${sheetName}_${SPREADSHEET_ID}`;
+      cacheUtils.set(cacheKey, data, 5 * 60);
+    }
+    
     return data;
   } catch (error) {
     console.error(`Error fetching sheet ${sheetName} without cache:`, error);
@@ -20605,6 +20626,9 @@ app.get('/api/closing-chart', async (req, res) => {
     const targetDate = date || new Date().toISOString().split('T')[0];
     
     console.log(`마감장표 데이터 조회 시작: ${targetDate}`);
+    
+    // 폰클개통데이터 캐시 무효화 (BZ열 데이터 포함하도록)
+    invalidatePhoneklActivationCache();
     
     // 캐시 키 생성
     const cacheKey = `closing_chart_${targetDate}`;
