@@ -8146,6 +8146,9 @@ app.get('/api/inspection-data', async (req, res) => {
   const { view = 'personal', userId, field } = req.query;
   const cacheKey = `inspection_data_${view}_${userId}_${field || 'all'}`;
   
+  // 폰클개통데이터 캐시 무효화 (BZ열 데이터 포함하도록)
+  invalidatePhoneklActivationCache();
+  
   // 캐시에서 먼저 확인 (보안 TTL 적용)
   const cachedData = cacheUtils.get(cacheKey);
   if (cachedData) {
