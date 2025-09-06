@@ -20713,9 +20713,21 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
   
   // 개통 데이터 필터링
   const dataRows = phoneklData.slice(3); // 헤더 제외
+  console.log('🔍 [CS 디버깅] 원본 데이터 행 수:', dataRows.length);
+  
+  let filteredCount = 0;
+  let lengthFilteredCount = 0;
+  let dateFilteredCount = 0;
+  let modelFilteredCount = 0;
+  let planFilteredCount = 0;
+  let conditionFilteredCount = 0;
+  let typeFilteredCount = 0;
   
   const filteredPhoneklData = dataRows.filter(row => {
-    if (row.length < 10) return false;
+    if (row.length < 10) {
+      lengthFilteredCount++;
+      return false;
+    }
     
     const activationDate = (row[9] || '').toString(); // J열: 개통일
     const model = (row[21] || '').toString(); // V열: 모델명
@@ -20726,18 +20738,44 @@ function processClosingChartData({ phoneklData, storeData, inventoryData, operat
     // 날짜 필터링
     const targetDateObj = new Date(targetDate);
     const activationDateObj = new Date(activationDate);
-    if (isNaN(activationDateObj.getTime()) || activationDateObj > targetDateObj) return false;
+    if (isNaN(activationDateObj.getTime()) || activationDateObj > targetDateObj) {
+      dateFilteredCount++;
+      return false;
+    }
     
     // 모델 필터링 (휴대폰만)
-    if (!phoneModels.has(model)) return false;
+    if (!phoneModels.has(model)) {
+      modelFilteredCount++;
+      return false;
+    }
     
     // 제외 조건
-    if (planType.includes('선불')) return false;
-    if (condition.includes('중고')) return false;
-    if (type.includes('중고') || type.includes('유심')) return false;
+    if (planType.includes('선불')) {
+      planFilteredCount++;
+      return false;
+    }
+    if (condition.includes('중고')) {
+      conditionFilteredCount++;
+      return false;
+    }
+    if (type.includes('중고') || type.includes('유심')) {
+      typeFilteredCount++;
+      return false;
+    }
     
+    filteredCount++;
     return true;
   });
+  
+  console.log('🔍 [CS 디버깅] 필터링 결과:');
+  console.log('🔍 [CS 디버깅] - 원본 행 수:', dataRows.length);
+  console.log('🔍 [CS 디버깅] - 필터링된 행 수:', filteredPhoneklData.length);
+  console.log('🔍 [CS 디버깅] - 행 길이 부족으로 제외:', lengthFilteredCount);
+  console.log('🔍 [CS 디버깅] - 날짜 조건으로 제외:', dateFilteredCount);
+  console.log('🔍 [CS 디버깅] - 모델 조건으로 제외:', modelFilteredCount);
+  console.log('🔍 [CS 디버깅] - 요금제 조건으로 제외:', planFilteredCount);
+  console.log('🔍 [CS 디버깅] - 상태 조건으로 제외:', conditionFilteredCount);
+  console.log('🔍 [CS 디버깅] - 유형 조건으로 제외:', typeFilteredCount);
   
   // 지원금 계산
   const supportBonusData = calculateSupportBonus(filteredPhoneklData, excludedAgents);
@@ -22196,7 +22234,10 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
 
 // CS 개통 요약 계산 (무선 + 유선)
 function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, phoneModels, excludedAgents) {
-
+  console.log('🔍 [CS 디버깅] calculateCSSummary 시작');
+  console.log('🔍 [CS 디버깅] filteredPhoneklData 길이:', filteredPhoneklData.length);
+  console.log('🔍 [CS 디버깅] targetDate:', targetDate);
+  console.log('🔍 [CS 디버깅] phoneModels 크기:', phoneModels.size);
   
   const csAgents = new Map();
   let totalWireless = 0;
@@ -22204,12 +22245,34 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
   
   // BZ열에서 CS 직원들 명단 추출 (고유값) - 무선
   const csEmployeeSet = new Set();
-  filteredPhoneklData.forEach(row => {
+  let bzColumnEmptyCount = 0;
+  let bzColumnNCount = 0;
+  let bzColumnValidCount = 0;
+  
+  filteredPhoneklData.forEach((row, index) => {
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
-    if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
+    
+    if (!csEmployee || csEmployee === '') {
+      bzColumnEmptyCount++;
+    } else if (csEmployee === 'N' || csEmployee === 'NO') {
+      bzColumnNCount++;
+    } else {
+      bzColumnValidCount++;
       csEmployeeSet.add(csEmployee);
+      
+      // 처음 5개 CS 직원명만 로그 출력
+      if (bzColumnValidCount <= 5) {
+        console.log(`🔍 [CS 디버깅] 유효한 CS 직원 ${bzColumnValidCount}: "${csEmployee}" (행 ${index + 4})`);
+      }
     }
   });
+  
+  console.log('🔍 [CS 디버깅] BZ열 분석 결과:');
+  console.log('🔍 [CS 디버깅] - 빈 값:', bzColumnEmptyCount);
+  console.log('🔍 [CS 디버깅] - N/NO 값:', bzColumnNCount);
+  console.log('🔍 [CS 디버깅] - 유효한 CS 직원:', bzColumnValidCount);
+  console.log('🔍 [CS 디버깅] - 고유 CS 직원 수:', csEmployeeSet.size);
+  console.log('🔍 [CS 디버깅] - 고유 CS 직원 목록:', Array.from(csEmployeeSet));
   
 
   
@@ -22250,9 +22313,14 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
   
   // 무선 개통 데이터 처리 (filteredPhoneklData 사용) - 모든 필터링이 이미 적용된 데이터
   let wirelessProcessed = 0;
+  let rowLengthIssueCount = 0;
+  let csEmployeeValidCount = 0;
   
   filteredPhoneklData.forEach((row, index) => {
-    if (row.length < 78) return; // 최소한 BZ열까지 있는지 확인
+    if (row.length < 78) {
+      rowLengthIssueCount++;
+      return; // 최소한 BZ열까지 있는지 확인
+    }
     
     const csEmployee = (row[77] || '').toString().trim(); // BZ열: CS직원
     
@@ -22260,13 +22328,26 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
     if (csEmployee && csEmployee !== '' && csEmployee !== 'N' && csEmployee !== 'NO') {
       totalWireless++;
       wirelessProcessed++;
+      csEmployeeValidCount++;
       
       if (csAgents.has(csEmployee)) {
         csAgents.get(csEmployee).wireless++;
         csAgents.get(csEmployee).total++;
       }
+      
+      // 처음 3개 CS 개통만 상세 로그 출력
+      if (csEmployeeValidCount <= 3) {
+        const activationDate = (row[9] || '').toString(); // J열: 개통일
+        const model = (row[21] || '').toString(); // V열: 모델명
+        console.log(`🔍 [CS 디버깅] CS 개통 ${csEmployeeValidCount}: "${csEmployee}" - ${activationDate} - ${model} (행 ${index + 4})`);
+      }
     }
   });
+  
+  console.log('🔍 [CS 디버깅] 무선 개통 처리 결과:');
+  console.log('🔍 [CS 디버깅] - 행 길이 부족:', rowLengthIssueCount);
+  console.log('🔍 [CS 디버깅] - 유효한 CS 개통:', csEmployeeValidCount);
+  console.log('🔍 [CS 디버깅] - 총 무선 개통:', totalWireless);
   
   
   
@@ -22305,7 +22386,7 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
 
   }
   
-  return {
+  const result = {
     totalWireless,
     totalWired,
     total: totalWireless + totalWired,
@@ -22319,6 +22400,15 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
         total: data.total
       }))
   };
+  
+  console.log('🔍 [CS 디버깅] 최종 결과:');
+  console.log('🔍 [CS 디버깅] - 총 무선 개통:', result.totalWireless);
+  console.log('🔍 [CS 디버깅] - 총 유선 개통:', result.totalWired);
+  console.log('🔍 [CS 디버깅] - 총 개통:', result.total);
+  console.log('🔍 [CS 디버깅] - CS 직원 수:', result.agents.length);
+  console.log('🔍 [CS 디버깅] - CS 직원 목록:', result.agents.map(a => `${a.agent}(${a.total}건)`));
+  
+  return result;
 }
 
 // 등록점 계산 함수
