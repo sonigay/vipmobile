@@ -22319,6 +22319,11 @@ function calculateCSSummary(filteredPhoneklData, phoneklHomeData, targetDate, ph
   let csEmployeeValidCount = 0;
   
   filteredPhoneklData.forEach((row, index) => {
+    // 처음 5개 행의 길이와 BZ열 값 확인
+    if (index < 5) {
+      console.log(`🔍 [CS 디버깅] 행 ${index + 1} 길이: ${row.length}, BZ열(77): "${row[77] || '없음'}"`);
+    }
+    
     if (row.length < 78) {
       rowLengthIssueCount++;
       return; // 최소한 BZ열까지 있는지 확인
