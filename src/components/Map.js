@@ -1171,8 +1171,11 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   icon={createDuplicateMarkerIcon(representativeStore, isSelected, totalInventoryCount)}
                   eventHandlers={{
                     click: () => {
-                      // 중복 좌표 클릭 시 대표 매장을 선택
-                      onStoreSelect(representativeStore);
+                      // 선택되지 않은 상태면 아무것도 하지 않음 (말풍선만 표시)
+                      // 선택된 상태면 해당 매장을 다시 선택
+                      if (isSelected) {
+                        onStoreSelect(representativeStore);
+                      }
                     }
                   }}
                 >
