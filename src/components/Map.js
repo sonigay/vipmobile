@@ -910,30 +910,59 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {store.address && <p>주소: {store.address}</p>}
                       <p>재고: {inventoryCount}개</p>
                       
-                      {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                        
-                        <button 
-                          onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
-                          disabled={!selectedModel || !selectedColor}
-                          style={{
-                            flex: 1,
-                            padding: '6px 8px',
-                            backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
-                            color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                            minWidth: '80px'
-                          }}
-                        >
-                          영업사원요청문구
-                        </button>
-                      </div>
+                      {/* 관리자모드일 때는 출고일 기준 재고 정보 표시 */}
+                      {isAgentMode ? (
+                        <div>
+                          {/* 출고일 기준 재고 정보 */}
+                          {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                            <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                              <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
+                              <div style={{ fontSize: '0.85em' }}>
+                                {inventoryByAge.over60 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                                )}
+                                {inventoryByAge.within60 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                                )}
+                                {inventoryByAge.within30 > 0 && (
+                                  <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
+                          {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                        </div>
+                      ) : (
+                        /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
+                        <div>
+                          {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
+                            {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
+                            
+                            <button 
+                              onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
+                              disabled={!selectedModel || !selectedColor}
+                              style={{
+                                flex: 1,
+                                padding: '6px 8px',
+                                backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
+                                color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                minWidth: '80px'
+                              }}
+                            >
+                              영업사원요청문구
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
