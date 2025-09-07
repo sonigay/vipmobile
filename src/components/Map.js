@@ -976,8 +976,18 @@ ${loggedInStore.name}으로 이동 예정입니다.
               const baseLat = parseFloat(stores[0].latitude);
               const baseLng = parseFloat(stores[0].longitude);
               
-              // 대표 매장 선택 (사무실이 있으면 사무실, 없으면 첫 번째 매장)
-              const representativeStore = stores.find(store => store.name && store.name.includes('사무실')) || stores[0];
+              // 대표 매장 선택 로직 개선
+              let representativeStore;
+              
+              // 1. 선택된 매장이 있으면 해당 매장을 대표로 사용
+              const selectedStoreInGroup = stores.find(store => selectedStore?.id === store.id);
+              if (selectedStoreInGroup) {
+                representativeStore = selectedStoreInGroup;
+              }
+              // 2. 선택된 매장이 없으면 사무실이 있으면 사무실, 없으면 첫 번째 매장
+              else {
+                representativeStore = stores.find(store => store.name && store.name.includes('사무실')) || stores[0];
+              }
               
               return (
                 <Marker
@@ -986,7 +996,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   icon={createMarkerIcon(representativeStore)}
                   eventHandlers={{
                     click: () => {
-                      // 중복 좌표 클릭 시 첫 번째 매장을 기본 선택
+                      // 중복 좌표 클릭 시 대표 매장을 선택
                       onStoreSelect(representativeStore);
                     }
                   }}
