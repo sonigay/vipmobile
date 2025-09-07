@@ -484,7 +484,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
       fillColor = '#e91e63';
       strokeColor = '#000000'; // 검은색 테두리로 더 눈에 띄게
       radius = 18; // 크기도 더 크게
-      iconStyle = 'border: 3px solid #000000; box-shadow: 0 0 0 4px rgba(233, 30, 99, 0.6), 0 0 20px rgba(233, 30, 99, 0.8);'; // 더 강한 그림자 효과
+      iconStyle = 'border: 3px solid #000000; box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.4), 0 0 8px rgba(233, 30, 99, 0.6); z-index: 1000;'; // 적당한 그림자 효과 + 최상위 표시
     }
     // 3. 선택된 매장
     else if (isSelected) {
