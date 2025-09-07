@@ -635,7 +635,19 @@ ${loggedInStore.name}으로 이동 예정입니다.
         const currentCenter = map.getCenter();
         const currentZoom = map.getZoom();
         
-        // 선택한 매장을 지도 중앙으로 이동
+        // 선택한 매장이 현재 화면에 보이는지 확인
+        const isVisible = currentBounds.contains([position.lat, position.lng]);
+        
+        // 선택한 매장과 현재 중심점의 거리 계산
+        const distance = currentCenter.distanceTo([position.lat, position.lng]);
+        
+        // 거리가 가까우면 (500m 이내) 이동하지 않음
+        if (isVisible && distance < 500) {
+          console.log('매장이 화면에 보이므로 지도 이동하지 않음');
+          return;
+        }
+        
+        // 현재 줌 레벨 유지 (강제 변경하지 않음)
         map.setView([position.lat, position.lng], currentZoom, {
           animate: true,
           duration: 0.8 // 애니메이션 시간 단축
