@@ -618,7 +618,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
     }
   }, [map, isMapReady]);
 
-  // 선택된 매장으로 지도 이동
+  // 선택된 매장으로 지도 이동 (개선된 버전)
   useEffect(() => {
     if (!selectedStore || !selectedStore.latitude || !selectedStore.longitude) return;
     
@@ -630,20 +630,22 @@ ${loggedInStore.name}으로 이동 예정입니다.
       };
       
       safeMapOperation(() => {
-        // 현재 줌 레벨을 유지하면서 위치만 이동 (줌 레벨 강제 변경 방지)
+        // 현재 지도 범위 확인
+        const currentBounds = map.getBounds();
+        const currentCenter = map.getCenter();
         const currentZoom = map.getZoom();
-        const targetZoom = Math.max(currentZoom, isAgentMode ? 12 : 14); // 최소 줌 레벨만 설정
         
-        map.setView([position.lat, position.lng], targetZoom, {
+        // 선택한 매장을 지도 중앙으로 이동
+        map.setView([position.lat, position.lng], currentZoom, {
           animate: true,
-          duration: 1.5 // 애니메이션 시간을 늘려서 더 자연스럽게
+          duration: 0.8 // 애니메이션 시간 단축
         });
       });
       
       // 선택한 매장 ID 저장
       previousSelectedStoreRef.current = selectedStore.id;
     }
-  }, [map, selectedStore, safeMapOperation, isAgentMode]);
+  }, [map, selectedStore, safeMapOperation]);
 
   // 강제 확대 (검색 결과 선택 시) - 직접 지도 조작
   useEffect(() => {
