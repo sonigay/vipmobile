@@ -864,8 +864,8 @@ ${loggedInStore.name}으로 이동 예정입니다.
                 <div>
                   <h3>{store.name}</h3>
                   
-                  {/* 담당재고확인 모드일 때만 모델별 재고 표시 */}
-                  {isAgentMode && currentView === 'assigned' ? (
+                  {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
+                  {isAgentMode ? (
                     <div>
                       {store.inventory && (
                         <div>
@@ -936,64 +936,35 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
                     </div>
                   ) : (
-                    /* 기존 말풍선 내용 (전체재고확인 및 일반 모드) */
+                    /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
                     <div>
                       {store.address && <p>주소: {store.address}</p>}
                       <p>재고: {inventoryCount}개</p>
                       
-                      {/* 관리자모드일 때는 출고일 기준 재고 정보 표시 */}
-                      {isAgentMode ? (
-                        <div>
-                          {/* 출고일 기준 재고 정보 */}
-                          {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
-                            <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                              <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
-                              <div style={{ fontSize: '0.85em' }}>
-                                {inventoryByAge.over60 > 0 && (
-                                  <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
-                                )}
-                                {inventoryByAge.within60 > 0 && (
-                                  <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
-                                )}
-                                {inventoryByAge.within30 > 0 && (
-                                  <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
-                          {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
-                        </div>
-                      ) : (
-                        /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
-                        <div>
-                          {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                            {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                            {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                            
-                            <button 
-                              onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
-                              disabled={!selectedModel || !selectedColor}
-                              style={{
-                                flex: 1,
-                                padding: '6px 8px',
-                                backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
-                                color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                                minWidth: '80px'
-                              }}
-                            >
-                              영업사원요청문구
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
+                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
+                        
+                        <button 
+                          onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
+                          disabled={!selectedModel || !selectedColor}
+                          style={{
+                            flex: 1,
+                            padding: '6px 8px',
+                            backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
+                            color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                            minWidth: '80px'
+                          }}
+                        >
+                          영업사원요청문구
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1001,143 +972,163 @@ ${loggedInStore.name}으로 이동 예정입니다.
             </Marker>
           );
             } else {
-              // 중복 좌표에 여러 매장이 있는 경우 원형으로 분산
+              // 중복 좌표에 여러 매장이 있는 경우 하나의 마커로 표시하고 클릭 시 말풍선으로 선택
               const baseLat = parseFloat(stores[0].latitude);
               const baseLng = parseFloat(stores[0].longitude);
-              const radius = 0.0001; // 약 10미터 정도의 분산
               
-              return stores.map((store, index) => {
-                // 원형으로 분산된 위치 계산
-                const angle = (2 * Math.PI * index) / stores.length;
-                const offsetLat = radius * Math.cos(angle);
-                const offsetLng = radius * Math.sin(angle);
-                
-                const position = [
-                  baseLat + offsetLat,
-                  baseLng + offsetLng
-                ];
-                
-                const inventoryCount = calculateInventory(store);
-                const inventoryByAge = getInventoryByAge(store);
-                const isSelected = selectedStore?.id === store.id;
-                const isLoggedInStore = loggedInStoreId === store.id;
-                
-                return (
-                  <Marker
-                    key={store.id}
-                    position={position}
-                    icon={createMarkerIcon(store)}
-                    eventHandlers={{
-                      click: () => onStoreSelect(store)
-                    }}
-                  >
-                    <Popup>
-                      <div>
-                        <h3>{store.name}</h3>
-                        
-                        {/* 담당재고확인 모드일 때만 모델별 재고 표시 */}
-                        {isAgentMode && currentView === 'assigned' ? (
-                          <div>
-                            {store.inventory && (
-                              <div>
-                                {Object.entries(store.inventory).map(([category, models]) => {
-                                  if (!models || typeof models !== 'object') return null;
-                                  
-                                  return Object.entries(models).map(([model, statuses]) => {
-                                    if (!statuses || typeof statuses !== 'object') return null;
-                                    
-                                    // 해당 모델의 총 재고 계산
-                                    let modelTotal = 0;
-                                    const colorDetails = [];
-                                    
-                                    Object.entries(statuses).forEach(([status, colors]) => {
-                                      if (colors && typeof colors === 'object') {
-                                        Object.entries(colors).forEach(([color, item]) => {
-                                          let quantity = 0;
-                                          if (typeof item === 'object' && item && item.quantity) {
-                                            quantity = item.quantity;
-                                          } else if (typeof item === 'number') {
-                                            quantity = item;
-                                          }
-                                          if (quantity && quantity > 0) {
-                                            modelTotal += quantity;
-                                            colorDetails.push(`${color}: ${quantity}개`);
-                                          }
-                                        });
-                                      }
-                                    });
-                                    
-                                    if (modelTotal > 0) {
-                                      return (
-                                        <div key={`${category}-${model}`} style={{ marginBottom: '8px', padding: '4px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                                          <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '0.9em' }}>{model}</p>
-                                          <p style={{ margin: '0 0 4px 0', fontSize: '0.85em' }}>총 {modelTotal}개</p>
-                                          {colorDetails.length > 0 && (
-                                            <p style={{ margin: '0', fontSize: '0.8em', color: '#666' }}>{colorDetails.join(', ')}</p>
-                                          )}
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  });
-                                })}
-                              </div>
-                            )}
+              // 대표 매장 선택 (사무실이 있으면 사무실, 없으면 첫 번째 매장)
+              const representativeStore = stores.find(store => store.name && store.name.includes('사무실')) || stores[0];
+              
+              return (
+                <Marker
+                  key={`duplicate-${coordKey}`}
+                  position={[baseLat, baseLng]}
+                  icon={createMarkerIcon(representativeStore)}
+                  eventHandlers={{
+                    click: () => {
+                      // 중복 좌표 클릭 시 첫 번째 매장을 기본 선택
+                      onStoreSelect(representativeStore);
+                    }
+                  }}
+                >
+                  <Popup>
+                    <div>
+                      <h3>같은 위치의 매장들 ({stores.length}개)</h3>
+                      <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                        {stores.map((store, index) => {
+                          const isSelected = selectedStore?.id === store.id;
+                          const isLoggedInStore = loggedInStoreId === store.id;
+                          const isRequestedStore = requestedStore?.id === store.id;
+                          const isOfficeStore = store.name && store.name.includes('사무실');
+                          const inventoryCount = calculateInventory(store);
+                          const inventoryByAge = getInventoryByAge(store);
+                          const hasInventory = inventoryCount > 0;
+                          
+                          // 마커와 동일한 색상 로직 적용
+                          let fillColor, strokeColor;
+                          
+                          // 1. 요청점 (최우선)
+                          if (isRequestedStore) {
+                            fillColor = '#ff9800';
+                            strokeColor = '#f57c00';
+                          }
+                          // 2. 사무실 (특별한 색상 - 청록색)
+                          else if (isOfficeStore) {
+                            fillColor = '#21f8fb';
+                            strokeColor = '#000000';
+                          }
+                          // 3. 선택된 매장
+                          else if (isSelected) {
+                            fillColor = '#2196f3';
+                            strokeColor = '#1976d2';
+                          }
+                          // 4. 로그인한 매장
+                          else if (isLoggedInStore) {
+                            fillColor = '#9c27b0';
+                            strokeColor = '#7b1fa2';
+                          }
+                          // 5. 일반 매장 - 출고일 기준 색상 조정
+                          else {
+                            const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
                             
-                            {inventoryByAge && (inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
-                              <div style={{ marginTop: '8px', padding: '4px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-                                <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
-                                <div style={{ fontSize: '0.85em' }}>
+                            if (totalFilteredInventory > 0) {
+                              const within30Ratio = inventoryByAge.within30 / totalFilteredInventory;
+                              const within60Ratio = inventoryByAge.within60 / totalFilteredInventory;
+                              const over60Ratio = inventoryByAge.over60 / totalFilteredInventory;
+                              
+                              if (over60Ratio >= within30Ratio && over60Ratio >= within60Ratio) {
+                                fillColor = hasInventory ? '#ff9800' : '#f44336';
+                                strokeColor = hasInventory ? '#f57c00' : '#d32f2f';
+                              } else if (within60Ratio >= within30Ratio) {
+                                fillColor = hasInventory ? '#ffc107' : '#f44336';
+                                strokeColor = hasInventory ? '#ff8f00' : '#d32f2f';
+                              } else {
+                                fillColor = hasInventory ? '#4caf50' : '#f44336';
+                                strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+                              }
+                            } else {
+                              fillColor = hasInventory ? '#4caf50' : '#f44336';
+                              strokeColor = hasInventory ? '#388e3c' : '#d32f2f';
+                            }
+                          }
+                          
+                          return (
+                            <div 
+                              key={store.id}
+                              style={{ 
+                                padding: '8px', 
+                                border: '1px solid #e0e0e0', 
+                                borderRadius: '4px', 
+                                marginBottom: '4px',
+                                cursor: 'pointer',
+                                backgroundColor: isSelected ? '#e3f2fd' : '#f9f9f9'
+                              }}
+                              onClick={() => onStoreSelect(store)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                {/* 마커 색상 표시 */}
+                                <div 
+                                  style={{
+                                    width: '12px',
+                                    height: '12px',
+                                    borderRadius: '50%',
+                                    backgroundColor: fillColor,
+                                    border: `2px solid ${strokeColor}`,
+                                    marginRight: '8px',
+                                    flexShrink: 0
+                                  }}
+                                />
+                                <div style={{ fontWeight: 'bold', flex: 1 }}>
+                                  {store.name}
+                                  {isSelected && <span style={{color: '#2196f3', marginLeft: '8px'}}>✓ 선택됨</span>}
+                                  {isLoggedInStore && <span style={{color: '#9c27b0', marginLeft: '8px'}}>내 매장</span>}
+                                </div>
+                                {/* 재고 수량을 마커 색상 원 안에 표시 */}
+                                {inventoryCount > 0 && (
+                                  <div 
+                                    style={{
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '50%',
+                                      backgroundColor: fillColor,
+                                      border: `2px solid ${strokeColor}`,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      color: isOfficeStore ? 'black' : 'white',
+                                      marginLeft: '8px'
+                                    }}
+                                  >
+                                    {inventoryCount}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* 관리자모드에서만 출고일 기준 재고 표시 */}
+                              {isAgentMode && currentView === 'assigned' && inventoryByAge && 
+                               (inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                                <div style={{ fontSize: '0.8em', marginTop: '4px' }}>
                                   {inventoryByAge.over60 > 0 && (
-                                    <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                                    <span style={{ color: '#ff9800', marginRight: '8px' }}>⚠️ {inventoryByAge.over60}</span>
                                   )}
                                   {inventoryByAge.within60 > 0 && (
-                                    <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                                    <span style={{ color: '#ffc107', marginRight: '8px' }}>⚡ {inventoryByAge.within60}</span>
                                   )}
                                   {inventoryByAge.within30 > 0 && (
-                                    <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                                    <span style={{ color: '#4caf50', marginRight: '8px' }}>✅ {inventoryByAge.within30}</span>
                                   )}
                                 </div>
-                              </div>
-                            )}
-                            
-                            {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
-                            {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
-                          </div>
-                        ) : (
-                          /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
-                          <div>
-                            {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                              {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
-                              {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
-                              
-                              <button 
-                                onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
-                                disabled={!selectedModel || !selectedColor}
-                                style={{
-                                  flex: 1,
-                                  padding: '6px 8px',
-                                  backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
-                                  color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: 'bold',
-                                  cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
-                                  minWidth: '80px'
-                                }}
-                              >
-                                영업사원요청문구
-                              </button>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })}
                       </div>
-                    </Popup>
-                  </Marker>
-                );
-              });
+                    </div>
+                  </Popup>
+                </Marker>
+              );
             }
           });
         })()}
@@ -1320,7 +1311,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
               opacity: 0.8,
               weight: 2
             }}
-      />
+          />
         )}
       </MapContainer>
     </Paper>
