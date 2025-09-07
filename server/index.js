@@ -1507,11 +1507,11 @@ app.get('/api/stores', async (req, res) => {
     const storeRows = storeValues.slice(1);
 
     // 출고 제외 로직 (includeShipped가 'false'일 때만 적용)
-    let twoDaysAgo = null;
+    let threeDaysAgo = null;
     if (includeShipped === 'false') {
       const today = new Date();
-      twoDaysAgo = new Date(today);
-      twoDaysAgo.setDate(today.getDate() - 2);
+      threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(today.getDate() - 3);
     }
 
     // 매장별 재고 데이터 매핑
