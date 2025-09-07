@@ -552,6 +552,7 @@ async function getUserRole(userId) {
 async function geocodeAddressWithKakao(address, retryCount = 0) {
   const apiKey = process.env.KAKAO_API_KEY;
   if (!apiKey) {
+    console.error('❌ [지오코딩] KAKAO_API_KEY 환경변수가 설정되어 있지 않습니다.');
     throw new Error('KAKAO_API_KEY 환경변수가 설정되어 있지 않습니다.');
   }
   
@@ -2849,14 +2850,17 @@ app.post('/api/login', async (req, res) => {
 // 주기적으로 주소 업데이트를 확인하고 실행하는 함수
 async function checkAndUpdateAddresses() {
   try {
+    console.log('🔍 [주소업데이트] 폰클출고처데이터 시트 데이터 가져오기 시작');
     const storeValues = await getSheetValues(STORE_SHEET_NAME);
     if (!storeValues) {
       throw new Error('Failed to fetch data from store sheet');
     }
+    console.log(`🔍 [주소업데이트] 폰클출고처데이터 로드 완료: ${storeValues.length}개 행`);
 
     // 헤더 제거
     const storeRows = storeValues.slice(1);
     const updates = [];
+    console.log(`🔍 [주소업데이트] 처리할 데이터 행 수: ${storeRows.length}개`);
     
     // 모든 주소에 대해 좌표 업데이트 (행 위치가 변경되어도 항상 처리)
     for (let i = 0; i < storeRows.length; i++) {
@@ -2899,7 +2903,9 @@ async function checkAndUpdateAddresses() {
     }
 
     // 일괄 업데이트 실행
+    console.log(`🔍 [주소업데이트] 업데이트할 좌표 수: ${updates.length}개`);
     if (updates.length > 0) {
+      console.log('🔍 [주소업데이트] Google Sheets 일괄 업데이트 시작');
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_ID,
         resource: {
@@ -2907,9 +2913,13 @@ async function checkAndUpdateAddresses() {
           data: updates
         }
       });
+      console.log('✅ [주소업데이트] Google Sheets 일괄 업데이트 완료');
+    } else {
+      console.log('⏭️ [주소업데이트] 업데이트할 좌표가 없음');
     }
+    console.log('✅ [주소업데이트] 주소 업데이트 함수 완료');
   } catch (error) {
-    console.error('Error in checkAndUpdateAddresses:', error);
+    console.error('❌ [주소업데이트] Error in checkAndUpdateAddresses:', error);
   }
 }
 
