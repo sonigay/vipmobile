@@ -1523,7 +1523,18 @@ app.get('/api/stores', async (req, res) => {
       
       const storeName = (row[21] || '').toString().trim();  // N열: 매장명 (13+8)
       // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거
-      const cleanStoreName = storeName.replace(/\([^)]*\)/g, '').trim();
+      let cleanStoreName = storeName.replace(/\([^)]*\)/g, '').trim();
+      
+      // 사무실별 통합 매핑
+      if (cleanStoreName.includes('평택')) {
+        cleanStoreName = '평택사무실';
+      } else if (cleanStoreName.includes('인천')) {
+        cleanStoreName = '인천사무실';
+      } else if (cleanStoreName.includes('군산')) {
+        cleanStoreName = '군산사무실';
+      } else if (cleanStoreName.includes('안산')) {
+        cleanStoreName = '안산사무실';
+      }
       const model = (row[13] || '').toString().trim();      // F열: 모델 (5+8)
       const color = (row[14] || '').toString().trim();      // G열: 색상 (6+8)
       const status = (row[15] || '').toString().trim();     // H열: 상태 (7+8)
@@ -1606,13 +1617,25 @@ app.get('/api/stores', async (req, res) => {
           return null;
         }
 
-        // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거
-        const cleanName = name.replace(/\([^)]*\)/g, '').trim();
+        // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거 및 통합
+        let cleanName = name.replace(/\([^)]*\)/g, '').trim();
+        
+        // 사무실별 통합 매핑 (출고처 이름도 통일)
+        if (cleanName.includes('평택')) {
+          cleanName = '평택사무실';
+        } else if (cleanName.includes('인천')) {
+          cleanName = '인천사무실';
+        } else if (cleanName.includes('군산')) {
+          cleanName = '군산사무실';
+        } else if (cleanName.includes('안산')) {
+          cleanName = '안산사무실';
+        }
+        
         const inventory = inventoryMap[cleanName] || inventoryMap[name] || {};
 
         return {
           id: storeId.toString(),
-          name,
+          name: cleanName, // 통합된 이름으로 설정
           address,
           phone,
           storePhone,
