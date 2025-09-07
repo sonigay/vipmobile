@@ -1522,6 +1522,8 @@ app.get('/api/stores', async (req, res) => {
       if (!row || row.length < 23) return; // 최소 O열까지 데이터가 있어야 함 (15+8)
       
       const storeName = (row[21] || '').toString().trim();  // N열: 매장명 (13+8)
+      // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거
+      const cleanStoreName = storeName.replace(/\([^)]*\)/g, '').trim();
       const model = (row[13] || '').toString().trim();      // F열: 모델 (5+8)
       const color = (row[14] || '').toString().trim();      // G열: 색상 (6+8)
       const status = (row[15] || '').toString().trim();     // H열: 상태 (7+8)
@@ -1536,9 +1538,9 @@ app.get('/api/stores', async (req, res) => {
         return;
       }
 
-      // 매장별 재고 데이터 구조 생성
-      if (!inventoryMap[storeName]) {
-        inventoryMap[storeName] = {
+      // 매장별 재고 데이터 구조 생성 (정리된 이름으로 매핑)
+      if (!inventoryMap[cleanStoreName]) {
+        inventoryMap[cleanStoreName] = {
           phones: {},    // 단말기
           sims: {},      // 유심
           wearables: {}, // 웨어러블
@@ -1556,13 +1558,13 @@ app.get('/api/stores', async (req, res) => {
         category = 'smartDevices';
       }
       
-      if (!inventoryMap[storeName][category][model]) {
-        inventoryMap[storeName][category][model] = {};
+      if (!inventoryMap[cleanStoreName][category][model]) {
+        inventoryMap[cleanStoreName][category][model] = {};
       }
       
       // 상태별로 수량 관리
-      if (!inventoryMap[storeName][category][model][status]) {
-        inventoryMap[storeName][category][model][status] = {};
+      if (!inventoryMap[cleanStoreName][category][model][status]) {
+        inventoryMap[cleanStoreName][category][model][status] = {};
       }
       
       // 같은 모델/색상/상태 조합의 수량과 출고일 정보 관리
@@ -1604,7 +1606,9 @@ app.get('/api/stores', async (req, res) => {
           return null;
         }
 
-        const inventory = inventoryMap[name] || {};
+        // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거
+        const cleanName = name.replace(/\([^)]*\)/g, '').trim();
+        const inventory = inventoryMap[cleanName] || inventoryMap[name] || {};
 
         return {
           id: storeId.toString(),
