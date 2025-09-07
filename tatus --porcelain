@@ -1,0 +1,33 @@
+[1mdiff --git a/server/index.js b/server/index.js[m
+[1mindex c19253c..c2eefa2 100644[m
+[1m--- a/server/index.js[m
+[1m+++ b/server/index.js[m
+[36m@@ -1530,8 +1530,8 @@[m [mapp.get('/api/stores', async (req, res) => {[m
+       [m
+       if (!storeName || !model || !color) return;[m
+ [m
+[31m-      // 출고일이 있고, 최근 2일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)[m
+[31m-      if (includeShipped === 'false' && shippingDate && twoDaysAgo && shippingDate >= twoDaysAgo) {[m
+[32m+[m[32m      // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)[m
+[32m+[m[32m      if (includeShipped === 'false' && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) {[m
+         excludedCount++;[m
+         return;[m
+       }[m
+[36m@@ -22210,7 +22210,7 @@[m [mfunction calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore[m
+         const storeCode = (row[14] || '').toString(); // O열: 출고처코드[m
+         [m
+         // 제외 조건들[m
+[31m-        // if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외 - 사무실재고도 표시하도록 주석 처리[m
+[32m+[m[32m        if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외[m
+         if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외[m
+         if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외[m
+         [m
+[36m@@ -22231,7 +22231,7 @@[m [mfunction calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore[m
+           const storeCode = (row[14] || '').toString();[m
+           [m
+           // 제외 조건들 (등록점과 동일)[m
+[31m-          // if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외 - 사무실재고도 표시하도록 주석 처리[m
+[32m+[m[32m          if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외[m
+           if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외[m
+           if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외[m
+           [m
