@@ -1507,11 +1507,11 @@ app.get('/api/stores', async (req, res) => {
     const storeRows = storeValues.slice(1);
 
     // 출고 제외 로직 (includeShipped가 'false'일 때만 적용)
-    let threeDaysAgo = null;
+    let twoDaysAgo = null;
     if (includeShipped === 'false') {
       const today = new Date();
-      threeDaysAgo = new Date(today);
-      threeDaysAgo.setDate(today.getDate() - 3);
+      twoDaysAgo = new Date(today);
+      twoDaysAgo.setDate(today.getDate() - 2);
     }
 
     // 매장별 재고 데이터 매핑
@@ -1530,8 +1530,8 @@ app.get('/api/stores', async (req, res) => {
       
       if (!storeName || !model || !color) return;
 
-      // 출고일이 있고, 최근 3일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)
-      if (includeShipped === 'false' && shippingDate && threeDaysAgo && shippingDate >= threeDaysAgo) {
+      // 출고일이 있고, 최근 2일 이내인 경우 재고에서 제외 (includeShipped가 'false'일 때만)
+      if (includeShipped === 'false' && shippingDate && twoDaysAgo && shippingDate >= twoDaysAgo) {
         excludedCount++;
         return;
       }
@@ -21415,7 +21415,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
           
           if (isOfficeAgent && storeCode) {
             // 제외 조건들
-            if (storeCode.includes('사무실')) return;
+            // if (storeCode.includes('사무실')) return; // 사무실재고도 표시하도록 주석 처리
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
@@ -21603,7 +21603,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
           
           if (isCodeAgent && storeCode) {
             // 제외 조건들
-            if (storeCode.includes('사무실')) return;
+            // if (storeCode.includes('사무실')) return; // 사무실재고도 표시하도록 주석 처리
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
@@ -21981,7 +21981,7 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
           
           if (isDepartmentAgent && storeCode) {
             // 제외 조건들
-            if (storeCode.includes('사무실')) return;
+            // if (storeCode.includes('사무실')) return; // 사무실재고도 표시하도록 주석 처리
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
@@ -22210,7 +22210,7 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
         const storeCode = (row[14] || '').toString(); // O열: 출고처코드
         
         // 제외 조건들
-        if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외
+        // if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외 - 사무실재고도 표시하도록 주석 처리
         if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외
         if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외
         
@@ -22231,7 +22231,7 @@ function calculateAgentDetails(agentMap, storeData, inventoryData, excludedStore
           const storeCode = (row[14] || '').toString();
           
           // 제외 조건들 (등록점과 동일)
-          if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외
+          // if (storeCode.includes('사무실')) return; // 출고처코드에 "사무실" 포함 시 제외 - 사무실재고도 표시하도록 주석 처리
           if (storeCode === agent) return; // 출고처코드와 담당자가 동일한 텍스트 시 제외
           if (agent.includes('거래종료')) return; // 담당자에 "거래종료" 포함 시 제외
           
