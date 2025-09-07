@@ -1835,7 +1835,7 @@ function AppContent() {
   };
 
   const handleStoreSelect = useCallback((store) => {
-    // console.log('선택된 매장:', store);
+    console.log('선택된 매장:', store.name, 'ID:', store.id);
     setSelectedStore(store);
   }, []);
 
