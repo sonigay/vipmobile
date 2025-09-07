@@ -3732,18 +3732,16 @@ app.get('/api/inventory/normalized-status', async (req, res) => {
         if (modelCapacity && color && storeName) {
           processedRows++;
           
-          // 사무실명 추출 (괄호 안 부가 정보 제거하여 매핑)
+          // 사무실명은 원래 이름 그대로 사용
           let officeName = '';
-          // 괄호 안의 부가 정보 제거 (예: "안산사무실(안산고잔)" -> "안산사무실")
-          const cleanStoreName = storeName.replace(/\([^)]*\)/g, '').trim();
           
-          if (cleanStoreName.includes('평택')) {
+          if (storeName.includes('평택사무실')) {
             officeName = '평택사무실';
-          } else if (cleanStoreName.includes('인천')) {
+          } else if (storeName.includes('인천사무실')) {
             officeName = '인천사무실';
-          } else if (cleanStoreName.includes('군산')) {
+          } else if (storeName.includes('군산사무실')) {
             officeName = '군산사무실';
-          } else if (cleanStoreName.includes('안산')) {
+          } else if (storeName.includes('안산사무실')) {
             officeName = '안산사무실';
           }
           
