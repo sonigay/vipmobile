@@ -308,10 +308,11 @@ function Login({ onLogin }) {
               PARTNERS
             </Typography>
             <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(4, 1fr)',
               gap: 1.5,
-              flexWrap: 'nowrap'
+              maxWidth: '320px',
+              margin: '0 auto'
             }}>
               <Box sx={{ 
                 width: '70px',
@@ -420,6 +421,72 @@ function Login({ onLogin }) {
                 <img 
                   src="/5.png" 
                   alt="폰다컴퍼니"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              </Box>
+              <Box sx={{ 
+                width: '70px',
+                height: '60px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
+              }}>
+                <img 
+                  src="/6.jpg" 
+                  alt="민텔레콤"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              </Box>
+              <Box sx={{ 
+                width: '70px',
+                height: '60px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
+              }}>
+                <img 
+                  src="/7.jpg" 
+                  alt="와룡"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              </Box>
+              <Box sx={{ 
+                width: '70px',
+                height: '60px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
+              }}>
+                <img 
+                  src="/8.jpg" 
+                  alt="정직폰"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
