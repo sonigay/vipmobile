@@ -479,12 +479,12 @@ ${loggedInStore.name}으로 이동 예정입니다.
       radius = 18;
       iconStyle = 'border: 3px solid #ff9800; box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3);';
     }
-    // 2. 사무실 (특별한 색상 - 빨간색, 더 눈에 띄게)
+    // 2. 사무실 (특별한 색상 - 청록색, 더 눈에 띄게)
     else if (isOfficeStore) {
-      fillColor = '#e91e63';
+      fillColor = '#21f8fb';
       strokeColor = '#000000'; // 검은색 테두리로 더 눈에 띄게
       radius = 18; // 크기도 더 크게
-      iconStyle = 'border: 3px solid #000000; box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.4), 0 0 8px rgba(233, 30, 99, 0.6); z-index: 1000;'; // 적당한 그림자 효과 + 최상위 표시
+      iconStyle = 'border: 3px solid #000000; box-shadow: 0 0 0 2px rgba(33, 248, 251, 0.4), 0 0 8px rgba(33, 248, 251, 0.6); z-index: 1000;'; // 적당한 그림자 효과 + 최상위 표시
     }
     // 3. 선택된 매장
     else if (isSelected) {
