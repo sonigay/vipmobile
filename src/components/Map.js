@@ -544,7 +544,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
           display: flex;
           align-items: center;
           justify-content: center;
-          color: white;
+          color: ${isOfficeStore ? 'black' : 'white'};
           font-weight: bold;
           font-size: ${radius > 12 ? '12px' : '10px'};
           box-shadow: 0 2px 4px rgba(0,0,0,0.3);
