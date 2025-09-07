@@ -1524,23 +1524,8 @@ app.get('/api/stores', async (req, res) => {
       const storeName = (row[21] || '').toString().trim();  // N열: 매장명 (13+8)
       let cleanStoreName = storeName;
       
-      // 사무실인 경우에만 괄호 제거 및 통합 매핑
-      if (storeName.includes('사무실')) {
-        // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거
-        cleanStoreName = storeName.replace(/\([^)]*\)/g, '').trim();
-        
-        // 사무실별 통합 매핑
-        if (cleanStoreName.includes('평택')) {
-          cleanStoreName = '평택사무실';
-        } else if (cleanStoreName.includes('인천')) {
-          cleanStoreName = '인천사무실';
-        } else if (cleanStoreName.includes('군산')) {
-          cleanStoreName = '군산사무실';
-        } else if (cleanStoreName.includes('안산')) {
-          cleanStoreName = '안산사무실';
-        }
-      }
-      // 일반 매장은 괄호를 유지 (cleanStoreName = storeName)
+      // 모든 매장(사무실 포함)은 원래 이름 그대로 유지
+      cleanStoreName = storeName;
       const model = (row[13] || '').toString().trim();      // F열: 모델 (5+8)
       const color = (row[14] || '').toString().trim();      // G열: 색상 (6+8)
       const status = (row[15] || '').toString().trim();     // H열: 상태 (7+8)
@@ -1623,31 +1608,12 @@ app.get('/api/stores', async (req, res) => {
           return null;
         }
 
-        let cleanName = name;
-        
-        // 사무실인 경우에만 괄호 제거 및 통합 매핑 (출고처 이름도 통일)
-        if (name.includes('사무실')) {
-          // 사무실 이름 매핑을 위해 괄호 안 부가 정보 제거
-          cleanName = name.replace(/\([^)]*\)/g, '').trim();
-          
-          // 사무실별 통합 매핑
-          if (cleanName.includes('평택')) {
-            cleanName = '평택사무실';
-          } else if (cleanName.includes('인천')) {
-            cleanName = '인천사무실';
-          } else if (cleanName.includes('군산')) {
-            cleanName = '군산사무실';
-          } else if (cleanName.includes('안산')) {
-            cleanName = '안산사무실';
-          }
-        }
-        // 일반 매장은 괄호를 유지 (cleanName = name)
-        
-        const inventory = inventoryMap[cleanName] || inventoryMap[name] || {};
+        // 모든 매장(사무실 포함)은 원래 이름 그대로 유지
+        const inventory = inventoryMap[name] || {};
 
         return {
           id: storeId.toString(),
-          name: cleanName, // 통합된 이름으로 설정
+          name: name, // 원래 이름 그대로 사용
           address,
           phone,
           storePhone,
