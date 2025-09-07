@@ -1136,15 +1136,15 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   // 선택된 상태면 기존 로직 사용
                   return createMarkerIcon(store);
                 } else {
-                  // 선택되지 않은 상태면 검은색으로 총 합산 수량 표시
+                  // 선택되지 않은 상태면 회색으로 총 합산 수량 표시
                   return L.divIcon({
                     className: 'custom-marker',
                     html: `
                       <div style="
                         width: 36px;
                         height: 36px;
-                        background-color: #000000;
-                        border: 2px solid #333333;
+                        background-color: #666666;
+                        border: 2px solid #888888;
                         border-radius: 50%;
                         display: flex;
                         align-items: center;
