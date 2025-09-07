@@ -843,6 +843,137 @@ ${loggedInStore.name}으로 이동 예정입니다.
 
           // 각 좌표 그룹에 대해 마커 렌더링
           return Object.entries(coordinateGroups).map(([coordKey, stores]) => {
+            // 선택된 매장이 있는 경우 해당 매장을 단일 매장으로 처리
+            const selectedStoreInGroup = stores.find(store => selectedStore?.id === store.id);
+            if (selectedStoreInGroup) {
+              const store = selectedStoreInGroup;
+              const inventoryCount = calculateInventory(store);
+              const inventoryByAge = getInventoryByAge(store);
+              const isSelected = selectedStore?.id === store.id;
+              const isLoggedInStore = loggedInStoreId === store.id;
+              
+              return (
+                <Marker
+                  key={store.id}
+                  position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
+                  icon={createMarkerIcon(store)}
+                  eventHandlers={{
+                    click: () => onStoreSelect(store)
+                  }}
+                >
+                  <Popup>
+                <div>
+                  <h3>{store.name}</h3>
+                  
+                  {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
+                  {isAgentMode ? (
+                    <div>
+                      {store.inventory && (
+                        <div>
+                          {Object.entries(store.inventory).map(([category, models]) => {
+                            if (!models || typeof models !== 'object') return null;
+                            
+                            return Object.entries(models).map(([model, statuses]) => {
+                              if (!statuses || typeof statuses !== 'object') return null;
+                              
+                              // 해당 모델의 총 재고 계산
+                              let modelTotal = 0;
+                              const colorDetails = [];
+                              
+                              Object.entries(statuses).forEach(([status, colors]) => {
+                                if (colors && typeof colors === 'object') {
+                                  Object.entries(colors).forEach(([color, item]) => {
+                                    let quantity = 0;
+                                    if (typeof item === 'object' && item && item.quantity) {
+                                      quantity = item.quantity;
+                                    } else if (typeof item === 'number') {
+                                      quantity = item;
+                                    }
+                                    if (quantity && quantity > 0) {
+                                      modelTotal += quantity;
+                                      colorDetails.push(`${color}: ${quantity}개`);
+                                    }
+                                  });
+                                }
+                              });
+                              
+                              if (modelTotal > 0) {
+                                return (
+                                  <div key={model} style={{ marginBottom: '8px' }}>
+                                    <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', color: '#2196f3' }}>
+                                      {model}: {modelTotal}개
+                                    </p>
+                                    <div style={{ fontSize: '0.9em', color: '#666', marginLeft: '8px' }}>
+                                      {colorDetails.join(', ')}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            });
+                          })}
+                        </div>
+                      )}
+                      
+                      {/* 출고일 기준 재고 정보 */}
+                      {(inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                        <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
+                          <div style={{ fontSize: '0.85em' }}>
+                            {inventoryByAge.over60 > 0 && (
+                              <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                            )}
+                            {inventoryByAge.within60 > 0 && (
+                              <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                            )}
+                            {inventoryByAge.within30 > 0 && (
+                              <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
+                      {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                    </div>
+                  ) : (
+                    /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
+                    <div>
+                      {store.address && <p>주소: {store.address}</p>}
+                      <p>재고: {inventoryCount}개</p>
+                      
+                      {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
+                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
+                        
+                        <button 
+                          onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
+                          disabled={!selectedModel || !selectedColor}
+                          style={{
+                            flex: 1,
+                            padding: '6px 8px',
+                            backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
+                            color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                            minWidth: '80px'
+                          }}
+                        >
+                          영업사원요청문구
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          );
+            }
+            
             if (stores.length === 1) {
               // 단일 매장인 경우 기존 로직
               const store = stores[0];
@@ -978,22 +1109,66 @@ ${loggedInStore.name}으로 이동 예정입니다.
               
               // 대표 매장 선택 로직 개선
               let representativeStore;
+              let isSelected = false;
               
               // 1. 선택된 매장이 있으면 해당 매장을 대표로 사용
               const selectedStoreInGroup = stores.find(store => selectedStore?.id === store.id);
               if (selectedStoreInGroup) {
                 representativeStore = selectedStoreInGroup;
+                isSelected = true;
               }
               // 2. 선택된 매장이 없으면 사무실이 있으면 사무실, 없으면 첫 번째 매장
               else {
                 representativeStore = stores.find(store => store.name && store.name.includes('사무실')) || stores[0];
               }
               
+              // 선택되지 않은 상태일 때는 총 합산 수량을 계산
+              let totalInventoryCount = 0;
+              if (!isSelected) {
+                totalInventoryCount = stores.reduce((total, store) => {
+                  return total + calculateInventory(store);
+                }, 0);
+              }
+              
+              // 중복 좌표용 마커 아이콘 생성 함수
+              const createDuplicateMarkerIcon = (store, isSelected, totalCount) => {
+                if (isSelected) {
+                  // 선택된 상태면 기존 로직 사용
+                  return createMarkerIcon(store);
+                } else {
+                  // 선택되지 않은 상태면 검은색으로 총 합산 수량 표시
+                  return L.divIcon({
+                    className: 'custom-marker',
+                    html: `
+                      <div style="
+                        width: 36px;
+                        height: 36px;
+                        background-color: #000000;
+                        border: 2px solid #333333;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-weight: bold;
+                        font-size: 12px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        position: relative;
+                      ">
+                        ${totalCount > 0 ? totalCount : ''}
+                      </div>
+                    `,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                  });
+                }
+              };
+              
               return (
                 <Marker
                   key={`duplicate-${coordKey}`}
                   position={[baseLat, baseLng]}
-                  icon={createMarkerIcon(representativeStore)}
+                  icon={createDuplicateMarkerIcon(representativeStore, isSelected, totalInventoryCount)}
                   eventHandlers={{
                     click: () => {
                       // 중복 좌표 클릭 시 대표 매장을 선택
