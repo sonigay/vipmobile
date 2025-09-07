@@ -21415,7 +21415,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
           
           if (isOfficeAgent && storeCode) {
             // 제외 조건들
-            // if (storeCode.includes('사무실')) return; // 사무실재고도 표시하도록 주석 처리
+            if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
@@ -21603,7 +21603,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
           
           if (isCodeAgent && storeCode) {
             // 제외 조건들
-            // if (storeCode.includes('사무실')) return; // 사무실재고도 표시하도록 주석 처리
+            if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
@@ -21981,7 +21981,7 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
           
           if (isDepartmentAgent && storeCode) {
             // 제외 조건들
-            // if (storeCode.includes('사무실')) return; // 사무실재고도 표시하도록 주석 처리
+            if (storeCode.includes('사무실')) return;
             if (storeCode === storeAgent) return;
             if (storeAgent.includes('거래종료')) return;
             
