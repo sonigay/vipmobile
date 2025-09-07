@@ -447,6 +447,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
     const isSelected = selectedStore?.id === store.id;
     const isLoggedInStore = loggedInStoreId === store.id;
     const isRequestedStore = requestedStore?.id === store.id;
+    const isOfficeStore = store.name && store.name.includes('사무실'); // 사무실 체크
     const inventoryCount = calculateInventory(store);
     const inventoryByAge = getInventoryByAge(store);
     const hasInventory = inventoryCount > 0;
@@ -478,21 +479,28 @@ ${loggedInStore.name}으로 이동 예정입니다.
       radius = 18;
       iconStyle = 'border: 3px solid #ff9800; box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3);';
     }
-    // 2. 선택된 매장
+    // 2. 사무실 (특별한 색상 - 빨간색)
+    else if (isOfficeStore) {
+      fillColor = '#e91e63';
+      strokeColor = '#c2185b';
+      radius = 16;
+      iconStyle = 'border: 2px solid #e91e63; box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.4);';
+    }
+    // 3. 선택된 매장
     else if (isSelected) {
       fillColor = '#2196f3';
       strokeColor = '#1976d2';
       radius = 16;
       iconStyle = '';
     }
-    // 3. 로그인한 매장
+    // 4. 로그인한 매장
     else if (isLoggedInStore) {
       fillColor = '#9c27b0';
       strokeColor = '#7b1fa2';
       radius = 16;
       iconStyle = '';
     }
-    // 4. 일반 매장 - 출고일 기준 색상 조정 (비중 기준)
+    // 5. 일반 매장 - 출고일 기준 색상 조정 (비중 기준)
     else {
       const totalFilteredInventory = inventoryByAge.within30 + inventoryByAge.within60 + inventoryByAge.over60;
       
