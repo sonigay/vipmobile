@@ -152,11 +152,14 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
   // 상태 변경 핸들러
   const handleStatusChange = async (store, action) => {
     try {
+      let hasUpdates = false;
+      
       if (action === 'select') {
         // 모든 항목을 회수대상으로 선정
         for (const item of store.items) {
           if (!item.recoveryTargetSelected) {
-            await onStatusUpdate(item.rowIndex, 'recoveryTargetSelected', 'O');
+            await onStatusUpdate(item.rowIndex, 'recoveryTargetSelected', 'O', false); // 새로고침 안함
+            hasUpdates = true;
           }
         }
       } else if (action === 'deselect') {
@@ -164,27 +167,35 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
         for (const item of store.items) {
           if (item.recoveryTargetSelected) {
             // 회수대상선정 취소
-            await onStatusUpdate(item.rowIndex, 'recoveryTargetSelected', '');
+            await onStatusUpdate(item.rowIndex, 'recoveryTargetSelected', '', false); // 새로고침 안함
             // 회수완료도 함께 취소
             if (item.recoveryCompleted) {
-              await onStatusUpdate(item.rowIndex, 'recoveryCompleted', '');
+              await onStatusUpdate(item.rowIndex, 'recoveryCompleted', '', false); // 새로고침 안함
             }
+            hasUpdates = true;
           }
         }
       } else if (action === 'complete') {
         // 모든 항목을 회수완료로 처리
         for (const item of store.items) {
           if (!item.recoveryCompleted) {
-            await onStatusUpdate(item.rowIndex, 'recoveryCompleted', 'O');
+            await onStatusUpdate(item.rowIndex, 'recoveryCompleted', 'O', false); // 새로고침 안함
+            hasUpdates = true;
           }
         }
       } else if (action === 'uncomplete') {
         // 모든 항목의 회수완료 해제
         for (const item of store.items) {
           if (item.recoveryCompleted) {
-            await onStatusUpdate(item.rowIndex, 'recoveryCompleted', '');
+            await onStatusUpdate(item.rowIndex, 'recoveryCompleted', '', false); // 새로고침 안함
+            hasUpdates = true;
           }
         }
+      }
+      
+      // 모든 업데이트가 완료된 후 한 번만 새로고침
+      if (hasUpdates && onRefresh) {
+        await onRefresh();
       }
       
       setSelectedMarker(null);

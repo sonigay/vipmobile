@@ -101,17 +101,19 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
   }, []);
 
   // 상태 업데이트 핸들러
-  const handleStatusUpdate = async (rowIndex, column, value) => {
+  const handleStatusUpdate = async (rowIndex, column, value, shouldRefresh = true) => {
     try {
       const response = await inventoryRecoveryAPI.updateStatus(rowIndex, column, value);
       if (response.success) {
-        // 데이터 새로고침
-        await loadRecoveryData();
-        setSnackbar({
-          open: true,
-          message: '상태가 성공적으로 업데이트되었습니다.',
-          severity: 'success'
-        });
+        // 새로고침이 필요한 경우에만 데이터 새로고침
+        if (shouldRefresh) {
+          await loadRecoveryData();
+          setSnackbar({
+            open: true,
+            message: '상태가 성공적으로 업데이트되었습니다.',
+            severity: 'success'
+          });
+        }
       } else {
         throw new Error(response.error || '상태 업데이트에 실패했습니다.');
       }
