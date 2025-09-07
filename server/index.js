@@ -20724,7 +20724,7 @@ function getExcludedStores(inventoryData) {
     const row = inventoryData[i];
     if (row.length > 4) {
       const storeName = (row[4] || '').toString(); // E열
-      if (storeName.includes('거래종료') || storeName.includes('본점판매')) {
+      if (storeName.includes('사무실') || storeName.includes('거래종료') || storeName.includes('본점판매')) {
         excluded.push(storeName);
       }
     }
