@@ -484,7 +484,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
       fillColor = '#21f8fb';
       strokeColor = '#000000'; // 검은색 테두리로 더 눈에 띄게
       radius = 18; // 크기도 더 크게
-      iconStyle = 'border: 3px solid #000000; box-shadow: 0 0 0 2px rgba(33, 248, 251, 0.4), 0 0 8px rgba(33, 248, 251, 0.6); z-index: 1000;'; // 적당한 그림자 효과 + 최상위 표시
+      iconStyle = 'border: 3px solid #000000; box-shadow: 0 0 0 2px rgba(33, 248, 251, 0.4), 0 0 8px rgba(33, 248, 251, 0.6);'; // 적당한 그림자 효과
     }
     // 3. 선택된 매장
     else if (isSelected) {
@@ -825,25 +825,42 @@ ${loggedInStore.name}으로 이동 예정입니다.
         />
         
         {/* 매장 마커들 (담당개통확인 모드에서는 재고 마커 숨김) */}
-        {currentView !== 'activation' && filteredStores.map((store) => {
-          if (!store.latitude || !store.longitude) return null;
-          
-          const inventoryCount = calculateInventory(store);
-          const inventoryByAge = getInventoryByAge(store);
-          const isSelected = selectedStore?.id === store.id;
-          const isLoggedInStore = loggedInStoreId === store.id;
-          
-          return (
-            <Marker
-              key={store.id}
-              position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
-              icon={createMarkerIcon(store)}
-              eventHandlers={{
-                click: () => onStoreSelect(store)
-              }}
-            >
+        {currentView !== 'activation' && (() => {
+          // 좌표별로 매장들을 그룹화
+          const coordinateGroups = {};
+          filteredStores.forEach(store => {
+            if (!store.latitude || !store.longitude) return;
+            
+            const lat = parseFloat(store.latitude).toFixed(6);
+            const lng = parseFloat(store.longitude).toFixed(6);
+            const coordKey = `${lat},${lng}`;
+            
+            if (!coordinateGroups[coordKey]) {
+              coordinateGroups[coordKey] = [];
+            }
+            coordinateGroups[coordKey].push(store);
+          });
 
-              <Popup>
+          // 각 좌표 그룹에 대해 마커 렌더링
+          return Object.entries(coordinateGroups).map(([coordKey, stores]) => {
+            if (stores.length === 1) {
+              // 단일 매장인 경우 기존 로직
+              const store = stores[0];
+              const inventoryCount = calculateInventory(store);
+              const inventoryByAge = getInventoryByAge(store);
+              const isSelected = selectedStore?.id === store.id;
+              const isLoggedInStore = loggedInStoreId === store.id;
+              
+              return (
+                <Marker
+                  key={store.id}
+                  position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
+                  icon={createMarkerIcon(store)}
+                  eventHandlers={{
+                    click: () => onStoreSelect(store)
+                  }}
+                >
+                  <Popup>
                 <div>
                   <h3>{store.name}</h3>
                   
@@ -983,7 +1000,147 @@ ${loggedInStore.name}으로 이동 예정입니다.
               </Popup>
             </Marker>
           );
-        })}
+            } else {
+              // 중복 좌표에 여러 매장이 있는 경우 원형으로 분산
+              const baseLat = parseFloat(stores[0].latitude);
+              const baseLng = parseFloat(stores[0].longitude);
+              const radius = 0.0001; // 약 10미터 정도의 분산
+              
+              return stores.map((store, index) => {
+                // 원형으로 분산된 위치 계산
+                const angle = (2 * Math.PI * index) / stores.length;
+                const offsetLat = radius * Math.cos(angle);
+                const offsetLng = radius * Math.sin(angle);
+                
+                const position = [
+                  baseLat + offsetLat,
+                  baseLng + offsetLng
+                ];
+                
+                const inventoryCount = calculateInventory(store);
+                const inventoryByAge = getInventoryByAge(store);
+                const isSelected = selectedStore?.id === store.id;
+                const isLoggedInStore = loggedInStoreId === store.id;
+                
+                return (
+                  <Marker
+                    key={store.id}
+                    position={position}
+                    icon={createMarkerIcon(store)}
+                    eventHandlers={{
+                      click: () => onStoreSelect(store)
+                    }}
+                  >
+                    <Popup>
+                      <div>
+                        <h3>{store.name}</h3>
+                        
+                        {/* 담당재고확인 모드일 때만 모델별 재고 표시 */}
+                        {isAgentMode && currentView === 'assigned' ? (
+                          <div>
+                            {store.inventory && (
+                              <div>
+                                {Object.entries(store.inventory).map(([category, models]) => {
+                                  if (!models || typeof models !== 'object') return null;
+                                  
+                                  return Object.entries(models).map(([model, statuses]) => {
+                                    if (!statuses || typeof statuses !== 'object') return null;
+                                    
+                                    // 해당 모델의 총 재고 계산
+                                    let modelTotal = 0;
+                                    const colorDetails = [];
+                                    
+                                    Object.entries(statuses).forEach(([status, colors]) => {
+                                      if (colors && typeof colors === 'object') {
+                                        Object.entries(colors).forEach(([color, item]) => {
+                                          let quantity = 0;
+                                          if (typeof item === 'object' && item && item.quantity) {
+                                            quantity = item.quantity;
+                                          } else if (typeof item === 'number') {
+                                            quantity = item;
+                                          }
+                                          if (quantity && quantity > 0) {
+                                            modelTotal += quantity;
+                                            colorDetails.push(`${color}: ${quantity}개`);
+                                          }
+                                        });
+                                      }
+                                    });
+                                    
+                                    if (modelTotal > 0) {
+                                      return (
+                                        <div key={`${category}-${model}`} style={{ marginBottom: '8px', padding: '4px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                                          <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '0.9em' }}>{model}</p>
+                                          <p style={{ margin: '0 0 4px 0', fontSize: '0.85em' }}>총 {modelTotal}개</p>
+                                          {colorDetails.length > 0 && (
+                                            <p style={{ margin: '0', fontSize: '0.8em', color: '#666' }}>{colorDetails.join(', ')}</p>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  });
+                                })}
+                              </div>
+                            )}
+                            
+                            {inventoryByAge && (inventoryByAge.within30 > 0 || inventoryByAge.within60 > 0 || inventoryByAge.over60 > 0) && (
+                              <div style={{ marginTop: '8px', padding: '4px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+                                <p style={{ fontWeight: 'bold', margin: '0 0 8px 0', fontSize: '0.9em' }}>출고일 기준 재고:</p>
+                                <div style={{ fontSize: '0.85em' }}>
+                                  {inventoryByAge.over60 > 0 && (
+                                    <p style={{ margin: '2px 0', color: '#ff9800' }}>⚠️ 60일 이상: {inventoryByAge.over60}개</p>
+                                  )}
+                                  {inventoryByAge.within60 > 0 && (
+                                    <p style={{ margin: '2px 0', color: '#ffc107' }}>⚡ 30-60일: {inventoryByAge.within60}개</p>
+                                  )}
+                                  {inventoryByAge.within30 > 0 && (
+                                    <p style={{ margin: '2px 0', color: '#4caf50' }}>✅ 30일 이내: {inventoryByAge.within30}개</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
+                            {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                          </div>
+                        ) : (
+                          /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
+                          <div>
+                            {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                              {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
+                              {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
+                              
+                              <button 
+                                onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
+                                disabled={!selectedModel || !selectedColor}
+                                style={{
+                                  flex: 1,
+                                  padding: '6px 8px',
+                                  backgroundColor: selectedModel && selectedColor ? '#FEE500' : '#F5F5F5',
+                                  color: selectedModel && selectedColor ? '#3C1E1E' : '#999',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                                  minWidth: '80px'
+                                }}
+                              >
+                                영업사원요청문구
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              });
+            }
+          });
+        })()}
         
         {/* 개통실적 마커들 (담당개통확인 화면에서만 표시) */}
         {showActivationMarkers && activationData && Object.entries(activationData).map(([storeName, data]) => {
