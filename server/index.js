@@ -774,8 +774,15 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:Z 범위
-    const range = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:Z`;
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:Z 범위
+    let range;
+    if (sheetName === 'raw데이터') {
+      range = `${safeSheetName}!A:AB`;
+    } else if (sheetName === '폰클개통데이터') {
+      range = `${safeSheetName}!A:BZ`;
+    } else {
+      range = `${safeSheetName}!A:Z`;
+    }
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
