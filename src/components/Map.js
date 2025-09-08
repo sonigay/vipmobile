@@ -242,14 +242,29 @@ ${loggedInStore.name}으로 이동 예정입니다.
   const calculateBounds = (stores) => {
     if (!stores || stores.length === 0) return null;
     
-    const validStores = stores.filter(store => 
-      store && 
-      store.latitude && store.longitude && 
-      !isNaN(parseFloat(store.latitude)) && !isNaN(parseFloat(store.longitude)) &&
-      parseFloat(store.latitude) !== 0 && parseFloat(store.longitude) !== 0
-    );
+    const validStores = stores.filter(store => {
+      if (!store) return false;
+      
+      const lat = store.latitude;
+      const lng = store.longitude;
+      
+      // null, undefined, 빈 문자열, 0, NaN 체크
+      if (!lat || !lng || 
+          lat === null || lng === null ||
+          lat === undefined || lng === undefined ||
+          lat === '' || lng === '' ||
+          isNaN(parseFloat(lat)) || isNaN(parseFloat(lng)) ||
+          parseFloat(lat) === 0 || parseFloat(lng) === 0) {
+        return false;
+      }
+      
+      return true;
+    });
     
-    if (validStores.length === 0) return null;
+    if (validStores.length === 0) {
+      console.warn('No valid stores with coordinates found for bounds calculation');
+      return null;
+    }
     
     let minLat = parseFloat(validStores[0].latitude);
     let maxLat = parseFloat(validStores[0].latitude);
@@ -849,17 +864,20 @@ ${loggedInStore.name}으로 이동 예정입니다.
             const selectedStoreInGroup = stores.find(store => selectedStore?.id === store.id);
             if (selectedStoreInGroup) {
               const store = selectedStoreInGroup;
+              
+              // 강력한 좌표 검증
+              if (!store || !store.latitude || !store.longitude || 
+                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
+                  parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
+                console.warn('Invalid coordinates for store:', store?.storeName, store?.latitude, store?.longitude);
+                return null;
+              }
+              
               const inventoryCount = calculateInventory(store);
               const inventoryByAge = getInventoryByAge(store);
               const isSelected = selectedStore?.id === store.id;
               const isLoggedInStore = loggedInStoreId === store.id;
-              
-              // 좌표 검증
-              if (!store.latitude || !store.longitude || 
-                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
-                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0) {
-                return null;
-              }
               
               return (
                 <Marker
@@ -986,17 +1004,20 @@ ${loggedInStore.name}으로 이동 예정입니다.
             if (stores.length === 1) {
               // 단일 매장인 경우 기존 로직
               const store = stores[0];
+              
+              // 강력한 좌표 검증
+              if (!store || !store.latitude || !store.longitude || 
+                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
+                  parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
+                console.warn('Invalid coordinates for store:', store?.storeName, store?.latitude, store?.longitude);
+                return null;
+              }
+              
               const inventoryCount = calculateInventory(store);
               const inventoryByAge = getInventoryByAge(store);
               const isSelected = selectedStore?.id === store.id;
               const isLoggedInStore = loggedInStoreId === store.id;
-              
-              // 좌표 검증
-              if (!store.latitude || !store.longitude || 
-                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
-                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0) {
-                return null;
-              }
               
               return (
                 <Marker
@@ -1120,8 +1141,19 @@ ${loggedInStore.name}으로 이동 예정입니다.
           );
             } else {
               // 중복 좌표에 여러 매장이 있는 경우 하나의 마커로 표시하고 클릭 시 말풍선으로 선택
-              const baseLat = parseFloat(stores[0].latitude);
-              const baseLng = parseFloat(stores[0].longitude);
+              const firstStore = stores[0];
+              
+              // 강력한 좌표 검증
+              if (!firstStore || !firstStore.latitude || !firstStore.longitude || 
+                  isNaN(parseFloat(firstStore.latitude)) || isNaN(parseFloat(firstStore.longitude)) ||
+                  parseFloat(firstStore.latitude) === 0 || parseFloat(firstStore.longitude) === 0 ||
+                  parseFloat(firstStore.latitude) === null || parseFloat(firstStore.longitude) === null) {
+                console.warn('Invalid coordinates for duplicate group:', firstStore?.storeName, firstStore?.latitude, firstStore?.longitude);
+                return null;
+              }
+              
+              const baseLat = parseFloat(firstStore.latitude);
+              const baseLng = parseFloat(firstStore.longitude);
               
               // 대표 매장 선택 로직 개선
               let representativeStore;
