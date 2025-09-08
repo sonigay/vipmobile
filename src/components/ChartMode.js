@@ -2970,7 +2970,7 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
             <TableCell align="right" sx={{ width: { xs: '25px', sm: '60px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{calculateTotal(data, 'registeredStores') - calculateTotal(data, 'activeStores')}</TableCell>
             <TableCell align="right" sx={{ width: { xs: '25px', sm: '60px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{calculateTotal(data, 'devices')}</TableCell>
             <TableCell align="right" sx={{ width: { xs: '25px', sm: '60px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{calculateTotal(data, 'sims')}</TableCell>
-            <TableCell align="right" sx={{ width: { xs: '20px', sm: '50px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{Math.round(calculateTotal(data, 'performance') / calculateTotal(data, 'devices') * 100)}%</TableCell>
+            <TableCell align="right" sx={{ width: { xs: '20px', sm: '50px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{Math.round(calculateTotal(data, 'expectedClosing') / (calculateTotal(data, 'expectedClosing') + calculateTotal(data, 'devices')) * 100)}%</TableCell>
             <TableCell align="right" sx={{ width: { xs: '25px', sm: '60px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{total}</TableCell>
             <TableCell align="right" sx={{ width: { xs: '30px', sm: '70px' }, backgroundColor: '#ffcdd2', fontWeight: 'bold', color: '#d32f2f', fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{totalExpectedClosing}</TableCell>
             <TableCell align="right" sx={{ width: { xs: '25px', sm: '60px' }, fontSize: { xs: '0.4rem', sm: '0.7rem' } }}>{calculateTotal(data, 'target')}</TableCell>
