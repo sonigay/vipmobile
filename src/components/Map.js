@@ -243,8 +243,10 @@ ${loggedInStore.name}으로 이동 예정입니다.
     if (!stores || stores.length === 0) return null;
     
     const validStores = stores.filter(store => 
+      store && 
       store.latitude && store.longitude && 
-      !isNaN(parseFloat(store.latitude)) && !isNaN(parseFloat(store.longitude))
+      !isNaN(parseFloat(store.latitude)) && !isNaN(parseFloat(store.longitude)) &&
+      parseFloat(store.latitude) !== 0 && parseFloat(store.longitude) !== 0
     );
     
     if (validStores.length === 0) return null;
@@ -852,6 +854,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
               const isSelected = selectedStore?.id === store.id;
               const isLoggedInStore = loggedInStoreId === store.id;
               
+              // 좌표 검증
+              if (!store.latitude || !store.longitude || 
+                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0) {
+                return null;
+              }
+              
               return (
                 <Marker
                   key={store.id}
@@ -981,6 +990,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
               const inventoryByAge = getInventoryByAge(store);
               const isSelected = selectedStore?.id === store.id;
               const isLoggedInStore = loggedInStoreId === store.id;
+              
+              // 좌표 검증
+              if (!store.latitude || !store.longitude || 
+                  isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                  parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0) {
+                return null;
+              }
               
               return (
                 <Marker
