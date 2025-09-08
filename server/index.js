@@ -21203,7 +21203,7 @@ function createUnifiedMatchingKeyData(phoneklData, storeData, inventoryData, exc
     data.expectedClosing = Math.round(data.performance / today.getDate() * daysInMonth);
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
   });
   
 
@@ -21501,7 +21501,7 @@ function aggregateByOffice(phoneklData, storeData, inventoryData, excludedAgents
     data.inactiveStores = data.registeredStores - data.activeStores;
     data.devices = totalDevices;
     data.sims = totalSims;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     
     // 지원금 적용
     data.support = officeSupportMap ? (officeSupportMap.get(data.office) || 0) : 0;
@@ -21689,7 +21689,7 @@ function aggregateByCode(phoneklData, storeData, inventoryData, excludedAgents, 
     data.inactiveStores = data.registeredStores - totalActiveStores;
     data.devices = totalDevices;
     data.sims = totalSims;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     
     // 지원금 적용
     data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
@@ -21740,7 +21740,7 @@ function aggregateByCodeFromUnified(unifiedData, codeSupportMap) {
     data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     data.support = codeSupportMap ? (codeSupportMap.get(data.code) || 0) : 0;
   });
   
@@ -21787,7 +21787,7 @@ function aggregateByOfficeFromUnified(unifiedData, officeSupportMap) {
     data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     data.support = officeSupportMap ? (officeSupportMap.get(data.office) || 0) : 0;
   });
   
@@ -21834,7 +21834,7 @@ function aggregateByDepartmentFromUnified(unifiedData, departmentSupportMap) {
     data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     data.support = departmentSupportMap ? (departmentSupportMap.get(data.department) || 0) : 0;
   });
   
@@ -21881,7 +21881,7 @@ function aggregateByAgentFromUnified(unifiedData, agentSupportMap) {
     data.expectedClosing = Math.round(data.performance / new Date().getDate() * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate());
     data.achievement = data.target > 0 ? Math.round((data.expectedClosing / data.target) * 100) : 0;
     data.utilization = data.registeredStores > 0 ? Math.round((data.activeStores / data.registeredStores) * 100) : 0;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     data.support = agentSupportMap ? (agentSupportMap.get(data.agent) || 0) : 0;
   });
   
@@ -22067,7 +22067,7 @@ function aggregateByDepartment(phoneklData, storeData, inventoryData, excludedAg
     data.inactiveStores = data.registeredStores - data.activeStores;
     data.devices = totalDevices;
     data.sims = totalSims;
-    data.rotation = data.devices > 0 ? Math.round((data.performance / data.devices) * 100) : 0;
+    data.rotation = data.devices > 0 ? Math.round((data.expectedClosing / data.devices) * 100) : 0;
     
     // 지원금 적용
     data.support = departmentSupportMap ? (departmentSupportMap.get(data.department) || 0) : 0;
