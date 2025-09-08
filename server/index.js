@@ -733,6 +733,8 @@ async function getSheetValuesWithoutCache(sheetName) {
       range = `${safeSheetName}!A:AB`;
     } else if (sheetName === '폰클개통데이터') {
       range = `${safeSheetName}!A:BZ`;
+    } else if (sheetName === '폰클홈데이터') {
+      range = `${safeSheetName}!A:CN`;
     } else {
       range = `${safeSheetName}!A:Z`;
     }
@@ -780,6 +782,8 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
       range = `${safeSheetName}!A:AB`;
     } else if (sheetName === '폰클개통데이터') {
       range = `${safeSheetName}!A:BZ`;
+    } else if (sheetName === '폰클홈데이터') {
+      range = `${safeSheetName}!A:CN`;
     } else {
       range = `${safeSheetName}!A:Z`;
     }
