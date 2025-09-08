@@ -446,17 +446,27 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                 />
                 
                 {/* 마커들 */}
-                {processedMarkers.map((store, index) => (
-                  <Marker
-                    key={index}
-                    position={[store.latitude, store.longitude]}
-                    icon={createCustomIcon(store.color)}
-                    eventHandlers={{
-                      click: () => {
-                        console.log('마커 클릭됨:', store);
-                        setSelectedMarker(store);
-                      }
-                    }}
+                {processedMarkers.map((store, index) => {
+                  // 좌표 검증
+                  if (!store || !store.latitude || !store.longitude || 
+                      isNaN(parseFloat(store.latitude)) || isNaN(parseFloat(store.longitude)) ||
+                      parseFloat(store.latitude) === 0 || parseFloat(store.longitude) === 0 ||
+                      parseFloat(store.latitude) === null || parseFloat(store.longitude) === null) {
+                    console.warn('Invalid coordinates for recovery marker:', store?.storeName, store?.latitude, store?.longitude);
+                    return null;
+                  }
+                  
+                  return (
+                    <Marker
+                      key={index}
+                      position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
+                      icon={createCustomIcon(store.color)}
+                      eventHandlers={{
+                        click: () => {
+                          console.log('마커 클릭됨:', store);
+                          setSelectedMarker(store);
+                        }
+                      }}
                   >
                     <Popup>
                       <div style={{ padding: '10px', minWidth: '250px' }}>
@@ -569,7 +579,8 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       </div>
                     </Popup>
                   </Marker>
-                ))}
+                  );
+                })}
               </MapContainer>
             ) : (
               <Box sx={{
