@@ -309,9 +309,9 @@ function Login({ onLogin }) {
             </Typography>
             <Box sx={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(4, 1fr)',
+              gridTemplateColumns: 'repeat(5, 1fr)',
               gap: 1.5,
-              maxWidth: '320px',
+              maxWidth: '400px',
               margin: '0 auto'
             }}>
               <Box sx={{ 
@@ -487,6 +487,28 @@ function Login({ onLogin }) {
                 <img 
                   src="/8.jpg" 
                   alt="정직폰"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              </Box>
+              <Box sx={{ 
+                width: '70px',
+                height: '60px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
+              }}>
+                <img 
+                  src="/9.png" 
+                  alt="파트너사9"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
