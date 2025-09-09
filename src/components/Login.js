@@ -508,7 +508,7 @@ function Login({ onLogin }) {
               }}>
                 <img 
                   src="/9.png" 
-                  alt="파트너사9"
+                  alt="킹콩폰"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
               </Box>
