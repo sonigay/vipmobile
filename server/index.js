@@ -13976,7 +13976,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
     const phoneklResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '폰클출고처데이터!A:N'
+      range: '폰클출고처데이터!A:V'
     });
 
     // 3. 마당접수 시트 로드 (서류접수 상태 확인용)
@@ -14810,7 +14810,7 @@ app.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, re
     // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
     const phoneklResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '폰클출고처데이터!A:N'
+      range: '폰클출고처데이터!A:V'
     });
 
     if (!reservationResponse.data.values || !phoneklResponse.data.values) {
@@ -14940,7 +14940,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     // 4. 폰클출고처데이터 시트 로드 (담당자 매칭용)
     const storeResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '폰클출고처데이터!A:N'
+      range: '폰클출고처데이터!A:V'
     });
 
     // 5. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
