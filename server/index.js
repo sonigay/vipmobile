@@ -14974,18 +14974,56 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     const storeHeaders = storeResponse.data.values[0];
     const storeData = storeResponse.data.values.slice(1);
     
-    storeData.forEach(row => {
+    console.log(`폰클출고처데이터 총 행 수: ${storeData.length}`);
+    
+    let processedRows = 0;
+    let validRows = 0;
+    let emptyStoreCode = 0;
+    let emptyManager = 0;
+    
+    storeData.forEach((row, index) => {
+      processedRows++;
+      
+      // 처음 5개 행의 상세 디버깅
+      if (index < 5) {
+        console.log(`=== 폰클출고처데이터 ${index + 1}번째 행 디버깅 ===`);
+        console.log(`행 길이: ${row.length}`);
+        console.log(`P열(15번인덱스): "${row[15] || ''}"`);
+        console.log(`V열(21번인덱스): "${row[21] || ''}"`);
+        console.log(`=== 폰클출고처데이터 디버깅 끝 ===`);
+      }
+      
       if (row.length >= 22) { // V열까지 필요
         const storeCode = (row[15] || '').toString().trim(); // P열: 매장코드
         const manager = (row[21] || '').toString().trim(); // V열: 담당자
         
+        if (!storeCode) {
+          emptyStoreCode++;
+        }
+        if (!manager) {
+          emptyManager++;
+        }
+        
         if (storeCode && manager) {
+          validRows++;
           // 담당자 이름에서 괄호 부분 제거 (예: "홍기현(별도)" → "홍기현")
           const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
           managerMapping.set(storeCode, cleanManager);
+          
+          // 처음 5개 유효한 매핑 로그
+          if (validRows <= 5) {
+            console.log(`매핑 추가: "${storeCode}" -> "${cleanManager}"`);
+          }
         }
       }
     });
+    
+    console.log(`폰클출고처데이터 처리 통계:`);
+    console.log(`- 총 처리된 행: ${processedRows}`);
+    console.log(`- 유효한 행(22열 이상): ${storeData.filter(row => row.length >= 22).length}`);
+    console.log(`- 매장코드가 있는 행: ${processedRows - emptyStoreCode}`);
+    console.log(`- 담당자가 있는 행: ${processedRows - emptyManager}`);
+    console.log(`- 유효한 매핑: ${validRows}`);
     
     console.log(`담당자 매핑 테이블 생성 완료: ${managerMapping.size}개 매장-담당자 매핑`);
     
