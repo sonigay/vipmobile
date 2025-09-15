@@ -14012,7 +14012,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     const reservationData = reservationResponse.data.values.slice(1);
     
     const phoneklHeaders = phoneklResponse.data.values[0];
-    const phoneklData = phoneklResponse.data.values.slice(1);
+    const phoneklData = phoneklResponse.data.values.slice(3); // 헤더가 3행이므로 4행부터 시작
     
     const yardHeaders = yardResponse.data.values[0];
     const yardData = yardResponse.data.values.slice(1);
@@ -14821,7 +14821,7 @@ app.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, re
     const reservationData = reservationResponse.data.values.slice(1);
     
     const phoneklHeaders = phoneklResponse.data.values[0];
-    const phoneklData = phoneklResponse.data.values.slice(1);
+    const phoneklData = phoneklResponse.data.values.slice(3); // 헤더가 3행이므로 4행부터 시작
 
     // 담당자 이름 정규화 함수
     const normalizeAgentName = (agentName) => {
@@ -14972,7 +14972,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     // 담당자 매핑 테이블 생성 (매장코드 -> 담당자)
     const managerMapping = new Map();
     const storeHeaders = storeResponse.data.values[0];
-    const storeData = storeResponse.data.values.slice(1);
+    const storeData = storeResponse.data.values.slice(3); // 헤더가 3행이므로 4행부터 시작
     
     console.log(`폰클출고처데이터 총 행 수: ${storeData.length}`);
     
