@@ -14089,13 +14089,13 @@ app.get('/api/sales-by-store/data', async (req, res) => {
       return agentName.replace(/\([^)]*\)/g, '').trim();
     };
 
-    // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
+    // 폰클출고처데이터에서 P열(매장코드)과 V열(담당자) 매핑 생성
     const storeAgentMap = new Map();
     const agentNormalizationMap = new Map(); // 정규화된 이름 -> 원본 이름 매핑
     
     phoneklData.forEach(row => {
-      const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
-      const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
+      const storeCode = row[15] || ''; // P열 (16번째, 0부터 시작)
+      const agent = row[21] || ''; // V열 (22번째, 0부터 시작)
       if (storeCode && agent) {
         const normalizedAgent = normalizeAgentName(agent);
         
@@ -14829,12 +14829,12 @@ app.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, re
       return agentName.replace(/\([^)]*\)/g, '').trim();
     };
 
-    // 폰클출고처데이터에서 H열(매장코드)과 N열(담당자) 매핑 생성
+    // 폰클출고처데이터에서 P열(매장코드)과 V열(담당자) 매핑 생성
     const storeAgentMap = new Map();
     
     phoneklData.forEach(row => {
-      const storeCode = row[7] || ''; // H열 (8번째, 0부터 시작)
-      const agent = row[13] || ''; // N열 (14번째, 0부터 시작)
+      const storeCode = row[15] || ''; // P열 (16번째, 0부터 시작)
+      const agent = row[21] || ''; // V열 (22번째, 0부터 시작)
       if (storeCode && agent) {
         const normalizedAgent = normalizeAgentName(agent);
         storeAgentMap.set(storeCode, normalizedAgent);
@@ -14975,9 +14975,9 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     const storeData = storeResponse.data.values.slice(1);
     
     storeData.forEach(row => {
-      if (row.length >= 14) { // N열까지 필요
-        const storeCode = (row[7] || '').toString().trim(); // H열: 매장코드
-        const manager = (row[13] || '').toString().trim(); // N열: 담당자
+      if (row.length >= 22) { // V열까지 필요
+        const storeCode = (row[15] || '').toString().trim(); // P열: 매장코드
+        const manager = (row[21] || '').toString().trim(); // V열: 담당자
         
         if (storeCode && manager) {
           // 담당자 이름에서 괄호 부분 제거 (예: "홍기현(별도)" → "홍기현")
