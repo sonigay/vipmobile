@@ -14988,6 +14988,17 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     });
     
     console.log(`담당자 매핑 테이블 생성 완료: ${managerMapping.size}개 매장-담당자 매핑`);
+    
+    // 디버깅: 매핑 테이블 내용 출력 (처음 5개만)
+    console.log('=== 담당자 매핑 테이블 디버깅 ===');
+    let debugCount = 0;
+    for (const [storeCode, manager] of managerMapping) {
+      if (debugCount < 5) {
+        console.log(`매장코드: "${storeCode}" -> 담당자: "${manager}"`);
+        debugCount++;
+      }
+    }
+    console.log('=== 매핑 테이블 디버깅 끝 ===');
 
     // POS코드 매핑 테이블 생성 (접수자별 매핑 지원)
     const posCodeMapping = new Map();
@@ -15169,6 +15180,17 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       
       // 변환된 매장코드로 담당자 찾기
       const manager = managerMapping.get(mappedManagerCode) || '';
+      
+      // 디버깅: 처음 5개 고객의 담당자 매칭 과정 출력
+      if (index < 5) {
+        console.log(`=== 담당자 매칭 디버깅 ${index + 1}번째 고객 ===`);
+        console.log(`고객명: "${customerName}"`);
+        console.log(`원본 매장코드(V열): "${originalManagerCode}"`);
+        console.log(`변환된 매장코드: "${mappedManagerCode}"`);
+        console.log(`매칭된 담당자: "${manager}"`);
+        console.log(`매핑 테이블에 존재하는가: ${managerMapping.has(mappedManagerCode)}`);
+        console.log(`=== 담당자 매칭 디버깅 끝 ===`);
+      }
 
       // POS명 매핑 적용 (접수자별 매핑 우선, 일반 매핑 차선)
       let mappedPosName = posName;
