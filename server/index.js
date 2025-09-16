@@ -14988,12 +14988,14 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
       if (index < 5) {
         console.log(`=== 폰클출고처데이터 ${index + 1}번째 행 디버깅 ===`);
         console.log(`행 길이: ${row.length}`);
+        console.log(`M열(12번인덱스): "${row[12] || ''}"`);
         console.log(`P열(15번인덱스): "${row[15] || ''}"`);
         console.log(`V열(21번인덱스): "${row[21] || ''}"`);
         console.log(`=== 폰클출고처데이터 디버깅 끝 ===`);
       }
       
       if (row.length >= 22) { // V열까지 필요
+        const status = (row[12] || '').toString().trim(); // M열: 사용/미사용 상태
         const storeCode = (row[15] || '').toString().trim(); // P열: 매장코드
         const manager = (row[21] || '').toString().trim(); // V열: 담당자
         
@@ -15004,7 +15006,8 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
           emptyManager++;
         }
         
-        if (storeCode && manager) {
+        // M열 상태가 "사용"인 경우에만 매핑 (매장코드 중복 처리)
+        if (storeCode && manager && status === "사용") {
           validRows++;
           // 담당자 이름에서 괄호 부분 제거 (예: "홍기현(별도)" → "홍기현")
           const cleanManager = manager.replace(/\([^)]*\)/g, '').trim();
@@ -15012,7 +15015,12 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
           
           // 처음 5개 유효한 매핑 로그
           if (validRows <= 5) {
-            console.log(`매핑 추가: "${storeCode}" -> "${cleanManager}"`);
+            console.log(`매핑 추가: "${storeCode}" -> "${cleanManager}" (상태: ${status})`);
+          }
+        } else if (storeCode && manager && status !== "사용") {
+          // 미사용 상태인 경우 로그 출력
+          if (index < 10) {
+            console.log(`미사용 상태로 제외: "${storeCode}" -> "${manager}" (상태: ${status})`);
           }
         }
       }
