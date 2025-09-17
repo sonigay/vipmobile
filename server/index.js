@@ -15828,39 +15828,41 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       }
     });
 
-    // 사전예약사이트에서 서류접수 완료로 계산된 건수 (앱에서 표시되는 354건)
+    // 대시보드에서 사용하는 정확한 서류접수 완료 건수 가져오기
     let appCalculatedCount = 0;
-    let debugCount = 0;
     
-    console.log(`마당접수 예약번호 개수: ${yardReservationNumbers.size}`);
-    console.log(`온세일 인덱스 개수: ${onSaleIndex.size}`);
-    console.log(`사전예약사이트 데이터 개수: ${reservationData.length}`);
-    
-    reservationData.forEach((row, index) => {
-      if (row.length < 26) return;
-      
-      const reservationNumber = (row[8] || '').toString().trim();
-      const customerName = (row[7] || '').toString().trim();
-      const storeCode = (row[25] || '').toString().trim();
-      
-      if (!reservationNumber) return;
-      
-      debugCount++;
-      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-      const isYardReceived = yardReservationNumbers.has(normalizedReservationNumber);
-      const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
-      
-      if (index < 5) {
-        console.log(`사전예약 ${index + 1}: 예약번호="${reservationNumber}", 정규화="${normalizedReservationNumber}", 마당접수=${isYardReceived}, 온세일=${isOnSaleReceived}`);
+    try {
+      // 기존 대시보드 API와 동일한 로직 사용
+      const salesResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:4000'}/api/sales-by-store/data`);
+      if (salesResponse.ok) {
+        const salesResult = await salesResponse.json();
+        if (salesResult.success) {
+          appCalculatedCount = salesResult.stats?.totalDocumentReceived || 0;
+          console.log(`대시보드 API에서 가져온 서류접수 완료 건수: ${appCalculatedCount}건`);
+        }
       }
-      
-      if (isYardReceived || isOnSaleReceived) {
-        appCalculatedCount++;
-      }
-    });
-    
-    console.log(`처리된 사전예약 데이터: ${debugCount}개`);
-    console.log(`서류접수 완료 계산: ${appCalculatedCount}건`);
+    } catch (error) {
+      console.error('대시보드 API 호출 실패:', error);
+      // 대시보드 API 실패 시 직접 계산
+      reservationData.forEach((row, index) => {
+        if (row.length < 26) return;
+        
+        const reservationNumber = (row[8] || '').toString().trim();
+        const customerName = (row[7] || '').toString().trim();
+        const storeCode = (row[25] || '').toString().trim();
+        
+        if (!reservationNumber) return;
+        
+        const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+        const isYardReceived = yardReservationNumbers.has(normalizedReservationNumber);
+        const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
+        
+        if (isYardReceived || isOnSaleReceived) {
+          appCalculatedCount++;
+        }
+      });
+      console.log(`직접 계산한 서류접수 완료 건수: ${appCalculatedCount}건`);
+    }
 
     const result = {
       success: true,
