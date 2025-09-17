@@ -60,7 +60,7 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
     setError('');
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reservation-sales/by-store-agent`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-by-store/data`);
       const result = await response.json();
       
       if (result.success) {
