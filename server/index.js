@@ -15720,6 +15720,161 @@ app.get('/api/mapping-failure-analysis', async (req, res) => {
   }
 });
 
+// 마당접수 데이터 누락 분석 API
+app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
+  try {
+    console.log('마당접수 데이터 누락 분석 시작');
+
+    // 1. 마당접수 시트 데이터 로드
+    const yardResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '마당접수!A:V'
+    });
+
+    // 2. 사전예약사이트 데이터 로드
+    const reservationResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트!A:Z'
+    });
+
+    // 3. 온세일 데이터 로드
+    const onSaleResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일!A:Z'
+    });
+
+    if (!yardResponse.data.values || !reservationResponse.data.values || !onSaleResponse.data.values) {
+      throw new Error('시트 데이터를 불러올 수 없습니다.');
+    }
+
+    // 마당접수 데이터 처리 (헤더 제외)
+    const yardData = yardResponse.data.values.slice(1);
+    const reservationData = reservationResponse.data.values.slice(1);
+
+    // 사전예약사이트에서 예약번호 추출 (정규화)
+    const reservationNumbers = new Set();
+    reservationData.forEach(row => {
+      if (row.length >= 9) {
+        const reservationNumber = (row[8] || '').toString().trim();
+        if (reservationNumber) {
+          reservationNumbers.add(reservationNumber.replace(/-/g, ''));
+        }
+      }
+    });
+
+    // 온세일 데이터에서 고객명_매장코드 조합 추출
+    const onSaleIndex = new Set();
+    onSaleResponse.data.values.slice(1).forEach(row => {
+      if (row.length >= 3) {
+        const customerName = (row[0] || '').toString().trim();
+        const storeCode = (row[2] || '').toString().trim();
+        if (customerName && storeCode) {
+          onSaleIndex.add(`${customerName}_${storeCode}`);
+        }
+      }
+    });
+
+    // 마당접수 데이터 분석
+    const yardAnalysis = {
+      total: 0,
+      matched: 0,
+      unmatched: 0,
+      missingDetails: []
+    };
+
+    yardData.forEach((row, index) => {
+      if (row.length < 8) return;
+      
+      const reservationNumber = (row[7] || '').toString().trim(); // H열: 예약번호
+      const customerName = (row[1] || '').toString().trim(); // B열: 고객명
+      const storeCode = (row[2] || '').toString().trim(); // C열: 매장코드
+      const receivedDate = (row[3] || '').toString().trim(); // D열: 접수일
+      const receivedMemo = (row[4] || '').toString().trim(); // E열: 메모
+      
+      if (!reservationNumber) return;
+      
+      yardAnalysis.total++;
+      
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const isMatched = reservationNumbers.has(normalizedReservationNumber) || 
+                       onSaleIndex.has(`${customerName}_${storeCode}`);
+      
+      if (isMatched) {
+        yardAnalysis.matched++;
+      } else {
+        yardAnalysis.unmatched++;
+        yardAnalysis.missingDetails.push({
+          rowIndex: index + 2, // 실제 행 번호
+          reservationNumber,
+          customerName,
+          storeCode,
+          receivedDate,
+          receivedMemo,
+          reason: !reservationNumbers.has(normalizedReservationNumber) ? 
+            '사전예약사이트에 예약번호 없음' : 
+            '온세일 접수로 처리됨'
+        });
+      }
+    });
+
+    // 사전예약사이트에서 서류접수 완료로 계산된 건수
+    let appCalculatedCount = 0;
+    reservationData.forEach(row => {
+      if (row.length < 26) return;
+      
+      const reservationNumber = (row[8] || '').toString().trim();
+      const customerName = (row[7] || '').toString().trim();
+      const storeCode = (row[25] || '').toString().trim();
+      
+      if (!reservationNumber) return;
+      
+      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
+      const isYardReceived = reservationNumbers.has(normalizedReservationNumber);
+      const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
+      
+      if (isYardReceived || isOnSaleReceived) {
+        appCalculatedCount++;
+      }
+    });
+
+    const result = {
+      success: true,
+      analysis: {
+        yardReceipt: {
+          total: yardAnalysis.total,
+          matched: yardAnalysis.matched,
+          unmatched: yardAnalysis.unmatched,
+          missingDetails: yardAnalysis.missingDetails.slice(0, 50) // 최대 50개만 반환
+        },
+        appCalculation: {
+          totalReservations: reservationData.length,
+          calculatedReceived: appCalculatedCount
+        },
+        difference: {
+          yardTotal: yardAnalysis.total,
+          appCalculated: appCalculatedCount,
+          difference: yardAnalysis.total - appCalculatedCount
+        }
+      }
+    };
+
+    console.log('마당접수 누락 분석 완료:', {
+      마당접수총건수: yardAnalysis.total,
+      앱계산건수: appCalculatedCount,
+      차이: yardAnalysis.total - appCalculatedCount
+    });
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('마당접수 누락 분석 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '분석 중 오류가 발생했습니다: ' + error.message
+    });
+  }
+});
+
 // 재고 현황 분석 API (대리점별 분리)
 app.get('/api/inventory-analysis', async (req, res) => {
   const { storeCode } = req.query; // 대리점 코드 필터링 (선택사항)

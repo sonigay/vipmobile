@@ -54,32 +54,47 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
     }
   };
 
-  // 매핑 실패 데이터 로드
+  // 마당접수 누락 데이터 로드
   const loadMappingFailures = async () => {
     setLoading(true);
     setError('');
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sales-by-store/data`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/yard-receipt-missing-analysis`);
       const result = await response.json();
       
       if (result.success) {
-        const failures = result.matchingFailures?.failureByPosCode || {};
-        const failureList = Object.entries(failures).map(([posCode, data]) => ({
-          posCode,
-          posName: data.posName,
-          count: data.count,
-          items: data.items || []
-        }));
+        const analysis = result.analysis;
+        const missingDetails = analysis.yardReceipt.missingDetails || [];
         
+        // 누락된 데이터를 그룹화
+        const groupedMissing = {};
+        missingDetails.forEach(item => {
+          const key = item.reason;
+          if (!groupedMissing[key]) {
+            groupedMissing[key] = {
+              reason: key,
+              count: 0,
+              items: []
+            };
+          }
+          groupedMissing[key].count++;
+          groupedMissing[key].items.push(item);
+        });
+        
+        const failureList = Object.values(groupedMissing);
         setMappingFailures(failureList);
         
-        // 각 POS코드에 대해 실패 원인 분석
-        failureList.forEach(item => {
-          analyzeFailureReasons(item.posCode);
+        // 통계 정보 저장
+        setFailureReasons({
+          total: analysis.yardReceipt.total,
+          matched: analysis.yardReceipt.matched,
+          unmatched: analysis.yardReceipt.unmatched,
+          appCalculated: analysis.appCalculation.calculatedReceived,
+          difference: analysis.difference.difference
         });
       } else {
-        setError('매핑 실패 데이터를 불러오는데 실패했습니다.');
+        setError('마당접수 누락 데이터를 불러오는데 실패했습니다.');
       }
     } catch (err) {
       setError('데이터 로드 중 오류가 발생했습니다: ' + err.message);
@@ -154,7 +169,7 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <WarningIcon color="warning" />
             <Typography variant="h6">
-              매핑 실패 항목 관리
+              마당접수 누락 데이터 분석
             </Typography>
             <Chip 
               label={`총 ${totalFailures}건`} 
@@ -180,33 +195,50 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
         ) : (
           <Box>
             <Alert severity="info" sx={{ mb: 2 }}>
-              매핑이 실패한 POS코드들을 확인하고 올바른 매장코드로 매핑해주세요.
-              매핑 설정 후에는 자동으로 목록에서 제거됩니다.
+              마당접수 시트의 385건 중에서 앱에 반영되지 않은 누락 데이터를 확인할 수 있습니다.
             </Alert>
+
+            {/* 통계 정보 표시 */}
+            {failureReasons.total && (
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  📊 데이터 분석 결과
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">마당접수 총 건수</Typography>
+                    <Typography variant="h6" color="primary">{failureReasons.total}건</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">앱 계산 건수</Typography>
+                    <Typography variant="h6" color="success.main">{failureReasons.appCalculated}건</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">누락 건수</Typography>
+                    <Typography variant="h6" color="error.main">{failureReasons.difference}건</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            )}
 
             <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>POS코드</TableCell>
-                    <TableCell>POS명</TableCell>
-                    <TableCell>실패건수</TableCell>
-                    <TableCell>실패원인</TableCell>
-                    <TableCell>새 매장코드</TableCell>
-                    <TableCell>작업</TableCell>
+                    <TableCell>누락 원인</TableCell>
+                    <TableCell>건수</TableCell>
+                    <TableCell>상세 정보</TableCell>
+                    <TableCell>예약번호</TableCell>
+                    <TableCell>고객명</TableCell>
+                    <TableCell>접수일</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {mappingFailures.map((item) => (
-                    <TableRow key={item.posCode}>
+                  {mappingFailures.map((item, index) => (
+                    <TableRow key={index}>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {item.posCode}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {item.posName}
+                        <Typography variant="body2" color="error.main" fontWeight="bold">
+                          {item.reason}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -217,101 +249,46 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                         />
                       </TableCell>
                       <TableCell>
-                        {failureReasons[item.posCode] ? (
-                          <Box>
-                            <Button
-                              size="small"
-                              variant="text"
-                              onClick={() => setShowReasons(prev => ({
-                                ...prev,
-                                [item.posCode]: !prev[item.posCode]
-                              }))}
-                              sx={{ textTransform: 'none', p: 0.5 }}
-                            >
-                              {showReasons[item.posCode] ? '숨기기' : '원인보기'}
-                            </Button>
-                            {showReasons[item.posCode] && (
-                              <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                <Typography variant="caption" fontWeight="bold" display="block" sx={{ mb: 0.5 }}>
-                                  📋 실패 원인:
-                                </Typography>
-                                {failureReasons[item.posCode].reasons?.map((reason, index) => (
-                                  <Typography key={index} variant="caption" display="block" color="text.secondary" sx={{ ml: 1 }}>
-                                    • {reason}
-                                  </Typography>
-                                ))}
-                                {failureReasons[item.posCode].solutions && failureReasons[item.posCode].solutions.length > 0 && (
-                                  <>
-                                    <Typography variant="caption" fontWeight="bold" display="block" sx={{ mt: 1, mb: 0.5 }}>
-                                      💡 해결 방안:
-                                    </Typography>
-                                    {failureReasons[item.posCode].solutions.map((solution, index) => (
-                                      <Typography key={index} variant="caption" display="block" color="primary.main" sx={{ ml: 1 }}>
-                                        {solution}
-                                      </Typography>
-                                    ))}
-                                  </>
-                                )}
-                              </Box>
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => setShowReasons(prev => ({
+                            ...prev,
+                            [index]: !prev[index]
+                          }))}
+                          sx={{ textTransform: 'none', p: 0.5 }}
+                        >
+                          {showReasons[index] ? '숨기기' : '상세보기'}
+                        </Button>
+                        {showReasons[index] && (
+                          <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                            {item.items.slice(0, 5).map((detail, detailIndex) => (
+                              <Typography key={detailIndex} variant="caption" display="block" color="text.secondary">
+                                • {detail.reservationNumber} - {detail.customerName} ({detail.receivedDate})
+                              </Typography>
+                            ))}
+                            {item.items.length > 5 && (
+                              <Typography variant="caption" color="text.secondary">
+                                ... 외 {item.items.length - 5}건
+                              </Typography>
                             )}
                           </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            분석중...
-                          </Typography>
                         )}
                       </TableCell>
                       <TableCell>
-                        {editingItem === item.posCode ? (
-                          <TextField
-                            size="small"
-                            value={newMapping}
-                            onChange={(e) => setNewMapping(e.target.value)}
-                            placeholder="매장코드 입력"
-                            sx={{ width: 120 }}
-                          />
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            미설정
-                          </Typography>
-                        )}
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {item.items[0]?.reservationNumber || '-'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
-                        {editingItem === item.posCode ? (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Tooltip title="저장">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handleSaveMapping(item.posCode, newMapping)}
-                              >
-                                <SaveIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="취소">
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  setEditingItem(null);
-                                  setNewMapping('');
-                                }}
-                              >
-                                <CloseIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        ) : (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => {
-                              setEditingItem(item.posCode);
-                              setNewMapping('');
-                            }}
-                          >
-                            매핑 설정
-                          </Button>
-                        )}
+                        <Typography variant="body2">
+                          {item.items[0]?.customerName || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {item.items[0]?.receivedDate || '-'}
+                        </Typography>
                       </TableCell>
                     </TableRow>
                   ))}
