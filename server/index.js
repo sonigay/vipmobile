@@ -15751,13 +15751,13 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     const yardData = yardResponse.data.values.slice(1);
     const reservationData = reservationResponse.data.values.slice(1);
 
-    // 사전예약사이트에서 예약번호 추출 (정규화)
-    const reservationNumbers = new Set();
-    reservationData.forEach(row => {
-      if (row.length >= 9) {
-        const reservationNumber = (row[8] || '').toString().trim();
+    // 마당접수에서 예약번호 추출 (정규화) - 매칭용
+    const yardReservationNumbers = new Set();
+    yardData.forEach(row => {
+      if (row.length >= 8) {
+        const reservationNumber = (row[7] || '').toString().trim(); // H열: 예약번호
         if (reservationNumber) {
-          reservationNumbers.add(reservationNumber.replace(/-/g, ''));
+          yardReservationNumbers.add(reservationNumber.replace(/-/g, ''));
         }
       }
     });
@@ -15781,6 +15781,17 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       unmatched: 0,
       missingDetails: []
     };
+
+    // 사전예약사이트에서 예약번호 추출 (정규화) - 매칭 확인용
+    const reservationNumbers = new Set();
+    reservationData.forEach(row => {
+      if (row.length >= 9) {
+        const reservationNumber = (row[8] || '').toString().trim();
+        if (reservationNumber) {
+          reservationNumbers.add(reservationNumber.replace(/-/g, ''));
+        }
+      }
+    });
 
     yardData.forEach((row, index) => {
       if (row.length < 8) return;
@@ -15817,7 +15828,7 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       }
     });
 
-    // 사전예약사이트에서 서류접수 완료로 계산된 건수
+    // 사전예약사이트에서 서류접수 완료로 계산된 건수 (앱에서 표시되는 354건)
     let appCalculatedCount = 0;
     reservationData.forEach(row => {
       if (row.length < 26) return;
@@ -15829,7 +15840,7 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       if (!reservationNumber) return;
       
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-      const isYardReceived = reservationNumbers.has(normalizedReservationNumber);
+      const isYardReceived = yardReservationNumbers.has(normalizedReservationNumber);
       const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
       
       if (isYardReceived || isOnSaleReceived) {
