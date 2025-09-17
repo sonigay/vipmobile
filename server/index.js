@@ -15904,8 +15904,18 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     console.log('마당접수 누락 분석 완료:', {
       마당접수총건수: yardAnalysis.total,
       앱계산건수: appCalculatedCount,
-      차이: yardAnalysis.total - appCalculatedCount
+      차이: yardAnalysis.total - appCalculatedCount,
+      매칭된건수: yardAnalysis.matched,
+      매칭안된건수: yardAnalysis.unmatched,
+      누락상세건수: yardAnalysis.missingDetails.length
     });
+    
+    console.log('누락 상세 분석:');
+    const reasonCounts = {};
+    yardAnalysis.missingDetails.forEach(item => {
+      reasonCounts[item.reason] = (reasonCounts[item.reason] || 0) + 1;
+    });
+    console.log('원인별 건수:', reasonCounts);
 
     res.json(result);
 

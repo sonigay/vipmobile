@@ -35,7 +35,6 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
   const [editingItem, setEditingItem] = useState(null);
   const [newMapping, setNewMapping] = useState('');
   const [failureReasons, setFailureReasons] = useState({});
-  const [showReasons, setShowReasons] = useState({});
 
   // 매핑 실패 원인 분석
   const analyzeFailureReasons = async (posCode) => {
@@ -156,15 +155,19 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
   }, [open]);
 
   const totalFailures = mappingFailures.reduce((sum, item) => sum + item.count, 0);
+  const actualMissingCount = mappingFailures.reduce((sum, item) => sum + item.items.length, 0);
 
   return (
     <Dialog 
       open={open} 
       onClose={onClose}
-      maxWidth="lg"
+      maxWidth="xl"
       fullWidth
       PaperProps={{
-        sx: { minHeight: '70vh' }
+        sx: { 
+          minHeight: '80vh',
+          maxHeight: '90vh'
+        }
       }}
     >
       <DialogTitle>
@@ -218,100 +221,69 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary">누락 건수</Typography>
-                    <Typography variant="h6" color="error.main">{failureReasons.difference}건</Typography>
+                    <Typography variant="h6" color="error.main">{actualMissingCount}건</Typography>
                   </Box>
                 </Box>
               </Box>
             )}
 
-            <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+            <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>누락 원인</TableCell>
-                    <TableCell>건수</TableCell>
-                    <TableCell>상세 정보</TableCell>
                     <TableCell>예약번호</TableCell>
+                    <TableCell>상호명</TableCell>
                     <TableCell>고객명</TableCell>
-                    <TableCell>접수일</TableCell>
+                    <TableCell>POS코드</TableCell>
+                    <TableCell>접수시간</TableCell>
+                    <TableCell>메모</TableCell>
+                    <TableCell>누락 원인</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {mappingFailures.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Typography variant="body2" color="error.main" fontWeight="bold">
-                          {item.reason}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={item.count} 
-                          color="error" 
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="small"
-                          variant="text"
-                          onClick={() => setShowReasons(prev => ({
-                            ...prev,
-                            [index]: !prev[index]
-                          }))}
-                          sx={{ textTransform: 'none', p: 0.5 }}
-                        >
-                          {showReasons[index] ? '숨기기' : '상세보기'}
-                        </Button>
-                        {showReasons[index] && (
-                          <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                            {item.items.slice(0, 5).map((detail, detailIndex) => (
-                              <Box key={detailIndex} sx={{ mb: 1, p: 1, bgcolor: 'white', borderRadius: 0.5 }}>
-                                <Typography variant="caption" display="block" fontWeight="bold">
-                                  • {detail.reservationNumber}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  상호명: {detail.storeName || '-'}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  고객명: {detail.customerName || '-'}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  POS코드: {detail.posCode || '-'}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  접수시간: {detail.receivedDateTime || '-'}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  메모: {detail.receivedMemo || '-'}
-                                </Typography>
-                              </Box>
-                            ))}
-                            {item.items.length > 5 && (
-                              <Typography variant="caption" color="text.secondary">
-                                ... 외 {item.items.length - 5}건
-                              </Typography>
-                            )}
-                          </Box>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {item.items[0]?.reservationNumber || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {item.items[0]?.customerName || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {item.items[0]?.receivedDateTime || '-'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {mappingFailures.map((item, index) => 
+                    item.items.map((detail, detailIndex) => (
+                      <TableRow key={`${index}-${detailIndex}`}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                            {detail.reservationNumber || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {detail.storeName || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {detail.customerName || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {detail.posCode || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {detail.receivedDateTime || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {detail.receivedMemo || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={item.reason} 
+                            color="error" 
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
