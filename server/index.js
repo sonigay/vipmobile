@@ -15798,9 +15798,9 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     });
 
     yardData.forEach((row, index) => {
-      if (row.length < 24) {
-        console.log(`행 ${index + 2}: 컬럼 수 부족 (${row.length}개, 최소 24개 필요)`);
-        return; // X열까지 필요하므로 최소 24개 컬럼
+      if (row.length < 22) {
+        console.log(`행 ${index + 2}: 컬럼 수 부족 (${row.length}개, 최소 22개 필요)`);
+        return; // V열까지 필요하므로 최소 22개 컬럼
       }
       
       // H열에서 "열람" 텍스트 확인 (이전 방식)
@@ -15896,7 +15896,7 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
         difference: {
           yardTotal: yardAnalysis.total,
           appCalculated: appCalculatedCount,
-          difference: yardAnalysis.total - appCalculatedCount
+          difference: yardAnalysis.unmatched // 실제 누락된 상세 항목 수
         }
       }
     };
