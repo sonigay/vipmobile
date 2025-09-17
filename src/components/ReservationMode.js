@@ -111,6 +111,7 @@ import ReservationSettingsScreen from './screens/ReservationSettingsScreen';
 // SalesByStoreScreen import 제거됨
 // ReservationAssignmentSettingsScreen import 제거됨
 import AllCustomerListScreen from './screens/AllCustomerListScreen';
+import MappingFailureModal from './MappingFailureModal';
 
 
 
@@ -119,6 +120,9 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
   
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  
+  // 매핑 실패 모달 상태
+  const [showMappingFailureModal, setShowMappingFailureModal] = useState(false);
   
   // 사전예약모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -371,7 +375,23 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
                           서류접수 완료
                         </Typography>
                       </Box>
-                      <CheckCircleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CheckCircleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                        <Tooltip title="매핑 실패 항목 관리">
+                          <IconButton
+                            size="small"
+                            onClick={() => setShowMappingFailureModal(true)}
+                            sx={{ 
+                              color: 'white',
+                              '&:hover': { 
+                                backgroundColor: 'rgba(255,255,255,0.1)' 
+                              }
+                            }}
+                          >
+                            <WarningIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </Box>
                   </CardContent>
                 </Card>
@@ -761,6 +781,16 @@ function ReservationMode({ onLogout, loggedInStore, onModeChange, availableModes
         loggedInStore={loggedInStore}
         onUpdateAdded={() => {
           console.log('사전예약모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
+      
+      {/* 매핑 실패 모달 */}
+      <MappingFailureModal
+        open={showMappingFailureModal}
+        onClose={() => setShowMappingFailureModal(false)}
+        onMappingUpdate={() => {
+          // 매핑 업데이트 후 대시보드 데이터 새로고침
+          loadDashboardData();
         }}
       />
       

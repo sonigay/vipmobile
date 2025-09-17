@@ -15488,6 +15488,109 @@ app.post('/api/pos-code-mappings', async (req, res) => {
   }
 });
 
+// 개별 POS코드 매핑 추가 API
+app.post('/api/pos-code-mapping', async (req, res) => {
+  try {
+    const { posCode, storeCode } = req.body;
+    
+    if (!posCode || !storeCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'POS코드와 매장코드를 모두 입력해주세요.'
+      });
+    }
+
+    // 기존 매핑 데이터 로드
+    const existingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'POS코드변경설정!A:H'
+    });
+
+    let existingMappings = [];
+    if (existingResponse.data.values && existingResponse.data.values.length > 1) {
+      existingMappings = existingResponse.data.values.slice(1).map(row => ({
+        originalCode: row[0] || '',
+        receiverCode: row[1] || '',
+        mappedCode: row[2] || '',
+        description: row[3] || '',
+        originalName: row[4] || '',
+        receiverName: row[5] || '',
+        mappedName: row[6] || '',
+        nameDescription: row[7] || ''
+      }));
+    }
+
+    // 중복 확인
+    const isDuplicate = existingMappings.some(mapping => 
+      mapping.originalCode === posCode && mapping.mappedCode === storeCode
+    );
+
+    if (isDuplicate) {
+      return res.status(400).json({
+        success: false,
+        message: '이미 동일한 매핑이 존재합니다.'
+      });
+    }
+
+    // 새 매핑 추가
+    const newMapping = {
+      originalCode: posCode,
+      receiverCode: '',
+      mappedCode: storeCode,
+      description: '매핑 실패 모달에서 추가됨',
+      originalName: '',
+      receiverName: '',
+      mappedName: '',
+      nameDescription: ''
+    };
+
+    existingMappings.push(newMapping);
+
+    // 시트에 저장할 데이터 준비
+    const sheetData = [
+      ['원본 POS코드', '접수자명', '변경될 POS코드', '설명', '원본 POS명', '접수자명', '변경될 POS명', '설명']
+    ];
+
+    existingMappings.forEach(mapping => {
+      sheetData.push([
+        mapping.originalCode,
+        mapping.receiverCode,
+        mapping.mappedCode,
+        mapping.description,
+        mapping.originalName,
+        mapping.receiverName,
+        mapping.mappedName,
+        mapping.nameDescription
+      ]);
+    });
+
+    // 시트에 저장
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'POS코드변경설정!A:H',
+      valueInputOption: 'RAW',
+      resource: {
+        values: sheetData
+      }
+    });
+
+    console.log(`POS코드 매핑 추가: ${posCode} -> ${storeCode}`);
+
+    res.json({
+      success: true,
+      message: '매핑이 성공적으로 추가되었습니다.',
+      mapping: newMapping
+    });
+
+  } catch (error) {
+    console.error('POS코드 매핑 추가 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '매핑 추가 중 오류가 발생했습니다: ' + error.message
+    });
+  }
+});
+
 // 재고 현황 분석 API (대리점별 분리)
 app.get('/api/inventory-analysis', async (req, res) => {
   const { storeCode } = req.query; // 대리점 코드 필터링 (선택사항)
