@@ -15918,17 +15918,17 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     console.log('원인별 건수:', reasonCounts);
     
     // 중복 예약번호 확인
-    const reservationNumbers = new Set();
+    const missingReservationNumbers = new Set();
     const duplicateReservations = new Set();
     yardAnalysis.missingDetails.forEach(item => {
-      if (reservationNumbers.has(item.reservationNumber)) {
+      if (missingReservationNumbers.has(item.reservationNumber)) {
         duplicateReservations.add(item.reservationNumber);
       } else {
-        reservationNumbers.add(item.reservationNumber);
+        missingReservationNumbers.add(item.reservationNumber);
       }
     });
     console.log('중복된 예약번호:', Array.from(duplicateReservations));
-    console.log('고유 예약번호 수:', reservationNumbers.size);
+    console.log('고유 예약번호 수:', missingReservationNumbers.size);
     console.log('총 누락 상세 항목 수:', yardAnalysis.missingDetails.length);
 
     res.json(result);

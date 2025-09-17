@@ -202,6 +202,8 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
           <Box>
             <Alert severity="info" sx={{ mb: 2 }}>
               마당접수 시트의 385건 중에서 앱에 반영되지 않은 누락 데이터를 확인할 수 있습니다.
+              <br />
+              <strong>차이 (계산)</strong>: 전체 차이 (385-354=31건) | <strong>누락 건수 (상세)</strong>: 실제 누락된 상세 항목 수
             </Alert>
 
             {/* 통계 정보 표시 */}
@@ -220,8 +222,12 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                     <Typography variant="h6" color="success.main">{failureReasons.appCalculated}건</Typography>
                   </Box>
                   <Box>
-                    <Typography variant="body2" color="text.secondary">누락 건수</Typography>
+                    <Typography variant="body2" color="text.secondary">누락 건수 (상세)</Typography>
                     <Typography variant="h6" color="error.main">{actualMissingCount}건</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">차이 (계산)</Typography>
+                    <Typography variant="h6" color="warning.main">{failureReasons.difference}건</Typography>
                   </Box>
                 </Box>
               </Box>
