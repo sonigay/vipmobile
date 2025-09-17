@@ -13982,7 +13982,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 3. 마당접수 시트 로드 (서류접수 상태 확인용)
     const yardResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '마당접수!A:V'
+      range: '마당접수!A:X'
     });
 
     // 4. 온세일 시트 로드 (온세일 접수 상태 확인용)
@@ -15728,7 +15728,7 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     // 1. 마당접수 시트 데이터 로드
     const yardResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '마당접수!A:V'
+      range: '마당접수!A:X'
     });
 
     // 2. 사전예약사이트 데이터 로드
@@ -15747,9 +15747,13 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       throw new Error('시트 데이터를 불러올 수 없습니다.');
     }
 
-    // 마당접수 데이터 처리 (헤더 제외)
+    // 마당접수 데이터 처리 (헤더 제외) - 마당접수는 헤더가 1행, 데이터가 2행부터
     const yardData = yardResponse.data.values.slice(1);
     const reservationData = reservationResponse.data.values.slice(1);
+    
+    console.log(`마당접수 원본 데이터 행 수: ${yardResponse.data.values.length}`);
+    console.log(`마당접수 처리 후 데이터 행 수: ${yardData.length}`);
+    console.log(`마당접수 첫 번째 데이터 행:`, yardData[0]?.slice(0, 5));
 
     // 마당접수에서 예약번호 추출 (정규화) - 매칭용
     const yardReservationNumbers = new Set();
@@ -15794,10 +15798,25 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     });
 
     yardData.forEach((row, index) => {
-      if (row.length < 24) return; // X열까지 필요하므로 최소 24개 컬럼
+      if (row.length < 24) {
+        console.log(`행 ${index + 2}: 컬럼 수 부족 (${row.length}개, 최소 24개 필요)`);
+        return; // X열까지 필요하므로 최소 24개 컬럼
+      }
       
-      const uValue = (row[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
-      const vValue = (row[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
+      // H열에서 "열람" 텍스트 확인 (이전 방식)
+      const hValue = (row[7] || '').toString().trim(); // H열: "열람" 텍스트
+      console.log(`행 ${index + 2}: H열="${hValue}"`);
+      
+      if (hValue !== '열람') {
+        console.log(`행 ${index + 2}: H열이 "열람"이 아님`);
+        return; // "열람"이 아니면 건너뛰기
+      }
+      
+      yardAnalysis.total++;
+      
+      // U열, V열에서 예약번호 추출
+      const uValue = (row[20] || '').toString().trim(); // U열
+      const vValue = (row[21] || '').toString().trim(); // V열
       
       // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
       const reservationPattern = /[A-Z]{2}\d{6}/g;
@@ -15805,31 +15824,24 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       const vMatches = vValue.match(reservationPattern) || [];
       const allMatches = [...uMatches, ...vMatches];
       
-      if (allMatches.length === 0) return; // 예약번호가 없으면 건너뛰기
+      const normalizedReservationNumber = allMatches.length > 0 ? allMatches[0] : '';
+      const isMatched = normalizedReservationNumber && reservationNumbers.has(normalizedReservationNumber);
       
-      // 각 예약번호에 대해 분석
-      allMatches.forEach(match => {
-        yardAnalysis.total++;
-        
-        const normalizedReservationNumber = match; // 이미 하이픈이 없는 형태
-        const isMatched = reservationNumbers.has(normalizedReservationNumber);
-        
-        if (isMatched) {
-          yardAnalysis.matched++;
-        } else {
-          yardAnalysis.unmatched++;
-          yardAnalysis.missingDetails.push({
-            rowIndex: index + 2, // 실제 행 번호
-            reservationNumber: match,
-            posCode: (row[17] || '').toString().trim(), // R열: POS코드
-            storeName: (row[18] || '').toString().trim(), // S열: 상호명
-            customerName: (row[23] || '').toString().trim(), // X열: 고객명
-            receivedDateTime: (row[11] || '').toString().trim(), // L열: 접수시간
-            receivedMemo: (row[20] || '').toString().trim(), // U열: 수신점메모
-            reason: '사전예약사이트에 예약번호 없음'
-          });
-        }
-      });
+      if (isMatched) {
+        yardAnalysis.matched++;
+      } else {
+        yardAnalysis.unmatched++;
+        yardAnalysis.missingDetails.push({
+          rowIndex: index + 2, // 실제 행 번호
+          reservationNumber: normalizedReservationNumber || '예약번호 없음',
+          posCode: (row[17] || '').toString().trim(), // R열: POS코드
+          storeName: (row[18] || '').toString().trim(), // S열: 상호명
+          customerName: (row[23] || '').toString().trim(), // X열: 고객명
+          receivedDateTime: (row[11] || '').toString().trim(), // L열: 접수시간
+          receivedMemo: (row[20] || '').toString().trim(), // U열: 수신점메모
+          reason: normalizedReservationNumber ? '사전예약사이트에 예약번호 없음' : '예약번호 추출 실패'
+        });
+      }
     });
 
     // 대시보드에서 사용하는 정확한 서류접수 완료 건수 가져오기
