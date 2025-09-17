@@ -15591,6 +15591,135 @@ app.post('/api/pos-code-mapping', async (req, res) => {
   }
 });
 
+// 매핑 실패 원인 분석 API
+app.get('/api/mapping-failure-analysis', async (req, res) => {
+  try {
+    const { posCode } = req.query;
+    
+    if (!posCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'POS코드를 입력해주세요.'
+      });
+    }
+
+    // 1. 폰클출고처데이터에서 해당 POS코드가 존재하는지 확인
+    const phoneklResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '폰클출고처데이터!A:V'
+    });
+
+    let phoneklHasCode = false;
+    let phoneklManager = '';
+    if (phoneklResponse.data.values && phoneklResponse.data.values.length > 3) {
+      const phoneklData = phoneklResponse.data.values.slice(3);
+      const foundRow = phoneklData.find(row => 
+        row.length >= 22 && (row[15] || '').toString().trim() === posCode
+      );
+      
+      if (foundRow) {
+        phoneklHasCode = true;
+        phoneklManager = (foundRow[21] || '').toString().trim();
+      }
+    }
+
+    // 2. POS코드변경설정에서 매핑이 설정되어 있는지 확인
+    const mappingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'POS코드변경설정!A:H'
+    });
+
+    let hasMapping = false;
+    let mappedCode = '';
+    if (mappingResponse.data.values && mappingResponse.data.values.length > 1) {
+      const mappingData = mappingResponse.data.values.slice(1);
+      const foundMapping = mappingData.find(row => 
+        (row[0] || '').toString().trim() === posCode
+      );
+      
+      if (foundMapping) {
+        hasMapping = true;
+        mappedCode = (foundMapping[2] || '').toString().trim();
+      }
+    }
+
+    // 3. 사전예약사이트에서 해당 POS코드 사용 현황 확인
+    const reservationResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '사전예약사이트!A:Z'
+    });
+
+    let reservationUsage = [];
+    if (reservationResponse.data.values && reservationResponse.data.values.length > 1) {
+      const reservationData = reservationResponse.data.values.slice(1);
+      reservationUsage = reservationData
+        .filter(row => row.length >= 26 && (row[25] || '').toString().trim() === posCode)
+        .slice(0, 3) // 최대 3개만 표시
+        .map(row => ({
+          customerName: (row[7] || '').toString().trim(),
+          reservationNumber: (row[8] || '').toString().trim(),
+          receiver: (row[25] || '').toString().trim()
+        }));
+    }
+
+    // 4. 실패 원인 분석
+    const reasons = [];
+
+    if (!phoneklHasCode) {
+      reasons.push(`폰클출고처데이터에 매장코드 "${posCode}"가 존재하지 않음`);
+    } else {
+      reasons.push(`폰클출고처데이터에 매장코드 "${posCode}" 존재 (담당자: ${phoneklManager || '없음'})`);
+    }
+
+    if (!hasMapping) {
+      reasons.push(`POS코드변경설정에 "${posCode}" 매핑이 설정되지 않음`);
+    } else {
+      reasons.push(`POS코드변경설정에 "${posCode}" → "${mappedCode}" 매핑 존재`);
+    }
+
+    if (reservationUsage.length === 0) {
+      reasons.push(`사전예약사이트에서 "${posCode}" 사용 내역 없음`);
+    } else {
+      reasons.push(`사전예약사이트에서 "${posCode}" 사용: ${reservationUsage.length}건`);
+      reasons.push(`사용 예시: ${reservationUsage.map(item => `${item.customerName}(${item.reservationNumber})`).join(', ')}`);
+    }
+
+    // 5. 해결 방안 제시
+    const solutions = [];
+    
+    if (!phoneklHasCode && !hasMapping) {
+      solutions.push(`1. 폰클출고처데이터에 "${posCode}" 매장코드 추가`);
+      solutions.push(`2. 또는 POS코드변경설정에서 다른 매장코드로 매핑`);
+    } else if (phoneklHasCode && !hasMapping) {
+      solutions.push(`1. POS코드변경설정에서 "${posCode}" → "${posCode}" 매핑 추가`);
+    } else if (!phoneklHasCode && hasMapping) {
+      solutions.push(`1. 폰클출고처데이터에 "${mappedCode}" 매장코드 확인`);
+    }
+
+    res.json({
+      success: true,
+      posCode,
+      reasons,
+      solutions,
+      details: {
+        phoneklHasCode,
+        phoneklManager,
+        hasMapping,
+        mappedCode,
+        reservationUsageCount: reservationUsage.length,
+        reservationUsage
+      }
+    });
+
+  } catch (error) {
+    console.error('매핑 실패 원인 분석 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '분석 중 오류가 발생했습니다: ' + error.message
+    });
+  }
+});
+
 // 재고 현황 분석 API (대리점별 분리)
 app.get('/api/inventory-analysis', async (req, res) => {
   const { storeCode } = req.query; // 대리점 코드 필터링 (선택사항)

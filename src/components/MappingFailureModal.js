@@ -34,6 +34,25 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
   const [error, setError] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [newMapping, setNewMapping] = useState('');
+  const [failureReasons, setFailureReasons] = useState({});
+  const [showReasons, setShowReasons] = useState({});
+
+  // 매핑 실패 원인 분석
+  const analyzeFailureReasons = async (posCode) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/mapping-failure-analysis?posCode=${posCode}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setFailureReasons(prev => ({
+          ...prev,
+          [posCode]: result.reasons
+        }));
+      }
+    } catch (err) {
+      console.error('매핑 실패 원인 분석 오류:', err);
+    }
+  };
 
   // 매핑 실패 데이터 로드
   const loadMappingFailures = async () => {
@@ -54,6 +73,11 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
         }));
         
         setMappingFailures(failureList);
+        
+        // 각 POS코드에 대해 실패 원인 분석
+        failureList.forEach(item => {
+          analyzeFailureReasons(item.posCode);
+        });
       } else {
         setError('매핑 실패 데이터를 불러오는데 실패했습니다.');
       }
@@ -167,6 +191,7 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                     <TableCell>POS코드</TableCell>
                     <TableCell>POS명</TableCell>
                     <TableCell>실패건수</TableCell>
+                    <TableCell>실패원인</TableCell>
                     <TableCell>새 매장코드</TableCell>
                     <TableCell>작업</TableCell>
                   </TableRow>
@@ -190,6 +215,51 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                           color="error" 
                           size="small"
                         />
+                      </TableCell>
+                      <TableCell>
+                        {failureReasons[item.posCode] ? (
+                          <Box>
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => setShowReasons(prev => ({
+                                ...prev,
+                                [item.posCode]: !prev[item.posCode]
+                              }))}
+                              sx={{ textTransform: 'none', p: 0.5 }}
+                            >
+                              {showReasons[item.posCode] ? '숨기기' : '원인보기'}
+                            </Button>
+                            {showReasons[item.posCode] && (
+                              <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                <Typography variant="caption" fontWeight="bold" display="block" sx={{ mb: 0.5 }}>
+                                  📋 실패 원인:
+                                </Typography>
+                                {failureReasons[item.posCode].reasons?.map((reason, index) => (
+                                  <Typography key={index} variant="caption" display="block" color="text.secondary" sx={{ ml: 1 }}>
+                                    • {reason}
+                                  </Typography>
+                                ))}
+                                {failureReasons[item.posCode].solutions && failureReasons[item.posCode].solutions.length > 0 && (
+                                  <>
+                                    <Typography variant="caption" fontWeight="bold" display="block" sx={{ mt: 1, mb: 0.5 }}>
+                                      💡 해결 방안:
+                                    </Typography>
+                                    {failureReasons[item.posCode].solutions.map((solution, index) => (
+                                      <Typography key={index} variant="caption" display="block" color="primary.main" sx={{ ml: 1 }}>
+                                        {solution}
+                                      </Typography>
+                                    ))}
+                                  </>
+                                )}
+                              </Box>
+                            )}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            분석중...
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         {editingItem === item.posCode ? (
