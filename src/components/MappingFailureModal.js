@@ -266,9 +266,26 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                         {showReasons[index] && (
                           <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                             {item.items.slice(0, 5).map((detail, detailIndex) => (
-                              <Typography key={detailIndex} variant="caption" display="block" color="text.secondary">
-                                • {detail.reservationNumber} - {detail.customerName} ({detail.receivedDate})
-                              </Typography>
+                              <Box key={detailIndex} sx={{ mb: 1, p: 1, bgcolor: 'white', borderRadius: 0.5 }}>
+                                <Typography variant="caption" display="block" fontWeight="bold">
+                                  • {detail.reservationNumber}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  상호명: {detail.storeName || '-'}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  고객명: {detail.customerName || '-'}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  POS코드: {detail.posCode || '-'}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  접수시간: {detail.receivedDateTime || '-'}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  메모: {detail.receivedMemo || '-'}
+                                </Typography>
+                              </Box>
                             ))}
                             {item.items.length > 5 && (
                               <Typography variant="caption" color="text.secondary">
@@ -290,7 +307,7 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {item.items[0]?.receivedDate || '-'}
+                          {item.items[0]?.receivedDateTime || '-'}
                         </Typography>
                       </TableCell>
                     </TableRow>

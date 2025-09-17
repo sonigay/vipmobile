@@ -15794,38 +15794,42 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     });
 
     yardData.forEach((row, index) => {
-      if (row.length < 8) return;
+      if (row.length < 24) return; // X열까지 필요하므로 최소 24개 컬럼
       
-      const reservationNumber = (row[7] || '').toString().trim(); // H열: 예약번호
-      const customerName = (row[1] || '').toString().trim(); // B열: 고객명
-      const storeCode = (row[2] || '').toString().trim(); // C열: 매장코드
-      const receivedDate = (row[3] || '').toString().trim(); // D열: 접수일
-      const receivedMemo = (row[4] || '').toString().trim(); // E열: 메모
+      const uValue = (row[20] || '').toString().trim(); // U열 (21번째, 0부터 시작)
+      const vValue = (row[21] || '').toString().trim(); // V열 (22번째, 0부터 시작)
       
-      if (!reservationNumber) return;
+      // 예약번호 패턴 찾기 (하이픈이 없는 형태: XX000000)
+      const reservationPattern = /[A-Z]{2}\d{6}/g;
+      const uMatches = uValue.match(reservationPattern) || [];
+      const vMatches = vValue.match(reservationPattern) || [];
+      const allMatches = [...uMatches, ...vMatches];
       
-      yardAnalysis.total++;
+      if (allMatches.length === 0) return; // 예약번호가 없으면 건너뛰기
       
-      const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
-      const isMatched = reservationNumbers.has(normalizedReservationNumber) || 
-                       onSaleIndex.has(`${customerName}_${storeCode}`);
-      
-      if (isMatched) {
-        yardAnalysis.matched++;
-      } else {
-        yardAnalysis.unmatched++;
-        yardAnalysis.missingDetails.push({
-          rowIndex: index + 2, // 실제 행 번호
-          reservationNumber,
-          customerName,
-          storeCode,
-          receivedDate,
-          receivedMemo,
-          reason: !reservationNumbers.has(normalizedReservationNumber) ? 
-            '사전예약사이트에 예약번호 없음' : 
-            '온세일 접수로 처리됨'
-        });
-      }
+      // 각 예약번호에 대해 분석
+      allMatches.forEach(match => {
+        yardAnalysis.total++;
+        
+        const normalizedReservationNumber = match; // 이미 하이픈이 없는 형태
+        const isMatched = reservationNumbers.has(normalizedReservationNumber);
+        
+        if (isMatched) {
+          yardAnalysis.matched++;
+        } else {
+          yardAnalysis.unmatched++;
+          yardAnalysis.missingDetails.push({
+            rowIndex: index + 2, // 실제 행 번호
+            reservationNumber: match,
+            posCode: (row[17] || '').toString().trim(), // R열: POS코드
+            storeName: (row[18] || '').toString().trim(), // S열: 상호명
+            customerName: (row[23] || '').toString().trim(), // X열: 고객명
+            receivedDateTime: (row[11] || '').toString().trim(), // L열: 접수시간
+            receivedMemo: (row[20] || '').toString().trim(), // U열: 수신점메모
+            reason: '사전예약사이트에 예약번호 없음'
+          });
+        }
+      });
     });
 
     // 대시보드에서 사용하는 정확한 서류접수 완료 건수 가져오기
