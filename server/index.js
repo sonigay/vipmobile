@@ -15830,7 +15830,13 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
 
     // 사전예약사이트에서 서류접수 완료로 계산된 건수 (앱에서 표시되는 354건)
     let appCalculatedCount = 0;
-    reservationData.forEach(row => {
+    let debugCount = 0;
+    
+    console.log(`마당접수 예약번호 개수: ${yardReservationNumbers.size}`);
+    console.log(`온세일 인덱스 개수: ${onSaleIndex.size}`);
+    console.log(`사전예약사이트 데이터 개수: ${reservationData.length}`);
+    
+    reservationData.forEach((row, index) => {
       if (row.length < 26) return;
       
       const reservationNumber = (row[8] || '').toString().trim();
@@ -15839,14 +15845,22 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
       
       if (!reservationNumber) return;
       
+      debugCount++;
       const normalizedReservationNumber = reservationNumber.replace(/-/g, '');
       const isYardReceived = yardReservationNumbers.has(normalizedReservationNumber);
       const isOnSaleReceived = onSaleIndex.has(`${customerName}_${storeCode}`);
+      
+      if (index < 5) {
+        console.log(`사전예약 ${index + 1}: 예약번호="${reservationNumber}", 정규화="${normalizedReservationNumber}", 마당접수=${isYardReceived}, 온세일=${isOnSaleReceived}`);
+      }
       
       if (isYardReceived || isOnSaleReceived) {
         appCalculatedCount++;
       }
     });
+    
+    console.log(`처리된 사전예약 데이터: ${debugCount}개`);
+    console.log(`서류접수 완료 계산: ${appCalculatedCount}건`);
 
     const result = {
       success: true,
