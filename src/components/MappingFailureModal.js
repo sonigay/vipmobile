@@ -67,6 +67,8 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
         const analysis = result.analysis;
         const missingDetails = analysis.yardReceipt.missingDetails || [];
         
+        console.log('서버에서 받은 누락 데이터:', missingDetails.slice(0, 3));
+        
         // 누락된 데이터를 그룹화
         const groupedMissing = {};
         missingDetails.forEach(item => {
@@ -83,6 +85,7 @@ const MappingFailureModal = ({ open, onClose, onMappingUpdate }) => {
         });
         
         const failureList = Object.values(groupedMissing);
+        console.log('그룹화된 누락 데이터:', failureList);
         setMappingFailures(failureList);
         
         // 통계 정보 저장
