@@ -12487,8 +12487,47 @@ app.get('/api/reservation/assignment-memory', async (req, res) => {
   }
 });
 
+// 배정 상태 변경 감지 API OPTIONS 요청 처리
+app.options('/api/reservation/assignment-changes', (req, res) => {
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'https://vipmobile.netlify.app/',
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).end();
+});
+
 // 배정 상태 변경 감지 API (실시간 업데이트용 - 최적화)
 app.get('/api/reservation/assignment-changes', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'https://vipmobile.netlify.app/',
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   try {
     const { lastCheck } = req.query;
     const lastCheckTime = lastCheck ? new Date(parseInt(lastCheck)) : new Date(0);
