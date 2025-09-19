@@ -4046,13 +4046,27 @@ app.get('/api/inventory/activation-status', async (req, res) => {
       throw new Error('폰클개통데이터를 가져올 수 없습니다.');
     }
     
+    // 디버깅: 폰클개통데이터 헤더 확인
+    console.log('🔍 [개통매칭 디버깅] 폰클개통데이터 헤더:', phoneklActivationValues[0]);
+    console.log('🔍 [개통매칭 디버깅] 폰클개통데이터 총 행 수:', phoneklActivationValues.length);
+    
+    // 처음 3개 데이터 행의 구조 확인
+    for (let i = 1; i <= Math.min(3, phoneklActivationValues.length - 1); i++) {
+      console.log(`🔍 [개통매칭 디버깅] 폰클개통데이터 행 ${i}:`, phoneklActivationValues[i]);
+    }
+    
     const activatedCustomers = new Set();
     let activationCount = 0;
     
     phoneklActivationValues.slice(1).forEach((row, index) => {
-      if (row.length >= 10) {
-        const customerName = cleanCustomerName((row[8] || '').toString().trim()); // I열: 고객명
-        const activationNumber = (row[9] || '').toString().trim(); // J열: 개통번호
+      if (row.length >= 18) {
+        const customerName = cleanCustomerName((row[16] || '').toString().trim()); // Q열: 고객명
+        const activationNumber = (row[17] || '').toString().trim(); // R열: 개통번호
+        
+        // 디버깅: 처음 5개 개통 데이터 확인
+        if (index < 5) {
+          console.log(`🔍 [개통매칭 디버깅] 폰클개통데이터 행 ${index + 1}: 고객명="${customerName}", 개통번호="${activationNumber}"`);
+        }
         
         if (customerName && activationNumber && activationNumber.length >= 4) {
           const lastFourDigits = activationNumber.slice(-4); // 끝 4자리
@@ -4061,10 +4075,15 @@ app.get('/api/inventory/activation-status', async (req, res) => {
           activatedCustomers.add(activationKey);
           activationCount++;
           
-
+          // 디버깅: 매칭 키 확인
+          if (index < 5) {
+            console.log(`🔍 [개통매칭 디버깅] 매칭키 생성: "${activationKey}"`);
+          }
         }
       }
     });
+    
+    console.log(`📊 [개통매칭 디버깅] 폰클개통데이터에서 수집된 개통 고객: ${activationCount}명`);
     
 
     
@@ -4085,12 +4104,20 @@ app.get('/api/inventory/activation-status', async (req, res) => {
       const customerName = cleanCustomerName((row[7] || '').toString().trim()); // H열: 고객명
       const phoneNumber = (row[9] || '').toString().trim(); // J열: 고객전화번호
       
+      // 디버깅: 처음 5개 사전예약사이트 데이터 확인
+      if (index < 5) {
+        console.log(`🔍 [개통매칭 디버깅] 사전예약사이트 행 ${index + 1}: 예약번호="${reservationNumber}", 고객명="${customerName}", 전화번호="${phoneNumber}"`);
+      }
+      
       if (reservationNumber && customerName && phoneNumber && phoneNumber.length >= 4) {
         const lastFourDigits = phoneNumber.slice(-4); // 끝 4자리
         const reservationKey = `${customerName}_${lastFourDigits}`;
         const isActivated = activatedCustomers.has(reservationKey);
         
-
+        // 디버깅: 매칭 키와 결과 확인
+        if (index < 5) {
+          console.log(`🔍 [개통매칭 디버깅] 사전예약사이트 매칭키: "${reservationKey}", 개통여부: ${isActivated}`);
+        }
         
         activationResults.push({
           reservationNumber,
