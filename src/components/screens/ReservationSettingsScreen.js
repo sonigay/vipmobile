@@ -1173,6 +1173,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={reservationSiteData.pColumn || []}
                           value={item.reservationSite.p}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.p', newValue || '')}
+                          onInputChange={(event, newInputValue) => updateNormalizationItem(item.id, 'reservationSite.p', newInputValue || '')}
                           renderInput={(params) => <TextField {...params} placeholder="P열(모델명)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
@@ -1182,6 +1183,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={reservationSiteData.qColumn || []}
                           value={item.reservationSite.q}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.q', newValue || '')}
+                          onInputChange={(event, newInputValue) => updateNormalizationItem(item.id, 'reservationSite.q', newInputValue || '')}
                           renderInput={(params) => <TextField {...params} placeholder="Q열(용량)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
@@ -1191,6 +1193,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={reservationSiteData.rColumn || []}
                           value={item.reservationSite.r}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'reservationSite.r', newValue || '')}
+                          onInputChange={(event, newInputValue) => updateNormalizationItem(item.id, 'reservationSite.r', newInputValue || '')}
                           renderInput={(params) => <TextField {...params} placeholder="R열(색상)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
@@ -1204,6 +1207,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={phoneklData.fColumn || []}
                           value={item.phonekl.f}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.f', newValue || '')}
+                          onInputChange={(event, newInputValue) => updateNormalizationItem(item.id, 'phonekl.f', newInputValue || '')}
                           renderInput={(params) => <TextField {...params} placeholder="F열(모델명&용량)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
@@ -1213,6 +1217,7 @@ function ReservationSettingsScreen({ loggedInStore }) {
                           options={phoneklData.gColumn || []}
                           value={item.phonekl.g}
                           onChange={(event, newValue) => updateNormalizationItem(item.id, 'phonekl.g', newValue || '')}
+                          onInputChange={(event, newInputValue) => updateNormalizationItem(item.id, 'phonekl.g', newInputValue || '')}
                           renderInput={(params) => <TextField {...params} placeholder="G열(색상)" size="small" sx={{ width: '120px' }} />}
                           freeSolo
                           sx={{ width: '120px' }}
