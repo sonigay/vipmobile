@@ -4027,7 +4027,7 @@ app.get('/api/inventory/activation-status', async (req, res) => {
     // 캐시 키 생성
     const cacheKey = 'inventory_activation_status';
     
-    // 캐시에서 먼저 확인 (5분 TTL)
+    // 캐시에서 먼저 확인 (1분 TTL로 단축)
     const cachedData = cacheUtils.get(cacheKey);
     if (cachedData) {
       console.log('✅ [개통상태 디버깅] 캐시된 개통 상태 반환');
@@ -4203,8 +4203,8 @@ app.get('/api/inventory/activation-status', async (req, res) => {
       notActivated: activationResults.length - matchedCount
     };
     
-    // 결과 캐싱 (5분 TTL)
-    cacheUtils.set(cacheKey, result, 5 * 60);
+    // 결과 캐싱 (1분 TTL로 단축)
+    cacheUtils.set(cacheKey, result, 1 * 60);
     
     console.log('✅ [개통상태 디버깅] 개통 상태 확인 완료');
     res.json(result);
