@@ -3444,7 +3444,7 @@ function SubscriberIncreaseTab() {
                             {Array.from({length: 12}, (_, i) => i + 1).map(month => {
                               const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
                               const colIndex = data[0].findIndex(header => header === yearMonthKey);
-                              const currentValue = colIndex !== -1 ? agent.subscriberData[colIndex - 3] : '';
+                              const currentValue = colIndex !== -1 ? agent.subscriberData[colIndex] : '';
                               
                               return (
                                 <TableCell key={month} sx={{ textAlign: 'center' }}>
@@ -3459,6 +3459,17 @@ function SubscriberIncreaseTab() {
                                       setInputData(newInputData);
                                     }}
                                     sx={{ width: 70 }}
+                                    inputProps={{
+                                      style: { textAlign: 'center' },
+                                      inputMode: 'numeric',
+                                      pattern: '[0-9]*'
+                                    }}
+                                    InputProps={{
+                                      inputProps: {
+                                        min: 0,
+                                        step: 1
+                                      }
+                                    }}
                                   />
                                 </TableCell>
                               );
@@ -3472,7 +3483,7 @@ function SubscriberIncreaseTab() {
                             {Array.from({length: 12}, (_, i) => i + 1).map(month => {
                               const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
                               const colIndex = data[0].findIndex(header => header === yearMonthKey);
-                              const currentValue = colIndex !== -1 ? agent.feeData[colIndex - 3] : '';
+                              const currentValue = colIndex !== -1 ? agent.feeData[colIndex] : '';
                               
                               return (
                                 <TableCell key={month} sx={{ textAlign: 'center' }}>
@@ -3487,6 +3498,17 @@ function SubscriberIncreaseTab() {
                                       setInputData(newInputData);
                                     }}
                                     sx={{ width: 70 }}
+                                    inputProps={{
+                                      style: { textAlign: 'center' },
+                                      inputMode: 'numeric',
+                                      pattern: '[0-9]*'
+                                    }}
+                                    InputProps={{
+                                      inputProps: {
+                                        min: 0,
+                                        step: 1
+                                      }
+                                    }}
                                   />
                                 </TableCell>
                               );
@@ -3592,6 +3614,17 @@ function SubscriberIncreaseTab() {
                                   value={inputData[`${agent.code}_가입자수`] || ''}
                                   onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
                                   sx={{ width: 100 }}
+                                  inputProps={{
+                                    style: { textAlign: 'center' },
+                                    inputMode: 'numeric',
+                                    pattern: '[0-9]*'
+                                  }}
+                                  InputProps={{
+                                    inputProps: {
+                                      min: 0,
+                                      step: 1
+                                    }
+                                  }}
                                 />
                               </TableCell>
                               <TableCell>
@@ -3645,6 +3678,17 @@ function SubscriberIncreaseTab() {
                                   value={inputData[`${agent.code}_관리수수료`] || ''}
                                   onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
                                   sx={{ width: 100 }}
+                                  inputProps={{
+                                    style: { textAlign: 'center' },
+                                    inputMode: 'numeric',
+                                    pattern: '[0-9]*'
+                                  }}
+                                  InputProps={{
+                                    inputProps: {
+                                      min: 0,
+                                      step: 1
+                                    }
+                                  }}
                                 />
                               </TableCell>
                               <TableCell>
@@ -3686,53 +3730,119 @@ function SubscriberIncreaseTab() {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
-                📈 가입자수 추이 (막대 그래프) {timeUnit === 'year' ? '(년간)' : ''}
+                📈 가입자수 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(막대 그래프)'}
               </Typography>
               <Box sx={{ height: 300 }}>
-                <Bar 
-                  data={{
-                    labels: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => `${agent.name}\n(${agent.code})`),
-                    datasets: [{
-                      label: timeUnit === 'year' ? '년간 가입자수' : '가입자수',
-                      data: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => {
-                        if (!selectedYearMonth) return 0;
-                        if (timeUnit === 'month') {
-                          const index = agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth);
-                          const value = agent.subscriberData[index];
-                          return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
-                        } else {
-                          return agent.yearlySubscriberTotal || 0;
+                {timeUnit === 'year' && selectedYearMonth ? (
+                  <Line 
+                    data={{
+                      labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                      datasets: agentData.map((agent, index) => {
+                        const colors = [
+                          'rgba(54, 162, 235, 1)',   // 파란색
+                          'rgba(255, 99, 132, 1)',   // 빨간색
+                          'rgba(75, 192, 192, 1)',   // 청록색
+                          'rgba(255, 205, 86, 1)',   // 노란색
+                          'rgba(153, 102, 255, 1)'   // 보라색
+                        ];
+                        const monthData = Array.from({length: 12}, (_, i) => {
+                          const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
+                          const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                          if (colIndex !== -1) {
+                            const value = agent.subscriberData[colIndex];
+                            return value !== '' && value !== null && value !== undefined ? (parseFloat(value) || 0) : 0;
+                          }
+                          return 0;
+                        });
+                        
+                        return {
+                          label: `${agent.name} (${agent.code})`,
+                          data: monthData,
+                          borderColor: colors[index % colors.length],
+                          backgroundColor: colors[index % colors.length] + '20',
+                          borderWidth: 2,
+                          borderDash: [5, 5], // 점선
+                          fill: false,
+                          tension: 0.1
+                        };
+                      })
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: true,
+                          text: `가입자수 월별 흐름 - ${selectedYearMonth}년`
                         }
-                      }),
-                      backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                      borderColor: 'rgba(54, 162, 235, 1)',
-                      borderWidth: 1
-                    }]
-                  }}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: 'top',
                       },
-                      title: {
-                        display: true,
-                        text: `가입자수 현황 - ${selectedYearMonth || (timeUnit === 'month' ? '년월 선택' : '년도 선택')}${timeUnit === 'year' ? ' (년간)' : ''}`
-                      }
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        ticks: {
-                          callback: function(value) {
-                            return value.toLocaleString() + '명';
+                      scales: {
+                        x: {
+                          title: {
+                            display: true,
+                            text: '월'
+                          }
+                        },
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: '가입자수 (명)'
+                          },
+                          ticks: {
+                            callback: function(value) {
+                              return value.toLocaleString() + '명';
+                            }
                           }
                         }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                ) : (
+                  <Bar 
+                    data={{
+                      labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
+                      datasets: [{
+                        label: '가입자수',
+                        data: agentData.map(agent => {
+                          if (!selectedYearMonth) return 0;
+                          const index = agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth);
+                          const value = agent.subscriberData[index];
+                          return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                        }),
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                      }]
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: true,
+                          text: `가입자수 현황 - ${selectedYearMonth || '년월 선택'}`
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            callback: function(value) {
+                              return value.toLocaleString() + '명';
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -3740,55 +3850,121 @@ function SubscriberIncreaseTab() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
-                📊 관리수수료 추이 (선 그래프) {timeUnit === 'year' ? '(년간)' : ''}
+                📊 관리수수료 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(선 그래프)'}
               </Typography>
               <Box sx={{ height: 300 }}>
-                <Line 
-                  data={{
-                    labels: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => `${agent.name}\n(${agent.code})`),
-                    datasets: [{
-                      label: timeUnit === 'year' ? '년간 관리수수료' : '관리수수료',
-                      data: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => {
-                        if (!selectedYearMonth) return 0;
-                        if (timeUnit === 'month') {
-                          const index = agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth);
-                          const value = agent.feeData[index];
-                          return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
-                        } else {
-                          return agent.yearlyFeeTotal || 0;
+                {timeUnit === 'year' && selectedYearMonth ? (
+                  <Line 
+                    data={{
+                      labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                      datasets: agentData.map((agent, index) => {
+                        const colors = [
+                          'rgba(54, 162, 235, 1)',   // 파란색
+                          'rgba(255, 99, 132, 1)',   // 빨간색
+                          'rgba(75, 192, 192, 1)',   // 청록색
+                          'rgba(255, 205, 86, 1)',   // 노란색
+                          'rgba(153, 102, 255, 1)'   // 보라색
+                        ];
+                        const monthData = Array.from({length: 12}, (_, i) => {
+                          const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
+                          const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                          if (colIndex !== -1) {
+                            const value = agent.feeData[colIndex];
+                            return value !== '' && value !== null && value !== undefined ? (parseFloat(value) || 0) : 0;
+                          }
+                          return 0;
+                        });
+                        
+                        return {
+                          label: `${agent.name} (${agent.code})`,
+                          data: monthData,
+                          borderColor: colors[index % colors.length],
+                          backgroundColor: colors[index % colors.length] + '20',
+                          borderWidth: 2,
+                          borderDash: [5, 5], // 점선
+                          fill: false,
+                          tension: 0.1
+                        };
+                      })
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: true,
+                          text: `관리수수료 월별 흐름 - ${selectedYearMonth}년`
                         }
-                      }),
-                      backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                      borderColor: 'rgba(153, 102, 255, 1)',
-                      borderWidth: 2,
-                      fill: true,
-                      tension: 0.1
-                    }]
-                  }}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: 'top',
                       },
-                      title: {
-                        display: true,
-                        text: `관리수수료 현황 - ${selectedYearMonth || (timeUnit === 'month' ? '년월 선택' : '년도 선택')}${timeUnit === 'year' ? ' (년간)' : ''}`
-                      }
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        ticks: {
-                          callback: function(value) {
-                            return value.toLocaleString() + '원';
+                      scales: {
+                        x: {
+                          title: {
+                            display: true,
+                            text: '월'
+                          }
+                        },
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: '관리수수료 (원)'
+                          },
+                          ticks: {
+                            callback: function(value) {
+                              return value.toLocaleString() + '원';
+                            }
                           }
                         }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                ) : (
+                  <Line 
+                    data={{
+                      labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
+                      datasets: [{
+                        label: '관리수수료',
+                        data: agentData.map(agent => {
+                          if (!selectedYearMonth) return 0;
+                          const index = agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth);
+                          const value = agent.feeData[index];
+                          return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                        }),
+                        backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                      }]
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: true,
+                          text: `관리수수료 현황 - ${selectedYearMonth || '년월 선택'}`
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            callback: function(value) {
+                              return value.toLocaleString() + '원';
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                )}
               </Box>
             </CardContent>
           </Card>
