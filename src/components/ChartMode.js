@@ -2857,20 +2857,32 @@ function SubscriberIncreaseTab() {
   // API 호출 함수들
   const checkPermission = async () => {
     try {
+      console.log('🔍 [가입자증갑] 권한 확인 API 호출 시작');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/access`, {
         credentials: 'include'
       });
+      
+      console.log('🔍 [가입자증갑] 권한 확인 응답 상태:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔍 [가입자증갑] 권한 확인 실패:', response.status, errorText);
+        throw new Error(`권한 확인 실패: ${response.status} ${errorText}`);
+      }
+      
       const result = await response.json();
+      console.log('🔍 [가입자증갑] 권한 확인 결과:', result);
       setHasPermission(result.hasAccess);
       return result.hasAccess;
     } catch (error) {
-      console.error('권한 확인 오류:', error);
+      console.error('🔍 [가입자증갑] 권한 확인 오류:', error);
       return false;
     }
   };
 
   const initializeSheet = async () => {
     try {
+      console.log('🔍 [가입자증갑] 시트 초기화 API 호출 시작');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/init-sheet`, {
         method: 'POST',
         headers: {
@@ -2878,31 +2890,54 @@ function SubscriberIncreaseTab() {
         },
         credentials: 'include'
       });
+      
+      console.log('🔍 [가입자증갑] 시트 초기화 응답 상태:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔍 [가입자증갑] 시트 초기화 실패:', response.status, errorText);
+        throw new Error(`시트 초기화 실패: ${response.status} ${errorText}`);
+      }
+      
       const result = await response.json();
+      console.log('🔍 [가입자증갑] 시트 초기화 결과:', result);
+      
       if (result.success) {
         setData(result.data);
         return result.data;
       }
       return null;
     } catch (error) {
-      console.error('시트 초기화 오류:', error);
+      console.error('🔍 [가입자증갑] 시트 초기화 오류:', error);
       return null;
     }
   };
 
   const fetchData = async () => {
     try {
+      console.log('🔍 [가입자증갑] 데이터 조회 API 호출 시작');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/data`, {
         credentials: 'include'
       });
+      
+      console.log('🔍 [가입자증갑] 데이터 조회 응답 상태:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔍 [가입자증갑] 데이터 조회 실패:', response.status, errorText);
+        throw new Error(`데이터 조회 실패: ${response.status} ${errorText}`);
+      }
+      
       const result = await response.json();
+      console.log('🔍 [가입자증갑] 데이터 조회 결과:', result);
+      
       if (result.success) {
         setData(result.data);
         return result.data;
       }
       return null;
     } catch (error) {
-      console.error('데이터 조회 오류:', error);
+      console.error('🔍 [가입자증갑] 데이터 조회 오류:', error);
       return null;
     }
   };
@@ -2950,7 +2985,11 @@ function SubscriberIncreaseTab() {
       setError(null);
       
       try {
+        console.log('🔍 [가입자증갑] 컴포넌트 초기화 시작');
+        
         const hasAccess = await checkPermission();
+        console.log('🔍 [가입자증갑] 권한 확인 결과:', hasAccess);
+        
         if (!hasAccess) {
           setError('가입자증갑 기능에 접근할 권한이 없습니다.');
           setLoading(false);
@@ -2958,23 +2997,29 @@ function SubscriberIncreaseTab() {
         }
 
         // 먼저 데이터 조회 시도
+        console.log('🔍 [가입자증갑] 기존 데이터 조회 시도');
         let sheetData = await fetchData();
         
         // 데이터가 없으면 시트 초기화
         if (!sheetData || sheetData.length === 0) {
+          console.log('🔍 [가입자증갑] 기존 데이터 없음, 시트 초기화 시도');
           sheetData = await initializeSheet();
         }
 
         if (sheetData && sheetData.length > 0) {
+          console.log('🔍 [가입자증갑] 데이터 로드 성공:', sheetData.length, '행');
           setData(sheetData);
           // 기본 년월 설정 (첫 번째 데이터 컬럼)
           if (sheetData[0] && sheetData[0].length > 3) {
             setSelectedYearMonth(sheetData[0][3]);
+            console.log('🔍 [가입자증갑] 기본 년월 설정:', sheetData[0][3]);
           }
         } else {
-          setError('데이터를 불러올 수 없습니다.');
+          console.error('🔍 [가입자증갑] 데이터 로드 실패');
+          setError('데이터를 불러올 수 없습니다. 시트 초기화에 실패했을 수 있습니다.');
         }
       } catch (error) {
+        console.error('🔍 [가입자증갑] 초기화 중 오류:', error);
         setError('초기화 중 오류가 발생했습니다: ' + error.message);
       } finally {
         setLoading(false);
