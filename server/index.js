@@ -518,7 +518,8 @@ const RESERVATION_SITE_SHEET_NAME = '사전예약사이트';  // 사전예약사
 const YARD_RECEIPT_SHEET_NAME = '마당접수';  // 마당접수 시트
 const ON_SALE_SHEET_NAME = '온세일';  // 온세일 시트
 const POS_CODE_MAPPING_SHEET_NAME = 'POS코드변경설정';  // POS코드변경설정 시트
-const NORMALIZATION_WORK_SHEET_NAME = '정규화작업';  // 정규화작업 시트
+const NORMALIZATION_WORK_SHEET_NAME = '정규화작업';
+const SUBSCRIBER_INCREASE_SHEET_NAME = '가입자증감';  // 가입자증감 시트  // 정규화작업 시트
 
 // 월간시상 관련 시트 이름 추가
 const PHONEKL_HOME_DATA_SHEET_NAME = '폰클홈데이터';  // 폰클홈데이터 시트
@@ -5181,6 +5182,480 @@ app.use((error, req, res, next) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// ==================== 가입자증갑 관련 API ====================
+
+// 가입자증갑 권한 확인 API
+app.get('/api/subscriber-increase/access', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    // 대리점아이디관리 시트에서 I열 권한 확인 (채권장표 메뉴 권한)
+    const agentResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${AGENT_SHEET_NAME}!A:J`
+    });
+
+    if (!agentResponse.data.values || agentResponse.data.values.length === 0) {
+      throw new Error('Failed to fetch agent data');
+    }
+
+    // 헤더 제거
+    const agentRows = agentResponse.data.values.slice(1);
+    
+    // I열에서 "O" 권한이 있는 대리점 찾기 (채권장표 메뉴 권한)
+    const authorizedAgents = agentRows
+      .filter(row => row && row.length > 8 && row[8] === 'O') // I열 (8번 인덱스)
+      .map(row => ({
+        agentCode: row[0] || '', // A열: 대리점코드
+        agentName: row[1] || '', // B열: 대리점명
+        accessLevel: row[8] || '' // I열: 채권장표 메뉴 접근권한
+      }));
+
+    res.json({
+      success: true,
+      hasAccess: authorizedAgents.length > 0,
+      authorizedAgents,
+      totalAgents: agentRows.length,
+      authorizedCount: authorizedAgents.length
+    });
+  } catch (error) {
+    console.error('Error checking subscriber increase access:', error);
+    res.status(500).json({
+      success: false,
+      hasAccess: false,
+      error: 'Failed to check subscriber increase access',
+      message: error.message
+    });
+  }
+});
+
+// 가입자증갑 시트 초기화/생성 API
+app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    // 시트 존재 여부 확인
+    const spreadsheetResponse = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID
+    });
+    
+    const existingSheets = spreadsheetResponse.data.sheets || [];
+    const targetSheet = existingSheets.find(sheet => sheet.properties.title === SUBSCRIBER_INCREASE_SHEET_NAME);
+    
+    if (targetSheet) {
+      // 시트가 이미 존재하는 경우 기존 데이터 반환
+      const dataResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+      });
+      
+      return res.json({
+        success: true,
+        message: '시트가 이미 존재합니다',
+        data: dataResponse.data.values || []
+      });
+    }
+    
+    // 시트 생성
+    const createSheetRequest = {
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [{
+          addSheet: {
+            properties: {
+              title: SUBSCRIBER_INCREASE_SHEET_NAME,
+              gridProperties: {
+                rowCount: 20,
+                columnCount: 26
+              }
+            }
+          }
+        }]
+      }
+    };
+    
+    await sheets.spreadsheets.batchUpdate(createSheetRequest);
+    
+    // 헤더 설정 (대리점코드, 대리점명, 구분, 년월 컬럼들)
+    const headers = [
+      '대리점코드', '대리점명', '구분', 
+      '2024년 1월', '2024년 2월', '2024년 3월', '2024년 4월', '2024년 5월', '2024년 6월',
+      '2024년 7월', '2024년 8월', '2024년 9월', '2024년 10월', '2024년 11월', '2024년 12월',
+      '2025년 1월', '2025년 2월', '2025년 3월', '2025년 4월', '2025년 5월', '2025년 6월',
+      '2025년 7월', '2025년 8월', '2025년 9월', '2025년 10월', '2025년 11월', '2025년 12월'
+    ];
+    
+    // 초기 데이터 설정
+    const initialData = [
+      headers,
+      ['합계', '합계', '가입자수', ...Array(24).fill('')],
+      ['합계', '합계', '관리수수료', ...Array(24).fill('')],
+      ['306891', '경수', '가입자수', ...Array(24).fill('')],
+      ['306891', '경수', '관리수수료', ...Array(24).fill('')],
+      ['315835', '경인', '가입자수', ...Array(24).fill('')],
+      ['315835', '경인', '관리수수료', ...Array(24).fill('')],
+      ['316558', '동서울', '가입자수', ...Array(24).fill('')],
+      ['316558', '동서울', '관리수수료', ...Array(24).fill('')],
+      ['314942', '호남', '가입자수', ...Array(24).fill('')],
+      ['314942', '호남', '관리수수료', ...Array(24).fill('')],
+      ['316254', '호남2', '가입자수', ...Array(24).fill('')],
+      ['316254', '호남2', '관리수수료', ...Array(24).fill('')]
+    ];
+    
+    // 데이터 입력
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A1:Z${initialData.length}`,
+      valueInputOption: 'RAW',
+      resource: { values: initialData }
+    });
+    
+    res.json({
+      success: true,
+      message: '가입자증갑 시트가 성공적으로 생성되었습니다',
+      data: initialData
+    });
+    
+  } catch (error) {
+    console.error('Error initializing subscriber increase sheet:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to initialize sheet',
+      message: error.message
+    });
+  }
+});
+
+// 가입자증갑 데이터 조회 API
+app.get('/api/subscriber-increase/data', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+    });
+    
+    res.json({
+      success: true,
+      data: dataResponse.data.values || []
+    });
+    
+  } catch (error) {
+    console.error('Error fetching subscriber increase data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch data',
+      message: error.message
+    });
+  }
+});
+
+// 가입자증갑 데이터 저장 API
+app.post('/api/subscriber-increase/save', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    const { yearMonth, agentCode, type, value } = req.body;
+    
+    // 입력 데이터 검증
+    if (!yearMonth || !agentCode || !type || value === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 데이터가 누락되었습니다',
+        required: ['yearMonth', 'agentCode', 'type', 'value']
+      });
+    }
+    
+    // 숫자 검증
+    if (type !== '가입자수' && type !== '관리수수료') {
+      return res.status(400).json({
+        success: false,
+        error: '잘못된 타입입니다. 가입자수 또는 관리수수료만 가능합니다'
+      });
+    }
+    
+    // 기존 데이터 조회
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+    });
+    
+    const existingData = dataResponse.data.values || [];
+    if (existingData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '시트 데이터를 찾을 수 없습니다'
+      });
+    }
+    
+    // 헤더에서 년월 컬럼 인덱스 찾기
+    const headers = existingData[0];
+    const yearMonthIndex = headers.findIndex(header => header === yearMonth);
+    
+    if (yearMonthIndex === -1) {
+      return res.status(400).json({
+        success: false,
+        error: '해당 년월 컬럼을 찾을 수 없습니다'
+      });
+    }
+    
+    // 해당 대리점과 타입의 행 찾기
+    let targetRowIndex = -1;
+    for (let i = 1; i < existingData.length; i++) {
+      const row = existingData[i];
+      if (row[0] === agentCode && row[2] === type) {
+        targetRowIndex = i;
+        break;
+      }
+    }
+    
+    if (targetRowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '해당 대리점과 타입의 행을 찾을 수 없습니다'
+      });
+    }
+    
+    // 데이터 업데이트
+    const updatedData = [...existingData];
+    updatedData[targetRowIndex][yearMonthIndex] = value;
+    
+    // Google Sheets에 저장
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A${targetRowIndex + 1}:Z${targetRowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: { values: [updatedData[targetRowIndex]] }
+    });
+    
+    // 합계 계산 및 업데이트
+    await calculateAndUpdateTotals(SPREADSHEET_ID, SUBSCRIBER_INCREASE_SHEET_NAME, yearMonthIndex);
+    
+    res.json({
+      success: true,
+      message: '데이터가 성공적으로 저장되었습니다',
+      data: {
+        yearMonth,
+        agentCode,
+        type,
+        value,
+        rowIndex: targetRowIndex + 1,
+        columnIndex: yearMonthIndex + 1
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error saving subscriber increase data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save data',
+      message: error.message
+    });
+  }
+});
+
+// 가입자증갑 데이터 삭제 API
+app.post('/api/subscriber-increase/delete', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    const { yearMonth, agentCode, type } = req.body;
+    
+    // 입력 데이터 검증
+    if (!yearMonth || !agentCode || !type) {
+      return res.status(400).json({
+        success: false,
+        error: '필수 데이터가 누락되었습니다',
+        required: ['yearMonth', 'agentCode', 'type']
+      });
+    }
+    
+    // 기존 데이터 조회
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+    });
+    
+    const existingData = dataResponse.data.values || [];
+    if (existingData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '시트 데이터를 찾을 수 없습니다'
+      });
+    }
+    
+    // 헤더에서 년월 컬럼 인덱스 찾기
+    const headers = existingData[0];
+    const yearMonthIndex = headers.findIndex(header => header === yearMonth);
+    
+    if (yearMonthIndex === -1) {
+      return res.status(400).json({
+        success: false,
+        error: '해당 년월 컬럼을 찾을 수 없습니다'
+      });
+    }
+    
+    // 해당 대리점과 타입의 행 찾기
+    let targetRowIndex = -1;
+    for (let i = 1; i < existingData.length; i++) {
+      const row = existingData[i];
+      if (row[0] === agentCode && row[2] === type) {
+        targetRowIndex = i;
+        break;
+      }
+    }
+    
+    if (targetRowIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: '해당 대리점과 타입의 행을 찾을 수 없습니다'
+      });
+    }
+    
+    // 데이터 삭제 (빈 값으로 설정)
+    const updatedData = [...existingData];
+    updatedData[targetRowIndex][yearMonthIndex] = '';
+    
+    // Google Sheets에 저장
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A${targetRowIndex + 1}:Z${targetRowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: { values: [updatedData[targetRowIndex]] }
+    });
+    
+    // 합계 계산 및 업데이트
+    await calculateAndUpdateTotals(SPREADSHEET_ID, SUBSCRIBER_INCREASE_SHEET_NAME, yearMonthIndex);
+    
+    res.json({
+      success: true,
+      message: '데이터가 성공적으로 삭제되었습니다',
+      data: {
+        yearMonth,
+        agentCode,
+        type,
+        rowIndex: targetRowIndex + 1,
+        columnIndex: yearMonthIndex + 1
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error deleting subscriber increase data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete data',
+      message: error.message
+    });
+  }
+});
+
+// 합계 계산 및 업데이트 함수
+async function calculateAndUpdateTotals(spreadsheetId, sheetName, yearMonthIndex) {
+  try {
+    // 기존 데이터 조회
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A:Z`
+    });
+    
+    const data = dataResponse.data.values || [];
+    if (data.length < 3) return;
+    
+    // 각 타입별 합계 계산
+    const subscriberTotals = {};
+    const feeTotals = {};
+    
+    for (let i = 3; i < data.length; i++) {
+      const row = data[i];
+      const agentCode = row[0];
+      const type = row[2];
+      const value = parseFloat(row[yearMonthIndex]) || 0;
+      
+      if (type === '가입자수') {
+        subscriberTotals[agentCode] = (subscriberTotals[agentCode] || 0) + value;
+      } else if (type === '관리수수료') {
+        feeTotals[agentCode] = (feeTotals[agentCode] || 0) + value;
+      }
+    }
+    
+    // 합계 계산
+    const totalSubscribers = Object.values(subscriberTotals).reduce((sum, val) => sum + val, 0);
+    const totalFees = Object.values(feeTotals).reduce((sum, val) => sum + val, 0);
+    
+    // 합계 행 업데이트
+    const updatedData = [...data];
+    updatedData[1][yearMonthIndex] = totalSubscribers; // 가입자수 합계
+    updatedData[2][yearMonthIndex] = totalFees; // 관리수수료 합계
+    
+    // Google Sheets에 합계 업데이트
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetName}!A2:Z3`,
+      valueInputOption: 'RAW',
+      resource: { values: [updatedData[1], updatedData[2]] }
+    });
+    
+  } catch (error) {
+    console.error('Error calculating totals:', error);
+  }
+}
 
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
