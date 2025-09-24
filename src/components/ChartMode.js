@@ -3035,7 +3035,7 @@ function SubscriberIncreaseTab() {
       return;
     }
 
-    if (!confirm(`정말로 ${agentCode}의 ${type} 데이터를 삭제하시겠습니까?`)) {
+    if (!window.confirm(`정말로 ${agentCode}의 ${type} 데이터를 삭제하시겠습니까?`)) {
       return;
     }
 
