@@ -2857,7 +2857,7 @@ function SubscriberIncreaseTab() {
   // API 호출 함수들
   const checkPermission = async () => {
     try {
-      const response = await fetch('/api/subscriber-increase/access', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/access`, {
         credentials: 'include'
       });
       const result = await response.json();
@@ -2871,7 +2871,7 @@ function SubscriberIncreaseTab() {
 
   const initializeSheet = async () => {
     try {
-      const response = await fetch('/api/subscriber-increase/init-sheet', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/init-sheet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -2892,7 +2892,7 @@ function SubscriberIncreaseTab() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch('/api/subscriber-increase/data', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/data`, {
         credentials: 'include'
       });
       const result = await response.json();
@@ -2909,7 +2909,7 @@ function SubscriberIncreaseTab() {
 
   const saveData = async (yearMonth, agentCode, type, value) => {
     try {
-      const response = await fetch('/api/subscriber-increase/save', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -2927,7 +2927,7 @@ function SubscriberIncreaseTab() {
 
   const deleteData = async (yearMonth, agentCode, type) => {
     try {
-      const response = await fetch('/api/subscriber-increase/delete', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/delete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
