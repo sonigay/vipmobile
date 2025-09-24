@@ -5266,16 +5266,63 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
     const targetSheet = existingSheets.find(sheet => sheet.properties.title === SUBSCRIBER_INCREASE_SHEET_NAME);
     
     if (targetSheet) {
-      // 시트가 이미 존재하는 경우 기존 데이터 반환
+      // 시트가 이미 존재하는 경우 기존 데이터 확인
       const dataResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
       });
       
+      const existingData = dataResponse.data.values || [];
+      
+      // 데이터가 비어있으면 초기 데이터 입력
+      if (existingData.length === 0) {
+        console.log('시트가 존재하지만 데이터가 비어있음. 초기 데이터를 입력합니다.');
+        
+        // 헤더 설정 (대리점코드, 대리점명, 구분, 년월 컬럼들)
+        const headers = [
+          '대리점코드', '대리점명', '구분', 
+          '2024년 1월', '2024년 2월', '2024년 3월', '2024년 4월', '2024년 5월', '2024년 6월',
+          '2024년 7월', '2024년 8월', '2024년 9월', '2024년 10월', '2024년 11월', '2024년 12월',
+          '2025년 1월', '2025년 2월', '2025년 3월', '2025년 4월', '2025년 5월', '2025년 6월',
+          '2025년 7월', '2025년 8월', '2025년 9월', '2025년 10월', '2025년 11월', '2025년 12월'
+        ];
+        
+        // 초기 데이터 설정
+        const initialData = [
+          headers,
+          ['합계', '합계', '가입자수', ...Array(24).fill('')],
+          ['합계', '합계', '관리수수료', ...Array(24).fill('')],
+          ['306891', '경수', '가입자수', ...Array(24).fill('')],
+          ['306891', '경수', '관리수수료', ...Array(24).fill('')],
+          ['315835', '경인', '가입자수', ...Array(24).fill('')],
+          ['315835', '경인', '관리수수료', ...Array(24).fill('')],
+          ['316558', '동서울', '가입자수', ...Array(24).fill('')],
+          ['316558', '동서울', '관리수수료', ...Array(24).fill('')],
+          ['314942', '호남', '가입자수', ...Array(24).fill('')],
+          ['314942', '호남', '관리수수료', ...Array(24).fill('')],
+          ['316254', '호남2', '가입자수', ...Array(24).fill('')],
+          ['316254', '호남2', '관리수수료', ...Array(24).fill('')]
+        ];
+        
+        // 데이터 입력
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A1:AA${initialData.length}`,
+          valueInputOption: 'RAW',
+          resource: { values: initialData }
+        });
+        
+        return res.json({
+          success: true,
+          message: '시트가 존재했지만 데이터가 비어있어 초기 데이터를 입력했습니다',
+          data: initialData
+        });
+      }
+      
       return res.json({
         success: true,
         message: '시트가 이미 존재합니다',
-        data: dataResponse.data.values || []
+        data: existingData
       });
     }
     
