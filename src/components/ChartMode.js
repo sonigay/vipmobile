@@ -294,7 +294,7 @@ function BondChartTab() {
   const subTabs = [
     { label: '연체채권', icon: <WarningIcon /> },
     { label: '재초담초채권', icon: <AccountBalanceWalletIcon /> },
-    { label: '가입자증갑', icon: <PersonAddIcon /> }
+    { label: '가입자증감', icon: <PersonAddIcon /> }
   ];
 
   const handleSubTabChange = (event, newValue) => {
@@ -310,7 +310,7 @@ function BondChartTab() {
           onChange={handleSubTabChange}
           variant="scrollable"
           scrollButtons="auto"
-          sx={{
+                sx={{
             '& .MuiTab-root': {
               minHeight: 56,
               fontSize: '0.9rem',
@@ -333,7 +333,7 @@ function BondChartTab() {
               label={tab.label}
               icon={tab.icon}
               iconPosition="start"
-              sx={{ 
+                  sx={{
                 textTransform: 'none',
                 minHeight: 56,
                 py: 1
@@ -2843,7 +2843,7 @@ function RechotanchoBondTab() {
   );
 }
 
-// 가입자증갑 탭 컴포넌트
+// 가입자증감 탭 컴포넌트
 function SubscriberIncreaseTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2853,6 +2853,7 @@ function SubscriberIncreaseTab() {
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' 또는 'chart'
   const [hasPermission, setHasPermission] = useState(false);
+  const [timeUnit, setTimeUnit] = useState('month'); // 'month' 또는 'year'
 
   // 숫자 포맷팅 함수
   const formatNumber = (value) => {
@@ -2869,32 +2870,32 @@ function SubscriberIncreaseTab() {
   // API 호출 함수들
   const checkPermission = async () => {
     try {
-      console.log('🔍 [가입자증갑] 권한 확인 API 호출 시작');
+      console.log('🔍 [가입자증감] 권한 확인 API 호출 시작');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/access`, {
         credentials: 'include'
       });
       
-      console.log('🔍 [가입자증갑] 권한 확인 응답 상태:', response.status);
+      console.log('🔍 [가입자증감] 권한 확인 응답 상태:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('🔍 [가입자증갑] 권한 확인 실패:', response.status, errorText);
+        console.error('🔍 [가입자증감] 권한 확인 실패:', response.status, errorText);
         throw new Error(`권한 확인 실패: ${response.status} ${errorText}`);
       }
       
       const result = await response.json();
-      console.log('🔍 [가입자증갑] 권한 확인 결과:', result);
+      console.log('🔍 [가입자증감] 권한 확인 결과:', result);
       setHasPermission(result.hasAccess);
       return result.hasAccess;
     } catch (error) {
-      console.error('🔍 [가입자증갑] 권한 확인 오류:', error);
+      console.error('🔍 [가입자증감] 권한 확인 오류:', error);
       return false;
     }
   };
 
   const initializeSheet = async () => {
     try {
-      console.log('🔍 [가입자증갑] 시트 초기화 API 호출 시작');
+      console.log('🔍 [가입자증감] 시트 초기화 API 호출 시작');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/init-sheet`, {
         method: 'POST',
         headers: {
@@ -2903,61 +2904,61 @@ function SubscriberIncreaseTab() {
         credentials: 'include'
       });
       
-      console.log('🔍 [가입자증갑] 시트 초기화 응답 상태:', response.status);
+      console.log('🔍 [가입자증감] 시트 초기화 응답 상태:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('🔍 [가입자증갑] 시트 초기화 실패:', response.status, errorText);
+        console.error('🔍 [가입자증감] 시트 초기화 실패:', response.status, errorText);
         throw new Error(`시트 초기화 실패: ${response.status} ${errorText}`);
       }
       
       const result = await response.json();
-      console.log('🔍 [가입자증갑] 시트 초기화 결과:', result);
-      console.log('🔍 [가입자증갑] 시트 초기화 성공 여부:', result.success);
-      console.log('🔍 [가입자증갑] 시트 초기화 데이터:', result.data);
-      console.log('🔍 [가입자증갑] 시트 초기화 데이터 길이:', result.data ? result.data.length : 'null');
+      console.log('🔍 [가입자증감] 시트 초기화 결과:', result);
+      console.log('🔍 [가입자증감] 시트 초기화 성공 여부:', result.success);
+      console.log('🔍 [가입자증감] 시트 초기화 데이터:', result.data);
+      console.log('🔍 [가입자증감] 시트 초기화 데이터 길이:', result.data ? result.data.length : 'null');
       
       if (result.success) {
         setData(result.data);
         return result.data;
       }
-      console.error('🔍 [가입자증갑] 시트 초기화 실패 - success가 false');
+      console.error('🔍 [가입자증감] 시트 초기화 실패 - success가 false');
       return null;
     } catch (error) {
-      console.error('🔍 [가입자증갑] 시트 초기화 오류:', error);
+      console.error('🔍 [가입자증감] 시트 초기화 오류:', error);
       return null;
     }
   };
 
   const fetchData = async () => {
     try {
-      console.log('🔍 [가입자증갑] 데이터 조회 API 호출 시작');
+      console.log('🔍 [가입자증감] 데이터 조회 API 호출 시작');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/data`, {
         credentials: 'include'
       });
       
-      console.log('🔍 [가입자증갑] 데이터 조회 응답 상태:', response.status);
+      console.log('🔍 [가입자증감] 데이터 조회 응답 상태:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('🔍 [가입자증갑] 데이터 조회 실패:', response.status, errorText);
+        console.error('🔍 [가입자증감] 데이터 조회 실패:', response.status, errorText);
         throw new Error(`데이터 조회 실패: ${response.status} ${errorText}`);
       }
       
       const result = await response.json();
-      console.log('🔍 [가입자증갑] 데이터 조회 결과:', result);
-      console.log('🔍 [가입자증갑] 데이터 조회 성공 여부:', result.success);
-      console.log('🔍 [가입자증갑] 데이터 조회 데이터:', result.data);
-      console.log('🔍 [가입자증갑] 데이터 조회 데이터 길이:', result.data ? result.data.length : 'null');
+      console.log('🔍 [가입자증감] 데이터 조회 결과:', result);
+      console.log('🔍 [가입자증감] 데이터 조회 성공 여부:', result.success);
+      console.log('🔍 [가입자증감] 데이터 조회 데이터:', result.data);
+      console.log('🔍 [가입자증감] 데이터 조회 데이터 길이:', result.data ? result.data.length : 'null');
       
       if (result.success) {
         setData(result.data);
         return result.data;
       }
-      console.log('🔍 [가입자증갑] 데이터 조회 실패 - success가 false 또는 데이터 없음');
+      console.log('🔍 [가입자증감] 데이터 조회 실패 - success가 false 또는 데이터 없음');
       return null;
     } catch (error) {
-      console.error('🔍 [가입자증갑] 데이터 조회 오류:', error);
+      console.error('🔍 [가입자증감] 데이터 조회 오류:', error);
       return null;
     }
   };
@@ -3005,41 +3006,41 @@ function SubscriberIncreaseTab() {
       setError(null);
       
       try {
-        console.log('🔍 [가입자증갑] 컴포넌트 초기화 시작');
+        console.log('🔍 [가입자증감] 컴포넌트 초기화 시작');
         
         const hasAccess = await checkPermission();
-        console.log('🔍 [가입자증갑] 권한 확인 결과:', hasAccess);
+        console.log('🔍 [가입자증감] 권한 확인 결과:', hasAccess);
         
         if (!hasAccess) {
-          setError('가입자증갑 기능에 접근할 권한이 없습니다.');
+          setError('가입자증감 기능에 접근할 권한이 없습니다.');
           setLoading(false);
           return;
         }
 
         // 먼저 데이터 조회 시도
-        console.log('🔍 [가입자증갑] 기존 데이터 조회 시도');
+        console.log('🔍 [가입자증감] 기존 데이터 조회 시도');
         let sheetData = await fetchData();
         
         // 데이터가 없으면 시트 초기화
         if (!sheetData || sheetData.length === 0) {
-          console.log('🔍 [가입자증갑] 기존 데이터 없음, 시트 초기화 시도');
+          console.log('🔍 [가입자증감] 기존 데이터 없음, 시트 초기화 시도');
           sheetData = await initializeSheet();
         }
 
         if (sheetData && sheetData.length > 0) {
-          console.log('🔍 [가입자증갑] 데이터 로드 성공:', sheetData.length, '행');
+          console.log('🔍 [가입자증감] 데이터 로드 성공:', sheetData.length, '행');
           setData(sheetData);
           // 기본 년월 설정 (첫 번째 데이터 컬럼)
           if (sheetData[0] && sheetData[0].length > 3) {
             setSelectedYearMonth(sheetData[0][3]);
-            console.log('🔍 [가입자증갑] 기본 년월 설정:', sheetData[0][3]);
+            console.log('🔍 [가입자증감] 기본 년월 설정:', sheetData[0][3]);
           }
         } else {
-          console.error('🔍 [가입자증갑] 데이터 로드 실패');
+          console.error('🔍 [가입자증감] 데이터 로드 실패');
           setError('데이터를 불러올 수 없습니다. 시트 초기화에 실패했을 수 있습니다.');
         }
       } catch (error) {
-        console.error('🔍 [가입자증갑] 초기화 중 오류:', error);
+        console.error('🔍 [가입자증감] 초기화 중 오류:', error);
         setError('초기화 중 오류가 발생했습니다: ' + error.message);
       } finally {
         setLoading(false);
@@ -3058,13 +3059,19 @@ function SubscriberIncreaseTab() {
   };
 
   // 데이터 저장 핸들러
-  const handleSave = async (agentCode, type) => {
-    if (!selectedYearMonth) {
-      alert('년월을 선택해주세요.');
+  const handleSave = async (agentCode, type, customYearMonth = null) => {
+    const yearMonth = customYearMonth || selectedYearMonth;
+    
+    if (!yearMonth) {
+      alert(timeUnit === 'month' ? '년월을 선택해주세요.' : '년도를 선택해주세요.');
       return;
     }
 
-    const value = inputData[`${agentCode}_${type}`];
+    const inputKey = customYearMonth ? 
+      `${agentCode}_${yearMonth}_${type}` : 
+      `${agentCode}_${type}`;
+    const value = inputData[inputKey];
+    
     if (value === undefined || value === '') {
       alert('값을 입력해주세요.');
       return;
@@ -3072,19 +3079,23 @@ function SubscriberIncreaseTab() {
 
     setSaving(true);
     try {
-      const success = await saveData(selectedYearMonth, agentCode, type, value);
+      const success = await saveData(yearMonth, agentCode, type, value);
       if (success) {
         // 데이터 새로고침
         await fetchData();
         // 입력 필드 초기화
         setInputData(prev => {
           const newData = { ...prev };
-          delete newData[`${agentCode}_${type}`];
+          delete newData[inputKey];
           return newData;
         });
-        alert('데이터가 성공적으로 저장되었습니다.');
+        if (!customYearMonth) {
+          alert('데이터가 성공적으로 저장되었습니다.');
+        }
       } else {
-        alert('데이터 저장에 실패했습니다.');
+        if (!customYearMonth) {
+          alert('데이터 저장에 실패했습니다.');
+        }
       }
     } catch (error) {
       alert('데이터 저장 중 오류가 발생했습니다.');
@@ -3130,6 +3141,25 @@ function SubscriberIncreaseTab() {
       value: header,
       label: header
     }));
+  };
+
+  // 년도 옵션 생성
+  const getYearOptions = () => {
+    if (!data || data.length === 0) return [];
+    
+    const headers = data[0];
+    const years = new Set();
+    
+    headers.slice(3).forEach(header => {
+      if (header && header.includes('년')) {
+        const yearMatch = header.match(/(\d{4})년/);
+        if (yearMatch) {
+          years.add(yearMatch[1]);
+        }
+      }
+    });
+    
+    return Array.from(years).sort();
   };
 
   // 대리점 데이터 추출
@@ -3194,7 +3224,7 @@ function SubscriberIncreaseTab() {
     return (
       <Alert severity="warning" sx={{ mb: 3 }}>
         <AlertTitle>권한 없음</AlertTitle>
-        가입자증갑 기능에 접근할 권한이 없습니다. 관리자에게 문의하세요.
+        가입자증감 기능에 접근할 권한이 없습니다. 관리자에게 문의하세요.
       </Alert>
     );
   }
@@ -3202,31 +3232,110 @@ function SubscriberIncreaseTab() {
   const agentData = getAgentData();
   const totalData = getTotalData();
   const yearMonthOptions = getYearMonthOptions();
+  const yearOptions = getYearOptions();
+
+  // 년간 데이터 계산 함수
+  const getYearlyData = (selectedYear) => {
+    if (!data || !selectedYear) return { agentData: [], totalData: null };
+
+    // 해당 년도의 월 컬럼 인덱스 찾기
+    const yearColumns = [];
+    data[0].forEach((header, index) => {
+      if (header && header.includes(`${selectedYear}년`)) {
+        yearColumns.push(index);
+      }
+    });
+
+    if (yearColumns.length === 0) return { agentData: [], totalData: null };
+
+    // 대리점별 년간 데이터 계산
+    const yearlyAgentData = agentData.map(agent => {
+      let yearlySubscriberTotal = 0;
+      let yearlyFeeTotal = 0;
+
+      yearColumns.forEach(colIndex => {
+        const subscriberValue = agent.subscriberData[colIndex - 3];
+        const feeValue = agent.feeData[colIndex - 3];
+        
+        if (subscriberValue !== '' && subscriberValue !== null && subscriberValue !== undefined) {
+          yearlySubscriberTotal += parseFloat(subscriberValue) || 0;
+        }
+        if (feeValue !== '' && feeValue !== null && feeValue !== undefined) {
+          yearlyFeeTotal += parseFloat(feeValue) || 0;
+        }
+      });
+
+      return {
+        ...agent,
+        yearlySubscriberTotal,
+        yearlyFeeTotal
+      };
+    });
+
+    // 전체 합계 계산
+    const yearlyTotalSubscriber = yearlyAgentData.reduce((sum, agent) => sum + agent.yearlySubscriberTotal, 0);
+    const yearlyTotalFee = yearlyAgentData.reduce((sum, agent) => sum + agent.yearlyFeeTotal, 0);
+
+    return {
+      agentData: yearlyAgentData,
+      totalData: {
+        subscriberData: [yearlyTotalSubscriber],
+        feeData: [yearlyTotalFee]
+      }
+    };
+  };
 
   return (
     <Box>
       {/* 헤더 */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold', color: '#f5576c' }}>
-          가입자증갑 관리
+          가입자증감 관리
         </Typography>
         
-        {/* 년월 선택 */}
+        {/* 시간 단위 선택 */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+            시간 단위:
+          </Typography>
+          <ToggleButtonGroup
+            value={timeUnit}
+            exclusive
+            onChange={(e, newUnit) => {
+              setTimeUnit(newUnit);
+              setSelectedYearMonth('');
+            }}
+            size="small"
+            sx={{ mb: 2 }}
+          >
+            <ToggleButton value="month">월단위</ToggleButton>
+            <ToggleButton value="year">년단위</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        {/* 년월/년도 선택 */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Typography variant="subtitle1" sx={{ mr: 2, fontWeight: 'bold' }}>
-            대상 년월:
+            {timeUnit === 'month' ? '대상 년월:' : '대상 년도:'}
           </Typography>
           <FormControl sx={{ minWidth: 200 }}>
             <Select
               value={selectedYearMonth}
-              label="년월 선택"
+              label={timeUnit === 'month' ? '년월 선택' : '년도 선택'}
               onChange={(e) => setSelectedYearMonth(e.target.value)}
             >
-              {yearMonthOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
+              {timeUnit === 'month' ? 
+                yearMonthOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                )) :
+                yearOptions.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}년
+                  </MenuItem>
+                ))
+              }
             </Select>
           </FormControl>
         </Box>
@@ -3251,11 +3360,11 @@ function SubscriberIncreaseTab() {
       {viewMode === 'table' ? (
         <Box>
           {/* 합계 테이블 */}
-          {totalData && (
+          {(timeUnit === 'month' ? totalData : getYearlyData(selectedYearMonth).totalData) && (
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
-                  📊 전체 합계
+                  📊 전체 합계 {timeUnit === 'year' ? '(년간)' : ''}
                 </Typography>
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
@@ -3263,7 +3372,7 @@ function SubscriberIncreaseTab() {
                       <TableRow>
                         <TableCell sx={{ fontWeight: 'bold' }}>구분</TableCell>
                         <TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>
-                          {selectedYearMonth || '년월 선택'}
+                          {selectedYearMonth || (timeUnit === 'month' ? '년월 선택' : '년도 선택')}
                         </TableCell>
                       </TableRow>
                     </TableHead>
@@ -3271,19 +3380,29 @@ function SubscriberIncreaseTab() {
                       <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
                         <TableCell sx={{ fontWeight: 'bold' }}>가입자수 합계</TableCell>
                         <TableCell sx={{ textAlign: 'right', fontWeight: 'bold' }}>
-                          {selectedYearMonth && totalData.subscriberData ? 
-                            formatNumber(totalData.subscriberData[totalData.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
-                            : '-'
-                          }
+                          {timeUnit === 'month' ? (
+                            selectedYearMonth && totalData.subscriberData ? 
+                              formatNumber(totalData.subscriberData[totalData.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
+                              : '-'
+                          ) : (
+                            selectedYearMonth && getYearlyData(selectedYearMonth).totalData ? 
+                              formatNumber(getYearlyData(selectedYearMonth).totalData.subscriberData[0]) + '명'
+                              : '-'
+                          )}
                         </TableCell>
                       </TableRow>
                       <TableRow sx={{ backgroundColor: '#f3e5f5' }}>
                         <TableCell sx={{ fontWeight: 'bold' }}>관리수수료 합계</TableCell>
                         <TableCell sx={{ textAlign: 'right', fontWeight: 'bold' }}>
-                          {selectedYearMonth && totalData.feeData ? 
-                            formatNumber(totalData.feeData[totalData.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
-                            : '-'
-                          }
+                          {timeUnit === 'month' ? (
+                            selectedYearMonth && totalData.feeData ? 
+                              formatNumber(totalData.feeData[totalData.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
+                              : '-'
+                          ) : (
+                            selectedYearMonth && getYearlyData(selectedYearMonth).totalData ? 
+                              formatNumber(getYearlyData(selectedYearMonth).totalData.feeData[0]) + '원'
+                              : '-'
+                          )}
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -3293,11 +3412,137 @@ function SubscriberIncreaseTab() {
             </Card>
           )}
 
+          {/* 년단위 월별 입력 테이블 */}
+          {timeUnit === 'year' && selectedYearMonth && (
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
+                  📅 {selectedYearMonth}년 월별 데이터 입력
+                </Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>대리점코드</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>대리점명</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>구분</TableCell>
+                        {Array.from({length: 12}, (_, i) => i + 1).map(month => (
+                          <TableCell key={month} sx={{ fontWeight: 'bold', textAlign: 'center', minWidth: 80 }}>
+                            {month}월
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {agentData.map((agent) => (
+                        <React.Fragment key={agent.code}>
+                          {/* 가입자수 행 */}
+                          <TableRow>
+                            <TableCell>{agent.code}</TableCell>
+                            <TableCell>{agent.name}</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>가입자수</TableCell>
+                            {Array.from({length: 12}, (_, i) => i + 1).map(month => {
+                              const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
+                              const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                              const currentValue = colIndex !== -1 ? agent.subscriberData[colIndex - 3] : '';
+                              
+                              return (
+                                <TableCell key={month} sx={{ textAlign: 'center' }}>
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    placeholder="0"
+                                    value={inputData[`${agent.code}_${yearMonthKey}_가입자수`] || currentValue || ''}
+                                    onChange={(e) => {
+                                      const newInputData = { ...inputData };
+                                      newInputData[`${agent.code}_${yearMonthKey}_가입자수`] = e.target.value;
+                                      setInputData(newInputData);
+                                    }}
+                                    sx={{ width: 70 }}
+                                  />
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                          {/* 관리수수료 행 */}
+                          <TableRow>
+                            <TableCell>{agent.code}</TableCell>
+                            <TableCell>{agent.name}</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: '#7b1fa2' }}>관리수수료</TableCell>
+                            {Array.from({length: 12}, (_, i) => i + 1).map(month => {
+                              const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
+                              const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                              const currentValue = colIndex !== -1 ? agent.feeData[colIndex - 3] : '';
+                              
+                              return (
+                                <TableCell key={month} sx={{ textAlign: 'center' }}>
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    placeholder="0"
+                                    value={inputData[`${agent.code}_${yearMonthKey}_관리수수료`] || currentValue || ''}
+                                    onChange={(e) => {
+                                      const newInputData = { ...inputData };
+                                      newInputData[`${agent.code}_${yearMonthKey}_관리수수료`] = e.target.value;
+                                      setInputData(newInputData);
+                                    }}
+                                    sx={{ width: 70 }}
+                                  />
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                
+                {/* 년단위 저장 버튼 */}
+                <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={() => {
+                      // 년단위 모든 월 데이터 저장
+                      const savePromises = [];
+                      agentData.forEach(agent => {
+                        Array.from({length: 12}, (_, i) => i + 1).forEach(month => {
+                          const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
+                          const subscriberKey = `${agent.code}_${yearMonthKey}_가입자수`;
+                          const feeKey = `${agent.code}_${yearMonthKey}_관리수수료`;
+                          
+                          if (inputData[subscriberKey] !== undefined && inputData[subscriberKey] !== '') {
+                            savePromises.push(handleSave(agent.code, '가입자수', yearMonthKey));
+                          }
+                          if (inputData[feeKey] !== undefined && inputData[feeKey] !== '') {
+                            savePromises.push(handleSave(agent.code, '관리수수료', yearMonthKey));
+                          }
+                        });
+                      });
+                      
+                      if (savePromises.length > 0) {
+                        Promise.all(savePromises).then(() => {
+                          alert('년간 데이터가 모두 저장되었습니다!');
+                        });
+                      }
+                    }}
+                    disabled={saving}
+                    sx={{ minWidth: 200 }}
+                  >
+                    {saving ? '저장 중...' : '년간 데이터 일괄 저장'}
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          )}
+
           {/* 대리점별 입력 테이블 */}
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
-                🏢 대리점별 데이터 입력
+                🏢 대리점별 데이터 {timeUnit === 'month' ? '입력' : '조회 및 월별 입력'} {timeUnit === 'year' ? '(년간)' : ''}
               </Typography>
               <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
@@ -3307,15 +3552,19 @@ function SubscriberIncreaseTab() {
                       <TableCell sx={{ fontWeight: 'bold' }}>대리점명</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>구분</TableCell>
                       <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
-                        {selectedYearMonth || '년월 선택'}
+                        {selectedYearMonth || (timeUnit === 'month' ? '년월 선택' : '년도 선택')}
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>입력</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>저장</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>삭제</TableCell>
+                      {timeUnit === 'month' && (
+                        <>
+                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>입력</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>저장</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>삭제</TableCell>
+                        </>
+                      )}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {agentData.map((agent) => (
+                    {(timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map((agent) => (
                       <React.Fragment key={agent.code}>
                         {/* 가입자수 행 */}
                         <TableRow>
@@ -3323,43 +3572,52 @@ function SubscriberIncreaseTab() {
                           <TableCell>{agent.name}</TableCell>
                           <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>가입자수</TableCell>
                           <TableCell sx={{ textAlign: 'right' }}>
-                            {selectedYearMonth ? 
-                              formatNumber(agent.subscriberData[agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
-                              : '-'
-                            }
+                            {timeUnit === 'month' ? (
+                              selectedYearMonth ? 
+                                formatNumber(agent.subscriberData[agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
+                                : '-'
+                            ) : (
+                              selectedYearMonth ? 
+                                formatNumber(agent.yearlySubscriberTotal) + '명'
+                                : '-'
+                            )}
                           </TableCell>
-                          <TableCell>
-                            <TextField
-                              type="number"
-                              size="small"
-                              placeholder="입력"
-                              value={inputData[`${agent.code}_가입자수`] || ''}
-                              onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
-                              sx={{ width: 100 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="primary"
-                              onClick={() => handleSave(agent.code, '가입자수')}
-                              disabled={saving || !selectedYearMonth}
-                            >
-                              저장
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              onClick={() => handleDelete(agent.code, '가입자수')}
-                              disabled={saving || !selectedYearMonth}
-                            >
-                              삭제
-                            </Button>
-                          </TableCell>
+                          {timeUnit === 'month' && (
+                            <>
+                              <TableCell>
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  placeholder="입력"
+                                  value={inputData[`${agent.code}_가입자수`] || ''}
+                                  onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
+                                  sx={{ width: 100 }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="primary"
+                                  onClick={() => handleSave(agent.code, '가입자수')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  저장
+                                </Button>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  onClick={() => handleDelete(agent.code, '가입자수')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  삭제
+                                </Button>
+                              </TableCell>
+                            </>
+                          )}
                         </TableRow>
                         {/* 관리수수료 행 */}
                         <TableRow>
@@ -3367,43 +3625,52 @@ function SubscriberIncreaseTab() {
                           <TableCell>{agent.name}</TableCell>
                           <TableCell sx={{ fontWeight: 'bold', color: '#7b1fa2' }}>관리수수료</TableCell>
                           <TableCell sx={{ textAlign: 'right' }}>
-                            {selectedYearMonth ? 
-                              formatNumber(agent.feeData[agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
-                              : '-'
-                            }
+                            {timeUnit === 'month' ? (
+                              selectedYearMonth ? 
+                                formatNumber(agent.feeData[agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
+                                : '-'
+                            ) : (
+                              selectedYearMonth ? 
+                                formatNumber(agent.yearlyFeeTotal) + '원'
+                                : '-'
+                            )}
                           </TableCell>
-                          <TableCell>
-                            <TextField
-                              type="number"
-                              size="small"
-                              placeholder="입력"
-                              value={inputData[`${agent.code}_관리수수료`] || ''}
-                              onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
-                              sx={{ width: 100 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="secondary"
-                              onClick={() => handleSave(agent.code, '관리수수료')}
-                              disabled={saving || !selectedYearMonth}
-                            >
-                              저장
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              onClick={() => handleDelete(agent.code, '관리수수료')}
-                              disabled={saving || !selectedYearMonth}
-                            >
-                              삭제
-                            </Button>
-                          </TableCell>
+                          {timeUnit === 'month' && (
+                            <>
+                              <TableCell>
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  placeholder="입력"
+                                  value={inputData[`${agent.code}_관리수수료`] || ''}
+                                  onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
+                                  sx={{ width: 100 }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="secondary"
+                                  onClick={() => handleSave(agent.code, '관리수수료')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  저장
+                                </Button>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  onClick={() => handleDelete(agent.code, '관리수수료')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  삭제
+                                </Button>
+                              </TableCell>
+                            </>
+                          )}
                         </TableRow>
                       </React.Fragment>
                     ))}
@@ -3419,19 +3686,23 @@ function SubscriberIncreaseTab() {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
-                📈 가입자수 추이 (막대 그래프)
+                📈 가입자수 추이 (막대 그래프) {timeUnit === 'year' ? '(년간)' : ''}
               </Typography>
               <Box sx={{ height: 300 }}>
                 <Bar 
                   data={{
-                    labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
+                    labels: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => `${agent.name}\n(${agent.code})`),
                     datasets: [{
-                      label: '가입자수',
-                      data: agentData.map(agent => {
+                      label: timeUnit === 'year' ? '년간 가입자수' : '가입자수',
+                      data: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => {
                         if (!selectedYearMonth) return 0;
-                        const index = agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth);
-                        const value = agent.subscriberData[index];
-                        return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                        if (timeUnit === 'month') {
+                          const index = agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth);
+                          const value = agent.subscriberData[index];
+                          return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                        } else {
+                          return agent.yearlySubscriberTotal || 0;
+                        }
                       }),
                       backgroundColor: 'rgba(54, 162, 235, 0.6)',
                       borderColor: 'rgba(54, 162, 235, 1)',
@@ -3447,7 +3718,7 @@ function SubscriberIncreaseTab() {
                       },
                       title: {
                         display: true,
-                        text: `가입자수 현황 - ${selectedYearMonth || '년월 선택'}`
+                        text: `가입자수 현황 - ${selectedYearMonth || (timeUnit === 'month' ? '년월 선택' : '년도 선택')}${timeUnit === 'year' ? ' (년간)' : ''}`
                       }
                     },
                     scales: {
@@ -3469,19 +3740,23 @@ function SubscriberIncreaseTab() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
-                📊 관리수수료 추이 (선 그래프)
+                📊 관리수수료 추이 (선 그래프) {timeUnit === 'year' ? '(년간)' : ''}
               </Typography>
               <Box sx={{ height: 300 }}>
                 <Line 
                   data={{
-                    labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
+                    labels: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => `${agent.name}\n(${agent.code})`),
                     datasets: [{
-                      label: '관리수수료',
-                      data: agentData.map(agent => {
+                      label: timeUnit === 'year' ? '년간 관리수수료' : '관리수수료',
+                      data: (timeUnit === 'month' ? agentData : getYearlyData(selectedYearMonth).agentData).map(agent => {
                         if (!selectedYearMonth) return 0;
-                        const index = agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth);
-                        const value = agent.feeData[index];
-                        return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                        if (timeUnit === 'month') {
+                          const index = agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth);
+                          const value = agent.feeData[index];
+                          return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
+                        } else {
+                          return agent.yearlyFeeTotal || 0;
+                        }
                       }),
                       backgroundColor: 'rgba(153, 102, 255, 0.2)',
                       borderColor: 'rgba(153, 102, 255, 1)',
@@ -3499,7 +3774,7 @@ function SubscriberIncreaseTab() {
                       },
                       title: {
                         display: true,
-                        text: `관리수수료 현황 - ${selectedYearMonth || '년월 선택'}`
+                        text: `관리수수료 현황 - ${selectedYearMonth || (timeUnit === 'month' ? '년월 선택' : '년도 선택')}${timeUnit === 'year' ? ' (년간)' : ''}`
                       }
                     },
                     scales: {

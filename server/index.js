@@ -5183,9 +5183,9 @@ app.use((error, req, res, next) => {
   });
 });
 
-// ==================== 가입자증갑 관련 API ====================
+// ==================== 가입자증감 관련 API ====================
 
-// 가입자증갑 권한 확인 API
+// 가입자증감 권한 확인 API
 app.get('/api/subscriber-increase/access', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
@@ -5241,7 +5241,7 @@ app.get('/api/subscriber-increase/access', async (req, res) => {
   }
 });
 
-// 가입자증갑 시트 초기화/생성 API
+// 가입자증감 시트 초기화/생성 API
 app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
@@ -5382,7 +5382,7 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
     
     res.json({
       success: true,
-      message: '가입자증갑 시트가 성공적으로 생성되었습니다',
+      message: '가입자증감 시트가 성공적으로 생성되었습니다',
       data: initialData
     });
     
@@ -5396,7 +5396,7 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
   }
 });
 
-// 가입자증갑 데이터 조회 API
+// 가입자증감 데이터 조회 API
 app.get('/api/subscriber-increase/data', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
@@ -5432,7 +5432,7 @@ app.get('/api/subscriber-increase/data', async (req, res) => {
   }
 });
 
-// 가입자증갑 데이터 저장 API
+// 가입자증감 데이터 저장 API
 app.post('/api/subscriber-increase/save', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
@@ -5547,7 +5547,7 @@ app.post('/api/subscriber-increase/save', async (req, res) => {
   }
 });
 
-// 가입자증갑 데이터 삭제 API
+// 가입자증감 데이터 삭제 API
 app.post('/api/subscriber-increase/delete', async (req, res) => {
   // CORS 헤더 설정
   const allowedOrigins = [
