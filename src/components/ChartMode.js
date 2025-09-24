@@ -2854,6 +2854,18 @@ function SubscriberIncreaseTab() {
   const [viewMode, setViewMode] = useState('table'); // 'table' 또는 'chart'
   const [hasPermission, setHasPermission] = useState(false);
 
+  // 숫자 포맷팅 함수
+  const formatNumber = (value) => {
+    if (value === '' || value === null || value === undefined) {
+      return '-';
+    }
+    const num = Number(value);
+    if (isNaN(num)) {
+      return '-';
+    }
+    return num.toLocaleString();
+  };
+
   // API 호출 함수들
   const checkPermission = async () => {
     try {
@@ -3260,7 +3272,7 @@ function SubscriberIncreaseTab() {
                         <TableCell sx={{ fontWeight: 'bold' }}>가입자수 합계</TableCell>
                         <TableCell sx={{ textAlign: 'right', fontWeight: 'bold' }}>
                           {selectedYearMonth && totalData.subscriberData ? 
-                            (totalData.subscriberData[totalData.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)] || 0).toLocaleString() + '명'
+                            formatNumber(totalData.subscriberData[totalData.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
                             : '-'
                           }
                         </TableCell>
@@ -3269,7 +3281,7 @@ function SubscriberIncreaseTab() {
                         <TableCell sx={{ fontWeight: 'bold' }}>관리수수료 합계</TableCell>
                         <TableCell sx={{ textAlign: 'right', fontWeight: 'bold' }}>
                           {selectedYearMonth && totalData.feeData ? 
-                            (totalData.feeData[totalData.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)] || 0).toLocaleString() + '원'
+                            formatNumber(totalData.feeData[totalData.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
                             : '-'
                           }
                         </TableCell>
@@ -3312,7 +3324,7 @@ function SubscriberIncreaseTab() {
                           <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>가입자수</TableCell>
                           <TableCell sx={{ textAlign: 'right' }}>
                             {selectedYearMonth ? 
-                              (agent.subscriberData[agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)] || 0).toLocaleString() + '명'
+                              formatNumber(agent.subscriberData[agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
                               : '-'
                             }
                           </TableCell>
@@ -3356,7 +3368,7 @@ function SubscriberIncreaseTab() {
                           <TableCell sx={{ fontWeight: 'bold', color: '#7b1fa2' }}>관리수수료</TableCell>
                           <TableCell sx={{ textAlign: 'right' }}>
                             {selectedYearMonth ? 
-                              (agent.feeData[agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)] || 0).toLocaleString() + '원'
+                              formatNumber(agent.feeData[agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
                               : '-'
                             }
                           </TableCell>
@@ -3418,7 +3430,8 @@ function SubscriberIncreaseTab() {
                       data: agentData.map(agent => {
                         if (!selectedYearMonth) return 0;
                         const index = agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth);
-                        return index !== -1 ? (parseFloat(agent.subscriberData[index]) || 0) : 0;
+                        const value = agent.subscriberData[index];
+                        return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
                       }),
                       backgroundColor: 'rgba(54, 162, 235, 0.6)',
                       borderColor: 'rgba(54, 162, 235, 1)',
@@ -3467,7 +3480,8 @@ function SubscriberIncreaseTab() {
                       data: agentData.map(agent => {
                         if (!selectedYearMonth) return 0;
                         const index = agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth);
-                        return index !== -1 ? (parseFloat(agent.feeData[index]) || 0) : 0;
+                        const value = agent.feeData[index];
+                        return index !== -1 && value !== '' ? (parseFloat(value) || 0) : 0;
                       }),
                       backgroundColor: 'rgba(153, 102, 255, 0.2)',
                       borderColor: 'rgba(153, 102, 255, 1)',
