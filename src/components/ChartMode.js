@@ -2901,11 +2901,15 @@ function SubscriberIncreaseTab() {
       
       const result = await response.json();
       console.log('🔍 [가입자증갑] 시트 초기화 결과:', result);
+      console.log('🔍 [가입자증갑] 시트 초기화 성공 여부:', result.success);
+      console.log('🔍 [가입자증갑] 시트 초기화 데이터:', result.data);
+      console.log('🔍 [가입자증갑] 시트 초기화 데이터 길이:', result.data ? result.data.length : 'null');
       
       if (result.success) {
         setData(result.data);
         return result.data;
       }
+      console.error('🔍 [가입자증갑] 시트 초기화 실패 - success가 false');
       return null;
     } catch (error) {
       console.error('🔍 [가입자증갑] 시트 초기화 오류:', error);
@@ -2930,11 +2934,15 @@ function SubscriberIncreaseTab() {
       
       const result = await response.json();
       console.log('🔍 [가입자증갑] 데이터 조회 결과:', result);
+      console.log('🔍 [가입자증갑] 데이터 조회 성공 여부:', result.success);
+      console.log('🔍 [가입자증갑] 데이터 조회 데이터:', result.data);
+      console.log('🔍 [가입자증갑] 데이터 조회 데이터 길이:', result.data ? result.data.length : 'null');
       
       if (result.success) {
         setData(result.data);
         return result.data;
       }
+      console.log('🔍 [가입자증갑] 데이터 조회 실패 - success가 false 또는 데이터 없음');
       return null;
     } catch (error) {
       console.error('🔍 [가입자증갑] 데이터 조회 오류:', error);
