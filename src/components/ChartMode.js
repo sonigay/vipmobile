@@ -3254,8 +3254,8 @@ function SubscriberIncreaseTab() {
       let yearlyFeeTotal = 0;
 
       yearColumns.forEach(colIndex => {
-        const subscriberValue = agent.subscriberData[colIndex - 3];
-        const feeValue = agent.feeData[colIndex - 3];
+        const subscriberValue = agent.subscriberData[colIndex];
+        const feeValue = agent.feeData[colIndex];
         
         if (subscriberValue !== '' && subscriberValue !== null && subscriberValue !== undefined) {
           yearlySubscriberTotal += parseFloat(subscriberValue) || 0;
@@ -3458,7 +3458,20 @@ function SubscriberIncreaseTab() {
                                       newInputData[`${agent.code}_${yearMonthKey}_가입자수`] = e.target.value;
                                       setInputData(newInputData);
                                     }}
-                                    sx={{ width: 70 }}
+                                    sx={{ 
+                                      width: 70,
+                                      '& input[type=number]': {
+                                        MozAppearance: 'textfield',
+                                      },
+                                      '& input[type=number]::-webkit-outer-spin-button': {
+                                        WebkitAppearance: 'none',
+                                        margin: 0,
+                                      },
+                                      '& input[type=number]::-webkit-inner-spin-button': {
+                                        WebkitAppearance: 'none',
+                                        margin: 0,
+                                      }
+                                    }}
                                     inputProps={{
                                       style: { textAlign: 'center' },
                                       inputMode: 'numeric',
@@ -3497,7 +3510,20 @@ function SubscriberIncreaseTab() {
                                       newInputData[`${agent.code}_${yearMonthKey}_관리수수료`] = e.target.value;
                                       setInputData(newInputData);
                                     }}
-                                    sx={{ width: 70 }}
+                                    sx={{ 
+                                      width: 70,
+                                      '& input[type=number]': {
+                                        MozAppearance: 'textfield',
+                                      },
+                                      '& input[type=number]::-webkit-outer-spin-button': {
+                                        WebkitAppearance: 'none',
+                                        margin: 0,
+                                      },
+                                      '& input[type=number]::-webkit-inner-spin-button': {
+                                        WebkitAppearance: 'none',
+                                        margin: 0,
+                                      }
+                                    }}
                                     inputProps={{
                                       style: { textAlign: 'center' },
                                       inputMode: 'numeric',
@@ -3613,7 +3639,20 @@ function SubscriberIncreaseTab() {
                                   placeholder="입력"
                                   value={inputData[`${agent.code}_가입자수`] || ''}
                                   onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
-                                  sx={{ width: 100 }}
+                                  sx={{ 
+                                    width: 100,
+                                    '& input[type=number]': {
+                                      MozAppearance: 'textfield',
+                                    },
+                                    '& input[type=number]::-webkit-outer-spin-button': {
+                                      WebkitAppearance: 'none',
+                                      margin: 0,
+                                    },
+                                    '& input[type=number]::-webkit-inner-spin-button': {
+                                      WebkitAppearance: 'none',
+                                      margin: 0,
+                                    }
+                                  }}
                                   inputProps={{
                                     style: { textAlign: 'center' },
                                     inputMode: 'numeric',
@@ -3677,7 +3716,20 @@ function SubscriberIncreaseTab() {
                                   placeholder="입력"
                                   value={inputData[`${agent.code}_관리수수료`] || ''}
                                   onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
-                                  sx={{ width: 100 }}
+                                  sx={{ 
+                                    width: 100,
+                                    '& input[type=number]': {
+                                      MozAppearance: 'textfield',
+                                    },
+                                    '& input[type=number]::-webkit-outer-spin-button': {
+                                      WebkitAppearance: 'none',
+                                      margin: 0,
+                                    },
+                                    '& input[type=number]::-webkit-inner-spin-button': {
+                                      WebkitAppearance: 'none',
+                                      margin: 0,
+                                    }
+                                  }}
                                   inputProps={{
                                     style: { textAlign: 'center' },
                                     inputMode: 'numeric',
