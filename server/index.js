@@ -728,7 +728,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:Z 범위
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:AA 범위
     let range;
     if (sheetName === 'raw데이터') {
       range = `${safeSheetName}!A:AB`;
@@ -737,7 +737,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else {
-      range = `${safeSheetName}!A:Z`;
+      range = `${safeSheetName}!A:AA`;
     }
     
     const response = await sheets.spreadsheets.values.get({
@@ -777,7 +777,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:Z 범위
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:AA 범위
     let range;
     if (sheetName === 'raw데이터') {
       range = `${safeSheetName}!A:AB`;
@@ -786,7 +786,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else {
-      range = `${safeSheetName}!A:Z`;
+      range = `${safeSheetName}!A:AA`;
     }
     
     const response = await sheets.spreadsheets.values.get({
@@ -816,8 +816,8 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
         console.log(`✅ [시트조회] 정확한 시트 이름 발견: '${exactSheetName}'`);
         const safeSheetName = `'${exactSheetName}'`;
         
-        // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:Z 범위
-        const retryRange = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:Z`;
+        // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:AA 범위
+        const retryRange = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:AA`;
         
         const retryResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: spreadsheetId,
@@ -5269,7 +5269,7 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
       // 시트가 이미 존재하는 경우 기존 데이터 반환
       const dataResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+        range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
       });
       
       return res.json({
@@ -5289,7 +5289,7 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
               title: SUBSCRIBER_INCREASE_SHEET_NAME,
               gridProperties: {
                 rowCount: 20,
-                columnCount: 26
+                columnCount: 27  // 27개 컬럼 (A부터 AA까지)
               }
             }
           }
@@ -5328,7 +5328,7 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
     // 데이터 입력
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A1:Z${initialData.length}`,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A1:AA${initialData.length}`,
       valueInputOption: 'RAW',
       resource: { values: initialData }
     });
@@ -5367,7 +5367,7 @@ app.get('/api/subscriber-increase/data', async (req, res) => {
   try {
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
     });
     
     res.json({
@@ -5423,7 +5423,7 @@ app.post('/api/subscriber-increase/save', async (req, res) => {
     // 기존 데이터 조회
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
     });
     
     const existingData = dataResponse.data.values || [];
@@ -5469,7 +5469,7 @@ app.post('/api/subscriber-increase/save', async (req, res) => {
     // Google Sheets에 저장
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A${targetRowIndex + 1}:Z${targetRowIndex + 1}`,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A${targetRowIndex + 1}:AA${targetRowIndex + 1}`,
       valueInputOption: 'RAW',
       resource: { values: [updatedData[targetRowIndex]] }
     });
@@ -5530,7 +5530,7 @@ app.post('/api/subscriber-increase/delete', async (req, res) => {
     // 기존 데이터 조회
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:Z`
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
     });
     
     const existingData = dataResponse.data.values || [];
@@ -5576,7 +5576,7 @@ app.post('/api/subscriber-increase/delete', async (req, res) => {
     // Google Sheets에 저장
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A${targetRowIndex + 1}:Z${targetRowIndex + 1}`,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A${targetRowIndex + 1}:AA${targetRowIndex + 1}`,
       valueInputOption: 'RAW',
       resource: { values: [updatedData[targetRowIndex]] }
     });
@@ -5612,7 +5612,7 @@ async function calculateAndUpdateTotals(spreadsheetId, sheetName, yearMonthIndex
     // 기존 데이터 조회
     const dataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A:Z`
+      range: `${sheetName}!A:AA`
     });
     
     const data = dataResponse.data.values || [];
@@ -5647,7 +5647,7 @@ async function calculateAndUpdateTotals(spreadsheetId, sheetName, yearMonthIndex
     // Google Sheets에 합계 업데이트
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A2:Z3`,
+      range: `${sheetName}!A2:AA3`,
       valueInputOption: 'RAW',
       resource: { values: [updatedData[1], updatedData[2]] }
     });
@@ -14315,7 +14315,7 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
     try {
       const reservationResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '사전예약사이트!A:Z' // 전체 데이터 읽기
+        range: '사전예약사이트!A:AA' // 전체 데이터 읽기
       });
       
       if (reservationResponse.data.values && reservationResponse.data.values.length > 1) {
@@ -14385,7 +14385,7 @@ app.get('/api/reservation-settings/normalized-data', async (req, res) => {
     try {
       const phoneklResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '폰클재고데이터!A:Z' // 전체 데이터 읽기
+        range: '폰클재고데이터!A:AA' // 전체 데이터 읽기
       });
       
       if (phoneklResponse.data.values && phoneklResponse.data.values.length > 1) {
@@ -14511,7 +14511,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 1. 사전예약사이트 시트 데이터 로드
     const reservationResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:Z'
+      range: '사전예약사이트!A:AA'
     });
 
     // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
@@ -14529,7 +14529,7 @@ app.get('/api/sales-by-store/data', async (req, res) => {
     // 4. 온세일 시트 로드 (온세일 접수 상태 확인용)
     const onSaleResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '온세일!A:Z'
+      range: '온세일!A:AA'
     });
 
     // 5. POS코드변경설정 시트 로드 (선택사항 - 없어도 에러 발생하지 않음)
@@ -15345,7 +15345,7 @@ app.get('/api/reservation-sales/model-color/by-agent/:agentName', async (req, re
     // 1. 사전예약사이트 데이터 로드
     const reservationResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:Z'
+      range: '사전예약사이트!A:AA'
     });
 
     // 2. 폰클출고처데이터 시트 로드 (담당자 매칭용)
@@ -15462,7 +15462,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     // 3. 온세일 데이터 로드
     const onSaleResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '온세일!A:Z'
+      range: '온세일!A:AA'
     });
 
     // 3-1. 모바일가입내역 데이터 로드
@@ -15470,7 +15470,7 @@ app.get('/api/reservation-sales/all-customers', async (req, res) => {
     try {
       mobileJoinResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '모바일가입내역!A:Z'
+        range: '모바일가입내역!A:AA'
       });
       console.log('전체고객리스트: 모바일가입내역 시트 로드 성공');
     } catch (error) {
@@ -16187,7 +16187,7 @@ app.get('/api/mapping-failure-analysis', async (req, res) => {
     // 3. 사전예약사이트에서 해당 POS코드 사용 현황 확인
     const reservationResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:Z'
+      range: '사전예약사이트!A:AA'
     });
 
     let reservationUsage = [];
@@ -16275,13 +16275,13 @@ app.get('/api/yard-receipt-missing-analysis', async (req, res) => {
     // 2. 사전예약사이트 데이터 로드
     const reservationResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '사전예약사이트!A:Z'
+      range: '사전예약사이트!A:AA'
     });
 
     // 3. 온세일 데이터 로드
     const onSaleResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: '온세일!A:Z'
+      range: '온세일!A:AA'
     });
 
     if (!yardResponse.data.values || !reservationResponse.data.values || !onSaleResponse.data.values) {
@@ -16546,7 +16546,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
     try {
       const reservationResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '사전예약사이트!A:Z'
+        range: '사전예약사이트!A:AA'
       });
       
       if (reservationResponse.data.values && reservationResponse.data.values.length > 1) {
@@ -16605,7 +16605,7 @@ app.get('/api/inventory-analysis', async (req, res) => {
     try {
       const inventoryResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '폰클재고데이터!A:Z'
+        range: '폰클재고데이터!A:AA'
       });
       
       if (inventoryResponse.data.values && inventoryResponse.data.values.length > 1) {
@@ -19592,7 +19592,7 @@ app.get('/api/budget/user-sheets-v2', async (req, res) => {
           // 액면예산 시트에서 해당 범위 가져오기
           const activationDataResponse = await sheets_api.spreadsheets.values.get({
             spreadsheetId: sheet.sheetId,
-            range: '액면예산!A:Z' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
+            range: '액면예산!A:AA' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
           });
           
           const activationData = activationDataResponse.data.values || [];
@@ -20692,7 +20692,7 @@ app.post('/api/budget/user-sheets/:sheetId/data', async (req, res) => {
     // 액면예산에서 해당 범위 가져오기
     const activationDataResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: '액면예산!A:Z' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
+      range: '액면예산!A:AA' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
     });
     
     const activationData = activationDataResponse.data.values || [];
@@ -21037,7 +21037,7 @@ app.get('/api/budget/summary/:targetMonth', async (req, res) => {
           // 액면예산 시트에서 데이터 가져오기
           const activationResponse = await sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            range: '액면예산!A:Z' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
+            range: '액면예산!A:AA' // A열부터 Z열까지 (26개 컬럼) - API 부하 감소
           });
           
           const activationData = activationResponse.data.values || [];
@@ -23861,7 +23861,7 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
         // 3. 메인 스프레드시트에서 해당 월의 모든 사용자 시트 조회
         const userSheetsResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: '예산_사용자시트관리!A:Z',
+          range: '예산_사용자시트관리!A:AA',
         });
         
         const userSheetRows = userSheetsResponse.data.values || [];
