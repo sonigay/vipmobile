@@ -3337,8 +3337,22 @@ function SubscriberIncreaseTab() {
     const agentCodes = ['306891', '315835', '316558', '314942', '316254', '315835(제외)'];
     
     agentCodes.forEach(code => {
-      if (code === '315835(제외)') {
-        // 315835(제외)는 별도 처리 - 빈 데이터로 행 생성
+      // 모든 행을 동일하게 처리 (315835(제외) 포함)
+      const subscriberRow = data.find(row => row[0] === code && row[2] === '가입자수');
+      const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
+      
+      if (subscriberRow && feeRow) {
+        console.log(`🔍 [가입자증감] ${code} 행 처리:`, { subscriberRow, feeRow });
+        agents.push({
+          code: code,
+          displayCode: code,
+          name: subscriberRow[1],
+          subscriberData: subscriberRow,
+          feeData: feeRow
+        });
+      } else if (code === '315835(제외)') {
+        // 315835(제외)가 데이터에 없으면 빈 데이터로 생성
+        console.log('🔍 [가입자증감] 315835(제외) 빈 데이터로 생성');
         const emptyData = Array(data[0].length).fill('');
         emptyData[0] = '315835(제외)';
         emptyData[1] = '경인(제외)';
@@ -3357,18 +3371,7 @@ function SubscriberIncreaseTab() {
           feeData: emptyFeeData
         });
       } else {
-        const subscriberRow = data.find(row => row[0] === code && row[2] === '가입자수');
-        const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
-        
-        if (subscriberRow && feeRow) {
-          agents.push({
-            code: code,
-            displayCode: code,
-            name: subscriberRow[1],
-            subscriberData: subscriberRow,
-            feeData: feeRow
-          });
-        }
+        console.log(`🔍 [가입자증감] ${code} 행을 찾을 수 없음`);
       }
     });
     
