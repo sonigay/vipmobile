@@ -3121,9 +3121,9 @@ function SubscriberIncreaseTab() {
   const handleYearlySave = async () => {
     setSaving(true);
     try {
-      // 315835(제외) 행이 있는지 확인하고 없으면 추가
-      const hasExcludedAgent = agentData.some(agent => agent.code === '315835(제외)');
-      if (!hasExcludedAgent) {
+      // Google Sheets에 315835(제외) 행이 있는지 확인하고 없으면 추가
+      const hasExcludedRowInSheet = data.some(row => row[0] === '315835(제외)');
+      if (!hasExcludedRowInSheet) {
         console.log('315835(제외) 행이 없어서 추가합니다.');
         try {
           const addRowResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/add-excluded-row`, {
