@@ -3306,16 +3306,16 @@ function SubscriberIncreaseTab() {
     if (!data || data.length < 4) return [];
     
     const agents = [];
-    const agentCodes = ['306891', '315835', '316558', '314942', '316254'];
+    const agentCodes = ['306891', '315835', '316558', '314942', '316254', '315835(제외)'];
     
     agentCodes.forEach(code => {
       const subscriberRow = data.find(row => row[0] === code && row[2] === '가입자수');
       const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
       
       if (subscriberRow && feeRow) {
-        // 315835 코드의 경우 "경인(제외)"로 표시
-        const displayName = code === '315835' ? '경인(제외)' : subscriberRow[1];
-        const displayCode = code === '315835' ? '315835(제외)' : code;
+        // 315835(제외) 코드의 경우 "경인(제외)"로 표시
+        const displayName = code === '315835(제외)' ? '경인(제외)' : subscriberRow[1];
+        const displayCode = code;
         
         agents.push({
           code: code,
@@ -3605,13 +3605,14 @@ function SubscriberIncreaseTab() {
                   component={Paper} 
                   variant="outlined" 
                   sx={{ 
-                    maxWidth: '100%', 
-                    overflowX: 'visible',
+                    width: '100%',
+                    maxWidth: 'none',
+                    overflowX: 'auto',
                     borderRadius: 2,
                     border: '1px solid #e0e0e0'
                   }}
                 >
-                  <Table size="small" sx={{ minWidth: '100%', width: '100%' }}>
+                  <Table size="small" sx={{ minWidth: 1800, width: '100%' }}>
                     <TableHead>
                       {/* 월별 헤더 */}
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
@@ -3978,13 +3979,14 @@ function SubscriberIncreaseTab() {
                   component={Paper} 
                   variant="outlined" 
                   sx={{ 
-                    maxWidth: '100%', 
+                    width: '100%',
+                    maxWidth: 'none',
                     overflowX: 'auto',
                     borderRadius: 2,
                     border: '1px solid #e0e0e0'
                   }}
                 >
-                  <Table size="small">
+                  <Table size="small" sx={{ minWidth: 1200, width: '100%' }}>
                     <TableHead>
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell sx={{ 
@@ -4247,12 +4249,12 @@ function SubscriberIncreaseTab() {
       ) : (
         <Box>
           {/* 그래프 표시 */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
+          <Card sx={{ mb: 3, width: '100%' }}>
+            <CardContent sx={{ width: '100%' }}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
                 📈 가입자수 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(막대 그래프)'}
               </Typography>
-              <Box sx={{ height: 650 }}>
+              <Box sx={{ height: 650, width: '100%' }}>
                 {timeUnit === 'year' && selectedYearMonth ? (
                   <Line 
                     data={{
@@ -4386,7 +4388,7 @@ function SubscriberIncreaseTab() {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
                 📊 관리수수료 추이 {timeUnit === 'year' ? '(월별 흐름)' : '(선 그래프)'}
               </Typography>
-              <Box sx={{ height: 650 }}>
+              <Box sx={{ height: 650, width: '100%' }}>
                 {timeUnit === 'year' && selectedYearMonth ? (
                   <Line 
                     data={{
