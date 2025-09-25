@@ -5446,6 +5446,81 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
   }
 });
 
+// 가입자증감 시트에 315835(제외) 행 추가 API
+app.post('/api/subscriber-increase/add-excluded-row', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    // 기존 데이터 조회
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
+    });
+    
+    const existingData = dataResponse.data.values || [];
+    if (existingData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '시트 데이터를 찾을 수 없습니다'
+      });
+    }
+    
+    // 315835(제외) 행이 있는지 확인
+    const hasExcludedRow = existingData.some(row => row[0] === '315835(제외)');
+    if (hasExcludedRow) {
+      return res.json({
+        success: true,
+        message: '315835(제외) 행이 이미 존재합니다',
+        data: existingData
+      });
+    }
+    
+    console.log('315835(제외) 행이 없어서 추가합니다.');
+    
+    // 315835 행 다음에 315835(제외) 행 추가
+    const updatedData = [...existingData];
+    const insertIndex = updatedData.findIndex(row => row[0] === '315835' && row[2] === '관리수수료') + 1;
+    
+    const excludedSubscriberRow = ['315835(제외)', '경인(제외)', '가입자수', ...Array(24).fill('')];
+    const excludedFeeRow = ['315835(제외)', '경인(제외)', '관리수수료', ...Array(24).fill('')];
+    
+    updatedData.splice(insertIndex, 0, excludedSubscriberRow, excludedFeeRow);
+    
+    // 업데이트된 데이터를 시트에 저장
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A1:AA${updatedData.length}`,
+      valueInputOption: 'RAW',
+      resource: { values: updatedData }
+    });
+    
+    res.json({
+      success: true,
+      message: '315835(제외) 행이 성공적으로 추가되었습니다',
+      data: updatedData
+    });
+    
+  } catch (error) {
+    console.error('Error adding excluded row:', error);
+    res.status(500).json({
+      success: false,
+      error: '315835(제외) 행 추가 중 오류가 발생했습니다',
+      message: error.message
+    });
+  }
+});
+
 // 가입자증감 데이터 조회 API
 app.get('/api/subscriber-increase/data', async (req, res) => {
   // CORS 헤더 설정

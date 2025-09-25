@@ -3121,6 +3121,31 @@ function SubscriberIncreaseTab() {
   const handleYearlySave = async () => {
     setSaving(true);
     try {
+      // 315835(제외) 행이 있는지 확인하고 없으면 추가
+      const hasExcludedAgent = agentData.some(agent => agent.code === '315835(제외)');
+      if (!hasExcludedAgent) {
+        console.log('315835(제외) 행이 없어서 추가합니다.');
+        try {
+          const addRowResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/add-excluded-row`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          });
+          const addRowResult = await addRowResponse.json();
+          if (addRowResult.success) {
+            console.log('315835(제외) 행이 추가되었습니다.');
+            // 데이터 새로고침
+            await fetchData();
+          } else {
+            console.error('315835(제외) 행 추가 실패:', addRowResult.error);
+          }
+        } catch (error) {
+          console.error('315835(제외) 행 추가 API 호출 오류:', error);
+        }
+      }
+      
       // 년단위 모든 월 데이터를 일괄 저장용 데이터로 변환
       const bulkData = [];
       agentData.forEach(agent => {
