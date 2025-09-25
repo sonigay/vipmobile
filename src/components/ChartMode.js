@@ -3107,9 +3107,12 @@ function SubscriberIncreaseTab() {
       const colIndex = data[0].findIndex(header => header === yearMonthKey);
       
       let total = 0;
-      // Google Sheets의 실제 데이터에서 계산
+      // Google Sheets의 실제 데이터에서 계산 (합계 행 제외)
       data.forEach(row => {
         if (row && row.length > 2 && colIndex !== -1 && colIndex < row.length) {
+          // 합계 행은 제외 (이미 모든 대리점의 합계이므로)
+          if (row[0] === '합계') return;
+          
           // type에 따라 올바른 구분값 사용
           const targetType = type === 'subscriber' ? '가입자수' : '관리수수료';
           if (row[2] === targetType) {
