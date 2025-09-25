@@ -2942,6 +2942,13 @@ function SubscriberIncreaseTab() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('🔍 [가입자증감] 데이터 조회 실패:', response.status, errorText);
+        
+        // Google Sheets API 할당량 초과 오류 감지
+        if (response.status === 500 && errorText.includes('Quota exceeded')) {
+          setError('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+          return null;
+        }
+        
         throw new Error(`데이터 조회 실패: ${response.status} ${errorText}`);
       }
       
@@ -2953,12 +2960,28 @@ function SubscriberIncreaseTab() {
       
       if (result.success) {
         setData(result.data);
+        setError(null); // 성공 시 오류 메시지 초기화
         return result.data;
       }
+      
+      // 서버에서 오류 메시지가 있는 경우
+      if (result.error && result.message && result.message.includes('Quota exceeded')) {
+        setError('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+        return null;
+      }
+      
       console.log('🔍 [가입자증감] 데이터 조회 실패 - success가 false 또는 데이터 없음');
       return null;
     } catch (error) {
       console.error('🔍 [가입자증감] 데이터 조회 오류:', error);
+      
+      // 네트워크 오류나 CORS 오류 감지
+      if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+        setError('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');
+      } else {
+        setError('데이터를 불러올 수 없습니다.');
+      }
+      
       return null;
     }
   };
@@ -3419,15 +3442,22 @@ function SubscriberIncreaseTab() {
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#388e3c' }}>
                   📅 {selectedYearMonth}년 월별 데이터 입력
                 </Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
+                <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 800 }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 'bold' }}>대리점코드</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>대리점명</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>구분</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '8%', minWidth: 80 }}>대리점코드</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '8%', minWidth: 80 }}>대리점명</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold', width: '8%', minWidth: 80 }}>구분</TableCell>
                         {Array.from({length: 12}, (_, i) => i + 1).map(month => (
-                          <TableCell key={month} sx={{ fontWeight: 'bold', textAlign: 'center', minWidth: 80 }}>
+                          <TableCell key={month} sx={{ 
+                            fontWeight: 'bold', 
+                            textAlign: 'center', 
+                            width: '6%', 
+                            minWidth: 50, 
+                            maxWidth: 60,
+                            padding: '8px 4px'
+                          }}>
                             {month}월
                           </TableCell>
                         ))}
@@ -3447,7 +3477,13 @@ function SubscriberIncreaseTab() {
                               const currentValue = colIndex !== -1 ? agent.subscriberData[colIndex] : '';
                               
                               return (
-                                <TableCell key={month} sx={{ textAlign: 'center' }}>
+                                <TableCell key={month} sx={{ 
+                                  textAlign: 'center', 
+                                  padding: '4px 2px',
+                                  width: '6%',
+                                  minWidth: 50,
+                                  maxWidth: 60
+                                }}>
                                   <TextField
                                     type="number"
                                     size="small"
@@ -3459,9 +3495,11 @@ function SubscriberIncreaseTab() {
                                       setInputData(newInputData);
                                     }}
                                     sx={{ 
-                                      width: 70,
+                                      width: '100%',
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
+                                        fontSize: '0.75rem',
+                                        padding: '4px 2px'
                                       },
                                       '& input[type=number]::-webkit-outer-spin-button': {
                                         WebkitAppearance: 'none',
@@ -3470,10 +3508,15 @@ function SubscriberIncreaseTab() {
                                       '& input[type=number]::-webkit-inner-spin-button': {
                                         WebkitAppearance: 'none',
                                         margin: 0,
+                                      },
+                                      '& .MuiOutlinedInput-root': {
+                                        '& fieldset': {
+                                          borderWidth: '1px'
+                                        }
                                       }
                                     }}
                                     inputProps={{
-                                      style: { textAlign: 'center' },
+                                      style: { textAlign: 'center', fontSize: '0.75rem' },
                                       inputMode: 'numeric',
                                       pattern: '[0-9]*'
                                     }}
@@ -3499,7 +3542,13 @@ function SubscriberIncreaseTab() {
                               const currentValue = colIndex !== -1 ? agent.feeData[colIndex] : '';
                               
                               return (
-                                <TableCell key={month} sx={{ textAlign: 'center' }}>
+                                <TableCell key={month} sx={{ 
+                                  textAlign: 'center', 
+                                  padding: '4px 2px',
+                                  width: '6%',
+                                  minWidth: 50,
+                                  maxWidth: 60
+                                }}>
                                   <TextField
                                     type="number"
                                     size="small"
@@ -3511,9 +3560,11 @@ function SubscriberIncreaseTab() {
                                       setInputData(newInputData);
                                     }}
                                     sx={{ 
-                                      width: 70,
+                                      width: '100%',
                                       '& input[type=number]': {
                                         MozAppearance: 'textfield',
+                                        fontSize: '0.75rem',
+                                        padding: '4px 2px'
                                       },
                                       '& input[type=number]::-webkit-outer-spin-button': {
                                         WebkitAppearance: 'none',
@@ -3522,10 +3573,15 @@ function SubscriberIncreaseTab() {
                                       '& input[type=number]::-webkit-inner-spin-button': {
                                         WebkitAppearance: 'none',
                                         margin: 0,
+                                      },
+                                      '& .MuiOutlinedInput-root': {
+                                        '& fieldset': {
+                                          borderWidth: '1px'
+                                        }
                                       }
                                     }}
                                     inputProps={{
-                                      style: { textAlign: 'center' },
+                                      style: { textAlign: 'center', fontSize: '0.75rem' },
                                       inputMode: 'numeric',
                                       pattern: '[0-9]*'
                                     }}
@@ -3552,28 +3608,82 @@ function SubscriberIncreaseTab() {
                     variant="contained"
                     color="primary"
                     size="large"
-                    onClick={() => {
-                      // 년단위 모든 월 데이터 저장
-                      const savePromises = [];
-                      agentData.forEach(agent => {
-                        Array.from({length: 12}, (_, i) => i + 1).forEach(month => {
-                          const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
-                          const subscriberKey = `${agent.code}_${yearMonthKey}_가입자수`;
-                          const feeKey = `${agent.code}_${yearMonthKey}_관리수수료`;
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        // 년단위 모든 월 데이터를 일괄 저장용 데이터로 변환
+                        const bulkData = [];
+                        agentData.forEach(agent => {
+                          Array.from({length: 12}, (_, i) => i + 1).forEach(month => {
+                            const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
+                            const subscriberKey = `${agent.code}_${yearMonthKey}_가입자수`;
+                            const feeKey = `${agent.code}_${yearMonthKey}_관리수수료`;
+                            
+                            if (inputData[subscriberKey] !== undefined && inputData[subscriberKey] !== '') {
+                              bulkData.push({
+                                yearMonth: yearMonthKey,
+                                agentCode: agent.code,
+                                type: '가입자수',
+                                value: inputData[subscriberKey]
+                              });
+                            }
+                            if (inputData[feeKey] !== undefined && inputData[feeKey] !== '') {
+                              bulkData.push({
+                                yearMonth: yearMonthKey,
+                                agentCode: agent.code,
+                                type: '관리수수료',
+                                value: inputData[feeKey]
+                              });
+                            }
+                          });
+                        });
+                        
+                        if (bulkData.length === 0) {
+                          alert('저장할 데이터가 없습니다.');
+                          return;
+                        }
+                        
+                        // 일괄 저장 API 호출
+                        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/bulk-save`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ bulkData })
+                        });
+                        
+                        if (!response.ok) {
+                          const errorText = await response.text();
                           
-                          if (inputData[subscriberKey] !== undefined && inputData[subscriberKey] !== '') {
-                            savePromises.push(handleSave(agent.code, '가입자수', yearMonthKey));
+                          // Google Sheets API 할당량 초과 오류 감지
+                          if (response.status === 500 && errorText.includes('Quota exceeded')) {
+                            alert('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+                            return;
                           }
-                          if (inputData[feeKey] !== undefined && inputData[feeKey] !== '') {
-                            savePromises.push(handleSave(agent.code, '관리수수료', yearMonthKey));
+                          
+                          throw new Error(`저장 실패: ${response.status} ${errorText}`);
+                        }
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                          alert(`년간 데이터가 성공적으로 저장되었습니다!\n저장된 항목: ${result.results.successCount}개`);
+                          // 데이터 새로고침
+                          await fetchData();
+                        } else {
+                          // 서버에서 오류 메시지가 있는 경우
+                          if (result.error && result.message && result.message.includes('Quota exceeded')) {
+                            alert('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+                          } else {
+                            alert(`저장 중 오류가 발생했습니다: ${result.error}`);
                           }
-                        });
-                      });
-                      
-                      if (savePromises.length > 0) {
-                        Promise.all(savePromises).then(() => {
-                          alert('년간 데이터가 모두 저장되었습니다!');
-                        });
+                        }
+                        
+                      } catch (error) {
+                        console.error('년간 데이터 저장 오류:', error);
+                        alert('년간 데이터 저장 중 오류가 발생했습니다.');
+                      } finally {
+                        setSaving(false);
                       }
                     }}
                     disabled={saving}

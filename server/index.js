@@ -15,6 +15,25 @@ const PhoneklDataManager = require('./PhoneklDataManager');
 const app = express();
 const port = process.env.PORT || 4000;
 
+// Google Sheets API 호출 빈도 제한을 위한 변수
+let lastSheetsApiCall = 0;
+const SHEETS_API_COOLDOWN = 1000; // 1초 대기
+
+// Google Sheets API 호출 빈도 제한 함수
+const rateLimitedSheetsCall = async (apiCall) => {
+  const now = Date.now();
+  const timeSinceLastCall = now - lastSheetsApiCall;
+  
+  if (timeSinceLastCall < SHEETS_API_COOLDOWN) {
+    const waitTime = SHEETS_API_COOLDOWN - timeSinceLastCall;
+    console.log(`Google Sheets API 호출 빈도 제한: ${waitTime}ms 대기`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastSheetsApiCall = Date.now();
+  return await apiCall();
+};
+
 // 서버 타임아웃 설정 (5분)
 app.use((req, res, next) => {
   req.setTimeout(300000); // 5분
@@ -5542,6 +5561,168 @@ app.post('/api/subscriber-increase/save', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to save data',
+      message: error.message
+    });
+  }
+});
+
+// 가입자증감 데이터 일괄 저장 API
+app.post('/api/subscriber-increase/bulk-save', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  try {
+    const { bulkData } = req.body; // [{ yearMonth, agentCode, type, value }, ...]
+    
+    if (!bulkData || !Array.isArray(bulkData) || bulkData.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '일괄 저장할 데이터가 없습니다'
+      });
+    }
+    
+    // 기존 데이터 조회 (빈도 제한 적용)
+    const dataResponse = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`
+      });
+    });
+    
+    const existingData = dataResponse.data.values || [];
+    if (existingData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '시트 데이터를 찾을 수 없습니다'
+      });
+    }
+    
+    const headers = existingData[0];
+    const updatedData = [...existingData];
+    const updateResults = [];
+    const errors = [];
+    
+    // 각 데이터 항목 처리
+    for (const item of bulkData) {
+      try {
+        const { yearMonth, agentCode, type, value } = item;
+        
+        // 입력 데이터 검증
+        if (!yearMonth || !agentCode || !type || value === undefined) {
+          errors.push({
+            item,
+            error: '필수 데이터가 누락되었습니다'
+          });
+          continue;
+        }
+        
+        // 타입 검증
+        if (type !== '가입자수' && type !== '관리수수료') {
+          errors.push({
+            item,
+            error: '잘못된 타입입니다. 가입자수 또는 관리수수료만 가능합니다'
+          });
+          continue;
+        }
+        
+        // 헤더에서 년월 컬럼 인덱스 찾기
+        const yearMonthIndex = headers.findIndex(header => header === yearMonth);
+        
+        if (yearMonthIndex === -1) {
+          errors.push({
+            item,
+            error: '해당 년월 컬럼을 찾을 수 없습니다'
+          });
+          continue;
+        }
+        
+        // 해당 대리점과 타입의 행 찾기
+        let targetRowIndex = -1;
+        for (let i = 1; i < updatedData.length; i++) {
+          const row = updatedData[i];
+          if (row[0] === agentCode && row[2] === type) {
+            targetRowIndex = i;
+            break;
+          }
+        }
+        
+        if (targetRowIndex === -1) {
+          errors.push({
+            item,
+            error: '해당 대리점과 타입의 행을 찾을 수 없습니다'
+          });
+          continue;
+        }
+        
+        // 데이터 업데이트
+        updatedData[targetRowIndex][yearMonthIndex] = value;
+        
+        updateResults.push({
+          yearMonth,
+          agentCode,
+          type,
+          value,
+          rowIndex: targetRowIndex + 1,
+          columnIndex: yearMonthIndex + 1
+        });
+        
+      } catch (itemError) {
+        errors.push({
+          item,
+          error: itemError.message
+        });
+      }
+    }
+    
+    // Google Sheets에 일괄 저장 (전체 시트 업데이트) - 빈도 제한 적용
+    if (updateResults.length > 0) {
+      await rateLimitedSheetsCall(async () => {
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A:AA`,
+          valueInputOption: 'RAW',
+          resource: { values: updatedData }
+        });
+      });
+      
+      // 합계 계산 및 업데이트 (모든 월에 대해) - 빈도 제한 적용
+      const uniqueYearMonths = [...new Set(updateResults.map(r => r.yearMonth))];
+      for (const yearMonth of uniqueYearMonths) {
+        const yearMonthIndex = headers.findIndex(header => header === yearMonth);
+        if (yearMonthIndex !== -1) {
+          await rateLimitedSheetsCall(async () => {
+            return await calculateAndUpdateTotals(SPREADSHEET_ID, SUBSCRIBER_INCREASE_SHEET_NAME, yearMonthIndex);
+          });
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `${updateResults.length}개 데이터가 성공적으로 저장되었습니다`,
+      results: {
+        successCount: updateResults.length,
+        errorCount: errors.length,
+        updatedData: updateResults,
+        errors: errors
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error bulk saving subscriber increase data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to bulk save data',
       message: error.message
     });
   }
