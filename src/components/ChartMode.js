@@ -2961,6 +2961,8 @@ function SubscriberIncreaseTab() {
       console.log('🔍 [가입자증감] 데이터 조회 데이터 길이:', result.data ? result.data.length : 'null');
       
       if (result.success) {
+        console.log('🔍 [가입자증감] 로드된 데이터 확인:', result.data);
+        console.log('🔍 [가입자증감] 315835(제외) 행 찾기:', result.data.filter(row => row[0] === '315835(제외)'));
         setData(result.data);
         setError(null); // 성공 시 오류 메시지 초기화
         return result.data;
