@@ -3105,9 +3105,10 @@ function SubscriberIncreaseTab() {
       const colIndex = data[0].findIndex(header => header === yearMonthKey);
       
       let total = 0;
-      agentData.forEach(agent => {
-        if (colIndex !== -1) {
-          const value = type === 'subscriber' ? agent.subscriberData[colIndex] : agent.feeData[colIndex];
+      // Google Sheets의 실제 데이터에서 계산
+      data.forEach(row => {
+        if (row && row.length > 2 && row[2] === type && colIndex !== -1 && colIndex < row.length) {
+          const value = row[colIndex];
           const numValue = parseFloat(value) || 0;
           total += numValue;
         }
@@ -3434,7 +3435,30 @@ function SubscriberIncreaseTab() {
 
     if (yearColumns.length === 0) return { agentData: [], totalData: null };
 
-    // 대리점별 년간 데이터 계산
+    // 전체 합계 계산 (Google Sheets 데이터에서 직접 계산)
+    let yearlyTotalSubscriber = 0;
+    let yearlyTotalFee = 0;
+
+    yearColumns.forEach(colIndex => {
+      data.forEach(row => {
+        if (row && row.length > 2) {
+          if (row[2] === '가입자수' && colIndex < row.length) {
+            const value = row[colIndex];
+            if (value !== '' && value !== null && value !== undefined) {
+              yearlyTotalSubscriber += parseFloat(value) || 0;
+            }
+          }
+          if (row[2] === '관리수수료' && colIndex < row.length) {
+            const value = row[colIndex];
+            if (value !== '' && value !== null && value !== undefined) {
+              yearlyTotalFee += parseFloat(value) || 0;
+            }
+          }
+        }
+      });
+    });
+
+    // agentData는 프론트엔드 표시용으로만 사용
     const yearlyAgentData = agentData.map(agent => {
       let yearlySubscriberTotal = 0;
       let yearlyFeeTotal = 0;
@@ -3457,10 +3481,6 @@ function SubscriberIncreaseTab() {
         yearlyFeeTotal
       };
     });
-
-    // 전체 합계 계산
-    const yearlyTotalSubscriber = yearlyAgentData.reduce((sum, agent) => sum + agent.yearlySubscriberTotal, 0);
-    const yearlyTotalFee = yearlyAgentData.reduce((sum, agent) => sum + agent.yearlyFeeTotal, 0);
 
     return {
       agentData: yearlyAgentData,
