@@ -3832,14 +3832,14 @@ function SubscriberIncreaseTab() {
                                   }
                                 }}
                                 inputProps={{
-                                      style: { 
-                                        textAlign: 'center', 
-                                        fontSize: '0.8rem',
-                                        fontWeight: 'bold',
-                                        color: '#1976d2'
-                                      },
+                                  style: { 
+                                    textAlign: 'center', 
+                                    fontSize: '0.8rem',
+                                    fontWeight: 'bold',
+                                    color: '#1976d2'
+                                  },
                                   inputMode: 'numeric',
-                                      pattern: '[0-9,]*'
+                                  pattern: '-?[0-9,]*'
                                 }}
                               />
                             </TableCell>
@@ -3932,14 +3932,14 @@ function SubscriberIncreaseTab() {
                                   }
                                 }}
                                 inputProps={{
-                                      style: { 
-                                        textAlign: 'center', 
-                                        fontSize: '0.8rem',
-                                        fontWeight: 'bold',
-                                        color: '#7b1fa2'
-                                      },
+                                  style: { 
+                                    textAlign: 'center', 
+                                    fontSize: '0.8rem',
+                                    fontWeight: 'bold',
+                                    color: '#7b1fa2'
+                                  },
                                   inputMode: 'numeric',
-                                      pattern: '[0-9,]*'
+                                  pattern: '-?[0-9,]*'
                                 }}
                               />
                             </TableCell>
@@ -4105,7 +4105,7 @@ function SubscriberIncreaseTab() {
                                     inputProps={{
                                   style: { textAlign: 'center' },
                                       inputMode: 'numeric',
-                                      pattern: '[0-9]*'
+                                      pattern: '-?[0-9]*'
                                     }}
                                     InputProps={{
                                       inputProps: {
@@ -4202,7 +4202,7 @@ function SubscriberIncreaseTab() {
                                     inputProps={{
                                   style: { textAlign: 'center' },
                                       inputMode: 'numeric',
-                                      pattern: '[0-9]*'
+                                      pattern: '-?[0-9]*'
                                     }}
                                     InputProps={{
                                       inputProps: {
