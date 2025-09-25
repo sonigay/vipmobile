@@ -230,7 +230,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
       {/* 탭 네비게이션 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
-        <Container maxWidth="xl">
+        <Container maxWidth={false} sx={{ px: 2 }}>
           <Tabs 
             value={activeTab} 
             onChange={handleTabChange}
@@ -271,7 +271,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       </Box>
       
       {/* 탭 컨텐츠 */}
-      <Container maxWidth="lg" sx={{ flex: 1, py: 3, overflow: 'auto' }}>
+      <Container maxWidth={false} sx={{ flex: 1, py: 3, overflow: 'auto', px: 2 }}>
         {/* 업데이트 팝업 */}
         <AppUpdatePopup
           open={showUpdatePopup}
@@ -3309,21 +3309,38 @@ function SubscriberIncreaseTab() {
     const agentCodes = ['306891', '315835', '316558', '314942', '316254', '315835(제외)'];
     
     agentCodes.forEach(code => {
-      const subscriberRow = data.find(row => row[0] === code && row[2] === '가입자수');
-      const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
-      
-      if (subscriberRow && feeRow) {
-        // 315835(제외) 코드의 경우 "경인(제외)"로 표시
-        const displayName = code === '315835(제외)' ? '경인(제외)' : subscriberRow[1];
-        const displayCode = code;
+      if (code === '315835(제외)') {
+        // 315835(제외)는 별도 처리 - 빈 데이터로 행 생성
+        const emptyData = Array(data[0].length).fill('');
+        emptyData[0] = '315835(제외)';
+        emptyData[1] = '경인(제외)';
+        emptyData[2] = '가입자수';
+        
+        const emptyFeeData = Array(data[0].length).fill('');
+        emptyFeeData[0] = '315835(제외)';
+        emptyFeeData[1] = '경인(제외)';
+        emptyFeeData[2] = '관리수수료';
         
         agents.push({
           code: code,
-          displayCode: displayCode,
-          name: displayName,
-          subscriberData: subscriberRow,
-          feeData: feeRow
+          displayCode: code,
+          name: '경인(제외)',
+          subscriberData: emptyData,
+          feeData: emptyFeeData
         });
+      } else {
+        const subscriberRow = data.find(row => row[0] === code && row[2] === '가입자수');
+        const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
+        
+        if (subscriberRow && feeRow) {
+          agents.push({
+            code: code,
+            displayCode: code,
+            name: subscriberRow[1],
+            subscriberData: subscriberRow,
+            feeData: feeRow
+          });
+        }
       }
     });
     
@@ -3612,14 +3629,14 @@ function SubscriberIncreaseTab() {
                     border: '1px solid #e0e0e0'
                   }}
                 >
-                  <Table size="small" sx={{ minWidth: 1800, width: '100%' }}>
+                  <Table size="small" sx={{ minWidth: 1400, width: '100%' }}>
                     <TableHead>
                       {/* 월별 헤더 */}
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell sx={{ 
                           fontWeight: 'bold', 
-                          width: '12%', 
-                          minWidth: 120,
+                          width: '10%', 
+                          minWidth: 100,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
@@ -3627,8 +3644,8 @@ function SubscriberIncreaseTab() {
                         </TableCell>
                         <TableCell sx={{ 
                           fontWeight: 'bold', 
-                          width: '15%', 
-                          minWidth: 100,
+                          width: '12%', 
+                          minWidth: 80,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
@@ -3636,8 +3653,8 @@ function SubscriberIncreaseTab() {
                         </TableCell>
                         <TableCell sx={{ 
                           fontWeight: 'bold', 
-                          width: '12%', 
-                          minWidth: 100,
+                          width: '10%', 
+                          minWidth: 80,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
@@ -3647,9 +3664,9 @@ function SubscriberIncreaseTab() {
                           <TableCell key={month} sx={{ 
                             fontWeight: 'bold', 
                             textAlign: 'center', 
-                            width: '5%', 
-                            minWidth: 70, 
-                            maxWidth: 80,
+                            width: '4%', 
+                            minWidth: 60, 
+                            maxWidth: 70,
                             padding: '8px 6px',
                             backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff',
                             borderRight: '1px solid #e0e0e0'
@@ -3757,8 +3774,8 @@ function SubscriberIncreaseTab() {
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8',
-                              width: '12%',
-                              minWidth: 120,
+                              width: '10%',
+                              minWidth: 100,
                               textAlign: 'center'
                             }}>
                               {agent.displayCode || agent.code}
@@ -3766,8 +3783,8 @@ function SubscriberIncreaseTab() {
                             <TableCell sx={{ 
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8',
-                              width: '15%',
-                              minWidth: 100,
+                              width: '12%',
+                              minWidth: 80,
                               textAlign: 'center'
                             }}>
                               {agent.name}
@@ -3792,9 +3809,9 @@ function SubscriberIncreaseTab() {
                                 <TableCell key={month} sx={{ 
                                   textAlign: 'center', 
                                   padding: '6px 4px',
-                                  width: '5%',
-                                  minWidth: 70,
-                                  maxWidth: 80,
+                                  width: '4%',
+                                  minWidth: 60,
+                                  maxWidth: 70,
                                   borderRight: '1px solid #e0e0e0',
                                   backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
                                 }}>
@@ -3857,8 +3874,8 @@ function SubscriberIncreaseTab() {
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5',
-                              width: '12%',
-                              minWidth: 120,
+                              width: '10%',
+                              minWidth: 100,
                               textAlign: 'center'
                             }}>
                               {agent.displayCode || agent.code}
@@ -3866,8 +3883,8 @@ function SubscriberIncreaseTab() {
                             <TableCell sx={{ 
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5',
-                              width: '15%',
-                              minWidth: 100,
+                              width: '12%',
+                              minWidth: 80,
                               textAlign: 'center'
                             }}>
                               {agent.name}
@@ -3892,9 +3909,9 @@ function SubscriberIncreaseTab() {
                                 <TableCell key={month} sx={{ 
                                   textAlign: 'center', 
                                   padding: '6px 4px',
-                                  width: '5%',
-                                  minWidth: 70,
-                                  maxWidth: 80,
+                                  width: '4%',
+                                  minWidth: 60,
+                                  maxWidth: 70,
                                   borderRight: '1px solid #e0e0e0',
                                   backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
                                 }}>
@@ -3986,7 +4003,7 @@ function SubscriberIncreaseTab() {
                     border: '1px solid #e0e0e0'
                   }}
                 >
-                  <Table size="small" sx={{ minWidth: 1200, width: '100%' }}>
+                  <Table size="small" sx={{ minWidth: 1000, width: '100%' }}>
                     <TableHead>
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell sx={{ 
