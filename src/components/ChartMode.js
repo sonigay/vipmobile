@@ -3109,10 +3109,17 @@ function SubscriberIncreaseTab() {
       let total = 0;
       // Google Sheets의 실제 데이터에서 계산
       data.forEach(row => {
-        if (row && row.length > 2 && row[2] === type && colIndex !== -1 && colIndex < row.length) {
-          const value = row[colIndex];
-          const numValue = parseFloat(value) || 0;
-          total += numValue;
+        if (row && row.length > 2 && colIndex !== -1 && colIndex < row.length) {
+          // type에 따라 올바른 구분값 사용
+          const targetType = type === 'subscriber' ? '가입자수' : '관리수수료';
+          if (row[2] === targetType) {
+            const value = row[colIndex];
+            const numValue = parseFloat(value) || 0;
+            total += numValue;
+            if (numValue !== 0) {
+              console.log(`🔍 [가입자증감] ${targetType} 합계 계산: ${row[0]} ${yearMonthKey} = ${numValue} (총합: ${total})`);
+            }
+          }
         }
       });
       return total;
