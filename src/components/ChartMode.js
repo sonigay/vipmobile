@@ -77,6 +77,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { Line, Bar } from 'react-chartjs-2';
 
 import AppUpdatePopup from './AppUpdatePopup';
@@ -92,7 +93,8 @@ ChartJS.register(
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartDataLabels
 );
 
 // 합계 계산 유틸리티 함수
@@ -3081,6 +3083,20 @@ function SubscriberIncreaseTab() {
     }));
   };
 
+  // 천단위 구분 서식 함수
+  const formatNumberWithCommas = (value) => {
+    if (!value || value === '') return '';
+    const num = parseFloat(value);
+    if (isNaN(num)) return value;
+    return num.toLocaleString();
+  };
+
+  // 천단위 구분 제거 함수
+  const removeCommas = (value) => {
+    if (!value) return '';
+    return value.toString().replace(/,/g, '');
+  };
+
   // 년간 데이터 일괄 저장 핸들러
   const handleYearlySave = async () => {
     setSaving(true);
@@ -3396,67 +3412,78 @@ function SubscriberIncreaseTab() {
           가입자증감 관리
         </Typography>
         
-        {/* 시간 단위 선택 */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-            시간 단위:
-          </Typography>
-          <ToggleButtonGroup
-            value={timeUnit}
-            exclusive
-            onChange={(e, newUnit) => {
-              setTimeUnit(newUnit);
-              setSelectedYearMonth('');
-            }}
-            size="small"
-            sx={{ mb: 2 }}
-          >
-            <ToggleButton value="month">월단위</ToggleButton>
-            <ToggleButton value="year">년단위</ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
-
-        {/* 년월/년도 선택 */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Typography variant="subtitle1" sx={{ mr: 2, fontWeight: 'bold' }}>
-            {timeUnit === 'month' ? '대상 년월:' : '대상 년도:'}
-          </Typography>
-          <FormControl sx={{ minWidth: 200 }}>
-            <Select
-              value={selectedYearMonth}
-              label={timeUnit === 'month' ? '년월 선택' : '년도 선택'}
-              onChange={(e) => setSelectedYearMonth(e.target.value)}
+        {/* 통합 선택 영역 */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 3, 
+          mb: 3,
+          p: 2,
+          backgroundColor: '#f8f9fa',
+          borderRadius: 2,
+          border: '1px solid #e0e0e0'
+        }}>
+          {/* 시간 단위 선택 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+              시간 단위:
+            </Typography>
+            <ToggleButtonGroup
+              value={timeUnit}
+              exclusive
+              onChange={(e, newUnit) => {
+                setTimeUnit(newUnit);
+                setSelectedYearMonth('');
+              }}
+              size="small"
             >
-              {timeUnit === 'month' ? 
-                yearMonthOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                )) :
-                yearOptions.map((year) => (
-                  <MenuItem key={year} value={year}>
-                    {year}년
-                  </MenuItem>
-                ))
-              }
-            </Select>
-          </FormControl>
-        </Box>
+              <ToggleButton value="month">월단위</ToggleButton>
+              <ToggleButton value="year">년단위</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
-        {/* 뷰 모드 선택 */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Typography variant="subtitle1" sx={{ mr: 2, fontWeight: 'bold' }}>
-            표시 모드:
-          </Typography>
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={(e, newMode) => setViewMode(newMode)}
-            size="small"
-          >
-            <ToggleButton value="table">숫자형식</ToggleButton>
-            <ToggleButton value="chart">그래프형식</ToggleButton>
-          </ToggleButtonGroup>
+          {/* 년월/년도 선택 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+              {timeUnit === 'month' ? '대상 년월:' : '대상 년도:'}
+            </Typography>
+            <FormControl sx={{ minWidth: 200 }}>
+              <Select
+                value={selectedYearMonth}
+                label={timeUnit === 'month' ? '년월 선택' : '년도 선택'}
+                onChange={(e) => setSelectedYearMonth(e.target.value)}
+              >
+                {timeUnit === 'month' ? 
+                  yearMonthOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  )) :
+                  yearOptions.map((year) => (
+                    <MenuItem key={year} value={year}>
+                      {year}년
+                    </MenuItem>
+                  ))
+                }
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* 뷰 모드 선택 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+              표시 모드:
+            </Typography>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(e, newMode) => setViewMode(newMode)}
+              size="small"
+            >
+              <ToggleButton value="table">숫자형식</ToggleButton>
+              <ToggleButton value="chart">그래프형식</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
         </Box>
       </Box>
 
@@ -3564,8 +3591,8 @@ function SubscriberIncreaseTab() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell sx={{ 
                           fontWeight: 'bold', 
-                          width: '8%', 
-                          minWidth: 80,
+                          width: '10%', 
+                          minWidth: 100,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
@@ -3573,8 +3600,8 @@ function SubscriberIncreaseTab() {
                         </TableCell>
                         <TableCell sx={{ 
                           fontWeight: 'bold', 
-                          width: '12%', 
-                          minWidth: 100,
+                          width: '8%', 
+                          minWidth: 80,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
@@ -3582,8 +3609,8 @@ function SubscriberIncreaseTab() {
                         </TableCell>
                         <TableCell sx={{ 
                           fontWeight: 'bold', 
-                          width: '8%', 
-                          minWidth: 80,
+                          width: '10%', 
+                          minWidth: 100,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
@@ -3616,13 +3643,19 @@ function SubscriberIncreaseTab() {
                             <TableCell sx={{ 
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
-                              backgroundColor: '#e8f5e8'
+                              backgroundColor: '#e8f5e8',
+                              width: '10%',
+                              minWidth: 100,
+                              textAlign: 'center'
                             }}>
                               {agent.code}
                             </TableCell>
                             <TableCell sx={{ 
                               borderRight: '1px solid #e0e0e0',
-                              backgroundColor: '#e8f5e8'
+                              backgroundColor: '#e8f5e8',
+                              width: '8%',
+                              minWidth: 80,
+                              textAlign: 'center'
                             }}>
                               {agent.name}
                             </TableCell>
@@ -3630,7 +3663,10 @@ function SubscriberIncreaseTab() {
                               fontWeight: 'bold', 
                               color: '#1976d2',
                               borderRight: '1px solid #e0e0e0',
-                              backgroundColor: '#e8f5e8'
+                              backgroundColor: '#e8f5e8',
+                              width: '10%',
+                              minWidth: 100,
+                              textAlign: 'center'
                             }}>
                               가입자수
                             </TableCell>
@@ -3650,29 +3686,22 @@ function SubscriberIncreaseTab() {
                                   backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
                                 }}>
                                   <TextField
-                                    type="number"
+                                    type="text"
                                     size="small"
                                     placeholder="0"
-                                    value={inputData[`${agent.code}_${yearMonthKey}_가입자수`] || currentValue || ''}
+                                    value={formatNumberWithCommas(inputData[`${agent.code}_${yearMonthKey}_가입자수`] || currentValue || '')}
                                     onChange={(e) => {
+                                      const rawValue = removeCommas(e.target.value);
                                       const newInputData = { ...inputData };
-                                      newInputData[`${agent.code}_${yearMonthKey}_가입자수`] = e.target.value;
+                                      newInputData[`${agent.code}_${yearMonthKey}_가입자수`] = rawValue;
                                       setInputData(newInputData);
                                     }}
                                     sx={{ 
                                       width: '100%',
-                                      '& input[type=number]': {
-                                        MozAppearance: 'textfield',
+                                      '& .MuiInputBase-input': {
                                         fontSize: '0.75rem',
-                                        padding: '4px 2px'
-                                      },
-                                      '& input[type=number]::-webkit-outer-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      },
-                                      '& input[type=number]::-webkit-inner-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
+                                        padding: '4px 2px',
+                                        textAlign: 'center'
                                       },
                                       '& .MuiOutlinedInput-root': {
                                         '& fieldset': {
@@ -3691,18 +3720,297 @@ function SubscriberIncreaseTab() {
                                     inputProps={{
                                       style: { textAlign: 'center', fontSize: '0.75rem' },
                                       inputMode: 'numeric',
-                                      pattern: '[0-9]*'
-                                    }}
-                                    InputProps={{
-                                      inputProps: {
-                                        min: 0,
-                                        step: 1
-                                      }
+                                      pattern: '[0-9,]*'
                                     }}
                                   />
                                 </TableCell>
                               );
                             })}
+                          </TableRow>
+                          
+                          {/* 관리수수료 행 */}
+                          <TableRow sx={{ 
+                            backgroundColor: agentIndex % 2 === 0 ? '#fafafa' : '#ffffff',
+                            '&:hover': { backgroundColor: '#f0f8ff' }
+                          }}>
+                            <TableCell sx={{ 
+                              fontWeight: 'bold',
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#f3e5f5',
+                              width: '10%',
+                              minWidth: 100,
+                              textAlign: 'center'
+                            }}>
+                              {agent.code}
+                            </TableCell>
+                            <TableCell sx={{ 
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#f3e5f5',
+                              width: '8%',
+                              minWidth: 80,
+                              textAlign: 'center'
+                            }}>
+                              {agent.name}
+                            </TableCell>
+                            <TableCell sx={{ 
+                              fontWeight: 'bold', 
+                              color: '#7b1fa2',
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#f3e5f5',
+                              width: '10%',
+                              minWidth: 100,
+                              textAlign: 'center'
+                            }}>
+                              관리수수료
+                            </TableCell>
+                            {Array.from({length: 12}, (_, i) => i + 1).map(month => {
+                              const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
+                              const colIndex = data[0].findIndex(header => header === yearMonthKey);
+                              const currentValue = colIndex !== -1 ? agent.feeData[colIndex] : '';
+                              
+                              return (
+                                <TableCell key={month} sx={{ 
+                                  textAlign: 'center', 
+                                  padding: '4px 2px',
+                                  width: '6%',
+                                  minWidth: 50,
+                                  maxWidth: 60,
+                                  borderRight: '1px solid #e0e0e0',
+                                  backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
+                                }}>
+                                  <TextField
+                                    type="text"
+                                    size="small"
+                                    placeholder="0"
+                                    value={formatNumberWithCommas(inputData[`${agent.code}_${yearMonthKey}_관리수수료`] || currentValue || '')}
+                                    onChange={(e) => {
+                                      const rawValue = removeCommas(e.target.value);
+                                      const newInputData = { ...inputData };
+                                      newInputData[`${agent.code}_${yearMonthKey}_관리수수료`] = rawValue;
+                                      setInputData(newInputData);
+                                    }}
+                                    sx={{ 
+                                      width: '100%',
+                                      '& .MuiInputBase-input': {
+                                        fontSize: '0.75rem',
+                                        padding: '4px 2px',
+                                        textAlign: 'center'
+                                      },
+                                      '& .MuiOutlinedInput-root': {
+                                        '& fieldset': {
+                                          borderWidth: '1px',
+                                          borderColor: '#e0e0e0'
+                                        },
+                                        '&:hover fieldset': {
+                                          borderColor: '#7b1fa2'
+                                        },
+                                        '&.Mui-focused fieldset': {
+                                          borderColor: '#7b1fa2',
+                                          borderWidth: '2px'
+                                        }
+                                      }
+                                    }}
+                                    inputProps={{
+                                      style: { textAlign: 'center', fontSize: '0.75rem' },
+                                      inputMode: 'numeric',
+                                      pattern: '[0-9,]*'
+                                    }}
+                                  />
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 월단위 입력 테이블 */}
+          {timeUnit === 'month' && selectedYearMonth && (
+            <Card sx={{ mb: 3, boxShadow: 3 }}>
+              <CardContent>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  mb: 3,
+                  p: 2,
+                  background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+                  borderRadius: 2,
+                  color: 'white'
+                }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                    📝 {selectedYearMonth} 월별 데이터 입력
+                  </Typography>
+                </Box>
+                
+                <TableContainer 
+                  component={Paper} 
+                  variant="outlined" 
+                  sx={{ 
+                    maxWidth: '100%', 
+                    overflowX: 'auto',
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}
+                >
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold', 
+                          width: '15%',
+                          backgroundColor: '#e3f2fd',
+                          borderRight: '1px solid #e0e0e0'
+                        }}>
+                          대리점코드
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold', 
+                          width: '20%',
+                          backgroundColor: '#e3f2fd',
+                          borderRight: '1px solid #e0e0e0'
+                        }}>
+                          대리점명
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold', 
+                          width: '15%',
+                          backgroundColor: '#e3f2fd',
+                          borderRight: '1px solid #e0e0e0'
+                        }}>
+                          구분
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold', 
+                          textAlign: 'center',
+                          width: '20%',
+                          backgroundColor: '#e3f2fd',
+                          borderRight: '1px solid #e0e0e0'
+                        }}>
+                          {selectedYearMonth}
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold', 
+                          textAlign: 'center',
+                          width: '15%',
+                          backgroundColor: '#e3f2fd',
+                          borderRight: '1px solid #e0e0e0'
+                        }}>
+                          입력
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold', 
+                          textAlign: 'center',
+                          width: '15%',
+                          backgroundColor: '#e3f2fd'
+                        }}>
+                          저장/삭제
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {agentData.map((agent, agentIndex) => (
+                        <React.Fragment key={agent.code}>
+                          {/* 가입자수 행 */}
+                          <TableRow sx={{ 
+                            backgroundColor: agentIndex % 2 === 0 ? '#fafafa' : '#ffffff',
+                            '&:hover': { backgroundColor: '#f0f8ff' }
+                          }}>
+                            <TableCell sx={{ 
+                              fontWeight: 'bold',
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#e8f5e8'
+                            }}>
+                              {agent.code}
+                            </TableCell>
+                            <TableCell sx={{ 
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#e8f5e8'
+                            }}>
+                              {agent.name}
+                            </TableCell>
+                            <TableCell sx={{ 
+                              fontWeight: 'bold', 
+                              color: '#1976d2',
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#e8f5e8'
+                            }}>
+                              가입자수
+                            </TableCell>
+                            <TableCell sx={{ 
+                              textAlign: 'right',
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#e8f5e8'
+                            }}>
+                              {selectedYearMonth ? 
+                                formatNumber(agent.subscriberData[agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
+                                : '-'
+                              }
+                            </TableCell>
+                            <TableCell sx={{ 
+                              textAlign: 'center',
+                              borderRight: '1px solid #e0e0e0'
+                            }}>
+                              <TextField
+                                type="number"
+                                size="small"
+                                placeholder="입력"
+                                value={inputData[`${agent.code}_가입자수`] || ''}
+                                onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
+                                sx={{ 
+                                  width: '100%',
+                                  '& input[type=number]': {
+                                    MozAppearance: 'textfield',
+                                  },
+                                  '& input[type=number]::-webkit-outer-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  },
+                                  '& input[type=number]::-webkit-inner-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  }
+                                }}
+                                inputProps={{
+                                  style: { textAlign: 'center' },
+                                  inputMode: 'numeric',
+                                  pattern: '[0-9]*'
+                                }}
+                                InputProps={{
+                                  inputProps: {
+                                    min: 0,
+                                    step: 1
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>
+                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="primary"
+                                  onClick={() => handleSave(agent.code, '가입자수')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  저장
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  onClick={() => handleDelete(agent.code, '가입자수')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  삭제
+                                </Button>
+                              </Box>
+                            </TableCell>
                           </TableRow>
                           
                           {/* 관리수수료 행 */}
@@ -3731,75 +4039,75 @@ function SubscriberIncreaseTab() {
                             }}>
                               관리수수료
                             </TableCell>
-                            {Array.from({length: 12}, (_, i) => i + 1).map(month => {
-                              const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
-                              const colIndex = data[0].findIndex(header => header === yearMonthKey);
-                              const currentValue = colIndex !== -1 ? agent.feeData[colIndex] : '';
-                              
-                              return (
-                                <TableCell key={month} sx={{ 
-                                  textAlign: 'center', 
-                                  padding: '4px 2px',
-                                  width: '6%',
-                                  minWidth: 50,
-                                  maxWidth: 60,
-                                  borderRight: '1px solid #e0e0e0',
-                                  backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff'
-                                }}>
-                                  <TextField
-                                    type="number"
-                                    size="small"
-                                    placeholder="0"
-                                    value={inputData[`${agent.code}_${yearMonthKey}_관리수수료`] || currentValue || ''}
-                                    onChange={(e) => {
-                                      const newInputData = { ...inputData };
-                                      newInputData[`${agent.code}_${yearMonthKey}_관리수수료`] = e.target.value;
-                                      setInputData(newInputData);
-                                    }}
-                                    sx={{ 
-                                      width: '100%',
-                                      '& input[type=number]': {
-                                        MozAppearance: 'textfield',
-                                        fontSize: '0.75rem',
-                                        padding: '4px 2px'
-                                      },
-                                      '& input[type=number]::-webkit-outer-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      },
-                                      '& input[type=number]::-webkit-inner-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      },
-                                      '& .MuiOutlinedInput-root': {
-                                        '& fieldset': {
-                                          borderWidth: '1px',
-                                          borderColor: '#e0e0e0'
-                                        },
-                                        '&:hover fieldset': {
-                                          borderColor: '#7b1fa2'
-                                        },
-                                        '&.Mui-focused fieldset': {
-                                          borderColor: '#7b1fa2',
-                                          borderWidth: '2px'
-                                        }
-                                      }
-                                    }}
-                                    inputProps={{
-                                      style: { textAlign: 'center', fontSize: '0.75rem' },
-                                      inputMode: 'numeric',
-                                      pattern: '[0-9]*'
-                                    }}
-                                    InputProps={{
-                                      inputProps: {
-                                        min: 0,
-                                        step: 1
-                                      }
-                                    }}
-                                  />
-                                </TableCell>
-                              );
-                            })}
+                            <TableCell sx={{ 
+                              textAlign: 'right',
+                              borderRight: '1px solid #e0e0e0',
+                              backgroundColor: '#f3e5f5'
+                            }}>
+                              {selectedYearMonth ? 
+                                formatNumber(agent.feeData[agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
+                                : '-'
+                              }
+                            </TableCell>
+                            <TableCell sx={{ 
+                              textAlign: 'center',
+                              borderRight: '1px solid #e0e0e0'
+                            }}>
+                              <TextField
+                                type="number"
+                                size="small"
+                                placeholder="입력"
+                                value={inputData[`${agent.code}_관리수수료`] || ''}
+                                onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
+                                sx={{ 
+                                  width: '100%',
+                                  '& input[type=number]': {
+                                    MozAppearance: 'textfield',
+                                  },
+                                  '& input[type=number]::-webkit-outer-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  },
+                                  '& input[type=number]::-webkit-inner-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  }
+                                }}
+                                inputProps={{
+                                  style: { textAlign: 'center' },
+                                  inputMode: 'numeric',
+                                  pattern: '[0-9]*'
+                                }}
+                                InputProps={{
+                                  inputProps: {
+                                    min: 0,
+                                    step: 1
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>
+                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="secondary"
+                                  onClick={() => handleSave(agent.code, '관리수수료')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  저장
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  onClick={() => handleDelete(agent.code, '관리수수료')}
+                                  disabled={saving || !selectedYearMonth}
+                                >
+                                  삭제
+                                </Button>
+                              </Box>
+                            </TableCell>
                           </TableRow>
                         </React.Fragment>
                       ))}
@@ -3863,6 +4171,20 @@ function SubscriberIncreaseTab() {
                         title: {
                           display: true,
                           text: `가입자수 월별 흐름 - ${selectedYearMonth}년`
+                        },
+                        datalabels: {
+                          display: true,
+                          color: '#333',
+                          font: {
+                            size: 10,
+                            weight: 'bold'
+                          },
+                          formatter: function(value, context) {
+                            return value > 0 ? value.toLocaleString() : '';
+                          },
+                          anchor: 'end',
+                          align: 'top',
+                          offset: 4
                         }
                       },
                       scales: {
@@ -3983,6 +4305,20 @@ function SubscriberIncreaseTab() {
                         title: {
                           display: true,
                           text: `관리수수료 월별 흐름 - ${selectedYearMonth}년`
+                        },
+                        datalabels: {
+                          display: true,
+                          color: '#333',
+                          font: {
+                            size: 10,
+                            weight: 'bold'
+                          },
+                          formatter: function(value, context) {
+                            return value > 0 ? value.toLocaleString() : '';
+                          },
+                          anchor: 'end',
+                          align: 'top',
+                          offset: 4
                         }
                       },
                       scales: {
