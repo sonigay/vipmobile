@@ -5315,6 +5315,8 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
           ['306891', '경수', '관리수수료', ...Array(24).fill('')],
           ['315835', '경인', '가입자수', ...Array(24).fill('')],
           ['315835', '경인', '관리수수료', ...Array(24).fill('')],
+          ['315835(제외)', '경인(제외)', '가입자수', ...Array(24).fill('')],
+          ['315835(제외)', '경인(제외)', '관리수수료', ...Array(24).fill('')],
           ['316558', '동서울', '가입자수', ...Array(24).fill('')],
           ['316558', '동서울', '관리수수료', ...Array(24).fill('')],
           ['314942', '호남', '가입자수', ...Array(24).fill('')],
@@ -5335,6 +5337,35 @@ app.post('/api/subscriber-increase/init-sheet', async (req, res) => {
           success: true,
           message: '시트가 존재했지만 데이터가 비어있어 초기 데이터를 입력했습니다',
           data: initialData
+        });
+      }
+      
+      // 315835(제외) 행이 있는지 확인하고 없으면 추가
+      const hasExcludedRow = existingData.some(row => row[0] === '315835(제외)');
+      if (!hasExcludedRow && existingData.length > 0) {
+        console.log('315835(제외) 행이 없어서 추가합니다.');
+        
+        // 315835 행 다음에 315835(제외) 행 추가
+        const updatedData = [...existingData];
+        const insertIndex = updatedData.findIndex(row => row[0] === '315835' && row[2] === '관리수수료') + 1;
+        
+        const excludedSubscriberRow = ['315835(제외)', '경인(제외)', '가입자수', ...Array(24).fill('')];
+        const excludedFeeRow = ['315835(제외)', '경인(제외)', '관리수수료', ...Array(24).fill('')];
+        
+        updatedData.splice(insertIndex, 0, excludedSubscriberRow, excludedFeeRow);
+        
+        // 업데이트된 데이터를 시트에 저장
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SUBSCRIBER_INCREASE_SHEET_NAME}!A1:AA${updatedData.length}`,
+          valueInputOption: 'RAW',
+          resource: { values: updatedData }
+        });
+        
+        return res.json({
+          success: true,
+          message: '시트가 존재했지만 315835(제외) 행이 없어서 추가했습니다',
+          data: updatedData
         });
       }
       
