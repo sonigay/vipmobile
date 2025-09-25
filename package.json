@@ -10,6 +10,7 @@
     "@mui/x-date-pickers": "^6.19.4",
     "axios": "^1.6.5",
     "chart.js": "^4.5.0",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "concurrently": "^9.1.2",
     "date-fns": "^2.30.0",
     "discord.js": "^14.19.1",
