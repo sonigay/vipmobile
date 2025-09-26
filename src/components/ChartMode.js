@@ -3130,7 +3130,7 @@ function SubscriberIncreaseTab() {
     return totals;
   };
 
-  // 인쇄 기능 (개선된 버전)
+  // 인쇄 기능 (완전히 새로운 버전)
   const handlePrint = () => {
     const printContent = document.getElementById('printable-content');
     if (!printContent) {
@@ -3138,37 +3138,17 @@ function SubscriberIncreaseTab() {
       return;
     }
 
-    // Canvas 요소들을 이미지로 변환
-    const canvases = printContent.querySelectorAll('canvas');
-    const canvasImages = [];
+    // 새 창 생성
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    const currentDate = new Date().toLocaleDateString('ko-KR');
+    const currentTime = new Date().toLocaleTimeString('ko-KR');
     
-    canvases.forEach((canvas, index) => {
-      const dataURL = canvas.toDataURL('image/png');
-      canvasImages[index] = dataURL;
-    });
-
     // 인쇄 스타일 생성
     const printStyles = `
       <style>
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          #printable-content, #printable-content * {
-            visibility: visible;
-          }
-          #printable-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-          }
-          .no-print {
-            display: none !important;
-          }
+          body { margin: 0; padding: 20px; }
+          .no-print { display: none !important; }
           .print-header {
             text-align: center;
             margin-bottom: 20px;
@@ -3184,15 +3164,18 @@ function SubscriberIncreaseTab() {
           .chart-container {
             page-break-inside: avoid;
             margin-bottom: 30px;
+            text-align: center;
           }
           canvas {
             max-width: 100% !important;
             height: auto !important;
+            border: 1px solid #ddd;
           }
           table {
             page-break-inside: avoid;
             border-collapse: collapse;
             width: 100%;
+            margin: 20px 0;
           }
           th, td {
             border: 1px solid #333;
@@ -3210,26 +3193,76 @@ function SubscriberIncreaseTab() {
             margin-bottom: 10px;
             text-align: center;
           }
+          .MuiCard-root {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+          }
+        }
+        @media screen {
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+          .no-print { display: none !important; }
+          .print-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+          }
+          .print-date {
+            text-align: right;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #666;
+          }
+          .chart-container {
+            page-break-inside: avoid;
+            margin-bottom: 30px;
+            text-align: center;
+          }
+          canvas {
+            max-width: 100% !important;
+            height: auto !important;
+            border: 1px solid #ddd;
+          }
+          table {
+            page-break-inside: avoid;
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+          }
+          th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+          }
+          th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+          }
+          .MuiCard-root {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+          }
         }
       </style>
     `;
 
-    // 새 창에서 인쇄
-    const printWindow = window.open('', '_blank');
-    const currentDate = new Date().toLocaleDateString('ko-KR');
-    const currentTime = new Date().toLocaleTimeString('ko-KR');
-    
-    // HTML 내용 복사
+    // HTML 내용 복사 (Canvas 포함)
     let printHTML = printContent.innerHTML;
     
-    // Canvas를 이미지로 교체
-    canvases.forEach((canvas, index) => {
-      if (canvasImages[index]) {
-        printHTML = printHTML.replace(canvas.outerHTML, 
-          `<img src="${canvasImages[index]}" style="max-width: 100%; height: auto;" alt="차트 ${index + 1}" />`
-        );
-      }
-    });
+    // Material-UI 클래스 제거 및 정리
+    printHTML = printHTML
+      .replace(/class="[^"]*Mui[^"]*"/g, '') // MUI 클래스 제거
+      .replace(/sx="[^"]*"/g, '') // sx 속성 제거
+      .replace(/style="[^"]*"/g, '') // style 속성 제거
+      .replace(/aria-[^=]*="[^"]*"/g, '') // aria 속성 제거
+      .replace(/data-[^=]*="[^"]*"/g, ''); // data 속성 제거
     
     printWindow.document.write(`
       <html>
@@ -3246,20 +3279,31 @@ function SubscriberIncreaseTab() {
           <div class="print-date">
             인쇄일시: ${currentDate} ${currentTime}
           </div>
-          ${printHTML}
+          <div class="print-content">
+            ${printHTML}
+          </div>
+          <script>
+            // 인쇄 버튼 추가
+            document.addEventListener('DOMContentLoaded', function() {
+              const printBtn = document.createElement('button');
+              printBtn.innerHTML = '🖨️ 인쇄하기';
+              printBtn.style.cssText = 'position: fixed; top: 10px; right: 10px; padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 1000;';
+              printBtn.onclick = function() {
+                window.print();
+              };
+              document.body.appendChild(printBtn);
+            });
+          </script>
         </body>
       </html>
     `);
     
     printWindow.document.close();
     
-    // 인쇄 창이 로드된 후 인쇄 실행
-    printWindow.onload = function() {
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 1000);
-    };
+    // 창이 완전히 로드된 후 처리
+    printWindow.addEventListener('load', function() {
+      console.log('인쇄 창이 로드되었습니다.');
+    });
   };
 
   // 년간 데이터 일괄 저장 핸들러
@@ -4597,16 +4641,28 @@ function SubscriberIncreaseTab() {
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          anchor: 'end',
-                          align: 'top',
-                          offset: 8,
+                          // 라벨 위치 다양화 - 더 큰 간격으로 겹침 방지
+                          anchor: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['end', 'start', 'center', 'start', 'end'];
+                            return positions[datasetIndex % 5];
+                          },
+                          align: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['top', 'bottom', 'top', 'bottom', 'top'];
+                            return positions[datasetIndex % 5];
+                          },
+                          offset: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            return 15 + (datasetIndex * 12); // 더 큰 간격 (15 + 12씩 증가)
+                          },
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           borderColor: function(context) {
                             return context.dataset.borderColor || '#1976d2';
                           },
                           borderRadius: 6,
                           borderWidth: 2,
-                          padding: 6,
+                          padding: 8,
                           textShadowColor: 'rgba(0, 0, 0, 0.3)',
                           textShadowBlur: 2
                         }
@@ -4629,7 +4685,7 @@ function SubscriberIncreaseTab() {
                           }
                         },
                         y: {
-                          beginAtZero: false,
+                          beginAtZero: true,
                           title: {
                             display: true,
                             text: '가입자수 (명)',
@@ -4646,19 +4702,6 @@ function SubscriberIncreaseTab() {
                             callback: function(value) {
                               return value.toLocaleString() + '명';
                             }
-                          },
-                          // 축 범위 조정 - 차이를 더 명확하게
-                          min: function(context) {
-                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
-                            if (values.length === 0) return 0;
-                            const minValue = Math.min(...values);
-                            return Math.max(0, minValue * 0.8); // 20% 여백
-                          },
-                          max: function(context) {
-                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
-                            if (values.length === 0) return 1000;
-                            const maxValue = Math.max(...values);
-                            return maxValue * 1.15; // 15% 여백
                           }
                         }
                       }
@@ -4815,16 +4858,28 @@ function SubscriberIncreaseTab() {
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          anchor: 'end',
-                          align: 'top',
-                          offset: 8,
+                          // 라벨 위치 다양화 - 더 큰 간격으로 겹침 방지
+                          anchor: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['end', 'start', 'center', 'start', 'end'];
+                            return positions[datasetIndex % 5];
+                          },
+                          align: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['top', 'bottom', 'top', 'bottom', 'top'];
+                            return positions[datasetIndex % 5];
+                          },
+                          offset: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            return 15 + (datasetIndex * 12); // 더 큰 간격 (15 + 12씩 증가)
+                          },
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           borderColor: function(context) {
                             return context.dataset.borderColor || '#388e3c';
                           },
                           borderRadius: 6,
                           borderWidth: 2,
-                          padding: 6,
+                          padding: 8,
                           textShadowColor: 'rgba(0, 0, 0, 0.3)',
                           textShadowBlur: 2
                         }
@@ -4847,7 +4902,7 @@ function SubscriberIncreaseTab() {
                           }
                         },
                         y: {
-                          beginAtZero: false,
+                          beginAtZero: true,
                           title: {
                             display: true,
                             text: '관리수수료 (원)',
@@ -4864,19 +4919,6 @@ function SubscriberIncreaseTab() {
                             callback: function(value) {
                               return value.toLocaleString() + '원';
                             }
-                          },
-                          // 축 범위 조정 - 차이를 더 명확하게
-                          min: function(context) {
-                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
-                            if (values.length === 0) return 0;
-                            const minValue = Math.min(...values);
-                            return Math.max(0, minValue * 0.8); // 20% 여백
-                          },
-                          max: function(context) {
-                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
-                            if (values.length === 0) return 1000000;
-                            const maxValue = Math.max(...values);
-                            return maxValue * 1.15; // 15% 여백
                           }
                         }
                       }
