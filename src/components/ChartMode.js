@@ -3191,41 +3191,68 @@ function SubscriberIncreaseTab() {
         return;
       }
       
-      // 일괄 저장 API 호출
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/bulk-save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ bulkData })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        
-        // Google Sheets API 할당량 초과 오류 감지
-        if (response.status === 500 && errorText.includes('Quota exceeded')) {
-          alert('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
-          return;
-        }
-        
-        throw new Error(`저장 실패: ${response.status} ${errorText}`);
+      // 배치 처리로 API 호출 빈도 제한
+      const batchSize = 10; // 한 번에 10개씩 처리
+      const batches = [];
+      for (let i = 0; i < bulkData.length; i += batchSize) {
+        batches.push(bulkData.slice(i, i + batchSize));
       }
       
-      const result = await response.json();
+      let totalSuccessCount = 0;
+      let totalErrorCount = 0;
       
-      if (result.success) {
-        alert(`년간 데이터가 성공적으로 저장되었습니다!\n저장된 항목: ${result.results.successCount}개`);
-        // 데이터 새로고침
-        await fetchData();
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        console.log(`배치 ${i + 1}/${batches.length} 처리 중... (${batch.length}개 항목)`);
+        
+        try {
+          // 배치 저장 API 호출
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/bulk-save`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ bulkData: batch })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`배치 ${i + 1} 저장 실패:`, errorText);
+            totalErrorCount += batch.length;
+            continue;
+          }
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            totalSuccessCount += result.results.successCount || batch.length;
+            console.log(`배치 ${i + 1} 저장 성공: ${result.results.successCount || batch.length}개`);
+          } else {
+            totalErrorCount += batch.length;
+            console.error(`배치 ${i + 1} 저장 실패:`, result.error);
+          }
+          
+          // 배치 간 대기 시간 (API 호출 빈도 제한)
+          if (i < batches.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
+          }
+          
+        } catch (error) {
+          console.error(`배치 ${i + 1} 처리 중 오류:`, error);
+          totalErrorCount += batch.length;
+        }
+      }
+      
+      // 최종 결과 알림
+      if (totalErrorCount === 0) {
+        alert(`년간 데이터가 성공적으로 저장되었습니다!\n저장된 항목: ${totalSuccessCount}개`);
       } else {
-        // 서버에서 오류 메시지가 있는 경우
-        if (result.error && result.message && result.message.includes('Quota exceeded')) {
-          alert('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
-        } else {
-          alert(`저장 중 오류가 발생했습니다: ${result.error}`);
-        }
+        alert(`년간 데이터 저장 완료!\n성공: ${totalSuccessCount}개, 실패: ${totalErrorCount}개`);
       }
+      
+      // 데이터 새로고침
+      await fetchData();
       
     } catch (error) {
       console.error('년간 데이터 저장 오류:', error);
