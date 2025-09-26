@@ -4372,16 +4372,31 @@ function SubscriberIncreaseTab() {
                       plugins: {
                         legend: {
                           position: 'top',
+                          labels: {
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            },
+                            padding: 20
+                          }
                         },
                         title: {
                           display: true,
-                          text: `가입자수 월별 흐름 - ${selectedYearMonth}년`
+                          text: `가입자수 월별 흐름 - ${selectedYearMonth}년`,
+                          font: {
+                            size: 18,
+                            weight: 'bold'
+                          },
+                          padding: {
+                            top: 10,
+                            bottom: 20
+                          }
                         },
                         datalabels: {
                           display: true,
-                          color: '#333',
+                          color: '#1976d2',
                           font: {
-                            size: 10,
+                            size: 12,
                             weight: 'bold'
                           },
                           formatter: function(value, context) {
@@ -4389,23 +4404,46 @@ function SubscriberIncreaseTab() {
                           },
                           anchor: 'end',
                           align: 'top',
-                          offset: 4
+                          offset: 6,
+                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                          borderColor: '#1976d2',
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          padding: 4
                         }
                       },
                       scales: {
                         x: {
                           title: {
                             display: true,
-                            text: '월'
+                            text: '월',
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            }
+                          },
+                          ticks: {
+                            font: {
+                              size: 12,
+                              weight: 'bold'
+                            }
                           }
                         },
                         y: {
                           beginAtZero: true,
                           title: {
                             display: true,
-                            text: '가입자수 (명)'
+                            text: '가입자수 (명)',
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            }
                           },
                           ticks: {
+                            font: {
+                              size: 12,
+                              weight: 'bold'
+                            },
                             callback: function(value) {
                               return value.toLocaleString() + '명';
                             }
@@ -4437,16 +4475,43 @@ function SubscriberIncreaseTab() {
                       plugins: {
                         legend: {
                           position: 'top',
+                          labels: {
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            },
+                            padding: 20
+                          }
                         },
                         title: {
                           display: true,
-                          text: `가입자수 현황 - ${selectedYearMonth || '년월 선택'}`
+                          text: `가입자수 현황 - ${selectedYearMonth || '년월 선택'}`,
+                          font: {
+                            size: 18,
+                            weight: 'bold'
+                          },
+                          padding: {
+                            top: 10,
+                            bottom: 20
+                          }
                         }
                       },
                       scales: {
                         y: {
                           beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: '가입자수 (명)',
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            }
+                          },
                           ticks: {
+                            font: {
+                              size: 12,
+                              weight: 'bold'
+                            },
                             callback: function(value) {
                               return value.toLocaleString() + '명';
                             }
@@ -4506,16 +4571,31 @@ function SubscriberIncreaseTab() {
                       plugins: {
                         legend: {
                           position: 'top',
+                          labels: {
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            },
+                            padding: 20
+                          }
                         },
                         title: {
                           display: true,
-                          text: `관리수수료 월별 흐름 - ${selectedYearMonth}년`
+                          text: `관리수수료 월별 흐름 - ${selectedYearMonth}년`,
+                          font: {
+                            size: 18,
+                            weight: 'bold'
+                          },
+                          padding: {
+                            top: 10,
+                            bottom: 20
+                          }
                         },
                         datalabels: {
                           display: true,
-                          color: '#333',
+                          color: '#388e3c',
                           font: {
-                            size: 10,
+                            size: 12,
                             weight: 'bold'
                           },
                           formatter: function(value, context) {
@@ -4523,23 +4603,46 @@ function SubscriberIncreaseTab() {
                           },
                           anchor: 'end',
                           align: 'top',
-                          offset: 4
+                          offset: 6,
+                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                          borderColor: '#388e3c',
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          padding: 4
                         }
                       },
                       scales: {
                         x: {
                           title: {
                             display: true,
-                            text: '월'
+                            text: '월',
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            }
+                          },
+                          ticks: {
+                            font: {
+                              size: 12,
+                              weight: 'bold'
+                            }
                           }
                         },
                         y: {
                           beginAtZero: true,
                           title: {
                             display: true,
-                            text: '관리수수료 (원)'
+                            text: '관리수수료 (원)',
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            }
                           },
                           ticks: {
+                            font: {
+                              size: 12,
+                              weight: 'bold'
+                            },
                             callback: function(value) {
                               return value.toLocaleString() + '원';
                             }
@@ -4573,16 +4676,43 @@ function SubscriberIncreaseTab() {
                       plugins: {
                         legend: {
                           position: 'top',
+                          labels: {
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            },
+                            padding: 20
+                          }
                         },
                         title: {
                           display: true,
-                          text: `관리수수료 현황 - ${selectedYearMonth || '년월 선택'}`
+                          text: `관리수수료 현황 - ${selectedYearMonth || '년월 선택'}`,
+                          font: {
+                            size: 18,
+                            weight: 'bold'
+                          },
+                          padding: {
+                            top: 10,
+                            bottom: 20
+                          }
                         }
                       },
                       scales: {
                         y: {
                           beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: '관리수수료 (원)',
+                            font: {
+                              size: 14,
+                              weight: 'bold'
+                            }
+                          },
                           ticks: {
+                            font: {
+                              size: 12,
+                              weight: 'bold'
+                            },
                             callback: function(value) {
                               return value.toLocaleString() + '원';
                             }
