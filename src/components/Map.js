@@ -196,12 +196,34 @@ function Map({
   activationDateSearch, // 개통실적 날짜 검색
   agentTarget, // 담당자 정보 추가
   isMapExpanded, // 맵 확대 상태
-  onMapExpandToggle // 맵 확대 토글 함수
+  onMapExpandToggle, // 맵 확대 토글 함수
+  rememberedRequests, // 기억된 요청 목록
+  setRememberedRequests // 기억된 요청 목록 설정 함수
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapCenter, setMapCenter] = useState(userLocation || defaultCenter);
+
+  // 기억 기능 함수
+  const handleRemember = (store, model, color) => {
+    if (!store || !model || !color) {
+      alert('모델과 색상을 모두 선택해주세요.');
+      return;
+    }
+
+    const newRequest = {
+      id: Date.now(),
+      storeName: store.name,
+      model: model,
+      color: color,
+      timestamp: new Date().toLocaleString()
+    };
+
+    setRememberedRequests(prev => [...prev, newRequest]);
+    alert(`${store.name}의 ${model} / ${color} 모델이 기억되었습니다!`);
+  };
+
 
   // 일반모드용 카톡문구 생성 함수
   const handleKakaoTalk = (store, model, color, loggedInStore) => {
@@ -992,6 +1014,24 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         >
                           영업사원요청문구
                         </button>
+                        
+                        <button 
+                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                          disabled={!selectedModel || !selectedColor}
+                          style={{
+                            padding: '6px 8px',
+                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                            color: selectedModel && selectedColor ? 'white' : '#999',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                            minWidth: '50px'
+                          }}
+                        >
+                          기억
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1131,6 +1171,24 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           }}
                         >
                           영업사원요청문구
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                          disabled={!selectedModel || !selectedColor}
+                          style={{
+                            padding: '6px 8px',
+                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                            color: selectedModel && selectedColor ? 'white' : '#999',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                            minWidth: '50px'
+                          }}
+                        >
+                          기억
                         </button>
                       </div>
                     </div>

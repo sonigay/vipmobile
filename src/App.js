@@ -22,6 +22,7 @@ import {
 } from './utils/activationService';
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
+import RememberedRequestsTable from './components/RememberedRequestsTable';
 
 import ModeSelectionPopup from './components/ModeSelectionPopup';
 import InspectionMode from './components/InspectionMode';
@@ -147,6 +148,8 @@ function AppContent() {
   const [searchResults, setSearchResults] = useState([]);
   const [forceZoomToStore, setForceZoomToStore] = useState(null); // 강제 확대 상태 추가
   const [requestedStore, setRequestedStore] = useState(null); // 요청점검색으로 선택된 매장
+  // 기억된 요청 목록 상태 추가
+  const [rememberedRequests, setRememberedRequests] = useState([]);
   const [isMapExpanded, setIsMapExpanded] = useState(false); // 맵 확대 상태
   // 관리자 모드 재고 확인 뷰 상태 추가
   const [currentView, setCurrentView] = useState('all'); // 'all' | 'assigned'
@@ -1925,6 +1928,64 @@ function AppContent() {
     }
   }, [loggedInStore, isAgentMode, agentTarget, ipInfo, deviceInfo, selectedModel, selectedColor]);
 
+  // 기억된 요청 목록 관련 함수들
+  const handleRemoveRequest = useCallback((id) => {
+    setRememberedRequests(prev => prev.filter(req => req.id !== id));
+  }, []);
+
+  const handleClearAllRequests = useCallback(() => {
+    if (rememberedRequests.length === 0) {
+      alert('삭제할 기억된 요청이 없습니다.');
+      return;
+    }
+    
+    if (window.confirm('모든 기억된 요청을 삭제하시겠습니까?')) {
+      setRememberedRequests([]);
+      alert('모든 기억된 요청이 삭제되었습니다.');
+    }
+  }, [rememberedRequests.length]);
+
+  const handleBulkRequest = useCallback(() => {
+    if (rememberedRequests.length === 0) {
+      alert('기억된 요청이 없습니다.');
+      return;
+    }
+
+    const requestList = rememberedRequests.map((req, index) => 
+      `${index + 1}. ${req.storeName}: ${req.model} / ${req.color}`
+    ).join('\n');
+
+    const message = `📱 앱 전송 메시지
+↓↓↓↓↓ 영업사원요청 메시지 ↓↓↓↓↓
+
+안녕하세요! 다음 매장들에서
+요청 가능한지 확인 부탁드립니다
+
+${requestList}
+
+담당님들 상기 매장에서 확인 후 연락 부탁드립니다.
+감사합니다.
+
+↓↓↓↓↓ 매장전달용 메시지 ↓↓↓↓↓
+(대상점 외 모델은 지우고 전달해주세요.)
+
+안녕하세요! 
+단말기 요청 드립니다.
+
+${requestList}
+
+일련번호 사진 부탁드립니다
+바쁘신데도 협조해주셔서 감사합니다.`;
+
+    // 클립보드에 복사
+    navigator.clipboard.writeText(message).then(() => {
+      alert('기억된 목록의 통합 요청문구가 복사되었습니다!\n\n담당자에게 @태그는 직접 추가해주세요!');
+    }).catch(err => {
+      console.error('클립보드 복사 실패:', err);
+      alert('클립보드 복사에 실패했습니다.');
+    });
+  }, [rememberedRequests]);
+
   // 재고 확인 뷰 변경 핸들러
   const handleViewChange = useCallback((view) => {
     setCurrentView(view);
@@ -2587,6 +2648,8 @@ function AppContent() {
                           agentTarget={agentTarget}
                           isMapExpanded={isMapExpanded}
                           onMapExpandToggle={handleMapExpandToggle}
+                          rememberedRequests={rememberedRequests}
+                          setRememberedRequests={setRememberedRequests}
                         />
                       </Box>
                       
@@ -2881,6 +2944,17 @@ function AppContent() {
                   isAgentMode={isAgentMode}
                 />
               )}
+              
+              {/* 기억된 요청 목록 테이블 - 일반 모드에서만 표시 */}
+              {!isAgentMode && (
+                <RememberedRequestsTable
+                  rememberedRequests={rememberedRequests}
+                  onRemoveRequest={handleRemoveRequest}
+                  onClearAllRequests={handleClearAllRequests}
+                  onBulkRequest={handleBulkRequest}
+                />
+              )}
+              
               {currentView !== 'activation' && (
                 <Box sx={{ 
                   flex: 1,
@@ -2912,6 +2986,8 @@ function AppContent() {
                     agentTarget={agentTarget}
                     isMapExpanded={isMapExpanded}
                     onMapExpandToggle={handleMapExpandToggle}
+                    rememberedRequests={rememberedRequests}
+                    setRememberedRequests={setRememberedRequests}
                   />
                 </Box>
               )}
