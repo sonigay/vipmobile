@@ -3130,6 +3130,114 @@ function SubscriberIncreaseTab() {
     return totals;
   };
 
+  // 인쇄 기능
+  const handlePrint = () => {
+    // 인쇄할 영역 선택
+    const printContent = document.getElementById('printable-content');
+    if (!printContent) {
+      alert('인쇄할 내용을 찾을 수 없습니다.');
+      return;
+    }
+
+    // 인쇄 스타일 생성
+    const printStyles = `
+      <style>
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-content, #printable-content * {
+            visibility: visible;
+          }
+          #printable-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+          }
+          .print-date {
+            text-align: right;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #666;
+          }
+          .chart-container {
+            page-break-inside: avoid;
+            margin-bottom: 30px;
+          }
+          table {
+            page-break-inside: avoid;
+            border-collapse: collapse;
+            width: 100%;
+          }
+          th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+          }
+          th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+          }
+        }
+      </style>
+    `;
+
+    // 새 창에서 인쇄
+    const printWindow = window.open('', '_blank');
+    const currentDate = new Date().toLocaleDateString('ko-KR');
+    const currentTime = new Date().toLocaleTimeString('ko-KR');
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>가입자증감 보고서 - ${currentDate}</title>
+          ${printStyles}
+        </head>
+        <body>
+          <div class="print-header">
+            <h1>📊 가입자증감 보고서</h1>
+            <p>생성일시: ${currentDate} ${currentTime}</p>
+            <p>조회 기간: ${selectedYearMonth || '전체'}</p>
+          </div>
+          <div class="print-date">
+            인쇄일시: ${currentDate} ${currentTime}
+          </div>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    
+    // 인쇄 창이 로드된 후 인쇄 실행
+    printWindow.onload = function() {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    };
+  };
+
   // 년간 데이터 일괄 저장 핸들러
   const handleYearlySave = async () => {
     setSaving(true);
@@ -3534,7 +3642,7 @@ function SubscriberIncreaseTab() {
   };
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 'none' }}>
+    <Box sx={{ width: '100%', maxWidth: 'none' }} id="printable-content">
       {/* 헤더 */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold', color: '#f5576c' }}>
@@ -3618,6 +3726,23 @@ function SubscriberIncreaseTab() {
 
       {viewMode === 'table' ? (
         <Box>
+          {/* 인쇄 버튼 */}
+          <Box sx={{ mb: 3, textAlign: 'right' }}>
+            <Button
+              variant="contained"
+              onClick={handlePrint}
+              sx={{
+                backgroundColor: '#ff9800',
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: '#f57c00'
+                }
+              }}
+            >
+              🖨️ 인쇄하기
+            </Button>
+          </Box>
+          
           {/* 합계 테이블 */}
           {(timeUnit === 'month' ? totalData : getYearlyData(selectedYearMonth).totalData) && (
             <Card sx={{ mb: 3 }}>
@@ -4352,6 +4477,23 @@ function SubscriberIncreaseTab() {
         </Box>
       ) : (
         <Box>
+          {/* 인쇄 버튼 */}
+          <Box sx={{ mb: 3, textAlign: 'right' }}>
+            <Button
+              variant="contained"
+              onClick={handlePrint}
+              sx={{
+                backgroundColor: '#ff9800',
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: '#f57c00'
+                }
+              }}
+            >
+              🖨️ 인쇄하기
+            </Button>
+          </Box>
+          
           {/* 그래프 표시 */}
           <Card sx={{ mb: 3, width: '100%' }}>
             <CardContent sx={{ width: '100%' }}>
@@ -4423,20 +4565,35 @@ function SubscriberIncreaseTab() {
                           display: true,
                           color: '#1976d2',
                           font: {
-                            size: 12,
+                            size: 11,
                             weight: 'bold'
                           },
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          anchor: 'end',
-                          align: 'top',
-                          offset: 6,
-                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                          // 라벨 위치 다양화 - 각 데이터셋마다 다른 위치
+                          anchor: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['end', 'start', 'center'];
+                            return positions[datasetIndex % 3];
+                          },
+                          align: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['top', 'bottom', 'end'];
+                            return positions[datasetIndex % 3];
+                          },
+                          offset: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            return 8 + (datasetIndex * 6); // 겹치지 않게 간격 조정
+                          },
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           borderColor: '#1976d2',
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          padding: 4
+                          borderRadius: 6,
+                          borderWidth: 2,
+                          padding: 6,
+                          // 그림자 효과 추가
+                          textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                          textShadowBlur: 2
                         }
                       },
                       scales: {
@@ -4457,7 +4614,7 @@ function SubscriberIncreaseTab() {
                           }
                         },
                         y: {
-                          beginAtZero: true,
+                          beginAtZero: false,
                           title: {
                             display: true,
                             text: '가입자수 (명)',
@@ -4474,6 +4631,19 @@ function SubscriberIncreaseTab() {
                             callback: function(value) {
                               return value.toLocaleString() + '명';
                             }
+                          },
+                          // 축 범위 조정 - 차이를 더 명확하게
+                          min: function(context) {
+                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
+                            if (values.length === 0) return 0;
+                            const minValue = Math.min(...values);
+                            return Math.max(0, minValue * 0.8); // 20% 여백
+                          },
+                          max: function(context) {
+                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
+                            if (values.length === 0) return 1000;
+                            const maxValue = Math.max(...values);
+                            return maxValue * 1.15; // 15% 여백
                           }
                         }
                       }
@@ -4622,20 +4792,35 @@ function SubscriberIncreaseTab() {
                           display: true,
                           color: '#388e3c',
                           font: {
-                            size: 12,
+                            size: 11,
                             weight: 'bold'
                           },
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          anchor: 'end',
-                          align: 'top',
-                          offset: 6,
-                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                          // 라벨 위치 다양화 - 각 데이터셋마다 다른 위치
+                          anchor: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['end', 'start', 'center'];
+                            return positions[datasetIndex % 3];
+                          },
+                          align: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            const positions = ['top', 'bottom', 'end'];
+                            return positions[datasetIndex % 3];
+                          },
+                          offset: function(context) {
+                            const datasetIndex = context.datasetIndex;
+                            return 8 + (datasetIndex * 6); // 겹치지 않게 간격 조정
+                          },
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           borderColor: '#388e3c',
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          padding: 4
+                          borderRadius: 6,
+                          borderWidth: 2,
+                          padding: 6,
+                          // 그림자 효과 추가
+                          textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                          textShadowBlur: 2
                         }
                       },
                       scales: {
@@ -4656,7 +4841,7 @@ function SubscriberIncreaseTab() {
                           }
                         },
                         y: {
-                          beginAtZero: true,
+                          beginAtZero: false,
                           title: {
                             display: true,
                             text: '관리수수료 (원)',
@@ -4673,6 +4858,19 @@ function SubscriberIncreaseTab() {
                             callback: function(value) {
                               return value.toLocaleString() + '원';
                             }
+                          },
+                          // 축 범위 조정 - 차이를 더 명확하게
+                          min: function(context) {
+                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
+                            if (values.length === 0) return 0;
+                            const minValue = Math.min(...values);
+                            return Math.max(0, minValue * 0.8); // 20% 여백
+                          },
+                          max: function(context) {
+                            const values = context.chart.data.datasets.flatMap(d => d.data).filter(v => v > 0);
+                            if (values.length === 0) return 1000000;
+                            const maxValue = Math.max(...values);
+                            return maxValue * 1.15; // 15% 여백
                           }
                         }
                       }
