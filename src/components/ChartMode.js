@@ -4641,20 +4641,25 @@ function SubscriberIncreaseTab() {
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          // 라벨 위치 다양화 - 더 큰 간격으로 겹침 방지
+                          // 라벨 위치 다양화 - 그래프 선과 일관성 있게 배치
                           anchor: function(context) {
                             const datasetIndex = context.datasetIndex;
-                            const positions = ['end', 'start', 'center', 'start', 'end'];
-                            return positions[datasetIndex % 5];
+                            // 짝수는 end, 홀수는 start로 일관성 유지
+                            return datasetIndex % 2 === 0 ? 'end' : 'start';
                           },
                           align: function(context) {
                             const datasetIndex = context.datasetIndex;
-                            const positions = ['top', 'bottom', 'top', 'bottom', 'top'];
-                            return positions[datasetIndex % 5];
+                            // 0,1은 top, 2,3은 bottom, 4는 top으로 교대
+                            if (datasetIndex <= 1) return 'top';
+                            if (datasetIndex <= 3) return 'bottom';
+                            return 'top';
                           },
                           offset: function(context) {
                             const datasetIndex = context.datasetIndex;
-                            return 15 + (datasetIndex * 12); // 더 큰 간격 (15 + 12씩 증가)
+                            // 그래프 선 순서에 맞춰 일정한 간격으로 배치
+                            const baseOffset = 10;
+                            const spacing = 15;
+                            return baseOffset + (datasetIndex * spacing);
                           },
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           borderColor: function(context) {
@@ -4858,20 +4863,25 @@ function SubscriberIncreaseTab() {
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          // 라벨 위치 다양화 - 더 큰 간격으로 겹침 방지
+                          // 라벨 위치 다양화 - 그래프 선과 일관성 있게 배치
                           anchor: function(context) {
                             const datasetIndex = context.datasetIndex;
-                            const positions = ['end', 'start', 'center', 'start', 'end'];
-                            return positions[datasetIndex % 5];
+                            // 짝수는 end, 홀수는 start로 일관성 유지
+                            return datasetIndex % 2 === 0 ? 'end' : 'start';
                           },
                           align: function(context) {
                             const datasetIndex = context.datasetIndex;
-                            const positions = ['top', 'bottom', 'top', 'bottom', 'top'];
-                            return positions[datasetIndex % 5];
+                            // 0,1은 top, 2,3은 bottom, 4는 top으로 교대
+                            if (datasetIndex <= 1) return 'top';
+                            if (datasetIndex <= 3) return 'bottom';
+                            return 'top';
                           },
                           offset: function(context) {
                             const datasetIndex = context.datasetIndex;
-                            return 15 + (datasetIndex * 12); // 더 큰 간격 (15 + 12씩 증가)
+                            // 그래프 선 순서에 맞춰 일정한 간격으로 배치
+                            const baseOffset = 10;
+                            const spacing = 15;
+                            return baseOffset + (datasetIndex * spacing);
                           },
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           borderColor: function(context) {
