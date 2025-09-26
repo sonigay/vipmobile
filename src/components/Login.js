@@ -272,6 +272,7 @@ function Login({ onLogin }) {
             <TextField
               fullWidth
               label="매장 ID(P코드) 또는 관리자 ID"
+              type="password"
               value={storeId}
               onChange={(e) => setStoreId(e.target.value)}
               margin="normal"
