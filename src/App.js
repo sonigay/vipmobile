@@ -23,6 +23,7 @@ import {
 import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import RememberedRequestsTable from './components/RememberedRequestsTable';
+import AgentRememberedRequestsTable from './components/AgentRememberedRequestsTable';
 
 import ModeSelectionPopup from './components/ModeSelectionPopup';
 import InspectionMode from './components/InspectionMode';
@@ -1951,11 +1952,82 @@ function AppContent() {
       return;
     }
 
-    const requestList = rememberedRequests.map((req, index) => 
-      `${index + 1}. ${req.storeName}: ${req.model} / ${req.color}`
-    ).join('\n');
+    // 관리자모드와 일반모드 구분
+    if (isAgentMode) {
+      // 관리자모드용 템플릿
+      const requestList = rememberedRequests.map((req, index) => 
+        `${index + 1}. ${req.storeName} (담당자: ${req.manager || '미지정'}): ${req.model} / ${req.color}`
+      ).join('\n');
 
-    const message = `📱 앱 전송 메시지
+      // 요청점이 있는지 확인
+      const hasRequestedStore = rememberedRequests.some(req => req.requestedStore);
+      const requestedStoreName = hasRequestedStore ? rememberedRequests[0].requestedStore?.name : null;
+
+      let message;
+      if (hasRequestedStore && requestedStoreName) {
+        message = `📱 앱 전송 메시지
+↓↓↓↓↓ 영업사원요청 메시지 ↓↓↓↓↓
+
+안녕하세요! 다음 매장들에서
+요청 가능한지 확인 부탁드립니다
+
+${requestList}
+
+"${requestedStoreName}"으로 이동 예정입니다.
+담당님들 상기 매장에서 확인 후 연락 부탁드립니다.
+감사합니다.
+
+↓↓↓↓↓ 매장전달용 메시지 ↓↓↓↓↓
+(대상점 외 모델은 지우고 전달해주세요.)
+
+안녕하세요! 
+단말기 요청 드립니다.
+
+${requestList}
+
+일련번호 사진 부탁드립니다
+"${requestedStoreName}"으로 이동 예정입니다.
+바쁘신데도 협조해주셔서 감사합니다.`;
+      } else {
+        message = `📱 앱 전송 메시지
+↓↓↓↓↓ 영업사원요청 메시지 ↓↓↓↓↓
+
+안녕하세요! 다음 매장들에서
+요청 가능한지 확인 부탁드립니다
+
+${requestList}
+
+요청점이 확인되지 않아 어디로 이동할지는 별도로 말씀드리겠습니다.
+담당님들 상기 매장에서 확인 후 연락 부탁드립니다.
+감사합니다.
+
+↓↓↓↓↓ 매장전달용 메시지 ↓↓↓↓↓
+(대상점 외 모델은 지우고 전달해주세요.)
+
+안녕하세요! 
+단말기 요청 드립니다.
+
+${requestList}
+
+일련번호 사진 부탁드립니다
+이동할곳은 연락 받는대로 다시 말씀드리겠습니다.
+바쁘신데도 협조해주셔서 감사합니다.`;
+      }
+
+      // 클립보드에 복사
+      navigator.clipboard.writeText(message).then(() => {
+        alert('기억된 목록의 통합 요청문구가 복사되었습니다!\n\n담당자에게 @태그는 직접 추가해주세요!');
+      }).catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        alert('클립보드 복사에 실패했습니다.');
+      });
+    } else {
+      // 일반모드용 템플릿 (기존)
+      const requestList = rememberedRequests.map((req, index) => 
+        `${index + 1}. ${req.storeName}: ${req.model} / ${req.color}`
+      ).join('\n');
+
+      const message = `📱 앱 전송 메시지
 ↓↓↓↓↓ 영업사원요청 메시지 ↓↓↓↓↓
 
 안녕하세요! 다음 매장들에서
@@ -1977,14 +2049,15 @@ ${requestList}
 일련번호 사진 부탁드립니다
 바쁘신데도 협조해주셔서 감사합니다.`;
 
-    // 클립보드에 복사
-    navigator.clipboard.writeText(message).then(() => {
-      alert('기억된 목록의 통합 요청문구가 복사되었습니다!\n\n담당자에게 @태그는 직접 추가해주세요!');
-    }).catch(err => {
-      console.error('클립보드 복사 실패:', err);
-      alert('클립보드 복사에 실패했습니다.');
-    });
-  }, [rememberedRequests]);
+      // 클립보드에 복사
+      navigator.clipboard.writeText(message).then(() => {
+        alert('기억된 목록의 통합 요청문구가 복사되었습니다!\n\n담당자에게 @태그는 직접 추가해주세요!');
+      }).catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        alert('클립보드 복사에 실패했습니다.');
+      });
+    }
+  }, [rememberedRequests, isAgentMode]);
 
   // 재고 확인 뷰 변경 핸들러
   const handleViewChange = useCallback((view) => {
@@ -2945,9 +3018,16 @@ ${requestList}
                 />
               )}
               
-              {/* 기억된 요청 목록 테이블 - 일반 모드에서만 표시 */}
-              {!isAgentMode && (
+              {/* 기억된 요청 목록 테이블 */}
+              {!isAgentMode ? (
                 <RememberedRequestsTable
+                  rememberedRequests={rememberedRequests}
+                  onRemoveRequest={handleRemoveRequest}
+                  onClearAllRequests={handleClearAllRequests}
+                  onBulkRequest={handleBulkRequest}
+                />
+              ) : (
+                <AgentRememberedRequestsTable
                   rememberedRequests={rememberedRequests}
                   onRemoveRequest={handleRemoveRequest}
                   onClearAllRequests={handleClearAllRequests}

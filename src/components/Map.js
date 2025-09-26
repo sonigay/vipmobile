@@ -217,6 +217,8 @@ function Map({
       storeName: store.name,
       model: model,
       color: color,
+      manager: store.manager, // 매장의 담당자 정보
+      requestedStore: requestedStore, // 요청점 정보
       timestamp: new Date().toLocaleString()
     };
 
@@ -982,8 +984,29 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         </div>
                       )}
                       
-                      {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
-                      {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                      {/* 선택됨과 기억 버튼을 같은 줄에 배치 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
+                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
+                        
+                        <button 
+                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                          disabled={!selectedModel || !selectedColor}
+                          style={{
+                            padding: '6px 8px',
+                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                            color: selectedModel && selectedColor ? 'white' : '#999',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                            minWidth: '50px'
+                          }}
+                        >
+                          기억
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
@@ -1140,8 +1163,29 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         </div>
                       )}
                       
-                      {isSelected && <p style={{color: '#2196f3', fontWeight: 'bold', marginTop: '8px'}}>✓ 선택됨</p>}
-                      {isLoggedInStore && <p style={{color: '#9c27b0', fontWeight: 'bold'}}>내 매장</p>}
+                      {/* 선택됨과 기억 버튼을 같은 줄에 배치 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
+                        {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
+                        
+                        <button 
+                          onClick={() => handleRemember(store, selectedModel, selectedColor)}
+                          disabled={!selectedModel || !selectedColor}
+                          style={{
+                            padding: '6px 8px',
+                            backgroundColor: selectedModel && selectedColor ? '#4CAF50' : '#F5F5F5',
+                            color: selectedModel && selectedColor ? 'white' : '#999',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: selectedModel && selectedColor ? 'pointer' : 'not-allowed',
+                            minWidth: '50px'
+                          }}
+                        >
+                          기억
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
