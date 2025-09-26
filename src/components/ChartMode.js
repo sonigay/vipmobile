@@ -3130,14 +3130,22 @@ function SubscriberIncreaseTab() {
     return totals;
   };
 
-  // 인쇄 기능
+  // 인쇄 기능 (개선된 버전)
   const handlePrint = () => {
-    // 인쇄할 영역 선택
     const printContent = document.getElementById('printable-content');
     if (!printContent) {
       alert('인쇄할 내용을 찾을 수 없습니다.');
       return;
     }
+
+    // Canvas 요소들을 이미지로 변환
+    const canvases = printContent.querySelectorAll('canvas');
+    const canvasImages = [];
+    
+    canvases.forEach((canvas, index) => {
+      const dataURL = canvas.toDataURL('image/png');
+      canvasImages[index] = dataURL;
+    });
 
     // 인쇄 스타일 생성
     const printStyles = `
@@ -3177,6 +3185,10 @@ function SubscriberIncreaseTab() {
             page-break-inside: avoid;
             margin-bottom: 30px;
           }
+          canvas {
+            max-width: 100% !important;
+            height: auto !important;
+          }
           table {
             page-break-inside: avoid;
             border-collapse: collapse;
@@ -3207,6 +3219,18 @@ function SubscriberIncreaseTab() {
     const currentDate = new Date().toLocaleDateString('ko-KR');
     const currentTime = new Date().toLocaleTimeString('ko-KR');
     
+    // HTML 내용 복사
+    let printHTML = printContent.innerHTML;
+    
+    // Canvas를 이미지로 교체
+    canvases.forEach((canvas, index) => {
+      if (canvasImages[index]) {
+        printHTML = printHTML.replace(canvas.outerHTML, 
+          `<img src="${canvasImages[index]}" style="max-width: 100%; height: auto;" alt="차트 ${index + 1}" />`
+        );
+      }
+    });
+    
     printWindow.document.write(`
       <html>
         <head>
@@ -3222,7 +3246,7 @@ function SubscriberIncreaseTab() {
           <div class="print-date">
             인쇄일시: ${currentDate} ${currentTime}
           </div>
-          ${printContent.innerHTML}
+          ${printHTML}
         </body>
       </html>
     `);
@@ -3234,7 +3258,7 @@ function SubscriberIncreaseTab() {
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
-      }, 500);
+      }, 1000);
     };
   };
 
@@ -3727,7 +3751,7 @@ function SubscriberIncreaseTab() {
       {viewMode === 'table' ? (
         <Box>
           {/* 인쇄 버튼 */}
-          <Box sx={{ mb: 3, textAlign: 'right' }}>
+          <Box sx={{ mb: 3, textAlign: 'right' }} className="no-print">
             <Button
               variant="contained"
               onClick={handlePrint}
@@ -4478,7 +4502,7 @@ function SubscriberIncreaseTab() {
       ) : (
         <Box>
           {/* 인쇄 버튼 */}
-          <Box sx={{ mb: 3, textAlign: 'right' }}>
+          <Box sx={{ mb: 3, textAlign: 'right' }} className="no-print">
             <Button
               variant="contained"
               onClick={handlePrint}
@@ -4563,35 +4587,26 @@ function SubscriberIncreaseTab() {
                         },
                         datalabels: {
                           display: true,
-                          color: '#1976d2',
+                          color: function(context) {
+                            return context.dataset.borderColor || '#1976d2';
+                          },
                           font: {
-                            size: 11,
+                            size: 12,
                             weight: 'bold'
                           },
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          // 라벨 위치 다양화 - 각 데이터셋마다 다른 위치
-                          anchor: function(context) {
-                            const datasetIndex = context.datasetIndex;
-                            const positions = ['end', 'start', 'center'];
-                            return positions[datasetIndex % 3];
-                          },
-                          align: function(context) {
-                            const datasetIndex = context.datasetIndex;
-                            const positions = ['top', 'bottom', 'end'];
-                            return positions[datasetIndex % 3];
-                          },
-                          offset: function(context) {
-                            const datasetIndex = context.datasetIndex;
-                            return 8 + (datasetIndex * 6); // 겹치지 않게 간격 조정
-                          },
+                          anchor: 'end',
+                          align: 'top',
+                          offset: 8,
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          borderColor: '#1976d2',
+                          borderColor: function(context) {
+                            return context.dataset.borderColor || '#1976d2';
+                          },
                           borderRadius: 6,
                           borderWidth: 2,
                           padding: 6,
-                          // 그림자 효과 추가
                           textShadowColor: 'rgba(0, 0, 0, 0.3)',
                           textShadowBlur: 2
                         }
@@ -4790,35 +4805,26 @@ function SubscriberIncreaseTab() {
                         },
                         datalabels: {
                           display: true,
-                          color: '#388e3c',
+                          color: function(context) {
+                            return context.dataset.borderColor || '#388e3c';
+                          },
                           font: {
-                            size: 11,
+                            size: 12,
                             weight: 'bold'
                           },
                           formatter: function(value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
-                          // 라벨 위치 다양화 - 각 데이터셋마다 다른 위치
-                          anchor: function(context) {
-                            const datasetIndex = context.datasetIndex;
-                            const positions = ['end', 'start', 'center'];
-                            return positions[datasetIndex % 3];
-                          },
-                          align: function(context) {
-                            const datasetIndex = context.datasetIndex;
-                            const positions = ['top', 'bottom', 'end'];
-                            return positions[datasetIndex % 3];
-                          },
-                          offset: function(context) {
-                            const datasetIndex = context.datasetIndex;
-                            return 8 + (datasetIndex * 6); // 겹치지 않게 간격 조정
-                          },
+                          anchor: 'end',
+                          align: 'top',
+                          offset: 8,
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          borderColor: '#388e3c',
+                          borderColor: function(context) {
+                            return context.dataset.borderColor || '#388e3c';
+                          },
                           borderRadius: 6,
                           borderWidth: 2,
                           padding: 6,
-                          // 그림자 효과 추가
                           textShadowColor: 'rgba(0, 0, 0, 0.3)',
                           textShadowBlur: 2
                         }
