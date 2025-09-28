@@ -2516,11 +2516,13 @@ function AgentClosingTab() {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   
-  // 업체 재고 상세 모달 상태
-  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  // 업체 재고 상세 모달 상태 (2단계 구조)
+  const [showTypeSelectionModal, setShowTypeSelectionModal] = useState(false);
+  const [showInventoryDetailModal, setShowInventoryDetailModal] = useState(false);
   const [inventoryData, setInventoryData] = useState(null);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [selectedInventoryType, setSelectedInventoryType] = useState('');
+  const [selectedCompanyName, setSelectedCompanyName] = useState('');
 
   // 영업사원명에서 괄호 제거하여 그룹핑
   const groupAgentNames = (agentList) => {
@@ -2624,8 +2626,9 @@ function AgentClosingTab() {
 
   // 업체 클릭 핸들러
   const handleCompanyClick = (companyName) => {
+    setSelectedCompanyName(companyName);
     setInventoryLoading(true);
-    setShowInventoryModal(true);
+    setShowTypeSelectionModal(true);
     setSelectedInventoryType('');
     
     // 업체별 재고 데이터 로드
@@ -2647,16 +2650,20 @@ function AgentClosingTab() {
       });
   };
 
-  // 재고 타입 선택 핸들러
+  // 재고 타입 선택 핸들러 (2단계: 상세 정보 모달 열기)
   const handleInventoryTypeSelect = (type) => {
     setSelectedInventoryType(type);
+    setShowTypeSelectionModal(false);
+    setShowInventoryDetailModal(true);
   };
 
   // 모달 닫기
   const handleCloseInventoryModal = () => {
-    setShowInventoryModal(false);
+    setShowTypeSelectionModal(false);
+    setShowInventoryDetailModal(false);
     setInventoryData(null);
     setSelectedInventoryType('');
+    setSelectedCompanyName('');
   };
 
   // 테이블 데이터 합계 계산
@@ -3002,8 +3009,9 @@ function AgentClosingTab() {
                     return (
                       <TableRow key={index} sx={{ 
                         backgroundColor: getGroupBackgroundColor(row.agent || ''),
+                        cursor: 'pointer',
                         '&:hover': { backgroundColor: '#e3f2fd' }
-                      }}>
+                      }} onClick={() => handleCompanyClick(row.companyName)}>
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
                         {row.policyGroup || '-'}
                       </TableCell>
@@ -3011,16 +3019,9 @@ function AgentClosingTab() {
                         {row.pCode || '-'}
                       </TableCell>
                       <TableCell sx={{ 
-                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        color: '#1976d2',
-                        textDecoration: 'underline',
-                        '&:hover': {
-                          backgroundColor: '#e3f2fd',
-                          fontWeight: 'bold'
-                        }
-                      }} onClick={() => handleCompanyClick(row.companyName)}>
+                        fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                        textAlign: 'center'
+                      }}>
                         {row.companyName || '-'}
                       </TableCell>
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
@@ -3103,21 +3104,30 @@ function AgentClosingTab() {
         </Paper>
       )}
 
-      {/* 업체 재고 상세 모달 */}
-      <CompanyInventoryModal
-        open={showInventoryModal}
+      {/* 1단계: 재고 타입 선택 모달 */}
+      <InventoryTypeSelectionModal
+        open={showTypeSelectionModal}
         onClose={handleCloseInventoryModal}
         data={inventoryData}
         loading={inventoryLoading}
-        selectedType={selectedInventoryType}
+        companyName={selectedCompanyName}
         onTypeSelect={handleInventoryTypeSelect}
+      />
+
+      {/* 2단계: 재고 상세 정보 모달 */}
+      <InventoryDetailModal
+        open={showInventoryDetailModal}
+        onClose={handleCloseInventoryModal}
+        data={inventoryData}
+        selectedType={selectedInventoryType}
+        companyName={selectedCompanyName}
       />
     </Box>
   );
 }
 
-// 업체 재고 상세 모달 컴포넌트
-function CompanyInventoryModal({ open, onClose, data, loading, selectedType, onTypeSelect }) {
+// 1단계: 재고 타입 선택 모달
+function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName, onTypeSelect }) {
   const [printContent, setPrintContent] = useState(null);
 
   // 인쇄 함수
