@@ -1819,6 +1819,71 @@ function StructurePolicyTab() {
 
 // 마감장표 탭 컴포넌트
 function ClosingChartTab() {
+  const [activeSubTab, setActiveSubTab] = useState(0);
+  
+  const handleSubTabChange = (event, newValue) => {
+    setActiveSubTab(newValue);
+  };
+
+  const subTabs = [
+    {
+      label: '전체총마감',
+      component: <TotalClosingTab />
+    },
+    {
+      label: '영업사원별마감',
+      component: <AgentClosingTab />
+    }
+  ];
+
+  return (
+    <Box>
+      {/* 서브 탭 네비게이션 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
+        <Tabs 
+          value={activeSubTab} 
+          onChange={handleSubTabChange}
+          sx={{
+            '& .MuiTab-root': {
+              minHeight: 48,
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              color: '#666',
+              '&.Mui-selected': {
+                color: '#1976d2',
+                fontWeight: 'bold'
+              }
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#1976d2',
+              height: 3
+            }
+          }}
+        >
+          {subTabs.map((tab, index) => (
+            <Tab
+              key={index}
+              label={tab.label}
+              sx={{ 
+                textTransform: 'none',
+                minHeight: 48,
+                py: 1
+              }}
+            />
+          ))}
+        </Tabs>
+      </Box>
+      
+      {/* 서브 탭 컨텐츠 */}
+      <Box sx={{ pt: 2 }}>
+        {subTabs[activeSubTab].component}
+      </Box>
+    </Box>
+  );
+}
+
+// 전체총마감 탭 컴포넌트 (기존 마감장표 내용)
+function TotalClosingTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -2019,7 +2084,7 @@ function ClosingChartTab() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6">
-              {new Date(selectedDate).getDate()}일 마감 실적장표
+              {new Date(selectedDate).getDate()}일 전체총마감 실적장표
             </Typography>
             <TextField
               type="date"
@@ -2435,6 +2500,123 @@ function ClosingChartTab() {
         matchingMismatches={matchingMismatches}
       />
 
+    </Box>
+  );
+}
+
+// 영업사원별마감 탭 컴포넌트
+function AgentClosingTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  // 데이터 로드
+  const loadData = useCallback(async (date = selectedDate) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-chart?date=${date}`);
+      if (!response.ok) {
+        throw new Error('데이터 로드에 실패했습니다.');
+      }
+
+      const result = await response.json();
+      setData(result);
+      setLastUpdate(new Date());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate]);
+
+  // 초기 로드
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 날짜 변경 시 데이터 재로드
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    loadData(newDate);
+  };
+
+  // 수동 새로고침
+  const handleRefresh = () => {
+    loadData();
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 2 }}>
+      {/* 상단 컨트롤 */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h6">
+              {new Date(selectedDate).getDate()}일 영업사원별마감 실적장표
+            </Typography>
+            <TextField
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              size="small"
+            />
+            <Button
+              variant="outlined"
+              onClick={handleRefresh}
+              startIcon={<RefreshIcon />}
+            >
+              새로고침
+            </Button>
+          </Box>
+          
+          {lastUpdate && (
+            <Typography variant="caption" color="text.secondary">
+              마지막 업데이트: {lastUpdate.toLocaleTimeString()}
+            </Typography>
+          )}
+        </Box>
+      </Paper>
+
+      {/* 영업사원별 실적 데이터 */}
+      {data && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            영업사원별 마감 실적
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            영업사원별 상세 마감 실적 데이터가 여기에 표시됩니다.
+          </Typography>
+          {/* TODO: 영업사원별 마감 데이터 테이블 구현 */}
+        </Paper>
+      )}
+
+      {!data && !loading && (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary">
+            영업사원별 마감 데이터가 없습니다.
+          </Typography>
+        </Paper>
+      )}
     </Box>
   );
 }
