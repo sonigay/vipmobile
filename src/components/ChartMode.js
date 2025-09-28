@@ -64,7 +64,6 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   AccountBalanceWallet as AccountBalanceWalletIcon,
-  Close as CloseIcon,
   Print as PrintIcon,
   PersonAdd as PersonAddIcon
 } from '@mui/icons-material';
