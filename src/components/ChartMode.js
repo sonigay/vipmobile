@@ -2959,19 +2959,22 @@ function AgentClosingTab() {
                     // 담당자명에서 괄호 제거하여 그룹핑 키 생성
                     const agentBaseName = (row.agent || '').replace(/\([^)]*\)/g, '').trim();
                     
-                    // 그룹별 배경색 결정 (홍기현, 김수빈 등)
+                    // 담당자별 배경색 결정 (전체 이름으로 구분)
                     const getGroupBackgroundColor = (agentName) => {
-                      const baseName = agentName.replace(/\([^)]*\)/g, '').trim();
                       const colors = {
-                        '홍기현': '#f3e5f5', // 보라색 계열
-                        '김수빈': '#e8f5e8', // 녹색 계열
-                        '이민호': '#fff3e0', // 주황색 계열
-                        '박지영': '#e3f2fd', // 파란색 계열
-                        '정민수': '#fce4ec', // 분홍색 계열
-                        '최영희': '#f1f8e9', // 연두색 계열
+                        '홍기현(직영)': '#f3e5f5', // 보라색 계열
+                        '홍기현(별도)': '#e8f5e8', // 녹색 계열
+                        '홍기현': '#fce4ec', // 분홍색 계열
+                        '김수빈(직영)': '#fff3e0', // 주황색 계열
+                        '김수빈(별도)': '#e3f2fd', // 파란색 계열
+                        '김수빈': '#f1f8e9', // 연두색 계열
+                        '이민호': '#fff8e1', // 노란색 계열
+                        '박지영': '#e0f2f1', // 청록색 계열
+                        '정민수': '#f9fbe7', // 연녹색 계열
+                        '최영희': '#fafafa', // 회색 계열
                         'default': '#fafafa' // 기본색
                       };
-                      return colors[baseName] || colors['default'];
+                      return colors[agentName] || colors['default'];
                     };
 
                     // 금일실적 색상 결정
