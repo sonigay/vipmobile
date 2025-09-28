@@ -2774,37 +2774,8 @@ function AgentClosingTab() {
             }
           }}>
             <Table size="small">
-              <TableHead>
-                <TableRow sx={{ 
-                  backgroundColor: '#1976d2',
-                  '& .MuiTableCell-root': {
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: { xs: '0.6rem', sm: '0.7rem' },
-                    borderBottom: '2px solid rgba(255,255,255,0.3)',
-                    padding: { xs: '2px 1px', sm: '8px 4px' },
-                    textAlign: 'center'
-                  }
-                }}>
-                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
-                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
-                  <TableCell sx={{ width: { xs: '150px', sm: '200px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
-                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
-                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력단말</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량유심</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력유심</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유재고</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>잔여유심</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>금일실적</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>당월실적</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>예상마감</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>무실적점</TableCell>
-                </TableRow>
-              </TableHead>
               <TableBody>
-                {/* 상단 합계 행 */}
+                {/* 상단 합계 행 (헤더 위쪽) */}
                 {data && data.agentData && data.agentData.length > 0 && (
                   <TableRow sx={{ 
                     background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
@@ -2858,24 +2829,24 @@ function AgentClosingTab() {
                           <TableCell sx={{ 
                             textAlign: 'center', 
                             fontWeight: 'bold',
-                            bgcolor: totals.dailyPerformance >= 30 ? '#e8f5e8' : totals.dailyPerformance >= 20 ? '#fff3e0' : totals.dailyPerformance >= 10 ? '#fff8e1' : totals.dailyPerformance >= 5 ? '#ffebee' : '#f5f5f5',
-                            color: totals.dailyPerformance >= 30 ? '#2e7d32' : totals.dailyPerformance >= 20 ? '#f57c00' : totals.dailyPerformance >= 10 ? '#f9a825' : totals.dailyPerformance >= 5 ? '#d32f2f' : '#757575'
+                            bgcolor: totals.dailyPerformance > 2 ? '#ffebee' : totals.dailyPerformance > 1 ? '#e3f2fd' : totals.dailyPerformance > 0 ? '#e8f5e8' : '#f5f5f5',
+                            color: totals.dailyPerformance > 2 ? '#d32f2f' : totals.dailyPerformance > 1 ? '#1976d2' : totals.dailyPerformance > 0 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.dailyPerformance}
                           </TableCell>
                           <TableCell sx={{ 
                             textAlign: 'center', 
                             fontWeight: 'bold',
-                            bgcolor: totals.monthlyPerformance >= 30 ? '#e8f5e8' : totals.monthlyPerformance >= 20 ? '#fff3e0' : totals.monthlyPerformance >= 10 ? '#fff8e1' : totals.monthlyPerformance >= 5 ? '#ffebee' : '#f5f5f5',
-                            color: totals.monthlyPerformance >= 30 ? '#2e7d32' : totals.monthlyPerformance >= 20 ? '#f57c00' : totals.monthlyPerformance >= 10 ? '#f9a825' : totals.monthlyPerformance >= 5 ? '#d32f2f' : '#757575'
+                            bgcolor: totals.monthlyPerformance >= 40 ? '#fff8e1' : totals.monthlyPerformance >= 30 ? '#f3e5f5' : totals.monthlyPerformance >= 20 ? '#ffebee' : totals.monthlyPerformance >= 10 ? '#e3f2fd' : totals.monthlyPerformance > 1 ? '#e8f5e8' : '#f5f5f5',
+                            color: totals.monthlyPerformance >= 40 ? '#f9a825' : totals.monthlyPerformance >= 30 ? '#7b1fa2' : totals.monthlyPerformance >= 20 ? '#d32f2f' : totals.monthlyPerformance >= 10 ? '#1976d2' : totals.monthlyPerformance > 1 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.monthlyPerformance}
                           </TableCell>
                           <TableCell sx={{ 
                             textAlign: 'center', 
                             fontWeight: 'bold',
-                            color: '#f57c00',
-                            bgcolor: '#fff8e1' // 예상마감 컬럼 배경색
+                            bgcolor: totals.expectedClosing >= 40 ? '#fff8e1' : totals.expectedClosing >= 30 ? '#f3e5f5' : totals.expectedClosing >= 20 ? '#ffebee' : totals.expectedClosing >= 10 ? '#e3f2fd' : totals.expectedClosing > 1 ? '#e8f5e8' : '#f5f5f5',
+                            color: totals.expectedClosing >= 40 ? '#f9a825' : totals.expectedClosing >= 30 ? '#7b1fa2' : totals.expectedClosing >= 20 ? '#d32f2f' : totals.expectedClosing >= 10 ? '#1976d2' : totals.expectedClosing > 1 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.expectedClosing}
                           </TableCell>
@@ -2887,7 +2858,37 @@ function AgentClosingTab() {
                     })()}
                   </TableRow>
                 )}
-                
+              </TableBody>
+              <TableHead>
+                <TableRow sx={{ 
+                  backgroundColor: '#1976d2',
+                  '& .MuiTableCell-root': {
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                    borderBottom: '2px solid rgba(255,255,255,0.3)',
+                    padding: { xs: '2px 1px', sm: '8px 4px' },
+                    textAlign: 'center'
+                  }
+                }}>
+                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
+                  <TableCell sx={{ width: { xs: '150px', sm: '200px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
+                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력단말</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유재고</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>잔여유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>금일실적</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>당월실적</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>예상마감</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>무실적점</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {/* 데이터가 있을 때 테이블 행 렌더링 */}
                 {data && data.agentData && data.agentData.length > 0 ? (
                   data.agentData.map((row, index) => {
@@ -2909,17 +2910,27 @@ function AgentClosingTab() {
                       return colors[baseName] || colors['default'];
                     };
 
-                    // 숫자 카운팅별 색상 결정
-                    const getPerformanceColor = (value) => {
-                      if (value >= 30) return { bgcolor: '#e8f5e8', color: '#2e7d32' }; // 녹색 - 30 이상
-                      if (value >= 20) return { bgcolor: '#fff3e0', color: '#f57c00' }; // 주황색 - 20-29
-                      if (value >= 10) return { bgcolor: '#fff8e1', color: '#f9a825' }; // 노란색 - 10-19
-                      if (value >= 5) return { bgcolor: '#ffebee', color: '#d32f2f' }; // 빨간색 - 5-9
-                      return { bgcolor: '#f5f5f5', color: '#757575' }; // 회색 - 5 미만
+                    // 금일실적 색상 결정
+                    const getDailyColor = (value) => {
+                      if (value > 2) return { bgcolor: '#ffebee', color: '#d32f2f' }; // 붉은계열 - 2보다 큼
+                      if (value > 1) return { bgcolor: '#e3f2fd', color: '#1976d2' }; // 파랑계열 - 1보다 큼
+                      if (value > 0) return { bgcolor: '#e8f5e8', color: '#2e7d32' }; // 녹색계열 - 0보다 큼
+                      return { bgcolor: '#f5f5f5', color: '#757575' }; // 회색 - 0 이하
                     };
 
-                    const dailyColor = getPerformanceColor(row.dailyPerformance || 0);
-                    const monthlyColor = getPerformanceColor(row.monthlyPerformance || 0);
+                    // 당월실적과 예상마감 색상 결정
+                    const getMonthlyColor = (value) => {
+                      if (value >= 40) return { bgcolor: '#fff8e1', color: '#f9a825' }; // 노랑계열 - 40 이상
+                      if (value >= 30) return { bgcolor: '#f3e5f5', color: '#7b1fa2' }; // 보라계열 - 30 이상
+                      if (value >= 20) return { bgcolor: '#ffebee', color: '#d32f2f' }; // 붉은계열 - 20 이상
+                      if (value >= 10) return { bgcolor: '#e3f2fd', color: '#1976d2' }; // 파랑계열 - 10 이상
+                      if (value > 1) return { bgcolor: '#e8f5e8', color: '#2e7d32' }; // 녹색계열 - 1보다 큼
+                      return { bgcolor: '#f5f5f5', color: '#757575' }; // 회색 - 1 이하
+                    };
+
+                    const dailyColor = getDailyColor(row.dailyPerformance || 0);
+                    const monthlyColor = getMonthlyColor(row.monthlyPerformance || 0);
+                    const expectedColor = getMonthlyColor(row.expectedClosing || 0);
 
                     return (
                       <TableRow key={index} sx={{ 
@@ -2981,8 +2992,8 @@ function AgentClosingTab() {
                         fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
                         textAlign: 'center', 
                         fontWeight: 'bold', 
-                        color: '#f57c00',
-                        bgcolor: '#fff8e1' // 예상마감 컬럼 배경색
+                        bgcolor: expectedColor.bgcolor,
+                        color: expectedColor.color
                       }}>
                         {row.expectedClosing || 0}
                       </TableCell>
