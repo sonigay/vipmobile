@@ -25322,7 +25322,21 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
     }
   }
   
-  return Array.from(agentMap.values());
+  // 담당자별로 먼저 그룹핑하고, 각 그룹 내에서 당월실적 내림차순 정렬
+  const sortedData = Array.from(agentMap.values()).sort((a, b) => {
+    // 1. 담당자명으로 먼저 정렬 (같은 담당자는 함께 그룹핑)
+    const agentA = a.agent || '';
+    const agentB = b.agent || '';
+    
+    if (agentA !== agentB) {
+      return agentA.localeCompare(agentB);
+    }
+    
+    // 2. 같은 담당자 내에서는 당월실적 내림차순 정렬
+    return (b.monthlyPerformance || 0) - (a.monthlyPerformance || 0);
+  });
+  
+  return sortedData;
 }
 
 // 서버 시작 (이미 위에서 처리됨)
