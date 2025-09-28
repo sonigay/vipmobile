@@ -2877,7 +2877,7 @@ function AgentClosingTab() {
             }
           }}>
             <Table size="small">
-              <TableBody>
+              <TableHead>
                 {/* 상단 합계 행 (헤더 위쪽) */}
                 {data && data.agentData && data.agentData.length > 0 && (
                   <TableRow sx={{ 
@@ -2961,8 +2961,6 @@ function AgentClosingTab() {
                     })()}
                   </TableRow>
                 )}
-              </TableBody>
-              <TableHead>
                 <TableRow sx={{ 
                   backgroundColor: '#1976d2',
                   '& .MuiTableCell-root': {
