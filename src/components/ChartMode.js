@@ -2509,16 +2509,45 @@ function AgentClosingTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAgent, setSelectedAgent] = useState('');
+  const [availableAgents, setAvailableAgents] = useState([]);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
+  // 영업사원명에서 괄호 제거하여 그룹핑
+  const groupAgentNames = (agentList) => {
+    const grouped = {};
+    agentList.forEach(agent => {
+      // 괄호 제거 (예: "홍기현(직영)" → "홍기현")
+      const baseName = agent.replace(/\([^)]*\)/g, '').trim();
+      if (!grouped[baseName]) {
+        grouped[baseName] = [];
+      }
+      grouped[baseName].push(agent);
+    });
+    return grouped;
+  };
+
   // 데이터 로드
-  const loadData = useCallback(async (date = selectedDate) => {
+  const loadData = useCallback(async (date = selectedDate, agent = selectedAgent) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-chart?date=${date}`);
+      // 영업사원 목록 로드
+      const agentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`);
+      if (agentsResponse.ok) {
+        const agentsResult = await agentsResponse.json();
+        setAvailableAgents(agentsResult.agents || []);
+      }
+
+      // 영업사원별 마감 데이터 로드
+      const params = new URLSearchParams({ date });
+      if (agent) {
+        params.append('agent', agent);
+      }
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-chart?${params}`);
       if (!response.ok) {
         throw new Error('데이터 로드에 실패했습니다.');
       }
@@ -2531,7 +2560,7 @@ function AgentClosingTab() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, selectedAgent]);
 
   // 초기 로드
   useEffect(() => {
@@ -2541,7 +2570,14 @@ function AgentClosingTab() {
   // 날짜 변경 시 데이터 재로드
   const handleDateChange = (newDate) => {
     setSelectedDate(newDate);
-    loadData(newDate);
+    loadData(newDate, selectedAgent);
+  };
+
+  // 영업사원 변경 시 데이터 재로드
+  const handleAgentChange = (event) => {
+    const newAgent = event.target.value;
+    setSelectedAgent(newAgent);
+    loadData(selectedDate, newAgent);
   };
 
   // 수동 새로고침
@@ -2565,21 +2601,48 @@ function AgentClosingTab() {
     );
   }
 
+  // 영업사원명 그룹핑
+  const groupedAgents = groupAgentNames(availableAgents);
+
   return (
     <Box sx={{ p: 2 }}>
-      {/* 상단 컨트롤 */}
+      {/* 상단 필터 */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6">
               {new Date(selectedDate).getDate()}일 영업사원별마감 실적장표
             </Typography>
+            
+            {/* 마감기준날짜 필터 */}
             <TextField
               type="date"
+              label="마감기준날짜"
               value={selectedDate}
               onChange={(e) => handleDateChange(e.target.value)}
               size="small"
+              sx={{ minWidth: 150 }}
             />
+            
+            {/* 영업사원명 필터 */}
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>영업사원명</InputLabel>
+              <Select
+                value={selectedAgent}
+                onChange={handleAgentChange}
+                label="영업사원명"
+              >
+                <MenuItem value="">
+                  <em>전체 영업사원</em>
+                </MenuItem>
+                {Object.entries(groupedAgents).map(([baseName, variants]) => (
+                  <MenuItem key={baseName} value={baseName}>
+                    {baseName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
             <Button
               variant="outlined"
               onClick={handleRefresh}
@@ -2597,16 +2660,132 @@ function AgentClosingTab() {
         </Box>
       </Paper>
 
-      {/* 영업사원별 실적 데이터 */}
+      {/* 영업사원별 실적 테이블 */}
       {data && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            영업사원별 마감 실적
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            영업사원별 상세 마감 실적 데이터가 여기에 표시됩니다.
-          </Typography>
-          {/* TODO: 영업사원별 마감 데이터 테이블 구현 */}
+        <Paper sx={{ 
+          borderRadius: 2,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          overflow: 'hidden'
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            p: 2, 
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+            color: 'white'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              👤 영업사원별 마감 실적
+            </Typography>
+          </Box>
+          
+          <TableContainer sx={{ 
+            borderRadius: 1, 
+            overflow: 'auto',
+            maxWidth: '100%',
+            '& .MuiTable-root': {
+              tableLayout: 'fixed',
+              minWidth: { xs: '1400px', sm: '100%' }
+            }
+          }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ 
+                  backgroundColor: '#1976d2',
+                  '& .MuiTableCell-root': {
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                    borderBottom: '2px solid rgba(255,255,255,0.3)',
+                    padding: { xs: '2px 1px', sm: '8px 4px' },
+                    textAlign: 'center'
+                  }
+                }}>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
+                  <TableCell sx={{ width: { xs: '100px', sm: '120px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
+                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력단말</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유재고</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>잔여유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>금일실적</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>당월실적</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>예상마감</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>무실적점</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {/* 데이터가 있을 때 테이블 행 렌더링 */}
+                {data.agentData && data.agentData.length > 0 ? (
+                  data.agentData.map((row, index) => (
+                    <TableRow key={index} sx={{ 
+                      backgroundColor: index % 2 === 0 ? '#f8f9fa' : '#ffffff',
+                      '&:hover': { backgroundColor: '#e3f2fd' }
+                    }}>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.policyGroup || '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.pCode || '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.companyName || '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.agent || '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.turnoverRate ? `${row.turnoverRate}%` : '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.defectiveDevices || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.historyDevices || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.defectiveSims || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.historySims || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.totalInventory || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                        {row.remainingSims || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#1976d2' }}>
+                        {row.dailyPerformance || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#2e7d32' }}>
+                        {row.monthlyPerformance || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#f57c00' }}>
+                        {row.expectedClosing || 0}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#d32f2f' }}>
+                        {row.noPerformanceStores || 0}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={15} sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        영업사원별 마감 데이터가 없습니다.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Paper>
       )}
 
