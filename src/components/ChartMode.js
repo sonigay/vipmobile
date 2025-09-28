@@ -2615,23 +2615,23 @@ function AgentClosingTab() {
       };
     }
 
-    return data.agentData.reduce((totals, row) => {
+    const totals = data.agentData.reduce((acc, row) => {
       return {
         policyGroup: '합계',
         pCode: '',
         companyName: '',
         agent: '',
-        turnoverRate: totals.turnoverRate + (parseFloat(row.turnoverRate) || 0),
-        defectiveDevices: totals.defectiveDevices + (parseInt(row.defectiveDevices) || 0),
-        historyDevices: totals.historyDevices + (parseInt(row.historyDevices) || 0),
-        defectiveSims: totals.defectiveSims + (parseInt(row.defectiveSims) || 0),
-        historySims: totals.historySims + (parseInt(row.historySims) || 0),
-        totalInventory: totals.totalInventory + (parseInt(row.totalInventory) || 0),
-        remainingSims: totals.remainingSims + (parseInt(row.remainingSims) || 0),
-        dailyPerformance: totals.dailyPerformance + (parseInt(row.dailyPerformance) || 0),
-        monthlyPerformance: totals.monthlyPerformance + (parseInt(row.monthlyPerformance) || 0),
-        expectedClosing: totals.expectedClosing + (parseInt(row.expectedClosing) || 0),
-        noPerformanceStores: totals.noPerformanceStores + (row.noPerformanceStores === "무실적점" ? 1 : 0)
+        turnoverRate: 0, // 개별 회전율 합계가 아닌 전체 회전율 계산
+        defectiveDevices: acc.defectiveDevices + (parseInt(row.defectiveDevices) || 0),
+        historyDevices: acc.historyDevices + (parseInt(row.historyDevices) || 0),
+        defectiveSims: acc.defectiveSims + (parseInt(row.defectiveSims) || 0),
+        historySims: acc.historySims + (parseInt(row.historySims) || 0),
+        totalInventory: acc.totalInventory + (parseInt(row.totalInventory) || 0),
+        remainingSims: acc.remainingSims + (parseInt(row.remainingSims) || 0),
+        dailyPerformance: acc.dailyPerformance + (parseInt(row.dailyPerformance) || 0),
+        monthlyPerformance: acc.monthlyPerformance + (parseInt(row.monthlyPerformance) || 0),
+        expectedClosing: acc.expectedClosing + (parseInt(row.expectedClosing) || 0),
+        noPerformanceStores: acc.noPerformanceStores + (row.noPerformanceStores === "무실적점" ? 1 : 0)
       };
     }, {
       policyGroup: '합계',
@@ -2650,6 +2650,13 @@ function AgentClosingTab() {
       expectedClosing: 0,
       noPerformanceStores: 0
     });
+
+    // 전체총마감 탭과 동일한 방식으로 회전율 계산: 예상마감 / (예상마감 + 보유재고) * 100
+    if (totals.expectedClosing + totals.totalInventory > 0) {
+      totals.turnoverRate = Math.round((totals.expectedClosing / (totals.expectedClosing + totals.totalInventory)) * 100);
+    }
+
+    return totals;
   };
 
   if (loading) {
@@ -2781,7 +2788,7 @@ function AgentClosingTab() {
                 }}>
                   <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
                   <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
-                  <TableCell sx={{ width: { xs: '120px', sm: '150px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
+                  <TableCell sx={{ width: { xs: '150px', sm: '200px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
                   <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
                   <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
                   <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
@@ -2797,13 +2804,128 @@ function AgentClosingTab() {
                 </TableRow>
               </TableHead>
               <TableBody>
+                {/* 상단 합계 행 */}
+                {data && data.agentData && data.agentData.length > 0 && (
+                  <TableRow sx={{ 
+                    background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+                    fontWeight: 'bold',
+                    '& .MuiTableCell-root': {
+                      borderBottom: '2px solid #dee2e6',
+                      fontWeight: 'bold',
+                      fontSize: '0.75rem',
+                      color: '#495057',
+                      padding: '8px 4px',
+                      textAlign: 'center'
+                    }
+                  }}>
+                    {(() => {
+                      const totals = calculateTableTotals();
+                      return (
+                        <>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                            {totals.policyGroup}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                            {totals.pCode}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                            {totals.companyName}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                            {totals.agent}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.turnoverRate.toFixed(1)}%
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                            {totals.defectiveDevices}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#ff9800' }}>
+                            {totals.historyDevices}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                            {totals.defectiveSims}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#ff9800' }}>
+                            {totals.historySims}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
+                            {totals.totalInventory}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.remainingSims}
+                          </TableCell>
+                          <TableCell sx={{ 
+                            textAlign: 'center', 
+                            fontWeight: 'bold',
+                            bgcolor: totals.dailyPerformance >= 30 ? '#e8f5e8' : totals.dailyPerformance >= 20 ? '#fff3e0' : totals.dailyPerformance >= 10 ? '#fff8e1' : totals.dailyPerformance >= 5 ? '#ffebee' : '#f5f5f5',
+                            color: totals.dailyPerformance >= 30 ? '#2e7d32' : totals.dailyPerformance >= 20 ? '#f57c00' : totals.dailyPerformance >= 10 ? '#f9a825' : totals.dailyPerformance >= 5 ? '#d32f2f' : '#757575'
+                          }}>
+                            {totals.dailyPerformance}
+                          </TableCell>
+                          <TableCell sx={{ 
+                            textAlign: 'center', 
+                            fontWeight: 'bold',
+                            bgcolor: totals.monthlyPerformance >= 30 ? '#e8f5e8' : totals.monthlyPerformance >= 20 ? '#fff3e0' : totals.monthlyPerformance >= 10 ? '#fff8e1' : totals.monthlyPerformance >= 5 ? '#ffebee' : '#f5f5f5',
+                            color: totals.monthlyPerformance >= 30 ? '#2e7d32' : totals.monthlyPerformance >= 20 ? '#f57c00' : totals.monthlyPerformance >= 10 ? '#f9a825' : totals.monthlyPerformance >= 5 ? '#d32f2f' : '#757575'
+                          }}>
+                            {totals.monthlyPerformance}
+                          </TableCell>
+                          <TableCell sx={{ 
+                            textAlign: 'center', 
+                            fontWeight: 'bold',
+                            color: '#f57c00',
+                            bgcolor: '#fff8e1' // 예상마감 컬럼 배경색
+                          }}>
+                            {totals.expectedClosing}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                            {totals.noPerformanceStores}
+                          </TableCell>
+                        </>
+                      );
+                    })()}
+                  </TableRow>
+                )}
+                
                 {/* 데이터가 있을 때 테이블 행 렌더링 */}
                 {data && data.agentData && data.agentData.length > 0 ? (
-                  data.agentData.map((row, index) => (
-                    <TableRow key={index} sx={{ 
-                      backgroundColor: index % 2 === 0 ? '#f8f9fa' : '#ffffff',
-                      '&:hover': { backgroundColor: '#e3f2fd' }
-                    }}>
+                  data.agentData.map((row, index) => {
+                    // 담당자명에서 괄호 제거하여 그룹핑 키 생성
+                    const agentBaseName = (row.agent || '').replace(/\([^)]*\)/g, '').trim();
+                    
+                    // 그룹별 배경색 결정 (홍기현, 김수빈 등)
+                    const getGroupBackgroundColor = (agentName) => {
+                      const baseName = agentName.replace(/\([^)]*\)/g, '').trim();
+                      const colors = {
+                        '홍기현': '#f3e5f5', // 보라색 계열
+                        '김수빈': '#e8f5e8', // 녹색 계열
+                        '이민호': '#fff3e0', // 주황색 계열
+                        '박지영': '#e3f2fd', // 파란색 계열
+                        '정민수': '#fce4ec', // 분홍색 계열
+                        '최영희': '#f1f8e9', // 연두색 계열
+                        'default': '#fafafa' // 기본색
+                      };
+                      return colors[baseName] || colors['default'];
+                    };
+
+                    // 숫자 카운팅별 색상 결정
+                    const getPerformanceColor = (value) => {
+                      if (value >= 30) return { bgcolor: '#e8f5e8', color: '#2e7d32' }; // 녹색 - 30 이상
+                      if (value >= 20) return { bgcolor: '#fff3e0', color: '#f57c00' }; // 주황색 - 20-29
+                      if (value >= 10) return { bgcolor: '#fff8e1', color: '#f9a825' }; // 노란색 - 10-19
+                      if (value >= 5) return { bgcolor: '#ffebee', color: '#d32f2f' }; // 빨간색 - 5-9
+                      return { bgcolor: '#f5f5f5', color: '#757575' }; // 회색 - 5 미만
+                    };
+
+                    const dailyColor = getPerformanceColor(row.dailyPerformance || 0);
+                    const monthlyColor = getPerformanceColor(row.monthlyPerformance || 0);
+
+                    return (
+                      <TableRow key={index} sx={{ 
+                        backgroundColor: getGroupBackgroundColor(row.agent || ''),
+                        '&:hover': { backgroundColor: '#e3f2fd' }
+                      }}>
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
                         {row.policyGroup || '-'}
                       </TableCell>
@@ -2837,20 +2959,39 @@ function AgentClosingTab() {
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
                         {row.remainingSims || 0}
                       </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#1976d2' }}>
+                      <TableCell sx={{ 
+                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
+                        textAlign: 'center', 
+                        fontWeight: 'bold', 
+                        bgcolor: dailyColor.bgcolor,
+                        color: dailyColor.color
+                      }}>
                         {row.dailyPerformance || 0}
                       </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#2e7d32' }}>
+                      <TableCell sx={{ 
+                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
+                        textAlign: 'center', 
+                        fontWeight: 'bold', 
+                        bgcolor: monthlyColor.bgcolor,
+                        color: monthlyColor.color
+                      }}>
                         {row.monthlyPerformance || 0}
                       </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#f57c00' }}>
+                      <TableCell sx={{ 
+                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
+                        textAlign: 'center', 
+                        fontWeight: 'bold', 
+                        color: '#f57c00',
+                        bgcolor: '#fff8e1' // 예상마감 컬럼 배경색
+                      }}>
                         {row.expectedClosing || 0}
                       </TableCell>
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#d32f2f' }}>
                         {row.noPerformanceStores || ''}
                       </TableCell>
-                    </TableRow>
-                  ))
+                      </TableRow>
+                    );
+                  })
                 ) : (
                   <TableRow>
                     <TableCell colSpan={15} sx={{ textAlign: 'center', py: 4 }}>
@@ -2858,71 +2999,6 @@ function AgentClosingTab() {
                         담당자별 마감 데이터가 없습니다.
                       </Typography>
                     </TableCell>
-                  </TableRow>
-                )}
-                
-                {/* 합계 행 */}
-                {data && data.agentData && data.agentData.length > 0 && (
-                  <TableRow sx={{ 
-                    backgroundColor: '#f5f5f5',
-                    '& td': {
-                      fontWeight: 'bold',
-                      fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                      borderTop: '2px solid #1976d2'
-                    }
-                  }}>
-                    {(() => {
-                      const totals = calculateTableTotals();
-                      return (
-                        <>
-                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
-                            {totals.policyGroup}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.pCode}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.companyName}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.agent}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#2e7d32' }}>
-                            {totals.turnoverRate.toFixed(1)}%
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.defectiveDevices}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.historyDevices}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.defectiveSims}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.historySims}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
-                            {totals.totalInventory}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
-                            {totals.remainingSims}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
-                            {totals.dailyPerformance}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#2e7d32' }}>
-                            {totals.monthlyPerformance}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#f57c00' }}>
-                            {totals.expectedClosing}
-                          </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
-                            {totals.noPerformanceStores}
-                          </TableCell>
-                        </>
-                      );
-                    })()}
                   </TableRow>
                 )}
               </TableBody>
