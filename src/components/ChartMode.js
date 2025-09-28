@@ -37,7 +37,8 @@ import {
   IconButton,
   Collapse,
   LinearProgress,
-  Checkbox
+  Checkbox,
+  Autocomplete
 } from '@mui/material';
 import {
   BarChart as BarChartIcon,
@@ -2513,7 +2514,6 @@ function AgentClosingTab() {
   const [availableAgents, setAvailableAgents] = useState([]);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [agentSearchText, setAgentSearchText] = useState('');
 
   // 영업사원명에서 괄호 제거하여 그룹핑
   const groupAgentNames = (agentList) => {
@@ -2529,23 +2529,6 @@ function AgentClosingTab() {
     return grouped;
   };
 
-  // 검색어로 필터링된 그룹 생성
-  const getFilteredGroups = () => {
-    const grouped = groupAgentNames(availableAgents);
-    if (!agentSearchText.trim()) {
-      return grouped;
-    }
-    
-    const filtered = {};
-    Object.entries(grouped).forEach(([baseName, variants]) => {
-      // 기본 이름 또는 변형 이름에 검색어가 포함된 경우
-      if (baseName.toLowerCase().includes(agentSearchText.toLowerCase()) ||
-          variants.some(variant => variant.toLowerCase().includes(agentSearchText.toLowerCase()))) {
-        filtered[baseName] = variants;
-      }
-    });
-    return filtered;
-  };
 
   // 데이터 로드
   const loadData = useCallback(async (date = selectedDate, agent = selectedAgent) => {
@@ -2612,7 +2595,7 @@ function AgentClosingTab() {
 
   // 테이블 데이터 합계 계산
   const calculateTableTotals = () => {
-    if (!data || !Array.isArray(data)) {
+    if (!data || !data.agentData || !Array.isArray(data.agentData)) {
       return {
         policyGroup: '합계',
         pCode: '',
@@ -2632,7 +2615,7 @@ function AgentClosingTab() {
       };
     }
 
-    return data.reduce((totals, row) => {
+    return data.agentData.reduce((totals, row) => {
       return {
         policyGroup: '합계',
         pCode: '',
@@ -2686,7 +2669,7 @@ function AgentClosingTab() {
   }
 
   // 영업사원명 그룹핑
-  const groupedAgents = getFilteredGroups();
+  const groupedAgents = groupAgentNames(availableAgents);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -2708,34 +2691,30 @@ function AgentClosingTab() {
               sx={{ minWidth: 150 }}
             />
             
-            {/* 담당자 검색 */}
-            <TextField
+            {/* 담당자 필터 (검색 가능) */}
+            <Autocomplete
               size="small"
-              label="담당자 검색"
-              value={agentSearchText}
-              onChange={(e) => setAgentSearchText(e.target.value)}
-              sx={{ minWidth: 150 }}
-              placeholder="이름 입력..."
+              sx={{ minWidth: 200 }}
+              options={Object.keys(groupedAgents)}
+              value={selectedAgent || null}
+              onChange={(event, newValue) => {
+                setSelectedAgent(newValue || '');
+                loadData(selectedDate, newValue || '');
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="담당자"
+                  placeholder="담당자명 입력..."
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  {option}
+                </Box>
+              )}
+              noOptionsText="검색 결과가 없습니다"
             />
-            
-            {/* 담당자 필터 */}
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>담당자</InputLabel>
-              <Select
-                value={selectedAgent}
-                onChange={handleAgentChange}
-                label="담당자"
-              >
-                <MenuItem value="">
-                  <em>전체 담당자</em>
-                </MenuItem>
-                {Object.entries(groupedAgents).map(([baseName, variants]) => (
-                  <MenuItem key={baseName} value={baseName}>
-                    {baseName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
             
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
               * 이번달 개통실적이 있는 담당자만 표시됩니다
@@ -2819,7 +2798,7 @@ function AgentClosingTab() {
               </TableHead>
               <TableBody>
                 {/* 데이터가 있을 때 테이블 행 렌더링 */}
-                {data.agentData && data.agentData.length > 0 ? (
+                {data && data.agentData && data.agentData.length > 0 ? (
                   data.agentData.map((row, index) => (
                     <TableRow key={index} sx={{ 
                       backgroundColor: index % 2 === 0 ? '#f8f9fa' : '#ffffff',
@@ -2883,7 +2862,7 @@ function AgentClosingTab() {
                 )}
                 
                 {/* 합계 행 */}
-                {data && data.length > 0 && (
+                {data && data.agentData && data.agentData.length > 0 && (
                   <TableRow sx={{ 
                     backgroundColor: '#f5f5f5',
                     '& td': {

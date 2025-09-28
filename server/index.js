@@ -25189,10 +25189,14 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
   phoneklStoreData.slice(3).forEach(row => {
     if (row.length < 22) return;
     
+    const status = row[12] || ''; // M열: 사용/미사용 상태
     const policyGroup = row[18] || ''; // S열
     const pCode = row[15] || ''; // P열
     const companyName = row[14] || ''; // O열
     const agent = row[21] || ''; // V열
+    
+    // M열이 "미사용"인 경우 제외
+    if (status === '미사용') return;
     
     // 영업사원 필터링 (기본 이름으로 그룹핑)
     if (selectedAgent) {
@@ -25232,7 +25236,7 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
     const status = row[15] || ''; // P열: 정상/불량/이력
     const companyName = row[21] || ''; // V열: 업체명
     
-    // agentMap에서 해당 업체명 찾기
+    // agentMap에서 해당 업체명 찾기 (미사용 업체는 이미 agentMap에서 제외됨)
     for (const [key, data] of agentMap) {
       if (data.companyName === companyName) {
         if (category === '휴대폰' && status === '불량') {
@@ -25311,7 +25315,18 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
   }
   
   // 5. 예상마감 계산 (전체총마감과 동일한 로직)
-  // TODO: 전체총마감의 예상마감 계산 로직 확인 후 구현
+  const targetDateObj = new Date(targetDate);
+  const currentDay = targetDateObj.getDate(); // 1일부터 선택된 날짜까지의 기간 (예: 15일 선택 시 15일간)
+  const daysInMonth = new Date(targetDateObj.getFullYear(), targetDateObj.getMonth() + 1, 0).getDate(); // 해당월 총 일수
+  
+  for (const [key, data] of agentMap) {
+    if (currentDay > 0 && data.monthlyPerformance > 0) {
+      // 당월실적(1일~선택된날짜까지)을 선택된 기간으로 나누어 일평균 계산 후 월 총 일수 곱하기
+      data.expectedClosing = Math.round((data.monthlyPerformance / currentDay) * daysInMonth);
+    } else {
+      data.expectedClosing = 0;
+    }
+  }
   
   // 6. 무실적점 계산 (당월실적이 없는 곳은 "무실적점"으로 표기)
   for (const [key, data] of agentMap) {
