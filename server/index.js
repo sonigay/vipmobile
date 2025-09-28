@@ -25247,6 +25247,118 @@ app.get('/api/agent-closing-chart', async (req, res) => {
   }
 });
 
+// 영업사원별마감 초기 데이터 조회 API (마지막 개통날짜 + 영업사원 목록)
+app.get('/api/agent-closing-initial', async (req, res) => {
+  try {
+    const cacheKey = 'agent_closing_initial_data';
+    
+    // 캐시 확인
+    if (cache.has(cacheKey)) {
+      return res.json(cache.get(cacheKey));
+    }
+    
+    // 마지막 개통날짜 조회
+    const phoneklActivationList = await getSheetValues('폰클개통리스트');
+    let lastActivationDate = new Date().toISOString().split('T')[0];
+    
+    if (phoneklActivationList && phoneklActivationList.length > 1) {
+      const dateColumn = phoneklActivationList[0].indexOf('개통날짜');
+      if (dateColumn !== -1) {
+        const dates = phoneklActivationList.slice(1)
+          .map(row => row[dateColumn])
+          .filter(date => date && typeof date === 'string' && date.includes('-'))
+          .map(dateStr => {
+            try {
+              const date = new Date(dateStr);
+              return isNaN(date.getTime()) ? null : date;
+            } catch {
+              return null;
+            }
+          })
+          .filter(date => date !== null);
+        
+        if (dates.length > 0) {
+          const latestDate = new Date(Math.max(...dates));
+          lastActivationDate = latestDate.toISOString().split('T')[0];
+        }
+      }
+    }
+    
+    // 영업사원 목록 조회
+    const [phoneklStoreData, phoneklActivationData] = await Promise.all([
+      getSheetValues('폰클출고처데이터'),
+      getSheetValues('폰클개통데이터')
+    ]);
+    
+    if (!phoneklStoreData || phoneklStoreData.length < 2) {
+      throw new Error('폰클출고처데이터를 가져올 수 없습니다.');
+    }
+    
+    if (!phoneklActivationData || phoneklActivationData.length < 4) {
+      throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+    }
+    
+    // 이번달 개통실적이 있는 담당자 추출
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const currentYearMonth = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+    
+    const agentsWithActivation = new Set();
+    let activationCount = 0;
+    
+    phoneklActivationData.slice(3).forEach(row => {
+      if (row[1] && row[9]) {
+        const activationDate = row[9];
+        const agent = row[1];
+        
+        if (typeof activationDate === 'string' && activationDate.includes('-')) {
+          const [year, month] = activationDate.split('-');
+          if (year === currentYear.toString() && month === currentMonth.toString().padStart(2, '0')) {
+            agentsWithActivation.add(agent);
+            activationCount++;
+          }
+        }
+      }
+    });
+    
+    // 폰클출고처데이터에서 해당 담당자들의 전체 목록 추출
+    const allAgents = new Set();
+    phoneklStoreData.slice(3).forEach(row => {
+      if (row[21] && row[12] !== '미사용') {
+        allAgents.add(row[21]);
+      }
+    });
+    
+    // 이번달 개통실적이 있는 담당자만 필터링
+    const filteredAgents = Array.from(allAgents).filter(agent => 
+      agentsWithActivation.has(agent)
+    ).sort();
+    
+    const result = {
+      success: true,
+      lastActivationDate,
+      agents: filteredAgents,
+      agentsWithActivation: filteredAgents.length,
+      totalAgents: allAgents.size,
+      activationCount
+    };
+    
+    // 캐시 저장 (2분)
+    cache.set(cacheKey, result, 120);
+    
+    console.log(`영업사원별마감 초기 데이터 로드 완료: 마지막 개통날짜=${lastActivationDate}, 담당자=${filteredAgents.length}명`);
+    res.json(result);
+    
+  } catch (error) {
+    console.error('영업사원별마감 초기 데이터 조회 오류:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '영업사원별마감 초기 데이터를 가져오는데 실패했습니다.',
+      details: error.message
+    });
+  }
+});
+
 // 영업사원별마감용 영업사원 목록 조회 API (이번달 개통실적 있는 담당자만)
 app.get('/api/agent-closing-agents', async (req, res) => {
   try {
