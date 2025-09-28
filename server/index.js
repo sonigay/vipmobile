@@ -25010,6 +25010,19 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
   }
 });
 
+// 마지막 개통날짜 캐시 초기화 API
+app.get('/api/last-activation-date/clear-cache', async (req, res) => {
+  try {
+    const cacheKey = 'last_activation_date';
+    cache.delete(cacheKey);
+    console.log('마지막 개통날짜 캐시 초기화 완료');
+    res.json({ success: true, message: '캐시가 초기화되었습니다.' });
+  } catch (error) {
+    console.error('캐시 초기화 오류:', error);
+    res.status(500).json({ error: '캐시 초기화 중 오류가 발생했습니다.' });
+  }
+});
+
 // 업체별 재고 상세 조회 API
 app.get('/api/company-inventory-details', async (req, res) => {
   try {
@@ -25137,12 +25150,14 @@ app.get('/api/last-activation-date', async (req, res) => {
     dataRows.forEach(row => {
       if (row.length > 9) {
         const activationDate = (row[9] || '').toString(); // J열: 개통일
-        
+        console.log(`개통날짜 발견: ${activationDate}`);
+
         // 날짜 형식 검증 (YYYY-MM-DD)
         if (activationDate && /^\d{4}-\d{2}-\d{2}$/.test(activationDate)) {
           const date = new Date(activationDate);
           if (!isNaN(date.getTime())) {
             if (!lastDate || date > lastDate) {
+              console.log(`새로운 최신 날짜: ${activationDate} (이전: ${lastDate ? lastDate.toISOString().split('T')[0] : '없음'})`);
               lastDate = date;
             }
           }
@@ -25153,8 +25168,8 @@ app.get('/api/last-activation-date', async (req, res) => {
     // 마지막 날짜가 없으면 오늘 날짜 반환
     const resultDate = lastDate ? lastDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     
-    // 캐시 저장 (10분)
-    cache.set(cacheKey, { success: true, lastActivationDate: resultDate }, 600);
+    // 캐시 저장 (1분)
+    cache.set(cacheKey, { success: true, lastActivationDate: resultDate }, 60);
     
     console.log(`마지막 개통날짜 조회 완료: ${resultDate}`);
     res.json({ success: true, lastActivationDate: resultDate });
