@@ -3128,8 +3128,78 @@ function AgentClosingTab() {
 
 // 1단계: 재고 타입 선택 모달
 function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName, onTypeSelect }) {
-  const [printContent, setPrintContent] = useState(null);
 
+  // 타입별 버튼 정보
+  const inventoryTypes = [
+    { key: 'defectiveDevices', label: '불량&이력단말', count: data?.defectiveDevices?.length || 0 },
+    { key: 'defectiveSims', label: '불량&유심', count: data?.defectiveSims?.length || 0 },
+    { key: 'normalDevices', label: '보유단말', count: data?.normalDevices?.length || 0 },
+    { key: 'normalSims', label: '보유유심', count: data?.normalSims?.length || 0 }
+  ];
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+        color: 'white'
+      }}>
+        <Typography variant="h6">
+          {companyName || '업체'} 재고 타입 선택
+        </Typography>
+        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 3 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 3, textAlign: 'center' }}>
+              조회할 재고 타입을 선택해주세요
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {inventoryTypes.map((type) => (
+                <Button
+                  key={type.key}
+                  variant="contained"
+                  onClick={() => onTypeSelect(type.key)}
+                  sx={{ 
+                    minWidth: '180px', 
+                    minHeight: '60px',
+                    fontSize: '1rem',
+                    fontWeight: 'bold'
+                  }}
+                  disabled={type.count === 0}
+                >
+                  {type.label}<br />({type.count}개)
+                </Button>
+              ))}
+            </Box>
+          </Box>
+        )}
+      </DialogContent>
+      
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose}>닫기</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// 2단계: 재고 상세 정보 모달
+function InventoryDetailModal({ open, onClose, data, selectedType, companyName }) {
   // 인쇄 함수
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -3139,7 +3209,7 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${data?.companyName || '업체'} 재고 상세</title>
+        <title>${companyName || '업체'} 재고 상세</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
           table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -3151,7 +3221,7 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
       </head>
       <body>
         <div class="header">
-          <h2>${data?.companyName || '업체'} 재고 상세</h2>
+          <h2>${companyName || '업체'} 재고 상세</h2>
           <p>조회일: ${new Date().toLocaleDateString()}</p>
         </div>
         <div class="type-header">${getTypeDisplayName(selectedType)}</div>
@@ -3177,7 +3247,7 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
           <td>${item.status || '-'}</td>
           <td>${item.model || '-'}</td>
           <td>${item.color || '-'}</td>
-          <td>${item.serial || '-'}</td>
+          <td>${item.serialNumber || '-'}</td>
           <td>${item.purchasePrice || '-'}</td>
           <td>${item.releaseDate || '-'}</td>
         </tr>
@@ -3207,14 +3277,6 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
     return names[type] || '';
   };
 
-  // 타입별 버튼 정보
-  const inventoryTypes = [
-    { key: 'defectiveDevices', label: '불량&이력단말', count: data?.defectiveDevices?.length || 0 },
-    { key: 'defectiveSims', label: '불량&유심', count: data?.defectiveSims?.length || 0 },
-    { key: 'normalDevices', label: '보유단말', count: data?.normalDevices?.length || 0 },
-    { key: 'normalSims', label: '보유유심', count: data?.normalSims?.length || 0 }
-  ];
-
   return (
     <Dialog
       open={open}
@@ -3233,7 +3295,7 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
         color: 'white'
       }}>
         <Typography variant="h6">
-          {data?.companyName || '업체'} 재고 상세
+          {companyName || '업체'} - {getTypeDisplayName(selectedType)}
         </Typography>
         <IconButton onClick={onClose} sx={{ color: 'white' }}>
           <CloseIcon />
@@ -3241,87 +3303,53 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
       </DialogTitle>
       
       <DialogContent sx={{ p: 3 }}>
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            {/* 재고 타입 선택 버튼들 */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>재고 타입 선택</Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {inventoryTypes.map((type) => (
-                  <Button
-                    key={type.key}
-                    variant={selectedType === type.key ? 'contained' : 'outlined'}
-                    onClick={() => onTypeSelect(type.key)}
-                    sx={{ minWidth: '150px' }}
-                  >
-                    {type.label} ({type.count})
-                  </Button>
-                ))}
-              </Box>
+        {selectedType && data && data[selectedType] && (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">
+                {getTypeDisplayName(selectedType)} ({data[selectedType].length}개)
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<PrintIcon />}
+                onClick={handlePrint}
+              >
+                인쇄
+              </Button>
             </Box>
-
-            {/* 선택된 타입의 데이터 테이블 */}
-            {selectedType && data && data[selectedType] && (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
-                    {getTypeDisplayName(selectedType)} ({data[selectedType].length}개)
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    startIcon={<PrintIcon />}
-                    onClick={handlePrint}
-                  >
-                    인쇄
-                  </Button>
-                </Box>
-                
-                <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 'bold' }}>종류</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>상태</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>모델명</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>색상</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>일련번호</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>입고가</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>출고일</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data[selectedType].map((item, index) => (
-                        <TableRow key={index} sx={{ '&:hover': { backgroundColor: '#f5f5f5' } }}>
-                          <TableCell>{item.category || '-'}</TableCell>
-                          <TableCell>{item.status || '-'}</TableCell>
-                          <TableCell>{item.model || '-'}</TableCell>
-                          <TableCell>{item.color || '-'}</TableCell>
-                          <TableCell>{item.serial || '-'}</TableCell>
-                          <TableCell>{item.purchasePrice || '-'}</TableCell>
-                          <TableCell>{item.releaseDate || '-'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
-
-            {selectedType && data && data[selectedType] && data[selectedType].length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body1" color="text.secondary">
-                  해당 타입의 재고가 없습니다.
-                </Typography>
-              </Box>
-            )}
-          </>
+            
+            <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>종류</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>상태</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>모델명</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>색상</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>일련번호</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>입고가</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>출고일</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data[selectedType].map((item, index) => (
+                    <TableRow key={index} sx={{ '&:hover': { backgroundColor: '#f5f5f5' } }}>
+                      <TableCell>{item.category || '-'}</TableCell>
+                      <TableCell>{item.status || '-'}</TableCell>
+                      <TableCell>{item.model || '-'}</TableCell>
+                      <TableCell>{item.color || '-'}</TableCell>
+                      <TableCell>{item.serialNumber || '-'}</TableCell>
+                      <TableCell>{item.purchasePrice || '-'}</TableCell>
+                      <TableCell>{item.releaseDate || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose}>닫기</Button>
       </DialogActions>
