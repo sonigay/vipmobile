@@ -2538,11 +2538,11 @@ function AgentClosingTab() {
     return grouped;
   };
 
-  // 초기 데이터 로드 (최적화된 단일 API 호출)
+  // 초기 데이터 로드 (폴백 로직 포함)
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // 마지막 개통날짜와 영업사원 목록을 한 번에 가져오는 API 호출
+        // 먼저 새로운 API 시도
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-initial`);
         if (response.ok) {
           const result = await response.json();
@@ -2552,13 +2552,29 @@ function AgentClosingTab() {
             
             // 초기 데이터 로드 (담당자 필터 없이)
             await loadDataOnly(result.lastActivationDate, '');
+            return;
           }
-        } else {
-          // API 실패 시 폴백: 오늘 날짜로 설정하고 기본 로드
-          const today = new Date().toISOString().split('T')[0];
-          setSelectedDate(today);
-          await loadData(today, '');
         }
+        
+        // 새로운 API 실패 시 기존 방식으로 폴백
+        console.log('새로운 API 실패, 기존 방식으로 폴백');
+        
+        // 마지막 개통날짜 조회
+        const dateResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/last-activation-date`);
+        if (dateResponse.ok) {
+          const dateResult = await dateResponse.json();
+          if (dateResult.success && dateResult.lastActivationDate) {
+            setSelectedDate(dateResult.lastActivationDate);
+            await loadData(dateResult.lastActivationDate, '');
+            return;
+          }
+        }
+        
+        // 모든 API 실패 시 오늘 날짜로 설정
+        const today = new Date().toISOString().split('T')[0];
+        setSelectedDate(today);
+        await loadData(today, '');
+        
       } catch (error) {
         console.error('초기 데이터 로드 실패:', error);
         // 오류 시 오늘 날짜로 설정
@@ -2962,6 +2978,7 @@ function AgentClosingTab() {
                           <TableCell sx={{ 
                             textAlign: 'center', 
                             fontWeight: 'bold',
+                            bgcolor: '#ffffff',
                             color: totals.dailyPerformance > 2 ? '#d32f2f' : totals.dailyPerformance > 1 ? '#1976d2' : totals.dailyPerformance > 0 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.dailyPerformance}
@@ -2969,6 +2986,7 @@ function AgentClosingTab() {
                           <TableCell sx={{ 
                             textAlign: 'center', 
                             fontWeight: 'bold',
+                            bgcolor: '#ffffff',
                             color: totals.monthlyPerformance >= 40 ? '#f9a825' : totals.monthlyPerformance >= 30 ? '#7b1fa2' : totals.monthlyPerformance >= 20 ? '#d32f2f' : totals.monthlyPerformance >= 10 ? '#1976d2' : totals.monthlyPerformance > 1 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.monthlyPerformance}
@@ -2976,6 +2994,7 @@ function AgentClosingTab() {
                           <TableCell sx={{ 
                             textAlign: 'center', 
                             fontWeight: 'bold',
+                            bgcolor: '#ffffff',
                             color: totals.expectedClosing >= 40 ? '#f9a825' : totals.expectedClosing >= 30 ? '#7b1fa2' : totals.expectedClosing >= 20 ? '#d32f2f' : totals.expectedClosing >= 10 ? '#1976d2' : totals.expectedClosing > 1 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.expectedClosing}
@@ -3096,7 +3115,8 @@ function AgentClosingTab() {
                       <TableCell sx={{ 
                         fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
                         textAlign: 'center', 
-                        fontWeight: 'bold', 
+                        fontWeight: 'bold',
+                        bgcolor: '#ffffff',
                         color: dailyColor.color
                       }}>
                         {row.dailyPerformance || 0}
@@ -3104,7 +3124,8 @@ function AgentClosingTab() {
                       <TableCell sx={{ 
                         fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
                         textAlign: 'center', 
-                        fontWeight: 'bold', 
+                        fontWeight: 'bold',
+                        bgcolor: '#ffffff',
                         color: monthlyColor.color
                       }}>
                         {row.monthlyPerformance || 0}
@@ -3112,7 +3133,8 @@ function AgentClosingTab() {
                       <TableCell sx={{ 
                         fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
                         textAlign: 'center', 
-                        fontWeight: 'bold', 
+                        fontWeight: 'bold',
+                        bgcolor: '#ffffff',
                         color: expectedColor.color
                       }}>
                         {row.expectedClosing || 0}
