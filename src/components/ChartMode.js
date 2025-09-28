@@ -2542,7 +2542,7 @@ function AgentClosingTab() {
   useEffect(() => {
     const loadLastActivationDate = async () => {
       try {
-        const response = await fetch('/api/last-activation-date');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/last-activation-date`);
         const result = await response.json();
         if (result.success && result.lastActivationDate) {
           setSelectedDate(result.lastActivationDate);
@@ -2632,7 +2632,7 @@ function AgentClosingTab() {
     setSelectedInventoryType('');
     
     // 업체별 재고 데이터 로드
-    fetch(`/api/company-inventory-details?companyName=${encodeURIComponent(companyName)}`)
+    fetch(`${process.env.REACT_APP_API_URL}/api/company-inventory-details?companyName=${encodeURIComponent(companyName)}`)
       .then(response => response.json())
       .then(result => {
         if (result.success) {
