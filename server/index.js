@@ -25307,14 +25307,7 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
     }
   });
   
-  // 4. 회전율 계산 (당월실적 / 보유재고 * 100)
-  for (const [key, data] of agentMap) {
-    if (data.totalInventory > 0) {
-      data.turnoverRate = Math.round((data.monthlyPerformance / data.totalInventory) * 100);
-    }
-  }
-  
-  // 5. 예상마감 계산 (전체총마감과 동일한 로직)
+  // 4. 예상마감 계산 (전체총마감과 동일한 로직)
   const targetDateObj = new Date(targetDate);
   const currentDay = targetDateObj.getDate(); // 1일부터 선택된 날짜까지의 기간 (예: 15일 선택 시 15일간)
   const daysInMonth = new Date(targetDateObj.getFullYear(), targetDateObj.getMonth() + 1, 0).getDate(); // 해당월 총 일수
@@ -25325,6 +25318,13 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
       data.expectedClosing = Math.round((data.monthlyPerformance / currentDay) * daysInMonth);
     } else {
       data.expectedClosing = 0;
+    }
+  }
+  
+  // 5. 회전율 계산 (예상마감 / (예상마감 + 보유재고) * 100) - 전체총마감 탭과 동일한 방식
+  for (const [key, data] of agentMap) {
+    if ((data.expectedClosing + data.totalInventory) > 0) {
+      data.turnoverRate = Math.round((data.expectedClosing / (data.expectedClosing + data.totalInventory)) * 100);
     }
   }
   
