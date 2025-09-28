@@ -2896,40 +2896,41 @@ function AgentClosingTab() {
                       const totals = calculateTableTotals();
                       return (
                         <>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                          <TableCell sx={{ width: { xs: '120px', sm: '150px' }, fontWeight: 'bold', color: '#1976d2' }}>
                             {totals.policyGroup}
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                          <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontWeight: 'bold', color: '#1976d2' }}>
                             {totals.pCode}
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                          <TableCell sx={{ width: { xs: '200px', sm: '250px' }, fontWeight: 'bold', color: '#1976d2' }}>
                             {totals.companyName}
                           </TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                          <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontWeight: 'bold', color: '#1976d2' }}>
                             {totals.agent}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
+                          <TableCell sx={{ width: { xs: '60px', sm: '80px' }, textAlign: 'center' }}>
                             {totals.turnoverRate.toFixed(1)}%
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center', color: '#d32f2f' }}>
                             {totals.defectiveDevices}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#ff9800' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center', color: '#ff9800' }}>
                             {totals.historyDevices}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center', color: '#d32f2f' }}>
                             {totals.defectiveSims}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#ff9800' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center', color: '#ff9800' }}>
                             {totals.historySims}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center', color: '#1976d2' }}>
                             {totals.totalInventory}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center' }}>
                             {totals.remainingSims}
                           </TableCell>
                           <TableCell sx={{ 
+                            width: { xs: '70px', sm: '90px' },
                             textAlign: 'center', 
                             fontWeight: 'bold',
                             bgcolor: '#ffffff',
@@ -2938,6 +2939,7 @@ function AgentClosingTab() {
                             {totals.dailyPerformance}
                           </TableCell>
                           <TableCell sx={{ 
+                            width: { xs: '70px', sm: '90px' },
                             textAlign: 'center', 
                             fontWeight: 'bold',
                             bgcolor: '#ffffff',
@@ -2946,6 +2948,7 @@ function AgentClosingTab() {
                             {totals.monthlyPerformance}
                           </TableCell>
                           <TableCell sx={{ 
+                            width: { xs: '70px', sm: '90px' },
                             textAlign: 'center', 
                             fontWeight: 'bold',
                             bgcolor: '#ffffff',
@@ -2953,7 +2956,7 @@ function AgentClosingTab() {
                           }}>
                             {totals.expectedClosing}
                           </TableCell>
-                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                          <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center', color: '#d32f2f' }}>
                             {totals.noPerformanceStores}
                           </TableCell>
                         </>
