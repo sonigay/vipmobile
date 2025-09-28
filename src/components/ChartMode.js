@@ -2538,27 +2538,10 @@ function AgentClosingTab() {
     return grouped;
   };
 
-  // 초기 데이터 로드 (폴백 로직 포함)
+  // 초기 데이터 로드 (기존 방식 사용)
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // 먼저 새로운 API 시도
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-initial`);
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setSelectedDate(result.lastActivationDate);
-            setAvailableAgents(result.agents || []);
-            
-            // 초기 데이터 로드 (담당자 필터 없이)
-            await loadDataOnly(result.lastActivationDate, '');
-            return;
-          }
-        }
-        
-        // 새로운 API 실패 시 기존 방식으로 폴백
-        console.log('새로운 API 실패, 기존 방식으로 폴백');
-        
         // 마지막 개통날짜 조회
         const dateResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/last-activation-date`);
         if (dateResponse.ok) {
@@ -2570,7 +2553,7 @@ function AgentClosingTab() {
           }
         }
         
-        // 모든 API 실패 시 오늘 날짜로 설정
+        // API 실패 시 오늘 날짜로 설정
         const today = new Date().toISOString().split('T')[0];
         setSelectedDate(today);
         await loadData(today, '');
