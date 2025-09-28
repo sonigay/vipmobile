@@ -25075,43 +25075,100 @@ app.get('/api/agent-closing-chart', async (req, res) => {
   }
 });
 
-// 영업사원별마감용 영업사원 목록 조회 API
+// 영업사원별마감용 영업사원 목록 조회 API (이번달 개통실적 있는 담당자만)
 app.get('/api/agent-closing-agents', async (req, res) => {
   try {
-    const cacheKey = 'agent_closing_agents_list';
+    const cacheKey = 'agent_closing_agents_list_with_activation';
     
     // 캐시 확인
     if (cache.has(cacheKey)) {
       return res.json(cache.get(cacheKey));
     }
     
-    // 폰클출고처데이터에서 영업사원 목록 추출
-    const phoneklStoreData = await getSheetValues('폰클출고처데이터');
+    // 필요한 시트 데이터 병렬 로드
+    const [phoneklStoreData, phoneklActivationData] = await Promise.all([
+      getSheetValues('폰클출고처데이터'),
+      getSheetValues('폰클개통데이터')
+    ]);
     
     if (!phoneklStoreData || phoneklStoreData.length < 2) {
       throw new Error('폰클출고처데이터를 가져올 수 없습니다.');
     }
     
-    // V열(21인덱스)에서 담당자명 추출 (테이블과 동일한 컬럼 사용)
-    const agents = new Set();
-    phoneklStoreData.slice(1).forEach(row => {
-      if (row.length > 21 && row[21]) {
-        const agentName = row[21].toString().trim();
-        if (agentName) {
-          agents.add(agentName);
+    if (!phoneklActivationData || phoneklActivationData.length < 4) {
+      throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+    }
+    
+    // 이번달 개통실적이 있는 담당자 추출
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const currentYearMonth = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+    
+    console.log(`이번달 개통실적 조회: ${currentYearMonth}`);
+    
+    // 폰클개통데이터에서 이번달 개통실적이 있는 담당자 찾기
+    const agentsWithActivation = new Set();
+    let activationCount = 0;
+    
+    phoneklActivationData.slice(3).forEach(row => {
+      if (row.length < 2) return; // B열(1인덱스)까지 필요
+      
+      const category = row[2] || ''; // C열: 휴대폰
+      const activationDate = row[9] || ''; // J열: 개통일
+      const assignedAgent = row[1] || ''; // B열: 담당자 (괄호 포함)
+      
+      if (category !== '휴대폰') return;
+      
+      // 날짜 파싱 (J열 형식: 2025-09-27)
+      if (activationDate.length >= 10) {
+        const dateStr = activationDate.substring(0, 10);
+        const dateObj = new Date(dateStr);
+        
+        if (isNaN(dateObj.getTime())) return;
+        
+        const yearMonth = dateStr.substring(0, 7); // YYYY-MM
+        
+        // 이번달 개통실적이 있는 경우
+        if (yearMonth === currentYearMonth && assignedAgent) {
+          const agentName = assignedAgent.toString().trim();
+          if (agentName) {
+            agentsWithActivation.add(agentName);
+            activationCount++;
+          }
         }
       }
     });
     
+    console.log(`이번달 개통실적 있는 담당자: ${agentsWithActivation.size}명, 총 개통건수: ${activationCount}건`);
+    
+    // 폰클출고처데이터에서 모든 담당자명 추출 (참고용)
+    const allAgents = new Set();
+    phoneklStoreData.slice(3).forEach(row => {
+      if (row.length > 21 && row[21]) {
+        const agentName = row[21].toString().trim();
+        if (agentName) {
+          allAgents.add(agentName);
+        }
+      }
+    });
+    
+    // 이번달 개통실적이 있는 담당자만 필터링
+    const filteredAgents = Array.from(agentsWithActivation).sort();
+    
     const result = {
       success: true,
-      agents: Array.from(agents).sort()
+      agents: filteredAgents,
+      currentMonth: currentYearMonth,
+      totalAgents: allAgents.size,
+      agentsWithActivation: agentsWithActivation.size,
+      activationCount: activationCount,
+      note: `이번달(${currentYearMonth}) 개통실적이 있는 담당자만 필터링`
     };
     
     // 캐시 저장 (10분)
     cache.set(cacheKey, result, 600);
     
-    console.log(`영업사원별마감용 담당자 목록 조회 완료: ${result.agents.length}명`);
+    console.log(`이번달 개통실적 있는 담당자 목록 조회 완료: ${result.agents.length}명 (전체 ${allAgents.size}명 중)`);
     res.json(result);
     
   } catch (error) {
@@ -25129,7 +25186,7 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
   const agentMap = new Map();
   
   // 1. 폰클출고처데이터에서 기본 정보 수집
-  phoneklStoreData.slice(1).forEach(row => {
+  phoneklStoreData.slice(3).forEach(row => {
     if (row.length < 22) return;
     
     const policyGroup = row[18] || ''; // S열
@@ -25201,10 +25258,12 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
   const targetDay = targetDate.substring(8, 10); // DD
   
   phoneklActivationData.slice(3).forEach(row => {
-    if (row.length < 10) return;
+    if (row.length < 15) return; // O열(14인덱스)까지 필요
     
     const category = row[2] || ''; // C열: 휴대폰
     const activationDate = row[9] || ''; // J열: 개통일
+    const assignedAgent = row[1] || ''; // B열: 담당자 (괄호 포함)
+    const companyName = row[14] || ''; // O열: 업체명
     
     if (category !== '휴대폰') return;
     
@@ -25218,21 +25277,27 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
       const yearMonth = dateStr.substring(0, 7);
       const day = dateStr.substring(8, 10);
       
-      // 업체명 매칭을 위해 개통데이터에서 업체명 찾기
-      // 개통데이터에는 업체명이 직접 없으므로, 폰클출고처데이터와 매칭 필요
-      // 여기서는 간단히 모든 업체에 카운트 (향후 개선 필요)
+      // 담당자와 업체명으로 정확한 실적 계산
+      const agentName = assignedAgent.toString().trim();
+      const activationCompanyName = companyName.toString().trim();
       
-      // 금일실적: 선택된 날짜와 정확히 일치
-      if (day === targetDay && yearMonth === targetYearMonth) {
-        for (const [key, data] of agentMap) {
-          data.dailyPerformance++;
+      if (agentName && activationCompanyName) {
+        // 금일실적: 선택된 날짜와 정확히 일치
+        if (day === targetDay && yearMonth === targetYearMonth) {
+          for (const [key, data] of agentMap) {
+            if (data.agent === agentName && data.companyName === activationCompanyName) {
+              data.dailyPerformance++;
+            }
+          }
         }
-      }
-      
-      // 당월실적: 선택된 월의 모든 날짜
-      if (yearMonth === targetYearMonth) {
-        for (const [key, data] of agentMap) {
-          data.monthlyPerformance++;
+        
+        // 당월실적: 선택된 월의 모든 날짜
+        if (yearMonth === targetYearMonth) {
+          for (const [key, data] of agentMap) {
+            if (data.agent === agentName && data.companyName === activationCompanyName) {
+              data.monthlyPerformance++;
+            }
+          }
         }
       }
     }
@@ -25248,10 +25313,12 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
   // 5. 예상마감 계산 (전체총마감과 동일한 로직)
   // TODO: 전체총마감의 예상마감 계산 로직 확인 후 구현
   
-  // 6. 무실적점 계산
+  // 6. 무실적점 계산 (당월실적이 없는 곳은 "무실적점"으로 표기)
   for (const [key, data] of agentMap) {
     if (data.monthlyPerformance === 0) {
-      data.noPerformanceStores = 1;
+      data.noPerformanceStores = "무실적점";
+    } else {
+      data.noPerformanceStores = "";
     }
   }
   

@@ -2513,6 +2513,7 @@ function AgentClosingTab() {
   const [availableAgents, setAvailableAgents] = useState([]);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [agentSearchText, setAgentSearchText] = useState('');
 
   // 영업사원명에서 괄호 제거하여 그룹핑
   const groupAgentNames = (agentList) => {
@@ -2528,6 +2529,24 @@ function AgentClosingTab() {
     return grouped;
   };
 
+  // 검색어로 필터링된 그룹 생성
+  const getFilteredGroups = () => {
+    const grouped = groupAgentNames(availableAgents);
+    if (!agentSearchText.trim()) {
+      return grouped;
+    }
+    
+    const filtered = {};
+    Object.entries(grouped).forEach(([baseName, variants]) => {
+      // 기본 이름 또는 변형 이름에 검색어가 포함된 경우
+      if (baseName.toLowerCase().includes(agentSearchText.toLowerCase()) ||
+          variants.some(variant => variant.toLowerCase().includes(agentSearchText.toLowerCase()))) {
+        filtered[baseName] = variants;
+      }
+    });
+    return filtered;
+  };
+
   // 데이터 로드
   const loadData = useCallback(async (date = selectedDate, agent = selectedAgent) => {
     setLoading(true);
@@ -2539,6 +2558,12 @@ function AgentClosingTab() {
       if (agentsResponse.ok) {
         const agentsResult = await agentsResponse.json();
         setAvailableAgents(agentsResult.agents || []);
+        
+        // 이번달 개통실적 정보 로그 출력
+        if (agentsResult.agentsWithActivation !== undefined) {
+          console.log(`📊 이번달 개통실적 있는 담당자: ${agentsResult.agentsWithActivation}명 (전체 ${agentsResult.totalAgents}명 중)`);
+          console.log(`📊 총 개통건수: ${agentsResult.activationCount}건`);
+        }
       }
 
       // 영업사원별 마감 데이터 로드
@@ -2585,6 +2610,65 @@ function AgentClosingTab() {
     loadData();
   };
 
+  // 테이블 데이터 합계 계산
+  const calculateTableTotals = () => {
+    if (!data || !Array.isArray(data)) {
+      return {
+        policyGroup: '합계',
+        pCode: '',
+        companyName: '',
+        agent: '',
+        turnoverRate: 0,
+        defectiveDevices: 0,
+        historyDevices: 0,
+        defectiveSims: 0,
+        historySims: 0,
+        totalInventory: 0,
+        remainingSims: 0,
+        dailyPerformance: 0,
+        monthlyPerformance: 0,
+        expectedClosing: 0,
+        noPerformanceStores: 0
+      };
+    }
+
+    return data.reduce((totals, row) => {
+      return {
+        policyGroup: '합계',
+        pCode: '',
+        companyName: '',
+        agent: '',
+        turnoverRate: totals.turnoverRate + (parseFloat(row.turnoverRate) || 0),
+        defectiveDevices: totals.defectiveDevices + (parseInt(row.defectiveDevices) || 0),
+        historyDevices: totals.historyDevices + (parseInt(row.historyDevices) || 0),
+        defectiveSims: totals.defectiveSims + (parseInt(row.defectiveSims) || 0),
+        historySims: totals.historySims + (parseInt(row.historySims) || 0),
+        totalInventory: totals.totalInventory + (parseInt(row.totalInventory) || 0),
+        remainingSims: totals.remainingSims + (parseInt(row.remainingSims) || 0),
+        dailyPerformance: totals.dailyPerformance + (parseInt(row.dailyPerformance) || 0),
+        monthlyPerformance: totals.monthlyPerformance + (parseInt(row.monthlyPerformance) || 0),
+        expectedClosing: totals.expectedClosing + (parseInt(row.expectedClosing) || 0),
+        noPerformanceStores: totals.noPerformanceStores + (row.noPerformanceStores === "무실적점" ? 1 : 0)
+      };
+    }, {
+      policyGroup: '합계',
+      pCode: '',
+      companyName: '',
+      agent: '',
+      turnoverRate: 0,
+      defectiveDevices: 0,
+      historyDevices: 0,
+      defectiveSims: 0,
+      historySims: 0,
+      totalInventory: 0,
+      remainingSims: 0,
+      dailyPerformance: 0,
+      monthlyPerformance: 0,
+      expectedClosing: 0,
+      noPerformanceStores: 0
+    });
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -2602,7 +2686,7 @@ function AgentClosingTab() {
   }
 
   // 영업사원명 그룹핑
-  const groupedAgents = groupAgentNames(availableAgents);
+  const groupedAgents = getFilteredGroups();
 
   return (
     <Box sx={{ p: 2 }}>
@@ -2624,6 +2708,16 @@ function AgentClosingTab() {
               sx={{ minWidth: 150 }}
             />
             
+            {/* 담당자 검색 */}
+            <TextField
+              size="small"
+              label="담당자 검색"
+              value={agentSearchText}
+              onChange={(e) => setAgentSearchText(e.target.value)}
+              sx={{ minWidth: 150 }}
+              placeholder="이름 입력..."
+            />
+            
             {/* 담당자 필터 */}
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>담당자</InputLabel>
@@ -2642,6 +2736,10 @@ function AgentClosingTab() {
                 ))}
               </Select>
             </FormControl>
+            
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              * 이번달 개통실적이 있는 담당자만 표시됩니다
+            </Typography>
             
             <Button
               variant="outlined"
@@ -2702,9 +2800,9 @@ function AgentClosingTab() {
                     textAlign: 'center'
                   }
                 }}>
-                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
+                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
                   <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
-                  <TableCell sx={{ width: { xs: '100px', sm: '120px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
+                  <TableCell sx={{ width: { xs: '120px', sm: '150px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
                   <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
                   <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
                   <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
@@ -2770,7 +2868,7 @@ function AgentClosingTab() {
                         {row.expectedClosing || 0}
                       </TableCell>
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#d32f2f' }}>
-                        {row.noPerformanceStores || 0}
+                        {row.noPerformanceStores || ''}
                       </TableCell>
                     </TableRow>
                   ))
@@ -2781,6 +2879,71 @@ function AgentClosingTab() {
                         담당자별 마감 데이터가 없습니다.
                       </Typography>
                     </TableCell>
+                  </TableRow>
+                )}
+                
+                {/* 합계 행 */}
+                {data && data.length > 0 && (
+                  <TableRow sx={{ 
+                    backgroundColor: '#f5f5f5',
+                    '& td': {
+                      fontWeight: 'bold',
+                      fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                      borderTop: '2px solid #1976d2'
+                    }
+                  }}>
+                    {(() => {
+                      const totals = calculateTableTotals();
+                      return (
+                        <>
+                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
+                            {totals.policyGroup}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.pCode}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.companyName}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.agent}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#2e7d32' }}>
+                            {totals.turnoverRate.toFixed(1)}%
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.defectiveDevices}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.historyDevices}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.defectiveSims}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.historySims}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
+                            {totals.totalInventory}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            {totals.remainingSims}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#1976d2' }}>
+                            {totals.dailyPerformance}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#2e7d32' }}>
+                            {totals.monthlyPerformance}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#f57c00' }}>
+                            {totals.expectedClosing}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center', color: '#d32f2f' }}>
+                            {totals.noPerformanceStores}
+                          </TableCell>
+                        </>
+                      );
+                    })()}
                   </TableRow>
                 )}
               </TableBody>
