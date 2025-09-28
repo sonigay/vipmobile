@@ -2877,37 +2877,8 @@ function AgentClosingTab() {
             }
           }}>
             <Table size="small">
-              <TableHead>
-                <TableRow sx={{ 
-                  backgroundColor: '#1976d2',
-                  '& .MuiTableCell-root': {
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: { xs: '0.6rem', sm: '0.7rem' },
-                    borderBottom: '2px solid rgba(255,255,255,0.3)',
-                    padding: { xs: '2px 1px', sm: '8px 4px' },
-                    textAlign: 'center'
-                  }
-                }}>
-                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
-                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
-                  <TableCell sx={{ width: { xs: '150px', sm: '200px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
-                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
-                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력단말</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량유심</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력유심</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유재고</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>잔여유심</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>금일실적</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>당월실적</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>예상마감</TableCell>
-                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>무실적점</TableCell>
-                </TableRow>
-              </TableHead>
               <TableBody>
-                {/* 상단 합계 행 (헤더 아래) */}
+                {/* 상단 합계 행 (헤더 위쪽) */}
                 {data && data.agentData && data.agentData.length > 0 && (
                   <TableRow sx={{ 
                     background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
@@ -2990,6 +2961,37 @@ function AgentClosingTab() {
                     })()}
                   </TableRow>
                 )}
+              </TableBody>
+              <TableHead>
+                <TableRow sx={{ 
+                  backgroundColor: '#1976d2',
+                  '& .MuiTableCell-root': {
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                    borderBottom: '2px solid rgba(255,255,255,0.3)',
+                    padding: { xs: '2px 1px', sm: '8px 4px' },
+                    textAlign: 'center'
+                  }
+                }}>
+                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
+                  <TableCell sx={{ width: { xs: '150px', sm: '200px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
+                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
+                  <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력단말</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>이력유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>보유재고</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>잔여유심</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>금일실적</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>당월실적</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>예상마감</TableCell>
+                  <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>무실적점</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {/* 데이터가 있을 때 테이블 행 렌더링 */}
                 {data && data.agentData && data.agentData.length > 0 ? (
                   data.agentData.map((row, index) => {
