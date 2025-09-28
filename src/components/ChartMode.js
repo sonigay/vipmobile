@@ -2535,7 +2535,7 @@ function AgentClosingTab() {
 
     try {
       // 영업사원 목록 로드
-      const agentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`);
+      const agentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/agent-closing-agents`);
       if (agentsResponse.ok) {
         const agentsResult = await agentsResponse.json();
         setAvailableAgents(agentsResult.agents || []);

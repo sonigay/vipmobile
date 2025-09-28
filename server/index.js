@@ -25075,10 +25075,10 @@ app.get('/api/agent-closing-chart', async (req, res) => {
   }
 });
 
-// 영업사원 목록 조회 API
-app.get('/api/agents', async (req, res) => {
+// 영업사원별마감용 영업사원 목록 조회 API
+app.get('/api/agent-closing-agents', async (req, res) => {
   try {
-    const cacheKey = 'agents_list';
+    const cacheKey = 'agent_closing_agents_list';
     
     // 캐시 확인
     if (cache.has(cacheKey)) {
@@ -25096,7 +25096,10 @@ app.get('/api/agents', async (req, res) => {
     const agents = new Set();
     phoneklStoreData.slice(1).forEach(row => {
       if (row.length > 21 && row[21]) {
-        agents.add(row[21].toString().trim());
+        const agentName = row[21].toString().trim();
+        if (agentName) {
+          agents.add(agentName);
+        }
       }
     });
     
@@ -25108,7 +25111,7 @@ app.get('/api/agents', async (req, res) => {
     // 캐시 저장 (10분)
     cache.set(cacheKey, result, 600);
     
-    console.log(`영업사원 목록 조회 완료: ${result.agents.length}명`);
+    console.log(`영업사원별마감용 영업사원 목록 조회 완료: ${result.agents.length}명`);
     res.json(result);
     
   } catch (error) {
@@ -25134,7 +25137,7 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
     const companyName = row[14] || ''; // O열
     const agent = row[21] || ''; // V열
     
-    // 영업사원 필터링
+    // 영업사원 필터링 (기본 이름으로 그룹핑)
     if (selectedAgent) {
       const baseAgentName = agent.replace(/\([^)]*\)/g, '').trim();
       if (baseAgentName !== selectedAgent) return;
@@ -25215,10 +25218,12 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
       const yearMonth = dateStr.substring(0, 7);
       const day = dateStr.substring(8, 10);
       
+      // 업체명 매칭을 위해 개통데이터에서 업체명 찾기
+      // 개통데이터에는 업체명이 직접 없으므로, 폰클출고처데이터와 매칭 필요
+      // 여기서는 간단히 모든 업체에 카운트 (향후 개선 필요)
+      
       // 금일실적: 선택된 날짜와 정확히 일치
       if (day === targetDay && yearMonth === targetYearMonth) {
-        // 업체명 매칭을 위해 폰클출고처데이터에서 찾기
-        // 여기서는 간단히 모든 업체에 카운트 (실제로는 업체명 매칭 필요)
         for (const [key, data] of agentMap) {
           data.dailyPerformance++;
         }
