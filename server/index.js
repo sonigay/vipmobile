@@ -25010,6 +25010,163 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
   }
 });
 
+// 업체별 재고 상세 조회 API
+app.get('/api/company-inventory-details', async (req, res) => {
+  try {
+    const { companyName } = req.query;
+    
+    if (!companyName) {
+      return res.status(400).json({ error: '업체명이 필요합니다.' });
+    }
+    
+    console.log(`업체별 재고 상세 조회 시작: ${companyName}`);
+    
+    // 캐시 키 생성
+    const cacheKey = `company_inventory_${companyName}`;
+    
+    // 캐시 확인
+    if (cache.has(cacheKey)) {
+      console.log('캐시된 업체 재고 데이터 반환');
+      return res.json(cache.get(cacheKey));
+    }
+    
+    // 폰클재고데이터 로드
+    const inventoryData = await getSheetValues('폰클재고데이터');
+    
+    if (!inventoryData || inventoryData.length < 4) {
+      return res.json({
+        success: true,
+        data: {
+          companyName,
+          defectiveDevices: [],
+          defectiveSims: [],
+          normalDevices: [],
+          normalSims: []
+        }
+      });
+    }
+    
+    // 헤더 3행 제외하고 데이터 처리
+    const dataRows = inventoryData.slice(3);
+    
+    const result = {
+      companyName,
+      defectiveDevices: [], // 불량&이력단말
+      defectiveSims: [],    // 불량&유심
+      normalDevices: [],    // 보유단말
+      normalSims: []        // 보유유심
+    };
+    
+    dataRows.forEach(row => {
+      if (row.length < 23) return; // 필요한 열이 없으면 스킵
+      
+      const company = (row[21] || '').toString(); // V열: 업체명
+      const category = (row[12] || '').toString(); // M열: 종류
+      const status = (row[15] || '').toString(); // P열: 상태
+      const model = (row[13] || '').toString(); // N열: 모델명
+      const color = (row[14] || '').toString(); // O열: 색상
+      const serial = (row[11] || '').toString(); // L열: 일련번호
+      const purchasePrice = (row[17] || '').toString(); // R열: 입고가
+      const releaseDate = (row[22] || '').toString(); // W열: 출고일
+      
+      // 업체명이 일치하는 경우만 처리
+      if (company === companyName) {
+        const item = {
+          category,
+          status,
+          model,
+          color,
+          serial,
+          purchasePrice,
+          releaseDate
+        };
+        
+        // 카테고리별, 상태별로 분류
+        if (category !== '유심' && status !== '정상') {
+          result.defectiveDevices.push(item); // 불량&이력단말
+        } else if (category === '유심' && status !== '정상') {
+          result.defectiveSims.push(item); // 불량&유심
+        } else if (category !== '유심' && status === '정상') {
+          result.normalDevices.push(item); // 보유단말
+        } else if (category === '유심' && status === '정상') {
+          result.normalSims.push(item); // 보유유심
+        }
+      }
+    });
+    
+    // 캐시 저장 (5분)
+    cache.set(cacheKey, { success: true, data: result }, 300);
+    
+    console.log(`업체별 재고 상세 조회 완료: ${companyName}`);
+    res.json({ success: true, data: result });
+    
+  } catch (error) {
+    console.error('업체별 재고 상세 조회 오류:', error);
+    res.status(500).json({ error: '업체별 재고 상세 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 마지막 개통날짜 조회 API
+app.get('/api/last-activation-date', async (req, res) => {
+  try {
+    console.log('마지막 개통날짜 조회 시작');
+    
+    // 캐시 키 생성
+    const cacheKey = 'last_activation_date';
+    
+    // 캐시 확인
+    if (cache.has(cacheKey)) {
+      console.log('캐시된 마지막 개통날짜 반환');
+      return res.json(cache.get(cacheKey));
+    }
+    
+    // 폰클개통데이터 로드
+    const phoneklData = await getSheetValues('폰클개통데이터');
+    
+    if (!phoneklData || phoneklData.length < 4) {
+      // 데이터가 없으면 오늘 날짜 반환
+      const today = new Date().toISOString().split('T')[0];
+      return res.json({ success: true, lastActivationDate: today });
+    }
+    
+    // 헤더 3행 제외하고 데이터 처리
+    const dataRows = phoneklData.slice(3);
+    
+    let lastDate = null;
+    
+    dataRows.forEach(row => {
+      if (row.length > 9) {
+        const activationDate = (row[9] || '').toString(); // J열: 개통일
+        
+        // 날짜 형식 검증 (YYYY-MM-DD)
+        if (activationDate && /^\d{4}-\d{2}-\d{2}$/.test(activationDate)) {
+          const date = new Date(activationDate);
+          if (!isNaN(date.getTime())) {
+            if (!lastDate || date > lastDate) {
+              lastDate = date;
+            }
+          }
+        }
+      }
+    });
+    
+    // 마지막 날짜가 없으면 오늘 날짜 반환
+    const resultDate = lastDate ? lastDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    
+    // 캐시 저장 (10분)
+    cache.set(cacheKey, { success: true, lastActivationDate: resultDate }, 600);
+    
+    console.log(`마지막 개통날짜 조회 완료: ${resultDate}`);
+    res.json({ success: true, lastActivationDate: resultDate });
+    
+  } catch (error) {
+    console.error('마지막 개통날짜 조회 오류:', error);
+    // 오류 시 오늘 날짜 반환
+    const today = new Date().toISOString().split('T')[0];
+    res.json({ success: true, lastActivationDate: today });
+  }
+});
+
 // 영업사원별마감 데이터 조회 API
 app.get('/api/agent-closing-chart', async (req, res) => {
   try {

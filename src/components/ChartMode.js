@@ -64,6 +64,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   AccountBalanceWallet as AccountBalanceWalletIcon,
+  Close as CloseIcon,
+  Print as PrintIcon,
   PersonAdd as PersonAddIcon
 } from '@mui/icons-material';
 import { createWorker } from 'tesseract.js';
@@ -2509,11 +2511,17 @@ function TotalClosingTab() {
 function AgentClosingTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('');
   const [availableAgents, setAvailableAgents] = useState([]);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  
+  // 업체 재고 상세 모달 상태
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryData, setInventoryData] = useState(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [selectedInventoryType, setSelectedInventoryType] = useState('');
 
   // 영업사원명에서 괄호 제거하여 그룹핑
   const groupAgentNames = (agentList) => {
@@ -2529,6 +2537,28 @@ function AgentClosingTab() {
     return grouped;
   };
 
+  // 초기 마지막 개통날짜 로드
+  useEffect(() => {
+    const loadLastActivationDate = async () => {
+      try {
+        const response = await fetch('/api/last-activation-date');
+        const result = await response.json();
+        if (result.success && result.lastActivationDate) {
+          setSelectedDate(result.lastActivationDate);
+          // 초기 데이터 로드
+          loadData(result.lastActivationDate, selectedAgent);
+        }
+      } catch (error) {
+        console.error('마지막 개통날짜 로드 오류:', error);
+        // 오류 시 오늘 날짜로 설정
+        const today = new Date().toISOString().split('T')[0];
+        setSelectedDate(today);
+        loadData(today, selectedAgent);
+      }
+    };
+    
+    loadLastActivationDate();
+  }, []); // 컴포넌트 마운트 시 한 번만 실행
 
   // 데이터 로드
   const loadData = useCallback(async (date = selectedDate, agent = selectedAgent) => {
@@ -2591,6 +2621,43 @@ function AgentClosingTab() {
   // 수동 새로고침
   const handleRefresh = () => {
     loadData();
+  };
+
+  // 업체 클릭 핸들러
+  const handleCompanyClick = (companyName) => {
+    setInventoryLoading(true);
+    setShowInventoryModal(true);
+    setSelectedInventoryType('');
+    
+    // 업체별 재고 데이터 로드
+    fetch(`/api/company-inventory-details?companyName=${encodeURIComponent(companyName)}`)
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          setInventoryData(result.data);
+        } else {
+          setError('재고 데이터를 불러오는데 실패했습니다.');
+        }
+      })
+      .catch(err => {
+        console.error('재고 데이터 로드 오류:', err);
+        setError('재고 데이터를 불러오는 중 오류가 발생했습니다.');
+      })
+      .finally(() => {
+        setInventoryLoading(false);
+      });
+  };
+
+  // 재고 타입 선택 핸들러
+  const handleInventoryTypeSelect = (type) => {
+    setSelectedInventoryType(type);
+  };
+
+  // 모달 닫기
+  const handleCloseInventoryModal = () => {
+    setShowInventoryModal(false);
+    setInventoryData(null);
+    setSelectedInventoryType('');
   };
 
   // 테이블 데이터 합계 계산
@@ -2943,7 +3010,17 @@ function AgentClosingTab() {
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
                         {row.pCode || '-'}
                       </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                      <TableCell sx={{ 
+                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        color: '#1976d2',
+                        textDecoration: 'underline',
+                        '&:hover': {
+                          backgroundColor: '#e3f2fd',
+                          fontWeight: 'bold'
+                        }
+                      }} onClick={() => handleCompanyClick(row.companyName)}>
                         {row.companyName || '-'}
                       </TableCell>
                       <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
@@ -3025,7 +3102,220 @@ function AgentClosingTab() {
           </Typography>
         </Paper>
       )}
+
+      {/* 업체 재고 상세 모달 */}
+      <CompanyInventoryModal
+        open={showInventoryModal}
+        onClose={handleCloseInventoryModal}
+        data={inventoryData}
+        loading={inventoryLoading}
+        selectedType={selectedInventoryType}
+        onTypeSelect={handleInventoryTypeSelect}
+      />
     </Box>
+  );
+}
+
+// 업체 재고 상세 모달 컴포넌트
+function CompanyInventoryModal({ open, onClose, data, loading, selectedType, onTypeSelect }) {
+  const [printContent, setPrintContent] = useState(null);
+
+  // 인쇄 함수
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    const printData = data && selectedType ? data[selectedType] : [];
+    
+    let printHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${data?.companyName || '업체'} 재고 상세</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .type-header { font-size: 18px; font-weight: bold; margin: 10px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>${data?.companyName || '업체'} 재고 상세</h2>
+          <p>조회일: ${new Date().toLocaleDateString()}</p>
+        </div>
+        <div class="type-header">${getTypeDisplayName(selectedType)}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>종류</th>
+              <th>상태</th>
+              <th>모델명</th>
+              <th>색상</th>
+              <th>일련번호</th>
+              <th>입고가</th>
+              <th>출고일</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    printData.forEach(item => {
+      printHTML += `
+        <tr>
+          <td>${item.category || '-'}</td>
+          <td>${item.status || '-'}</td>
+          <td>${item.model || '-'}</td>
+          <td>${item.color || '-'}</td>
+          <td>${item.serial || '-'}</td>
+          <td>${item.purchasePrice || '-'}</td>
+          <td>${item.releaseDate || '-'}</td>
+        </tr>
+      `;
+    });
+    
+    printHTML += `
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(printHTML);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  // 타입별 표시명
+  const getTypeDisplayName = (type) => {
+    const names = {
+      'defectiveDevices': '불량&이력단말',
+      'defectiveSims': '불량&유심',
+      'normalDevices': '보유단말',
+      'normalSims': '보유유심'
+    };
+    return names[type] || '';
+  };
+
+  // 타입별 버튼 정보
+  const inventoryTypes = [
+    { key: 'defectiveDevices', label: '불량&이력단말', count: data?.defectiveDevices?.length || 0 },
+    { key: 'defectiveSims', label: '불량&유심', count: data?.defectiveSims?.length || 0 },
+    { key: 'normalDevices', label: '보유단말', count: data?.normalDevices?.length || 0 },
+    { key: 'normalSims', label: '보유유심', count: data?.normalSims?.length || 0 }
+  ];
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: { minHeight: '600px' }
+      }}
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+        color: 'white'
+      }}>
+        <Typography variant="h6">
+          {data?.companyName || '업체'} 재고 상세
+        </Typography>
+        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 3 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {/* 재고 타입 선택 버튼들 */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>재고 타입 선택</Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                {inventoryTypes.map((type) => (
+                  <Button
+                    key={type.key}
+                    variant={selectedType === type.key ? 'contained' : 'outlined'}
+                    onClick={() => onTypeSelect(type.key)}
+                    sx={{ minWidth: '150px' }}
+                  >
+                    {type.label} ({type.count})
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+
+            {/* 선택된 타입의 데이터 테이블 */}
+            {selectedType && data && data[selectedType] && (
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    {getTypeDisplayName(selectedType)} ({data[selectedType].length}개)
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<PrintIcon />}
+                    onClick={handlePrint}
+                  >
+                    인쇄
+                  </Button>
+                </Box>
+                
+                <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 'bold' }}>종류</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>상태</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>모델명</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>색상</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>일련번호</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>입고가</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>출고일</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {data[selectedType].map((item, index) => (
+                        <TableRow key={index} sx={{ '&:hover': { backgroundColor: '#f5f5f5' } }}>
+                          <TableCell>{item.category || '-'}</TableCell>
+                          <TableCell>{item.status || '-'}</TableCell>
+                          <TableCell>{item.model || '-'}</TableCell>
+                          <TableCell>{item.color || '-'}</TableCell>
+                          <TableCell>{item.serial || '-'}</TableCell>
+                          <TableCell>{item.purchasePrice || '-'}</TableCell>
+                          <TableCell>{item.releaseDate || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+
+            {selectedType && data && data[selectedType] && data[selectedType].length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary">
+                  해당 타입의 재고가 없습니다.
+                </Typography>
+              </Box>
+            )}
+          </>
+        )}
+      </DialogContent>
+      
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose}>닫기</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
