@@ -2873,7 +2873,7 @@ function AgentClosingTab() {
             maxWidth: '100%',
             '& .MuiTable-root': {
               tableLayout: 'fixed',
-              minWidth: { xs: '1400px', sm: '100%' }
+              minWidth: { xs: '1600px', sm: '100%' }
             }
           }}>
             <Table size="small">
@@ -2972,9 +2972,9 @@ function AgentClosingTab() {
                     textAlign: 'center'
                   }
                 }}>
-                  <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
+                  <TableCell sx={{ width: { xs: '120px', sm: '150px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
                   <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>P코드</TableCell>
-                  <TableCell sx={{ width: { xs: '150px', sm: '200px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
+                  <TableCell sx={{ width: { xs: '200px', sm: '250px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>업체명</TableCell>
                   <TableCell sx={{ width: { xs: '80px', sm: '100px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>담당자</TableCell>
                   <TableCell sx={{ width: { xs: '60px', sm: '80px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>회전율</TableCell>
                   <TableCell sx={{ width: { xs: '70px', sm: '90px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>불량단말</TableCell>
