@@ -25016,14 +25016,14 @@ app.get('/api/agent-closing-chart', async (req, res) => {
     const { date, agent } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
     
-    console.log(`영업사원별마감 데이터 조회 시작: ${targetDate}, 영업사원: ${agent || '전체'}`);
+    console.log(`담당자별마감 데이터 조회 시작: ${targetDate}, 담당자: ${agent || '전체'}`);
     
     // 캐시 키 생성
     const cacheKey = `agent_closing_chart_${targetDate}_${agent || 'all'}`;
     
     // 캐시 확인
     if (cache.has(cacheKey)) {
-      console.log('캐시된 영업사원별마감 데이터 반환');
+      console.log('캐시된 담당자별마감 데이터 반환');
       return res.json(cache.get(cacheKey));
     }
     
@@ -25062,14 +25062,14 @@ app.get('/api/agent-closing-chart', async (req, res) => {
     // 캐시 저장 (5분)
     cache.set(cacheKey, result, 300);
     
-    console.log(`영업사원별마감 데이터 처리 완료: ${agentData.length}건`);
+    console.log(`담당자별마감 데이터 처리 완료: ${agentData.length}건`);
     res.json(result);
     
   } catch (error) {
-    console.error('영업사원별마감 데이터 조회 오류:', error);
+    console.error('담당자별마감 데이터 조회 오류:', error);
     res.status(500).json({ 
       success: false,
-      error: '영업사원별마감 데이터를 가져오는데 실패했습니다.',
+      error: '담당자별마감 데이터를 가져오는데 실패했습니다.',
       details: error.message
     });
   }
@@ -25092,7 +25092,7 @@ app.get('/api/agent-closing-agents', async (req, res) => {
       throw new Error('폰클출고처데이터를 가져올 수 없습니다.');
     }
     
-    // V열(21인덱스)에서 영업사원명 추출
+    // V열(21인덱스)에서 담당자명 추출 (테이블과 동일한 컬럼 사용)
     const agents = new Set();
     phoneklStoreData.slice(1).forEach(row => {
       if (row.length > 21 && row[21]) {
@@ -25111,14 +25111,14 @@ app.get('/api/agent-closing-agents', async (req, res) => {
     // 캐시 저장 (10분)
     cache.set(cacheKey, result, 600);
     
-    console.log(`영업사원별마감용 영업사원 목록 조회 완료: ${result.agents.length}명`);
+    console.log(`영업사원별마감용 담당자 목록 조회 완료: ${result.agents.length}명`);
     res.json(result);
     
   } catch (error) {
-    console.error('영업사원 목록 조회 오류:', error);
+    console.error('담당자 목록 조회 오류:', error);
     res.status(500).json({ 
       success: false,
-      error: '영업사원 목록을 가져오는데 실패했습니다.',
+      error: '담당자 목록을 가져오는데 실패했습니다.',
       details: error.message
     });
   }

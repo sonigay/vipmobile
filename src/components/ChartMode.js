@@ -1831,7 +1831,7 @@ function ClosingChartTab() {
       component: <TotalClosingTab />
     },
     {
-      label: '영업사원별마감',
+      label: '담당자별마감',
       component: <AgentClosingTab />
     }
   ];
@@ -2611,7 +2611,7 @@ function AgentClosingTab() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6">
-              {new Date(selectedDate).getDate()}일 영업사원별마감 실적장표
+              {new Date(selectedDate).getDate()}일 담당자별마감 실적장표
             </Typography>
             
             {/* 마감기준날짜 필터 */}
@@ -2624,16 +2624,16 @@ function AgentClosingTab() {
               sx={{ minWidth: 150 }}
             />
             
-            {/* 영업사원명 필터 */}
+            {/* 담당자 필터 */}
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>영업사원명</InputLabel>
+              <InputLabel>담당자</InputLabel>
               <Select
                 value={selectedAgent}
                 onChange={handleAgentChange}
-                label="영업사원명"
+                label="담당자"
               >
                 <MenuItem value="">
-                  <em>전체 영업사원</em>
+                  <em>전체 담당자</em>
                 </MenuItem>
                 {Object.entries(groupedAgents).map(([baseName, variants]) => (
                   <MenuItem key={baseName} value={baseName}>
@@ -2676,7 +2676,7 @@ function AgentClosingTab() {
             color: 'white'
           }}>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              👤 영업사원별 마감 실적
+              👤 담당자별 마감 실적
             </Typography>
           </Box>
           
@@ -2778,7 +2778,7 @@ function AgentClosingTab() {
                   <TableRow>
                     <TableCell colSpan={15} sx={{ textAlign: 'center', py: 4 }}>
                       <Typography variant="body2" color="text.secondary">
-                        영업사원별 마감 데이터가 없습니다.
+                        담당자별 마감 데이터가 없습니다.
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -2792,7 +2792,7 @@ function AgentClosingTab() {
       {!data && !loading && (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
-            영업사원별 마감 데이터가 없습니다.
+            담당자별 마감 데이터가 없습니다.
           </Typography>
         </Paper>
       )}
