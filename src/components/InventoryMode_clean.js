@@ -14,7 +14,6 @@ import {
   Button,
   CircularProgress,
   Alert,
-  AlertTitle,
   Chip,
   Grid,
   Card,
@@ -61,275 +60,8 @@ import {
 } from '@mui/icons-material';
 
 // 지연 로딩 컴포넌트들
-const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
+const AssignmentSettingsScreen = lazy(() => import('./AssignmentSettingsScreen'));
 const AppUpdatePopup = lazy(() => import('./AppUpdatePopup'));
-
-// 폰클중복값 컴포넌트
-const PhoneDuplicateTab = () => {
-  const [activeTab, setActiveTab] = useState(0);
-  const [phoneData, setPhoneData] = useState(null);
-  const [simData, setSimData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-
-  const fetchPhoneDuplicates = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/phone-duplicates`);
-      const result = await response.json();
-      if (result.success) {
-        setPhoneData(result.data);
-      }
-    } catch (error) {
-      console.error('휴대폰 중복값 조회 오류:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSimDuplicates = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sim-duplicates`);
-      const result = await response.json();
-      if (result.success) {
-        setSimData(result.data);
-      }
-    } catch (error) {
-      console.error('유심 중복값 조회 오류:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-    if (newValue === 0) {
-      fetchPhoneDuplicates();
-    } else {
-      fetchSimDuplicates();
-    }
-  };
-
-  useEffect(() => {
-    fetchPhoneDuplicates();
-    setLastUpdate(new Date());
-    
-    // 30초마다 자동 새로고침
-    const interval = setInterval(() => {
-      if (activeTab === 0) {
-        fetchPhoneDuplicates();
-      } else {
-        fetchSimDuplicates();
-      }
-      setLastUpdate(new Date());
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [activeTab]);
-
-  return (
-    <Box sx={{ p: 3 }}>
-      {/* 헤더 */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: '#1976D2' }}>
-          📱 폰클중복값 검사
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {lastUpdate && (
-            <Typography variant="caption" color="text.secondary">
-              마지막 업데이트: {lastUpdate.toLocaleTimeString()}
-            </Typography>
-          )}
-          <Button
-            variant="outlined"
-            onClick={activeTab === 0 ? fetchPhoneDuplicates : fetchSimDuplicates}
-            disabled={loading}
-            startIcon={<RefreshIcon />}
-          >
-            새로고침
-          </Button>
-        </Box>
-      </Box>
-
-      {/* 탭 네비게이션 */}
-      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
-        <Tab 
-          label={`휴대폰 중복값 ${phoneData ? `(${phoneData.duplicates.length}개 그룹)` : ''}`}
-          icon={<PhoneAndroidIcon />}
-          iconPosition="start"
-        />
-        <Tab 
-          label={`유심 중복값 ${simData ? `(${simData.duplicates.length}개 그룹)` : ''}`}
-          icon={<SimCardIcon />}
-          iconPosition="start"
-        />
-      </Tabs>
-
-      {/* 콘텐츠 */}
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress />
-        </Box>
-      )}
-
-      {!loading && activeTab === 0 && (
-        <PhoneDuplicateContent data={phoneData} type="휴대폰" />
-      )}
-
-      {!loading && activeTab === 1 && (
-        <PhoneDuplicateContent data={simData} type="유심" />
-      )}
-    </Box>
-  );
-};
-
-// 중복값 콘텐츠 컴포넌트
-const PhoneDuplicateContent = ({ data, type }) => {
-  if (!data) {
-    return (
-      <Alert severity="info">
-        데이터를 불러오는 중입니다...
-      </Alert>
-    );
-  }
-
-  if (data.duplicates.length === 0) {
-    return (
-      <Alert severity="success" sx={{ fontSize: '1.1rem', py: 2 }}>
-        🎉 {type} 중복값이 없습니다! 모든 데이터가 정상입니다.
-      </Alert>
-    );
-  }
-
-  // 등록직원 빈도순 정렬
-  const sortedEmployees = Object.entries(data.employeeFrequency)
-    .sort(([,a], [,b]) => b - a)
-    .slice(0, 5); // 상위 5명
-
-  return (
-    <Box>
-      {/* 통계 카드 */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#ffebee' }}>
-            <Typography variant="h4" color="error" fontWeight="bold">
-              {data.duplicates.length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              중복 그룹 수
-            </Typography>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#ffebee' }}>
-            <Typography variant="h4" color="error" fontWeight="bold">
-              {data.totalDuplicates}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              총 중복 항목 수
-            </Typography>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#fff3e0' }}>
-            <Typography variant="h4" color="warning.main" fontWeight="bold">
-              {sortedEmployees.length > 0 ? sortedEmployees[0][1] : 0}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              최다 중복 등록자
-            </Typography>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* 주의 직원 목록 */}
-      {sortedEmployees.length > 0 && (
-        <Card sx={{ mb: 3, p: 2 }}>
-          <Typography variant="h6" gutterBottom color="warning.main">
-            ⚠️ 중복 등록 빈도가 높은 직원 (상위 5명)
-          </Typography>
-          <Grid container spacing={1}>
-            {sortedEmployees.map(([employee, count]) => (
-              <Grid item key={employee}>
-                <Chip
-                  label={`${employee}: ${count}회`}
-                  color={count > 10 ? 'error' : count > 5 ? 'warning' : 'default'}
-                  variant="outlined"
-                />
-              </Grid>
-            ))}
-          </Grid>
-        </Card>
-      )}
-
-      {/* 중복 그룹 목록 */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            🔍 {type} 중복 그룹 상세
-          </Typography>
-          {data.duplicates.map((duplicate, index) => (
-            <Accordion key={index} sx={{ mb: 1 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                  <Chip 
-                    label={`${duplicate.count}개 중복`} 
-                    color="error" 
-                    size="small"
-                  />
-                  <Typography variant="body1" fontWeight="bold">
-                    {duplicate.key}
-                  </Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>타입</TableCell>
-                        <TableCell>업체명</TableCell>
-                        <TableCell>등록직원</TableCell>
-                        {type === '휴대폰' && <TableCell>모델명</TableCell>}
-                        {type === '휴대폰' && <TableCell>색상</TableCell>}
-                        <TableCell>일련번호</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {duplicate.items.map((item, itemIndex) => (
-                        <TableRow key={itemIndex}>
-                          <TableCell>
-                            <Chip 
-                              label={item.type} 
-                              size="small" 
-                              color={item.type === '개통' ? 'primary' : 'secondary'}
-                            />
-                          </TableCell>
-                          <TableCell>{item.store}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={item.employee || '미등록'} 
-                              size="small"
-                              color={data.employeeFrequency[item.employee] > 5 ? 'error' : 'default'}
-                            />
-                          </TableCell>
-                          {type === '휴대폰' && <TableCell>{item.model}</TableCell>}
-                          {type === '휴대폰' && <TableCell>{item.color}</TableCell>}
-                          <TableCell>{item.serial}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </AccordionDetails>
-            </Accordion>
-          ))}
-        </CardContent>
-      </Card>
-    </Box>
-  );
-};
 
 // 로딩 스켈레톤 컴포넌트
 const LoadingSkeleton = () => (
@@ -562,7 +294,22 @@ const InventoryMode = ({
         {/* 탭 콘텐츠 */}
         <Box sx={{ flex: 1, overflow: 'auto' }}>
           {currentScreen === 'duplicate' && (
-            <PhoneDuplicateTab />
+            <Box sx={{ p: 3 }}>
+              <Card sx={{ p: 4, textAlign: 'center' }}>
+                <CardContent>
+                  <WarningIcon sx={{ fontSize: 80, color: '#1976D2', mb: 2 }} />
+                  <Typography variant="h4" component="h1" gutterBottom>
+                    폰클중복값
+                  </Typography>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    현재 개발 중입니다
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    곧 새로운 기능으로 찾아뵙겠습니다.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
           )}
 
           {currentScreen === 'master' && (

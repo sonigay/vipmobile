@@ -25638,6 +25638,205 @@ function processAgentClosingData({ phoneklStoreData, phoneklInventoryData, phone
   return sortedData;
 }
 
+// 폰클중복값 API 엔드포인트들
+app.get('/api/phone-duplicates', async (req, res) => {
+  try {
+    console.log('📱 폰클중복값 API 호출 시작');
+    
+    // 폰클개통데이터와 폰클재고데이터 시트에서 데이터 가져오기
+    const activationData = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '폰클개통데이터!A4:Z',
+    });
+
+    const inventoryData = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '폰클재고데이터!A4:AC',
+    });
+
+    const activationRows = activationData.data.values || [];
+    const inventoryRows = inventoryData.data.values || [];
+
+    // 휴대폰 데이터 통합 (개통 + 재고)
+    const phoneData = [];
+    
+    // 개통데이터에서 휴대폰 정보 추출 (M4:M, O4:O, V4:V, W4:W, X4:X, Y4:Y, Z4:Z, BZ4:BZ)
+    activationRows.forEach((row, index) => {
+      if (row[12] && row[12] !== '유심') { // M열이 유심이 아닌 경우
+        phoneData.push({
+          model: row[14] || '', // O열 - 모델명
+          color: row[21] || '', // V열 - 색상
+          serial: row[22] ? row[22].slice(-6) : '', // W열 - 일련번호 (마지막 6자리)
+          store: row[14] || '', // O열 - 업체명
+          employee: row[77] || '', // BZ열 - 등록직원
+          type: '개통'
+        });
+      }
+    });
+
+    // 재고데이터에서 휴대폰 정보 추출 (S4:S, V4:V, N4:N, O4:O, L4:L, AC4:AC)
+    inventoryRows.forEach((row, index) => {
+      if (row[18] && row[18] !== '유심') { // M열이 유심이 아닌 경우
+        phoneData.push({
+          model: row[13] || '', // N열 - 모델명
+          color: row[20] || '', // V열 - 색상
+          serial: row[11] ? row[11].slice(-6) : '', // L열 - 일련번호 (마지막 6자리)
+          store: row[20] || '', // V열 - 업체명
+          employee: row[28] || '', // AC열 - 등록직원
+          type: '재고'
+        });
+      }
+    });
+
+    // 중복 검사: 모델명 + 색상 + 일련번호 조합
+    const duplicateMap = new Map();
+    phoneData.forEach(item => {
+      const key = `${item.model}|${item.color}|${item.serial}`;
+      if (key !== '||') { // 빈 값 제외
+        if (!duplicateMap.has(key)) {
+          duplicateMap.set(key, []);
+        }
+        duplicateMap.get(key).push(item);
+      }
+    });
+
+    // 중복된 항목만 필터링
+    const duplicates = Array.from(duplicateMap.entries())
+      .filter(([key, items]) => items.length > 1)
+      .map(([key, items]) => ({
+        key,
+        count: items.length,
+        items: items.sort((a, b) => a.store.localeCompare(b.store))
+      }));
+
+    // 등록직원 빈도 계산
+    const employeeFrequency = {};
+    duplicates.forEach(duplicate => {
+      duplicate.items.forEach(item => {
+        if (item.employee) {
+          employeeFrequency[item.employee] = (employeeFrequency[item.employee] || 0) + 1;
+        }
+      });
+    });
+
+    console.log(`📱 휴대폰 중복 검사 완료: ${duplicates.length}개 중복 그룹 발견`);
+    
+    res.json({
+      success: true,
+      data: {
+        duplicates,
+        employeeFrequency,
+        totalDuplicates: duplicates.reduce((sum, dup) => sum + dup.count, 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ 폰클중복값 API 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/sim-duplicates', async (req, res) => {
+  try {
+    console.log('📲 유심중복값 API 호출 시작');
+    
+    // 폰클개통데이터와 폰클재고데이터 시트에서 데이터 가져오기
+    const activationData = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '폰클개통데이터!A4:Z',
+    });
+
+    const inventoryData = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '폰클재고데이터!A4:AC',
+    });
+
+    const activationRows = activationData.data.values || [];
+    const inventoryRows = inventoryData.data.values || [];
+
+    // 유심 데이터 통합 (개통 + 재고)
+    const simData = [];
+    
+    // 개통데이터에서 유심 정보 추출
+    activationRows.forEach((row, index) => {
+      if (row[12] === '유심') { // M열이 유심인 경우
+        simData.push({
+          model: row[14] || '', // O열 - 유심모델명
+          serial: row[22] ? row[22].slice(-6) : '', // W열 - 유심일련번호 (마지막 6자리)
+          store: row[14] || '', // O열 - 업체명
+          employee: row[77] || '', // BZ열 - 등록직원
+          type: '개통'
+        });
+      }
+    });
+
+    // 재고데이터에서 유심 정보 추출
+    inventoryRows.forEach((row, index) => {
+      if (row[18] === '유심') { // M열이 유심인 경우
+        simData.push({
+          model: row[13] || '', // N열 - 유심모델명
+          serial: row[11] ? row[11].slice(-6) : '', // L열 - 유심일련번호 (마지막 6자리)
+          store: row[20] || '', // V열 - 업체명
+          employee: row[28] || '', // AC열 - 등록직원
+          type: '재고'
+        });
+      }
+    });
+
+    // 중복 검사: 유심모델명 + 유심일련번호 조합
+    const duplicateMap = new Map();
+    simData.forEach(item => {
+      const key = `${item.model}|${item.serial}`;
+      if (key !== '|') { // 빈 값 제외
+        if (!duplicateMap.has(key)) {
+          duplicateMap.set(key, []);
+        }
+        duplicateMap.get(key).push(item);
+      }
+    });
+
+    // 중복된 항목만 필터링
+    const duplicates = Array.from(duplicateMap.entries())
+      .filter(([key, items]) => items.length > 1)
+      .map(([key, items]) => ({
+        key,
+        count: items.length,
+        items: items.sort((a, b) => a.store.localeCompare(b.store))
+      }));
+
+    // 등록직원 빈도 계산
+    const employeeFrequency = {};
+    duplicates.forEach(duplicate => {
+      duplicate.items.forEach(item => {
+        if (item.employee) {
+          employeeFrequency[item.employee] = (employeeFrequency[item.employee] || 0) + 1;
+        }
+      });
+    });
+
+    console.log(`📲 유심 중복 검사 완료: ${duplicates.length}개 중복 그룹 발견`);
+    
+    res.json({
+      success: true,
+      data: {
+        duplicates,
+        employeeFrequency,
+        totalDuplicates: duplicates.reduce((sum, dup) => sum + dup.count, 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ 유심중복값 API 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // 서버 시작 (이미 위에서 처리됨)
   console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
   console.log(`📊 예산 관리 시스템이 준비되었습니다.`);
