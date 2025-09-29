@@ -2022,29 +2022,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* 헤더 */}
-      <AppBar position="static">
-        <Toolbar>
-          <Button color="inherit" onClick={onBack} sx={{ mr: 2 }}>
-            ← 뒤로가기
-          </Button>
-          <SettingsIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            배정셋팅
-          </Typography>
-          <Button 
-            color="inherit" 
-            onClick={handleResetAllSettings}
-            sx={{ mr: 2 }}
-            title="모든 배정 설정 초기화"
-          >
-            설정 초기화
-          </Button>
-          <Button color="inherit" onClick={onLogout}>
-            로그아웃
-          </Button>
-        </Toolbar>
-      </AppBar>
 
       {/* 탭 네비게이션 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'background.paper' }}>
@@ -2098,6 +2075,29 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             </Typography>
           </Box>
         </Box>
+      </Box>
+
+      {/* 설정 초기화 버튼 */}
+      <Box sx={{ 
+        p: 2, 
+        backgroundColor: 'background.paper',
+        borderBottom: 1,
+        borderColor: 'divider',
+        display: 'flex',
+        justifyContent: 'center'
+      }}>
+        <Button 
+          variant="outlined" 
+          color="warning"
+          onClick={handleResetAllSettings}
+          startIcon={<SettingsIcon />}
+          title="모든 배정 설정 초기화"
+          sx={{
+            fontWeight: 'bold'
+          }}
+        >
+          설정 초기화
+        </Button>
       </Box>
 
       {/* 콘텐츠 */}
