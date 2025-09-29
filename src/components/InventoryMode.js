@@ -115,7 +115,7 @@ const PhoneDuplicateTab = () => {
     fetchPhoneDuplicates();
     setLastUpdate(new Date());
     
-    // 30초마다 자동 새로고침
+    // 1시간마다 자동 새로고침
     const interval = setInterval(() => {
       if (activeTab === 0) {
         fetchPhoneDuplicates();
@@ -123,7 +123,7 @@ const PhoneDuplicateTab = () => {
         fetchSimDuplicates();
       }
       setLastUpdate(new Date());
-    }, 30000);
+    }, 3600000);
 
     return () => clearInterval(interval);
   }, [activeTab]);
