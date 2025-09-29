@@ -2871,6 +2871,7 @@ function AgentClosingTab() {
             borderRadius: 1, 
             overflow: 'auto',
             maxWidth: '100%',
+            maxHeight: '70vh',
             '& .MuiTable-root': {
               tableLayout: 'fixed',
               minWidth: { xs: '1600px', sm: '100%' }
@@ -2881,7 +2882,6 @@ function AgentClosingTab() {
                 {/* 상단 합계 행 (헤더 위쪽) */}
                 {data && data.agentData && data.agentData.length > 0 && (
                   <TableRow sx={{ 
-                    background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
                     fontWeight: 'bold',
                     position: 'sticky',
                     top: 0,
@@ -2892,8 +2892,7 @@ function AgentClosingTab() {
                       fontSize: '0.75rem',
                       color: '#495057',
                       padding: '8px 4px',
-                      textAlign: 'center',
-                      background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+                      textAlign: 'center'
                     }
                   }}>
                     {(() => {
