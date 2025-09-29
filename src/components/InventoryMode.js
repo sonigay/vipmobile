@@ -60,7 +60,7 @@ import {
 } from '@mui/icons-material';
 
 // 지연 로딩 컴포넌트들
-const AssignmentSettingsScreen = lazy(() => import('./AssignmentSettingsScreen'));
+const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
 const AppUpdatePopup = lazy(() => import('./AppUpdatePopup'));
 
 // 로딩 스켈레톤 컴포넌트
