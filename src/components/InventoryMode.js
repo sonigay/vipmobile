@@ -623,7 +623,25 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
 
         
         {/* 메인 콘텐츠 */}
-        <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Card sx={{ p: 4, textAlign: 'center' }}>
+            <CardContent>
+              <InventoryIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
+              <Typography variant="h4" component="h1" gutterBottom>
+                재고 관리 시스템
+              </Typography>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                현재 개발 중입니다
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                곧 새로운 기능으로 찾아뵙겠습니다.
+              </Typography>
+            </CardContent>
+          </Card>
+        </Box>
+        
+        {/* 기존 메인 콘텐츠 숨김 */}
+        <Box sx={{ display: 'none' }}>
           {/* 업데이트 팝업 */}
           <AppUpdatePopup
             open={showUpdatePopup}
