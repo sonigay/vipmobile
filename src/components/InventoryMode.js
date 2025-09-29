@@ -1197,10 +1197,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
         </Toolbar>
       </AppBar>
       
-      {/* 알림 시스템 */}
-      <NotificationButton />
-      <AnnouncementBanner />
-      
       <Box sx={{ flex: 1, p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <Typography variant="h4" color="text.secondary">
           {currentScreen} 화면 개발 중...
