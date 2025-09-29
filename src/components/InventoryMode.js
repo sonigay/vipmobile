@@ -627,12 +627,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
                 </ListItemIcon>
                 <ListItemText>배정셋팅</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => setCurrentScreen('assignment_history')}>
-                <ListItemIcon>
-                  <HistoryIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>배정 히스토리</ListItemText>
-              </MenuItem>
             </>
           )}
         </Menu>
@@ -1172,16 +1166,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
     );
   }
 
-  if (currentScreen === 'assignment_history') {
-    return (
-      <Suspense fallback={<LoadingSkeleton />}>
-        <AssignmentHistoryScreen
-          onBack={handleBackToMain}
-          onLogout={onLogout}
-        />
-      </Suspense>
-    );
-  }
 
   if (currentScreen === 'realtime_dashboard') {
     return (
