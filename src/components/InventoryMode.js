@@ -107,7 +107,7 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
   const [error, setError] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedMenu, setSelectedMenu] = useState(null);
-  const [currentScreen, setCurrentScreen] = useState('main');
+  const [currentScreen, setCurrentScreen] = useState('assignment');
   const [preloadedScreens, setPreloadedScreens] = useState(new Set());
   
   // 검색 관련 상태
@@ -494,8 +494,8 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
     );
   }
 
-  // 메인 화면
-  if (currentScreen === 'main') {
+  // 메인 화면 (탭 화면들)
+  if (currentScreen === 'assignment' || currentScreen === 'duplicate' || currentScreen === 'master') {
     return (
       <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* 헤더 */}
@@ -622,22 +622,111 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
         </Menu>
 
         
-        {/* 메인 콘텐츠 */}
-        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <Card sx={{ p: 4, textAlign: 'center' }}>
-            <CardContent>
-              <InventoryIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h4" component="h1" gutterBottom>
-                재고 관리 시스템
-              </Typography>
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                현재 개발 중입니다
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                곧 새로운 기능으로 찾아뵙겠습니다.
-              </Typography>
-            </CardContent>
-          </Card>
+        {/* 메인 콘텐츠 - 탭 구조 */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* 탭 헤더 */}
+          <Paper sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs 
+              value={currentScreen} 
+              onChange={(event, newValue) => setCurrentScreen(newValue)}
+              aria-label="재고 관리 탭"
+              variant="fullWidth"
+            >
+              <Tab 
+                label="재고배정" 
+                value="assignment"
+                sx={{ 
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  color: '#2E7D32',
+                  '&.Mui-selected': {
+                    color: '#2E7D32',
+                    backgroundColor: 'rgba(46, 125, 50, 0.1)'
+                  }
+                }}
+              />
+              <Tab 
+                label="폰클중복값" 
+                value="duplicate"
+                sx={{ 
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  color: '#1976D2',
+                  '&.Mui-selected': {
+                    color: '#1976D2',
+                    backgroundColor: 'rgba(25, 118, 210, 0.1)'
+                  }
+                }}
+              />
+              <Tab 
+                label="마스터재고검수" 
+                value="master"
+                sx={{ 
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  color: '#7B1FA2',
+                  '&.Mui-selected': {
+                    color: '#7B1FA2',
+                    backgroundColor: 'rgba(123, 31, 162, 0.1)'
+                  }
+                }}
+              />
+            </Tabs>
+          </Paper>
+
+          {/* 탭 콘텐츠 */}
+          <Box sx={{ flex: 1, p: 3 }}>
+            {currentScreen === 'assignment' && (
+              <Card sx={{ p: 4, textAlign: 'center' }}>
+                <CardContent>
+                  <AssignmentIcon sx={{ fontSize: 80, color: '#2E7D32', mb: 2 }} />
+                  <Typography variant="h4" component="h1" gutterBottom>
+                    재고배정
+                  </Typography>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    현재 개발 중입니다
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    곧 새로운 기능으로 찾아뵙겠습니다.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+
+            {currentScreen === 'duplicate' && (
+              <Card sx={{ p: 4, textAlign: 'center' }}>
+                <CardContent>
+                  <WarningIcon sx={{ fontSize: 80, color: '#1976D2', mb: 2 }} />
+                  <Typography variant="h4" component="h1" gutterBottom>
+                    폰클중복값
+                  </Typography>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    현재 개발 중입니다
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    곧 새로운 기능으로 찾아뵙겠습니다.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+
+            {currentScreen === 'master' && (
+              <Card sx={{ p: 4, textAlign: 'center' }}>
+                <CardContent>
+                  <InventoryIcon sx={{ fontSize: 80, color: '#7B1FA2', mb: 2 }} />
+                  <Typography variant="h4" component="h1" gutterBottom>
+                    마스터재고검수
+                  </Typography>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    현재 개발 중입니다
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    곧 새로운 기능으로 찾아뵙겠습니다.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
         </Box>
         
         {/* 기존 메인 콘텐츠 숨김 */}
