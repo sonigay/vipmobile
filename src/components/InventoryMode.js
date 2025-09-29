@@ -63,10 +63,7 @@ import {
 import { fetchData } from '../api';
 
 
-import NotificationButton from './NotificationButton';
-import AnnouncementBanner from './AnnouncementBanner';
 import AppUpdatePopup from './AppUpdatePopup';
-import { notificationManager } from '../utils/notificationUtils';
 import { 
   mobileOptimizationManager, 
   applyMobileOptimizations, 
@@ -152,16 +149,9 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
 
 
 
-  // 알림 시스템 및 모바일 최적화 초기화
+  // 모바일 최적화 초기화
   useEffect(() => {
     if (!notificationInitialized) {
-      // 알림 권한 요청
-      notificationManager.requestNotificationPermission();
-      
-      // 오래된 알림 및 공지사항 정리
-      notificationManager.cleanupOldNotifications();
-      notificationManager.cleanupExpiredAnnouncements();
-      
       // 모바일 최적화 적용
       applyMobileOptimizations();
       optimizeMobileNavigation();
@@ -631,9 +621,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
           )}
         </Menu>
 
-        {/* 알림 시스템 */}
-        <NotificationButton />
-        <AnnouncementBanner />
         
         {/* 메인 콘텐츠 */}
         <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
@@ -1093,9 +1080,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
           </Toolbar>
         </AppBar>
         
-        {/* 알림 시스템 */}
-        <NotificationButton />
-        <AnnouncementBanner />
         
         <LoadingSkeleton />
       </Box>
