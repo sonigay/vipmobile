@@ -2883,13 +2883,17 @@ function AgentClosingTab() {
                   <TableRow sx={{ 
                     background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
                     fontWeight: 'bold',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
                     '& .MuiTableCell-root': {
                       borderBottom: '2px solid #dee2e6',
                       fontWeight: 'bold',
                       fontSize: '0.75rem',
                       color: '#495057',
                       padding: '8px 4px',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
                     }
                   }}>
                     {(() => {
@@ -2966,13 +2970,17 @@ function AgentClosingTab() {
                 )}
                 <TableRow sx={{ 
                   backgroundColor: '#1976d2',
+                  position: 'sticky',
+                  top: data && data.agentData && data.agentData.length > 0 ? '48px' : 0,
+                  zIndex: 9,
                   '& .MuiTableCell-root': {
                     color: 'white',
                     fontWeight: 'bold',
                     fontSize: { xs: '0.6rem', sm: '0.7rem' },
                     borderBottom: '2px solid rgba(255,255,255,0.3)',
                     padding: { xs: '2px 1px', sm: '8px 4px' },
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    backgroundColor: '#1976d2'
                   }
                 }}>
                   <TableCell sx={{ width: { xs: '120px', sm: '150px' }, fontSize: { xs: '0.5rem', sm: '0.7rem' } }}>정책그룹</TableCell>
