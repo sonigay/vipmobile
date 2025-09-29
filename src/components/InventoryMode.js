@@ -32,7 +32,8 @@ import {
   AccordionDetails,
   Tabs,
   Tab,
-  Skeleton
+  Skeleton,
+  Container
 } from '@mui/material';
 import {
   Inventory as InventoryIcon,
@@ -506,41 +507,20 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
               재고 관리 시스템
             </Typography>
             
-            {/* 2차 메뉴 */}
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                color="inherit" 
-                onClick={(e) => handleMenuClick(e, 'assignment')}
-                onMouseEnter={() => {
-                  handleMenuHover('assignment', 'office');
-                  handleMenuHover('assignment', 'sales');
-                }}
-                endIcon={<ExpandMoreIcon />}
-                sx={{
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.2)'
-                  }
-                }}
-              >
-                재고배정
-              </Button>
-              
-              {/* 업데이트 확인 버튼 */}
-              <Button
-                color="inherit"
-                startIcon={<UpdateIcon />}
-                onClick={() => setShowUpdatePopup(true)}
-                sx={{
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.2)'
-                  }
-                }}
-              >
-                업데이트 확인
-              </Button>
-            </Box>
+            {/* 업데이트 확인 버튼 */}
+            <Button
+              color="inherit"
+              startIcon={<UpdateIcon />}
+              onClick={() => setShowUpdatePopup(true)}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              업데이트 확인
+            </Button>
             
             {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
             {onModeChange && availableModes && availableModes.length > 1 && (
@@ -571,126 +551,80 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
           </Toolbar>
         </AppBar>
 
-        {/* 드롭다운 메뉴 */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'left',
-          }}
-          PaperProps={{
-            sx: {
-              minWidth: '220px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(10px)',
-              backgroundColor: 'rgba(255,255,255,0.95)',
-              '& .MuiMenuItem-root': {
-                borderRadius: '8px',
-                margin: '4px 8px',
-                padding: '12px 16px',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                  backgroundColor: 'rgba(46, 125, 50, 0.08)',
-                  transform: 'translateX(4px)',
-                  boxShadow: '0 2px 8px rgba(46, 125, 50, 0.15)'
-                },
-                '&:active': {
-                  transform: 'translateX(2px) scale(0.98)'
-                }
-              }
-            }
-          }}
-        >
-          {selectedMenu === 'assignment' && (
-            <>
-              <MenuItem onClick={() => handleSubMenuClick('settings')}>
-                <ListItemIcon>
-                  <SettingsIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>배정셋팅</ListItemText>
-              </MenuItem>
-            </>
-          )}
-        </Menu>
 
         
-        {/* 메인 콘텐츠 - 탭 구조 */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* 탭 헤더 */}
-          <Paper sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        {/* 탭 네비게이션 */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
+          <Container maxWidth={false} sx={{ px: 2 }}>
             <Tabs 
               value={currentScreen} 
               onChange={(event, newValue) => setCurrentScreen(newValue)}
-              aria-label="재고 관리 탭"
-              variant="fullWidth"
-            >
-              <Tab 
-                label="재고배정" 
-                value="assignment"
-                sx={{ 
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                '& .MuiTab-root': {
+                  minHeight: 64,
                   fontSize: '1rem',
                   fontWeight: 'bold',
-                  color: '#2E7D32',
+                  color: '#666',
                   '&.Mui-selected': {
                     color: '#2E7D32',
-                    backgroundColor: 'rgba(46, 125, 50, 0.1)'
+                    fontWeight: 'bold'
                   }
-                }}
-              />
-              <Tab 
-                label="폰클중복값" 
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: '#2E7D32',
+                  height: 3
+                }
+              }}
+            >
+              <Tab
+                label="폰클중복값"
                 value="duplicate"
+                icon={<WarningIcon />}
+                iconPosition="start"
                 sx={{ 
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  color: '#1976D2',
-                  '&.Mui-selected': {
-                    color: '#1976D2',
-                    backgroundColor: 'rgba(25, 118, 210, 0.1)'
-                  }
+                  textTransform: 'none',
+                  minHeight: 64,
+                  py: 1
                 }}
               />
-              <Tab 
-                label="마스터재고검수" 
+              <Tab
+                label="마스터재고검수"
                 value="master"
+                icon={<InventoryIcon />}
+                iconPosition="start"
                 sx={{ 
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  color: '#7B1FA2',
-                  '&.Mui-selected': {
-                    color: '#7B1FA2',
-                    backgroundColor: 'rgba(123, 31, 162, 0.1)'
-                  }
+                  textTransform: 'none',
+                  minHeight: 64,
+                  py: 1
+                }}
+              />
+              <Tab
+                label="재고배정"
+                value="assignment"
+                icon={<AssignmentIcon />}
+                iconPosition="start"
+                sx={{ 
+                  textTransform: 'none',
+                  minHeight: 64,
+                  py: 1
                 }}
               />
             </Tabs>
-          </Paper>
+          </Container>
+        </Box>
 
           {/* 탭 콘텐츠 */}
           <Box sx={{ flex: 1, p: 3 }}>
             {currentScreen === 'assignment' && (
-              <Card sx={{ p: 4, textAlign: 'center' }}>
-                <CardContent>
-                  <AssignmentIcon sx={{ fontSize: 80, color: '#2E7D32', mb: 2 }} />
-                  <Typography variant="h4" component="h1" gutterBottom>
-                    재고배정
-                  </Typography>
-                  <Typography variant="h6" color="text.secondary" gutterBottom>
-                    현재 개발 중입니다
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary">
-                    곧 새로운 기능으로 찾아뵙겠습니다.
-                  </Typography>
-                </CardContent>
-              </Card>
+              <Suspense fallback={<LoadingSkeleton />}>
+                <AssignmentSettingsScreen 
+                  data={data}
+                  onBack={() => setCurrentScreen('duplicate')}
+                  onLogout={onLogout}
+                />
+              </Suspense>
             )}
 
             {currentScreen === 'duplicate' && (
@@ -727,12 +661,9 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
               </Card>
             )}
           </Box>
-        </Box>
-        
-        {/* 기존 메인 콘텐츠 숨김 */}
-        <Box sx={{ display: 'none' }}>
-          {/* 업데이트 팝업 */}
-          <AppUpdatePopup
+
+        {/* 업데이트 팝업 */}
+        <AppUpdatePopup
             open={showUpdatePopup}
             onClose={() => setShowUpdatePopup(false)}
             mode="inventory"
@@ -1165,7 +1096,6 @@ function InventoryMode({ onLogout, loggedInStore, onAssignmentMode, inventoryUse
             </>
           )}
         </Box>
-      </Box>
     );
   }
 
