@@ -25688,10 +25688,11 @@ app.get('/api/phone-duplicates', async (req, res) => {
       }
     });
 
-    // 중복 검사: 모델명 + 일련번호 조합
+    // 중복 검사: 모델명 + 일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
     phoneData.forEach(item => {
-      const key = `${item.model}|${item.serial}`;
+      const serialKey = item.serial ? item.serial.slice(-5) : ''; // 마지막 5자리
+      const key = `${item.model}|${serialKey}`;
       if (key !== '|') { // 빈 값 제외
         if (!duplicateMap.has(key)) {
           duplicateMap.set(key, []);
@@ -25786,10 +25787,11 @@ app.get('/api/sim-duplicates', async (req, res) => {
       }
     });
 
-    // 중복 검사: 유심모델명 + 유심일련번호 조합
+    // 중복 검사: 유심모델명 + 유심일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
     simData.forEach(item => {
-      const key = `${item.model}|${item.serial}`;
+      const serialKey = item.serial ? item.serial.slice(-5) : ''; // 마지막 5자리
+      const key = `${item.model}|${serialKey}`;
       if (key !== '|') { // 빈 값 제외
         if (!duplicateMap.has(key)) {
           duplicateMap.set(key, []);
