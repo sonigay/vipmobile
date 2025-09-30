@@ -25661,13 +25661,23 @@ app.get('/api/phone-duplicates', async (req, res) => {
     const phoneData = [];
     
     // 개통데이터에서 휴대폰 정보 추출
+    console.log(`📱 개통 데이터 행 수: ${activationRows.length}`);
+    
     activationRows.forEach((row, index) => {
       if (row[12] && row[12] !== '유심') { // M열(12)이 유심이 아닌 경우
+        const serial = row[23] || '';
+        const cleanSerial = serial.replace(/\s/g, '');
+        
+        // 디버깅: 처음 5개 일련번호 로그
+        if (index < 5) {
+          console.log(`개통 일련번호 ${index}: 원본="${row[23]}", 공백제거="${cleanSerial}", 길이=${cleanSerial.length}`);
+        }
+        
         phoneData.push({
           store: row[14] || '', // O열(14) - 업체명
           model: row[21] || '', // V열(21) - 모델명
           color: row[22] || '', // W열(22) - 색상
-          serial: row[23] || '', // X열(23) - 일련번호 (RIGHT 함수로 6자리)
+          serial: serial, // X열(23) - 일련번호 (RIGHT 함수로 6자리)
           employee: row[77] || '', // BZ열(77) - 등록직원
           type: '개통'
         });
@@ -25675,13 +25685,23 @@ app.get('/api/phone-duplicates', async (req, res) => {
     });
 
     // 재고데이터에서 휴대폰 정보 추출
+    console.log(`📱 재고 데이터 행 수: ${inventoryRows.length}`);
+    
     inventoryRows.forEach((row, index) => {
       if (row[18] && row[18] !== '유심') { // S열(18)이 유심이 아닌 경우
+        const serial = row[11] || '';
+        const cleanSerial = serial.replace(/\s/g, '');
+        
+        // 디버깅: 처음 5개 일련번호 로그
+        if (index < 5) {
+          console.log(`재고 일련번호 ${index}: 원본="${row[11]}", 공백제거="${cleanSerial}", 길이=${cleanSerial.length}`);
+        }
+        
         phoneData.push({
           store: row[21] || '', // V열(21) - 업체명
           model: row[13] || '', // N열(13) - 모델명
           color: row[14] || '', // O열(14) - 색상
-          serial: row[11] || '', // L열(11) - 일련번호
+          serial: serial, // L열(11) - 일련번호
           employee: row[28] || '', // AC열(28) - 등록직원
           type: '재고'
         });
@@ -25767,8 +25787,16 @@ app.get('/api/sim-duplicates', async (req, res) => {
     const simData = [];
     
     // 개통데이터에서 유심 정보 추출
+    console.log(`📲 개통 데이터에서 유심 검색 중...`);
+    let simCount = 0;
+    
     activationRows.forEach((row, index) => {
       if (row[12] && row[12].includes('유심')) { // M열(12)에 유심이 포함된 경우
+        simCount++;
+        if (simCount <= 5) {
+          console.log(`개통 유심 ${simCount}: M열="${row[12]}", 모델="${row[21]}", 일련번호="${row[23]}"`);
+        }
+        
         simData.push({
           store: row[14] || '', // O열(14) - 업체명
           model: row[21] || '', // V열(21) - 유심모델명
@@ -25778,10 +25806,20 @@ app.get('/api/sim-duplicates', async (req, res) => {
         });
       }
     });
+    
+    console.log(`📲 개통에서 유심 데이터 ${simCount}개 발견`);
 
     // 재고데이터에서 유심 정보 추출
+    console.log(`📲 재고 데이터에서 유심 검색 중...`);
+    let inventorySimCount = 0;
+    
     inventoryRows.forEach((row, index) => {
       if (row[18] && row[18].includes('유심')) { // S열(18)에 유심이 포함된 경우
+        inventorySimCount++;
+        if (inventorySimCount <= 5) {
+          console.log(`재고 유심 ${inventorySimCount}: S열="${row[18]}", 모델="${row[13]}", 일련번호="${row[11]}"`);
+        }
+        
         simData.push({
           store: row[21] || '', // V열(21) - 업체명
           model: row[13] || '', // N열(13) - 유심모델명
@@ -25791,6 +25829,8 @@ app.get('/api/sim-duplicates', async (req, res) => {
         });
       }
     });
+    
+    console.log(`📲 재고에서 유심 데이터 ${inventorySimCount}개 발견`);
 
     // 중복 검사: 유심모델명 + 유심일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
