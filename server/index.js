@@ -25762,7 +25762,7 @@ app.get('/api/sim-duplicates', async (req, res) => {
     
     // 개통데이터에서 유심 정보 추출
     activationRows.forEach((row, index) => {
-      if (row[12] === '유심') { // M열(12)이 유심인 경우
+      if (row[12] && row[12].includes('유심')) { // M열(12)에 유심이 포함된 경우
         simData.push({
           store: row[14] || '', // O열(14) - 업체명
           model: row[21] || '', // V열(21) - 유심모델명
@@ -25775,7 +25775,7 @@ app.get('/api/sim-duplicates', async (req, res) => {
 
     // 재고데이터에서 유심 정보 추출
     inventoryRows.forEach((row, index) => {
-      if (row[18] === '유심') { // S열(18)이 유심인 경우
+      if (row[18] && row[18].includes('유심')) { // S열(18)에 유심이 포함된 경우
         simData.push({
           store: row[21] || '', // V열(21) - 업체명
           model: row[13] || '', // N열(13) - 유심모델명
@@ -25817,6 +25817,7 @@ app.get('/api/sim-duplicates', async (req, res) => {
       });
     });
 
+    console.log(`📲 유심 데이터 통합 완료: ${simData.length}개 유심 데이터 발견`);
     console.log(`📲 유심 중복 검사 완료: ${duplicates.length}개 중복 그룹 발견`);
     
     res.json({
