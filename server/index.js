@@ -25691,8 +25691,8 @@ app.get('/api/phone-duplicates', async (req, res) => {
     // 중복 검사: 모델명 + 일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
     phoneData.forEach(item => {
-      // 일련번호 유효성 검사: 공백이나 빈 값 제외, 최소 4자리 이상
-      if (!item.serial || item.serial.trim() === '' || item.serial.length < 4) {
+      // 일련번호 유효성 검사: 공백이나 빈 값 제외, 최소 5자리 이상
+      if (!item.serial || item.serial.trim() === '' || item.serial.length < 5) {
         return; // 유효하지 않은 일련번호는 건너뛰기
       }
       
@@ -25794,8 +25794,8 @@ app.get('/api/sim-duplicates', async (req, res) => {
     // 중복 검사: 유심모델명 + 유심일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
     simData.forEach(item => {
-      // 유심 일련번호 유효성 검사: 공백이나 빈 값 제외, 최소 4자리 이상
-      if (!item.serial || item.serial.trim() === '' || item.serial.length < 4) {
+      // 유심 일련번호 유효성 검사: 공백이나 빈 값 제외, 최소 5자리 이상
+      if (!item.serial || item.serial.trim() === '' || item.serial.length < 5) {
         return; // 유효하지 않은 일련번호는 건너뛰기
       }
       
