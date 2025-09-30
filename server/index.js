@@ -25708,16 +25708,16 @@ app.get('/api/phone-duplicates', async (req, res) => {
       }
     });
 
-    // 중복 검사: 모델명 + 일련번호(마지막 5자리) 조합
+    // 중복 검사: 모델명 + 일련번호(마지막 6자리) 조합
     const duplicateMap = new Map();
     phoneData.forEach(item => {
-      // 일련번호 유효성 검사: 공백 제거 후 최소 5자리 이상
+      // 일련번호 유효성 검사: 공백 제거 후 최소 6자리 이상
       const cleanSerial = item.serial ? item.serial.replace(/\s/g, '') : '';
-      if (!cleanSerial || cleanSerial.length < 5) {
+      if (!cleanSerial || cleanSerial.length < 6) {
         return; // 유효하지 않은 일련번호는 건너뛰기
       }
       
-      const serialKey = cleanSerial.slice(-5); // 마지막 5자리 (공백 제거 후)
+      const serialKey = cleanSerial.slice(-6); // 마지막 6자리 (공백 제거 후)
       const key = `${item.model}|${serialKey}`;
       
       if (!duplicateMap.has(key)) {
@@ -25832,16 +25832,16 @@ app.get('/api/sim-duplicates', async (req, res) => {
     
     console.log(`📲 재고에서 유심 데이터 ${inventorySimCount}개 발견`);
 
-    // 중복 검사: 유심모델명 + 유심일련번호(마지막 5자리) 조합
+    // 중복 검사: 유심모델명 + 유심일련번호(마지막 6자리) 조합
     const duplicateMap = new Map();
     simData.forEach(item => {
-      // 유심 일련번호 유효성 검사: 공백 제거 후 최소 5자리 이상
+      // 유심 일련번호 유효성 검사: 공백 제거 후 최소 6자리 이상
       const cleanSerial = item.serial ? item.serial.replace(/\s/g, '') : '';
-      if (!cleanSerial || cleanSerial.length < 5) {
+      if (!cleanSerial || cleanSerial.length < 6) {
         return; // 유효하지 않은 일련번호는 건너뛰기
       }
       
-      const serialKey = cleanSerial.slice(-5); // 마지막 5자리 (공백 제거 후)
+      const serialKey = cleanSerial.slice(-6); // 마지막 6자리 (공백 제거 후)
       const key = `${item.model}|${serialKey}`;
       
       if (!duplicateMap.has(key)) {
