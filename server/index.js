@@ -25668,7 +25668,7 @@ app.get('/api/phone-duplicates', async (req, res) => {
           model: row[21] || '', // V열(21) - 모델명
           color: row[22] || '', // W열(22) - 색상
           serial: row[23] || '', // X열(23) - 일련번호 (RIGHT 함수로 6자리)
-          employee: row[24] || '', // Y열(24) - 등록직원
+          employee: row[77] || '', // BZ열(77) - 등록직원
           type: '개통'
         });
       }
@@ -25767,7 +25767,7 @@ app.get('/api/sim-duplicates', async (req, res) => {
           store: row[14] || '', // O열(14) - 업체명
           model: row[21] || '', // V열(21) - 유심모델명
           serial: row[23] || '', // X열(23) - 유심일련번호
-          employee: row[24] || '', // Y열(24) - 등록직원
+          employee: row[77] || '', // BZ열(77) - 등록직원
           type: '개통'
         });
       }
