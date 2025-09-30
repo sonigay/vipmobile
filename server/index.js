@@ -25679,6 +25679,8 @@ app.get('/api/phone-duplicates', async (req, res) => {
           color: row[22] || '', // W열(22) - 색상
           serial: serial, // X열(23) - 일련번호 (RIGHT 함수로 6자리)
           employee: row[77] || '', // BZ열(77) - 등록직원
+          inputStore: row[12] || '', // M열(12) - 입고처
+          outputDate: row[9] || '', // J열(9) - 출고일
           type: '개통'
         });
       }
@@ -25703,6 +25705,8 @@ app.get('/api/phone-duplicates', async (req, res) => {
           color: row[14] || '', // O열(14) - 색상
           serial: serial, // L열(11) - 일련번호
           employee: row[28] || '', // AC열(28) - 등록직원
+          inputStore: row[18] || '', // S열(18) - 입고처
+          outputDate: row[22] || '', // W열(22) - 출고일
           type: '재고'
         });
       }
@@ -25802,6 +25806,8 @@ app.get('/api/sim-duplicates', async (req, res) => {
           model: row[24] || '', // Y열(24) - 유심모델명
           serial: row[25] || '', // Z열(25) - 유심일련번호
           employee: row[77] || '', // BZ열(77) - 등록직원
+          inputStore: row[12] || '', // M열(12) - 입고처
+          outputDate: row[9] || '', // J열(9) - 출고일
           type: '개통'
         });
       }
@@ -25825,6 +25831,8 @@ app.get('/api/sim-duplicates', async (req, res) => {
           model: row[13] || '', // N열(13) - 유심모델명
           serial: row[11] || '', // L열(11) - 유심일련번호
           employee: row[28] || '', // AC열(28) - 등록직원
+          inputStore: row[18] || '', // S열(18) - 입고처
+          outputDate: row[22] || '', // W열(22) - 출고일
           type: '재고'
         });
       }

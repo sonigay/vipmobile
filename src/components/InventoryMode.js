@@ -294,6 +294,8 @@ const PhoneDuplicateContent = ({ data, type }) => {
                         {type === '휴대폰' && <TableCell>모델명</TableCell>}
                         {type === '휴대폰' && <TableCell>색상</TableCell>}
                         <TableCell>일련번호</TableCell>
+                        <TableCell>입고처</TableCell>
+                        <TableCell>출고일</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -317,6 +319,8 @@ const PhoneDuplicateContent = ({ data, type }) => {
                           {type === '휴대폰' && <TableCell>{item.model}</TableCell>}
                           {type === '휴대폰' && <TableCell>{item.color}</TableCell>}
                           <TableCell>{item.serial}</TableCell>
+                          <TableCell>{item.inputStore}</TableCell>
+                          <TableCell>{item.outputDate}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
