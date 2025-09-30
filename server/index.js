@@ -25691,20 +25691,18 @@ app.get('/api/phone-duplicates', async (req, res) => {
     // 중복 검사: 모델명 + 일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
     phoneData.forEach(item => {
-      const serialKey = item.serial ? item.serial.slice(-5) : ''; // 마지막 5자리
-      
-      // 디버깅: 일련번호 길이 확인
-      if (item.serial && item.serial.length < 5) {
-        console.log(`일련번호 길이 부족: "${item.serial}" (길이: ${item.serial.length})`);
+      // 일련번호 유효성 검사: 공백이나 빈 값 제외, 최소 4자리 이상
+      if (!item.serial || item.serial.trim() === '' || item.serial.length < 4) {
+        return; // 유효하지 않은 일련번호는 건너뛰기
       }
       
+      const serialKey = item.serial.slice(-5); // 마지막 5자리
       const key = `${item.model}|${serialKey}`;
-      if (key !== '|') { // 빈 값 제외
-        if (!duplicateMap.has(key)) {
-          duplicateMap.set(key, []);
-        }
-        duplicateMap.get(key).push(item);
+      
+      if (!duplicateMap.has(key)) {
+        duplicateMap.set(key, []);
       }
+      duplicateMap.get(key).push(item);
     });
 
     // 중복된 항목만 필터링
@@ -25796,20 +25794,18 @@ app.get('/api/sim-duplicates', async (req, res) => {
     // 중복 검사: 유심모델명 + 유심일련번호(마지막 5자리) 조합
     const duplicateMap = new Map();
     simData.forEach(item => {
-      const serialKey = item.serial ? item.serial.slice(-5) : ''; // 마지막 5자리
-      
-      // 디버깅: 유심 일련번호 길이 확인
-      if (item.serial && item.serial.length < 5) {
-        console.log(`유심 일련번호 길이 부족: "${item.serial}" (길이: ${item.serial.length})`);
+      // 유심 일련번호 유효성 검사: 공백이나 빈 값 제외, 최소 4자리 이상
+      if (!item.serial || item.serial.trim() === '' || item.serial.length < 4) {
+        return; // 유효하지 않은 일련번호는 건너뛰기
       }
       
+      const serialKey = item.serial.slice(-5); // 마지막 5자리
       const key = `${item.model}|${serialKey}`;
-      if (key !== '|') { // 빈 값 제외
-        if (!duplicateMap.has(key)) {
-          duplicateMap.set(key, []);
-        }
-        duplicateMap.get(key).push(item);
+      
+      if (!duplicateMap.has(key)) {
+        duplicateMap.set(key, []);
       }
+      duplicateMap.get(key).push(item);
     });
 
     // 중복된 항목만 필터링
