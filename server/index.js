@@ -25692,6 +25692,12 @@ app.get('/api/phone-duplicates', async (req, res) => {
     const duplicateMap = new Map();
     phoneData.forEach(item => {
       const serialKey = item.serial ? item.serial.slice(-5) : ''; // 마지막 5자리
+      
+      // 디버깅: 일련번호 길이 확인
+      if (item.serial && item.serial.length < 5) {
+        console.log(`일련번호 길이 부족: "${item.serial}" (길이: ${item.serial.length})`);
+      }
+      
       const key = `${item.model}|${serialKey}`;
       if (key !== '|') { // 빈 값 제외
         if (!duplicateMap.has(key)) {
@@ -25791,6 +25797,12 @@ app.get('/api/sim-duplicates', async (req, res) => {
     const duplicateMap = new Map();
     simData.forEach(item => {
       const serialKey = item.serial ? item.serial.slice(-5) : ''; // 마지막 5자리
+      
+      // 디버깅: 유심 일련번호 길이 확인
+      if (item.serial && item.serial.length < 5) {
+        console.log(`유심 일련번호 길이 부족: "${item.serial}" (길이: ${item.serial.length})`);
+      }
+      
       const key = `${item.model}|${serialKey}`;
       if (key !== '|') { // 빈 값 제외
         if (!duplicateMap.has(key)) {
