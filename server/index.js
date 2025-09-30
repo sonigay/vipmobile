@@ -25660,29 +25660,29 @@ app.get('/api/phone-duplicates', async (req, res) => {
     // 휴대폰 데이터 통합 (개통 + 재고)
     const phoneData = [];
     
-    // 개통데이터에서 휴대폰 정보 추출 (M4:M, O4:O, V4:V, W4:W, X4:X, Y4:Y, Z4:Z, BZ4:BZ)
+    // 개통데이터에서 휴대폰 정보 추출
     activationRows.forEach((row, index) => {
-      if (row[12] && row[12] !== '유심') { // M열이 유심이 아닌 경우
+      if (row[12] && row[12] !== '유심') { // M열(12)이 유심이 아닌 경우
         phoneData.push({
-          model: row[14] || '', // O열 - 모델명
-          color: row[21] || '', // V열 - 색상
-          serial: row[22] ? row[22].slice(-6) : '', // W열 - 일련번호 (마지막 6자리)
-          store: row[14] || '', // O열 - 업체명
-          employee: row[77] || '', // BZ열 - 등록직원
+          store: row[14] || '', // O열(14) - 업체명
+          model: row[21] || '', // V열(21) - 모델명
+          color: row[22] || '', // W열(22) - 색상
+          serial: row[23] || '', // X열(23) - 일련번호 (RIGHT 함수로 6자리)
+          employee: row[24] || '', // Y열(24) - 등록직원
           type: '개통'
         });
       }
     });
 
-    // 재고데이터에서 휴대폰 정보 추출 (S4:S, V4:V, N4:N, O4:O, L4:L, AC4:AC)
+    // 재고데이터에서 휴대폰 정보 추출
     inventoryRows.forEach((row, index) => {
-      if (row[18] && row[18] !== '유심') { // M열이 유심이 아닌 경우
+      if (row[18] && row[18] !== '유심') { // S열(18)이 유심이 아닌 경우
         phoneData.push({
-          model: row[13] || '', // N열 - 모델명
-          color: row[20] || '', // V열 - 색상
-          serial: row[11] ? row[11].slice(-6) : '', // L열 - 일련번호 (마지막 6자리)
-          store: row[20] || '', // V열 - 업체명
-          employee: row[28] || '', // AC열 - 등록직원
+          store: row[21] || '', // V열(21) - 업체명
+          model: row[13] || '', // N열(13) - 모델명
+          color: row[14] || '', // O열(14) - 색상
+          serial: row[11] || '', // L열(11) - 일련번호
+          employee: row[28] || '', // AC열(28) - 등록직원
           type: '재고'
         });
       }
@@ -25762,12 +25762,12 @@ app.get('/api/sim-duplicates', async (req, res) => {
     
     // 개통데이터에서 유심 정보 추출
     activationRows.forEach((row, index) => {
-      if (row[12] === '유심') { // M열이 유심인 경우
+      if (row[12] === '유심') { // M열(12)이 유심인 경우
         simData.push({
-          model: row[14] || '', // O열 - 유심모델명
-          serial: row[22] ? row[22].slice(-6) : '', // W열 - 유심일련번호 (마지막 6자리)
-          store: row[14] || '', // O열 - 업체명
-          employee: row[77] || '', // BZ열 - 등록직원
+          store: row[14] || '', // O열(14) - 업체명
+          model: row[21] || '', // V열(21) - 유심모델명
+          serial: row[23] || '', // X열(23) - 유심일련번호
+          employee: row[24] || '', // Y열(24) - 등록직원
           type: '개통'
         });
       }
@@ -25775,12 +25775,12 @@ app.get('/api/sim-duplicates', async (req, res) => {
 
     // 재고데이터에서 유심 정보 추출
     inventoryRows.forEach((row, index) => {
-      if (row[18] === '유심') { // M열이 유심인 경우
+      if (row[18] === '유심') { // S열(18)이 유심인 경우
         simData.push({
-          model: row[13] || '', // N열 - 유심모델명
-          serial: row[11] ? row[11].slice(-6) : '', // L열 - 유심일련번호 (마지막 6자리)
-          store: row[20] || '', // V열 - 업체명
-          employee: row[28] || '', // AC열 - 등록직원
+          store: row[21] || '', // V열(21) - 업체명
+          model: row[13] || '', // N열(13) - 유심모델명
+          serial: row[11] || '', // L열(11) - 유심일련번호
+          employee: row[28] || '', // AC열(28) - 등록직원
           type: '재고'
         });
       }
