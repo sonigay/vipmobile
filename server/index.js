@@ -25688,7 +25688,7 @@ app.get('/api/phone-duplicates', async (req, res) => {
     console.log(`📱 재고 데이터 행 수: ${inventoryRows.length}`);
     
     inventoryRows.forEach((row, index) => {
-      if (row[18] && row[18] !== '유심') { // S열(18)이 유심이 아닌 경우
+      if (row[12] && row[12] !== '유심') { // M열(12)이 유심이 아닌 경우
         const serial = row[11] || '';
         const cleanSerial = serial.replace(/\s/g, '');
         
@@ -25794,13 +25794,13 @@ app.get('/api/sim-duplicates', async (req, res) => {
       if (row[12] && row[12].includes('유심')) { // M열(12)에 유심이 포함된 경우
         simCount++;
         if (simCount <= 5) {
-          console.log(`개통 유심 ${simCount}: M열="${row[12]}", 모델="${row[21]}", 일련번호="${row[23]}"`);
+          console.log(`개통 유심 ${simCount}: M열="${row[12]}", 모델="${row[24]}", 일련번호="${row[25]}"`);
         }
         
         simData.push({
           store: row[14] || '', // O열(14) - 업체명
-          model: row[21] || '', // V열(21) - 유심모델명
-          serial: row[23] || '', // X열(23) - 유심일련번호
+          model: row[24] || '', // Y열(24) - 유심모델명
+          serial: row[25] || '', // Z열(25) - 유심일련번호
           employee: row[77] || '', // BZ열(77) - 등록직원
           type: '개통'
         });
@@ -25814,10 +25814,10 @@ app.get('/api/sim-duplicates', async (req, res) => {
     let inventorySimCount = 0;
     
     inventoryRows.forEach((row, index) => {
-      if (row[18] && row[18].includes('유심')) { // S열(18)에 유심이 포함된 경우
+      if (row[12] && row[12].includes('유심')) { // M열(12)에 유심이 포함된 경우
         inventorySimCount++;
         if (inventorySimCount <= 5) {
-          console.log(`재고 유심 ${inventorySimCount}: S열="${row[18]}", 모델="${row[13]}", 일련번호="${row[11]}"`);
+          console.log(`재고 유심 ${inventorySimCount}: M열="${row[12]}", 모델="${row[13]}", 일련번호="${row[11]}"`);
         }
         
         simData.push({
