@@ -25646,7 +25646,7 @@ app.get('/api/phone-duplicates', async (req, res) => {
     // 폰클개통데이터와 폰클재고데이터 시트에서 데이터 가져오기
     const activationData = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.SHEET_ID,
-      range: '폰클개통데이터!A4:Z',
+      range: '폰클개통데이터!A4:BZ',
     });
 
     const inventoryData = await sheets.spreadsheets.values.get({
@@ -25688,11 +25688,11 @@ app.get('/api/phone-duplicates', async (req, res) => {
       }
     });
 
-    // 중복 검사: 모델명 + 색상 + 일련번호 조합
+    // 중복 검사: 모델명 + 일련번호 조합
     const duplicateMap = new Map();
     phoneData.forEach(item => {
-      const key = `${item.model}|${item.color}|${item.serial}`;
-      if (key !== '||') { // 빈 값 제외
+      const key = `${item.model}|${item.serial}`;
+      if (key !== '|') { // 빈 값 제외
         if (!duplicateMap.has(key)) {
           duplicateMap.set(key, []);
         }
@@ -25746,7 +25746,7 @@ app.get('/api/sim-duplicates', async (req, res) => {
     // 폰클개통데이터와 폰클재고데이터 시트에서 데이터 가져오기
     const activationData = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.SHEET_ID,
-      range: '폰클개통데이터!A4:Z',
+      range: '폰클개통데이터!A4:BZ',
     });
 
     const inventoryData = await sheets.spreadsheets.values.get({
