@@ -35,7 +35,6 @@ import ReservationMode from './components/ReservationMode';
 import BudgetMode from './components/BudgetMode';
 import SalesMode from './components/SalesMode';
 import InventoryRecoveryMode from './components/InventoryRecoveryMode';
-import DataCollectionMode from './components/DataCollectionMode';
 
 
 
