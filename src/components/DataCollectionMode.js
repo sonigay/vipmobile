@@ -17,6 +17,7 @@ import {
   DataUsage as DataUsageIcon,
   Update as UpdateIcon
 } from '@mui/icons-material';
+import AppUpdatePopup from './AppUpdatePopup';
 
 const DataCollectionMode = ({ 
   loggedInStore, 
@@ -26,6 +27,7 @@ const DataCollectionMode = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // 로딩 상태
   if (loading) {
@@ -89,6 +91,7 @@ const DataCollectionMode = ({
           <Button
             color="inherit"
             startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
             sx={{
               backgroundColor: 'rgba(255,255,255,0.1)',
               '&:hover': {
@@ -141,6 +144,17 @@ const DataCollectionMode = ({
           </Card>
         </Container>
       </Box>
+
+      {/* 업데이트 팝업 */}
+      <AppUpdatePopup
+        open={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        mode="dataCollection"
+        loggedInStore={loggedInStore}
+        onUpdateAdded={() => {
+          console.log('정보수집모드 새 업데이트가 추가되었습니다.');
+        }}
+      />
     </Box>
   );
 };
