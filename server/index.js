@@ -18761,7 +18761,11 @@ app.get('/api/inventory/status', async (req, res) => {
     // 재고 데이터 처리 (모델별 집계)
     const inventoryMap = new Map(); // key: "모델명", value: { 재고수량, 담당자, 사무실, 소속, 구분 }
     
-    inventoryValues.slice(3).forEach(row => {
+    console.log(`📊 [재고배정 디버깅] 재고 데이터 행 수: ${inventoryValues.length}`);
+    let processedRows = 0;
+    let validModels = 0;
+    
+    inventoryValues.slice(3).forEach((row, index) => {
       if (row.length >= 23) {
         const modelName = (row[13] || '').toString().trim(); // N열: 모델명
         const color = (row[14] || '').toString().trim(); // O열: 색상
@@ -18771,7 +18775,13 @@ app.get('/api/inventory/status', async (req, res) => {
         const agent = (row[8] || '').toString().trim(); // I열: 담당자
         const store = (row[21] || '').toString().trim(); // V열: 출고처
         
+        // 디버깅: 처음 5개 행의 모델명 확인
+        if (index < 5) {
+          console.log(`재고 행 ${index}: 모델명="${modelName}", 색상="${color}", 구분="${category}", 길이=${row.length}`);
+        }
+        
         if (modelName && category !== '#N/A') {
+          validModels++;
           // 필터링 적용
           if (req.query.agent && req.query.agent !== agent) return;
           if (req.query.office && req.query.office !== office) return;
