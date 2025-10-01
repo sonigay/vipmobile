@@ -25911,6 +25911,459 @@ app.get('/api/sim-duplicates', async (req, res) => {
   }
 });
 
+// ============================================================
+// 무선단말검수 관련 API
+// ============================================================
+
+// 일련번호 정규화 함수 (공백 제거, 앞부분 연속된 0 제거)
+function normalizeSerialNumber(serial) {
+  if (!serial) return '';
+  
+  // 공백 제거
+  let normalized = serial.toString().trim().replace(/\s+/g, '');
+  
+  // 알파벳으로 시작하는 경우, 앞부분 연속된 0 제거
+  // 예: "000000ABC123" -> "ABC123", "00123ABC" -> "123ABC"
+  normalized = normalized.replace(/^0+(?=\w)/, '');
+  
+  return normalized.toUpperCase(); // 대소문자 통일
+}
+
+// 마스터재고 데이터 조회 API
+app.get('/api/master-inventory', async (req, res) => {
+  try {
+    console.log('📦 마스터재고 데이터 조회 시작...');
+    
+    // 마스터재고 시트 ID는 환경변수에서 가져옴
+    const masterSpreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    const sheetData = await fetchSheetValuesDirectly('마스터재고', masterSpreadsheetId);
+    
+    if (!sheetData || sheetData.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제외하고 데이터 파싱
+    const rows = sheetData.slice(1);
+    const inventory = rows.map(row => ({
+      modelCode: row[9] || '',           // 모델코드 (10번째 컬럼)
+      color: row[11] || '',              // 색상 (12번째 컬럼)
+      serialNumber: row[12] || '',       // 일련번호 (13번째 컬럼)
+      normalizedSerial: normalizeSerialNumber(row[12]), // 정규화된 일련번호
+      outletCode: row[17] || '',         // 출고점코드 (18번째 컬럼)
+      firstInDate: row[23] || '',        // 최초입고일자 (24번째 컬럼)
+      dealerInDate: row[26] || ''        // 대리점입고일자 (27번째 컬럼)
+    })).filter(item => item.serialNumber); // 일련번호가 있는 것만
+    
+    console.log(`✅ 마스터재고 데이터 조회 완료: ${inventory.length}개`);
+    
+    res.json({
+      success: true,
+      data: inventory
+    });
+    
+  } catch (error) {
+    console.error('❌ 마스터재고 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 폰클재고 데이터 조회 API
+app.get('/api/phonekl-inventory', async (req, res) => {
+  try {
+    console.log('📱 폰클재고 데이터 조회 시작...');
+    
+    const phoneklSpreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    const sheetData = await fetchSheetValuesDirectly('폰클재고', phoneklSpreadsheetId);
+    
+    if (!sheetData || sheetData.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제외하고 데이터 파싱
+    const rows = sheetData.slice(1);
+    const inventory = rows.map(row => ({
+      inDate: row[8] || '',              // 입고일 (9번째 컬럼)
+      serialNumber: row[10] || '',       // 일련번호 (11번째 컬럼)
+      normalizedSerial: normalizeSerialNumber(row[10]), // 정규화된 일련번호
+      type: row[11] || '',               // 종류 (12번째 컬럼)
+      modelName: row[12] || '',          // 모델명 (13번째 컬럼)
+      color: row[13] || '',              // 색상 (14번째 컬럼)
+      status: row[14] || '',             // 상태 (15번째 컬럼)
+      inPrice: row[16] || ''             // 입고가 (17번째 컬럼)
+    })).filter(item => item.serialNumber); // 일련번호가 있는 것만
+    
+    console.log(`✅ 폰클재고 데이터 조회 완료: ${inventory.length}개`);
+    
+    res.json({
+      success: true,
+      data: inventory
+    });
+    
+  } catch (error) {
+    console.error('❌ 폰클재고 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 모델명정규화 데이터 조회 API
+app.get('/api/model-normalization', async (req, res) => {
+  try {
+    console.log('🔄 모델명정규화 데이터 조회 시작...');
+    
+    const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    const sheetData = await fetchSheetValuesDirectly('모델명정규화', spreadsheetId);
+    
+    if (!sheetData || sheetData.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+    
+    // 헤더 제외하고 데이터 파싱
+    const rows = sheetData.slice(1);
+    const normalizationMap = {};
+    
+    rows.forEach(row => {
+      const modelCode = row[0] || '';           // 원본 모델코드
+      const normalizedName = row[1] || '';      // 정규화된 모델명
+      
+      if (modelCode && normalizedName) {
+        normalizationMap[modelCode] = normalizedName;
+      }
+    });
+    
+    console.log(`✅ 모델명정규화 데이터 조회 완료: ${Object.keys(normalizationMap).length}개`);
+    
+    res.json({
+      success: true,
+      data: normalizationMap
+    });
+    
+  } catch (error) {
+    console.error('❌ 모델명정규화 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 모델명정규화 데이터 저장 API
+app.post('/api/model-normalization', async (req, res) => {
+  try {
+    console.log('💾 모델명정규화 데이터 저장 시작...');
+    
+    const { normalizationMap } = req.body;
+    
+    if (!normalizationMap || typeof normalizationMap !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: '정규화 데이터가 올바르지 않습니다.'
+      });
+    }
+    
+    const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    
+    // 헤더 + 데이터 행 생성
+    const rows = [
+      ['모델코드', '정규화모델명', '등록일시']
+    ];
+    
+    Object.entries(normalizationMap).forEach(([modelCode, normalizedName]) => {
+      if (normalizedName) { // 정규화명이 입력된 것만 저장
+        rows.push([
+          modelCode,
+          normalizedName,
+          new Date().toISOString()
+        ]);
+      }
+    });
+    
+    // 시트 업데이트
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: spreadsheetId,
+      range: '모델명정규화!A:C',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: rows
+      }
+    });
+    
+    console.log(`✅ 모델명정규화 데이터 저장 완료: ${rows.length - 1}개`);
+    
+    res.json({
+      success: true,
+      message: `${rows.length - 1}개의 정규화 데이터가 저장되었습니다.`
+    });
+    
+  } catch (error) {
+    console.error('❌ 모델명정규화 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 확인된미확인재고 데이터 조회 API
+app.get('/api/confirmed-unconfirmed-inventory', async (req, res) => {
+  try {
+    console.log('✔️ 확인된미확인재고 데이터 조회 시작...');
+    
+    const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    const sheetData = await fetchSheetValuesDirectly('확인된미확인재고', spreadsheetId);
+    
+    if (!sheetData || sheetData.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제외하고 데이터 파싱
+    const rows = sheetData.slice(1);
+    const confirmedItems = rows.map(row => ({
+      outletCode: row[0] || '',          // 출고점코드
+      inPrice: row[1] || '',             // 입고가
+      modelCode: row[2] || '',           // 모델코드
+      color: row[3] || '',               // 색상
+      serialNumber: row[4] || '',        // 일련번호
+      normalizedSerial: normalizeSerialNumber(row[4]), // 정규화된 일련번호
+      inDate: row[5] || '',              // 입고일자
+      confirmNote: row[6] || '',         // 확인내용
+      status: row[7] || ''               // 진행상황
+    })).filter(item => item.serialNumber); // 일련번호가 있는 것만
+    
+    console.log(`✅ 확인된미확인재고 데이터 조회 완료: ${confirmedItems.length}개`);
+    
+    res.json({
+      success: true,
+      data: confirmedItems
+    });
+    
+  } catch (error) {
+    console.error('❌ 확인된미확인재고 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 확인된미확인재고 데이터 추가 API
+app.post('/api/confirmed-unconfirmed-inventory', async (req, res) => {
+  try {
+    console.log('💾 확인된미확인재고 데이터 추가 시작...');
+    
+    const { items } = req.body;
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '추가할 항목이 없습니다.'
+      });
+    }
+    
+    const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    
+    // 기존 데이터 조회
+    const existingData = await fetchSheetValuesDirectly('확인된미확인재고', spreadsheetId);
+    
+    // 새로운 항목 추가
+    const newRows = items.map(item => [
+      item.outletCode || '',
+      item.inPrice || '',
+      item.modelCode || '',
+      item.color || '',
+      item.serialNumber || '',
+      item.inDate || '',
+      item.confirmNote || '',
+      item.status || '처리중'
+    ]);
+    
+    // 헤더가 없으면 생성
+    let allRows;
+    if (!existingData || existingData.length === 0) {
+      allRows = [
+        ['출고점코드', '입고가', '모델코드', '색상', '일련번호', '입고일자', '확인내용', '진행상황'],
+        ...newRows
+      ];
+    } else {
+      allRows = [
+        ...existingData,
+        ...newRows
+      ];
+    }
+    
+    // 시트 업데이트
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: spreadsheetId,
+      range: '확인된미확인재고!A:H',
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: allRows
+      }
+    });
+    
+    console.log(`✅ 확인된미확인재고 데이터 추가 완료: ${newRows.length}개`);
+    
+    res.json({
+      success: true,
+      message: `${newRows.length}개의 항목이 추가되었습니다.`
+    });
+    
+  } catch (error) {
+    console.error('❌ 확인된미확인재고 추가 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 재고 비교 검수 API
+app.post('/api/inventory-inspection', async (req, res) => {
+  try {
+    console.log('🔍 재고 비교 검수 시작...');
+    
+    const spreadsheetId = '12_oC7c2xqHlDCppUvWL2EFesszA3oDU5JBdrYccYT7Q';
+    
+    // 1. 마스터재고 조회
+    const masterData = await fetchSheetValuesDirectly('마스터재고', spreadsheetId);
+    const masterRows = masterData.slice(1);
+    const masterInventory = masterRows.map(row => ({
+      modelCode: row[9] || '',
+      color: row[11] || '',
+      serialNumber: row[12] || '',
+      normalizedSerial: normalizeSerialNumber(row[12]),
+      outletCode: row[17] || '',
+      firstInDate: row[23] || '',
+      dealerInDate: row[26] || ''
+    })).filter(item => item.serialNumber);
+    
+    // 2. 폰클재고 조회
+    const phoneklData = await fetchSheetValuesDirectly('폰클재고', spreadsheetId);
+    const phoneklRows = phoneklData.slice(1);
+    const phoneklInventory = phoneklRows.map(row => ({
+      inDate: row[8] || '',
+      serialNumber: row[10] || '',
+      normalizedSerial: normalizeSerialNumber(row[10]),
+      type: row[11] || '',
+      modelName: row[12] || '',
+      color: row[13] || '',
+      status: row[14] || '',
+      inPrice: row[16] || ''
+    })).filter(item => item.serialNumber);
+    
+    // 3. 모델명정규화 맵 조회
+    const normData = await fetchSheetValuesDirectly('모델명정규화', spreadsheetId);
+    const normalizationMap = {};
+    if (normData && normData.length > 1) {
+      normData.slice(1).forEach(row => {
+        const modelCode = row[0] || '';
+        const normalizedName = row[1] || '';
+        if (modelCode && normalizedName) {
+          normalizationMap[modelCode] = normalizedName;
+        }
+      });
+    }
+    
+    // 4. 확인된미확인재고 조회
+    const confirmedData = await fetchSheetValuesDirectly('확인된미확인재고', spreadsheetId);
+    const confirmedSet = new Set();
+    if (confirmedData && confirmedData.length > 1) {
+      confirmedData.slice(1).forEach(row => {
+        const serial = normalizeSerialNumber(row[4] || '');
+        if (serial) {
+          confirmedSet.add(serial);
+        }
+      });
+    }
+    
+    // 5. 폰클재고를 Map으로 변환 (빠른 검색을 위해)
+    const phoneklMap = new Map();
+    phoneklInventory.forEach(item => {
+      phoneklMap.set(item.normalizedSerial, item);
+    });
+    
+    // 6. 마스터재고 기준으로 비교
+    const matchedItems = [];
+    const unmatchedItems = [];
+    const needsNormalization = new Set();
+    
+    masterInventory.forEach(masterItem => {
+      const phoneklItem = phoneklMap.get(masterItem.normalizedSerial);
+      
+      if (phoneklItem) {
+        // 일련번호 일치
+        matchedItems.push({
+          ...masterItem,
+          phoneklData: phoneklItem,
+          matched: true
+        });
+      } else {
+        // 일련번호 불일치 - 확인된미확인재고에 있는지 확인
+        const isConfirmed = confirmedSet.has(masterItem.normalizedSerial);
+        
+        if (!isConfirmed) {
+          // 확인되지 않은 미확인 재고
+          unmatchedItems.push({
+            ...masterItem,
+            matched: false,
+            isConfirmed: false
+          });
+        } else {
+          // 이미 확인된 재고
+          unmatchedItems.push({
+            ...masterItem,
+            matched: false,
+            isConfirmed: true
+          });
+        }
+      }
+      
+      // 모델코드가 정규화되지 않은 경우 추가
+      if (masterItem.modelCode && !normalizationMap[masterItem.modelCode]) {
+        needsNormalization.add(masterItem.modelCode);
+      }
+    });
+    
+    console.log(`✅ 재고 비교 검수 완료`);
+    console.log(`   - 전체: ${masterInventory.length}개`);
+    console.log(`   - 일치: ${matchedItems.length}개`);
+    console.log(`   - 미확인: ${unmatchedItems.filter(i => !i.isConfirmed).length}개`);
+    console.log(`   - 확인됨: ${unmatchedItems.filter(i => i.isConfirmed).length}개`);
+    console.log(`   - 정규화 필요: ${needsNormalization.size}개`);
+    
+    res.json({
+      success: true,
+      data: {
+        total: masterInventory.length,
+        matched: matchedItems,
+        unmatched: unmatchedItems.filter(i => !i.isConfirmed), // 미확인만
+        confirmed: unmatchedItems.filter(i => i.isConfirmed),  // 확인된 것들
+        needsNormalization: Array.from(needsNormalization),
+        normalizationMap: normalizationMap,
+        statistics: {
+          totalCount: masterInventory.length,
+          matchedCount: matchedItems.length,
+          unmatchedCount: unmatchedItems.filter(i => !i.isConfirmed).length,
+          confirmedCount: unmatchedItems.filter(i => i.isConfirmed).length,
+          needsNormalizationCount: needsNormalization.size
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ 재고 비교 검수 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // 서버 시작 (이미 위에서 처리됨)
   console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
   console.log(`📊 예산 관리 시스템이 준비되었습니다.`);

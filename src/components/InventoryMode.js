@@ -473,7 +473,138 @@ const MasterInventoryTab = () => {
 
 // 무선단말검수 콘텐츠 컴포넌트
 const WirelessInventoryContent = ({ data }) => {
-  if (!data) {
+  const [inspectionData, setInspectionData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState('inspection'); // 'inspection' or 'normalization'
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmNote, setConfirmNote] = useState('');
+  const [normalizationMap, setNormalizationMap] = useState({});
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  // 재고 검수 데이터 로드
+  const loadInspectionData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/inventory-inspection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setInspectionData(result.data);
+        setNormalizationMap(result.data.normalizationMap || {});
+      } else {
+        setSnackbar({ open: true, message: '데이터 로드 실패', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('검수 데이터 로드 오류:', error);
+      setSnackbar({ open: true, message: '데이터 로드 중 오류 발생', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInspectionData();
+  }, [loadInspectionData]);
+
+  // 선택 항목 토글
+  const handleToggleItem = (item) => {
+    setSelectedItems(prev => {
+      const exists = prev.find(i => i.serialNumber === item.serialNumber);
+      if (exists) {
+        return prev.filter(i => i.serialNumber !== item.serialNumber);
+      } else {
+        return [...prev, item];
+      }
+    });
+  };
+
+  // 전체 선택/해제
+  const handleToggleAll = () => {
+    if (selectedItems.length === inspectionData?.unmatched?.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems([...(inspectionData?.unmatched || [])]);
+    }
+  };
+
+  // 확인된미확인재고로 이동
+  const handleMoveToConfirmed = async () => {
+    if (selectedItems.length === 0) {
+      setSnackbar({ open: true, message: '선택된 항목이 없습니다', severity: 'warning' });
+      return;
+    }
+
+    try {
+      const items = selectedItems.map(item => ({
+        outletCode: item.outletCode,
+        inPrice: '', // 폰클재고에 없으므로 비어있음
+        modelCode: item.modelCode,
+        color: item.color,
+        serialNumber: item.serialNumber,
+        inDate: item.firstInDate || item.dealerInDate,
+        confirmNote: confirmNote,
+        status: '완료'
+      }));
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/confirmed-unconfirmed-inventory`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setSnackbar({ open: true, message: `${selectedItems.length}개 항목이 확인처리되었습니다`, severity: 'success' });
+        setSelectedItems([]);
+        setConfirmNote('');
+        setConfirmDialogOpen(false);
+        await loadInspectionData(); // 데이터 새로고침
+      } else {
+        setSnackbar({ open: true, message: '저장 실패', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('확인처리 오류:', error);
+      setSnackbar({ open: true, message: '처리 중 오류 발생', severity: 'error' });
+    }
+  };
+
+  // 모델명 정규화 저장
+  const handleSaveNormalization = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/model-normalization`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ normalizationMap })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setSnackbar({ open: true, message: '모델명 정규화가 저장되었습니다', severity: 'success' });
+        await loadInspectionData(); // 데이터 새로고침
+      } else {
+        setSnackbar({ open: true, message: '저장 실패', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('정규화 저장 오류:', error);
+      setSnackbar({ open: true, message: '저장 중 오류 발생', severity: 'error' });
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!inspectionData) {
     return (
       <Alert severity="info">
         데이터를 불러오는 중입니다...
@@ -483,22 +614,309 @@ const WirelessInventoryContent = ({ data }) => {
 
   return (
     <Box>
-      <Card>
-        <CardContent>
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <PhoneAndroidIcon sx={{ fontSize: 80, color: '#7B1FA2', mb: 2 }} />
-            <Typography variant="h5" gutterBottom fontWeight="bold">
-              무선단말검수
-            </Typography>
-            <Typography variant="body1" color="text.secondary" gutterBottom>
-              무선단말 재고를 검수하고 관리합니다.
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              현재 개발 중입니다. 곧 새로운 기능으로 찾아뵙겠습니다.
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+      {/* 뷰 전환 탭 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeView} onChange={(e, v) => setActiveView(v)}>
+          <Tab label="재고 검수" value="inspection" />
+          <Tab 
+            label={`모델명 정규화 ${inspectionData.needsNormalization.length > 0 ? `(${inspectionData.needsNormalization.length})` : ''}`} 
+            value="normalization" 
+          />
+        </Tabs>
+      </Box>
+
+      {/* 재고 검수 뷰 */}
+      {activeView === 'inspection' && (
+        <Box>
+          {/* 통계 카드 */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={3}>
+              <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#e3f2fd' }}>
+                <Typography variant="h4" color="primary" fontWeight="bold">
+                  {inspectionData.statistics.totalCount}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  전체 재고
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#e8f5e9' }}>
+                <Typography variant="h4" color="success.main" fontWeight="bold">
+                  {inspectionData.statistics.matchedCount}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  일치 (정상)
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#ffebee' }}>
+                <Typography variant="h4" color="error" fontWeight="bold">
+                  {inspectionData.statistics.unmatchedCount}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  미확인 재고
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#fff3e0' }}>
+                <Typography variant="h4" color="warning.main" fontWeight="bold">
+                  {inspectionData.statistics.confirmedCount}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  확인된 재고
+                </Typography>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* 미확인 재고 테이블 */}
+          {inspectionData.unmatched.length > 0 && (
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" color="error">
+                    ⚠️ 미확인 재고 ({inspectionData.unmatched.length}개)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleToggleAll}
+                    >
+                      {selectedItems.length === inspectionData.unmatched.length ? '전체 해제' : '전체 선택'}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      disabled={selectedItems.length === 0}
+                      onClick={() => setConfirmDialogOpen(true)}
+                    >
+                      확인처리 ({selectedItems.length})
+                    </Button>
+                  </Box>
+                </Box>
+                
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedItems.length === inspectionData.unmatched.length && inspectionData.unmatched.length > 0}
+                            indeterminate={selectedItems.length > 0 && selectedItems.length < inspectionData.unmatched.length}
+                            onChange={handleToggleAll}
+                          />
+                        </TableCell>
+                        <TableCell>모델코드</TableCell>
+                        <TableCell>색상</TableCell>
+                        <TableCell>일련번호</TableCell>
+                        <TableCell>출고점코드</TableCell>
+                        <TableCell>최초입고일</TableCell>
+                        <TableCell>대리점입고일</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {inspectionData.unmatched.map((item, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedItems.some(i => i.serialNumber === item.serialNumber)}
+                              onChange={() => handleToggleItem(item)}
+                            />
+                          </TableCell>
+                          <TableCell>{item.modelCode}</TableCell>
+                          <TableCell>{item.color}</TableCell>
+                          <TableCell>{item.serialNumber}</TableCell>
+                          <TableCell>{item.outletCode}</TableCell>
+                          <TableCell>{item.firstInDate}</TableCell>
+                          <TableCell>{item.dealerInDate}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 일치하는 재고 (접을 수 있게) */}
+          {inspectionData.matched.length > 0 && (
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="h6" color="success.main">
+                  ✓ 정상 재고 ({inspectionData.matched.length}개)
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>모델코드</TableCell>
+                        <TableCell>색상</TableCell>
+                        <TableCell>일련번호</TableCell>
+                        <TableCell>출고점코드</TableCell>
+                        <TableCell>폰클 모델명</TableCell>
+                        <TableCell>입고가</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {inspectionData.matched.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.modelCode}</TableCell>
+                          <TableCell>{item.color}</TableCell>
+                          <TableCell>{item.serialNumber}</TableCell>
+                          <TableCell>{item.outletCode}</TableCell>
+                          <TableCell>{item.phoneklData?.modelName}</TableCell>
+                          <TableCell>{item.phoneklData?.inPrice}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </AccordionDetails>
+            </Accordion>
+          )}
+        </Box>
+      )}
+
+      {/* 모델명 정규화 뷰 */}
+      {activeView === 'normalization' && (
+        <Box>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6">
+                  모델명 정규화 관리
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSaveNormalization}
+                  startIcon={<CheckCircleIcon />}
+                >
+                  저장
+                </Button>
+              </Box>
+
+              <Alert severity="info" sx={{ mb: 2 }}>
+                마스터재고의 모델코드를 표준 모델명으로 정규화하세요. 정규화된 모델명은 검수에 활용됩니다.
+              </Alert>
+
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell width="40%">원본 모델코드</TableCell>
+                      <TableCell width="60%">정규화 모델명</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {inspectionData.needsNormalization.map((modelCode, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="medium">
+                            {modelCode}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="정규화된 모델명 입력"
+                            value={normalizationMap[modelCode] || ''}
+                            onChange={(e) => {
+                              setNormalizationMap(prev => ({
+                                ...prev,
+                                [modelCode]: e.target.value
+                              }));
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {/* 확인처리 다이얼로그 */}
+      {confirmDialogOpen && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+          onClick={() => setConfirmDialogOpen(false)}
+        >
+          <Card 
+            sx={{ width: 500, maxWidth: '90%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                미확인 재고 확인처리
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                선택된 {selectedItems.length}개 항목을 확인처리합니다.
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="확인 내용"
+                placeholder="확인 사유를 입력하세요"
+                value={confirmNote}
+                onChange={(e) => setConfirmNote(e.target.value)}
+                sx={{ mt: 2, mb: 2 }}
+              />
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <Button onClick={() => setConfirmDialogOpen(false)}>
+                  취소
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleMoveToConfirmed}
+                >
+                  확인
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {/* 스낵바 */}
+      {snackbar.open && (
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            zIndex: 10000
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      )}
     </Box>
   );
 };
