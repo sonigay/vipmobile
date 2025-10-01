@@ -205,23 +205,51 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           }
         }
         
-        // 모델 추출
-        if (storeData && Array.isArray(storeData)) {
-          // console.log('모델 추출 시작, 매장 수:', storeData.length);
-          const models = extractAvailableModels(storeData);
-          // console.log('추출된 모델 결과:', models);
-          // console.log('사용 가능한 모델 수:', models.models.length);
-          // console.log('사용 가능한 색상 수:', models.colors.length);
-          setAvailableModels(models);
-          // console.log('✅ 실제 모델 데이터 설정 완료');
-        } else {
-          console.warn('⚠️ 매장 데이터가 없어 모델 추출 불가');
-          // 빈 모델 데이터 설정
-          setAvailableModels({
-            models: [],
-            colors: [],
-            modelColors: new Map()
-          });
+        // 재고 데이터 직접 로드 (props 대신)
+        try {
+          console.log('🔄 [재고배정] 재고 데이터 직접 로드 시작');
+          const inventoryResponse = await fetch(`${API_BASE_URL}/api/inventory/status`);
+          
+          if (inventoryResponse.ok) {
+            const inventoryData = await inventoryResponse.json();
+            console.log('📊 [재고배정] 재고 데이터 로드 완료:', inventoryData.data?.length || 0, '개 모델');
+            
+            if (inventoryData.success && inventoryData.data && Array.isArray(inventoryData.data)) {
+              // 재고 데이터를 매장 형태로 변환
+              const mockStoreData = inventoryData.data.map(item => ({
+                id: `store_${item.modelName}`,
+                name: item.store || '미지정',
+                inventory: {
+                  phones: {
+                    [item.modelName]: {
+                      정상: {
+                        [item.color || '기본']: { quantity: item.inventoryCount }
+                      }
+                    }
+                  }
+                }
+              }));
+              
+              console.log('🔄 [재고배정] 모델 추출 시작, 변환된 매장 수:', mockStoreData.length);
+              const models = extractAvailableModels(mockStoreData);
+              console.log('📊 [재고배정] 추출된 모델 결과:', {
+                modelsCount: models.models.length,
+                colorsCount: models.colors.length,
+                models: models.models.slice(0, 5) // 처음 5개만 로그
+              });
+              setAvailableModels(models);
+              console.log('✅ [재고배정] 모델 데이터 설정 완료');
+            } else {
+              console.warn('⚠️ [재고배정] 재고 데이터 형식이 올바르지 않음');
+              setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+            }
+          } else {
+            console.error('❌ [재고배정] 재고 데이터 로드 실패:', inventoryResponse.status);
+            setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+          }
+        } catch (inventoryError) {
+          console.error('❌ [재고배정] 재고 데이터 로드 중 오류:', inventoryError);
+          setAvailableModels({ models: [], colors: [], modelColors: new Map() });
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);
