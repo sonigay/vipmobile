@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -481,6 +481,9 @@ const WirelessInventoryContent = ({ data }) => {
   const [confirmNote, setConfirmNote] = useState('');
   const [normalizationMap, setNormalizationMap] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  
+  // debounce를 위한 ref
+  const debounceRef = useRef(null);
 
   // 재고 검수 데이터 로드
   const loadInspectionData = useCallback(async () => {
@@ -573,6 +576,20 @@ const WirelessInventoryContent = ({ data }) => {
     }
   };
 
+  // debounce된 정규화 맵 업데이트
+  const updateNormalizationMap = useCallback((modelCode, value) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    debounceRef.current = setTimeout(() => {
+      setNormalizationMap(prev => ({
+        ...prev,
+        [modelCode]: value
+      }));
+    }, 100); // 100ms 지연
+  }, []);
+
   // 모델명 정규화 저장
   const handleSaveNormalization = async () => {
     try {
@@ -621,6 +638,10 @@ const WirelessInventoryContent = ({ data }) => {
           <Tab 
             label={`모델명 정규화 ${inspectionData.needsNormalization.length > 0 ? `(${inspectionData.needsNormalization.length})` : ''}`} 
             value="normalization" 
+          />
+          <Tab 
+            label={`확인된 재고 ${inspectionData.confirmed.length > 0 ? `(${inspectionData.confirmed.length})` : ''}`} 
+            value="confirmed" 
           />
         </Tabs>
       </Box>
@@ -681,6 +702,34 @@ const WirelessInventoryContent = ({ data }) => {
                     ⚠️ 미확인 재고 ({inspectionData.unmatched.length}개)
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<UpdateIcon />}
+                      onClick={() => {
+                        // 미확인 재고 엑셀 다운로드
+                        const csvData = [
+                          ['모델코드', '색상', '일련번호', '출고점코드', '최초입고일', '대리점입고일'],
+                          ...inspectionData.unmatched.map(item => [
+                            item.modelCode,
+                            item.color,
+                            item.serialNumber,
+                            item.outletCode,
+                            item.firstInDate,
+                            item.dealerInDate
+                          ])
+                        ];
+                        
+                        const csvContent = csvData.map(row => row.join(',')).join('\n');
+                        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `미확인재고_${new Date().toISOString().split('T')[0]}.csv`;
+                        link.click();
+                      }}
+                    >
+                      엑셀 다운로드
+                    </Button>
                     <Button
                       variant="outlined"
                       size="small"
@@ -752,6 +801,41 @@ const WirelessInventoryContent = ({ data }) => {
                 </Typography>
               </AccordionSummary>
               <AccordionDetails>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    정상적으로 일치하는 재고 목록
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<UpdateIcon />}
+                    onClick={() => {
+                      // 엑셀 다운로드 기능
+                      const csvData = [
+                        ['모델코드', '색상', '일련번호', '출고점코드', '폰클 모델명', '입고가', '입고처', '출고처'],
+                        ...inspectionData.matched.map(item => [
+                          item.modelCode,
+                          item.color,
+                          item.serialNumber,
+                          item.outletCode,
+                          item.phoneklData?.modelName || '',
+                          item.phoneklData?.inPrice || '',
+                          item.phoneklData?.inStore || '',
+                          item.phoneklData?.outStore || ''
+                        ])
+                      ];
+                      
+                      const csvContent = csvData.map(row => row.join(',')).join('\n');
+                      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `정상재고_${new Date().toISOString().split('T')[0]}.csv`;
+                      link.click();
+                    }}
+                  >
+                    엑셀 다운로드
+                  </Button>
+                </Box>
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
@@ -762,6 +846,8 @@ const WirelessInventoryContent = ({ data }) => {
                         <TableCell>출고점코드</TableCell>
                         <TableCell>폰클 모델명</TableCell>
                         <TableCell>입고가</TableCell>
+                        <TableCell>입고처</TableCell>
+                        <TableCell>출고처</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -772,7 +858,14 @@ const WirelessInventoryContent = ({ data }) => {
                           <TableCell>{item.serialNumber}</TableCell>
                           <TableCell>{item.outletCode}</TableCell>
                           <TableCell>{item.phoneklData?.modelName}</TableCell>
-                          <TableCell>{item.phoneklData?.inPrice}</TableCell>
+                          <TableCell>
+                            {item.phoneklData?.inPrice ? 
+                              Number(item.phoneklData.inPrice).toLocaleString() + '원' : 
+                              '-'
+                            }
+                          </TableCell>
+                          <TableCell>{item.phoneklData?.inStore || '-'}</TableCell>
+                          <TableCell>{item.phoneklData?.outStore || '-'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -828,13 +921,8 @@ const WirelessInventoryContent = ({ data }) => {
                             fullWidth
                             size="small"
                             placeholder="정규화된 모델명 입력"
-                            value={normalizationMap[modelCode] || ''}
-                            onChange={(e) => {
-                              setNormalizationMap(prev => ({
-                                ...prev,
-                                [modelCode]: e.target.value
-                              }));
-                            }}
+                            defaultValue={normalizationMap[modelCode] || ''}
+                            onChange={(e) => updateNormalizationMap(modelCode, e.target.value)}
                           />
                         </TableCell>
                       </TableRow>
@@ -842,6 +930,108 @@ const WirelessInventoryContent = ({ data }) => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {/* 확인된 재고 뷰 */}
+      {activeView === 'confirmed' && (
+        <Box>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" color="warning.main">
+                  ✅ 확인된 재고 ({inspectionData.confirmed.length}개)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<UpdateIcon />}
+                    onClick={() => {
+                      // 확인된 재고 엑셀 다운로드
+                      const csvData = [
+                        ['모델코드', '색상', '일련번호', '출고점코드', '입고일자', '확인내용', '진행상황'],
+                        ...inspectionData.confirmed.map(item => [
+                          item.modelCode,
+                          item.color,
+                          item.serialNumber,
+                          item.outletCode,
+                          item.inDate,
+                          item.confirmNote || '',
+                          item.status || '완료'
+                        ])
+                      ];
+                      
+                      const csvContent = csvData.map(row => row.join(',')).join('\n');
+                      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const link = document.createElement('a');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `확인된재고_${new Date().toISOString().split('T')[0]}.csv`;
+                      link.click();
+                    }}
+                  >
+                    엑셀 다운로드
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={loadInspectionData}
+                  >
+                    새로고침
+                  </Button>
+                </Box>
+              </Box>
+
+              <Alert severity="info" sx={{ mb: 2 }}>
+                이미 확인처리된 재고 목록입니다. 이 항목들은 미확인 재고 목록에서 제외됩니다.
+              </Alert>
+
+              {inspectionData.confirmed.length > 0 ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>모델코드</TableCell>
+                        <TableCell>색상</TableCell>
+                        <TableCell>일련번호</TableCell>
+                        <TableCell>출고점코드</TableCell>
+                        <TableCell>입고일자</TableCell>
+                        <TableCell>확인내용</TableCell>
+                        <TableCell>진행상황</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {inspectionData.confirmed.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.modelCode}</TableCell>
+                          <TableCell>{item.color}</TableCell>
+                          <TableCell>{item.serialNumber}</TableCell>
+                          <TableCell>{item.outletCode}</TableCell>
+                          <TableCell>{item.inDate}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.confirmNote || '-'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={item.status || '완료'} 
+                              color={item.status === '완료' ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Alert severity="success">
+                  확인된 재고가 없습니다.
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </Box>

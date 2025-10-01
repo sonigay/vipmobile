@@ -26253,7 +26253,9 @@ app.post('/api/inventory-inspection', async (req, res) => {
       modelName: row[12] || '',
       color: row[13] || '',
       status: row[14] || '',
-      inPrice: row[16] || ''
+      inPrice: row[16] || '',
+      inStore: row[17] || '',    // 입고처 (18번째 컬럼)
+      outStore: row[20] || ''    // 출고처 (21번째 컬럼)
     })).filter(item => item.serialNumber);
     
     // 3. 모델명정규화 맵 조회
