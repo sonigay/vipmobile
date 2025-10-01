@@ -18787,9 +18787,11 @@ app.get('/api/inventory/status', async (req, res) => {
           if (req.query.office && req.query.office !== office) return;
           if (req.query.department && req.query.department !== department) return;
           
-          if (!inventoryMap.has(modelName)) {
-            inventoryMap.set(modelName, {
+          const key = `${modelName}|${color}`;
+          if (!inventoryMap.has(key)) {
+            inventoryMap.set(key, {
               modelName,
+              color,
               category,
               store,
               agent,
@@ -18801,7 +18803,7 @@ app.get('/api/inventory/status', async (req, res) => {
             });
           }
           
-          inventoryMap.get(modelName).inventoryCount++;
+          inventoryMap.get(key).inventoryCount++;
         }
       }
     });
@@ -18836,7 +18838,8 @@ app.get('/api/inventory/status', async (req, res) => {
               if (req.query.office && req.query.office !== office) return;
               if (req.query.department && req.query.department !== department) return;
               
-              const inventoryItem = inventoryMap.get(modelName);
+              const key = `${modelName}|${color}`;
+              const inventoryItem = inventoryMap.get(key);
               if (inventoryItem) {
                 inventoryItem.monthlyActivation++;
                 

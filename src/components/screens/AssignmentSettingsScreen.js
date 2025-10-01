@@ -115,6 +115,94 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDetails, setErrorDetails] = useState(''); // 배정 로직 세부사항 접기/펼치기 상태
 
+  // 모델 다이얼로그가 열릴 때 데이터 로드
+  useEffect(() => {
+    if (showModelDialog && availableModels.models.length === 0) {
+      loadModelData();
+    }
+  }, [showModelDialog]);
+
+  // 모델 데이터 로드 함수 분리
+  const loadModelData = async () => {
+    try {
+      console.log('🔄 [재고배정] 재고 데이터 직접 로드 시작');
+      const inventoryResponse = await fetch(`${API_BASE_URL}/api/inventory/status`);
+      
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json();
+        console.log('📊 [재고배정] 재고 데이터 로드 완료:', inventoryData.data?.length || 0, '개 모델');
+        
+        if (inventoryData.success && inventoryData.data && Array.isArray(inventoryData.data)) {
+          console.log('📊 [재고배정] API 응답 데이터 샘플:', inventoryData.data.slice(0, 3));
+          
+          // 재고 데이터를 모델명별로 그룹핑하여 매장 형태로 변환
+          const modelGroups = new Map();
+          
+          inventoryData.data.forEach(item => {
+            const modelName = item.modelName;
+            const color = item.color || '기본';
+            
+            if (!modelGroups.has(modelName)) {
+              modelGroups.set(modelName, {
+                modelName,
+                colors: new Map()
+              });
+            }
+            
+            // 색상별 수량 합계
+            const colorGroup = modelGroups.get(modelName);
+            const currentQuantity = colorGroup.colors.get(color) || 0;
+            colorGroup.colors.set(color, currentQuantity + (item.inventoryCount || 0));
+          });
+          
+          console.log('📊 [재고배정] 그룹핑 결과:', Array.from(modelGroups.entries()).slice(0, 3));
+          
+          // 매장 데이터 형태로 변환
+          const mockStoreData = Array.from(modelGroups.values()).map((modelGroup, index) => {
+            const colorObject = {};
+            modelGroup.colors.forEach((quantity, color) => {
+              colorObject[color] = { quantity };
+            });
+            
+            return {
+              id: `store_${index}`,
+              name: '통합재고',
+              inventory: {
+                phones: {
+                  [modelGroup.modelName]: {
+                    정상: colorObject
+                  }
+                }
+              }
+            };
+          });
+          
+          console.log('🔄 [재고배정] 모델 추출 시작, 변환된 매장 수:', mockStoreData.length);
+          console.log('📊 [재고배정] 변환된 데이터 샘플:', mockStoreData.slice(0, 2)); // 처음 2개 매장 데이터 확인
+          
+          const models = extractAvailableModels(mockStoreData);
+          console.log('📊 [재고배정] 추출된 모델 결과:', {
+            modelsCount: models.models.length,
+            colorsCount: models.colors.length,
+            models: models.models.slice(0, 5), // 처음 5개만 로그
+            modelColorsSample: Array.from(models.modelColors.entries()).slice(0, 3) // 모델별 색상 샘플
+          });
+          setAvailableModels(models);
+          console.log('✅ [재고배정] 모델 데이터 설정 완료');
+        } else {
+          console.warn('⚠️ [재고배정] 재고 데이터 형식이 올바르지 않음');
+          setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+        }
+      } else {
+        console.error('❌ [재고배정] 재고 데이터 로드 실패:', inventoryResponse.status);
+        setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+      }
+    } catch (inventoryError) {
+      console.error('❌ [재고배정] 재고 데이터 로드 중 오류:', inventoryError);
+      setAvailableModels({ models: [], colors: [], modelColors: new Map() });
+    }
+  };
+
   // 담당자 데이터 및 사용 가능한 모델 로드
   useEffect(() => {
     const loadData = async () => {
@@ -203,81 +291,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             console.error('API에서 데이터 가져오기 실패:', apiError);
             console.error('네트워크 에러 상세:', apiError.message);
           }
-        }
-        
-        // 재고 데이터 직접 로드 (props 대신)
-        try {
-          console.log('🔄 [재고배정] 재고 데이터 직접 로드 시작');
-          const inventoryResponse = await fetch(`${API_BASE_URL}/api/inventory/status`);
-          
-          if (inventoryResponse.ok) {
-            const inventoryData = await inventoryResponse.json();
-            console.log('📊 [재고배정] 재고 데이터 로드 완료:', inventoryData.data?.length || 0, '개 모델');
-            
-            if (inventoryData.success && inventoryData.data && Array.isArray(inventoryData.data)) {
-              // 재고 데이터를 모델명별로 그룹핑하여 매장 형태로 변환
-              const modelGroups = new Map();
-              
-              inventoryData.data.forEach(item => {
-                const modelName = item.modelName;
-                const color = item.color || '기본';
-                
-                if (!modelGroups.has(modelName)) {
-                  modelGroups.set(modelName, {
-                    modelName,
-                    colors: new Map()
-                  });
-                }
-                
-                // 색상별 수량 합계
-                const colorGroup = modelGroups.get(modelName);
-                const currentQuantity = colorGroup.colors.get(color) || 0;
-                colorGroup.colors.set(color, currentQuantity + (item.inventoryCount || 0));
-              });
-              
-              // 매장 데이터 형태로 변환
-              const mockStoreData = Array.from(modelGroups.values()).map((modelGroup, index) => {
-                const colorObject = {};
-                modelGroup.colors.forEach((quantity, color) => {
-                  colorObject[color] = { quantity };
-                });
-                
-                return {
-                  id: `store_${index}`,
-                  name: '통합재고',
-                  inventory: {
-                    phones: {
-                      [modelGroup.modelName]: {
-                        정상: colorObject
-                      }
-                    }
-                  }
-                };
-              });
-              
-              console.log('🔄 [재고배정] 모델 추출 시작, 변환된 매장 수:', mockStoreData.length);
-              console.log('📊 [재고배정] 변환된 데이터 샘플:', mockStoreData.slice(0, 2)); // 처음 2개 매장 데이터 확인
-              
-              const models = extractAvailableModels(mockStoreData);
-              console.log('📊 [재고배정] 추출된 모델 결과:', {
-                modelsCount: models.models.length,
-                colorsCount: models.colors.length,
-                models: models.models.slice(0, 5), // 처음 5개만 로그
-                modelColorsSample: Array.from(models.modelColors.entries()).slice(0, 3) // 모델별 색상 샘플
-              });
-              setAvailableModels(models);
-              console.log('✅ [재고배정] 모델 데이터 설정 완료');
-            } else {
-              console.warn('⚠️ [재고배정] 재고 데이터 형식이 올바르지 않음');
-              setAvailableModels({ models: [], colors: [], modelColors: new Map() });
-            }
-          } else {
-            console.error('❌ [재고배정] 재고 데이터 로드 실패:', inventoryResponse.status);
-            setAvailableModels({ models: [], colors: [], modelColors: new Map() });
-          }
-        } catch (inventoryError) {
-          console.error('❌ [재고배정] 재고 데이터 로드 중 오류:', inventoryError);
-          setAvailableModels({ models: [], colors: [], modelColors: new Map() });
         }
       } catch (error) {
         console.error('데이터 로드 실패:', error);
@@ -3859,7 +3872,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                     if (availableModels.models.length === 0) {
                       return (
                         <MenuItem disabled>
-                          <em>사용 가능한 모델이 없습니다. 매장 데이터를 확인해주세요.</em>
+                          <em>모델 데이터를 로드 중입니다...</em>
                         </MenuItem>
                       );
                     }
