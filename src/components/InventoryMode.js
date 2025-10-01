@@ -511,6 +511,26 @@ const WirelessInventoryContent = ({ data }) => {
     }
   }, []);
 
+  // 확인된 재고 데이터 로드
+  const loadConfirmedData = useCallback(async () => {
+    try {
+      setConfirmedLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/confirmed-unconfirmed-inventory`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setConfirmedData(result.data);
+      } else {
+        setSnackbar({ open: true, message: '확인된 재고 데이터 로드 실패', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('확인된 재고 데이터 로드 오류:', error);
+      setSnackbar({ open: true, message: '확인된 재고 데이터 로드 중 오류 발생', severity: 'error' });
+    } finally {
+      setConfirmedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadInspectionData();
   }, [loadInspectionData]);
@@ -597,26 +617,6 @@ const WirelessInventoryContent = ({ data }) => {
         [modelCode]: value
       }));
     }, 100); // 100ms 지연
-  }, []);
-
-  // 확인된 재고 데이터 로드
-  const loadConfirmedData = useCallback(async () => {
-    try {
-      setConfirmedLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/confirmed-unconfirmed-inventory`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setConfirmedData(result.data);
-      } else {
-        setSnackbar({ open: true, message: '확인된 재고 데이터 로드 실패', severity: 'error' });
-      }
-    } catch (error) {
-      console.error('확인된 재고 데이터 로드 오류:', error);
-      setSnackbar({ open: true, message: '확인된 재고 데이터 로드 중 오류 발생', severity: 'error' });
-    } finally {
-      setConfirmedLoading(false);
-    }
   }, []);
 
   // 모델명 정규화 저장
