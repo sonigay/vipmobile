@@ -29,6 +29,18 @@ const DataCollectionMode = ({
   const [error, setError] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
+  // 정보수집모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
+  useEffect(() => {
+    // 오늘 하루 보지 않기 설정 확인
+    const hideUntil = localStorage.getItem('hideUpdate_dataCollection');
+    const shouldShowPopup = !(hideUntil && new Date() < new Date(hideUntil));
+    
+    if (shouldShowPopup) {
+      // 숨김 설정이 없거나 만료된 경우에만 팝업 표시
+      setShowUpdatePopup(true);
+    }
+  }, []);
+
   // 로딩 상태
   if (loading) {
     return (
