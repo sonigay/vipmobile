@@ -215,27 +215,55 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             console.log('📊 [재고배정] 재고 데이터 로드 완료:', inventoryData.data?.length || 0, '개 모델');
             
             if (inventoryData.success && inventoryData.data && Array.isArray(inventoryData.data)) {
-              // 재고 데이터를 매장 형태로 변환
-              const mockStoreData = inventoryData.data.map(item => ({
-                id: `store_${item.modelName}`,
-                name: item.store || '미지정',
-                inventory: {
-                  phones: {
-                    [item.modelName]: {
-                      정상: {
-                        [item.color || '기본']: { quantity: item.inventoryCount }
+              // 재고 데이터를 모델명별로 그룹핑하여 매장 형태로 변환
+              const modelGroups = new Map();
+              
+              inventoryData.data.forEach(item => {
+                const modelName = item.modelName;
+                const color = item.color || '기본';
+                
+                if (!modelGroups.has(modelName)) {
+                  modelGroups.set(modelName, {
+                    modelName,
+                    colors: new Map()
+                  });
+                }
+                
+                // 색상별 수량 합계
+                const colorGroup = modelGroups.get(modelName);
+                const currentQuantity = colorGroup.colors.get(color) || 0;
+                colorGroup.colors.set(color, currentQuantity + (item.inventoryCount || 0));
+              });
+              
+              // 매장 데이터 형태로 변환
+              const mockStoreData = Array.from(modelGroups.values()).map((modelGroup, index) => {
+                const colorObject = {};
+                modelGroup.colors.forEach((quantity, color) => {
+                  colorObject[color] = { quantity };
+                });
+                
+                return {
+                  id: `store_${index}`,
+                  name: '통합재고',
+                  inventory: {
+                    phones: {
+                      [modelGroup.modelName]: {
+                        정상: colorObject
                       }
                     }
                   }
-                }
-              }));
+                };
+              });
               
               console.log('🔄 [재고배정] 모델 추출 시작, 변환된 매장 수:', mockStoreData.length);
+              console.log('📊 [재고배정] 변환된 데이터 샘플:', mockStoreData.slice(0, 2)); // 처음 2개 매장 데이터 확인
+              
               const models = extractAvailableModels(mockStoreData);
               console.log('📊 [재고배정] 추출된 모델 결과:', {
                 modelsCount: models.models.length,
                 colorsCount: models.colors.length,
-                models: models.models.slice(0, 5) // 처음 5개만 로그
+                models: models.models.slice(0, 5), // 처음 5개만 로그
+                modelColorsSample: Array.from(models.modelColors.entries()).slice(0, 3) // 모델별 색상 샘플
               });
               setAvailableModels(models);
               console.log('✅ [재고배정] 모델 데이터 설정 완료');
