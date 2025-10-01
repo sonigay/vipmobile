@@ -335,6 +335,206 @@ const PhoneDuplicateContent = ({ data, type }) => {
   );
 };
 
+// 마스터재고검수 탭 컴포넌트
+const MasterInventoryTab = () => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [wirelessData, setWirelessData] = useState(null);
+  const [simData, setSimData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  const fetchWirelessInventory = async () => {
+    try {
+      setLoading(true);
+      // TODO: 서버 API 연결 필요
+      // const response = await fetch(`${process.env.REACT_APP_API_URL}/api/wireless-inventory`);
+      // const result = await response.json();
+      // if (result.success) {
+      //   setWirelessData(result.data);
+      // }
+      
+      // 임시 데이터
+      setWirelessData({ items: [] });
+    } catch (error) {
+      console.error('무선단말 검수 데이터 조회 오류:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSimInventory = async () => {
+    try {
+      setLoading(true);
+      // TODO: 서버 API 연결 필요
+      // const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sim-inventory`);
+      // const result = await response.json();
+      // if (result.success) {
+      //   setSimData(result.data);
+      // }
+      
+      // 임시 데이터
+      setSimData({ items: [] });
+    } catch (error) {
+      console.error('유심 검수 데이터 조회 오류:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+    if (newValue === 0) {
+      fetchWirelessInventory();
+    } else {
+      fetchSimInventory();
+    }
+  };
+
+  useEffect(() => {
+    fetchWirelessInventory();
+    setLastUpdate(new Date());
+  }, []);
+
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* 헤더 */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: '#7B1FA2' }}>
+          📦 마스터재고검수
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {lastUpdate && (
+            <Typography variant="caption" color="text.secondary">
+              마지막 업데이트: {lastUpdate.toLocaleTimeString()}
+            </Typography>
+          )}
+          <Button
+            variant="outlined"
+            onClick={activeTab === 0 ? fetchWirelessInventory : fetchSimInventory}
+            disabled={loading}
+            startIcon={<RefreshIcon />}
+          >
+            새로고침
+          </Button>
+        </Box>
+      </Box>
+
+      {/* 서브 탭 네비게이션 */}
+      <Tabs 
+        value={activeTab} 
+        onChange={handleTabChange} 
+        sx={{ 
+          mb: 3,
+          '& .MuiTab-root': {
+            fontSize: '1rem',
+            fontWeight: 'medium',
+            color: '#666',
+            '&.Mui-selected': {
+              color: '#7B1FA2',
+              fontWeight: 'bold'
+            }
+          },
+          '& .MuiTabs-indicator': {
+            backgroundColor: '#7B1FA2'
+          }
+        }}
+      >
+        <Tab 
+          label="무선단말검수"
+          icon={<PhoneAndroidIcon />}
+          iconPosition="start"
+          sx={{ textTransform: 'none' }}
+        />
+        <Tab 
+          label="유심검수"
+          icon={<SimCardIcon />}
+          iconPosition="start"
+          sx={{ textTransform: 'none' }}
+        />
+      </Tabs>
+
+      {/* 콘텐츠 */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {!loading && activeTab === 0 && (
+        <WirelessInventoryContent data={wirelessData} />
+      )}
+
+      {!loading && activeTab === 1 && (
+        <SimInventoryContent data={simData} />
+      )}
+    </Box>
+  );
+};
+
+// 무선단말검수 콘텐츠 컴포넌트
+const WirelessInventoryContent = ({ data }) => {
+  if (!data) {
+    return (
+      <Alert severity="info">
+        데이터를 불러오는 중입니다...
+      </Alert>
+    );
+  }
+
+  return (
+    <Box>
+      <Card>
+        <CardContent>
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <PhoneAndroidIcon sx={{ fontSize: 80, color: '#7B1FA2', mb: 2 }} />
+            <Typography variant="h5" gutterBottom fontWeight="bold">
+              무선단말검수
+            </Typography>
+            <Typography variant="body1" color="text.secondary" gutterBottom>
+              무선단말 재고를 검수하고 관리합니다.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              현재 개발 중입니다. 곧 새로운 기능으로 찾아뵙겠습니다.
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
+// 유심검수 콘텐츠 컴포넌트
+const SimInventoryContent = ({ data }) => {
+  if (!data) {
+    return (
+      <Alert severity="info">
+        데이터를 불러오는 중입니다...
+      </Alert>
+    );
+  }
+
+  return (
+    <Box>
+      <Card>
+        <CardContent>
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <SimCardIcon sx={{ fontSize: 80, color: '#7B1FA2', mb: 2 }} />
+            <Typography variant="h5" gutterBottom fontWeight="bold">
+              유심검수
+            </Typography>
+            <Typography variant="body1" color="text.secondary" gutterBottom>
+              유심 재고를 검수하고 관리합니다.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              현재 개발 중입니다. 곧 새로운 기능으로 찾아뵙겠습니다.
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
 // 로딩 스켈레톤 컴포넌트
 const LoadingSkeleton = () => (
   <Box sx={{ p: 3 }}>
@@ -570,22 +770,7 @@ const InventoryMode = ({
           )}
 
           {currentScreen === 'master' && (
-            <Box sx={{ p: 3 }}>
-              <Card sx={{ p: 4, textAlign: 'center' }}>
-                <CardContent>
-                  <InventoryIcon sx={{ fontSize: 80, color: '#7B1FA2', mb: 2 }} />
-                  <Typography variant="h4" component="h1" gutterBottom>
-                    마스터재고검수
-                  </Typography>
-                  <Typography variant="h6" color="text.secondary" gutterBottom>
-                    현재 개발 중입니다
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary">
-                    곧 새로운 기능으로 찾아뵙겠습니다.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Box>
+            <MasterInventoryTab />
           )}
 
           {currentScreen === 'assignment' && (
