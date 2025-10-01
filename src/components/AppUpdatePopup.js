@@ -51,7 +51,8 @@ const MODE_COLORS = {
   'chart': '#ff9800',      // 주황색
   'budget': '#795548',     // 갈색 (예산모드)
   'sales': '#e91e63',      // 핑크색 (영업모드)
-  'inventoryRecovery': '#8bc34a'  // 초록색 (재고회수모드)
+  'inventoryRecovery': '#8bc34a',  // 초록색 (재고회수모드)
+  'dataCollection': '#9c27b0'  // 보라색 (정보수집모드)
 };
 
 // 모드별 제목
@@ -67,7 +68,8 @@ const MODE_TITLES = {
   'chart': '장표 모드',
   'budget': '예산 모드',
   'sales': '영업 모드',
-  'inventoryRecovery': '재고회수 모드'
+  'inventoryRecovery': '재고회수 모드',
+  'dataCollection': '정보수집 모드'
 };
 
 function AppUpdatePopup({ 
