@@ -2719,6 +2719,7 @@ app.post('/api/login', async (req, res) => {
         const hasBudgetPermission = agent[16] === 'O'; // Q열: 예산모드 권한
         const hasSalesPermission = agent[18] === 'O'; // S열: 영업모드 권한
         const hasInventoryRecoveryPermission = agent[19] === 'O'; // T열: 재고회수모드 권한
+        const hasDataCollectionPermission = agent[20] === 'O'; // U열: 정보수집모드 권한
         
         // console.log('Step 6.5: Permission check:', {
         //   inventory: hasInventoryPermission,
@@ -2744,7 +2745,8 @@ app.post('/api/login', async (req, res) => {
           reservation: hasReservationPermission,
           budget: hasBudgetPermission, // 예산모드 권한
           sales: hasSalesPermission, // 영업모드 권한
-          inventoryRecovery: hasInventoryRecoveryPermission // 재고회수모드 권한
+          inventoryRecovery: hasInventoryRecoveryPermission, // 재고회수모드 권한
+          dataCollection: hasDataCollectionPermission // 정보수집모드 권한
         };
         
         // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
@@ -26363,6 +26365,43 @@ app.post('/api/inventory-inspection', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// 정보수집모드 앱 업데이트 API
+app.get('/api/data-collection-updates', async (req, res) => {
+  try {
+    console.log('정보수집모드 앱 업데이트 데이터 요청');
+    
+    const values = await getSheetValues('어플업데이트');
+    
+    if (!values || values.length === 0) {
+      console.log('정보수집모드 앱 업데이트 데이터가 없습니다.');
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 2행 제거하고 데이터 반환 (3행부터 시작)
+    const dataRows = values.slice(2);
+    
+    // 정보수집모드 관련 업데이트만 필터링 (O열 14인덱스)
+    const dataCollectionUpdates = dataRows.filter(row => {
+      const mode = row[14] || ''; // O열
+      return mode.toString().toLowerCase().includes('정보수집') || 
+             mode.toString().toLowerCase().includes('데이터수집');
+    });
+    
+    // 빈 행 제거
+    const filteredData = dataCollectionUpdates.filter(row => 
+      row.length > 0 && row.some(cell => cell && cell.toString().trim() !== '')
+    );
+    
+    console.log(`정보수집모드 앱 업데이트 데이터 처리 완료: ${filteredData.length}건`);
+    
+    res.json({ success: true, data: filteredData });
+    
+  } catch (error) {
+    console.error('정보수집모드 앱 업데이트 데이터 가져오기 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

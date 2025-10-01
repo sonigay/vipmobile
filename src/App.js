@@ -8,6 +8,7 @@ import AgentFilterPanel from './components/AgentFilterPanel';
 import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
 import SettlementMode from './components/SettlementMode';
+import DataCollectionMode from './components/DataCollectionMode';
 import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
@@ -34,6 +35,7 @@ import ReservationMode from './components/ReservationMode';
 import BudgetMode from './components/BudgetMode';
 import SalesMode from './components/SalesMode';
 import InventoryRecoveryMode from './components/InventoryRecoveryMode';
+import DataCollectionMode from './components/DataCollectionMode';
 
 
 
@@ -141,6 +143,7 @@ function AppContent() {
   // 예산모드 관련 상태 추가
   const [isBudgetMode, setIsBudgetMode] = useState(false);
   const [isInventoryRecoveryMode, setIsInventoryRecoveryMode] = useState(false);
+  const [isDataCollectionMode, setIsDataCollectionMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1383,6 +1386,7 @@ function AppContent() {
       setIsReservationMode(false);
       setIsBudgetMode(false);
       setIsInventoryRecoveryMode(false);
+      setIsDataCollectionMode(false);
       setCurrentMode('sales');
       
       // 영업 모드에서는 서울시청을 중심으로 전체 지역 보기
@@ -1421,6 +1425,7 @@ function AppContent() {
       setIsReservationMode(false);
       setIsBudgetMode(false);
       setIsInventoryRecoveryMode(false);
+      setIsDataCollectionMode(false);
       setCurrentMode('agent');
       
       // agentTarget 설정 (store.target이 비어있으면 store.name에서 추출)
@@ -1506,6 +1511,7 @@ function AppContent() {
       setIsReservationMode(false);
       setIsBudgetMode(false);
       setIsInventoryRecoveryMode(false);
+      setIsDataCollectionMode(false);
       setCurrentMode('general');
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
@@ -1583,6 +1589,9 @@ function AppContent() {
       case 'inventoryRecovery':
         modifiedStore.isInventoryRecovery = true;
         break;
+      case 'dataCollection':
+        modifiedStore.isDataCollection = true;
+        break;
       default:
         break;
     }
@@ -1628,6 +1637,7 @@ function AppContent() {
     setIsBudgetMode(false);
     setIsSalesMode(false);
     setIsInventoryRecoveryMode(false);
+    setIsDataCollectionMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1682,6 +1692,10 @@ function AppContent() {
       case 'inventoryRecovery':
         // console.log('재고회수 모드로 전환');
         setIsInventoryRecoveryMode(true);
+        break;
+      case 'dataCollection':
+        // console.log('정보수집 모드로 전환');
+        setIsDataCollectionMode(true);
         break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
@@ -1741,6 +1755,8 @@ function AppContent() {
     setIsBudgetMode(false);
     // 재고회수모드 상태 초기화
     setIsInventoryRecoveryMode(false);
+    // 정보수집모드 상태 초기화
+    setIsDataCollectionMode(false);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -2477,6 +2493,27 @@ ${requestList}
             setIsBudgetMode(false);
             setShowModeSelection(true);
             // console.log('BudgetMode 모드 선택 팝업 열기 완료');
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 정보수집모드일 때는 별도 화면 렌더링
+  if (isDataCollectionMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <DataCollectionMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsDataCollectionMode(false);
+            setShowModeSelection(true);
           }}
           availableModes={availableModes}
         />

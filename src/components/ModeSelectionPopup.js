@@ -24,7 +24,8 @@ import {
   CheckCircle as CheckCircleIcon,
   AccountBalance as BudgetIcon,
   TrendingUp as SalesIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  DataUsage as DataUsageIcon
 } from '@mui/icons-material';
 
 const ModeSelectionPopup = ({ 
@@ -167,6 +168,18 @@ const ModeSelectionPopup = ({
         '회수 통계 분석',
         '자동화 프로세스',
         '회수 알림 시스템'
+      ]
+    },
+    dataCollection: {
+      title: '정보수집 모드',
+      description: '데이터 수집 및 분석 시스템',
+      icon: <DataUsageIcon sx={{ fontSize: 40, color: '#9c27b0' }} />,
+      color: '#9c27b0',
+      features: [
+        '데이터 수집 및 관리',
+        '정보 분석 및 통계',
+        '자동화된 데이터 처리',
+        '실시간 모니터링'
       ]
     }
   };
