@@ -481,6 +481,8 @@ const WirelessInventoryContent = ({ data }) => {
   const [confirmNote, setConfirmNote] = useState('');
   const [normalizationMap, setNormalizationMap] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [confirmedData, setConfirmedData] = useState([]);
+  const [confirmedLoading, setConfirmedLoading] = useState(false);
   
   // debounce를 위한 ref
   const debounceRef = useRef(null);
@@ -512,6 +514,13 @@ const WirelessInventoryContent = ({ data }) => {
   useEffect(() => {
     loadInspectionData();
   }, [loadInspectionData]);
+
+  // 확인된 재고 탭이 활성화될 때 데이터 로드
+  useEffect(() => {
+    if (activeView === 'confirmed') {
+      loadConfirmedData();
+    }
+  }, [activeView, loadConfirmedData]);
 
   // 선택 항목 토글
   const handleToggleItem = (item) => {
@@ -590,6 +599,26 @@ const WirelessInventoryContent = ({ data }) => {
     }, 100); // 100ms 지연
   }, []);
 
+  // 확인된 재고 데이터 로드
+  const loadConfirmedData = useCallback(async () => {
+    try {
+      setConfirmedLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/confirmed-unconfirmed-inventory`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setConfirmedData(result.data);
+      } else {
+        setSnackbar({ open: true, message: '확인된 재고 데이터 로드 실패', severity: 'error' });
+      }
+    } catch (error) {
+      console.error('확인된 재고 데이터 로드 오류:', error);
+      setSnackbar({ open: true, message: '확인된 재고 데이터 로드 중 오류 발생', severity: 'error' });
+    } finally {
+      setConfirmedLoading(false);
+    }
+  }, []);
+
   // 모델명 정규화 저장
   const handleSaveNormalization = async () => {
     try {
@@ -640,7 +669,7 @@ const WirelessInventoryContent = ({ data }) => {
             value="normalization" 
           />
           <Tab 
-            label={`확인된 재고 ${inspectionData.confirmed.length > 0 ? `(${inspectionData.confirmed.length})` : ''}`} 
+            label={`확인된 재고 ${confirmedData.length > 0 ? `(${confirmedData.length})` : ''}`} 
             value="confirmed" 
           />
         </Tabs>
@@ -942,7 +971,7 @@ const WirelessInventoryContent = ({ data }) => {
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6" color="warning.main">
-                  ✅ 확인된 재고 ({inspectionData.confirmed.length}개)
+                  ✅ 확인된 재고 ({confirmedData.length}개)
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Button
@@ -953,7 +982,7 @@ const WirelessInventoryContent = ({ data }) => {
                       // 확인된 재고 엑셀 다운로드
                       const csvData = [
                         ['모델코드', '색상', '일련번호', '출고점코드', '입고일자', '확인내용', '진행상황'],
-                        ...inspectionData.confirmed.map(item => [
+                        ...confirmedData.map(item => [
                           item.modelCode,
                           item.color,
                           item.serialNumber,
@@ -977,7 +1006,7 @@ const WirelessInventoryContent = ({ data }) => {
                   <Button
                     variant="outlined"
                     startIcon={<RefreshIcon />}
-                    onClick={loadInspectionData}
+                    onClick={loadConfirmedData}
                   >
                     새로고침
                   </Button>
@@ -988,7 +1017,11 @@ const WirelessInventoryContent = ({ data }) => {
                 이미 확인처리된 재고 목록입니다. 이 항목들은 미확인 재고 목록에서 제외됩니다.
               </Alert>
 
-              {inspectionData.confirmed.length > 0 ? (
+              {confirmedLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : confirmedData.length > 0 ? (
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
@@ -1003,7 +1036,7 @@ const WirelessInventoryContent = ({ data }) => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {inspectionData.confirmed.map((item, index) => (
+                      {confirmedData.map((item, index) => (
                         <TableRow key={index}>
                           <TableCell>{item.modelCode}</TableCell>
                           <TableCell>{item.color}</TableCell>
