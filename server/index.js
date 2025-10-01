@@ -2721,6 +2721,12 @@ app.post('/api/login', async (req, res) => {
         const hasInventoryRecoveryPermission = agent[19] === 'O'; // T열: 재고회수모드 권한
         const hasDataCollectionPermission = agent[20] === 'O'; // U열: 정보수집모드 권한
         
+        // 정보수집모드 권한 디버깅
+        console.log('🔍 [권한체크] 정보수집모드 디버깅:');
+        console.log('  - agent[20] 값:', agent[20]);
+        console.log('  - hasDataCollectionPermission:', hasDataCollectionPermission);
+        console.log('  - agent 전체:', agent);
+        
         // console.log('Step 6.5: Permission check:', {
         //   inventory: hasInventoryPermission,
         //   settlement: hasSettlementPermission,
