@@ -17641,7 +17641,8 @@ app.post('/api/app-updates', async (req, res) => {
       'chart': 10,     // K열: 장표모드
       'budget': 11,    // L열: 예산모드
       'sales': 12,     // M열: 영업모드
-      'inventoryRecovery': 13 // N열: 재고회수모드 (새로 추가)
+      'inventoryRecovery': 13, // N열: 재고회수모드
+      'dataCollection': 14     // O열: 정보수집모드 (새로 추가)
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -17653,14 +17654,14 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(14).fill(''); // A~N열 (14개 컬럼)
+    const newRow = new Array(15).fill(''); // A~O열 (15개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:N`,
+      range: `${UPDATE_SHEET_NAME}!A:O`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {

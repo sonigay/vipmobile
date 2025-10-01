@@ -15,7 +15,8 @@ const UPDATE_SHEET_COLUMNS = {
   CHART: 10,         // K열: 장표모드 업데이트내용
   BUDGET: 11,        // L열: 예산모드 업데이트내용
   SALES: 12,         // M열: 영업모드 업데이트내용
-  INVENTORY_RECOVERY: 13  // N열: 재고회수모드 업데이트내용
+  INVENTORY_RECOVERY: 13,  // N열: 재고회수모드 업데이트내용
+  DATA_COLLECTION: 14      // O열: 정보수집모드 업데이트내용
 };
 
 // 모드별 컬럼 매핑
@@ -31,7 +32,8 @@ const MODE_COLUMN_MAP = {
   'chart': UPDATE_SHEET_COLUMNS.CHART,
   'budget': UPDATE_SHEET_COLUMNS.BUDGET,
   'sales': UPDATE_SHEET_COLUMNS.SALES,
-  'inventoryRecovery': UPDATE_SHEET_COLUMNS.INVENTORY_RECOVERY
+  'inventoryRecovery': UPDATE_SHEET_COLUMNS.INVENTORY_RECOVERY,
+  'dataCollection': UPDATE_SHEET_COLUMNS.DATA_COLLECTION
 };
 
 // 캐시 설정
