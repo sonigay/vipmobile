@@ -270,8 +270,6 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       
       {/* 메인 콘텐츠 */}
       <Box sx={{ p: 2 }}>
-        {/* 우선순위 모델 선정 메뉴 - 임시 제거 */}
-
         {/* 탭 메뉴 */}
         <Card sx={{ mb: 2 }}>
           <Tabs 
@@ -314,6 +312,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
             )}
           </Box>
         </Card>
+
 
         {/* 콘텐츠 영역 */}
         <Card>
