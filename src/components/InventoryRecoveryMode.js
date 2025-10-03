@@ -313,11 +313,18 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
           </Box>
         </Card>
 
-        {/* 우선순위 모델 선정 - 1단계: 텍스트만 */}
+        {/* 우선순위 모델 선정 - 2단계: 간단한 버튼 1개 */}
         <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            우선순위 모델 선정 기능 (준비 중)
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            우선순위 모델 선정 기능
           </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            sx={{ textTransform: 'none' }}
+          >
+            1순위 모델 선택
+          </Button>
         </Box>
 
         {/* 콘텐츠 영역 */}
