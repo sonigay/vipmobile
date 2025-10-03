@@ -269,11 +269,19 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               const contentType = storeResponse.headers.get('content-type');
               if (contentType && contentType.includes('application/json')) {
                 const responseData = await storeResponse.json();
-                // console.log('API에서 가져온 매장 데이터:', responseData.stores?.length || 0, '개');
-                if (responseData.stores && Array.isArray(responseData.stores)) {
+                // console.log('API에서 가져온 매장 데이터:', responseData?.length || 0, '개');
+                
+                // API가 직접 stores 배열을 반환하는 경우
+                if (Array.isArray(responseData)) {
+                  storeData = responseData;
+                  storeDataLoaded = true;
+                  // console.log('✅ API에서 매장 데이터 로드 성공 (직접 배열)');
+                } 
+                // API가 {stores: [...]} 형태로 반환하는 경우
+                else if (responseData.stores && Array.isArray(responseData.stores)) {
                   storeData = responseData.stores;
                   storeDataLoaded = true;
-                  // console.log('✅ API에서 매장 데이터 로드 성공');
+                  // console.log('✅ API에서 매장 데이터 로드 성공 (stores 속성)');
                 } else {
                   console.error('API 응답에 stores 배열이 없음:', responseData);
                 }
