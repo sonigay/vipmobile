@@ -270,69 +270,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       
       {/* 메인 콘텐츠 */}
       <Box sx={{ p: 2 }}>
-        {/* 1단계: 우선순위 모델 선정 메뉴 */}
-        <Card sx={{ mb: 2, p: 2 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-            ⭐ 우선순위 모델 선정하기
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Button
-              variant="outlined"
-              color="default"
-              sx={{ 
-                minWidth: 120,
-                textTransform: 'none',
-                fontWeight: 'bold'
-              }}
-            >
-              1순위 모델
-            </Button>
-            <Button
-              variant="outlined"
-              color="default"
-              sx={{ 
-                minWidth: 120,
-                textTransform: 'none',
-                fontWeight: 'bold'
-              }}
-            >
-              2순위 모델
-            </Button>
-            <Button
-              variant="outlined"
-              color="default"
-              sx={{ 
-                minWidth: 120,
-                textTransform: 'none',
-                fontWeight: 'bold'
-              }}
-            >
-              3순위 모델
-            </Button>
-            <Button
-              variant="outlined"
-              color="default"
-              sx={{ 
-                minWidth: 120,
-                textTransform: 'none',
-                fontWeight: 'bold'
-              }}
-            >
-              4순위 모델
-            </Button>
-            <Button
-              variant="outlined"
-              color="default"
-              sx={{ 
-                minWidth: 120,
-                textTransform: 'none',
-                fontWeight: 'bold'
-              }}
-            >
-              5순위 모델
-            </Button>
-          </Box>
-        </Card>
+        {/* 우선순위 모델 선정 메뉴 - 임시 제거 */}
 
         {/* 탭 메뉴 */}
         <Card sx={{ mb: 2 }}>
