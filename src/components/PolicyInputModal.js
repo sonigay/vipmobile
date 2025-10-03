@@ -767,39 +767,42 @@ function PolicyInputModal({
             </Grid>
           )}
           
-          <Grid item xs={12} sm={6}>
-            <FormControl component="fieldset" error={!!errors.amountType}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                금액 유형 *
-              </Typography>
-              <RadioGroup
-                row
-                value={formData.amountType}
-                onChange={(e) => handleInputChange('amountType', e.target.value)}
-              >
-                <FormControlLabel
-                  value="total"
-                  control={<Radio />}
-                  label="총금액"
-                />
-                <FormControlLabel
-                  value="per_case"
-                  control={<Radio />}
-                  label="건당금액"
-                />
-                <FormControlLabel
-                  value="in_content"
-                  control={<Radio />}
-                  label="내용에 직접입력"
-                />
-              </RadioGroup>
-              {errors.amountType && (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
-                  {errors.amountType}
+          {/* 구두정책이 아닌 경우에만 금액 유형 선택 표시 */}
+          {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') && (
+            <Grid item xs={12} sm={6}>
+              <FormControl component="fieldset" error={!!errors.amountType}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  금액 유형 *
                 </Typography>
-              )}
-            </FormControl>
-          </Grid>
+                <RadioGroup
+                  row
+                  value={formData.amountType}
+                  onChange={(e) => handleInputChange('amountType', e.target.value)}
+                >
+                  <FormControlLabel
+                    value="total"
+                    control={<Radio />}
+                    label="총금액"
+                  />
+                  <FormControlLabel
+                    value="per_case"
+                    control={<Radio />}
+                    label="건당금액"
+                  />
+                  <FormControlLabel
+                    value="in_content"
+                    control={<Radio />}
+                    label="내용에 직접입력"
+                  />
+                </RadioGroup>
+                {errors.amountType && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                    {errors.amountType}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+          )}
 
           {/* 소속정책팀 선택 */}
           <Grid item xs={12} sm={6}>
