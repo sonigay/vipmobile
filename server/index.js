@@ -18796,11 +18796,12 @@ app.get('/api/inventory/status', async (req, res) => {
           if (req.query.office && req.query.office !== office) return;
           if (req.query.department && req.query.department !== department) return;
           
-          const key = `${modelName}|${color}`;
+          // 모델별재고현황에서는 모델명만으로 집계 (색상 구분 없음)
+          const key = modelName;
           if (!inventoryMap.has(key)) {
             inventoryMap.set(key, {
               modelName,
-              color,
+              color: '', // 색상별 구분 없음
               category,
               store,
               agent,
@@ -18847,7 +18848,8 @@ app.get('/api/inventory/status', async (req, res) => {
               if (req.query.office && req.query.office !== office) return;
               if (req.query.department && req.query.department !== department) return;
               
-              const key = `${modelName}|${color}`;
+              // 모델별재고현황에서는 모델명만으로 매칭
+              const key = modelName;
               const inventoryItem = inventoryMap.get(key);
               if (inventoryItem) {
                 inventoryItem.monthlyActivation++;

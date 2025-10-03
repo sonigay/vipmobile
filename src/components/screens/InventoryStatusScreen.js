@@ -878,7 +878,7 @@ const InventoryStatusScreen = () => {
                                              <TableRow 
                          key={index}
                          sx={{ 
-                           backgroundColor: activeTab === 1 ? getRowBackgroundColor(item.category) : '#ffffff',
+                           backgroundColor: getRowBackgroundColor(item.category),
                            borderBottom: '1px solid #f0f0f0',
                            '&:hover': { 
                              backgroundColor: '#f5f9ff',
@@ -896,18 +896,14 @@ const InventoryStatusScreen = () => {
                              label={item.category || '기타'} 
                              size="small"
                              sx={{
-                               backgroundColor: activeTab === 1 ? (
-                                 item.category === '삼성' ? '#bbdefb' : 
-                                 item.category === '애플' ? '#c8e6c9' :
-                                 item.category === '2ND' ? '#fff59d' :
-                                 item.category === '기타' ? '#e1bee7' : '#f5f5f5'
-                               ) : '#f5f5f5',
-                               color: activeTab === 1 ? (
-                                 item.category === '삼성' ? '#1565c0' : 
-                                 item.category === '애플' ? '#2e7d32' :
-                                 item.category === '2ND' ? '#f57f17' :
-                                 item.category === '기타' ? '#7b1fa2' : '#666666'
-                               ) : '#666666',
+                               backgroundColor: item.category === '삼성' ? '#bbdefb' : 
+                                               item.category === '애플' ? '#c8e6c9' :
+                                               item.category === '2ND' ? '#fff59d' :
+                                               item.category === '기타' ? '#e1bee7' : '#f5f5f5',
+                               color: item.category === '삼성' ? '#1565c0' : 
+                                      item.category === '애플' ? '#2e7d32' :
+                                      item.category === '2ND' ? '#f57f17' :
+                                      item.category === '기타' ? '#7b1fa2' : '#666666',
                                fontWeight: 'bold',
                                fontSize: '0.6rem'
                              }}
