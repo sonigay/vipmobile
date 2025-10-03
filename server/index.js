@@ -18463,7 +18463,7 @@ app.post('/api/policies', async (req, res) => {
   }
 });
 
-// 정책 삭제 API (라우터 순서 문제 해결을 위해 앞에 배치)
+// 정책 삭제 API (라우터 순서 문제 해결을 위해 가장 앞에 배치)
 app.delete('/api/policies/:policyId', async (req, res) => {
   console.log('🔥 [DELETE API] 요청 받음:', req.method, req.url);
   console.log('🔥 [DELETE API] 요청 헤더:', req.headers);
