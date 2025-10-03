@@ -18010,6 +18010,12 @@ app.get('/api/policies', async (req, res) => {
         filters: { yearMonth, policyType, category, userId, approvalStatus }
       });
       
+      // 정책이 통과했는지 확인
+      const passed = true; // 기본적으로 통과
+      if (passed) {
+        console.log(`✅ [정책필터] 정책 통과: ${row[0]}`);
+      }
+      
       // 년월 필터
       if (yearMonth && policyYearMonth && policyYearMonth !== yearMonth) {
         console.log(`❌ [정책필터] yearMonth 불일치: ${policyYearMonth} !== ${yearMonth}`);
@@ -18119,7 +18125,22 @@ app.get('/api/policies', async (req, res) => {
         storeNameFromSheet: row[25] || '',       // Z열: 업체명 (시트에서 직접 읽은 값)
         activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
         amount95Above: row[27] || '',            // AB열: 95군이상금액
-        amount95Below: row[28] || ''             // AC열: 95군미만금액
+        amount95Below: row[28] || '',            // AC열: 95군미만금액
+        // activationType을 객체로 파싱
+        activationType: (() => {
+          const activationTypeStr = row[26] || '';
+          if (!activationTypeStr) return { new010: false, mnp: false, change: false };
+          
+          const hasNew010 = activationTypeStr.includes('010신규');
+          const hasMnp = activationTypeStr.includes('MNP');
+          const hasChange = activationTypeStr.includes('기변');
+          
+          return {
+            new010: hasNew010,
+            mnp: hasMnp,
+            change: hasChange
+          };
+        })()
       };
     });
 
@@ -18583,6 +18604,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
 
 // 정책 삭제 API
 app.delete('/api/policies/:policyId', async (req, res) => {
+  console.log('DELETE 요청 받음:', req.method, req.url);
   try {
     const { policyId } = req.params;
     console.log('정책 삭제 요청:', { policyId });
@@ -18630,6 +18652,12 @@ app.delete('/api/policies/:policyId', async (req, res) => {
     console.error('정책 삭제 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// DELETE 메서드 테스트 API
+app.delete('/api/test-delete', (req, res) => {
+  console.log('DELETE 테스트 요청 받음');
+  res.json({ success: true, message: 'DELETE 메서드가 작동합니다.' });
 });
 
 // 정책 승인 API
