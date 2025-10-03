@@ -64,11 +64,19 @@ function PriorityModelSelectionModal({
 
   // 검색어에 따른 모델 필터링
   useEffect(() => {
+    console.log('🔍 [PriorityModelSelectionModal] useEffect 실행:', { searchTerm, uniqueModels });
+    
+    if (!uniqueModels || !Array.isArray(uniqueModels)) {
+      console.log('🔍 [PriorityModelSelectionModal] uniqueModels가 유효하지 않음');
+      setFilteredModels([]);
+      return;
+    }
+    
     if (!searchTerm.trim()) {
       setFilteredModels(uniqueModels);
     } else {
       const filtered = uniqueModels.filter(model =>
-        model.toLowerCase().includes(searchTerm.toLowerCase())
+        model && model.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredModels(filtered);
     }
@@ -167,10 +175,10 @@ function PriorityModelSelectionModal({
         {/* 모델 목록 */}
         <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
           <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-            총 {filteredModels.length}개 모델
+            총 {filteredModels?.length || 0}개 모델
           </Typography>
           
-          {filteredModels.length === 0 ? (
+          {!filteredModels || filteredModels.length === 0 ? (
             <Alert severity="info">
               {searchTerm ? '검색 결과가 없습니다.' : '회수 대상 모델이 없습니다.'}
             </Alert>
