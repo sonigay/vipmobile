@@ -275,8 +275,8 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       {/* 메인 콘텐츠 */}
       <Box sx={{ p: 2 }}>
         {/* 우선순위 모델 선정 메뉴 */}
-        {/* 우선순위 모델 선정하기 - 임시로 비활성화 */}
-        {/* <Card sx={{ mb: 2, p: 2 }}>
+        {/* 우선순위 모델 선정하기 */}
+        <Card sx={{ mb: 2, p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
             ⭐ 우선순위 모델 선정하기
           </Typography>
@@ -302,7 +302,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
               </Button>
             ))}
           </Box>
-        </Card> */}
+        </Card>
 
         {/* 탭 메뉴 */}
         <Card sx={{ mb: 2 }}>
@@ -356,7 +356,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
                 tabIndex={currentTab}
                 onStatusUpdate={handleStatusUpdate}
                 onRefresh={loadRecoveryData}
-                // priorityModels={priorityModels}
+                priorityModels={priorityModels}
               />
             ) : (
               <InventoryRecoveryMap
@@ -364,7 +364,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
                 tabIndex={currentTab}
                 onStatusUpdate={handleStatusUpdate}
                 onRefresh={loadRecoveryData}
-                // priorityModels={priorityModels}
+                priorityModels={priorityModels}
               />
             )}
           </CardContent>
@@ -394,14 +394,14 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
         }}
       />
 
-      {/* 우선순위 모델 선정 모달 - 임시로 비활성화 (디버깅용) */}
-      {/* <PriorityModelSelectionModal
+      {/* 우선순위 모델 선정 모달 */}
+      <PriorityModelSelectionModal
         open={showPriorityModal}
         onClose={handlePriorityModalClose}
         recoveryData={recoveryData}
         priorityModels={priorityModels}
         onPriorityChange={handlePriorityChange}
-      /> */}
+      />
     </Box>
   );
 }
