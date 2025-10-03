@@ -177,6 +177,10 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
 
   // 우선순위 모델 선정 핸들러
   const handlePriorityModelSelect = (priorityLevel) => {
+    console.log('🔍 [InventoryRecoveryMode] handlePriorityModelSelect 호출됨:', priorityLevel);
+    console.log('🔍 [InventoryRecoveryMode] recoveryData 상태:', recoveryData);
+    console.log('🔍 [InventoryRecoveryMode] priorityModels 상태:', priorityModels);
+    
     setSelectedPriorityLevel(priorityLevel);
     setShowPriorityModal(true);
   };
@@ -390,6 +394,11 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       />
 
       {/* 우선순위 모델 선정 모달 */}
+      {console.log('🔍 [InventoryRecoveryMode] PriorityModelSelectionModal 렌더링 시도:', {
+        open: showPriorityModal,
+        recoveryData: recoveryData?.length || 0,
+        priorityModels: priorityModels
+      })}
       <PriorityModelSelectionModal
         open={showPriorityModal}
         onClose={handlePriorityModalClose}

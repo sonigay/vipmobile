@@ -25169,6 +25169,11 @@ app.post('/api/budget/recalculate-all', async (req, res) => {
 
 // 재고회수 데이터 조회 API
 app.get('/api/inventory-recovery/data', async (req, res) => {
+  console.log('🔍 [재고회수 API] 요청 받음 - 시작');
+  console.log('🔍 [재고회수 API] 요청 헤더:', req.headers);
+  console.log('🔍 [재고회수 API] 요청 URL:', req.url);
+  console.log('🔍 [재고회수 API] 요청 메서드:', req.method);
+  
   // CORS 헤더 설정
   const allowedOrigins = [
     'https://vipmobile.netlify.app',
@@ -25179,10 +25184,14 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
   ];
   
   const origin = req.headers.origin;
+  console.log('🔍 [재고회수 API] Origin:', origin);
+  
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
+    console.log('🔍 [재고회수 API] CORS 허용된 Origin 사용:', origin);
   } else {
     res.header('Access-Control-Allow-Origin', '*');
+    console.log('🔍 [재고회수 API] CORS * 사용');
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -25190,6 +25199,7 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   
   if (req.method === 'OPTIONS') {
+    console.log('🔍 [재고회수 API] OPTIONS 요청 - 200 응답');
     res.sendStatus(200);
     return;
   }
@@ -25198,12 +25208,21 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
     console.log('🔄 [재고회수] 데이터 조회 시작');
     
     // 회수목록 시트만 가져오기 (좌표는 "회수목록" 시트에서 직접 읽기)
+    console.log('🔍 [재고회수 API] Google Sheets API 호출 시작');
+    console.log('🔍 [재고회수 API] Spreadsheet ID:', process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY');
+    console.log('🔍 [재고회수 API] Sheet Name:', process.env.INVENTORY_RECOVERY_SHEET_NAME || '회수목록');
+    
     const recoveryListResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
       range: (process.env.INVENTORY_RECOVERY_SHEET_NAME || '회수목록') + '!A:AA'
     });
 
+    console.log('🔍 [재고회수 API] Google Sheets API 응답 받음');
+    console.log('🔍 [재고회수 API] 응답 데이터 존재 여부:', !!recoveryListResponse.data.values);
+    console.log('🔍 [재고회수 API] 응답 데이터 길이:', recoveryListResponse.data.values?.length || 0);
+
     if (!recoveryListResponse.data.values) {
+      console.error('❌ [재고회수 API] 데이터를 가져올 수 없습니다.');
       throw new Error('데이터를 가져올 수 없습니다.');
     }
 
@@ -25265,14 +25284,20 @@ app.get('/api/inventory-recovery/data', async (req, res) => {
       });
 
     console.log(`✅ [재고회수] 데이터 조회 완료: ${processedData.length}개 항목`);
+    console.log('🔍 [재고회수 API] 응답 데이터 샘플:', processedData.slice(0, 2));
     
     res.json({
       success: true,
       data: processedData
     });
     
+    console.log('🔍 [재고회수 API] 응답 전송 완료');
+    
   } catch (error) {
     console.error('❌ [재고회수] 데이터 조회 오류:', error);
+    console.error('❌ [재고회수 API] 에러 스택:', error.stack);
+    console.error('❌ [재고회수 API] 에러 메시지:', error.message);
+    
     res.status(500).json({
       success: false,
       error: '재고회수 데이터 조회에 실패했습니다.',

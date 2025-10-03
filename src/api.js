@@ -767,6 +767,9 @@ export const budgetPolicyGroupAPI = {
 export const inventoryRecoveryAPI = {
   // 재고회수 데이터 조회
   getData: async () => {
+    console.log('🔍 [재고회수 API] 프론트엔드에서 데이터 조회 시작');
+    console.log('🔍 [재고회수 API] API URL:', `${API_BASE_URL}/api/inventory-recovery/data`);
+    
     try {
       const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/data`, {
         method: 'GET',
@@ -775,13 +778,22 @@ export const inventoryRecoveryAPI = {
         },
       });
       
+      console.log('🔍 [재고회수 API] 응답 상태:', response.status, response.statusText);
+      console.log('🔍 [재고회수 API] 응답 헤더:', response.headers);
+      
       if (!response.ok) {
+        console.error('❌ [재고회수 API] HTTP 에러:', response.status, response.statusText);
         throw new Error('재고회수 데이터 조회에 실패했습니다.');
       }
       
-      return await response.json();
+      const data = await response.json();
+      console.log('🔍 [재고회수 API] 응답 데이터:', data);
+      console.log('🔍 [재고회수 API] 데이터 길이:', data.data?.length || 0);
+      
+      return data;
     } catch (error) {
-      console.error('재고회수 데이터 조회 오류:', error);
+      console.error('❌ [재고회수 API] 데이터 조회 오류:', error);
+      console.error('❌ [재고회수 API] 에러 스택:', error.stack);
       throw error;
     }
   },

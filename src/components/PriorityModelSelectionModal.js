@@ -32,23 +32,34 @@ function PriorityModelSelectionModal({
   priorityModels, 
   onPriorityChange 
 }) {
+  console.log('🔍 [PriorityModelSelectionModal] 컴포넌트 렌더링 시작');
+  console.log('🔍 [PriorityModelSelectionModal] props:', { open, recoveryData, priorityModels, onPriorityChange });
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredModels, setFilteredModels] = useState([]);
   const [selectedPriority, setSelectedPriority] = useState(null);
 
   // 회수 데이터에서 고유한 모델명 추출
   const uniqueModels = useMemo(() => {
+    console.log('🔍 [PriorityModelSelectionModal] uniqueModels 계산 시작');
+    console.log('🔍 [PriorityModelSelectionModal] recoveryData:', recoveryData);
+    
     if (!recoveryData || !Array.isArray(recoveryData)) {
+      console.log('🔍 [PriorityModelSelectionModal] recoveryData가 유효하지 않음');
       return [];
     }
     
     const models = new Set();
-    recoveryData.forEach(item => {
+    recoveryData.forEach((item, index) => {
+      console.log(`🔍 [PriorityModelSelectionModal] item ${index}:`, item);
       if (item && item.modelName && item.modelName.trim()) {
         models.add(item.modelName.trim());
       }
     });
-    return Array.from(models).sort();
+    
+    const result = Array.from(models).sort();
+    console.log('🔍 [PriorityModelSelectionModal] uniqueModels 결과:', result);
+    return result;
   }, [recoveryData]);
 
   // 검색어에 따른 모델 필터링
