@@ -261,7 +261,10 @@ function PolicyInputModal({
           inputUserName: loggedInUser?.target || loggedInUser?.name,
           modifiedBy: loggedInUser?.contactId || loggedInUser?.id,
           modifiedByName: loggedInUser?.target || loggedInUser?.name,
-          modifiedAt: new Date().toISOString()
+          modifiedAt: new Date().toISOString(),
+          activationType: formData.activationType, // 개통유형
+          amount95Above: formData.amount95Above, // 95군이상금액
+          amount95Below: formData.amount95Below // 95군미만금액
         };
 
         await onSave(policy.id, updateData);
@@ -290,7 +293,9 @@ function PolicyInputModal({
               team: '대기'
             },
             team: formData.team, // 소속정책팀 추가
-            activationType: formData.activationType // 개통유형
+            activationType: formData.activationType, // 개통유형
+            amount95Above: formData.amount95Above, // 95군이상금액
+            amount95Below: formData.amount95Below // 95군미만금액
           };
 
           await onSave(policyData);
@@ -319,7 +324,9 @@ function PolicyInputModal({
             team: formData.team,
             isMultiple: true, // 복수점 정책임을 표시
             multipleStoreName: formData.multipleStoreName, // 사용자가 입력한 복수점명
-            activationType: formData.activationType // 개통유형
+            activationType: formData.activationType, // 개통유형
+            amount95Above: formData.amount95Above, // 95군이상금액
+            amount95Below: formData.amount95Below // 95군미만금액
           }));
 
           // 각 정책을 순차적으로 저장
