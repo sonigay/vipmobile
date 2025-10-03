@@ -101,8 +101,40 @@ const InventoryStatusScreen = () => {
               return 0;
             });
             
-            // 색상별 탭에서 동일 모델명 그룹화 처리 (정렬 후)
-            if (activeTab === 1) {
+            // 모델별 탭에서는 모델명별로 그룹화하여 집계
+            if (activeTab === 0) {
+              const modelGroups = new Map();
+              sortedData.forEach(item => {
+                if (!modelGroups.has(item.modelName)) {
+                  modelGroups.set(item.modelName, {
+                    modelName: item.modelName,
+                    category: item.category,
+                    store: item.store,
+                    agent: item.agent,
+                    office: item.office,
+                    department: item.department,
+                    inventoryCount: 0,
+                    monthlyActivation: 0,
+                    dailyActivation: Array(31).fill(0)
+                  });
+                }
+                
+                const group = modelGroups.get(item.modelName);
+                group.inventoryCount += item.inventoryCount;
+                group.monthlyActivation += item.monthlyActivation;
+                
+                // 일별 개통 현황 합계
+                for (let i = 0; i < 31; i++) {
+                  group.dailyActivation[i] += item.dailyActivation[i] || 0;
+                }
+              });
+              
+              // 그룹화된 데이터를 배열로 변환
+              const groupedData = Array.from(modelGroups.values());
+              setInventoryData(groupedData);
+              
+            } else if (activeTab === 1) {
+              // 색상별 탭에서는 기존 그룹화 처리 유지
               const modelGroups = new Map();
               sortedData.forEach(item => {
                 if (!modelGroups.has(item.modelName)) {
