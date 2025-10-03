@@ -18697,6 +18697,20 @@ app.delete('/api/test-delete', (req, res) => {
   res.json({ success: true, message: 'DELETE 메서드가 작동합니다.' });
 });
 
+// 정책 삭제 테스트 API (더 간단한 버전)
+app.delete('/api/policies-delete/:policyId', async (req, res) => {
+  console.log('🔥 [DELETE TEST API] 요청 받음:', req.method, req.url);
+  try {
+    const { policyId } = req.params;
+    console.log('🔥 [DELETE TEST API] 정책 삭제 요청:', { policyId });
+    
+    res.json({ success: true, message: 'DELETE 테스트 API가 작동합니다.', policyId });
+  } catch (error) {
+    console.error('DELETE 테스트 API 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 정책 승인 API
 app.put('/api/policies/:policyId/approve', async (req, res) => {
   try {

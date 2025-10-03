@@ -370,6 +370,23 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
     try {
       console.log('정책 삭제 시도:', policy.id);
+      
+      // 먼저 테스트 API로 DELETE 메서드가 작동하는지 확인
+      console.log('DELETE 테스트 API 호출 시도...');
+      const testResponse = await fetch('/api/test-delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (testResponse.ok) {
+        console.log('DELETE 테스트 API 성공:', await testResponse.json());
+      } else {
+        console.log('DELETE 테스트 API 실패:', testResponse.status, testResponse.statusText);
+      }
+      
+      // 실제 정책 삭제 API 호출
       const response = await fetch(`/api/policies/${policy.id}`, {
         method: 'DELETE',
         headers: {
