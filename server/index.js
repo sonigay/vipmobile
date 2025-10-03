@@ -17991,7 +17991,7 @@ app.get('/api/policies', async (req, res) => {
     
     // 필터링 적용
     let filteredPolicies = dataRows.filter(row => {
-      if (row.length < 29) return false; // 최소 컬럼 수 확인 (A~AC열)
+      if (row.length < 30) return false; // 최소 컬럼 수 확인 (A~AD열)
       
       const policyYearMonth = row[23] || ''; // X열: 대상년월
       const policyTypeData = row[6];   // G열: 정책유형
@@ -18133,6 +18133,7 @@ app.get('/api/policies', async (req, res) => {
         activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
         amount95Above: row[27] || '',            // AB열: 95군이상금액
         amount95Below: row[28] || '',            // AC열: 95군미만금액
+        policyTeam: row[29] || '미지정',         // AD열: 소속팀
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18341,7 +18342,8 @@ app.post('/api/policies', async (req, res) => {
       '업체명',           // Z열
       '개통유형',         // AA열
       '95군이상금액',     // AB열
-      '95군미만금액'      // AC열
+      '95군미만금액',     // AC열
+      '소속팀'            // AD열
     ];
     
     // 매장 데이터에서 업체명 조회
@@ -18378,7 +18380,7 @@ app.post('/api/policies', async (req, res) => {
       new Date().toISOString(),    // L열: 입력일시
       '대기',                      // M열: 승인상태_총괄
       '대기',                      // N열: 승인상태_정산팀
-      policyTeam || '미지정',      // O열: 승인상태_소속팀 (소속팀 정보 저장)
+      '대기',                      // O열: 승인상태_소속팀
       '활성',                      // P열: 정책상태
       '',                          // Q열: 취소사유
       '',                          // R열: 취소일시
@@ -18401,7 +18403,8 @@ app.post('/api/policies', async (req, res) => {
         return types.join(', ');
       })(),
       req.body.amount95Above || '', // AB열: 95군이상금액
-      req.body.amount95Below || ''  // AC열: 95군미만금액
+      req.body.amount95Below || '', // AC열: 95군미만금액
+      policyTeam || '미지정'        // AD열: 소속팀
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
