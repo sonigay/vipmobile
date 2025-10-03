@@ -18430,17 +18430,55 @@ app.put('/api/policies/:policyId', async (req, res) => {
       inputUserName
     } = req.body;
     
-    // 필수 필드 검증
-    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || !amountType) {
+    // 구두정책 여부 확인
+    const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
+    console.log('정책 수정 - 구두정책 여부:', isShoePolicy, 'category:', category);
+    
+    // 필수 필드 검증 (구두정책이 아닌 경우에만 amountType 필수)
+    const missingFields = [];
+    if (!policyName) missingFields.push('policyName');
+    if (!policyStartDate) missingFields.push('policyStartDate');
+    if (!policyEndDate) missingFields.push('policyEndDate');
+    if (!policyStore) missingFields.push('policyStore');
+    
+    // 구두정책이 아닌 경우에만 policyContent 필수
+    if (!isShoePolicy && !policyContent) missingFields.push('policyContent');
+    
+    // 구두정책인 경우 95군이상/미만 금액 중 하나라도 있어야 함
+    if (isShoePolicy && !req.body.amount95Above && !req.body.amount95Below && !policyContent) {
+      missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+    }
+    
+    if (!isShoePolicy && !amountType) missingFields.push('amountType');
+    
+    if (missingFields.length > 0) {
+      console.log('정책 수정 - 누락된 필드:', missingFields);
+      
+      // 필드명을 한국어로 변환
+      const fieldNames = {
+        'policyName': '정책명',
+        'policyStartDate': '정책 시작일',
+        'policyEndDate': '정책 종료일',
+        'policyStore': '정책적용점',
+        'policyContent': '정책내용',
+        'amountType': '금액 유형',
+        'amount95Above 또는 amount95Below 또는 policyContent': '95군이상/미만 금액 또는 정책내용'
+      };
+      
+      const missingFieldNames = missingFields.map(field => fieldNames[field] || field);
+      const errorMessage = `다음 필수 항목이 누락되었습니다: ${missingFieldNames.join(', ')}`;
+      
       return res.status(400).json({
         success: false,
-        error: '필수 필드가 누락되었습니다.',
-        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, amountType }
+        error: errorMessage,
+        missingFields: missingFields,
+        missingFieldNames: missingFieldNames,
+        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, amountType, isShoePolicy }
       });
     }
     
-    // amountType이 'in_content'가 아닐 때만 policyAmount 필수
-    if (amountType !== 'in_content' && !policyAmount) {
+    // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책이 아닌 경우에만)
+    if (!isShoePolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
@@ -18489,7 +18527,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
       inputUserId,                 // J열: 입력자ID
       inputUserName,               // K열: 입력자명
       new Date().toISOString(),    // L열: 입력일시 (수정일시로 업데이트)
-      yearMonth                    // X열: 대상년월
+      yearMonth,                   // X열: 대상년월
+      req.body.amount95Above || '', // AB열: 95군이상금액
+      req.body.amount95Below || ''  // AC열: 95군미만금액
     ];
     
     // 각 필드를 개별적으로 업데이트
@@ -18505,7 +18545,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
       `'정책_기본정보 '!J${rowNumber}`,  // 입력자ID
       `'정책_기본정보 '!K${rowNumber}`,  // 입력자명
       `'정책_기본정보 '!L${rowNumber}`,  // 입력일시
-      `'정책_기본정보 '!X${rowNumber}`   // 대상년월
+      `'정책_기본정보 '!X${rowNumber}`,  // 대상년월
+      `'정책_기본정보 '!AB${rowNumber}`, // 95군이상금액
+      `'정책_기본정보 '!AC${rowNumber}`  // 95군미만금액
     ];
     
     // 배치 업데이트 실행
