@@ -270,35 +270,69 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       
       {/* 메인 콘텐츠 */}
       <Box sx={{ p: 2 }}>
-        {/* 우선순위 모델 선정 메뉴 */}
-        {/* 우선순위 모델 선정하기 - 완전히 비활성화 */}
-        {/* <Card sx={{ mb: 2, p: 2 }}>
+        {/* 1단계: 우선순위 모델 선정 메뉴 */}
+        <Card sx={{ mb: 2, p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
             ⭐ 우선순위 모델 선정하기
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {Object.entries(priorityModels).map(([priority, model]) => (
-              <Button
-                key={priority}
-                variant={model ? 'contained' : 'outlined'}
-                color={model ? 'primary' : 'default'}
-                onClick={() => handlePriorityModelSelect(priority)}
-                sx={{ 
-                  minWidth: 120,
-                  textTransform: 'none',
-                  fontWeight: 'bold'
-                }}
-              >
-                {priority} 모델
-                {model && (
-                  <Typography variant="caption" sx={{ ml: 1, opacity: 0.8 }}>
-                    ({model})
-                  </Typography>
-                )}
-              </Button>
-            ))}
+            <Button
+              variant="outlined"
+              color="default"
+              sx={{ 
+                minWidth: 120,
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }}
+            >
+              1순위 모델
+            </Button>
+            <Button
+              variant="outlined"
+              color="default"
+              sx={{ 
+                minWidth: 120,
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }}
+            >
+              2순위 모델
+            </Button>
+            <Button
+              variant="outlined"
+              color="default"
+              sx={{ 
+                minWidth: 120,
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }}
+            >
+              3순위 모델
+            </Button>
+            <Button
+              variant="outlined"
+              color="default"
+              sx={{ 
+                minWidth: 120,
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }}
+            >
+              4순위 모델
+            </Button>
+            <Button
+              variant="outlined"
+              color="default"
+              sx={{ 
+                minWidth: 120,
+                textTransform: 'none',
+                fontWeight: 'bold'
+              }}
+            >
+              5순위 모델
+            </Button>
           </Box>
-        </Card> */}
+        </Card>
 
         {/* 탭 메뉴 */}
         <Card sx={{ mb: 2 }}>
