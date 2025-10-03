@@ -18235,7 +18235,8 @@ app.post('/api/policies', async (req, res) => {
       category,
       yearMonth,
       inputUserId,
-      inputUserName
+      inputUserName,
+      policyTeam // 소속팀 정보 추가
     } = req.body;
     
     // 구두정책 여부 확인
@@ -18377,7 +18378,7 @@ app.post('/api/policies', async (req, res) => {
       new Date().toISOString(),    // L열: 입력일시
       '대기',                      // M열: 승인상태_총괄
       '대기',                      // N열: 승인상태_정산팀
-      '대기',                      // O열: 승인상태_소속팀
+      policyTeam || '미지정',      // O열: 승인상태_소속팀 (소속팀 정보 저장)
       '활성',                      // P열: 정책상태
       '',                          // Q열: 취소사유
       '',                          // R열: 취소일시
@@ -18488,13 +18489,16 @@ app.delete('/api/policies/:policyId', async (req, res) => {
     }
     
     // Google Sheets에서 해당 행 삭제
+    const sheetId = await getSheetIdByName('정책_기본정보 ');
+    console.log('🔥 [DELETE API] 정책_기본정보 시트 ID:', sheetId);
+    
     const response = await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
       resource: {
         requests: [{
           deleteDimension: {
             range: {
-              sheetId: 0, // 정책_기본정보 시트
+              sheetId: sheetId, // 정책_기본정보 시트 ID
               dimension: 'ROWS',
               startIndex: policyRowIndex + 1, // 0-based index, +1 for header
               endIndex: policyRowIndex + 2

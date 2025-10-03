@@ -256,7 +256,7 @@ function PolicyInputModal({
           policyType: isWireless ? '무선' : '유선',
           category: categoryId,
           yearMonth: yearMonth,
-          team: formData.team,
+          policyTeam: formData.team,
           inputUserId: loggedInUser?.contactId || loggedInUser?.id,
           inputUserName: loggedInUser?.target || loggedInUser?.name,
           modifiedBy: loggedInUser?.contactId || loggedInUser?.id,
@@ -292,7 +292,7 @@ function PolicyInputModal({
               settlement: '대기',
               team: '대기'
             },
-            team: formData.team, // 소속정책팀 추가
+            policyTeam: formData.team, // 소속정책팀 추가
             activationType: formData.activationType, // 개통유형
             amount95Above: formData.amount95Above, // 95군이상금액
             amount95Below: formData.amount95Below // 95군미만금액
@@ -321,7 +321,7 @@ function PolicyInputModal({
               settlement: '대기',
               team: '대기'
             },
-            team: formData.team,
+            policyTeam: formData.team,
             isMultiple: true, // 복수점 정책임을 표시
             multipleStoreName: formData.multipleStoreName, // 사용자가 입력한 복수점명
             activationType: formData.activationType, // 개통유형
