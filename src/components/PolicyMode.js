@@ -390,6 +390,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
       
       // 실제 정책 삭제 API 호출
+      console.log('실제 정책 삭제 API 호출:', `${API_BASE_URL}/api/policies/${policy.id}`);
       const response = await fetch(`${API_BASE_URL}/api/policies/${policy.id}`, {
         method: 'DELETE',
         headers: {
@@ -397,7 +398,11 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         }
       });
 
+      console.log('정책 삭제 응답 상태:', response.status, response.statusText);
+      
       if (response.ok) {
+        const result = await response.json();
+        console.log('정책 삭제 성공 응답:', result);
         alert('정책이 삭제되었습니다.');
         loadPolicyData(); // 정책 목록 새로고침
       } else {
@@ -407,6 +412,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         let errorMessage = '알 수 없는 오류가 발생했습니다.';
         try {
           const errorData = await response.json();
+          console.log('삭제 실패 상세:', errorData);
           errorMessage = errorData.error || errorMessage;
         } catch (parseError) {
           console.error('응답 파싱 실패:', parseError);
