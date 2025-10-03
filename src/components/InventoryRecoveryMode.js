@@ -21,7 +21,7 @@ import Header from './Header';
 import AppUpdatePopup from './AppUpdatePopup';
 import InventoryRecoveryTable from './InventoryRecoveryTable';
 import InventoryRecoveryMap from './InventoryRecoveryMap';
-import PriorityModelSelectionModal from './PriorityModelSelectionModal';
+// import PriorityModelSelectionModal from './PriorityModelSelectionModal';
 import { inventoryRecoveryAPI } from '../api';
 
 function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
@@ -44,16 +44,16 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     severity: 'success'
   });
 
-  // 우선순위 모델 상태
-  const [priorityModels, setPriorityModels] = useState({
-    '1순위': null,
-    '2순위': null,
-    '3순위': null,
-    '4순위': null,
-    '5순위': null
-  });
-  const [showPriorityModal, setShowPriorityModal] = useState(false);
-  const [selectedPriorityLevel, setSelectedPriorityLevel] = useState(null);
+  // 우선순위 모델 상태 - 완전히 비활성화
+  // const [priorityModels, setPriorityModels] = useState({
+  //   '1순위': null,
+  //   '2순위': null,
+  //   '3순위': null,
+  //   '4순위': null,
+  //   '5순위': null
+  // });
+  // const [showPriorityModal, setShowPriorityModal] = useState(false);
+  // const [selectedPriorityLevel, setSelectedPriorityLevel] = useState(null);
 
   // 업데이트 확인 핸들러
   const handleUpdateCheck = () => {
@@ -175,44 +175,44 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // 우선순위 모델 선정 핸들러
-  const handlePriorityModelSelect = (priorityLevel) => {
-    setSelectedPriorityLevel(priorityLevel);
-    setShowPriorityModal(true);
-  };
+  // 우선순위 모델 선정 핸들러 - 완전히 비활성화
+  // const handlePriorityModelSelect = (priorityLevel) => {
+  //   setSelectedPriorityLevel(priorityLevel);
+  //   setShowPriorityModal(true);
+  // };
 
-  // 우선순위 모델 변경 핸들러
-  const handlePriorityChange = (model, removePriority = null) => {
-    if (removePriority) {
-      // 우선순위 제거
-      setPriorityModels(prev => ({
-        ...prev,
-        [removePriority]: null
-      }));
-      setSnackbar({
-        open: true,
-        message: `${removePriority} 모델이 제거되었습니다.`,
-        severity: 'info'
-      });
-    } else if (model && selectedPriorityLevel) {
-      // 우선순위 설정
-      setPriorityModels(prev => ({
-        ...prev,
-        [selectedPriorityLevel]: model
-      }));
-      setSnackbar({
-        open: true,
-        message: `${selectedPriorityLevel} 모델이 설정되었습니다: ${model}`,
-        severity: 'success'
-      });
-    }
-  };
+  // 우선순위 모델 변경 핸들러 - 완전히 비활성화
+  // const handlePriorityChange = (model, removePriority = null) => {
+  //   if (removePriority) {
+  //     // 우선순위 제거
+  //     setPriorityModels(prev => ({
+  //       ...prev,
+  //       [removePriority]: null
+  //     }));
+  //     setSnackbar({
+  //       open: true,
+  //       message: `${removePriority} 모델이 제거되었습니다.`,
+  //       severity: 'info'
+  //     });
+  //   } else if (model && selectedPriorityLevel) {
+  //     // 우선순위 설정
+  //     setPriorityModels(prev => ({
+  //       ...prev,
+  //       [selectedPriorityLevel]: model
+  //     }));
+  //     setSnackbar({
+  //       open: true,
+  //       message: `${selectedPriorityLevel} 모델이 설정되었습니다: ${model}`,
+  //       severity: 'success'
+  //     });
+  //   }
+  // };
 
-  // 우선순위 모달 닫기
-  const handlePriorityModalClose = () => {
-    setShowPriorityModal(false);
-    setSelectedPriorityLevel(null);
-  };
+  // 우선순위 모달 닫기 - 완전히 비활성화
+  // const handlePriorityModalClose = () => {
+  //   setShowPriorityModal(false);
+  //   setSelectedPriorityLevel(null);
+  // };
 
   if (loading) {
     return (
@@ -271,8 +271,8 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       {/* 메인 콘텐츠 */}
       <Box sx={{ p: 2 }}>
         {/* 우선순위 모델 선정 메뉴 */}
-        {/* 우선순위 모델 선정하기 */}
-        <Card sx={{ mb: 2, p: 2 }}>
+        {/* 우선순위 모델 선정하기 - 완전히 비활성화 */}
+        {/* <Card sx={{ mb: 2, p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
             ⭐ 우선순위 모델 선정하기
           </Typography>
@@ -298,7 +298,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
               </Button>
             ))}
           </Box>
-        </Card>
+        </Card> */}
 
         {/* 탭 메뉴 */}
         <Card sx={{ mb: 2 }}>
@@ -352,7 +352,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
                 tabIndex={currentTab}
                 onStatusUpdate={handleStatusUpdate}
                 onRefresh={loadRecoveryData}
-                priorityModels={priorityModels}
+                // priorityModels={priorityModels}
               />
             ) : (
               <InventoryRecoveryMap
@@ -360,7 +360,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
                 tabIndex={currentTab}
                 onStatusUpdate={handleStatusUpdate}
                 onRefresh={loadRecoveryData}
-                priorityModels={priorityModels}
+                // priorityModels={priorityModels}
               />
             )}
           </CardContent>
@@ -390,14 +390,14 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
         }}
       />
 
-      {/* 우선순위 모델 선정 모달 */}
-      <PriorityModelSelectionModal
+      {/* 우선순위 모델 선정 모달 - 완전히 비활성화 */}
+      {/* <PriorityModelSelectionModal
         open={showPriorityModal}
         onClose={handlePriorityModalClose}
         recoveryData={recoveryData}
         priorityModels={priorityModels}
         onPriorityChange={handlePriorityChange}
-      />
+      /> */}
     </Box>
   );
 }
