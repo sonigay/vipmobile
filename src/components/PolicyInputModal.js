@@ -348,15 +348,23 @@ function PolicyInputModal({
         try {
           if (error.message.includes('HTTP error! status: 400')) {
             // 서버 응답에서 누락된 필드 정보 추출 시도
-            if (error.response && error.response.data && error.response.data.received) {
-              const received = error.response.data.received;
-              const missingFields = [];
+            if (error.response && error.response.data) {
+              const responseData = error.response.data;
               
-              // 필드명 매핑
-              const fieldNames = {
-                policyName: '정책명',
-                policyStartDate: '정책 시작일',
-                policyEndDate: '정책 종료일',
+              // 서버에서 제공한 구체적인 오류 메시지 사용
+              if (responseData.error) {
+                errorMessage = responseData.error;
+              } else if (responseData.missingFieldNames && responseData.missingFieldNames.length > 0) {
+                errorMessage = `다음 필수 항목이 누락되었습니다: ${responseData.missingFieldNames.join(', ')}`;
+              } else if (responseData.received) {
+                const received = responseData.received;
+                const missingFields = [];
+                
+                // 필드명 매핑
+                const fieldNames = {
+                  policyName: '정책명',
+                  policyStartDate: '정책 시작일',
+                  policyEndDate: '정책 종료일',
                 policyStore: '정책적용점',
                 policyContent: '정책내용',
                 policyAmount: '금액',
