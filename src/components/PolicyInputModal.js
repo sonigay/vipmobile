@@ -65,7 +65,17 @@ function PolicyInputModal({
     team: '', // 소속정책팀 추가
     storeType: 'single', // 'single' 또는 'multiple'
     multipleStores: [], // 복수점 선택 시 매장 목록
-    multipleStoreName: '' // 복수점명 (수기 입력)
+    multipleStoreName: '', // 복수점명 (수기 입력)
+    // 구두정책 전용 필드
+    activationType: {
+      new010: false,    // 010신규
+      mnp: false,       // MNP
+      change: false     // 기변
+    },
+    // 95군 이상/미만 금액 입력
+    amount95Above: '',     // 95군 이상 금액
+    amount95Below: '',     // 95군 미만 금액
+    isDirectInput: false   // 직접입력 여부
   });
   
   const [errors, setErrors] = useState({});
@@ -90,7 +100,15 @@ function PolicyInputModal({
           team: policy.team || loggedInUser?.userRole || '',
           storeType: 'single',
           multipleStores: [],
-          multipleStoreName: ''
+          multipleStoreName: '',
+          activationType: {
+            new010: false,
+            mnp: false,
+            change: false
+          },
+          amount95Above: '',
+          amount95Below: '',
+          isDirectInput: false
         });
       } else {
         // 새 정책 생성 모드: 빈 폼으로 초기화
@@ -105,7 +123,15 @@ function PolicyInputModal({
           team: loggedInUser?.userRole || '', // 현재 사용자의 소속팀으로 기본 설정
           storeType: 'single',
           multipleStores: [],
-          multipleStoreName: ''
+          multipleStoreName: '',
+          activationType: {
+            new010: false,
+            mnp: false,
+            change: false
+          },
+          amount95Above: '',
+          amount95Below: '',
+          isDirectInput: false
         });
       }
       setErrors({});
@@ -142,6 +168,24 @@ function PolicyInputModal({
     
     if (formData.storeType === 'multiple' && !formData.multipleStoreName.trim()) {
       newErrors.multipleStoreName = '복수점명을 입력해주세요.';
+    }
+    
+    // 구두정책 개통유형 검사
+    if (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') {
+      const hasAnyActivationType = formData.activationType.new010 || formData.activationType.mnp || formData.activationType.change;
+      if (!hasAnyActivationType) {
+        newErrors.activationType = '개통유형을 최소 1개 이상 선택해주세요.';
+      }
+      
+      // 95군 이상/미만 금액 검사
+      if (!formData.isDirectInput) {
+        if (!formData.amount95Above.trim()) {
+          newErrors.amount95Above = '95군 이상 금액을 입력해주세요.';
+        }
+        if (!formData.amount95Below.trim()) {
+          newErrors.amount95Below = '95군 미만 금액을 입력해주세요.';
+        }
+      }
     }
     
     if (!formData.policyContent.trim()) {
@@ -239,7 +283,8 @@ function PolicyInputModal({
               settlement: '대기',
               team: '대기'
             },
-            team: formData.team // 소속정책팀 추가
+            team: formData.team, // 소속정책팀 추가
+            activationType: formData.activationType // 개통유형
           };
 
           await onSave(policyData);
@@ -267,7 +312,8 @@ function PolicyInputModal({
             },
             team: formData.team,
             isMultiple: true, // 복수점 정책임을 표시
-            multipleStoreName: formData.multipleStoreName // 사용자가 입력한 복수점명
+            multipleStoreName: formData.multipleStoreName, // 사용자가 입력한 복수점명
+            activationType: formData.activationType // 개통유형
           }));
 
           // 각 정책을 순차적으로 저장
@@ -564,6 +610,121 @@ function PolicyInputModal({
             </>
           )}
           
+          {/* 구두정책 전용: 개통유형 선택 */}
+          {categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' ? (
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" gutterBottom>
+                개통유형 *
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.activationType.new010}
+                      onChange={(e) => {
+                        const newActivationType = {
+                          ...formData.activationType,
+                          new010: e.target.checked
+                        };
+                        handleInputChange('activationType', newActivationType);
+                      }}
+                    />
+                  }
+                  label="010신규"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.activationType.mnp}
+                      onChange={(e) => {
+                        const newActivationType = {
+                          ...formData.activationType,
+                          mnp: e.target.checked
+                        };
+                        handleInputChange('activationType', newActivationType);
+                      }}
+                    />
+                  }
+                  label="MNP"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.activationType.change}
+                      onChange={(e) => {
+                        const newActivationType = {
+                          ...formData.activationType,
+                          change: e.target.checked
+                        };
+                        handleInputChange('activationType', newActivationType);
+                      }}
+                    />
+                  }
+                  label="기변"
+                />
+              </Box>
+              {errors.activationType && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                  {errors.activationType}
+                </Typography>
+              )}
+            </Grid>
+          ) : null}
+
+          {/* 구두정책 전용: 95군 이상/미만 금액 입력 */}
+          {categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' ? (
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" gutterBottom>
+                금액 설정 *
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ minWidth: 80 }}>95군이상</Typography>
+                  <TextField
+                    size="small"
+                    value={formData.amount95Above}
+                    onChange={(e) => handleInputChange('amount95Above', e.target.value)}
+                    placeholder="금액 입력"
+                    type="number"
+                    sx={{ width: 120 }}
+                    inputProps={{ min: 0 }}
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" sx={{ minWidth: 80 }}>95군미만</Typography>
+                  <TextField
+                    size="small"
+                    value={formData.amount95Below}
+                    onChange={(e) => handleInputChange('amount95Below', e.target.value)}
+                    placeholder="금액 입력"
+                    type="number"
+                    sx={{ width: 120 }}
+                    inputProps={{ min: 0 }}
+                  />
+                </Box>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.isDirectInput}
+                      onChange={(e) => handleInputChange('isDirectInput', e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Box>
+              {errors.amount95Above && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                  {errors.amount95Above}
+                </Typography>
+              )}
+              {errors.amount95Below && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                  {errors.amount95Below}
+                </Typography>
+              )}
+            </Grid>
+          ) : null}
+
           <Grid item xs={12}>
             <TextField
               fullWidth
@@ -571,27 +732,39 @@ function PolicyInputModal({
               value={formData.policyContent}
               onChange={(e) => handleInputChange('policyContent', e.target.value)}
               error={!!errors.policyContent}
-              helperText={errors.policyContent}
+              helperText={
+                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
+                  ? (formData.isDirectInput ? '직접입력 모드: 정책 내용을 입력해주세요.' : '95군 이상/미만 금액을 입력하면 자동으로 내용이 생성됩니다.')
+                  : errors.policyContent
+              }
               multiline
               rows={4}
               required
+              disabled={
+                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
+                  ? !formData.isDirectInput 
+                  : false
+              }
             />
           </Grid>
           
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="금액 (원)"
-              value={formData.policyAmount}
-              onChange={(e) => handleInputChange('policyAmount', e.target.value)}
-              error={!!errors.policyAmount}
-              helperText={errors.policyAmount}
-              type="number"
-              inputProps={{ min: 0 }}
-              disabled={formData.amountType === 'in_content'}
-              required={formData.amountType !== 'in_content'}
-            />
-          </Grid>
+          {/* 구두정책이 아닌 경우에만 금액 입력 필드 표시 */}
+          {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') && (
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="금액 (원)"
+                value={formData.policyAmount}
+                onChange={(e) => handleInputChange('policyAmount', e.target.value)}
+                error={!!errors.policyAmount}
+                helperText={errors.policyAmount}
+                type="number"
+                inputProps={{ min: 0 }}
+                disabled={formData.amountType === 'in_content'}
+                required={formData.amountType !== 'in_content'}
+              />
+            </Grid>
+          )}
           
           <Grid item xs={12} sm={6}>
             <FormControl component="fieldset" error={!!errors.amountType}>

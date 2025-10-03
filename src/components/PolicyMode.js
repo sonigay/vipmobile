@@ -39,7 +39,8 @@ import {
   CheckCircle as CheckCircleIcon,
   CancelOutlined as CancelOutlinedIcon,
   AccountBalance as AccountBalanceIcon,
-  ContentCopy as ContentCopyIcon
+  ContentCopy as ContentCopyIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 import AppUpdatePopup from './AppUpdatePopup';
@@ -361,6 +362,33 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     setShowCancelModal(true);
   };
 
+  // 정책 삭제 함수
+  const handleDeleteClick = async (policy) => {
+    if (!window.confirm(`정책 "${policy.policyName}"을(를) 삭제하시겠습니까?\n삭제된 정책은 복구할 수 없습니다.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/policies/${policy.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        alert('정책이 삭제되었습니다.');
+        loadPolicyData(); // 정책 목록 새로고침
+      } else {
+        const errorData = await response.json();
+        alert(`삭제 실패: ${errorData.error || '알 수 없는 오류가 발생했습니다.'}`);
+      }
+    } catch (error) {
+      console.error('정책 삭제 실패:', error);
+      alert('정책 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleCancelSubmit = async (cancelData) => {
     try {
       if (cancelData.cancelType === 'policy') {
@@ -601,6 +629,14 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     });
   };
 
+  const canBulkDelete = () => {
+    const currentUserId = loggedInStore?.contactId || loggedInStore?.id;
+    return selectedPolicies.length > 0 && selectedPolicies.every(policy => {
+      // 본인이 입력한 정책인 경우
+      return policy.inputUserId === currentUserId;
+    });
+  };
+
   const canBulkCopy = () => {
     return selectedPolicies.length > 0 && selectedPolicies.every(policy => {
       // 정책이 취소되지 않은 경우
@@ -611,6 +647,37 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const handleBulkAction = async (action) => {
     if (action === 'copy') {
       setShowBulkCopyModal(true);
+      return;
+    }
+    
+    if (action === 'delete') {
+      if (!window.confirm(`선택된 ${selectedPolicies.length}건의 정책을 삭제하시겠습니까?\n삭제된 정책은 복구할 수 없습니다.`)) {
+        return;
+      }
+      
+      try {
+        // 선택된 정책들을 순차적으로 삭제
+        for (const policy of selectedPolicies) {
+          const response = await fetch(`/api/policies/${policy.id}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || '삭제 실패');
+          }
+        }
+        
+        alert(`${selectedPolicies.length}건의 정책이 삭제되었습니다.`);
+        setSelectedPolicies([]); // 선택 해제
+        loadPolicyData(); // 정책 목록 새로고침
+      } catch (error) {
+        console.error('일괄 삭제 실패:', error);
+        alert(`일괄 삭제 중 오류가 발생했습니다: ${error.message}`);
+      }
       return;
     }
 
@@ -1044,6 +1111,16 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                   <Button
                     size="small"
                     variant="outlined"
+                    color="error"
+                    onClick={() => handleBulkAction('delete')}
+                    disabled={!canBulkDelete()}
+                    sx={{ backgroundColor: 'error.light', color: 'white' }}
+                  >
+                    선택 일괄삭제
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
                     color="secondary"
                     onClick={() => handleBulkAction('copy')}
                     disabled={!canBulkCopy()}
@@ -1134,8 +1211,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 200 }}>
                             내용
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
-                            금액
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
+                            개통유형
                           </TableCell>
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
                             입력자
@@ -1218,15 +1295,67 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <TableCell>{policy.teamName}</TableCell>
                             <TableCell>
                               <Box>
-                                <Typography variant="body2">{policy.policyContent}</Typography>
-                                {policy.cancelReason && (
-                                  <Typography variant="caption" color="error" display="block">
-                                    취소사유: {policy.cancelReason}
-                                  </Typography>
-                                )}
+                                {(() => {
+                                  // 구두정책인 경우 95군 이상/미만 정보 표시
+                                  if (policy.category === 'wireless_shoe' || policy.category === 'wired_shoe') {
+                                    if (policy.amount95Above || policy.amount95Below) {
+                                      return (
+                                        <Box>
+                                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                            금액 정보:
+                                          </Typography>
+                                          {policy.amount95Above && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                              95군이상: {Number(policy.amount95Above).toLocaleString()}원
+                                            </Typography>
+                                          )}
+                                          {policy.amount95Below && (
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                              95군미만: {Number(policy.amount95Below).toLocaleString()}원
+                                            </Typography>
+                                          )}
+                                          {policy.policyContent && (
+                                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                                              추가내용: {policy.policyContent}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      );
+                                    }
+                                  }
+                                  
+                                  // 일반 정책이거나 직접입력이 있는 경우
+                                  return (
+                                    <>
+                                      <Typography variant="body2">{policy.policyContent}</Typography>
+                                      {policy.cancelReason && (
+                                        <Typography variant="caption" color="error" display="block">
+                                          취소사유: {policy.cancelReason}
+                                        </Typography>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </Box>
                             </TableCell>
-                            <TableCell>{policy.policyAmount}</TableCell>
+                            <TableCell>
+                              {(() => {
+                                // 개통유형 표시 로직
+                                if (!policy.activationType) return '-';
+                                
+                                const { new010, mnp, change } = policy.activationType;
+                                const types = [];
+                                
+                                if (new010) types.push('010신규');
+                                if (mnp) types.push('MNP');
+                                if (change) types.push('기변');
+                                
+                                if (types.length === 0) return '-';
+                                if (types.length === 3) return '전유형';
+                                
+                                return types.join(', ');
+                              })()}
+                            </TableCell>
                             <TableCell>{policy.inputUserName}</TableCell>
                             <TableCell sx={{ py: 1.5 }}>
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -1310,6 +1439,24 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                     }}
                                   >
                                     <CancelIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                
+                                {/* 정책 삭제 버튼 (입력자만 보임) */}
+                                {policy.inputUserId === (loggedInStore?.contactId || loggedInStore?.id) && (
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDeleteClick(policy)}
+                                    title="정책삭제"
+                                    sx={{ 
+                                      p: 0.5,
+                                      backgroundColor: 'error.dark',
+                                      color: 'white',
+                                      '&:hover': { backgroundColor: 'error.main', color: 'white' }
+                                    }}
+                                  >
+                                    <DeleteIcon fontSize="small" />
                                   </IconButton>
                                 )}
                                 

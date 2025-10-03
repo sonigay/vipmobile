@@ -18116,7 +18116,10 @@ app.get('/api/policies', async (req, res) => {
         settlementUserId: row[22] || '',       // W열: 정산반영자ID
         yearMonth: row[23] || '',               // X열: 대상년월
         multipleStoreName: row[24] || '',       // Y열: 복수점명
-        storeNameFromSheet: row[25] || ''       // Z열: 업체명 (시트에서 직접 읽은 값)
+        storeNameFromSheet: row[25] || '',       // Z열: 업체명 (시트에서 직접 읽은 값)
+        activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
+        amount95Above: row[27] || '',            // AB열: 95군이상금액
+        amount95Below: row[28] || ''             // AC열: 95군미만금액
       };
     });
 
@@ -18253,7 +18256,10 @@ app.post('/api/policies', async (req, res) => {
       '정산반영자ID',     // W열
       '대상년월',         // X열
       '복수점명',         // Y열
-      '업체명'            // Z열
+      '업체명',           // Z열
+      '개통유형',         // AA열
+      '95군이상금액',     // AB열
+      '95군미만금액'      // AC열
     ];
     
     // 매장 데이터에서 업체명 조회
@@ -18301,7 +18307,19 @@ app.post('/api/policies', async (req, res) => {
       '',                          // W열: 정산반영자ID
       yearMonth,                   // X열: 대상년월
       req.body.multipleStoreName || '', // Y열: 복수점명
-      storeName                    // Z열: 업체명
+      storeName,                   // Z열: 업체명
+      (() => {                     // AA열: 개통유형
+        if (!req.body.activationType) return '';
+        const { new010, mnp, change } = req.body.activationType;
+        const types = [];
+        if (new010) types.push('010신규');
+        if (mnp) types.push('MNP');
+        if (change) types.push('기변');
+        if (types.length === 3) return '전유형';
+        return types.join(', ');
+      })(),
+      req.body.amount95Above || '', // AB열: 95군이상금액
+      req.body.amount95Below || ''  // AC열: 95군미만금액
     ];
     
     let response;
@@ -18311,7 +18329,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:Z',
+        range: '정책_기본정보 !A:AC',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18323,7 +18341,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:Z',
+        range: '정책_기본정보 !A:AC',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18479,6 +18497,57 @@ app.put('/api/policies/:policyId', async (req, res) => {
     
   } catch (error) {
     console.error('정책 수정 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 정책 삭제 API
+app.delete('/api/policies/:policyId', async (req, res) => {
+  try {
+    const { policyId } = req.params;
+    console.log('정책 삭제 요청:', { policyId });
+    
+    // 정책_기본정보 시트에서 해당 정책 찾기
+    const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+    
+    if (!values || values.length <= 1) {
+      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+    }
+    
+    // 헤더 제거
+    const dataRows = values.slice(1);
+    const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
+    
+    if (policyRowIndex === -1) {
+      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+    }
+    
+    // Google Sheets에서 해당 행 삭제
+    const response = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [{
+          deleteDimension: {
+            range: {
+              sheetId: 0, // 정책_기본정보 시트
+              dimension: 'ROWS',
+              startIndex: policyRowIndex + 1, // 0-based index, +1 for header
+              endIndex: policyRowIndex + 2
+            }
+          }
+        }]
+      }
+    });
+    
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
+    
+    console.log('정책 삭제 완료:', response.data);
+    
+    res.json({ success: true, message: '정책이 삭제되었습니다.' });
+    
+  } catch (error) {
+    console.error('정책 삭제 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
