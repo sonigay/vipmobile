@@ -18200,6 +18200,21 @@ app.get('/api/policies', async (req, res) => {
 app.post('/api/policies', async (req, res) => {
   try {
     console.log('새 정책 생성 요청:', req.body);
+    console.log('📝 [정책생성] 요청 데이터 상세:', {
+      policyName: req.body.policyName,
+      policyStartDate: req.body.policyStartDate,
+      policyEndDate: req.body.policyEndDate,
+      policyStore: req.body.policyStore,
+      policyContent: req.body.policyContent,
+      policyAmount: req.body.policyAmount,
+      amountType: req.body.amountType,
+      category: req.body.category,
+      yearMonth: req.body.yearMonth,
+      activationType: req.body.activationType,
+      amount95Above: req.body.amount95Above,
+      amount95Below: req.body.amount95Below,
+      multipleStoreName: req.body.multipleStoreName
+    });
     
     const {
       policyName,
@@ -18380,6 +18395,18 @@ app.post('/api/policies', async (req, res) => {
       req.body.amount95Above || '', // AB열: 95군이상금액
       req.body.amount95Below || ''  // AC열: 95군미만금액
     ];
+    
+    console.log('📝 [정책생성] 구글시트 저장 데이터:', {
+      policyId,
+      policyName,
+      policyContent,
+      amount95Above: req.body.amount95Above,
+      amount95Below: req.body.amount95Below,
+      activationType: req.body.activationType,
+      multipleStoreName: req.body.multipleStoreName,
+      storeName,
+      newPolicyRow
+    });
     
     let response;
     
