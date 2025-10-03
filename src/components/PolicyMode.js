@@ -841,7 +841,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         </Toolbar>
       </AppBar>
       
-      <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
+      <Container maxWidth={false} sx={{ flex: 1, py: 4, px: 2 }}>
         {/* 정책 타입 선택 탭 */}
         <Paper sx={{ mb: 3 }}>
           <Tabs 
@@ -1065,9 +1065,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                 sx={{ 
                   borderRadius: 2,
                   boxShadow: 2,
+                  maxHeight: 'calc(100vh - 300px)',
+                  overflow: 'auto',
                   '& .MuiTable-root': {
                     borderCollapse: 'separate',
-                    borderSpacing: 0
+                    borderSpacing: 0,
+                    minWidth: '100%'
                   }
                 }}
               >
@@ -1110,40 +1113,40 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                             />
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
                             정책명
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             정책일자
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             복수점명
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
                             적용점
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
                             업체명
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             소속정책팀
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 200 }}>
                             내용
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             금액
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
                             입력자
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
                             승인상태
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             정산반영
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
                             작업
                           </TableCell>
                         </TableRow>

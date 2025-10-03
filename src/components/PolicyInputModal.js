@@ -64,7 +64,8 @@ function PolicyInputModal({
     amountType: 'total', // 'total', 'per_case', 'in_content'
     team: '', // 소속정책팀 추가
     storeType: 'single', // 'single' 또는 'multiple'
-    multipleStores: [] // 복수점 선택 시 매장 목록
+    multipleStores: [], // 복수점 선택 시 매장 목록
+    multipleStoreName: '' // 복수점명 (수기 입력)
   });
   
   const [errors, setErrors] = useState({});
@@ -88,7 +89,8 @@ function PolicyInputModal({
           amountType: policy.amountType || 'total',
           team: policy.team || loggedInUser?.userRole || '',
           storeType: 'single',
-          multipleStores: []
+          multipleStores: [],
+          multipleStoreName: ''
         });
       } else {
         // 새 정책 생성 모드: 빈 폼으로 초기화
@@ -102,7 +104,8 @@ function PolicyInputModal({
           amountType: 'total',
           team: loggedInUser?.userRole || '', // 현재 사용자의 소속팀으로 기본 설정
           storeType: 'single',
-          multipleStores: []
+          multipleStores: [],
+          multipleStoreName: ''
         });
       }
       setErrors({});
@@ -135,6 +138,10 @@ function PolicyInputModal({
     
     if (formData.storeType === 'multiple' && formData.multipleStores.length === 0) {
       newErrors.multipleStores = '적용점을 최소 1개 이상 선택해주세요.';
+    }
+    
+    if (formData.storeType === 'multiple' && !formData.multipleStoreName.trim()) {
+      newErrors.multipleStoreName = '복수점명을 입력해주세요.';
     }
     
     if (!formData.policyContent.trim()) {
@@ -260,7 +267,7 @@ function PolicyInputModal({
             },
             team: formData.team,
             isMultiple: true, // 복수점 정책임을 표시
-            multipleStoreName: store.name // 매장명 추가
+            multipleStoreName: formData.multipleStoreName // 사용자가 입력한 복수점명
           }));
 
           // 각 정책을 순차적으로 저장
@@ -500,46 +507,61 @@ function PolicyInputModal({
 
           {/* 복수점 선택 */}
           {formData.storeType === 'multiple' && (
-            <Grid item xs={12}>
-              <Box>
-                <Typography variant="subtitle2" gutterBottom>
-                  적용점 선택 (복수 선택 가능)
-                </Typography>
-                <Autocomplete
-                  multiple
-                  options={stores}
-                  getOptionLabel={(option) => option.name}
-                  value={formData.multipleStores}
-                  onChange={(event, newValue) => {
-                    handleInputChange('multipleStores', newValue);
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="정책적용점들"
-                      error={!!errors.multipleStores}
-                      helperText={errors.multipleStores || '여러 매장을 선택할 수 있습니다.'}
-                      required
-                    />
-                  )}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip
-                        variant="outlined"
-                        label={option.name}
-                        {...getTagProps({ index })}
-                        key={option.id}
-                      />
-                    ))
-                  }
-                  filterOptions={(options, { inputValue }) => {
-                    return options.filter((option) =>
-                      option.name.toLowerCase().includes(inputValue.toLowerCase())
-                    );
-                  }}
+            <>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="복수점명"
+                  value={formData.multipleStoreName}
+                  onChange={(e) => handleInputChange('multipleStoreName', e.target.value)}
+                  error={!!errors.multipleStoreName}
+                  helperText={errors.multipleStoreName || '복수점의 이름을 입력해주세요. (예: 서울지역, 강남구 등)'}
+                  required
+                  placeholder="예: 서울지역, 강남구, A그룹 등"
                 />
-              </Box>
-            </Grid>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    적용점 선택 (복수 선택 가능)
+                  </Typography>
+                  <Autocomplete
+                    multiple
+                    options={stores}
+                    getOptionLabel={(option) => option.name}
+                    value={formData.multipleStores}
+                    onChange={(event, newValue) => {
+                      handleInputChange('multipleStores', newValue);
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="정책적용점들"
+                        error={!!errors.multipleStores}
+                        helperText={errors.multipleStores || '여러 매장을 선택할 수 있습니다.'}
+                        required
+                      />
+                    )}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => (
+                        <Chip
+                          variant="outlined"
+                          label={option.name}
+                          {...getTagProps({ index })}
+                          key={option.id}
+                        />
+                      ))
+                    }
+                    filterOptions={(options, { inputValue }) => {
+                      return options.filter((option) =>
+                        option.name.toLowerCase().includes(inputValue.toLowerCase())
+                      );
+                    }}
+                  />
+                </Box>
+              </Grid>
+            </>
           )}
           
           <Grid item xs={12}>

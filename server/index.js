@@ -18114,7 +18114,9 @@ app.get('/api/policies', async (req, res) => {
         settlementUserName: row[20] || '',     // U열: 정산반영자명
         settlementDateTime: row[21] || '',     // V열: 정산반영일시
         settlementUserId: row[22] || '',       // W열: 정산반영자ID
-        yearMonth: row[23] || ''               // X열: 대상년월
+        yearMonth: row[23] || '',               // X열: 대상년월
+        multipleStoreName: row[24] || '',       // Y열: 복수점명
+        storeNameFromSheet: row[25] || ''       // Z열: 업체명 (시트에서 직접 읽은 값)
       };
     });
 
@@ -18139,9 +18141,8 @@ app.get('/api/policies', async (req, res) => {
     // 각 그룹에서 복수점명 추가
     policyGroups.forEach((group, groupKey) => {
       if (group.policies.length > 1) {
-        // 복수점 정책인 경우
-        const storeNames = group.policies.map(p => p.policyStoreName).filter(name => name);
-        const multipleStoreName = storeNames.length > 0 ? storeNames.join(', ') : '복수점';
+        // 복수점 정책인 경우 - 시트에서 읽은 복수점명 사용
+        const multipleStoreName = group.policies[0].multipleStoreName || '복수점';
         
         group.policies.forEach(policy => {
           processedPolicies.push({
@@ -18250,9 +18251,29 @@ app.post('/api/policies', async (req, res) => {
       '정산반영자명',     // U열
       '정산반영일시',     // V열
       '정산반영자ID',     // W열
-      '대상년월'          // X열
+      '대상년월',         // X열
+      '복수점명',         // Y열
+      '업체명'            // Z열
     ];
     
+    // 매장 데이터에서 업체명 조회
+    let storeName = '';
+    try {
+      const storeValues = await getSheetValuesWithoutCache(STORE_SHEET_NAME);
+      if (storeValues && storeValues.length > 1) {
+        const storeRows = storeValues.slice(1);
+        const store = storeRows.find(row => {
+          const storeId = row[15]; // P열: 매장코드 (15인덱스)
+          return storeId && storeId.toString() === policyStore.toString();
+        });
+        if (store) {
+          storeName = store[14] ? store[14].toString().trim() : ''; // O열: 업체명 (14인덱스)
+        }
+      }
+    } catch (error) {
+      console.warn('매장 데이터 조회 실패:', error.message);
+    }
+
     // 새 정책 데이터 생성
     const newPolicyRow = [
       policyId,                    // A열: 정책ID
@@ -18278,7 +18299,9 @@ app.post('/api/policies', async (req, res) => {
       '',                          // U열: 정산반영자명
       '',                          // V열: 정산반영일시
       '',                          // W열: 정산반영자ID
-      yearMonth                    // X열: 대상년월
+      yearMonth,                   // X열: 대상년월
+      req.body.multipleStoreName || '', // Y열: 복수점명
+      storeName                    // Z열: 업체명
     ];
     
     let response;
@@ -18288,7 +18311,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:X',
+        range: '정책_기본정보 !A:Z',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18300,7 +18323,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:X',
+        range: '정책_기본정보 !A:Z',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
