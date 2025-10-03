@@ -313,6 +313,12 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
           </Box>
         </Card>
 
+        {/* 우선순위 모델 선정 - 1단계: 텍스트만 */}
+        <Box sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            우선순위 모델 선정 기능 (준비 중)
+          </Typography>
+        </Box>
 
         {/* 콘텐츠 영역 */}
         <Card>
