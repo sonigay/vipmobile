@@ -369,6 +369,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     }
 
     try {
+      console.log('정책 삭제 시도:', policy.id);
       const response = await fetch(`/api/policies/${policy.id}`, {
         method: 'DELETE',
         headers: {
@@ -380,12 +381,23 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         alert('정책이 삭제되었습니다.');
         loadPolicyData(); // 정책 목록 새로고침
       } else {
-        const errorData = await response.json();
-        alert(`삭제 실패: ${errorData.error || '알 수 없는 오류가 발생했습니다.'}`);
+        console.error('삭제 실패 응답:', response.status, response.statusText);
+        
+        // 응답이 JSON인지 확인
+        let errorMessage = '알 수 없는 오류가 발생했습니다.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('응답 파싱 실패:', parseError);
+          errorMessage = `서버 오류 (${response.status}): ${response.statusText}`;
+        }
+        
+        alert(`삭제 실패: ${errorMessage}`);
       }
     } catch (error) {
       console.error('정책 삭제 실패:', error);
-      alert('정책 삭제 중 오류가 발생했습니다.');
+      alert(`정책 삭제 중 오류가 발생했습니다: ${error.message}`);
     }
   };
 
@@ -446,6 +458,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   const handleSavePolicy = async (policyData) => {
     try {
+      console.log('정책 저장 시도:', policyData);
       await PolicyService.createPolicy(policyData);
       
       // 정책 데이터 다시 로드
@@ -455,7 +468,20 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       alert('정책이 성공적으로 저장되었습니다.');
     } catch (error) {
       console.error('정책 저장 실패:', error);
-      alert('정책 저장에 실패했습니다. 다시 시도해주세요.');
+      
+      // 서버에서 받은 에러 메시지가 있으면 사용
+      let errorMessage = '정책 저장에 실패했습니다. 다시 시도해주세요.';
+      
+      if (error.response && error.response.data) {
+        const responseData = error.response.data;
+        if (responseData.error) {
+          errorMessage = responseData.error;
+        } else if (responseData.missingFieldNames && responseData.missingFieldNames.length > 0) {
+          errorMessage = `다음 필수 항목이 누락되었습니다: ${responseData.missingFieldNames.join(', ')}`;
+        }
+      }
+      
+      alert(`정책 저장 실패: ${errorMessage}`);
       throw error;
     }
   };
