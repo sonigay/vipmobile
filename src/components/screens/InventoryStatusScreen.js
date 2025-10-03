@@ -125,7 +125,15 @@ const InventoryStatusScreen = () => {
                 
                 // 일별 개통 현황 합계
                 for (let i = 0; i < 31; i++) {
-                  group.dailyActivation[i] += item.dailyActivation[i] || 0;
+                  if (item.dailyActivation && item.dailyActivation[i] !== undefined) {
+                    const dayValue = item.dailyActivation[i];
+                    // dayValue가 객체인 경우 count 속성 사용, 아니면 직접 값 사용
+                    if (dayValue && typeof dayValue === 'object' && dayValue.count !== undefined) {
+                      group.dailyActivation[i] += dayValue.count || 0;
+                    } else if (typeof dayValue === 'number') {
+                      group.dailyActivation[i] += dayValue;
+                    }
+                  }
                 }
               });
               
