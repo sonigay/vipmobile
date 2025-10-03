@@ -17991,7 +17991,7 @@ app.get('/api/policies', async (req, res) => {
     
     // 필터링 적용
     let filteredPolicies = dataRows.filter(row => {
-      if (row.length < 24) return false; // 최소 컬럼 수 확인 (A~X열)
+      if (row.length < 29) return false; // 최소 컬럼 수 확인 (A~AC열)
       
       const policyYearMonth = row[23] || ''; // X열: 대상년월
       const policyTypeData = row[6];   // G열: 정책유형
