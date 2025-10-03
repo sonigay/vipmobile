@@ -110,6 +110,15 @@ function PriorityModelSelectionModal({
     }
   };
 
+  console.log('🔍 [PriorityModelSelectionModal] 렌더링 시작 - return 문 직전');
+  console.log('🔍 [PriorityModelSelectionModal] 현재 상태:', { 
+    open, 
+    searchTerm, 
+    filteredModels: filteredModels?.length || 0, 
+    selectedPriority,
+    uniqueModels: uniqueModels?.length || 0
+  });
+
   return (
     <Dialog 
       open={open} 
@@ -130,26 +139,39 @@ function PriorityModelSelectionModal({
 
       <DialogContent>
         {/* 현재 우선순위 모델들 */}
-        {priorityModels && Object.keys(priorityModels).length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-              현재 우선순위 모델
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {priorityModels && Object.entries(priorityModels).map(([priority, model]) => (
-                <Chip
-                  key={priority}
-                  label={`${priority}순위: ${model}`}
-                  color="primary"
-                  variant="filled"
-                  onDelete={() => handleRemovePriority(priority)}
-                  icon={<StarIcon />}
-                />
-              ))}
+        {(() => {
+          console.log('🔍 [PriorityModelSelectionModal] priorityModels 체크:', priorityModels);
+          console.log('🔍 [PriorityModelSelectionModal] Object.keys(priorityModels):', priorityModels ? Object.keys(priorityModels) : 'null');
+          
+          if (!priorityModels || !Object.keys(priorityModels).length) {
+            console.log('🔍 [PriorityModelSelectionModal] priorityModels가 비어있음');
+            return null;
+          }
+          
+          return (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+                현재 우선순위 모델
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {Object.entries(priorityModels).map(([priority, model]) => {
+                  console.log('🔍 [PriorityModelSelectionModal] priority, model:', priority, model);
+                  return (
+                    <Chip
+                      key={priority}
+                      label={`${priority}순위: ${model || '미지정'}`}
+                      color="primary"
+                      variant="filled"
+                      onDelete={() => handleRemovePriority(priority)}
+                      icon={<StarIcon />}
+                    />
+                  );
+                })}
+              </Box>
+              <Divider sx={{ my: 2 }} />
             </Box>
-            <Divider sx={{ my: 2 }} />
-          </Box>
-        )}
+          );
+        })()}
 
         {/* 모델 검색 */}
         <Box sx={{ mb: 3 }}>
