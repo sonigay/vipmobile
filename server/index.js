@@ -18117,10 +18117,54 @@ app.get('/api/policies', async (req, res) => {
         yearMonth: row[23] || ''               // X열: 대상년월
       };
     });
+
+    // 복수점 정책 그룹화 및 복수점명 추가
+    const policyGroups = new Map();
+    const processedPolicies = [];
+
+    policies.forEach(policy => {
+      // 정책명과 입력자ID로 그룹화 (같은 정책명과 입력자ID를 가진 정책들을 그룹화)
+      const groupKey = `${policy.policyName}_${policy.inputUserId}_${policy.inputDateTime}`;
+      
+      if (!policyGroups.has(groupKey)) {
+        policyGroups.set(groupKey, {
+          policies: [],
+          groupName: policy.policyName
+        });
+      }
+      
+      policyGroups.get(groupKey).policies.push(policy);
+    });
+
+    // 각 그룹에서 복수점명 추가
+    policyGroups.forEach((group, groupKey) => {
+      if (group.policies.length > 1) {
+        // 복수점 정책인 경우
+        const storeNames = group.policies.map(p => p.policyStoreName).filter(name => name);
+        const multipleStoreName = storeNames.length > 0 ? storeNames.join(', ') : '복수점';
+        
+        group.policies.forEach(policy => {
+          processedPolicies.push({
+            ...policy,
+            isMultiple: true,
+            multipleStoreName: multipleStoreName
+          });
+        });
+      } else {
+        // 단일점 정책인 경우
+        group.policies.forEach(policy => {
+          processedPolicies.push({
+            ...policy,
+            isMultiple: false,
+            multipleStoreName: null
+          });
+        });
+      }
+    });
     
-    console.log(`정책 목록 조회 완료: ${policies.length}건`);
+    console.log(`정책 목록 조회 완료: ${processedPolicies.length}건`);
     
-    res.json({ success: true, policies });
+    res.json({ success: true, policies: processedPolicies });
     
   } catch (error) {
     console.error('정책 목록 조회 실패:', error);

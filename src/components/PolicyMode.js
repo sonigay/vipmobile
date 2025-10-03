@@ -1117,6 +1117,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             정책일자
                           </TableCell>
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            복수점명
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
                             적용점
                           </TableCell>
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
@@ -1194,6 +1197,19 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               </Box>
                             </TableCell>
                             <TableCell>{policy.policyDate}</TableCell>
+                            <TableCell>
+                              {policy.isMultiple ? (
+                                <Chip 
+                                  label={policy.multipleStoreName || '복수점'} 
+                                  size="small" 
+                                  color="primary" 
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
                             <TableCell>{policy.policyStore}</TableCell>
                             <TableCell>{policy.policyStoreName || '-'}</TableCell>
                             <TableCell>{policy.teamName}</TableCell>

@@ -62,7 +62,9 @@ function PolicyInputModal({
     policyContent: '',
     policyAmount: '',
     amountType: 'total', // 'total', 'per_case', 'in_content'
-    team: '' // 소속정책팀 추가
+    team: '', // 소속정책팀 추가
+    storeType: 'single', // 'single' 또는 'multiple'
+    multipleStores: [] // 복수점 선택 시 매장 목록
   });
   
   const [errors, setErrors] = useState({});
@@ -84,7 +86,9 @@ function PolicyInputModal({
           policyContent: policy.policyContent || '',
           policyAmount: policy.policyAmount ? String(policy.policyAmount) : '',
           amountType: policy.amountType || 'total',
-          team: policy.team || loggedInUser?.userRole || ''
+          team: policy.team || loggedInUser?.userRole || '',
+          storeType: 'single',
+          multipleStores: []
         });
       } else {
         // 새 정책 생성 모드: 빈 폼으로 초기화
@@ -96,7 +100,9 @@ function PolicyInputModal({
           policyContent: '',
           policyAmount: '',
           amountType: 'total',
-          team: loggedInUser?.userRole || '' // 현재 사용자의 소속팀으로 기본 설정
+          team: loggedInUser?.userRole || '', // 현재 사용자의 소속팀으로 기본 설정
+          storeType: 'single',
+          multipleStores: []
         });
       }
       setErrors({});
@@ -123,8 +129,12 @@ function PolicyInputModal({
       newErrors.policyEndDate = '종료일은 시작일보다 늦어야 합니다.';
     }
     
-    if (!formData.policyStore) {
+    if (formData.storeType === 'single' && !formData.policyStore) {
       newErrors.policyStore = '정책적용점을 선택해주세요.';
+    }
+    
+    if (formData.storeType === 'multiple' && formData.multipleStores.length === 0) {
+      newErrors.multipleStores = '적용점을 최소 1개 이상 선택해주세요.';
     }
     
     if (!formData.policyContent.trim()) {
@@ -200,30 +210,64 @@ function PolicyInputModal({
         await onSave(policy.id, updateData);
       } else {
         // 새 정책 생성 모드
-        const policyData = {
-          id: `POL_${Date.now()}`, // 임시 ID 생성
-          policyName: formData.policyName.trim(),
-          policyStartDate: formData.policyStartDate,
-          policyEndDate: formData.policyEndDate,
-          policyStore: formData.policyStore,
-          policyContent: formData.policyContent.trim(),
-          policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
-          amountType: formData.amountType,
-          policyType: isWireless ? '무선' : '유선',
-          category: categoryId,
-          yearMonth: yearMonth,
-          inputUserId: loggedInUser?.contactId || loggedInUser?.id,
-          inputUserName: loggedInUser?.target || loggedInUser?.name,
-          inputDateTime: new Date().toISOString(),
-          approvalStatus: {
-            total: '대기',
-            settlement: '대기',
-            team: '대기'
-          },
-          team: formData.team // 소속정책팀 추가
-        };
+        if (formData.storeType === 'single') {
+          // 단일점 선택
+          const policyData = {
+            id: `POL_${Date.now()}`, // 임시 ID 생성
+            policyName: formData.policyName.trim(),
+            policyStartDate: formData.policyStartDate,
+            policyEndDate: formData.policyEndDate,
+            policyStore: formData.policyStore,
+            policyContent: formData.policyContent.trim(),
+            policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
+            amountType: formData.amountType,
+            policyType: isWireless ? '무선' : '유선',
+            category: categoryId,
+            yearMonth: yearMonth,
+            inputUserId: loggedInUser?.contactId || loggedInUser?.id,
+            inputUserName: loggedInUser?.target || loggedInUser?.name,
+            inputDateTime: new Date().toISOString(),
+            approvalStatus: {
+              total: '대기',
+              settlement: '대기',
+              team: '대기'
+            },
+            team: formData.team // 소속정책팀 추가
+          };
 
-        await onSave(policyData);
+          await onSave(policyData);
+        } else {
+          // 복수점 선택 - 각 매장별로 개별 정책 생성
+          const policies = formData.multipleStores.map((store, index) => ({
+            id: `POL_${Date.now()}_${index}`, // 임시 ID 생성
+            policyName: formData.policyName.trim(),
+            policyStartDate: formData.policyStartDate,
+            policyEndDate: formData.policyEndDate,
+            policyStore: store.id,
+            policyContent: formData.policyContent.trim(),
+            policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
+            amountType: formData.amountType,
+            policyType: isWireless ? '무선' : '유선',
+            category: categoryId,
+            yearMonth: yearMonth,
+            inputUserId: loggedInUser?.contactId || loggedInUser?.id,
+            inputUserName: loggedInUser?.target || loggedInUser?.name,
+            inputDateTime: new Date().toISOString(),
+            approvalStatus: {
+              total: '대기',
+              settlement: '대기',
+              team: '대기'
+            },
+            team: formData.team,
+            isMultiple: true, // 복수점 정책임을 표시
+            multipleStoreName: store.name // 매장명 추가
+          }));
+
+          // 각 정책을 순차적으로 저장
+          for (const policyData of policies) {
+            await onSave(policyData);
+          }
+        }
       }
       
       onClose();
@@ -401,30 +445,102 @@ function PolicyInputModal({
             </LocalizationProvider>
           </Grid>
           
+          {/* 적용점 타입 선택 */}
           <Grid item xs={12}>
-            <Autocomplete
-              options={stores}
-              getOptionLabel={(option) => option.name}
-              value={stores.find(store => store.id === formData.policyStore) || null}
-              onChange={(event, newValue) => {
-                handleInputChange('policyStore', newValue ? newValue.id : '');
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="정책적용점"
-                  error={!!errors.policyStore}
-                  helperText={errors.policyStore}
-                  required
-                />
-              )}
-              filterOptions={(options, { inputValue }) => {
-                return options.filter((option) =>
-                  option.name.toLowerCase().includes(inputValue.toLowerCase())
-                );
-              }}
-            />
+            <FormControl component="fieldset">
+              <Typography variant="subtitle2" gutterBottom>
+                적용점 선택 방식
+              </Typography>
+              <RadioGroup
+                row
+                value={formData.storeType}
+                onChange={(e) => {
+                  handleInputChange('storeType', e.target.value);
+                  // 타입 변경 시 기존 선택 초기화
+                  if (e.target.value === 'single') {
+                    handleInputChange('multipleStores', []);
+                  } else {
+                    handleInputChange('policyStore', '');
+                  }
+                }}
+              >
+                <FormControlLabel value="single" control={<Radio />} label="단일점" />
+                <FormControlLabel value="multiple" control={<Radio />} label="복수점" />
+              </RadioGroup>
+            </FormControl>
           </Grid>
+
+          {/* 단일점 선택 */}
+          {formData.storeType === 'single' && (
+            <Grid item xs={12}>
+              <Autocomplete
+                options={stores}
+                getOptionLabel={(option) => option.name}
+                value={stores.find(store => store.id === formData.policyStore) || null}
+                onChange={(event, newValue) => {
+                  handleInputChange('policyStore', newValue ? newValue.id : '');
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="정책적용점"
+                    error={!!errors.policyStore}
+                    helperText={errors.policyStore}
+                    required
+                  />
+                )}
+                filterOptions={(options, { inputValue }) => {
+                  return options.filter((option) =>
+                    option.name.toLowerCase().includes(inputValue.toLowerCase())
+                  );
+                }}
+              />
+            </Grid>
+          )}
+
+          {/* 복수점 선택 */}
+          {formData.storeType === 'multiple' && (
+            <Grid item xs={12}>
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  적용점 선택 (복수 선택 가능)
+                </Typography>
+                <Autocomplete
+                  multiple
+                  options={stores}
+                  getOptionLabel={(option) => option.name}
+                  value={formData.multipleStores}
+                  onChange={(event, newValue) => {
+                    handleInputChange('multipleStores', newValue);
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="정책적용점들"
+                      error={!!errors.multipleStores}
+                      helperText={errors.multipleStores || '여러 매장을 선택할 수 있습니다.'}
+                      required
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option.name}
+                        {...getTagProps({ index })}
+                        key={option.id}
+                      />
+                    ))
+                  }
+                  filterOptions={(options, { inputValue }) => {
+                    return options.filter((option) =>
+                      option.name.toLowerCase().includes(inputValue.toLowerCase())
+                    );
+                  }}
+                />
+              </Box>
+            </Grid>
+          )}
           
           <Grid item xs={12}>
             <TextField

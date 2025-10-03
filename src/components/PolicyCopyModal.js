@@ -24,13 +24,13 @@ function PolicyCopyModal({
   const [targetYearMonth, setTargetYearMonth] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 대상년월 옵션 생성 (현재 년월 포함 앞으로 24개월)
+  // 대상년월 옵션 생성 (과거 12개월부터 미래 12개월까지 총 25개월)
   const getYearMonthOptions = () => {
     const options = [];
     const currentDate = new Date();
     
-    // 현재 년월부터 앞으로 24개월까지
-    for (let i = 0; i <= 24; i++) {
+    // 과거 12개월부터 미래 12개월까지 (총 25개월)
+    for (let i = -12; i <= 12; i++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
