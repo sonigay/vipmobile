@@ -27,7 +27,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
+function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh, priorityModels }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
 
   // selectedMarker 상태 변화 로그
@@ -42,6 +42,18 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
   const [mapError, setMapError] = useState('');
   const [markerProgress, setMarkerProgress] = useState(0);
   const mapRef = useRef(null);
+
+  // 우선순위 확인 함수
+  const getPriorityLevel = (modelName) => {
+    if (!priorityModels || !modelName) return null;
+    
+    for (const [priority, model] of Object.entries(priorityModels)) {
+      if (model === modelName) {
+        return priority;
+      }
+    }
+    return null;
+  };
 
   // 마커 색상 정의 (Leaflet용)
   const markerColors = {
@@ -115,17 +127,38 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
   }, [processedMarkers]);
 
   // 커스텀 마커 아이콘 생성
-  const createCustomIcon = (color) => {
+  const createCustomIcon = (color, priorityLevels = []) => {
+    const priorityText = priorityLevels.length > 0 
+      ? `<div style="
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background-color: #1976d2;
+          color: white;
+          border-radius: 50%;
+          width: 16px;
+          height: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: bold;
+          border: 2px solid white;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        ">${priorityLevels.length}</div>`
+      : '';
+
     return L.divIcon({
       className: 'custom-marker',
       html: `<div style="
+        position: relative;
         width: 20px; 
         height: 20px; 
         background-color: ${color}; 
         border: 2px solid white; 
         border-radius: 50%; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      "></div>`,
+      ">${priorityText}</div>`,
       iconSize: [20, 20],
       iconAnchor: [10, 10]
     });
@@ -456,11 +489,18 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                     return null;
                   }
                   
+                  // 해당 위치의 우선순위 모델들 찾기
+                  const priorityLevels = store.items 
+                    ? store.items
+                        .map(item => getPriorityLevel(item.modelName))
+                        .filter(level => level !== null)
+                    : [];
+
                   return (
                     <Marker
                       key={index}
                       position={[parseFloat(store.latitude), parseFloat(store.longitude)]}
-                      icon={createCustomIcon(store.color)}
+                      icon={createCustomIcon(store.color, priorityLevels)}
                       eventHandlers={{
                         click: () => {
                           console.log('마커 클릭됨:', store);
@@ -482,6 +522,32 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh }) {
                         <p style={{ margin: '5px 0' }}>
                           <strong>완료된 항목:</strong> {store.completedCount}건
                         </p>
+                        
+                        {/* 우선순위 모델 정보 */}
+                        {store.items && store.items.some(item => getPriorityLevel(item.modelName)) && (
+                          <div style={{ margin: '10px 0', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+                            <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', color: '#1976d2' }}>
+                              ⭐ 우선순위 모델:
+                            </p>
+                            {store.items
+                              .filter(item => getPriorityLevel(item.modelName))
+                              .map((item, idx) => (
+                                <span key={idx} style={{ 
+                                  display: 'inline-block',
+                                  margin: '2px 4px 2px 0',
+                                  padding: '2px 6px',
+                                  backgroundColor: '#1976d2',
+                                  color: 'white',
+                                  borderRadius: '12px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold'
+                                }}>
+                                  {getPriorityLevel(item.modelName)}: {item.modelName}
+                                </span>
+                              ))
+                            }
+                          </div>
+                        )}
                         
                         {/* 액션 버튼들 */}
                         <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

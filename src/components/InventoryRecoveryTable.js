@@ -24,7 +24,7 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 
-function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
+function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, priorityModels }) {
   const [copySuccess, setCopySuccess] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [cachedData, setCachedData] = useState({});
@@ -44,6 +44,18 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
     
     return `${tabIndex}-${dataHash}`;
   }, []);
+
+  // 우선순위 확인 함수
+  const getPriorityLevel = (modelName) => {
+    if (!priorityModels || !modelName) return null;
+    
+    for (const [priority, model] of Object.entries(priorityModels)) {
+      if (model === modelName) {
+        return priority;
+      }
+    }
+    return null;
+  };
 
   // 색상별 배경색 반환 함수
   const getColorBackground = (color) => {
@@ -580,7 +592,24 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh }) {
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
                     }}>
-                      {item.modelName}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {item.modelName}
+                        </Typography>
+                        {getPriorityLevel(item.modelName) && (
+                          <Chip
+                            label={getPriorityLevel(item.modelName)}
+                            size="small"
+                            color="primary"
+                            variant="filled"
+                            sx={{ 
+                              fontSize: '0.7rem',
+                              height: '20px',
+                              fontWeight: 'bold'
+                            }}
+                          />
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
