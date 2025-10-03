@@ -365,22 +365,25 @@ function PolicyInputModal({
                   policyName: '정책명',
                   policyStartDate: '정책 시작일',
                   policyEndDate: '정책 종료일',
-                policyStore: '정책적용점',
-                policyContent: '정책내용',
-                policyAmount: '금액',
-                amountType: '금액 유형',
-                team: '소속정책팀'
-              };
-              
-              // 누락된 필드 확인
-              Object.keys(fieldNames).forEach(field => {
-                if (!received[field] || received[field] === '') {
-                  missingFields.push(fieldNames[field]);
+                  policyStore: '정책적용점',
+                  policyContent: '정책내용',
+                  policyAmount: '금액',
+                  amountType: '금액 유형',
+                  team: '소속정책팀'
+                };
+                
+                // 누락된 필드 확인
+                Object.keys(fieldNames).forEach(field => {
+                  if (!received[field] || received[field] === '') {
+                    missingFields.push(fieldNames[field]);
+                  }
+                });
+                
+                if (missingFields.length > 0) {
+                  errorMessage = `다음 필수 입력란을 확인해주세요: [${missingFields.join(', ')}]`;
+                } else {
+                  errorMessage = '입력 정보를 확인해주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.';
                 }
-              });
-              
-              if (missingFields.length > 0) {
-                errorMessage = `다음 필수 입력란을 확인해주세요: [${missingFields.join(', ')}]`;
               } else {
                 errorMessage = '입력 정보를 확인해주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.';
               }
