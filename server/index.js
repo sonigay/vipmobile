@@ -747,7 +747,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 나머지는 A:AA 범위
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 정책_기본정보는 A:AC 범위 필요 (AC열까지), 나머지는 A:AA 범위
     let range;
     if (sheetName === 'raw데이터') {
       range = `${safeSheetName}!A:AB`;
@@ -755,6 +755,8 @@ async function getSheetValuesWithoutCache(sheetName) {
       range = `${safeSheetName}!A:BZ`;
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
+    } else if (sheetName === '정책_기본정보 ') {
+      range = `${safeSheetName}!A:AC`;
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -18022,6 +18024,11 @@ app.get('/api/policies', async (req, res) => {
         return false;
       }
       
+      // 년월 필터 통과 로그
+      if (yearMonth && policyYearMonth && policyYearMonth === yearMonth) {
+        console.log(`✅ [정책필터] yearMonth 일치: ${policyYearMonth} === ${yearMonth}`);
+      }
+      
       // 정책유형 필터 (URL 디코딩 및 처리)
       if (policyType) {
         const decodedPolicyType = decodeURIComponent(policyType);
@@ -18456,6 +18463,60 @@ app.post('/api/policies', async (req, res) => {
   }
 });
 
+// 정책 삭제 API (라우터 순서 문제 해결을 위해 앞에 배치)
+app.delete('/api/policies/:policyId', async (req, res) => {
+  console.log('🔥 [DELETE API] 요청 받음:', req.method, req.url);
+  console.log('🔥 [DELETE API] 요청 헤더:', req.headers);
+  console.log('🔥 [DELETE API] 요청 파라미터:', req.params);
+  try {
+    const { policyId } = req.params;
+    console.log('🔥 [DELETE API] 정책 삭제 요청:', { policyId });
+    
+    // 정책_기본정보 시트에서 해당 정책 찾기
+    const values = await getSheetValuesWithoutCache('정책_기본정보 ');
+    
+    if (!values || values.length <= 1) {
+      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+    }
+    
+    // 헤더 제거
+    const dataRows = values.slice(1);
+    const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
+    
+    if (policyRowIndex === -1) {
+      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
+    }
+    
+    // Google Sheets에서 해당 행 삭제
+    const response = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [{
+          deleteDimension: {
+            range: {
+              sheetId: 0, // 정책_기본정보 시트
+              dimension: 'ROWS',
+              startIndex: policyRowIndex + 1, // 0-based index, +1 for header
+              endIndex: policyRowIndex + 2
+            }
+          }
+        }]
+      }
+    });
+    
+    // 정책_기본정보 시트 캐시 무효화
+    cacheUtils.delete('sheet_정책_기본정보 ');
+    
+    console.log('정책 삭제 완료:', response.data);
+    
+    res.json({ success: true, message: '정책이 삭제되었습니다.' });
+    
+  } catch (error) {
+    console.error('정책 삭제 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 정책 수정 API
 app.put('/api/policies/:policyId', async (req, res) => {
   try {
@@ -18629,57 +18690,6 @@ app.put('/api/policies/:policyId', async (req, res) => {
   }
 });
 
-// 정책 삭제 API
-app.delete('/api/policies/:policyId', async (req, res) => {
-  console.log('DELETE 요청 받음:', req.method, req.url);
-  try {
-    const { policyId } = req.params;
-    console.log('정책 삭제 요청:', { policyId });
-    
-    // 정책_기본정보 시트에서 해당 정책 찾기
-    const values = await getSheetValuesWithoutCache('정책_기본정보 ');
-    
-    if (!values || values.length <= 1) {
-      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
-    }
-    
-    // 헤더 제거
-    const dataRows = values.slice(1);
-    const policyRowIndex = dataRows.findIndex(row => row[0] === policyId);
-    
-    if (policyRowIndex === -1) {
-      return res.status(404).json({ success: false, error: '정책을 찾을 수 없습니다.' });
-    }
-    
-    // Google Sheets에서 해당 행 삭제
-    const response = await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      resource: {
-        requests: [{
-          deleteDimension: {
-            range: {
-              sheetId: 0, // 정책_기본정보 시트
-              dimension: 'ROWS',
-              startIndex: policyRowIndex + 1, // 0-based index, +1 for header
-              endIndex: policyRowIndex + 2
-            }
-          }
-        }]
-      }
-    });
-    
-    // 정책_기본정보 시트 캐시 무효화
-    cacheUtils.delete('sheet_정책_기본정보 ');
-    
-    console.log('정책 삭제 완료:', response.data);
-    
-    res.json({ success: true, message: '정책이 삭제되었습니다.' });
-    
-  } catch (error) {
-    console.error('정책 삭제 실패:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // DELETE 메서드 테스트 API
 app.delete('/api/test-delete', (req, res) => {
