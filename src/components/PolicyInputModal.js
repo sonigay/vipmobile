@@ -189,12 +189,16 @@ function PolicyInputModal({
       }
     }
     
-    if (!formData.policyContent.trim()) {
-      newErrors.policyContent = '정책내용을 입력해주세요.';
+    // 정책내용 검사 - 구두정책이 아니거나 직접입력이 체크된 경우에만 필수
+    const isShoePolicy = categoryId === 'wireless_shoe' || categoryId === 'wired_shoe';
+    if (!isShoePolicy || formData.isDirectInput) {
+      if (!formData.policyContent.trim()) {
+        newErrors.policyContent = '정책내용을 입력해주세요.';
+      }
     }
     
-    // 금액 입력 방식에 따른 검증
-    if (formData.amountType !== 'in_content') {
+    // 금액 입력 방식에 따른 검증 (구두정책이 아닌 경우에만)
+    if (!isShoePolicy && formData.amountType !== 'in_content') {
       if (!formData.policyAmount.trim()) {
         newErrors.policyAmount = '금액을 입력해주세요.';
       } else if (isNaN(Number(formData.policyAmount))) {
@@ -202,7 +206,8 @@ function PolicyInputModal({
       }
     }
     
-    if (!formData.amountType) {
+    // 금액 유형 검사 (구두정책이 아닌 경우에만)
+    if (!isShoePolicy && !formData.amountType) {
       newErrors.amountType = '금액 유형을 선택해주세요.';
     }
     
@@ -740,7 +745,11 @@ function PolicyInputModal({
               }
               multiline
               rows={4}
-              required
+              required={
+                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
+                  ? formData.isDirectInput 
+                  : true
+              }
               disabled={
                 (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
                   ? !formData.isDirectInput 
