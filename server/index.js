@@ -18052,37 +18052,71 @@ app.get('/api/policies', async (req, res) => {
       return true;
     });
     
+    // 매장 데이터 가져오기 (업체명 매핑용)
+    let storeData = [];
+    try {
+      const storeValues = await getSheetValuesWithoutCache(STORE_SHEET_NAME);
+      if (storeValues && storeValues.length > 1) {
+        const storeRows = storeValues.slice(1);
+        storeData = storeRows
+          .filter(row => {
+            const name = (row[14] || '').toString().trim();  // O열: 업체명 (14인덱스)
+            const status = row[12];                          // M열: 거래상태 (12번째 컬럼)
+            return name && status === "사용";
+          })
+          .map(row => ({
+            id: row[15],                        // P열: 매장코드 (15인덱스)
+            name: row[14].toString().trim()   // O열: 업체명 (14인덱스)
+          }));
+      }
+    } catch (error) {
+      console.warn('매장 데이터 가져오기 실패:', error.message);
+    }
+
+    // 매장 ID로 업체명을 찾는 함수
+    const getStoreNameById = (storeId) => {
+      if (!storeId || !storeData.length) return '';
+      const store = storeData.find(s => s.id && s.id.toString() === storeId.toString());
+      return store ? store.name : '';
+    };
+
     // 정책 데이터 변환
-    const policies = filteredPolicies.map(row => ({
-      id: row[0],                    // A열: 정책ID
-      policyName: row[1],            // B열: 정책명
-      policyDate: row[2],            // C열: 정책적용일 (시작일~종료일)
-      policyStore: row[3],           // D열: 정책적용점
-      policyContent: row[4],         // E열: 정책내용
-      policyAmount: row[5],          // F열: 금액 (금액 + 유형)
-      policyType: row[6],            // G열: 정책유형
-      wirelessWired: row[7],         // H열: 무선/유선
-      category: row[8],              // I열: 하위카테고리
-      inputUserId: row[9],           // J열: 입력자ID
-      inputUserName: row[10],        // K열: 입력자명
-      inputDateTime: row[11],        // L열: 입력일시
-      approvalStatus: {
-        total: row[12] || '대기',     // M열: 승인상태_총괄
-        settlement: row[13] || '대기', // N열: 승인상태_정산팀
-        team: row[14] || '대기'       // O열: 승인상태_소속팀
-      },
-      // 취소 관련 정보 추가
-      policyStatus: row[15] || '활성', // P열: 정책상태
-      cancelReason: row[16] || '',    // Q열: 취소사유
-      cancelDateTime: row[17] || '',  // R열: 취소일시
-      cancelUserName: row[18] || '',  // S열: 취소자명
-      // 정산 반영 관련 정보 추가
-      settlementStatus: row[19] || '미반영', // T열: 정산반영상태
-      settlementUserName: row[20] || '',     // U열: 정산반영자명
-      settlementDateTime: row[21] || '',     // V열: 정산반영일시
-      settlementUserId: row[22] || '',       // W열: 정산반영자ID
-      yearMonth: row[23] || ''               // X열: 대상년월
-    }));
+    const policies = filteredPolicies.map(row => {
+      const policyStore = row[3]; // D열: 정책적용점
+      const storeName = getStoreNameById(policyStore);
+      
+      return {
+        id: row[0],                    // A열: 정책ID
+        policyName: row[1],            // B열: 정책명
+        policyDate: row[2],            // C열: 정책적용일 (시작일~종료일)
+        policyStore: policyStore,      // D열: 정책적용점 (코드)
+        policyStoreName: storeName,    // 매장명 (매핑된 업체명)
+        policyContent: row[4],         // E열: 정책내용
+        policyAmount: row[5],          // F열: 금액 (금액 + 유형)
+        policyType: row[6],            // G열: 정책유형
+        wirelessWired: row[7],         // H열: 무선/유선
+        category: row[8],              // I열: 하위카테고리
+        inputUserId: row[9],           // J열: 입력자ID
+        inputUserName: row[10],        // K열: 입력자명
+        inputDateTime: row[11],        // L열: 입력일시
+        approvalStatus: {
+          total: row[12] || '대기',     // M열: 승인상태_총괄
+          settlement: row[13] || '대기', // N열: 승인상태_정산팀
+          team: row[14] || '대기'       // O열: 승인상태_소속팀
+        },
+        // 취소 관련 정보 추가
+        policyStatus: row[15] || '활성', // P열: 정책상태
+        cancelReason: row[16] || '',    // Q열: 취소사유
+        cancelDateTime: row[17] || '',  // R열: 취소일시
+        cancelUserName: row[18] || '',  // S열: 취소자명
+        // 정산 반영 관련 정보 추가
+        settlementStatus: row[19] || '미반영', // T열: 정산반영상태
+        settlementUserName: row[20] || '',     // U열: 정산반영자명
+        settlementDateTime: row[21] || '',     // V열: 정산반영일시
+        settlementUserId: row[22] || '',       // W열: 정산반영자ID
+        yearMonth: row[23] || ''               // X열: 대상년월
+      };
+    });
     
     console.log(`정책 목록 조회 완료: ${policies.length}건`);
     

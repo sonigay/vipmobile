@@ -1120,6 +1120,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             적용점
                           </TableCell>
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
+                            업체명
+                          </TableCell>
+                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
                             소속정책팀
                           </TableCell>
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white' }}>
@@ -1192,6 +1195,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             </TableCell>
                             <TableCell>{policy.policyDate}</TableCell>
                             <TableCell>{policy.policyStore}</TableCell>
+                            <TableCell>{policy.policyStoreName || '-'}</TableCell>
                             <TableCell>{policy.teamName}</TableCell>
                             <TableCell>
                               <Box>
