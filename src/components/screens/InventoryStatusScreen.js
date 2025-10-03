@@ -281,8 +281,32 @@ const InventoryStatusScreen = () => {
 
            // 일별 개통 현황 렌더링
     const renderDailyActivation = (dailyData) => {
+      // dailyData가 숫자 배열인 경우 처리
+      if (Array.isArray(dailyData) && typeof dailyData[0] === 'number') {
+        return dailyData.map((count, index) => {
+          const colorStyle = getQuantityColor(count, 'daily');
+          return (
+            <TableCell key={index} align="center" sx={{ 
+              minWidth: 25, 
+              p: 0.25,
+              fontSize: '0.7rem',
+              color: colorStyle.color,
+              backgroundColor: colorStyle.backgroundColor,
+              fontWeight: count > 0 ? 'bold' : 'normal',
+              borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
+              borderRadius: count > 0 ? '2px' : '0',
+              borderLeft: index === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+            }}>
+              {count}
+            </TableCell>
+          );
+        });
+      }
+      
+      // 기존 객체 배열 형태 처리 (하위 호환성)
       return dailyData.map((day, index) => {
-        const colorStyle = getQuantityColor(day.count, 'daily');
+        const count = day.count || day || 0;
+        const colorStyle = getQuantityColor(count, 'daily');
         return (
           <TableCell key={index} align="center" sx={{ 
             minWidth: 25, 
@@ -290,12 +314,12 @@ const InventoryStatusScreen = () => {
             fontSize: '0.7rem',
             color: colorStyle.color,
             backgroundColor: colorStyle.backgroundColor,
-            fontWeight: day.count > 0 ? 'bold' : 'normal',
+            fontWeight: count > 0 ? 'bold' : 'normal',
             borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
-            borderRadius: day.count > 0 ? '2px' : '0',
+            borderRadius: count > 0 ? '2px' : '0',
             borderLeft: index === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
           }}>
-            {day.count}
+            {count}
           </TableCell>
         );
       });
