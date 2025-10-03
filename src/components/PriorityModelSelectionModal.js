@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -37,7 +37,7 @@ function PriorityModelSelectionModal({
   const [selectedPriority, setSelectedPriority] = useState(null);
 
   // 회수 데이터에서 고유한 모델명 추출
-  const uniqueModels = React.useMemo(() => {
+  const uniqueModels = useMemo(() => {
     if (!recoveryData || !Array.isArray(recoveryData)) {
       return [];
     }
