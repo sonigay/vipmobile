@@ -394,11 +394,6 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
       />
 
       {/* 우선순위 모델 선정 모달 */}
-      {console.log('🔍 [InventoryRecoveryMode] PriorityModelSelectionModal 렌더링 시도:', {
-        open: showPriorityModal,
-        recoveryData: recoveryData?.length || 0,
-        priorityModels: priorityModels
-      })}
       <PriorityModelSelectionModal
         open={showPriorityModal}
         onClose={handlePriorityModalClose}
