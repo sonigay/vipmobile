@@ -733,7 +733,18 @@ const InventoryStatusScreen = () => {
                     
                                            {/* 일별 총 개통 수량 */}
                       {Array.from({ length: 31 }, (_, i) => {
-                        const dayTotal = inventoryData.reduce((sum, item) => sum + (item.dailyActivation[i]?.count || 0), 0);
+                        const dayTotal = inventoryData.reduce((sum, item) => {
+                          if (item.dailyActivation && item.dailyActivation[i] !== undefined) {
+                            const dayValue = item.dailyActivation[i];
+                            // dayValue가 객체인 경우 count 속성 사용, 아니면 직접 값 사용
+                            if (dayValue && typeof dayValue === 'object' && dayValue.count !== undefined) {
+                              return sum + (dayValue.count || 0);
+                            } else if (typeof dayValue === 'number') {
+                              return sum + dayValue;
+                            }
+                          }
+                          return sum;
+                        }, 0);
                         return (
                           <TableCell key={i} align="center" sx={{ 
                             backgroundColor: '#f8f9fa', 
