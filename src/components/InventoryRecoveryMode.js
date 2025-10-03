@@ -44,16 +44,16 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     severity: 'success'
   });
 
-  // 우선순위 모델 상태
-  const [priorityModels, setPriorityModels] = useState({
-    '1순위': null,
-    '2순위': null,
-    '3순위': null,
-    '4순위': null,
-    '5순위': null
-  });
-  const [showPriorityModal, setShowPriorityModal] = useState(false);
-  const [selectedPriorityLevel, setSelectedPriorityLevel] = useState(null);
+  // 우선순위 모델 상태 - 임시로 비활성화
+  // const [priorityModels, setPriorityModels] = useState({
+  //   '1순위': null,
+  //   '2순위': null,
+  //   '3순위': null,
+  //   '4순위': null,
+  //   '5순위': null
+  // });
+  // const [showPriorityModal, setShowPriorityModal] = useState(false);
+  // const [selectedPriorityLevel, setSelectedPriorityLevel] = useState(null);
 
   // 업데이트 확인 핸들러
   const handleUpdateCheck = () => {

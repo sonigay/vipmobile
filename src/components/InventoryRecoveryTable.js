@@ -47,14 +47,20 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
 
   // 우선순위 확인 함수
   const getPriorityLevel = (modelName) => {
-    if (!priorityModels || !modelName) return null;
-    
-    for (const [priority, model] of Object.entries(priorityModels)) {
-      if (model === modelName) {
-        return priority;
+    try {
+      if (!priorityModels || !modelName || typeof priorityModels !== 'object') return null;
+      
+      const entries = Object.entries(priorityModels);
+      for (const [priority, model] of entries) {
+        if (model === modelName) {
+          return priority;
+        }
       }
+      return null;
+    } catch (error) {
+      console.error('❌ [InventoryRecoveryTable] getPriorityLevel 에러:', error);
+      return null;
     }
-    return null;
   };
 
   // 색상별 배경색 반환 함수
