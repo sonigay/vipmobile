@@ -18195,17 +18195,20 @@ app.post('/api/policies', async (req, res) => {
       inputUserName
     } = req.body;
     
-    // 필수 필드 검증
-    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || !amountType) {
+    // 구두정책 여부 확인
+    const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
+    
+    // 필수 필드 검증 (구두정책이 아닌 경우에만 amountType 필수)
+    if (!policyName || !policyStartDate || !policyEndDate || !policyStore || !policyContent || (!isShoePolicy && !amountType)) {
       return res.status(400).json({
         success: false,
         error: '필수 필드가 누락되었습니다.',
-        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, amountType }
+        received: { policyName, policyStartDate, policyEndDate, policyStore, policyContent, amountType, isShoePolicy }
       });
     }
     
-    // amountType이 'in_content'가 아닐 때만 policyAmount 필수
-    if (amountType !== 'in_content' && !policyAmount) {
+    // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책이 아닌 경우에만)
+    if (!isShoePolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
