@@ -371,9 +371,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       console.log('정책 삭제 시도:', policy.id);
       
+      // API 기본 URL 설정
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://jegomap2-server.onrender.com';
+      
       // 먼저 테스트 API로 DELETE 메서드가 작동하는지 확인
       console.log('DELETE 테스트 API 호출 시도...');
-      const testResponse = await fetch('/api/test-delete', {
+      const testResponse = await fetch(`${API_BASE_URL}/api/test-delete`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -387,7 +390,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
       
       // 실제 정책 삭제 API 호출
-      const response = await fetch(`/api/policies/${policy.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/policies/${policy.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'

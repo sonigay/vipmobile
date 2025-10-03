@@ -1,6 +1,6 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = process.env.REACT_APP_API_URL || 'https://jegomap2-server.onrender.com';
 
 // 정책 관련 API 엔드포인트
 const POLICY_ENDPOINTS = {
