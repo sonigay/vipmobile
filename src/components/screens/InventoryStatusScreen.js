@@ -281,31 +281,38 @@ const InventoryStatusScreen = () => {
 
            // 일별 개통 현황 렌더링
     const renderDailyActivation = (dailyData) => {
-      // dailyData가 숫자 배열인 경우 처리
-      if (Array.isArray(dailyData) && typeof dailyData[0] === 'number') {
-        return dailyData.map((count, index) => {
-          const colorStyle = getQuantityColor(count, 'daily');
-          return (
-            <TableCell key={index} align="center" sx={{ 
-              minWidth: 25, 
-              p: 0.25,
-              fontSize: '0.7rem',
-              color: colorStyle.color,
-              backgroundColor: colorStyle.backgroundColor,
-              fontWeight: count > 0 ? 'bold' : 'normal',
-              borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
-              borderRadius: count > 0 ? '2px' : '0',
-              borderLeft: index === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
-            }}>
-              {count}
-            </TableCell>
-          );
-        });
+      // dailyData가 null이거나 undefined인 경우 빈 배열 처리
+      if (!dailyData || !Array.isArray(dailyData)) {
+        return Array.from({ length: 31 }, (_, index) => (
+          <TableCell key={index} align="center" sx={{ 
+            minWidth: 25, 
+            p: 0.25,
+            fontSize: '0.7rem',
+            borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
+            borderLeft: index === 0 ? '2px solid #ffffff' : 'none'
+          }}>
+            0
+          </TableCell>
+        ));
       }
       
-      // 기존 객체 배열 형태 처리 (하위 호환성)
-      return dailyData.map((day, index) => {
-        const count = day.count || day || 0;
+      // 31일 배열 생성 (부족한 경우 0으로 채움)
+      const days = Array.from({ length: 31 }, (_, index) => {
+        if (index < dailyData.length) {
+          const day = dailyData[index];
+          // day가 객체인 경우 count 속성 사용, 아니면 직접 값 사용
+          if (day && typeof day === 'object' && day.count !== undefined) {
+            return day.count;
+          } else if (typeof day === 'number') {
+            return day;
+          } else {
+            return 0;
+          }
+        }
+        return 0;
+      });
+      
+      return days.map((count, index) => {
         const colorStyle = getQuantityColor(count, 'daily');
         return (
           <TableCell key={index} align="center" sx={{ 
@@ -317,7 +324,7 @@ const InventoryStatusScreen = () => {
             fontWeight: count > 0 ? 'bold' : 'normal',
             borderRight: index < 30 ? '1px solid #f0f0f0' : 'none',
             borderRadius: count > 0 ? '2px' : '0',
-            borderLeft: index === 0 ? '2px solid #ffffff' : 'none' // 첫 번째 일별 컬럼에 하얀 구분선 추가
+            borderLeft: index === 0 ? '2px solid #ffffff' : 'none'
           }}>
             {count}
           </TableCell>
