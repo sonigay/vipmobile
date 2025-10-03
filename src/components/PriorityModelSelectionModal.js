@@ -38,9 +38,13 @@ function PriorityModelSelectionModal({
 
   // 회수 데이터에서 고유한 모델명 추출
   const uniqueModels = React.useMemo(() => {
+    if (!recoveryData || !Array.isArray(recoveryData)) {
+      return [];
+    }
+    
     const models = new Set();
     recoveryData.forEach(item => {
-      if (item.modelName && item.modelName.trim()) {
+      if (item && item.modelName && item.modelName.trim()) {
         models.add(item.modelName.trim());
       }
     });
@@ -82,7 +86,9 @@ function PriorityModelSelectionModal({
 
   // 우선순위 제거 핸들러
   const handleRemovePriority = (priority) => {
-    onPriorityChange(null, priority);
+    if (onPriorityChange) {
+      onPriorityChange(null, priority);
+    }
   };
 
   return (
@@ -105,13 +111,13 @@ function PriorityModelSelectionModal({
 
       <DialogContent>
         {/* 현재 우선순위 모델들 */}
-        {Object.keys(priorityModels).length > 0 && (
+        {priorityModels && Object.keys(priorityModels).length > 0 && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
               현재 우선순위 모델
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {Object.entries(priorityModels).map(([priority, model]) => (
+              {priorityModels && Object.entries(priorityModels).map(([priority, model]) => (
                 <Chip
                   key={priority}
                   label={`${priority}순위: ${model}`}
@@ -161,7 +167,7 @@ function PriorityModelSelectionModal({
             <List>
               {filteredModels.map((model, index) => {
                 const isSelected = selectedPriority === model;
-                const isAlreadyPriority = Object.values(priorityModels).includes(model);
+                const isAlreadyPriority = priorityModels && Object.values(priorityModels).includes(model);
                 
                 return (
                   <ListItem key={index} disablePadding>
