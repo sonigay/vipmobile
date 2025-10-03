@@ -1299,23 +1299,27 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                   // 구두정책인 경우 95군 이상/미만 정보 표시
                                   if (policy.category === 'wireless_shoe' || policy.category === 'wired_shoe') {
                                     if (policy.amount95Above || policy.amount95Below) {
+                                      const aboveAmount = Number(policy.amount95Above) || 0;
+                                      const belowAmount = Number(policy.amount95Below) || 0;
+                                      
+                                      let amountText;
+                                      if (aboveAmount > 0 && belowAmount > 0 && aboveAmount === belowAmount) {
+                                        // 95군이상과 95군미만 금액이 동일한 경우
+                                        amountText = `전요금제: ${aboveAmount.toLocaleString()}원`;
+                                      } else {
+                                        // 일반적인 경우
+                                        const aboveText = aboveAmount > 0 ? `95군이상: ${aboveAmount.toLocaleString()}원` : '';
+                                        const belowText = belowAmount > 0 ? `95군미만: ${belowAmount.toLocaleString()}원` : '';
+                                        amountText = [aboveText, belowText].filter(Boolean).join(' / ');
+                                      }
+                                      
                                       return (
                                         <Box>
-                                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                            금액 정보:
+                                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                            {amountText}
                                           </Typography>
-                                          {policy.amount95Above && (
-                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                              95군이상: {Number(policy.amount95Above).toLocaleString()}원
-                                            </Typography>
-                                          )}
-                                          {policy.amount95Below && (
-                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                              95군미만: {Number(policy.amount95Below).toLocaleString()}원
-                                            </Typography>
-                                          )}
                                           {policy.policyContent && (
-                                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
                                               추가내용: {policy.policyContent}
                                             </Typography>
                                           )}
