@@ -18266,15 +18266,19 @@ app.post('/api/policies', async (req, res) => {
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
     
-    // 구두정책인 경우 95군이상/미만 금액 중 하나라도 있어야 함
-    if (isShoePolicy && !req.body.amount95Above && !req.body.amount95Below && !policyContent) {
-      missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+    // 구두정책 전용 검증
+    if (isShoePolicy) {
+      console.log('🔍 [구두정책] 전용 검증 시작');
+      // 95군이상/미만 금액 중 하나라도 있어야 함
+      if (!req.body.amount95Above && !req.body.amount95Below && !policyContent) {
+        missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+      }
+      console.log('✅ [구두정책] 검증 완료');
     }
     
-    if (!isShoePolicy && !isAddDeductPolicy && !amountType) missingFields.push('amountType');
-    
-    // 부가차감지원정책인 경우 차감지원 금액 검증 (조건부 옵션은 선택사항)
+    // 부가차감지원정책 전용 검증
     if (isAddDeductPolicy) {
+      console.log('🔍 [부가차감지원정책] 전용 검증 시작');
       const deductSupport = req.body.deductSupport || {};
       
       console.log('🔍 [부가차감지원정책] 검증 데이터:', {
@@ -18299,6 +18303,14 @@ app.post('/api/policies', async (req, res) => {
       }
       
       // 조건부 옵션은 선택사항이므로 검증하지 않음
+      console.log('✅ [부가차감지원정책] 검증 완료');
+    }
+    
+    // 일반 정책 검증 (구두정책, 부가차감지원정책이 아닌 경우)
+    if (!isShoePolicy && !isAddDeductPolicy) {
+      console.log('🔍 [일반정책] 검증 시작');
+      if (!amountType) missingFields.push('amountType');
+      console.log('✅ [일반정책] 검증 완료');
     }
     
     console.log('🔍 [전체 검증] missingFields:', missingFields);
@@ -18457,37 +18469,67 @@ app.post('/api/policies', async (req, res) => {
       policyTeam || '미지정',       // AD열: 소속팀
       (() => {                     // AE열: 부가미유치금액
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          return req.body.deductSupport?.addServiceAmount || '';
+          try {
+            return req.body.deductSupport?.addServiceAmount || '';
+          } catch (error) {
+            console.warn('부가미유치금액 처리 오류:', error);
+            return '';
+          }
         }
         return '';
       })(),
       (() => {                     // AF열: 보험미유치금액
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          return req.body.deductSupport?.insuranceAmount || '';
+          try {
+            return req.body.deductSupport?.insuranceAmount || '';
+          } catch (error) {
+            console.warn('보험미유치금액 처리 오류:', error);
+            return '';
+          }
         }
         return '';
       })(),
       (() => {                     // AG열: 연결음미유치금액
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          return req.body.deductSupport?.connectionAmount || '';
+          try {
+            return req.body.deductSupport?.connectionAmount || '';
+          } catch (error) {
+            console.warn('연결음미유치금액 처리 오류:', error);
+            return '';
+          }
         }
         return '';
       })(),
       (() => {                     // AH열: 부가유치시조건
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          return req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N';
+          try {
+            return req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N';
+          } catch (error) {
+            console.warn('부가유치시조건 처리 오류:', error);
+            return 'N';
+          }
         }
         return '';
       })(),
       (() => {                     // AI열: 보험유치시조건
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          return req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N';
+          try {
+            return req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N';
+          } catch (error) {
+            console.warn('보험유치시조건 처리 오류:', error);
+            return 'N';
+          }
         }
         return '';
       })(),
       (() => {                     // AJ열: 연결음유치시조건
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          return req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N';
+          try {
+            return req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N';
+          } catch (error) {
+            console.warn('연결음유치시조건 처리 오류:', error);
+            return 'N';
+          }
         }
         return '';
       })()
@@ -18657,15 +18699,19 @@ app.put('/api/policies/:policyId', async (req, res) => {
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
     
-    // 구두정책인 경우 95군이상/미만 금액 중 하나라도 있어야 함
-    if (isShoePolicy && !req.body.amount95Above && !req.body.amount95Below && !policyContent) {
-      missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+    // 구두정책 전용 검증
+    if (isShoePolicy) {
+      console.log('🔍 [정책수정-구두정책] 전용 검증 시작');
+      // 95군이상/미만 금액 중 하나라도 있어야 함
+      if (!req.body.amount95Above && !req.body.amount95Below && !policyContent) {
+        missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+      }
+      console.log('✅ [정책수정-구두정책] 검증 완료');
     }
     
-    if (!isShoePolicy && !isAddDeductPolicy && !amountType) missingFields.push('amountType');
-    
-    // 부가차감지원정책인 경우 차감지원 금액 검증 (조건부 옵션은 선택사항)
+    // 부가차감지원정책 전용 검증
     if (isAddDeductPolicy) {
+      console.log('🔍 [정책수정-부가차감지원정책] 전용 검증 시작');
       const deductSupport = req.body.deductSupport || {};
       
       // 차감지원 금액 중 최소 하나는 입력되어야 함 (지원할 항목이 있어야 함)
@@ -18678,6 +18724,14 @@ app.put('/api/policies/:policyId', async (req, res) => {
       }
       
       // 조건부 옵션은 선택사항이므로 검증하지 않음
+      console.log('✅ [정책수정-부가차감지원정책] 검증 완료');
+    }
+    
+    // 일반 정책 검증 (구두정책, 부가차감지원정책이 아닌 경우)
+    if (!isShoePolicy && !isAddDeductPolicy) {
+      console.log('🔍 [정책수정-일반정책] 검증 시작');
+      if (!amountType) missingFields.push('amountType');
+      console.log('✅ [정책수정-일반정책] 검증 완료');
     }
     
     if (missingFields.length > 0) {
