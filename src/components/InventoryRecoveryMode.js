@@ -113,7 +113,24 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
   // 초기 데이터 로드
   useEffect(() => {
     loadRecoveryData();
+    loadPriorityModels();
   }, []);
+
+  // 우선순위 모델 로드
+  const loadPriorityModels = async () => {
+    try {
+      console.log('🔄 [우선순위 모델] 로드 시작');
+      const response = await inventoryRecoveryAPI.getPriorityModels();
+      
+      if (response.success) {
+        setPriorityModels(response.data);
+        console.log('✅ [우선순위 모델] 로드 완료:', response.data);
+      }
+    } catch (error) {
+      console.error('❌ [우선순위 모델] 로드 오류:', error);
+      // 오류가 있어도 기본값으로 계속 진행
+    }
+  };
 
   // 상태 업데이트 핸들러
   const handleStatusUpdate = async (rowIndex, column, value, shouldRefresh = true) => {
@@ -184,19 +201,40 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     setShowPriorityModal(true);
   };
 
-  const handlePriorityChange = (model, removePriority = null) => {
+  const handlePriorityChange = async (model, removePriority = null) => {
+    let newPriorityModels;
+    
     if (removePriority) {
       // 우선순위 제거
-      setPriorityModels(prev => ({
-        ...prev,
+      newPriorityModels = {
+        ...priorityModels,
         [removePriority]: null
-      }));
+      };
     } else if (model && selectedPriorityLevel) {
       // 우선순위 설정
-      setPriorityModels(prev => ({
-        ...prev,
+      newPriorityModels = {
+        ...priorityModels,
         [selectedPriorityLevel]: model
-      }));
+      };
+    } else {
+      return;
+    }
+
+    // 상태 업데이트
+    setPriorityModels(newPriorityModels);
+
+    // 백엔드에 저장
+    try {
+      console.log('🔄 [우선순위 모델] 저장 시작:', newPriorityModels);
+      await inventoryRecoveryAPI.savePriorityModels(newPriorityModels);
+      console.log('✅ [우선순위 모델] 저장 완료');
+    } catch (error) {
+      console.error('❌ [우선순위 모델] 저장 오류:', error);
+      setSnackbar({
+        open: true,
+        message: '우선순위 모델 저장에 실패했습니다: ' + error.message,
+        severity: 'error'
+      });
     }
   };
 

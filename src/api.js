@@ -822,5 +822,58 @@ export const inventoryRecoveryAPI = {
       console.error('재고회수 상태 업데이트 오류:', error);
       throw error;
     }
+  },
+
+  // 우선순위 모델 저장
+  savePriorityModels: async (priorityModels) => {
+    try {
+      console.log('🔄 [우선순위 모델 API] 저장 요청:', priorityModels);
+      
+      const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/priority-models`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priorityModels }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('우선순위 모델 저장에 실패했습니다.');
+      }
+      
+      const result = await response.json();
+      console.log('✅ [우선순위 모델 API] 저장 완료:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ [우선순위 모델 API] 저장 오류:', error);
+      throw error;
+    }
+  },
+
+  // 우선순위 모델 로드
+  getPriorityModels: async () => {
+    try {
+      console.log('🔄 [우선순위 모델 API] 로드 요청');
+      
+      const response = await fetch(`${API_BASE_URL}/api/inventory-recovery/priority-models`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('우선순위 모델 로드에 실패했습니다.');
+      }
+      
+      const result = await response.json();
+      console.log('✅ [우선순위 모델 API] 로드 완료:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ [우선순위 모델 API] 로드 오류:', error);
+      throw error;
+    }
   }
 }; 

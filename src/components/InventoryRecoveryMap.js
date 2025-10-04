@@ -498,12 +498,13 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh, prior
                     return null;
                   }
                   
-                  // 해당 위치의 우선순위 모델들 찾기 (숫자만 추출)
+                  // 해당 위치의 우선순위 모델들 찾기 (숫자만 추출, 중복 제거)
                   const priorityLevels = store.items 
                     ? store.items
                         .map(item => getPriorityLevel(item.modelName))
                         .filter(level => level !== null)
                         .map(level => level.replace('순위', '')) // "1순위" → "1"
+                        .filter((value, index, self) => self.indexOf(value) === index) // 중복 제거
                         .sort((a, b) => parseInt(a) - parseInt(b)) // 숫자 순으로 정렬
                     : [];
 

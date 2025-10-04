@@ -25395,6 +25395,162 @@ app.post('/api/inventory-recovery/update-status', async (req, res) => {
   }
 });
 
+// 우선순위 모델 저장 API
+app.post('/api/inventory-recovery/priority-models', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'https://vipmobile.netlify.app/',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  try {
+    const { priorityModels } = req.body;
+    
+    if (!priorityModels || typeof priorityModels !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: '우선순위 모델 데이터가 필요합니다.'
+      });
+    }
+
+    console.log('🔄 [우선순위 모델] 저장 요청:', priorityModels);
+
+    // 구글시트에 우선순위 모델 저장 (회수목록 시트의 특정 셀에 저장)
+    const ranges = [];
+    const values = [];
+    
+    // 우선순위 모델을 JSON 형태로 저장할 셀 (우선순위 시트의 A1 셀)
+    ranges.push('우선순위!A1');
+    values.push([JSON.stringify(priorityModels)]);
+    
+    // 배치 업데이트 실행
+    await rateLimitedSheetsCall(async () => {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+        resource: {
+          valueInputOption: 'RAW',
+          data: ranges.map((range, index) => ({
+            range: range,
+            values: [values[index]]
+          }))
+        }
+      });
+    });
+
+    console.log('✅ [우선순위 모델] 저장 완료');
+    
+    res.json({
+      success: true,
+      message: '우선순위 모델이 성공적으로 저장되었습니다.',
+      data: priorityModels
+    });
+    
+  } catch (error) {
+    console.error('❌ [우선순위 모델] 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '우선순위 모델 저장에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 우선순위 모델 로드 API
+app.get('/api/inventory-recovery/priority-models', async (req, res) => {
+  // CORS 헤더 설정
+  const allowedOrigins = [
+    'https://vipmobile.netlify.app',
+    'https://vipmobile.netlify.app/',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  try {
+    console.log('🔄 [우선순위 모델] 로드 요청');
+
+    // 구글시트에서 우선순위 모델 데이터 로드 (우선순위 시트의 A1 셀)
+    const response = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.INVENTORY_RECOVERY_SPREADSHEET_ID || '1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY',
+        range: '우선순위!A1'
+      });
+    });
+
+    let priorityModels = {
+      '1순위': null,
+      '2순위': null,
+      '3순위': null,
+      '4순위': null,
+      '5순위': null,
+      '6순위': null,
+      '7순위': null,
+      '8순위': null
+    };
+
+    // 데이터가 있으면 파싱
+    if (response.data.values && response.data.values[0] && response.data.values[0][0]) {
+      try {
+        const savedData = JSON.parse(response.data.values[0][0]);
+        priorityModels = { ...priorityModels, ...savedData };
+        console.log('✅ [우선순위 모델] 로드 완료:', priorityModels);
+      } catch (parseError) {
+        console.warn('⚠️ [우선순위 모델] 파싱 오류, 기본값 사용:', parseError.message);
+      }
+    } else {
+      console.log('ℹ️ [우선순위 모델] 저장된 데이터 없음, 기본값 사용');
+    }
+
+    res.json({
+      success: true,
+      data: priorityModels
+    });
+    
+  } catch (error) {
+    console.error('❌ [우선순위 모델] 로드 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: '우선순위 모델 로드에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // 마지막 개통날짜 캐시 초기화 API
 app.get('/api/last-activation-date/clear-cache', async (req, res) => {
   try {
