@@ -134,6 +134,7 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh, prior
 
   // 커스텀 마커 아이콘 생성
   const createCustomIcon = (color, priorityLevels = []) => {
+    // 우선순위 번호들을 모두 표시 (예: "1 2 3")
     const priorityText = priorityLevels.length > 0 
       ? `<div style="
           position: absolute;
@@ -141,17 +142,19 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh, prior
           right: -8px;
           background-color: #1976d2;
           color: white;
-          border-radius: 50%;
-          width: 16px;
+          border-radius: 8px;
+          padding: 2px 6px;
+          min-width: 16px;
           height: 16px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: bold;
           border: 2px solid white;
           box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        ">${priorityLevels.length}</div>`
+          white-space: nowrap;
+        ">${priorityLevels.join(' ')}</div>`
       : '';
 
     return L.divIcon({
@@ -495,11 +498,13 @@ function InventoryRecoveryMap({ data, tabIndex, onStatusUpdate, onRefresh, prior
                     return null;
                   }
                   
-                  // 해당 위치의 우선순위 모델들 찾기
+                  // 해당 위치의 우선순위 모델들 찾기 (숫자만 추출)
                   const priorityLevels = store.items 
                     ? store.items
                         .map(item => getPriorityLevel(item.modelName))
                         .filter(level => level !== null)
+                        .map(level => level.replace('순위', '')) // "1순위" → "1"
+                        .sort((a, b) => parseInt(a) - parseInt(b)) // 숫자 순으로 정렬
                     : [];
 
                   return (
