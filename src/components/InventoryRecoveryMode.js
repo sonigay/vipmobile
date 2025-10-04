@@ -44,7 +44,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     severity: 'success'
   });
 
-  // 우선순위 모델 상태 - 8순위까지 확장
+  // 우선순위 모델 상태 - 10순위까지 확장
   const [priorityModels, setPriorityModels] = useState({
     '1순위': null,
     '2순위': null,
@@ -53,7 +53,9 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
     '5순위': null,
     '6순위': null,
     '7순위': null,
-    '8순위': null
+    '8순위': null,
+    '9순위': null,
+    '10순위': null
   });
   const [showPriorityModal, setShowPriorityModal] = useState(false);
   const [selectedPriorityLevel, setSelectedPriorityLevel] = useState(null);
@@ -305,7 +307,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
             ⭐ 우선순위 모델 선정
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {['1순위', '2순위', '3순위', '4순위', '5순위', '6순위', '7순위', '8순위'].map((priority) => (
+            {['1순위', '2순위', '3순위', '4순위', '5순위', '6순위', '7순위', '8순위', '9순위', '10순위'].map((priority) => (
               <Button
                 key={priority}
                 variant={priorityModels[priority] ? 'contained' : 'outlined'}

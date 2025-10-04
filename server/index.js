@@ -25520,7 +25520,9 @@ app.get('/api/inventory-recovery/priority-models', async (req, res) => {
       '5순위': null,
       '6순위': null,
       '7순위': null,
-      '8순위': null
+      '8순위': null,
+      '9순위': null,
+      '10순위': null
     };
 
     // 데이터가 있으면 파싱
