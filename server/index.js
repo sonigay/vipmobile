@@ -18221,9 +18221,9 @@ app.post('/api/policies', async (req, res) => {
     console.log('새 정책 생성 요청:', req.body);
     
     // 카테고리별 로그 출력
-    const category = req.body.category;
-    const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
-    const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+    const policyCategory = req.body.category;
+    const isShoePolicy = policyCategory === 'wireless_shoe' || policyCategory === 'wired_shoe';
+    const isAddDeductPolicy = policyCategory === 'wireless_add_deduct' || policyCategory === 'wired_add_deduct';
     
     if (isShoePolicy) {
       console.log('📝 [정책생성-구두정책] 요청 데이터 상세:', {
