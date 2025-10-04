@@ -121,8 +121,19 @@ export const getSelectedTargets = (agents, settings) => {
 // 담당자명 정규화 함수 (괄호 제거)
 function normalizeAgentName(agentName) {
   if (!agentName || typeof agentName !== 'string') return agentName;
-  // 괄호와 그 안의 내용 제거 (예: "홍기현(별도)" → "홍기현")
-  return agentName.replace(/\s*\([^)]*\)/g, '').trim();
+  
+  // 1단계: 괄호와 그 안의 내용 제거 (예: "홍기현(별도)" → "홍기현")
+  let normalized = agentName.replace(/\s*\([^)]*\)/g, '').trim();
+  
+  // 2단계: 추가 정규화 (공백, 특수문자 정리)
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  
+  // 3단계: 디버깅을 위한 로그 (이병각 관련)
+  if (normalized.includes('이병각') || agentName.includes('이병각')) {
+    console.log(`🔍 [이병각 정규화] 원본: "${agentName}" → 정규화: "${normalized}"`);
+  }
+  
+  return normalized;
 }
 
 // 거래처수 0인 인원을 배정목록에서 제거하는 함수
@@ -138,9 +149,20 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
       const uniqueStoreIds = new Set();
       
       // 정규화된 이름과 매칭되는 모든 담당자의 매장을 수집
+      let 이병각매칭카운트 = 0;
       storeData.forEach(store => {
         const storeManagerNormalized = normalizeAgentName(store.manager);
         const store담당자Normalized = normalizeAgentName(store.담당자);
+        
+        // 이병각 특별 로그
+        if (agent.target.includes('이병각') || normalizedAgentName.includes('이병각')) {
+          if (store.manager && store.manager.includes('이병각')) {
+            console.log(`🔍 [이병각 매칭] 매장: ${store.name || store[1]}, 담당자: "${store.manager}" → 정규화: "${storeManagerNormalized}"`);
+          }
+          if (store.담당자 && store.담당자.includes('이병각')) {
+            console.log(`🔍 [이병각 매칭] 매장: ${store.name || store[1]}, 담당자: "${store.담당자}" → 정규화: "${store담당자Normalized}"`);
+          }
+        }
         
         if (storeManagerNormalized === normalizedAgentName || 
             store담당자Normalized === normalizedAgentName) {
@@ -148,11 +170,28 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
           const storeName = store.name || store[1]; // B열: 매장명 또는 name 속성
           if (storeName && storeName.trim() !== '') {
             uniqueStoreIds.add(storeName.trim());
+            이병각매칭카운트++;
           }
         }
       });
       
+      // 이병각 매칭 결과 로그
+      if (agent.target.includes('이병각') || normalizedAgentName.includes('이병각')) {
+        console.log(`🔍 [이병각 매칭 결과] 총 매칭된 매장 수: ${이병각매칭카운트}`);
+      }
+      
       storeCount = uniqueStoreIds.size;
+      
+      // 이병각 특별 디버깅
+      if (agent.target.includes('이병각') || normalizedAgentName.includes('이병각')) {
+        console.log(`🔍 [이병각 특별 디버깅] ${agent.target} 정규화된 거래처수 계산:`, {
+          원본담당자: agent.target,
+          정규화된이름: normalizedAgentName,
+          고유매장수: storeCount,
+          매장목록: Array.from(uniqueStoreIds),
+          매칭된매장수: Array.from(uniqueStoreIds).length
+        });
+      }
       
       console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
         원본담당자: agent.target,
