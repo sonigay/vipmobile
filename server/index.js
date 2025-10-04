@@ -18291,6 +18291,7 @@ app.post('/api/policies', async (req, res) => {
     const isShoePolicy = isShoePolicyForLog;
     const isAddDeductPolicy = isAddDeductPolicyForLog;
     console.log('구두정책 여부:', isShoePolicy, '부가차감지원정책 여부:', isAddDeductPolicy, 'category:', category);
+    console.log('🔍 [정책생성] policyTeam 값:', policyTeam);
     
     // 필수 필드 검증 (구두정책이나 부가차감지원정책이 아닌 경우에만 amountType 필수)
     const missingFields = [];
@@ -18501,8 +18502,11 @@ app.post('/api/policies', async (req, res) => {
         if (types.length === 3) return '전유형';
         return types.join(', ');
       })(),
-      req.body.amount95Above || '', // AB열: 95군이상금액
-      req.body.amount95Below || '', // AC열: 95군미만금액
+      // 구두정책용 필드 (부가차감지원정책에서는 제외)
+      ...(category === 'wireless_shoe' || category === 'wired_shoe' ? [
+        req.body.amount95Above || '', // AB열: 95군이상금액
+        req.body.amount95Below || ''  // AC열: 95군미만금액
+      ] : []),
       policyTeam || '미지정',       // AD열: 소속팀
       (() => {                     // AE열: 부가미유치금액
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
@@ -18799,8 +18803,8 @@ app.put('/api/policies/:policyId', async (req, res) => {
       });
     }
     
-    // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책이 아닌 경우에만)
-    if (!isShoePolicy && amountType !== 'in_content' && !policyAmount) {
+    // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
