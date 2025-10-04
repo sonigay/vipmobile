@@ -18133,7 +18133,11 @@ app.get('/api/policies', async (req, res) => {
         activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
         amount95Above: row[27] || '',            // AB열: 95군이상금액
         amount95Below: row[28] || '',            // AC열: 95군미만금액
-        policyTeam: row[29] || '미지정',         // AD열: 소속팀 (기존 데이터는 미지정)
+        policyTeam: (() => {
+          const teamValue = row[29];
+          console.log('🔍 [정책목록] AD열 소속팀 값:', teamValue, '정책ID:', row[0], '전체 row 길이:', row.length);
+          return teamValue || '미지정';
+        })(),         // AD열: 소속팀 (기존 데이터는 미지정)
         // 부가차감지원정책 관련 데이터
         deductSupport: {
           addServiceAmount: row[30] || '',        // AE열: 부가미유치금액
