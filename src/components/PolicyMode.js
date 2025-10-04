@@ -1332,7 +1332,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <TableCell>
                               {policy.isMultiple ? (
                                 <Chip 
-                                  label={policy.multipleStoreName || '복수점'} 
+                                  label={policy.multipleStoreName || '단일점'} 
                                   size="small" 
                                   color="primary" 
                                   variant="outlined"
@@ -1469,6 +1469,11 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <TableCell>
                               {(() => {
                                 // 개통유형 표시 로직
+                                // 부가차감지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 표시
+                                if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct') {
+                                  return '전유형';
+                                }
+                                
                                 if (!policy.activationType) return '-';
                                 
                                 const { new010, mnp, change } = policy.activationType;
