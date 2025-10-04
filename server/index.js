@@ -18219,21 +18219,57 @@ app.get('/api/policies', async (req, res) => {
 app.post('/api/policies', async (req, res) => {
   try {
     console.log('새 정책 생성 요청:', req.body);
-    console.log('📝 [정책생성] 요청 데이터 상세:', {
-      policyName: req.body.policyName,
-      policyStartDate: req.body.policyStartDate,
-      policyEndDate: req.body.policyEndDate,
-      policyStore: req.body.policyStore,
-      policyContent: req.body.policyContent,
-      policyAmount: req.body.policyAmount,
-      amountType: req.body.amountType,
-      category: req.body.category,
-      yearMonth: req.body.yearMonth,
-      activationType: req.body.activationType,
-      amount95Above: req.body.amount95Above,
-      amount95Below: req.body.amount95Below,
-      multipleStoreName: req.body.multipleStoreName
-    });
+    
+    // 카테고리별 로그 출력
+    const category = req.body.category;
+    const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
+    const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+    
+    if (isShoePolicy) {
+      console.log('📝 [정책생성-구두정책] 요청 데이터 상세:', {
+        policyName: req.body.policyName,
+        policyStartDate: req.body.policyStartDate,
+        policyEndDate: req.body.policyEndDate,
+        policyStore: req.body.policyStore,
+        policyContent: req.body.policyContent,
+        policyAmount: req.body.policyAmount,
+        amountType: req.body.amountType,
+        category: req.body.category,
+        yearMonth: req.body.yearMonth,
+        activationType: req.body.activationType,
+        amount95Above: req.body.amount95Above,
+        amount95Below: req.body.amount95Below,
+        multipleStoreName: req.body.multipleStoreName
+      });
+    } else if (isAddDeductPolicy) {
+      console.log('📝 [정책생성-부가차감지원정책] 요청 데이터 상세:', {
+        policyName: req.body.policyName,
+        policyStartDate: req.body.policyStartDate,
+        policyEndDate: req.body.policyEndDate,
+        policyStore: req.body.policyStore,
+        policyContent: req.body.policyContent,
+        category: req.body.category,
+        yearMonth: req.body.yearMonth,
+        activationType: req.body.activationType,
+        deductSupport: req.body.deductSupport,
+        conditionalOptions: req.body.conditionalOptions,
+        multipleStoreName: req.body.multipleStoreName
+      });
+    } else {
+      console.log('📝 [정책생성-일반정책] 요청 데이터 상세:', {
+        policyName: req.body.policyName,
+        policyStartDate: req.body.policyStartDate,
+        policyEndDate: req.body.policyEndDate,
+        policyStore: req.body.policyStore,
+        policyContent: req.body.policyContent,
+        policyAmount: req.body.policyAmount,
+        amountType: req.body.amountType,
+        category: req.body.category,
+        yearMonth: req.body.yearMonth,
+        activationType: req.body.activationType,
+        multipleStoreName: req.body.multipleStoreName
+      });
+    }
     
     const {
       policyName,
