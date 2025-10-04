@@ -359,7 +359,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
                 tabIndex={currentTab}
                 onStatusUpdate={handleStatusUpdate}
                 onRefresh={loadRecoveryData}
-                // priorityModels={priorityModels}
+                priorityModels={priorityModels}
               />
             ) : (
               <InventoryRecoveryMap
@@ -367,7 +367,7 @@ function InventoryRecoveryMode({ onLogout, loggedInStore, onModeChange, availabl
                 tabIndex={currentTab}
                 onStatusUpdate={handleStatusUpdate}
                 onRefresh={loadRecoveryData}
-                // priorityModels={priorityModels}
+                priorityModels={priorityModels}
               />
             )}
           </CardContent>
