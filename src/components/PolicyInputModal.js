@@ -268,6 +268,12 @@ function PolicyInputModal({
       newErrors.multipleStoreName = '복수점명을 입력해주세요.';
     }
     
+    // 단일점 선택일 때는 복수점명 검증하지 않음
+    if (formData.storeType === 'single') {
+      // 복수점명 관련 오류 제거
+      delete newErrors.multipleStoreName;
+    }
+    
     // 부가차감지원정책 차감지원설정 검사 (직접입력이 아닐 때만)
     if ((categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && !formData.isDirectInput) {
       const hasAnyAmount = (formData.deductSupport?.addServiceAmount || '').trim() || 
