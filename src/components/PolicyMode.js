@@ -1332,7 +1332,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             <TableCell>
                               {policy.isMultiple ? (
                                 <Chip 
-                                  label={policy.multipleStoreName || '단일점'} 
+                                  label={policy.multipleStoreName && policy.multipleStoreName.trim() ? policy.multipleStoreName : '단일점'} 
                                   size="small" 
                                   color="primary" 
                                   variant="outlined"
