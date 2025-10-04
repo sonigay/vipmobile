@@ -238,14 +238,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         return policy.inputUserId === currentUserId;
       });
       
-      // 팀 이름 매핑 추가
-      const policiesWithTeamNames = filteredPolicies.map(policy => {
-        const teamInfo = teams.find(team => team.code === policy.team);
-        return {
-          ...policy,
-          teamName: teamInfo ? teamInfo.name : (policy.team || '미지정')
-        };
-      });
+      // 서버에서 이미 teamName을 제공하므로 추가 변환 불필요
+      const policiesWithTeamNames = filteredPolicies;
       
       // 전체 정책 목록 저장 (필터링된 정책들)
       setPolicies(policiesWithTeamNames);
