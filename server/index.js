@@ -18264,6 +18264,7 @@ app.post('/api/policies', async (req, res) => {
     if (!policyStore) missingFields.push('policyStore');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
+    // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
     if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
     
     // 구두정책 전용 검증
@@ -18697,6 +18698,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
     if (!policyStore) missingFields.push('policyStore');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
+    // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
     if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
     
     // 구두정책 전용 검증
