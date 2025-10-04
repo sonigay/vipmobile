@@ -192,17 +192,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const loadTeams = async () => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/teams`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setTeams(data.teams || []);
-        }
-      }
-    } catch (error) {
-      console.error('팀 데이터 로드 실패:', error);
-    }
+    // 팀 데이터는 하드코딩으로 정의됨
   };
 
   const loadCategories = async () => {

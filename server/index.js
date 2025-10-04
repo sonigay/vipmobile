@@ -18145,6 +18145,26 @@ app.get('/api/policies', async (req, res) => {
           // 새 정책들 (36개 컬럼)은 AD열에서 소속팀 정보 읽기
           return teamValue || '미지정';
         })(),         // AD열: 소속팀 (기존 데이터는 미지정)
+        teamName: (() => {
+          const teamValue = row[29];
+          
+          // 기존 정책들 (24개 컬럼)은 소속팀 정보가 없으므로 '미지정'
+          if (row.length < 30) {
+            return '미지정';
+          }
+          
+          // 팀 코드를 팀 이름으로 변환
+          const teamMapping = {
+            'AA': '홍기현',
+            'BB': '김철수', 
+            'CC': '이영희',
+            'DD': '박민수',
+            'EE': '정수진',
+            'FF': '최동현'
+          };
+          
+          return teamMapping[teamValue] || teamValue || '미지정';
+        })(),         // 팀 이름 (코드 변환)
         // 부가차감지원정책 관련 데이터
         deductSupport: {
           addServiceAmount: row[30] || '',        // AE열: 부가미유치금액
