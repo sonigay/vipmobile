@@ -18144,7 +18144,7 @@ app.get('/api/policies', async (req, res) => {
           addServiceAcquired: row[33] === 'Y',    // AH열: 부가유치시조건
           insuranceAcquired: row[34] === 'Y',     // AI열: 보험유치시조건
           connectionAcquired: row[35] === 'Y'     // AJ열: 연결음유치시조건
-        }
+        },
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
