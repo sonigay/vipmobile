@@ -18277,13 +18277,25 @@ app.post('/api/policies', async (req, res) => {
     if (isAddDeductPolicy) {
       const deductSupport = req.body.deductSupport || {};
       
+      console.log('🔍 [부가차감지원정책] 검증 데이터:', {
+        deductSupport,
+        addServiceAmount: deductSupport.addServiceAmount,
+        insuranceAmount: deductSupport.insuranceAmount,
+        connectionAmount: deductSupport.connectionAmount
+      });
+      
       // 차감지원 금액 중 최소 하나는 입력되어야 함 (지원할 항목이 있어야 함)
       const hasAnyAmount = (deductSupport.addServiceAmount && deductSupport.addServiceAmount.trim()) ||
                           (deductSupport.insuranceAmount && deductSupport.insuranceAmount.trim()) ||
                           (deductSupport.connectionAmount && deductSupport.connectionAmount.trim());
       
+      console.log('🔍 [부가차감지원정책] hasAnyAmount:', hasAnyAmount);
+      
       if (!hasAnyAmount) {
+        console.log('❌ [부가차감지원정책] 차감지원 금액 누락');
         missingFields.push('차감지원 금액');
+      } else {
+        console.log('✅ [부가차감지원정책] 차감지원 금액 검증 통과');
       }
       
       // 조건부 옵션은 선택사항이므로 검증하지 않음
