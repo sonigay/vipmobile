@@ -1339,7 +1339,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                   sx={{ fontSize: '0.7rem' }}
                                 />
                               ) : (
-                                '-'
+                                '단일점'
                               )}
                             </TableCell>
                             <TableCell>{policy.policyStore}</TableCell>
