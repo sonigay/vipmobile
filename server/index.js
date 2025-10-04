@@ -18508,28 +18508,38 @@ app.post('/api/policies', async (req, res) => {
     let response;
     
     // 시트가 비어있으면 헤더와 함께 데이터 추가
-    if (!existingData || existingData.length === 0) {
-      console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
-      response = await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:AJ',
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        resource: {
-          values: [headerRow, newPolicyRow]
-        }
-      });
-    } else {
-      // 기존 데이터가 있으면 정책만 추가
-      console.log('📝 [정책생성] 기존 데이터에 정책 추가');
-      response = await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:AJ',
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        resource: {
-          values: [newPolicyRow]
-        }
+    try {
+      if (!existingData || existingData.length === 0) {
+        console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
+        response = await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '정책_기본정보 !A:AJ',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [headerRow, newPolicyRow]
+          }
+        });
+      } else {
+        // 기존 데이터가 있으면 정책만 추가
+        console.log('📝 [정책생성] 기존 데이터에 정책 추가');
+        response = await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: '정책_기본정보 !A:AJ',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [newPolicyRow]
+          }
+        });
+      }
+      console.log('✅ [정책생성] Google Sheets 저장 성공:', response.data);
+    } catch (sheetsError) {
+      console.error('❌ [정책생성] Google Sheets 저장 실패:', sheetsError);
+      return res.status(400).json({
+        success: false,
+        error: 'Google Sheets 저장에 실패했습니다.',
+        details: sheetsError.message
       });
     }
     
