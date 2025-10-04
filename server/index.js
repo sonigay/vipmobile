@@ -18222,10 +18222,10 @@ app.post('/api/policies', async (req, res) => {
     
     // 카테고리별 로그 출력
     const policyCategory = req.body.category;
-    const isShoePolicy = policyCategory === 'wireless_shoe' || policyCategory === 'wired_shoe';
-    const isAddDeductPolicy = policyCategory === 'wireless_add_deduct' || policyCategory === 'wired_add_deduct';
+    const isShoePolicyForLog = policyCategory === 'wireless_shoe' || policyCategory === 'wired_shoe';
+    const isAddDeductPolicyForLog = policyCategory === 'wireless_add_deduct' || policyCategory === 'wired_add_deduct';
     
-    if (isShoePolicy) {
+    if (isShoePolicyForLog) {
       console.log('📝 [정책생성-구두정책] 요청 데이터 상세:', {
         policyName: req.body.policyName,
         policyStartDate: req.body.policyStartDate,
@@ -18241,7 +18241,7 @@ app.post('/api/policies', async (req, res) => {
         amount95Below: req.body.amount95Below,
         multipleStoreName: req.body.multipleStoreName
       });
-    } else if (isAddDeductPolicy) {
+    } else if (isAddDeductPolicyForLog) {
       console.log('📝 [정책생성-부가차감지원정책] 요청 데이터 상세:', {
         policyName: req.body.policyName,
         policyStartDate: req.body.policyStartDate,
