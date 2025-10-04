@@ -347,8 +347,8 @@ function PolicyInputModal({
           policyEndDate: formData.policyEndDate,
           policyStore: formData.policyStore,
           policyContent: formData.policyContent.trim(),
-          policyAmount: formData.amountType === 'in_content' ? '' : Number(formData.policyAmount),
-          amountType: formData.amountType,
+          policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
+          amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : formData.amountType,
           policyType: isWireless ? '무선' : '유선',
           category: categoryId,
           yearMonth: yearMonth,
@@ -375,8 +375,8 @@ function PolicyInputModal({
             policyEndDate: formData.policyEndDate,
             policyStore: formData.policyStore,
             policyContent: formData.policyContent.trim(),
-            policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
-            amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') ? '' : formData.amountType,
+            policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
+            amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : formData.amountType,
             policyType: isWireless ? '무선' : '유선',
             category: categoryId,
             yearMonth: yearMonth,
@@ -394,7 +394,8 @@ function PolicyInputModal({
             amount95Below: formData.amount95Below, // 95군미만금액
             // 부가차감지원정책 데이터 추가
             deductSupport: formData.deductSupport,
-            conditionalOptions: formData.conditionalOptions
+            conditionalOptions: formData.conditionalOptions,
+            multipleStoreName: formData.multipleStoreName || ''
           };
 
           await onSave(policyData);
@@ -407,8 +408,8 @@ function PolicyInputModal({
             policyEndDate: formData.policyEndDate,
             policyStore: store.id,
             policyContent: formData.policyContent.trim(),
-            policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
-            amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') ? '' : formData.amountType,
+            policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
+            amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : formData.amountType,
             policyType: isWireless ? '무선' : '유선',
             category: categoryId,
             yearMonth: yearMonth,
@@ -425,7 +426,10 @@ function PolicyInputModal({
             multipleStoreName: formData.multipleStoreName, // 사용자가 입력한 복수점명
             activationType: formData.activationType, // 개통유형
             amount95Above: formData.amount95Above, // 95군이상금액
-            amount95Below: formData.amount95Below // 95군미만금액
+            amount95Below: formData.amount95Below, // 95군미만금액
+            // 부가차감지원정책 데이터 추가
+            deductSupport: formData.deductSupport,
+            conditionalOptions: formData.conditionalOptions
           }));
 
           // 각 정책을 순차적으로 저장
