@@ -178,39 +178,50 @@ function PolicyInputModal({
       if (formData.conditionalOptions?.insuranceAcquired) conditions.push('보험유치시');
       if (formData.conditionalOptions?.connectionAcquired) conditions.push('연결음유치시');
       
-      // 조건부에 맞는 차감지원 금액만 수집
+      // 조건부에 맞는 차감지원 금액 수집
       const deductItems = [];
       const deductAmounts = [];
       
-      // 부가유치시 조건이 체크되지 않았을 때만 부가미유치 금액 표시
-      if (!formData.conditionalOptions?.addServiceAcquired && formData.deductSupport?.addServiceAmount?.trim()) {
+      // 조건부가 있는 경우: 체크되지 않은 항목만 표시
+      // 조건부가 없는 경우: 모든 항목 표시
+      const hasAnyCondition = conditions.length > 0;
+      
+      // 부가미유치 금액 (조건부가 없거나 부가유치시 조건이 체크되지 않았을 때)
+      if ((!hasAnyCondition || !formData.conditionalOptions?.addServiceAcquired) && formData.deductSupport?.addServiceAmount?.trim()) {
         deductItems.push('📱 부가미유치');
         deductAmounts.push(Number(formData.deductSupport.addServiceAmount));
       }
       
-      // 보험유치시 조건이 체크되지 않았을 때만 보험미유치 금액 표시
-      if (!formData.conditionalOptions?.insuranceAcquired && formData.deductSupport?.insuranceAmount?.trim()) {
+      // 보험미유치 금액 (조건부가 없거나 보험유치시 조건이 체크되지 않았을 때)
+      if ((!hasAnyCondition || !formData.conditionalOptions?.insuranceAcquired) && formData.deductSupport?.insuranceAmount?.trim()) {
         deductItems.push('🛡️ 보험미유치');
         deductAmounts.push(Number(formData.deductSupport.insuranceAmount));
       }
       
-      // 연결음유치시 조건이 체크되지 않았을 때만 연결음미유치 금액 표시
-      if (!formData.conditionalOptions?.connectionAcquired && formData.deductSupport?.connectionAmount?.trim()) {
+      // 연결음미유치 금액 (조건부가 없거나 연결음유치시 조건이 체크되지 않았을 때)
+      if ((!hasAnyCondition || !formData.conditionalOptions?.connectionAcquired) && formData.deductSupport?.connectionAmount?.trim()) {
         deductItems.push('🔊 연결음미유치');
         deductAmounts.push(Number(formData.deductSupport.connectionAmount));
       }
       
-      if (conditions.length > 0 && deductItems.length > 0) {
+      if (deductItems.length > 0) {
         // 모든 금액이 동일한 경우 하나의 금액으로 표시
         const uniqueAmounts = [...new Set(deductAmounts)];
         const amountText = uniqueAmounts.length === 1 
           ? `${uniqueAmounts[0].toLocaleString()}원`
           : deductAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
         
-        const content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
+        let content;
+        if (conditions.length > 0) {
+          // 조건부가 있는 경우
+          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
+        } else {
+          // 조건부가 없는 경우 - 모든 차감지원 금액 표시
+          content = `💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
+        }
         setFormData(prev => ({ ...prev, policyContent: content }));
-      } else if (conditions.length === 0) {
-        // 조건부가 모두 해제된 경우 내용 초기화
+      } else {
+        // 차감지원 금액이 없는 경우 내용 초기화
         setFormData(prev => ({ ...prev, policyContent: '' }));
       }
     }

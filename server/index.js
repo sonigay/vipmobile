@@ -18253,24 +18253,25 @@ app.post('/api/policies', async (req, res) => {
     
     // 구두정책 여부 확인
     const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
-    console.log('구두정책 여부:', isShoePolicy, 'category:', category);
+    const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+    console.log('구두정책 여부:', isShoePolicy, '부가차감지원정책 여부:', isAddDeductPolicy, 'category:', category);
     
-    // 필수 필드 검증 (구두정책이 아닌 경우에만 amountType 필수)
+    // 필수 필드 검증 (구두정책이나 부가차감지원정책이 아닌 경우에만 amountType 필수)
     const missingFields = [];
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
     if (!policyStore) missingFields.push('policyStore');
     
-    // 구두정책이 아닌 경우에만 policyContent 필수
-    if (!isShoePolicy && !policyContent) missingFields.push('policyContent');
+    // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
+    if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
     
     // 구두정책인 경우 95군이상/미만 금액 중 하나라도 있어야 함
     if (isShoePolicy && !req.body.amount95Above && !req.body.amount95Below && !policyContent) {
       missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
     }
     
-    if (!isShoePolicy && !amountType) missingFields.push('amountType');
+    if (!isShoePolicy && !isAddDeductPolicy && !amountType) missingFields.push('amountType');
     
     if (missingFields.length > 0) {
       console.log('누락된 필드:', missingFields);
@@ -18601,24 +18602,25 @@ app.put('/api/policies/:policyId', async (req, res) => {
     
     // 구두정책 여부 확인
     const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
-    console.log('정책 수정 - 구두정책 여부:', isShoePolicy, 'category:', category);
+    const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+    console.log('정책 수정 - 구두정책 여부:', isShoePolicy, '부가차감지원정책 여부:', isAddDeductPolicy, 'category:', category);
     
-    // 필수 필드 검증 (구두정책이 아닌 경우에만 amountType 필수)
+    // 필수 필드 검증 (구두정책이나 부가차감지원정책이 아닌 경우에만 amountType 필수)
     const missingFields = [];
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
     if (!policyStore) missingFields.push('policyStore');
     
-    // 구두정책이 아닌 경우에만 policyContent 필수
-    if (!isShoePolicy && !policyContent) missingFields.push('policyContent');
+    // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
+    if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
     
     // 구두정책인 경우 95군이상/미만 금액 중 하나라도 있어야 함
     if (isShoePolicy && !req.body.amount95Above && !req.body.amount95Below && !policyContent) {
       missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
     }
     
-    if (!isShoePolicy && !amountType) missingFields.push('amountType');
+    if (!isShoePolicy && !isAddDeductPolicy && !amountType) missingFields.push('amountType');
     
     if (missingFields.length > 0) {
       console.log('정책 수정 - 누락된 필드:', missingFields);
