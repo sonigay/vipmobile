@@ -18136,6 +18136,13 @@ app.get('/api/policies', async (req, res) => {
         policyTeam: (() => {
           const teamValue = row[29];
           console.log('🔍 [정책목록] AD열 소속팀 값:', teamValue, '정책ID:', row[0], '전체 row 길이:', row.length);
+          
+          // 기존 정책들 (24개 컬럼)은 소속팀 정보가 없으므로 '미지정'
+          if (row.length < 30) {
+            return '미지정';
+          }
+          
+          // 새 정책들 (36개 컬럼)은 AD열에서 소속팀 정보 읽기
           return teamValue || '미지정';
         })(),         // AD열: 소속팀 (기존 데이터는 미지정)
         // 부가차감지원정책 관련 데이터
