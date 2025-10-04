@@ -18301,8 +18301,11 @@ app.post('/api/policies', async (req, res) => {
       // 조건부 옵션은 선택사항이므로 검증하지 않음
     }
     
+    console.log('🔍 [전체 검증] missingFields:', missingFields);
+    console.log('🔍 [전체 검증] missingFields.length:', missingFields.length);
+    
     if (missingFields.length > 0) {
-      console.log('누락된 필드:', missingFields);
+      console.log('❌ [전체 검증] 누락된 필드:', missingFields);
       
       // 필드명을 한국어로 변환
       const fieldNames = {
