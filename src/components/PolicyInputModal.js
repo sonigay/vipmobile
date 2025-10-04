@@ -78,12 +78,16 @@ function PolicyInputModal({
     amount95Below: '',     // 95군 미만 금액
     isDirectInput: false,   // 직접입력 여부
     // 부가차감지원정책 전용 필드
-    deductOptions: {
-      addService: false,    // 부가 미유치
-      insurance: false,     // 보험 미유치
-      connection: false    // 연결음미유치
+    deductSupport: {
+      addServiceAmount: '',    // 부가 미유치 금액
+      insuranceAmount: '',     // 보험 미유치 금액
+      connectionAmount: ''    // 연결음미유치 금액
     },
-    directAmount: ''       // 직접입력 금액
+    conditionalOptions: {
+      addServiceAcquired: false,    // 부가유치시
+      insuranceAcquired: false,    // 보험유치시
+      connectionAcquired: false    // 연결음유치시
+    }
   });
   
   const [errors, setErrors] = useState({});
@@ -146,6 +150,26 @@ function PolicyInputModal({
     }
   }, [open, loggedInUser, policy]);
 
+  // 부가차감지원정책 내용 자동생성
+  useEffect(() => {
+    if ((categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && !formData.isDirectInput) {
+      const conditions = [];
+      if (formData.conditionalOptions?.addServiceAcquired) conditions.push('부가유치시');
+      if (formData.conditionalOptions?.insuranceAcquired) conditions.push('보험유치시');
+      if (formData.conditionalOptions?.connectionAcquired) conditions.push('연결음유치시');
+      
+      const deductItems = [];
+      if (formData.deductSupport?.addServiceAmount?.trim()) deductItems.push(`부가미유치 ${formData.deductSupport.addServiceAmount}원`);
+      if (formData.deductSupport?.insuranceAmount?.trim()) deductItems.push(`보험미유치 ${formData.deductSupport.insuranceAmount}원`);
+      if (formData.deductSupport?.connectionAmount?.trim()) deductItems.push(`연결음미유치 ${formData.deductSupport.connectionAmount}원`);
+      
+      if (conditions.length > 0 && deductItems.length > 0) {
+        const content = `조건부-${conditions.join(', ')}\n${deductItems.join('/')} 차감금액지원`;
+        setFormData(prev => ({ ...prev, policyContent: content }));
+      }
+    }
+  }, [formData.deductSupport, formData.conditionalOptions, formData.isDirectInput, categoryId]);
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -178,17 +202,21 @@ function PolicyInputModal({
       newErrors.multipleStoreName = '복수점명을 입력해주세요.';
     }
     
-    // 부가차감지원정책 차감 옵션 검사
-    if (categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') {
-      const hasSelectedOption = (formData.deductOptions?.addService || false) || 
-                               (formData.deductOptions?.insurance || false) || 
-                               (formData.deductOptions?.connection || false) || 
-                               formData.isDirectInput;
-      if (!hasSelectedOption) {
-        newErrors.deductOptions = '차감 옵션을 최소 하나 선택해주세요.';
+    // 부가차감지원정책 차감지원설정 검사 (직접입력이 아닐 때만)
+    if ((categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && !formData.isDirectInput) {
+      const hasAnyAmount = (formData.deductSupport?.addServiceAmount || '').trim() || 
+                          (formData.deductSupport?.insuranceAmount || '').trim() || 
+                          (formData.deductSupport?.connectionAmount || '').trim();
+      if (!hasAnyAmount) {
+        newErrors.deductSupport = '차감지원 금액을 최소 하나 입력해주세요.';
       }
-      if (formData.isDirectInput && !formData.directAmount.trim()) {
-        newErrors.directAmount = '직접입력 금액을 입력해주세요.';
+      
+      // 조건부 옵션 검사
+      const hasAnyCondition = (formData.conditionalOptions?.addServiceAcquired || false) || 
+                             (formData.conditionalOptions?.insuranceAcquired || false) || 
+                             (formData.conditionalOptions?.connectionAcquired || false);
+      if (!hasAnyCondition) {
+        newErrors.conditionalOptions = '조건부 옵션을 최소 하나 선택해주세요.';
       }
     }
 
@@ -771,49 +799,107 @@ function PolicyInputModal({
             </Grid>
           ) : null}
 
-          {/* 부가차감지원정책 전용: 차감 옵션 선택 */}
+          {/* 부가차감지원정책 전용: 차감지원설정 */}
           {categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' ? (
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                차감 옵션 선택 *
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={formData.deductOptions?.addService || false}
-                      onChange={(e) => handleInputChange('deductOptions', {
-                        ...(formData.deductOptions || {}),
-                        addService: e.target.checked
-                      })}
-                    />
-                  }
-                  label="부가 미유치"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={formData.deductOptions?.insurance || false}
-                      onChange={(e) => handleInputChange('deductOptions', {
-                        ...(formData.deductOptions || {}),
-                        insurance: e.target.checked
-                      })}
-                    />
-                  }
-                  label="보험 미유치"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={formData.deductOptions?.connection || false}
-                      onChange={(e) => handleInputChange('deductOptions', {
-                        ...(formData.deductOptions || {}),
-                        connection: e.target.checked
-                      })}
-                    />
-                  }
-                  label="연결음미유치"
-                />
+            <>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  차감지원설정 *
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                  <TextField
+                    label="부가미유치 금액"
+                    value={formData.deductSupport?.addServiceAmount || ''}
+                    onChange={(e) => handleInputChange('deductSupport', {
+                      ...(formData.deductSupport || {}),
+                      addServiceAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 150 }}
+                    placeholder="금액 입력"
+                  />
+                  <TextField
+                    label="보험미유치 금액"
+                    value={formData.deductSupport?.insuranceAmount || ''}
+                    onChange={(e) => handleInputChange('deductSupport', {
+                      ...(formData.deductSupport || {}),
+                      insuranceAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 150 }}
+                    placeholder="금액 입력"
+                  />
+                  <TextField
+                    label="연결음미유치 금액"
+                    value={formData.deductSupport?.connectionAmount || ''}
+                    onChange={(e) => handleInputChange('deductSupport', {
+                      ...(formData.deductSupport || {}),
+                      connectionAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 150 }}
+                    placeholder="금액 입력"
+                  />
+                </Box>
+                {errors.deductSupport && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {errors.deductSupport}
+                  </Typography>
+                )}
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  조건부 *
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.conditionalOptions?.addServiceAcquired || false}
+                        onChange={(e) => handleInputChange('conditionalOptions', {
+                          ...(formData.conditionalOptions || {}),
+                          addServiceAcquired: e.target.checked
+                        })}
+                      />
+                    }
+                    label="부가유치시"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.conditionalOptions?.insuranceAcquired || false}
+                        onChange={(e) => handleInputChange('conditionalOptions', {
+                          ...(formData.conditionalOptions || {}),
+                          insuranceAcquired: e.target.checked
+                        })}
+                      />
+                    }
+                    label="보험유치시"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.conditionalOptions?.connectionAcquired || false}
+                        onChange={(e) => handleInputChange('conditionalOptions', {
+                          ...(formData.conditionalOptions || {}),
+                          connectionAcquired: e.target.checked
+                        })}
+                      />
+                    }
+                    label="연결음유치시"
+                  />
+                </Box>
+                {errors.conditionalOptions && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {errors.conditionalOptions}
+                  </Typography>
+                )}
+                
+                {/* 직접입력 체크박스 */}
                 <FormControlLabel
                   control={
                     <Checkbox
@@ -823,30 +909,8 @@ function PolicyInputModal({
                   }
                   label="직접입력"
                 />
-              </Box>
-              {errors.deductOptions && (
-                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                  {errors.deductOptions}
-                </Typography>
-              )}
-            </Grid>
-          ) : null}
-
-          {/* 부가차감지원정책 전용: 직접입력 금액 */}
-          {(categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && formData.isDirectInput ? (
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="직접입력 금액"
-                value={formData.directAmount}
-                onChange={(e) => handleInputChange('directAmount', e.target.value)}
-                placeholder="차감 금액을 직접 입력하세요"
-                type="number"
-                inputProps={{ min: 0 }}
-                error={!!errors.directAmount}
-                helperText={errors.directAmount}
-              />
-            </Grid>
+              </Grid>
+            </>
           ) : null}
 
           <Grid item xs={12}>
@@ -859,25 +923,30 @@ function PolicyInputModal({
               helperText={
                 (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
                   ? (formData.isDirectInput ? '직접입력 모드: 정책 내용을 입력해주세요.' : '95군 이상/미만 금액을 입력하면 자동으로 내용이 생성됩니다.')
+                  : (categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct')
+                  ? (formData.isDirectInput ? '직접입력 모드: 정책 내용을 입력해주세요.' : '차감지원설정과 조건부를 입력하면 자동으로 내용이 생성됩니다.')
                   : errors.policyContent
               }
               multiline
               rows={4}
               required={
-                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
+                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
+                 categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') 
                   ? formData.isDirectInput 
                   : true
               }
               disabled={
-                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') 
+                (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
+                 categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') 
                   ? !formData.isDirectInput 
                   : false
               }
             />
           </Grid>
           
-          {/* 구두정책이 아닌 경우에만 금액 입력 필드 표시 */}
-          {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') && (
+          {/* 구두정책과 부가차감지원정책이 아닌 경우에만 금액 입력 필드 표시 */}
+          {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
+             categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && (
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -894,8 +963,9 @@ function PolicyInputModal({
             </Grid>
           )}
           
-          {/* 구두정책이 아닌 경우에만 금액 유형 선택 표시 */}
-          {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') && (
+          {/* 구두정책과 부가차감지원정책이 아닌 경우에만 금액 유형 선택 표시 */}
+          {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
+             categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && (
             <Grid item xs={12} sm={6}>
               <FormControl component="fieldset" error={!!errors.amountType}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>

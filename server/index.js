@@ -756,7 +756,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '정책_기본정보 ') {
-      range = `${safeSheetName}!A:AC`;
+      range = `${safeSheetName}!A:AJ`;
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -18134,6 +18134,17 @@ app.get('/api/policies', async (req, res) => {
         amount95Above: row[27] || '',            // AB열: 95군이상금액
         amount95Below: row[28] || '',            // AC열: 95군미만금액
         policyTeam: row[29] || '미지정',         // AD열: 소속팀 (기존 데이터는 미지정)
+        // 부가차감지원정책 관련 데이터
+        deductSupport: {
+          addServiceAmount: row[30] || '',        // AE열: 부가미유치금액
+          insuranceAmount: row[31] || '',         // AF열: 보험미유치금액
+          connectionAmount: row[32] || ''         // AG열: 연결음미유치금액
+        },
+        conditionalOptions: {
+          addServiceAcquired: row[33] === 'Y',    // AH열: 부가유치시조건
+          insuranceAcquired: row[34] === 'Y',     // AI열: 보험유치시조건
+          connectionAcquired: row[35] === 'Y'     // AJ열: 연결음유치시조건
+        }
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18343,7 +18354,13 @@ app.post('/api/policies', async (req, res) => {
       '개통유형',         // AA열
       '95군이상금액',     // AB열
       '95군미만금액',     // AC열
-      '소속팀'            // AD열
+      '소속팀',           // AD열
+      '부가미유치금액',   // AE열
+      '보험미유치금액',   // AF열
+      '연결음미유치금액', // AG열
+      '부가유치시조건',   // AH열
+      '보험유치시조건',   // AI열
+      '연결음유치시조건'  // AJ열
     ];
     
     // 매장 데이터에서 업체명 조회
@@ -18404,7 +18421,43 @@ app.post('/api/policies', async (req, res) => {
       })(),
       req.body.amount95Above || '', // AB열: 95군이상금액
       req.body.amount95Below || '', // AC열: 95군미만금액
-      policyTeam || '미지정'        // AD열: 소속팀
+      policyTeam || '미지정',       // AD열: 소속팀
+      (() => {                     // AE열: 부가미유치금액
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return req.body.deductSupport?.addServiceAmount || '';
+        }
+        return '';
+      })(),
+      (() => {                     // AF열: 보험미유치금액
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return req.body.deductSupport?.insuranceAmount || '';
+        }
+        return '';
+      })(),
+      (() => {                     // AG열: 연결음미유치금액
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return req.body.deductSupport?.connectionAmount || '';
+        }
+        return '';
+      })(),
+      (() => {                     // AH열: 부가유치시조건
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N';
+        }
+        return '';
+      })(),
+      (() => {                     // AI열: 보험유치시조건
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N';
+        }
+        return '';
+      })(),
+      (() => {                     // AJ열: 연결음유치시조건
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N';
+        }
+        return '';
+      })()
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -18426,7 +18479,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:AC',
+        range: '정책_기본정보 !A:AJ',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18438,7 +18491,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: '정책_기본정보 !A:AC',
+        range: '정책_기본정보 !A:AJ',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {

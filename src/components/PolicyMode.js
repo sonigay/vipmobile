@@ -1380,6 +1380,37 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                     }
                                   }
                                   
+                                  // 부가차감지원정책인 경우 차감지원 정보 표시
+                                  if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct') {
+                                    const deductItems = [];
+                                    if (policy.deductSupport?.addServiceAmount) deductItems.push(`부가미유치: ${Number(policy.deductSupport.addServiceAmount).toLocaleString()}원`);
+                                    if (policy.deductSupport?.insuranceAmount) deductItems.push(`보험미유치: ${Number(policy.deductSupport.insuranceAmount).toLocaleString()}원`);
+                                    if (policy.deductSupport?.connectionAmount) deductItems.push(`연결음미유치: ${Number(policy.deductSupport.connectionAmount).toLocaleString()}원`);
+                                    
+                                    const conditions = [];
+                                    if (policy.conditionalOptions?.addServiceAcquired) conditions.push('부가유치시');
+                                    if (policy.conditionalOptions?.insuranceAcquired) conditions.push('보험유치시');
+                                    if (policy.conditionalOptions?.connectionAcquired) conditions.push('연결음유치시');
+                                    
+                                    if (deductItems.length > 0 && conditions.length > 0) {
+                                      return (
+                                        <Box>
+                                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                            조건부-{conditions.join(', ')}
+                                          </Typography>
+                                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                            {deductItems.join(' / ')} 차감금액지원
+                                          </Typography>
+                                          {policy.policyContent && policy.policyContent !== `조건부-${conditions.join(', ')}\n${deductItems.join('/')} 차감금액지원` && (
+                                            <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}>
+                                              추가내용: {policy.policyContent}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      );
+                                    }
+                                  }
+                                  
                                   // 일반 정책이거나 직접입력이 있는 경우
                                   return (
                                     <>
