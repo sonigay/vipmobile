@@ -144,13 +144,22 @@ export const filterAgentsByStoreCount = async (agents, storeData) => {
         
         if (storeManagerNormalized === normalizedAgentName || 
             store담당자Normalized === normalizedAgentName) {
-          uniqueStoreIds.add(store.id || store.name);
+          // 매장명만 사용 (배정 로직에서는 매장명이 중요)
+          const storeName = store.name || store[1]; // B열: 매장명 또는 name 속성
+          if (storeName && storeName.trim() !== '') {
+            uniqueStoreIds.add(storeName.trim());
+          }
         }
       });
       
       storeCount = uniqueStoreIds.size;
       
-      // 김수빈의 경우 더 상세한 로그
+      console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
+        원본담당자: agent.target,
+        정규화된이름: normalizedAgentName,
+        고유매장수: storeCount,
+        매장목록: Array.from(uniqueStoreIds)
+      });
 
     }
     
@@ -716,16 +725,20 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         
         if (storeManagerNormalized === normalizedAgentName || 
             store담당자Normalized === normalizedAgentName) {
-          uniqueStoreIds.add(store.id || store.name);
+          // 매장명만 사용 (배정 로직에서는 매장명이 중요)
+          const storeName = store.name || store[1]; // B열: 매장명 또는 name 속성
+          if (storeName && storeName.trim() !== '') {
+            uniqueStoreIds.add(storeName.trim());
+          }
         }
       });
       
-      // console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
-      //   원본담당자: agent.target,
-      //   정규화된이름: normalizedAgentName,
-      //   고유매장수: storeCount,
-      //   매장목록: Array.from(uniqueStoreIds)
-      // });
+      console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
+        원본담당자: agent.target,
+        정규화된이름: normalizedAgentName,
+        고유매장수: storeCount,
+        매장목록: Array.from(uniqueStoreIds)
+      });
     }
     
     // storeData가 없거나 매장 정보가 없는 경우 개통실적 데이터에서 추정
