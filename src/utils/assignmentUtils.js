@@ -772,6 +772,8 @@ const calculateColorRawScore = async (agent, model, color, settings, storeData, 
         }
       });
       
+      storeCount = uniqueStoreIds.size;
+      
       console.log(`🔍 ${agent.target} 정규화된 거래처수 계산:`, {
         원본담당자: agent.target,
         정규화된이름: normalizedAgentName,
