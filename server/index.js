@@ -18287,9 +18287,9 @@ app.post('/api/policies', async (req, res) => {
       policyTeam // 소속팀 정보 추가
     } = req.body;
     
-    // 구두정책 여부 확인
-    const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
-    const isAddDeductPolicy = category === 'wireless_add_deduct' || category === 'wired_add_deduct';
+    // 구두정책 여부 확인 (로그 출력용 변수 재사용)
+    const isShoePolicy = isShoePolicyForLog;
+    const isAddDeductPolicy = isAddDeductPolicyForLog;
     console.log('구두정책 여부:', isShoePolicy, '부가차감지원정책 여부:', isAddDeductPolicy, 'category:', category);
     
     // 필수 필드 검증 (구두정책이나 부가차감지원정책이 아닌 경우에만 amountType 필수)
@@ -18380,8 +18380,8 @@ app.post('/api/policies', async (req, res) => {
       });
     }
     
-    // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책이 아닌 경우에만)
-    if (!isShoePolicy && amountType !== 'in_content' && !policyAmount) {
+    // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
