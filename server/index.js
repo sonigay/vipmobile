@@ -18273,6 +18273,22 @@ app.post('/api/policies', async (req, res) => {
     
     if (!isShoePolicy && !isAddDeductPolicy && !amountType) missingFields.push('amountType');
     
+    // 부가차감지원정책인 경우 차감지원 금액 검증 (조건부 옵션은 선택사항)
+    if (isAddDeductPolicy) {
+      const deductSupport = req.body.deductSupport || {};
+      
+      // 차감지원 금액 중 최소 하나는 입력되어야 함 (지원할 항목이 있어야 함)
+      const hasAnyAmount = (deductSupport.addServiceAmount && deductSupport.addServiceAmount.trim()) ||
+                          (deductSupport.insuranceAmount && deductSupport.insuranceAmount.trim()) ||
+                          (deductSupport.connectionAmount && deductSupport.connectionAmount.trim());
+      
+      if (!hasAnyAmount) {
+        missingFields.push('차감지원 금액');
+      }
+      
+      // 조건부 옵션은 선택사항이므로 검증하지 않음
+    }
+    
     if (missingFields.length > 0) {
       console.log('누락된 필드:', missingFields);
       
@@ -18284,7 +18300,8 @@ app.post('/api/policies', async (req, res) => {
         'policyStore': '정책적용점',
         'policyContent': '정책내용',
         'amountType': '금액 유형',
-        'amount95Above 또는 amount95Below 또는 policyContent': '95군이상/미만 금액 또는 정책내용'
+        'amount95Above 또는 amount95Below 또는 policyContent': '95군이상/미만 금액 또는 정책내용',
+        '차감지원 금액': '차감지원 금액'
       };
       
       const missingFieldNames = missingFields.map(field => fieldNames[field] || field);
@@ -18622,6 +18639,22 @@ app.put('/api/policies/:policyId', async (req, res) => {
     
     if (!isShoePolicy && !isAddDeductPolicy && !amountType) missingFields.push('amountType');
     
+    // 부가차감지원정책인 경우 차감지원 금액 검증 (조건부 옵션은 선택사항)
+    if (isAddDeductPolicy) {
+      const deductSupport = req.body.deductSupport || {};
+      
+      // 차감지원 금액 중 최소 하나는 입력되어야 함 (지원할 항목이 있어야 함)
+      const hasAnyAmount = (deductSupport.addServiceAmount && deductSupport.addServiceAmount.trim()) ||
+                          (deductSupport.insuranceAmount && deductSupport.insuranceAmount.trim()) ||
+                          (deductSupport.connectionAmount && deductSupport.connectionAmount.trim());
+      
+      if (!hasAnyAmount) {
+        missingFields.push('차감지원 금액');
+      }
+      
+      // 조건부 옵션은 선택사항이므로 검증하지 않음
+    }
+    
     if (missingFields.length > 0) {
       console.log('정책 수정 - 누락된 필드:', missingFields);
       
@@ -18633,7 +18666,8 @@ app.put('/api/policies/:policyId', async (req, res) => {
         'policyStore': '정책적용점',
         'policyContent': '정책내용',
         'amountType': '금액 유형',
-        'amount95Above 또는 amount95Below 또는 policyContent': '95군이상/미만 금액 또는 정책내용'
+        'amount95Above 또는 amount95Below 또는 policyContent': '95군이상/미만 금액 또는 정책내용',
+        '차감지원 금액': '차감지원 금액'
       };
       
       const missingFieldNames = missingFields.map(field => fieldNames[field] || field);

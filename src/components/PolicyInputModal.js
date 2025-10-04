@@ -204,6 +204,15 @@ function PolicyInputModal({
         deductAmounts.push(Number(formData.deductSupport.connectionAmount));
       }
       
+      console.log('🔍 [자동생성] 디버그:', {
+        hasAnyCondition,
+        conditions,
+        deductItems,
+        deductAmounts,
+        deductSupport: formData.deductSupport,
+        conditionalOptions: formData.conditionalOptions
+      });
+      
       if (deductItems.length > 0) {
         // 모든 금액이 동일한 경우 하나의 금액으로 표시
         const uniqueAmounts = [...new Set(deductAmounts)];
