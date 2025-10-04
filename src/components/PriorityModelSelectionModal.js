@@ -1,45 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  Typography,
-  TextField,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemButton,
-  Chip,
-  IconButton,
-  Alert,
-  InputAdornment
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography,
+  TextField, List, ListItem, ListItemText, ListItemButton, Chip, IconButton,
+  Divider, Alert, InputAdornment
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  Close as CloseIcon,
-  Star as StarIcon
-} from '@mui/icons-material';
+import { Search as SearchIcon, Close as CloseIcon, Star as StarIcon, StarBorder as StarBorderIcon } from '@mui/icons-material';
 
 function PriorityModelSelectionModal({ 
   open, 
   onClose, 
-  recoveryData = [], 
-  priorityModels = {}, 
-  onPriorityChange 
+  recoveryData, 
+  priorityModels, 
+  onPriorityChange,
+  selectedPriorityLevel 
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredModels, setFilteredModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState(null);
 
-  // 고유한 모델명 추출
-  const uniqueModels = React.useMemo(() => {
-    if (!Array.isArray(recoveryData)) return [];
+  // 회수 데이터에서 고유한 모델명 추출
+  const uniqueModels = useMemo(() => {
+    if (!recoveryData || !Array.isArray(recoveryData)) {
+      return [];
+    }
     
     const models = new Set();
     recoveryData.forEach(item => {
-      if (item && item.modelName && typeof item.modelName === 'string') {
+      if (item && item.modelName && typeof item.modelName === 'string' && item.modelName.trim()) {
         models.add(item.modelName.trim());
       }
     });
@@ -47,50 +34,63 @@ function PriorityModelSelectionModal({
     return Array.from(models).sort();
   }, [recoveryData]);
 
-  // 검색 필터링
+  // 검색어에 따른 모델 필터링
   useEffect(() => {
+    if (!uniqueModels || !Array.isArray(uniqueModels)) {
+      setFilteredModels([]);
+      return;
+    }
+    
     if (!searchTerm.trim()) {
       setFilteredModels(uniqueModels);
     } else {
-      const filtered = uniqueModels.filter(model => 
-        model.toLowerCase().includes(searchTerm.toLowerCase())
+      const filtered = uniqueModels.filter(model =>
+        model && typeof model === 'string' && model.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredModels(filtered);
     }
   }, [searchTerm, uniqueModels]);
 
-  // 모달 열릴 때 초기화
+  // 모달이 열릴 때 초기화
   useEffect(() => {
     if (open) {
       setSearchTerm('');
-      setFilteredModels(uniqueModels);
+      setSelectedModel(null);
     }
-  }, [open, uniqueModels]);
+  }, [open]);
 
+  // 모델 선택 핸들러
   const handleModelSelect = (model) => {
-    if (onPriorityChange) {
-      onPriorityChange(model);
-    }
-    onClose();
+    setSelectedModel(model);
   };
 
+  // 우선순위 저장 핸들러
+  const handleSavePriority = () => {
+    if (selectedModel && onPriorityChange) {
+      onPriorityChange(selectedModel);
+      onClose();
+    }
+  };
+
+  // 우선순위 제거 핸들러
   const handleRemovePriority = (priority) => {
     if (onPriorityChange) {
       onPriorityChange(null, priority);
     }
   };
 
+  // 이미 우선순위로 설정된 모델인지 확인
+  const isAlreadyPriority = (model) => {
+    if (!priorityModels || !model) return false;
+    return Object.values(priorityModels).includes(model);
+  };
+
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6">
-            우선순위 모델 선정하기
+            {selectedPriorityLevel} 모델 선정하기
           </Typography>
           <IconButton onClick={onClose}>
             <CloseIcon />
@@ -100,7 +100,7 @@ function PriorityModelSelectionModal({
 
       <DialogContent>
         {/* 현재 우선순위 모델들 */}
-        {Object.keys(priorityModels).length > 0 && (
+        {priorityModels && Object.keys(priorityModels).length > 0 && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
               현재 우선순위 모델
@@ -109,7 +109,7 @@ function PriorityModelSelectionModal({
               {Object.entries(priorityModels).map(([priority, model]) => (
                 <Chip
                   key={priority}
-                  label={`${priority}순위: ${model || '미지정'}`}
+                  label={`${priority}: ${model || '미지정'}`}
                   color="primary"
                   variant="filled"
                   onDelete={() => handleRemovePriority(priority)}
@@ -117,6 +117,7 @@ function PriorityModelSelectionModal({
                 />
               ))}
             </Box>
+            <Divider sx={{ my: 2 }} />
           </Box>
         )}
 
@@ -127,7 +128,8 @@ function PriorityModelSelectionModal({
           </Typography>
           <TextField
             fullWidth
-            placeholder="모델명을 입력하세요..."
+            variant="outlined"
+            placeholder="모델명 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -137,30 +139,42 @@ function PriorityModelSelectionModal({
                 </InputAdornment>
               ),
             }}
+            sx={{ mb: 2 }}
           />
-        </Box>
-
-        {/* 모델 목록 */}
-        <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
           <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-            총 {filteredModels.length}개 모델
+            총 {filteredModels?.length || 0}개 모델
           </Typography>
-          {filteredModels.length === 0 ? (
+          
+          {!filteredModels || filteredModels.length === 0 ? (
             <Alert severity="info">
               {searchTerm ? '검색 결과가 없습니다.' : '회수 대상 모델이 없습니다.'}
             </Alert>
           ) : (
-            <List>
+            <List sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
               {filteredModels.map((model, index) => {
-                const isAlreadyPriority = Object.values(priorityModels).includes(model);
+                const isSelected = selectedModel === model;
+                const isAlreadySet = isAlreadyPriority(model);
+                
                 return (
                   <ListItem key={index} disablePadding>
                     <ListItemButton
-                      onClick={() => !isAlreadyPriority && handleModelSelect(model)}
-                      disabled={isAlreadyPriority}
+                      onClick={() => !isAlreadySet && handleModelSelect(model)}
+                      selected={isSelected}
+                      disabled={isAlreadySet}
+                      sx={{
+                        '&.Mui-selected': {
+                          backgroundColor: '#e3f2fd',
+                        },
+                        '&.Mui-disabled': {
+                          opacity: 0.6,
+                        }
+                      }}
                     >
-                      <ListItemText primary={model} />
-                      {isAlreadyPriority && <StarIcon color="warning" />}
+                      <ListItemText 
+                        primary={model}
+                        secondary={isAlreadySet ? '이미 우선순위로 설정됨' : ''}
+                      />
+                      {isAlreadySet && <StarIcon color="warning" />}
                     </ListItemButton>
                   </ListItem>
                 );
@@ -171,8 +185,16 @@ function PriorityModelSelectionModal({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>
-          닫기
+        <Button onClick={onClose} color="secondary">
+          취소
+        </Button>
+        <Button
+          onClick={handleSavePriority}
+          color="primary"
+          variant="contained"
+          disabled={!selectedModel}
+        >
+          {selectedPriorityLevel} 모델로 선택
         </Button>
       </DialogActions>
     </Dialog>
