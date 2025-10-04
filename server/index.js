@@ -18502,78 +18502,23 @@ app.post('/api/policies', async (req, res) => {
         if (types.length === 3) return '전유형';
         return types.join(', ');
       })(),
-      // 구두정책용 필드 (부가차감지원정책에서는 제외)
-      ...(category === 'wireless_shoe' || category === 'wired_shoe' ? [
-        req.body.amount95Above || '', // AB열: 95군이상금액
-        req.body.amount95Below || ''  // AC열: 95군미만금액
-      ] : []),
+      // AB열: 95군이상금액 (구두정책에서만 사용)
+      (category === 'wireless_shoe' || category === 'wired_shoe') ? (req.body.amount95Above || '') : '',
+      // AC열: 95군미만금액 (구두정책에서만 사용)
+      (category === 'wireless_shoe' || category === 'wired_shoe') ? (req.body.amount95Below || '') : '',
       policyTeam || '미지정',       // AD열: 소속팀
-      (() => {                     // AE열: 부가미유치금액
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          try {
-            return req.body.deductSupport?.addServiceAmount || '';
-          } catch (error) {
-            console.warn('부가미유치금액 처리 오류:', error);
-            return '';
-          }
-        }
-        return '';
-      })(),
-      (() => {                     // AF열: 보험미유치금액
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          try {
-            return req.body.deductSupport?.insuranceAmount || '';
-          } catch (error) {
-            console.warn('보험미유치금액 처리 오류:', error);
-            return '';
-          }
-        }
-        return '';
-      })(),
-      (() => {                     // AG열: 연결음미유치금액
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          try {
-            return req.body.deductSupport?.connectionAmount || '';
-          } catch (error) {
-            console.warn('연결음미유치금액 처리 오류:', error);
-            return '';
-          }
-        }
-        return '';
-      })(),
-      (() => {                     // AH열: 부가유치시조건
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          try {
-            return req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N';
-          } catch (error) {
-            console.warn('부가유치시조건 처리 오류:', error);
-            return 'N';
-          }
-        }
-        return '';
-      })(),
-      (() => {                     // AI열: 보험유치시조건
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          try {
-            return req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N';
-          } catch (error) {
-            console.warn('보험유치시조건 처리 오류:', error);
-            return 'N';
-          }
-        }
-        return '';
-      })(),
-      (() => {                     // AJ열: 연결음유치시조건
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
-          try {
-            return req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N';
-          } catch (error) {
-            console.warn('연결음유치시조건 처리 오류:', error);
-            return 'N';
-          }
-        }
-        return '';
-      })()
+      // AE열: 부가미유치금액 (부가차감지원정책에서만 사용)
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.addServiceAmount || '') : '',
+      // AF열: 보험미유치금액 (부가차감지원정책에서만 사용)
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.insuranceAmount || '') : '',
+      // AG열: 연결음미유치금액 (부가차감지원정책에서만 사용)
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.connectionAmount || '') : '',
+      // AH열: 부가유치시조건 (부가차감지원정책에서만 사용)
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N') : '',
+      // AI열: 보험유치시조건 (부가차감지원정책에서만 사용)
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N') : '',
+      // AJ열: 연결음유치시조건 (부가차감지원정책에서만 사용)
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N') : ''
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
