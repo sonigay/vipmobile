@@ -416,8 +416,11 @@ function PolicyInputModal({
             },
             policyTeam: formData.team, // 소속정책팀 추가
             activationType: formData.activationType, // 개통유형
-            amount95Above: formData.amount95Above, // 95군이상금액
-            amount95Below: formData.amount95Below, // 95군미만금액
+            // 구두정책용 필드 (부가차감지원정책에서는 제외)
+            ...(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' ? {
+              amount95Above: formData.amount95Above, // 95군이상금액
+              amount95Below: formData.amount95Below, // 95군미만금액
+            } : {}),
             // 부가차감지원정책 데이터 추가
             deductSupport: formData.deductSupport,
             conditionalOptions: formData.conditionalOptions,
@@ -451,8 +454,11 @@ function PolicyInputModal({
             isMultiple: true, // 복수점 정책임을 표시
             multipleStoreName: formData.multipleStoreName, // 사용자가 입력한 복수점명
             activationType: formData.activationType, // 개통유형
-            amount95Above: formData.amount95Above, // 95군이상금액
-            amount95Below: formData.amount95Below, // 95군미만금액
+            // 구두정책용 필드 (부가차감지원정책에서는 제외)
+            ...(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' ? {
+              amount95Above: formData.amount95Above, // 95군이상금액
+              amount95Below: formData.amount95Below, // 95군미만금액
+            } : {}),
             // 부가차감지원정책 데이터 추가
             deductSupport: formData.deductSupport,
             conditionalOptions: formData.conditionalOptions
