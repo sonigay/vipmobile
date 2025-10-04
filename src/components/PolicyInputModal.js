@@ -120,7 +120,17 @@ function PolicyInputModal({
           },
           amount95Above: '',
           amount95Below: '',
-          isDirectInput: false
+          isDirectInput: false,
+          deductSupport: {
+            addServiceAmount: '',
+            insuranceAmount: '',
+            connectionAmount: ''
+          },
+          conditionalOptions: {
+            addServiceAcquired: false,
+            insuranceAcquired: false,
+            connectionAcquired: false
+          }
         });
       } else {
         // 새 정책 생성 모드: 빈 폼으로 초기화
@@ -143,7 +153,17 @@ function PolicyInputModal({
           },
           amount95Above: '',
           amount95Below: '',
-          isDirectInput: false
+          isDirectInput: false,
+          deductSupport: {
+            addServiceAmount: '',
+            insuranceAmount: '',
+            connectionAmount: ''
+          },
+          conditionalOptions: {
+            addServiceAcquired: false,
+            insuranceAcquired: false,
+            connectionAcquired: false
+          }
         });
       }
       setErrors({});
@@ -158,14 +178,40 @@ function PolicyInputModal({
       if (formData.conditionalOptions?.insuranceAcquired) conditions.push('보험유치시');
       if (formData.conditionalOptions?.connectionAcquired) conditions.push('연결음유치시');
       
+      // 조건부에 맞는 차감지원 금액만 수집
       const deductItems = [];
-      if (formData.deductSupport?.addServiceAmount?.trim()) deductItems.push(`부가미유치 ${formData.deductSupport.addServiceAmount}원`);
-      if (formData.deductSupport?.insuranceAmount?.trim()) deductItems.push(`보험미유치 ${formData.deductSupport.insuranceAmount}원`);
-      if (formData.deductSupport?.connectionAmount?.trim()) deductItems.push(`연결음미유치 ${formData.deductSupport.connectionAmount}원`);
+      const deductAmounts = [];
+      
+      // 부가유치시 조건이 체크되지 않았을 때만 부가미유치 금액 표시
+      if (!formData.conditionalOptions?.addServiceAcquired && formData.deductSupport?.addServiceAmount?.trim()) {
+        deductItems.push('📱 부가미유치');
+        deductAmounts.push(Number(formData.deductSupport.addServiceAmount));
+      }
+      
+      // 보험유치시 조건이 체크되지 않았을 때만 보험미유치 금액 표시
+      if (!formData.conditionalOptions?.insuranceAcquired && formData.deductSupport?.insuranceAmount?.trim()) {
+        deductItems.push('🛡️ 보험미유치');
+        deductAmounts.push(Number(formData.deductSupport.insuranceAmount));
+      }
+      
+      // 연결음유치시 조건이 체크되지 않았을 때만 연결음미유치 금액 표시
+      if (!formData.conditionalOptions?.connectionAcquired && formData.deductSupport?.connectionAmount?.trim()) {
+        deductItems.push('🔊 연결음미유치');
+        deductAmounts.push(Number(formData.deductSupport.connectionAmount));
+      }
       
       if (conditions.length > 0 && deductItems.length > 0) {
-        const content = `조건부-${conditions.join(', ')}\n${deductItems.join('/')} 차감금액지원`;
+        // 모든 금액이 동일한 경우 하나의 금액으로 표시
+        const uniqueAmounts = [...new Set(deductAmounts)];
+        const amountText = uniqueAmounts.length === 1 
+          ? `${uniqueAmounts[0].toLocaleString()}원`
+          : deductAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
+        
+        const content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
         setFormData(prev => ({ ...prev, policyContent: content }));
+      } else if (conditions.length === 0) {
+        // 조건부가 모두 해제된 경우 내용 초기화
+        setFormData(prev => ({ ...prev, policyContent: '' }));
       }
     }
   }, [formData.deductSupport, formData.conditionalOptions, formData.isDirectInput, categoryId]);
@@ -345,7 +391,10 @@ function PolicyInputModal({
             policyTeam: formData.team, // 소속정책팀 추가
             activationType: formData.activationType, // 개통유형
             amount95Above: formData.amount95Above, // 95군이상금액
-            amount95Below: formData.amount95Below // 95군미만금액
+            amount95Below: formData.amount95Below, // 95군미만금액
+            // 부가차감지원정책 데이터 추가
+            deductSupport: formData.deductSupport,
+            conditionalOptions: formData.conditionalOptions
           };
 
           await onSave(policyData);
