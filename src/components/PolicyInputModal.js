@@ -76,7 +76,14 @@ function PolicyInputModal({
     // 95군 이상/미만 금액 입력
     amount95Above: '',     // 95군 이상 금액
     amount95Below: '',     // 95군 미만 금액
-    isDirectInput: false   // 직접입력 여부
+    isDirectInput: false,   // 직접입력 여부
+    // 부가차감지원정책 전용 필드
+    deductOptions: {
+      addService: false,    // 부가 미유치
+      insurance: false,     // 보험 미유치
+      connection: false    // 연결음미유치
+    },
+    directAmount: ''       // 직접입력 금액
   });
   
   const [errors, setErrors] = useState({});
@@ -171,6 +178,20 @@ function PolicyInputModal({
       newErrors.multipleStoreName = '복수점명을 입력해주세요.';
     }
     
+    // 부가차감지원정책 차감 옵션 검사
+    if (categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') {
+      const hasSelectedOption = formData.deductOptions.addService || 
+                               formData.deductOptions.insurance || 
+                               formData.deductOptions.connection || 
+                               formData.isDirectInput;
+      if (!hasSelectedOption) {
+        newErrors.deductOptions = '차감 옵션을 최소 하나 선택해주세요.';
+      }
+      if (formData.isDirectInput && !formData.directAmount.trim()) {
+        newErrors.directAmount = '직접입력 금액을 입력해주세요.';
+      }
+    }
+
     // 구두정책 개통유형 검사
     if (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') {
       const hasAnyActivationType = formData.activationType.new010 || formData.activationType.mnp || formData.activationType.change;
@@ -189,16 +210,17 @@ function PolicyInputModal({
       }
     }
     
-    // 정책내용 검사 - 구두정책이 아니거나 직접입력이 체크된 경우에만 필수
+    // 정책내용 검사 - 구두정책이나 부가차감지원정책이 아니거나 직접입력이 체크된 경우에만 필수
     const isShoePolicy = categoryId === 'wireless_shoe' || categoryId === 'wired_shoe';
-    if (!isShoePolicy || formData.isDirectInput) {
+    const isAddDeductPolicy = categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct';
+    if (!isShoePolicy && !isAddDeductPolicy || formData.isDirectInput) {
       if (!formData.policyContent.trim()) {
         newErrors.policyContent = '정책내용을 입력해주세요.';
       }
     }
     
-    // 금액 입력 방식에 따른 검증 (구두정책이 아닌 경우에만)
-    if (!isShoePolicy && formData.amountType !== 'in_content') {
+    // 금액 입력 방식에 따른 검증 (구두정책이나 부가차감지원정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && formData.amountType !== 'in_content') {
       if (!formData.policyAmount.trim()) {
         newErrors.policyAmount = '금액을 입력해주세요.';
       } else if (isNaN(Number(formData.policyAmount))) {
@@ -206,8 +228,8 @@ function PolicyInputModal({
       }
     }
     
-    // 금액 유형 검사 (구두정책이 아닌 경우에만)
-    if (!isShoePolicy && !formData.amountType) {
+    // 금액 유형 검사 (구두정책이나 부가차감지원정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && !formData.amountType) {
       newErrors.amountType = '금액 유형을 선택해주세요.';
     }
     
@@ -746,6 +768,84 @@ function PolicyInputModal({
                   {errors.amount95Below}
                 </Typography>
               )}
+            </Grid>
+          ) : null}
+
+          {/* 부가차감지원정책 전용: 차감 옵션 선택 */}
+          {categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' ? (
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" gutterBottom>
+                차감 옵션 선택 *
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.deductOptions.addService}
+                      onChange={(e) => handleInputChange('deductOptions', {
+                        ...formData.deductOptions,
+                        addService: e.target.checked
+                      })}
+                    />
+                  }
+                  label="부가 미유치"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.deductOptions.insurance}
+                      onChange={(e) => handleInputChange('deductOptions', {
+                        ...formData.deductOptions,
+                        insurance: e.target.checked
+                      })}
+                    />
+                  }
+                  label="보험 미유치"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.deductOptions.connection}
+                      onChange={(e) => handleInputChange('deductOptions', {
+                        ...formData.deductOptions,
+                        connection: e.target.checked
+                      })}
+                    />
+                  }
+                  label="연결음미유치"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.isDirectInput}
+                      onChange={(e) => handleInputChange('isDirectInput', e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Box>
+              {errors.deductOptions && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                  {errors.deductOptions}
+                </Typography>
+              )}
+            </Grid>
+          ) : null}
+
+          {/* 부가차감지원정책 전용: 직접입력 금액 */}
+          {(categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && formData.isDirectInput ? (
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="직접입력 금액"
+                value={formData.directAmount}
+                onChange={(e) => handleInputChange('directAmount', e.target.value)}
+                placeholder="차감 금액을 직접 입력하세요"
+                type="number"
+                inputProps={{ min: 0 }}
+                error={!!errors.directAmount}
+                helperText={errors.directAmount}
+              />
             </Grid>
           ) : null}
 
