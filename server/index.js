@@ -18128,7 +18128,7 @@ app.get('/api/policies', async (req, res) => {
         settlementDateTime: row[21] || '',     // V열: 정산반영일시
         settlementUserId: row[22] || '',       // W열: 정산반영자ID
         yearMonth: row[23] || '',               // X열: 대상년월
-        multipleStoreName: row[24] || '',       // Y열: 복수점명
+        multipleStoreName: row[24] || '단일점',       // Y열: 복수점명 (빈 공란일 때 "단일점"으로 표시)
         storeNameFromSheet: row[25] || '',       // Z열: 업체명 (시트에서 직접 읽은 값)
         activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
         amount95Above: row[27] || '',            // AB열: 95군이상금액
@@ -18493,6 +18493,11 @@ app.post('/api/policies', async (req, res) => {
       req.body.multipleStoreName || '', // Y열: 복수점명
       storeName,                   // Z열: 업체명
       (() => {                     // AA열: 개통유형
+        // 부가차감지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 설정
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+          return '전유형';
+        }
+        
         if (!req.body.activationType) return '';
         const { new010, mnp, change } = req.body.activationType;
         const types = [];
