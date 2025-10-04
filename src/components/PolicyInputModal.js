@@ -180,9 +180,9 @@ function PolicyInputModal({
     
     // 부가차감지원정책 차감 옵션 검사
     if (categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') {
-      const hasSelectedOption = formData.deductOptions.addService || 
-                               formData.deductOptions.insurance || 
-                               formData.deductOptions.connection || 
+      const hasSelectedOption = (formData.deductOptions?.addService || false) || 
+                               (formData.deductOptions?.insurance || false) || 
+                               (formData.deductOptions?.connection || false) || 
                                formData.isDirectInput;
       if (!hasSelectedOption) {
         newErrors.deductOptions = '차감 옵션을 최소 하나 선택해주세요.';
@@ -781,9 +781,9 @@ function PolicyInputModal({
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={formData.deductOptions.addService}
+                      checked={formData.deductOptions?.addService || false}
                       onChange={(e) => handleInputChange('deductOptions', {
-                        ...formData.deductOptions,
+                        ...(formData.deductOptions || {}),
                         addService: e.target.checked
                       })}
                     />
@@ -793,9 +793,9 @@ function PolicyInputModal({
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={formData.deductOptions.insurance}
+                      checked={formData.deductOptions?.insurance || false}
                       onChange={(e) => handleInputChange('deductOptions', {
-                        ...formData.deductOptions,
+                        ...(formData.deductOptions || {}),
                         insurance: e.target.checked
                       })}
                     />
@@ -805,9 +805,9 @@ function PolicyInputModal({
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={formData.deductOptions.connection}
+                      checked={formData.deductOptions?.connection || false}
                       onChange={(e) => handleInputChange('deductOptions', {
-                        ...formData.deductOptions,
+                        ...(formData.deductOptions || {}),
                         connection: e.target.checked
                       })}
                     />
