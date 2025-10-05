@@ -103,8 +103,12 @@ app.options('/api/budget/user-sheets-v2', (req, res) => {
 // 팀 목록 조회 API
 app.get('/api/teams', async (req, res) => {
   try {
+    console.log('🔍 [팀목록] 팀 목록 조회 시작');
+    
     // 대리점아이디관리 시트에서 팀장 목록 가져오기
     const sheetId = await getSheetIdByName('대리점아이디관리');
+    console.log('🔍 [팀목록] 시트 ID:', sheetId);
+    
     const range = 'A:P'; // A열(이름)과 P열(권한레벨) 포함
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -112,6 +116,8 @@ app.get('/api/teams', async (req, res) => {
     });
     
     const rows = response.data.values || [];
+    console.log('🔍 [팀목록] 총 행 수:', rows.length);
+    
     const teams = [];
     
     // 헤더 제외하고 데이터 처리
@@ -120,19 +126,23 @@ app.get('/api/teams', async (req, res) => {
       const name = row[0]; // A열: 대상(이름)
       const permissionLevel = row[15]; // P열: 정책모드권한레벨
       
+      console.log(`🔍 [팀목록] 행 ${i}: 이름=${name}, 권한레벨=${permissionLevel}`);
+      
       // 권한레벨이 알파벳 두 개인 경우 팀장으로 인식 (AA, BB, CC, DD, EE, FF 등)
       if (permissionLevel && permissionLevel.length === 2 && /^[A-Z]{2}$/.test(permissionLevel)) {
         teams.push({
           code: permissionLevel,
           name: name
         });
+        console.log(`✅ [팀목록] 팀장 추가: ${permissionLevel} - ${name}`);
       }
     }
     
+    console.log('🔍 [팀목록] 최종 팀 목록:', teams);
     res.json(teams);
   } catch (error) {
-    console.error('팀 목록 조회 실패:', error);
-    res.status(500).json({ error: '팀 목록 조회에 실패했습니다.' });
+    console.error('❌ [팀목록] 팀 목록 조회 실패:', error);
+    res.status(500).json({ error: '팀 목록 조회에 실패했습니다.', details: error.message });
   }
 });
 
