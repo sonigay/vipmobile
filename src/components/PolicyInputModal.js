@@ -142,7 +142,7 @@ function PolicyInputModal({
           policyContent: '',
           policyAmount: '',
           amountType: 'total',
-          team: loggedInUser?.userRole || '', // 현재 사용자의 소속팀으로 기본 설정
+          team: '', // 소속팀장을 선택하세요
           storeType: 'single',
           multipleStores: [],
           multipleStoreName: '',

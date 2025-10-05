@@ -18605,7 +18605,8 @@ app.post('/api/policies', async (req, res) => {
       activationType: req.body.activationType,
       multipleStoreName: req.body.multipleStoreName,
       storeName,
-      newPolicyRow
+      newPolicyRow,
+      arrayLength: newPolicyRow.length
     });
     
     let response;
