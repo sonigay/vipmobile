@@ -120,8 +120,8 @@ app.get('/api/teams', async (req, res) => {
       const name = row[0]; // A열: 대상(이름)
       const permissionLevel = row[15]; // P열: 정책모드권한레벨
       
-      // 권한레벨이 'AA'인 경우만 팀장으로 인식
-      if (permissionLevel === 'AA') {
+      // 권한레벨이 알파벳 두 개인 경우 팀장으로 인식 (AA, BB, CC, DD, EE, FF 등)
+      if (permissionLevel && permissionLevel.length === 2 && /^[A-Z]{2}$/.test(permissionLevel)) {
         teams.push({
           code: permissionLevel,
           name: name
