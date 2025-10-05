@@ -18368,6 +18368,7 @@ app.post('/api/policies', async (req, res) => {
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
     if (!policyStore) missingFields.push('policyStore');
+    if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
@@ -18580,7 +18581,7 @@ app.post('/api/policies', async (req, res) => {
       (category === 'wireless_shoe' || category === 'wired_shoe') ? (req.body.amount95Above || '') : '',
       // AC열: 95군미만금액 (구두정책에서만 사용)
       (category === 'wireless_shoe' || category === 'wired_shoe') ? (req.body.amount95Below || '') : '',
-      policyTeam || '미지정',       // AD열: 소속팀
+      (policyTeam && policyTeam.trim()) || '미지정',       // AD열: 소속팀
       // AE열: 부가미유치금액 (부가차감지원정책에서만 사용)
       (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.addServiceAmount || '') : '',
       // AF열: 보험미유치금액 (부가차감지원정책에서만 사용)
@@ -18755,6 +18756,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
     if (!policyStore) missingFields.push('policyStore');
+    if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
