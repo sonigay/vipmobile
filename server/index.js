@@ -18048,25 +18048,25 @@ app.get('/api/policies', async (req, res) => {
       const settlementApproval = row[13]; // N열: 승인상태_정산팀
       const teamApproval = row[14];    // O열: 승인상태_소속팀
       
-      console.log(`🔍 [정책필터] 정책 필터링:`, {
-        rowId: row[0], // A열: 정책ID
-        policyYearMonth,
-        policyTypeData,
-        categoryData,
-        subCategory,
-        inputUserId,
-        filters: { yearMonth, policyType, category, userId, approvalStatus }
-      });
+      // console.log(`🔍 [정책필터] 정책 필터링:`, {
+      //   rowId: row[0], // A열: 정책ID
+      //   policyYearMonth,
+      //   policyTypeData,
+      //   categoryData,
+      //   subCategory,
+      //   inputUserId,
+      //   filters: { yearMonth, policyType, category, userId, approvalStatus }
+      // });
       
       // 정책이 통과했는지 확인
       const passed = true; // 기본적으로 통과
       if (passed) {
-        console.log(`✅ [정책필터] 정책 통과: ${row[0]}`);
+        // console.log(`✅ [정책필터] 정책 통과: ${row[0]}`);
       }
       
       // 년월 필터
       if (yearMonth && policyYearMonth && policyYearMonth !== yearMonth) {
-        console.log(`❌ [정책필터] yearMonth 불일치: ${policyYearMonth} !== ${yearMonth}`);
+        // console.log(`❌ [정책필터] yearMonth 불일치: ${policyYearMonth} !== ${yearMonth}`);
         return false;
       }
       
@@ -18081,20 +18081,20 @@ app.get('/api/policies', async (req, res) => {
         // "무선:1" 형태에서 "무선" 부분만 추출
         const cleanPolicyType = decodedPolicyType.split(':')[0];
         if (policyTypeData !== cleanPolicyType) {
-          console.log(`❌ [정책필터] policyType 불일치: ${policyTypeData} !== ${cleanPolicyType}`);
+          // console.log(`❌ [정책필터] policyType 불일치: ${policyTypeData} !== ${cleanPolicyType}`);
           return false;
         }
       }
       
       // 카테고리 필터
       if (category && subCategory !== category) {
-        console.log(`❌ [정책필터] category 불일치: ${subCategory} !== ${category}`);
+        // console.log(`❌ [정책필터] category 불일치: ${subCategory} !== ${category}`);
         return false;
       }
       
       // 사용자 필터
       if (userId && inputUserId !== userId) {
-        console.log(`❌ [정책필터] userId 불일치: ${inputUserId} !== ${userId}`);
+        // console.log(`❌ [정책필터] userId 불일치: ${inputUserId} !== ${userId}`);
         return false;
       }
       
@@ -18102,12 +18102,12 @@ app.get('/api/policies', async (req, res) => {
       if (approvalStatus) {
         const hasApprovalStatus = [totalApproval, settlementApproval, teamApproval].includes(approvalStatus);
         if (!hasApprovalStatus) {
-          console.log(`❌ [정책필터] approvalStatus 불일치`);
+          // console.log(`❌ [정책필터] approvalStatus 불일치`);
           return false;
         }
       }
       
-      console.log(`✅ [정책필터] 정책 통과: ${row[0]}`);
+      // console.log(`✅ [정책필터] 정책 통과: ${row[0]}`);
       return true;
     });
     
