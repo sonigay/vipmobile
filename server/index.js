@@ -18747,6 +18747,8 @@ app.put('/api/policies/:policyId', async (req, res) => {
       inputUserId,
       inputUserName
     } = req.body;
+    // 정책팀 값 정규화: 프론트는 policyTeam(이름) 또는 team(코드/이름)로 보낼 수 있음
+    const policyTeam = (req.body.policyTeam ?? team ?? '').toString();
     
     // 구두정책 여부 확인
     const isShoePolicy = category === 'wireless_shoe' || category === 'wired_shoe';
