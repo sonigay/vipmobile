@@ -106,13 +106,13 @@ app.get('/api/teams', async (req, res) => {
     console.log('🔍 [팀목록] 팀 목록 조회 시작');
     
     // 대리점아이디관리 시트에서 팀장 목록 가져오기
-    const sheetId = await getSheetIdByName('대리점아이디관리');
-    console.log('🔍 [팀목록] 시트 ID:', sheetId);
+    const sheetName = '대리점아이디관리';
+    console.log('🔍 [팀목록] 시트 이름:', sheetName);
     
     const range = 'A:P'; // A열(이름)과 P열(권한레벨) 포함
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetId}!${range}`,
+      range: `${sheetName}!${range}`,
     });
     
     const rows = response.data.values || [];
