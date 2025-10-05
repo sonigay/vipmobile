@@ -103,15 +103,31 @@ app.options('/api/budget/user-sheets-v2', (req, res) => {
 // 팀 목록 조회 API
 app.get('/api/teams', async (req, res) => {
   try {
-    // 팀 목록을 하드코딩으로 반환
-    const teams = [
-      { code: 'AA', name: '홍기현' },
-      { code: 'BB', name: '김철수' },
-      { code: 'CC', name: '이영희' },
-      { code: 'DD', name: '박민수' },
-      { code: 'EE', name: '정수진' },
-      { code: 'FF', name: '최동현' }
-    ];
+    // 대리점아이디관리 시트에서 팀장 목록 가져오기
+    const sheetId = await getSheetIdByName('대리점아이디관리');
+    const range = 'A:P'; // A열(이름)과 P열(권한레벨) 포함
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetId}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    const teams = [];
+    
+    // 헤더 제외하고 데이터 처리
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const name = row[0]; // A열: 대상(이름)
+      const permissionLevel = row[15]; // P열: 정책모드권한레벨
+      
+      // 권한레벨이 'AA'인 경우만 팀장으로 인식
+      if (permissionLevel === 'AA') {
+        teams.push({
+          code: permissionLevel,
+          name: name
+        });
+      }
+    }
     
     res.json(teams);
   } catch (error) {
@@ -18173,17 +18189,9 @@ app.get('/api/policies', async (req, res) => {
             return '미지정';
           }
           
-          // 팀 코드를 팀 이름으로 변환
-          const teamMapping = {
-            'AA': '홍기현',
-            'BB': '김철수', 
-            'CC': '이영희',
-            'DD': '박민수',
-            'EE': '정수진',
-            'FF': '최동현'
-          };
-          
-          return teamMapping[teamValue] || teamValue || '미지정';
+          // 팀 코드가 'AA'인 경우, 대리점아이디관리 시트에서 실제 팀장 이름을 찾아서 반환
+          // 임시로 팀 코드를 그대로 반환 (나중에 실제 팀장 이름으로 매핑)
+          return teamValue || '미지정';
         })(),         // 팀 이름 (코드 변환)
         // 부가차감지원정책 관련 데이터
         deductSupport: {
