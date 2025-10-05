@@ -1111,6 +1111,7 @@ function PolicyInputModal({
                 <TextField
                   {...params}
                   label="소속정책팀 *"
+                  placeholder="소속팀장을 선택하세요"
                   error={!!errors.team}
                   helperText={errors.team}
                   required
