@@ -193,15 +193,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const loadTeams = async () => {
-    // 팀 데이터는 하드코딩으로 정의 (원래 잘 작동하던 방식)
-    setTeams([
-      { code: 'AA', name: '홍기현' },
-      { code: 'BB', name: '김철수' },
-      { code: 'CC', name: '이영희' },
-      { code: 'DD', name: '박민수' },
-      { code: 'EE', name: '정수진' },
-      { code: 'FF', name: '최동현' }
-    ]);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/teams`);
+      if (response.ok) {
+        const data = await response.json();
+        setTeams(data);
+      }
+    } catch (error) {
+      console.error('팀 목록 로드 실패:', error);
+    }
   };
 
   const loadCategories = async () => {
