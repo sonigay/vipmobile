@@ -192,7 +192,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const loadTeams = async () => {
-    // 팀 데이터는 하드코딩으로 정의됨
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/teams`);
+      if (response.ok) {
+        const data = await response.json();
+        setTeams(data);
+      }
+    } catch (error) {
+      console.error('팀 목록 로드 실패:', error);
+    }
   };
 
   const loadCategories = async () => {
@@ -694,7 +702,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       try {
         // 선택된 정책들을 순차적으로 삭제
         for (const policy of selectedPolicies) {
-          const response = await fetch(`/api/policies/${policy.id}`, {
+          const response = await fetch(`${API_BASE_URL}/api/policies/${policy.id}`, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json'

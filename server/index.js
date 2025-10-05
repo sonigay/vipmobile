@@ -100,6 +100,26 @@ app.options('/api/budget/user-sheets-v2', (req, res) => {
   res.status(200).end();
 });
 
+// 팀 목록 조회 API
+app.get('/api/teams', async (req, res) => {
+  try {
+    // 팀 목록을 하드코딩으로 반환
+    const teams = [
+      { code: 'AA', name: '홍기현' },
+      { code: 'BB', name: '김철수' },
+      { code: 'CC', name: '이영희' },
+      { code: 'DD', name: '박민수' },
+      { code: 'EE', name: '정수진' },
+      { code: 'FF', name: '최동현' }
+    ];
+    
+    res.json(teams);
+  } catch (error) {
+    console.error('팀 목록 조회 실패:', error);
+    res.status(500).json({ error: '팀 목록 조회에 실패했습니다.' });
+  }
+});
+
 // VAPID 키 설정 (환경변수에서 가져오거나 생성)
 const vapidKeys = process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY 
   ? {
