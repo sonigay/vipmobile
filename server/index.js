@@ -18625,13 +18625,15 @@ app.post('/api/policies', async (req, res) => {
           }
         });
       } else {
-        // 기존 데이터가 있으면 정책만 추가
+        // 기존 데이터가 있으면 정책만 추가 (다음 행의 A열부터 정확히 기록)
         console.log('📝 [정책생성] 기존 데이터에 정책 추가');
-        response = await sheets.spreadsheets.values.append({
+        // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
+        const nextRowIndex = existingData.length + 1; // 1-based index
+        const targetRange = `정책_기본정보 !A${nextRowIndex}:AJ${nextRowIndex}`;
+        response = await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: '정책_기본정보 !A:AJ',
+          range: targetRange,
           valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
           resource: {
             values: [newPolicyRow]
           }
