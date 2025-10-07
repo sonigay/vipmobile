@@ -18372,7 +18372,8 @@ app.post('/api/policies', async (req, res) => {
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
-    if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
+    const isAddSupportPolicyForValidation = category === 'wireless_add_support' || category === 'wired_add_support';
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !policyContent) missingFields.push('policyContent');
     
     // 구두정책 전용 검증
     if (isShoePolicy) {
@@ -18413,9 +18414,42 @@ app.post('/api/policies', async (req, res) => {
       // 조건부 옵션은 선택사항이므로 검증하지 않음
       console.log('✅ [부가차감지원정책] 검증 완료');
     }
+
+    // 부가추가지원정책 전용 검증
+    const isAddSupportPolicy = category === 'wireless_add_support' || category === 'wired_add_support';
+    if (isAddSupportPolicy) {
+      console.log('🔍 [부가추가지원정책] 전용 검증 시작');
+      const addSupport = req.body.addSupport || {};
+      
+      console.log('🔍 [부가추가지원정책] 검증 데이터:', {
+        addSupport,
+        uplayPremiumAmount: addSupport.uplayPremiumAmount,
+        phoneExchangePassAmount: addSupport.phoneExchangePassAmount,
+        musicAmount: addSupport.musicAmount,
+        numberFilteringAmount: addSupport.numberFilteringAmount
+      });
+      
+      // 추가지원 금액 중 최소 하나는 입력되어야 함 (지원할 항목이 있어야 함)
+      const hasAnyAmount = (addSupport.uplayPremiumAmount && addSupport.uplayPremiumAmount.trim()) ||
+                          (addSupport.phoneExchangePassAmount && addSupport.phoneExchangePassAmount.trim()) ||
+                          (addSupport.musicAmount && addSupport.musicAmount.trim()) ||
+                          (addSupport.numberFilteringAmount && addSupport.numberFilteringAmount.trim());
+      
+      console.log('🔍 [부가추가지원정책] hasAnyAmount:', hasAnyAmount);
+      
+      if (!hasAnyAmount) {
+        console.log('❌ [부가추가지원정책] 추가지원 금액 누락');
+        missingFields.push('추가지원 금액');
+      } else {
+        console.log('✅ [부가추가지원정책] 추가지원 금액 검증 통과');
+      }
+      
+      // 조건부 옵션은 선택사항이므로 검증하지 않음
+      console.log('✅ [부가추가지원정책] 검증 완료');
+    }
     
-    // 일반 정책 검증 (구두정책, 부가차감지원정책이 아닌 경우)
-    if (!isShoePolicy && !isAddDeductPolicy) {
+    // 일반 정책 검증 (구두정책, 부가차감지원정책, 부가추가지원정책이 아닌 경우)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy) {
       console.log('🔍 [일반정책] 검증 시작');
       if (!amountType) missingFields.push('amountType');
       console.log('✅ [일반정책] 검증 완료');
@@ -18452,7 +18486,7 @@ app.post('/api/policies', async (req, res) => {
     }
     
     // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && amountType !== 'in_content' && !policyAmount) {
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
@@ -18563,8 +18597,9 @@ app.post('/api/policies', async (req, res) => {
       req.body.multipleStoreName || '', // Y열: 복수점명
       storeName,                   // Z열: 업체명
       (() => {                     // AA열: 개통유형
-        // 부가차감지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 설정
-        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct') {
+        // 부가차감/추가지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 설정
+        if (category === 'wireless_add_deduct' || category === 'wired_add_deduct' || 
+            category === 'wireless_add_support' || category === 'wired_add_support') {
           return '전유형';
         }
         
@@ -18593,7 +18628,21 @@ app.post('/api/policies', async (req, res) => {
       // AI열: 보험유치시조건 (부가차감지원정책에서만 사용)
       (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N') : '',
       // AJ열: 연결음유치시조건 (부가차감지원정책에서만 사용)
-      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N') : ''
+      (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N') : '',
+      // AK열: 유플레이(프리미엄) 유치금액 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.uplayPremiumAmount || '') : '',
+      // AL열: 폰교체패스 유치금액 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.phoneExchangePassAmount || '') : '',
+      // AM열: 음악감상 유치금액 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.musicAmount || '') : '',
+      // AN열: 지정번호필터링 유치금액 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.numberFilteringAmount || '') : '',
+      // AO열: VAS 2종 동시유치 조건 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.vas2Both ? 'Y' : 'N') : '',
+      // AP열: VAS 2종중 1개유치 조건 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N') : '',
+      // AQ열: 부가3종 모두유치 조건 (부가추가지원정책에서만 사용)
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : ''
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -18765,7 +18814,8 @@ app.put('/api/policies/:policyId', async (req, res) => {
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
-    if (!isShoePolicy && !isAddDeductPolicy && !policyContent) missingFields.push('policyContent');
+    const isAddSupportPolicyForValidation = category === 'wireless_add_support' || category === 'wired_add_support';
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !policyContent) missingFields.push('policyContent');
     
     // 구두정책 전용 검증
     if (isShoePolicy) {
@@ -18830,7 +18880,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
     }
     
     // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && amountType !== 'in_content' && !policyAmount) {
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',

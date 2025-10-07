@@ -87,6 +87,18 @@ function PolicyInputModal({
       addServiceAcquired: false,    // 부가유치시
       insuranceAcquired: false,    // 보험유치시
       connectionAcquired: false    // 연결음유치시
+    },
+    // 부가추가지원정책 전용 필드
+    addSupport: {
+      uplayPremiumAmount: '',      // 유플레이(프리미엄) 유치금액
+      phoneExchangePassAmount: '', // 폰교체패스 유치금액
+      musicAmount: '',             // 음악감상 유치금액
+      numberFilteringAmount: ''    // 지정번호필터링 유치금액
+    },
+    supportConditionalOptions: {
+      vas2Both: false,             // VAS 2종 동시유치
+      vas2Either: false,           // VAS 2종중 1개유치
+      addon3All: false             // 부가3종 모두유치
     }
   });
   
@@ -236,6 +248,65 @@ function PolicyInputModal({
     }
   }, [formData.deductSupport, formData.conditionalOptions, formData.isDirectInput, categoryId]);
 
+  // 부가추가지원정책 내용 자동생성
+  useEffect(() => {
+    if ((categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') && !formData.isDirectInput) {
+      const conditions = [];
+      if (formData.supportConditionalOptions?.vas2Both) conditions.push('VAS 2종 동시유치');
+      if (formData.supportConditionalOptions?.vas2Either) conditions.push('VAS 2종중 1개유치');
+      if (formData.supportConditionalOptions?.addon3All) conditions.push('부가3종 모두유치');
+      
+      // 추가지원 금액 수집
+      const supportItems = [];
+      const supportAmounts = [];
+      
+      // 유플레이(프리미엄) 유치금액
+      if (formData.addSupport?.uplayPremiumAmount?.trim()) {
+        supportItems.push('📺 유플레이(프리미엄)');
+        supportAmounts.push(Number(formData.addSupport.uplayPremiumAmount));
+      }
+      
+      // 폰교체패스 유치금액
+      if (formData.addSupport?.phoneExchangePassAmount?.trim()) {
+        supportItems.push('📱 폰교체패스');
+        supportAmounts.push(Number(formData.addSupport.phoneExchangePassAmount));
+      }
+      
+      // 음악감상 유치금액
+      if (formData.addSupport?.musicAmount?.trim()) {
+        supportItems.push('🎵 음악감상');
+        supportAmounts.push(Number(formData.addSupport.musicAmount));
+      }
+      
+      // 지정번호필터링 유치금액
+      if (formData.addSupport?.numberFilteringAmount?.trim()) {
+        supportItems.push('🔢 지정번호필터링');
+        supportAmounts.push(Number(formData.addSupport.numberFilteringAmount));
+      }
+      
+      if (supportItems.length > 0) {
+        // 모든 금액이 동일한 경우 하나의 금액으로 표시
+        const uniqueAmounts = [...new Set(supportAmounts)];
+        const amountText = uniqueAmounts.length === 1 
+          ? `${uniqueAmounts[0].toLocaleString()}원`
+          : supportAmounts.map(amount => `${amount.toLocaleString()}원`).join('/');
+        
+        let content;
+        if (conditions.length > 0) {
+          // 조건부가 있는 경우
+          content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${supportItems.join('/')} ${amountText} 추가금액지원`;
+        } else {
+          // 조건부가 없는 경우 - 모든 추가지원 금액 표시
+          content = `💰 ${supportItems.join('/')} ${amountText} 추가금액지원`;
+        }
+        setFormData(prev => ({ ...prev, policyContent: content }));
+      } else {
+        // 추가지원 금액이 없는 경우 내용 초기화
+        setFormData(prev => ({ ...prev, policyContent: '' }));
+      }
+    }
+  }, [formData.addSupport, formData.supportConditionalOptions, formData.isDirectInput, categoryId]);
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -292,6 +363,17 @@ function PolicyInputModal({
       }
     }
 
+    // 부가추가지원정책 추가지원설정 검사 (직접입력이 아닐 때만)
+    if ((categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') && !formData.isDirectInput) {
+      const hasAnyAmount = (formData.addSupport?.uplayPremiumAmount || '').trim() || 
+                          (formData.addSupport?.phoneExchangePassAmount || '').trim() || 
+                          (formData.addSupport?.musicAmount || '').trim() ||
+                          (formData.addSupport?.numberFilteringAmount || '').trim();
+      if (!hasAnyAmount) {
+        newErrors.addSupport = '추가지원 금액을 최소 하나 입력해주세요.';
+      }
+    }
+
     // 구두정책 개통유형 검사
     if (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') {
       const hasAnyActivationType = formData.activationType.new010 || formData.activationType.mnp || formData.activationType.change;
@@ -310,17 +392,18 @@ function PolicyInputModal({
       }
     }
     
-    // 정책내용 검사 - 구두정책이나 부가차감지원정책이 아니거나 직접입력이 체크된 경우에만 필수
+    // 정책내용 검사 - 구두정책이나 부가차감지원정책, 부가추가지원정책이 아니거나 직접입력이 체크된 경우에만 필수
     const isShoePolicy = categoryId === 'wireless_shoe' || categoryId === 'wired_shoe';
     const isAddDeductPolicy = categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct';
-    if (!isShoePolicy && !isAddDeductPolicy || formData.isDirectInput) {
+    const isAddSupportPolicy = categoryId === 'wireless_add_support' || categoryId === 'wired_add_support';
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy || formData.isDirectInput) {
       if (!formData.policyContent.trim()) {
         newErrors.policyContent = '정책내용을 입력해주세요.';
       }
     }
     
-    // 금액 입력 방식에 따른 검증 (구두정책이나 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && formData.amountType !== 'in_content') {
+    // 금액 입력 방식에 따른 검증 (구두정책이나 부가차감지원정책, 부가추가지원정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && formData.amountType !== 'in_content') {
       if (!formData.policyAmount.trim()) {
         newErrors.policyAmount = '금액을 입력해주세요.';
       } else if (isNaN(Number(formData.policyAmount))) {
@@ -373,8 +456,8 @@ function PolicyInputModal({
           policyEndDate: formData.policyEndDate,
           policyStore: formData.policyStore,
           policyContent: formData.policyContent.trim(),
-          policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
-          amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') ? '' : formData.amountType,
+          policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' || categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
+          amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' || categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') ? '' : formData.amountType,
           policyType: isWireless ? '무선' : '유선',
           category: categoryId,
           yearMonth: yearMonth,
@@ -390,7 +473,13 @@ function PolicyInputModal({
           modifiedAt: new Date().toISOString(),
           activationType: formData.activationType, // 개통유형
           amount95Above: formData.amount95Above, // 95군이상금액
-          amount95Below: formData.amount95Below // 95군미만금액
+          amount95Below: formData.amount95Below, // 95군미만금액
+          // 부가차감지원정책 데이터
+          deductSupport: formData.deductSupport,
+          conditionalOptions: formData.conditionalOptions,
+          // 부가추가지원정책 데이터
+          addSupport: formData.addSupport,
+          supportConditionalOptions: formData.supportConditionalOptions
         };
 
         await onSave(policy.id, updateData);
@@ -432,6 +521,9 @@ function PolicyInputModal({
             // 부가차감지원정책 데이터 추가
             deductSupport: formData.deductSupport,
             conditionalOptions: formData.conditionalOptions,
+            // 부가추가지원정책 데이터 추가
+            addSupport: formData.addSupport,
+            supportConditionalOptions: formData.supportConditionalOptions,
             multipleStoreName: formData.multipleStoreName || ''
           };
 
@@ -473,7 +565,10 @@ function PolicyInputModal({
             } : {}),
             // 부가차감지원정책 데이터 추가
             deductSupport: formData.deductSupport,
-            conditionalOptions: formData.conditionalOptions
+            conditionalOptions: formData.conditionalOptions,
+            // 부가추가지원정책 데이터 추가
+            addSupport: formData.addSupport,
+            supportConditionalOptions: formData.supportConditionalOptions
           }));
 
           // 각 정책을 순차적으로 저장
