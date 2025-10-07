@@ -18214,6 +18214,18 @@ app.get('/api/policies', async (req, res) => {
           insuranceAcquired: row[34] === 'Y',     // AI열: 보험유치시조건
           connectionAcquired: row[35] === 'Y'     // AJ열: 연결음유치시조건
         },
+        // 부가추가지원정책 관련 데이터
+        addSupport: {
+          uplayPremiumAmount: row[36] || '',      // AK열: 유플레이(프리미엄) 유치금액
+          phoneExchangePassAmount: row[37] || '', // AL열: 폰교체패스 유치금액
+          musicAmount: row[38] || '',             // AM열: 음악감상 유치금액
+          numberFilteringAmount: row[39] || ''    // AN열: 지정번호필터링 유치금액
+        },
+        supportConditionalOptions: {
+          vas2Both: row[40] === 'Y',              // AO열: VAS 2종 동시유치 조건
+          vas2Either: row[41] === 'Y',            // AP열: VAS 2종중 1개유치 조건
+          addon3All: row[42] === 'Y'              // AQ열: 부가3종 모두유치 조건
+        },
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18844,9 +18856,29 @@ app.put('/api/policies/:policyId', async (req, res) => {
       // 조건부 옵션은 선택사항이므로 검증하지 않음
       console.log('✅ [정책수정-부가차감지원정책] 검증 완료');
     }
+
+    // 부가추가지원정책 전용 검증
+    const isAddSupportPolicy = category === 'wireless_add_support' || category === 'wired_add_support';
+    if (isAddSupportPolicy) {
+      console.log('🔍 [정책수정-부가추가지원정책] 전용 검증 시작');
+      const addSupport = req.body.addSupport || {};
+      
+      // 추가지원 금액 중 최소 하나는 입력되어야 함 (지원할 항목이 있어야 함)
+      const hasAnyAmount = (addSupport.uplayPremiumAmount && addSupport.uplayPremiumAmount.trim()) ||
+                          (addSupport.phoneExchangePassAmount && addSupport.phoneExchangePassAmount.trim()) ||
+                          (addSupport.musicAmount && addSupport.musicAmount.trim()) ||
+                          (addSupport.numberFilteringAmount && addSupport.numberFilteringAmount.trim());
+      
+      if (!hasAnyAmount) {
+        missingFields.push('추가지원 금액');
+      }
+      
+      // 조건부 옵션은 선택사항이므로 검증하지 않음
+      console.log('✅ [정책수정-부가추가지원정책] 검증 완료');
+    }
     
-    // 일반 정책 검증 (구두정책, 부가차감지원정책이 아닌 경우)
-    if (!isShoePolicy && !isAddDeductPolicy) {
+    // 일반 정책 검증 (구두정책, 부가차감지원정책, 부가추가지원정책이 아닌 경우)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy) {
       console.log('🔍 [정책수정-일반정책] 검증 시작');
       if (!amountType) missingFields.push('amountType');
       console.log('✅ [정책수정-일반정책] 검증 완료');

@@ -1105,6 +1105,127 @@ function PolicyInputModal({
             </>
           ) : null}
 
+          {/* 부가추가지원정책 전용: 추가지원설정 */}
+          {categoryId === 'wireless_add_support' || categoryId === 'wired_add_support' ? (
+            <>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  추가지원설정 *
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                  <TextField
+                    label="유플레이(프리미엄) 유치금액"
+                    value={formData.addSupport?.uplayPremiumAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      uplayPremiumAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 200 }}
+                    placeholder="금액 입력"
+                  />
+                  <TextField
+                    label="폰교체패스 유치금액"
+                    value={formData.addSupport?.phoneExchangePassAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      phoneExchangePassAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 200 }}
+                    placeholder="금액 입력"
+                  />
+                  <TextField
+                    label="음악감상 유치금액"
+                    value={formData.addSupport?.musicAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      musicAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 200 }}
+                    placeholder="금액 입력"
+                  />
+                  <TextField
+                    label="지정번호필터링 유치금액"
+                    value={formData.addSupport?.numberFilteringAmount || ''}
+                    onChange={(e) => handleInputChange('addSupport', {
+                      ...(formData.addSupport || {}),
+                      numberFilteringAmount: e.target.value
+                    })}
+                    type="number"
+                    inputProps={{ min: 0 }}
+                    sx={{ width: 200 }}
+                    placeholder="금액 입력"
+                  />
+                </Box>
+                {errors.addSupport && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {errors.addSupport}
+                  </Typography>
+                )}
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  조건부 (선택사항)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.supportConditionalOptions?.vas2Both || false}
+                        onChange={(e) => handleInputChange('supportConditionalOptions', {
+                          ...(formData.supportConditionalOptions || {}),
+                          vas2Both: e.target.checked
+                        })}
+                      />
+                    }
+                    label="VAS 2종 동시유치"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.supportConditionalOptions?.vas2Either || false}
+                        onChange={(e) => handleInputChange('supportConditionalOptions', {
+                          ...(formData.supportConditionalOptions || {}),
+                          vas2Either: e.target.checked
+                        })}
+                      />
+                    }
+                    label="VAS 2종중 1개유치"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.supportConditionalOptions?.addon3All || false}
+                        onChange={(e) => handleInputChange('supportConditionalOptions', {
+                          ...(formData.supportConditionalOptions || {}),
+                          addon3All: e.target.checked
+                        })}
+                      />
+                    }
+                    label="부가3종 모두유치"
+                  />
+                </Box>
+                
+                {/* 직접입력 체크박스 */}
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.isDirectInput}
+                      onChange={(e) => handleInputChange('isDirectInput', e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Grid>
+            </>
+          ) : null}
+
           <Grid item xs={12}>
             <TextField
               fullWidth
