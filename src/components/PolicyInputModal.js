@@ -411,8 +411,8 @@ function PolicyInputModal({
       }
     }
     
-    // 금액 유형 검사 (구두정책이나 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && !formData.amountType) {
+    // 금액 유형 검사 (구두정책이나 부가차감지원정책, 부가추가지원정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !formData.amountType) {
       newErrors.amountType = '금액 유형을 선택해주세요.';
     }
     
@@ -1278,7 +1278,8 @@ function PolicyInputModal({
           
           {/* 구두정책과 부가차감지원정책이 아닌 경우에만 금액 유형 선택 표시 */}
           {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
-             categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && (
+             categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' ||
+             categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') && (
             <Grid item xs={12} sm={6}>
               <FormControl component="fieldset" error={!!errors.amountType}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
