@@ -802,7 +802,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '정책_기본정보 ') {
-      range = `${safeSheetName}!A:AR`;  // 요금제유형별정책 AR열까지 확장
+      range = `${safeSheetName}!A:AU`;  // 연합정책 AU열까지 확장
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -18234,6 +18234,22 @@ app.get('/api/policies', async (req, res) => {
             return [];
           }
         })(),
+        // 연합정책 관련 데이터
+        unionSettlementStore: row[44] || '',  // AS열: 정산 입금처
+        unionTargetStores: (() => {
+          try {
+            return JSON.parse(row[45] || '[]');  // AT열: 연합대상하부점 (JSON)
+          } catch (error) {
+            return [];
+          }
+        })(),
+        unionConditions: (() => {
+          try {
+            return JSON.parse(row[46] || '{}');  // AU열: 조건 (JSON)
+          } catch (error) {
+            return {};
+          }
+        })(),
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18697,7 +18713,13 @@ app.post('/api/policies', async (req, res) => {
       // AQ열: 부가3종 모두유치 조건 (부가추가지원정책에서만 사용)
       (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : '',
       // AR열: 요금제유형별정책 지원사항 (JSON 문자열)
-      (category === 'wireless_rate' || category === 'wired_rate') ? JSON.stringify(req.body.rateSupports || []) : ''
+      (category === 'wireless_rate' || category === 'wired_rate') ? JSON.stringify(req.body.rateSupports || []) : '',
+      // AS열: 연합정책 정산 입금처
+      (category === 'wireless_union' || category === 'wired_union') ? (req.body.unionSettlementStore || '') : '',
+      // AT열: 연합정책 연합대상하부점 (JSON 문자열)
+      (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionTargetStores || []) : '',
+      // AU열: 연합정책 조건 (JSON 문자열)
+      (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionConditions || {}) : ''
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -18721,7 +18743,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-          range: '정책_기본정보 !A:AR',
+          range: '정책_기본정보 !A:AU',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18733,7 +18755,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
-        const targetRange = `정책_기본정보 !A${nextRowIndex}:AR${nextRowIndex}`;
+        const targetRange = `정책_기본정보 !A${nextRowIndex}:AU${nextRowIndex}`;
         response = await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
           range: targetRange,
@@ -19047,7 +19069,11 @@ app.put('/api/policies/:policyId', async (req, res) => {
       (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N'), // AP열
       (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N'), // AQ열
       // 요금제유형별정책 데이터
-      JSON.stringify(req.body.rateSupports || []) // AR열
+      JSON.stringify(req.body.rateSupports || []), // AR열
+      // 연합정책 데이터
+      req.body.unionSettlementStore || '', // AS열
+      JSON.stringify(req.body.unionTargetStores || []), // AT열
+      JSON.stringify(req.body.unionConditions || {}) // AU열
     ];
     
     // 각 필드를 개별적으로 업데이트
@@ -19080,7 +19106,10 @@ app.put('/api/policies/:policyId', async (req, res) => {
       `'정책_기본정보 '!AO${rowNumber}`, // VAS 2종 동시유치
       `'정책_기본정보 '!AP${rowNumber}`, // VAS 2종중 1개유치
       `'정책_기본정보 '!AQ${rowNumber}`, // 부가3종 모두유치
-      `'정책_기본정보 '!AR${rowNumber}`  // 요금제유형별정책 데이터
+      `'정책_기본정보 '!AR${rowNumber}`, // 요금제유형별정책 데이터
+      `'정책_기본정보 '!AS${rowNumber}`, // 연합정책 정산 입금처
+      `'정책_기본정보 '!AT${rowNumber}`, // 연합정책 연합대상하부점
+      `'정책_기본정보 '!AU${rowNumber}`  // 연합정책 조건
     ];
     
     // 배치 업데이트 실행

@@ -103,7 +103,14 @@ function PolicyInputModal({
       addon3All: false             // 부가3종 모두유치
     },
     // 요금제유형별정책 전용 필드
-    rateSupports: []  // 동적 배열: { modelType, rateGrade, rateRange, activationType, amount }
+    rateSupports: [],  // 동적 배열: { modelType, rateGrade, rateRange, activationType, amount }
+    // 연합정책 전용 필드
+    unionSettlementStore: '',  // 정산 입금처 (단일점)
+    unionTargetStores: [],     // 연합대상하부점 (복수점)
+    unionConditions: {
+      individualInput: false,  // 개별 입력
+      postSettlement: false    // 후정산 입력
+    }
   });
   
   const [errors, setErrors] = useState({});
@@ -359,6 +366,54 @@ function PolicyInputModal({
     }
   }, [formData.rateSupports, formData.isDirectInput, categoryId]);
 
+  // 연합정책 내용 자동생성
+  useEffect(() => {
+    if ((categoryId === 'wireless_union' || categoryId === 'wired_union') && !formData.isDirectInput) {
+      const parts = [];
+      
+      // 1. 정산 입금처
+      if (formData.unionSettlementStore) {
+        parts.push(`🏢 정산 입금처: ${formData.unionSettlementStore}`);
+      }
+      
+      // 2. 연합대상하부점
+      if (formData.unionTargetStores && formData.unionTargetStores.length > 0) {
+        parts.push('\n🏪 연합대상하부점:');
+        formData.unionTargetStores.forEach(store => {
+          parts.push(`   - ${store}`);
+        });
+      }
+      
+      // 3. 지원금액
+      if (formData.policyAmount) {
+        const amountNum = Number(formData.policyAmount);
+        const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
+          ? `${amountNum / 10000}만원`
+          : `${amountNum.toLocaleString()}원`;
+        const amountTypeText = formData.amountType === 'total' ? '총금액' : '건당금액';
+        parts.push(`\n💰 지원금액: ${amountText} (${amountTypeText})`);
+      }
+      
+      // 4. 조건
+      const conditions = [];
+      if (formData.unionConditions.individualInput) conditions.push('개별 입력');
+      if (formData.unionConditions.postSettlement) conditions.push('후정산 입력');
+      
+      if (conditions.length > 0) {
+        parts.push(`\n📌 조건: ${conditions.join(', ')}`);
+      } else {
+        parts.push('\n📌 조건: 없음');
+      }
+      
+      if (parts.length > 0) {
+        const content = parts.join('\n');
+        setFormData(prev => ({ ...prev, policyContent: content }));
+      } else {
+        setFormData(prev => ({ ...prev, policyContent: '' }));
+      }
+    }
+  }, [formData.unionSettlementStore, formData.unionTargetStores, formData.policyAmount, formData.amountType, formData.unionConditions, formData.isDirectInput, categoryId]);
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -438,6 +493,16 @@ function PolicyInputModal({
         if (hasIncompleteRow) {
           newErrors.rateSupports = '모든 지원사항의 필수 필드를 입력해주세요.';
         }
+      }
+    }
+
+    // 연합정책 필드 검사 (직접입력이 아닐 때만)
+    if ((categoryId === 'wireless_union' || categoryId === 'wired_union') && !formData.isDirectInput) {
+      if (!formData.unionSettlementStore) {
+        newErrors.unionSettlementStore = '정산 입금처를 선택해주세요.';
+      }
+      if (!formData.unionTargetStores || formData.unionTargetStores.length === 0) {
+        newErrors.unionTargetStores = '연합대상하부점을 최소 1개 이상 선택해주세요.';
       }
     }
 
@@ -549,7 +614,11 @@ function PolicyInputModal({
           addSupport: formData.addSupport,
           supportConditionalOptions: formData.supportConditionalOptions,
           // 요금제유형별정책 데이터
-          rateSupports: formData.rateSupports
+          rateSupports: formData.rateSupports,
+          // 연합정책 데이터
+          unionSettlementStore: formData.unionSettlementStore,
+          unionTargetStores: formData.unionTargetStores,
+          unionConditions: formData.unionConditions
         };
 
         await onSave(policy.id, updateData);
@@ -596,6 +665,10 @@ function PolicyInputModal({
             supportConditionalOptions: formData.supportConditionalOptions,
             // 요금제유형별정책 데이터 추가
             rateSupports: formData.rateSupports,
+            // 연합정책 데이터 추가
+            unionSettlementStore: formData.unionSettlementStore,
+            unionTargetStores: formData.unionTargetStores,
+            unionConditions: formData.unionConditions,
             multipleStoreName: formData.multipleStoreName || ''
           };
 
@@ -642,7 +715,11 @@ function PolicyInputModal({
             addSupport: formData.addSupport,
             supportConditionalOptions: formData.supportConditionalOptions,
             // 요금제유형별정책 데이터 추가
-            rateSupports: formData.rateSupports
+            rateSupports: formData.rateSupports,
+            // 연합정책 데이터 추가
+            unionSettlementStore: formData.unionSettlementStore,
+            unionTargetStores: formData.unionTargetStores,
+            unionConditions: formData.unionConditions
           }));
 
           // 각 정책을 순차적으로 저장
@@ -1450,6 +1527,101 @@ function PolicyInputModal({
             </>
           ) : null}
 
+          {/* 연합정책 전용: 정산 입금처 + 연합대상하부점 + 조건 */}
+          {categoryId === 'wireless_union' || categoryId === 'wired_union' ? (
+            <>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  정산 입금처 *
+                </Typography>
+                <Autocomplete
+                  options={stores}
+                  getOptionLabel={(option) => option.storeName || ''}
+                  value={stores.find(s => s.storeName === formData.unionSettlementStore) || null}
+                  onChange={(event, newValue) => {
+                    handleInputChange('unionSettlementStore', newValue ? newValue.storeName : '');
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="정산 입금처 매장을 선택하세요"
+                      error={!!errors.unionSettlementStore}
+                      helperText={errors.unionSettlementStore}
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  연합대상하부점 *
+                </Typography>
+                <Autocomplete
+                  multiple
+                  options={stores}
+                  getOptionLabel={(option) => option.storeName || ''}
+                  value={stores.filter(s => formData.unionTargetStores.includes(s.storeName))}
+                  onChange={(event, newValue) => {
+                    handleInputChange('unionTargetStores', newValue.map(v => v.storeName));
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="연합대상하부점을 선택하세요 (복수 선택 가능)"
+                      error={!!errors.unionTargetStores}
+                      helperText={errors.unionTargetStores}
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  조건부 옵션
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.unionConditions.individualInput}
+                        onChange={(e) => handleInputChange('unionConditions', {
+                          ...formData.unionConditions,
+                          individualInput: e.target.checked
+                        })}
+                      />
+                    }
+                    label="개별 입력"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.unionConditions.postSettlement}
+                        onChange={(e) => handleInputChange('unionConditions', {
+                          ...formData.unionConditions,
+                          postSettlement: e.target.checked
+                        })}
+                      />
+                    }
+                    label="후정산 입력"
+                  />
+                </Box>
+              </Grid>
+
+              {/* 직접입력 체크박스 */}
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.isDirectInput}
+                      onChange={(e) => handleInputChange('isDirectInput', e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Grid>
+            </>
+          ) : null}
+
           <Grid item xs={12}>
             <TextField
               fullWidth
@@ -1527,11 +1699,14 @@ function PolicyInputModal({
                     control={<Radio />}
                     label="건당금액"
                   />
-                  <FormControlLabel
-                    value="in_content"
-                    control={<Radio />}
-                    label="내용에 직접입력"
-                  />
+                  {/* 연합정책이 아닐 때만 "내용에 직접입력" 옵션 표시 */}
+                  {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && (
+                    <FormControlLabel
+                      value="in_content"
+                      control={<Radio />}
+                      label="내용에 직접입력"
+                    />
+                  )}
                 </RadioGroup>
                 {errors.amountType && (
                   <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
