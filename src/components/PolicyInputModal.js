@@ -153,6 +153,24 @@ function PolicyInputModal({
             addServiceAcquired: false,
             insuranceAcquired: false,
             connectionAcquired: false
+          },
+          addSupport: policy.addSupport || {
+            uplayPremiumAmount: '',
+            phoneExchangePassAmount: '',
+            musicAmount: '',
+            numberFilteringAmount: ''
+          },
+          supportConditionalOptions: policy.supportConditionalOptions || {
+            vas2Both: false,
+            vas2Either: false,
+            addon3All: false
+          },
+          rateSupports: policy.rateSupports || [],
+          unionSettlementStore: policy.unionSettlementStore || '',
+          unionTargetStores: policy.unionTargetStores || [],
+          unionConditions: policy.unionConditions || {
+            individualInput: false,
+            postSettlement: false
           }
         });
       } else {
