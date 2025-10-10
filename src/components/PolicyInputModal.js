@@ -1601,9 +1601,9 @@ function PolicyInputModal({
                   <FormControlLabel
                     control={
                       <Checkbox
-                        checked={formData.unionConditions.individualInput}
+                        checked={formData.unionConditions?.individualInput || false}
                         onChange={(e) => handleInputChange('unionConditions', {
-                          ...formData.unionConditions,
+                          ...(formData.unionConditions || {}),
                           individualInput: e.target.checked
                         })}
                       />
@@ -1613,9 +1613,9 @@ function PolicyInputModal({
                   <FormControlLabel
                     control={
                       <Checkbox
-                        checked={formData.unionConditions.postSettlement}
+                        checked={formData.unionConditions?.postSettlement || false}
                         onChange={(e) => handleInputChange('unionConditions', {
-                          ...formData.unionConditions,
+                          ...(formData.unionConditions || {}),
                           postSettlement: e.target.checked
                         })}
                       />
