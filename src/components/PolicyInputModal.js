@@ -103,7 +103,7 @@ function PolicyInputModal({
       addon3All: false             // 부가3종 모두유치
     },
     // 요금제유형별정책 전용 필드
-    rateSupports: []  // 동적 배열: { modelType, rateGrade, activationType, amount }
+    rateSupports: []  // 동적 배열: { modelType, rateGrade, rateRange, activationType, amount }
   });
   
   const [errors, setErrors] = useState({});
@@ -315,29 +315,36 @@ function PolicyInputModal({
   useEffect(() => {
     if ((categoryId === 'wireless_rate' || categoryId === 'wired_rate') && !formData.isDirectInput) {
       if (formData.rateSupports && formData.rateSupports.length > 0) {
-        // 요금제군/유형/금액이 동일한 것끼리 그룹핑
+        // 모델유형/요금제군(+범위)/금액이 동일한 것끼리 그룹핑 → 유형만 나열
         const grouped = {};
         
         formData.rateSupports.forEach(item => {
           if (item.modelType && item.rateGrade && item.activationType && item.amount) {
-            const key = `${item.rateGrade}|${item.activationType}|${item.amount}`;
+            const rateGradeText = item.rateRange && item.rateRange !== '해당군' 
+              ? `${item.rateGrade} ${item.rateRange}` 
+              : item.rateGrade;
+            const key = `${item.modelType}|${rateGradeText}|${item.amount}`;
             if (!grouped[key]) {
               grouped[key] = {
-                models: [],
-                rateGrade: item.rateGrade,
-                activationType: item.activationType,
+                modelType: item.modelType,
+                rateGradeText: rateGradeText,
+                activationTypes: [],
                 amount: item.amount
               };
             }
-            grouped[key].models.push(item.modelType);
+            grouped[key].activationTypes.push(item.activationType);
           }
         });
         
         // 자동문구 생성
         const lines = Object.values(grouped).map(group => {
-          const models = group.models.join(', ');
-          const amount = Number(group.amount).toLocaleString();
-          return `💰 ${models} / ${group.rateGrade} / ${group.activationType} / ${amount}원`;
+          const types = group.activationTypes.join(', ');
+          const amountNum = Number(group.amount);
+          // 10,000원 단위로 +X만 형식으로 변환
+          const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
+            ? `+${amountNum / 10000}만`
+            : `+${amountNum.toLocaleString()}원`;
+          return `💰 ${group.modelType} / ${group.rateGradeText} / ${types} / ${amountText}`;
         });
         
         if (lines.length > 0) {
@@ -424,12 +431,12 @@ function PolicyInputModal({
       if (!formData.rateSupports || formData.rateSupports.length === 0) {
         newErrors.rateSupports = '지원사항을 최소 1개 이상 추가해주세요.';
       } else {
-        // 각 행의 필드 검증
+        // 각 행의 필드 검증 (rateRange는 선택사항이므로 제외)
         const hasIncompleteRow = formData.rateSupports.some(item => 
           !item.modelType || !item.rateGrade || !item.activationType || !item.amount
         );
         if (hasIncompleteRow) {
-          newErrors.rateSupports = '모든 지원사항의 필드를 입력해주세요.';
+          newErrors.rateSupports = '모든 지원사항의 필수 필드를 입력해주세요.';
         }
       }
     }
@@ -1305,7 +1312,7 @@ function PolicyInputModal({
                     variant="outlined"
                     size="small"
                     onClick={() => {
-                      const newSupports = [...(formData.rateSupports || []), { modelType: '', rateGrade: '', activationType: '', amount: '' }];
+                      const newSupports = [...(formData.rateSupports || []), { modelType: '', rateGrade: '', rateRange: '해당군', activationType: '', amount: '' }];
                       handleInputChange('rateSupports', newSupports);
                     }}
                   >
@@ -1357,6 +1364,24 @@ function PolicyInputModal({
                         <MenuItem value="키즈군">키즈군</MenuItem>
                         <MenuItem value="키즈22군">키즈22군</MenuItem>
                         <MenuItem value="2nd군">2nd군</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <FormControl sx={{ width: 90 }} size="small">
+                      <InputLabel>범위</InputLabel>
+                      <Select
+                        value={item.rateRange || '해당군'}
+                        label="범위"
+                        onChange={(e) => {
+                          const newSupports = [...formData.rateSupports];
+                          newSupports[index].rateRange = e.target.value;
+                          handleInputChange('rateSupports', newSupports);
+                        }}
+                      >
+                        <MenuItem value="해당군">해당군</MenuItem>
+                        <MenuItem value="이상">이상</MenuItem>
+                        <MenuItem value="이하">이하</MenuItem>
+                        <MenuItem value="초과">초과</MenuItem>
+                        <MenuItem value="미만">미만</MenuItem>
                       </Select>
                     </FormControl>
                     <FormControl sx={{ width: 100 }} size="small">

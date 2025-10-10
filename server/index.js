@@ -18485,7 +18485,7 @@ app.post('/api/policies', async (req, res) => {
         console.log('❌ [요금제유형별정책] 지원사항 누락');
         missingFields.push('지원사항');
       } else {
-        // 각 항목의 필드 검증
+        // 각 항목의 필드 검증 (rateRange는 선택사항이므로 제외)
         const hasIncompleteItem = rateSupports.some(item => 
           !item.modelType || !item.rateGrade || !item.activationType || !item.amount
         );
@@ -18931,7 +18931,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
       if (rateSupports.length === 0) {
         missingFields.push('지원사항');
       } else {
-        // 각 항목의 필드 검증
+        // 각 항목의 필드 검증 (rateRange는 선택사항이므로 제외)
         const hasIncompleteItem = rateSupports.some(item => 
           !item.modelType || !item.rateGrade || !item.activationType || !item.amount
         );
