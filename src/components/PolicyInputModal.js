@@ -18,8 +18,10 @@ import {
   FormControlLabel,
   Radio,
   RadioGroup,
-  Checkbox
+  Checkbox,
+  IconButton
 } from '@mui/material';
+import { Delete as DeleteIcon } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
