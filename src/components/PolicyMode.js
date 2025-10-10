@@ -1256,9 +1256,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 200 }}>
                             내용
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
-                            개통유형
-                          </TableCell>
+                          {/* 요금제유형별정책이 아닐 때만 개통유형 컬럼 표시 */}
+                          {selectedCategory !== 'wireless_rate' && selectedCategory !== 'wired_rate' && (
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
+                              개통유형
+                            </TableCell>
+                          )}
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
                             입력자
                           </TableCell>
@@ -1448,7 +1451,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                   // 일반 정책이거나 직접입력이 있는 경우
                                   return (
                                     <>
-                                      <Typography variant="body2">{policy.policyContent}</Typography>
+                                      <Typography 
+                                        variant="body2" 
+                                        sx={{ whiteSpace: 'pre-line' }}
+                                      >
+                                        {policy.policyContent}
+                                      </Typography>
                                       {policy.cancelReason && (
                                         <Typography variant="caption" color="error" display="block">
                                           취소사유: {policy.cancelReason}
@@ -1459,31 +1467,33 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                 })()}
                               </Box>
                             </TableCell>
-                            <TableCell>
-                              {(() => {
-                                // 개통유형 표시 로직
-                                // 부가차감/추가지원정책, 요금제유형별정책은 개통유형 선택 필드가 없으므로 "전유형"으로 표시
-                                if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct' || 
-                                    policy.category === 'wireless_add_support' || policy.category === 'wired_add_support' ||
-                                    policy.category === 'wireless_rate' || policy.category === 'wired_rate') {
-                                  return '전유형';
-                                }
-                                
-                                if (!policy.activationType) return '-';
-                                
-                                const { new010, mnp, change } = policy.activationType;
-                                const types = [];
-                                
-                                if (new010) types.push('010신규');
-                                if (mnp) types.push('MNP');
-                                if (change) types.push('기변');
-                                
-                                if (types.length === 0) return '-';
-                                if (types.length === 3) return '전유형';
-                                
-                                return types.join(', ');
-                              })()}
-                            </TableCell>
+                            {/* 요금제유형별정책이 아닐 때만 개통유형 셀 표시 */}
+                            {selectedCategory !== 'wireless_rate' && selectedCategory !== 'wired_rate' && (
+                              <TableCell>
+                                {(() => {
+                                  // 개통유형 표시 로직
+                                  // 부가차감/추가지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 표시
+                                  if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct' || 
+                                      policy.category === 'wireless_add_support' || policy.category === 'wired_add_support') {
+                                    return '전유형';
+                                  }
+                                  
+                                  if (!policy.activationType) return '-';
+                                  
+                                  const { new010, mnp, change } = policy.activationType;
+                                  const types = [];
+                                  
+                                  if (new010) types.push('010신규');
+                                  if (mnp) types.push('MNP');
+                                  if (change) types.push('기변');
+                                  
+                                  if (types.length === 0) return '-';
+                                  if (types.length === 3) return '전유형';
+                                  
+                                  return types.join(', ');
+                                })()}
+                              </TableCell>
+                            )}
                             <TableCell>{policy.inputUserName}</TableCell>
                             <TableCell sx={{ py: 1.5 }}>
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
