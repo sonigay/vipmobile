@@ -18226,6 +18226,14 @@ app.get('/api/policies', async (req, res) => {
           vas2Either: row[41] === 'Y',            // AP열: VAS 2종중 1개유치 조건
           addon3All: row[42] === 'Y'              // AQ열: 부가3종 모두유치 조건
         },
+        // 요금제유형별정책 관련 데이터
+        rateSupports: (() => {
+          try {
+            return JSON.parse(row[43] || '[]');  // AR열: 요금제유형별정책 지원사항 (JSON)
+          } catch (error) {
+            return [];
+          }
+        })(),
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18308,20 +18316,20 @@ app.post('/api/policies', async (req, res) => {
     
     if (isShoePolicyForLog) {
       console.log('📝 [정책생성-구두정책] 요청 데이터 상세:', {
-        policyName: req.body.policyName,
-        policyStartDate: req.body.policyStartDate,
-        policyEndDate: req.body.policyEndDate,
-        policyStore: req.body.policyStore,
-        policyContent: req.body.policyContent,
-        policyAmount: req.body.policyAmount,
-        amountType: req.body.amountType,
-        category: req.body.category,
-        yearMonth: req.body.yearMonth,
-        activationType: req.body.activationType,
-        amount95Above: req.body.amount95Above,
-        amount95Below: req.body.amount95Below,
-        multipleStoreName: req.body.multipleStoreName
-      });
+      policyName: req.body.policyName,
+      policyStartDate: req.body.policyStartDate,
+      policyEndDate: req.body.policyEndDate,
+      policyStore: req.body.policyStore,
+      policyContent: req.body.policyContent,
+      policyAmount: req.body.policyAmount,
+      amountType: req.body.amountType,
+      category: req.body.category,
+      yearMonth: req.body.yearMonth,
+      activationType: req.body.activationType,
+      amount95Above: req.body.amount95Above,
+      amount95Below: req.body.amount95Below,
+      multipleStoreName: req.body.multipleStoreName
+    });
     } else if (isAddDeductPolicyForLog) {
       console.log('📝 [정책생성-부가차감지원정책] 요청 데이터 상세:', {
         policyName: req.body.policyName,
@@ -18385,14 +18393,15 @@ app.post('/api/policies', async (req, res) => {
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
     const isAddSupportPolicyForValidation = category === 'wireless_add_support' || category === 'wired_add_support';
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !policyContent) missingFields.push('policyContent');
+    const isRatePolicyForValidation = category === 'wireless_rate' || category === 'wired_rate';
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !isRatePolicyForValidation && !policyContent) missingFields.push('policyContent');
     
     // 구두정책 전용 검증
     if (isShoePolicy) {
       console.log('🔍 [구두정책] 전용 검증 시작');
       // 95군이상/미만 금액 중 하나라도 있어야 함
       if (!req.body.amount95Above && !req.body.amount95Below && !policyContent) {
-        missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+      missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
       }
       console.log('✅ [구두정책] 검증 완료');
     }
@@ -18459,9 +18468,40 @@ app.post('/api/policies', async (req, res) => {
       // 조건부 옵션은 선택사항이므로 검증하지 않음
       console.log('✅ [부가추가지원정책] 검증 완료');
     }
+
+    // 요금제유형별정책 전용 검증
+    const isRatePolicy = category === 'wireless_rate' || category === 'wired_rate';
+    if (isRatePolicy) {
+      console.log('🔍 [요금제유형별정책] 전용 검증 시작');
+      const rateSupports = req.body.rateSupports || [];
+      
+      console.log('🔍 [요금제유형별정책] 검증 데이터:', {
+        rateSupports,
+        count: rateSupports.length
+      });
+      
+      // 지원사항 최소 1개는 입력되어야 함
+      if (rateSupports.length === 0) {
+        console.log('❌ [요금제유형별정책] 지원사항 누락');
+        missingFields.push('지원사항');
+      } else {
+        // 각 항목의 필드 검증
+        const hasIncompleteItem = rateSupports.some(item => 
+          !item.modelType || !item.rateGrade || !item.activationType || !item.amount
+        );
+        if (hasIncompleteItem) {
+          console.log('❌ [요금제유형별정책] 불완전한 지원사항 존재');
+          missingFields.push('지원사항 필드');
+        } else {
+          console.log('✅ [요금제유형별정책] 지원사항 검증 통과');
+        }
+      }
+      
+      console.log('✅ [요금제유형별정책] 검증 완료');
+    }
     
-    // 일반 정책 검증 (구두정책, 부가차감지원정책, 부가추가지원정책이 아닌 경우)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy) {
+    // 일반 정책 검증 (구두정책, 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아닌 경우)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy) {
       console.log('🔍 [일반정책] 검증 시작');
       if (!amountType) missingFields.push('amountType');
       console.log('✅ [일반정책] 검증 완료');
@@ -18498,7 +18538,7 @@ app.post('/api/policies', async (req, res) => {
     }
     
     // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && amountType !== 'in_content' && !policyAmount) {
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
@@ -18609,9 +18649,10 @@ app.post('/api/policies', async (req, res) => {
       req.body.multipleStoreName || '', // Y열: 복수점명
       storeName,                   // Z열: 업체명
       (() => {                     // AA열: 개통유형
-        // 부가차감/추가지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 설정
+        // 부가차감/추가지원정책, 요금제유형별정책은 개통유형 선택 필드가 없으므로 "전유형"으로 설정
         if (category === 'wireless_add_deduct' || category === 'wired_add_deduct' || 
-            category === 'wireless_add_support' || category === 'wired_add_support') {
+            category === 'wireless_add_support' || category === 'wired_add_support' ||
+            category === 'wireless_rate' || category === 'wired_rate') {
           return '전유형';
         }
         
@@ -18654,7 +18695,9 @@ app.post('/api/policies', async (req, res) => {
       // AP열: VAS 2종중 1개유치 조건 (부가추가지원정책에서만 사용)
       (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N') : '',
       // AQ열: 부가3종 모두유치 조건 (부가추가지원정책에서만 사용)
-      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : ''
+      (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : '',
+      // AR열: 요금제유형별정책 지원사항 (JSON 문자열)
+      (category === 'wireless_rate' || category === 'wired_rate') ? JSON.stringify(req.body.rateSupports || []) : ''
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -18674,30 +18717,30 @@ app.post('/api/policies', async (req, res) => {
     
     // 시트가 비어있으면 헤더와 함께 데이터 추가
     try {
-      if (!existingData || existingData.length === 0) {
-        console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
-        response = await sheets.spreadsheets.values.append({
-          spreadsheetId: SPREADSHEET_ID,
+    if (!existingData || existingData.length === 0) {
+      console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
+      response = await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
           range: '정책_기본정보 !A:AJ',
-          valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
-          resource: {
-            values: [headerRow, newPolicyRow]
-          }
-        });
-      } else {
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [headerRow, newPolicyRow]
+        }
+      });
+    } else {
         // 기존 데이터가 있으면 정책만 추가 (다음 행의 A열부터 정확히 기록)
-        console.log('📝 [정책생성] 기존 데이터에 정책 추가');
+      console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
         const targetRange = `정책_기본정보 !A${nextRowIndex}:AJ${nextRowIndex}`;
         response = await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
+        spreadsheetId: SPREADSHEET_ID,
           range: targetRange,
-          valueInputOption: 'RAW',
-          resource: {
-            values: [newPolicyRow]
-          }
+        valueInputOption: 'RAW',
+        resource: {
+          values: [newPolicyRow]
+        }
         });
       }
       console.log('✅ [정책생성] Google Sheets 저장 성공:', response.data);
@@ -18827,14 +18870,15 @@ app.put('/api/policies/:policyId', async (req, res) => {
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
     // 부가차감지원정책은 자동 생성되므로 policyContent 검증 제외
     const isAddSupportPolicyForValidation = category === 'wireless_add_support' || category === 'wired_add_support';
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !policyContent) missingFields.push('policyContent');
+    const isRatePolicyForValidation = category === 'wireless_rate' || category === 'wired_rate';
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicyForValidation && !isRatePolicyForValidation && !policyContent) missingFields.push('policyContent');
     
     // 구두정책 전용 검증
     if (isShoePolicy) {
       console.log('🔍 [정책수정-구두정책] 전용 검증 시작');
       // 95군이상/미만 금액 중 하나라도 있어야 함
       if (!req.body.amount95Above && !req.body.amount95Below && !policyContent) {
-        missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
+      missingFields.push('amount95Above 또는 amount95Below 또는 policyContent');
       }
       console.log('✅ [정책수정-구두정책] 검증 완료');
     }
@@ -18876,9 +18920,31 @@ app.put('/api/policies/:policyId', async (req, res) => {
       // 조건부 옵션은 선택사항이므로 검증하지 않음
       console.log('✅ [정책수정-부가추가지원정책] 검증 완료');
     }
+
+    // 요금제유형별정책 전용 검증
+    const isRatePolicyForUpdate = category === 'wireless_rate' || category === 'wired_rate';
+    if (isRatePolicyForUpdate) {
+      console.log('🔍 [정책수정-요금제유형별정책] 전용 검증 시작');
+      const rateSupports = req.body.rateSupports || [];
+      
+      // 지원사항 최소 1개는 입력되어야 함
+      if (rateSupports.length === 0) {
+        missingFields.push('지원사항');
+      } else {
+        // 각 항목의 필드 검증
+        const hasIncompleteItem = rateSupports.some(item => 
+          !item.modelType || !item.rateGrade || !item.activationType || !item.amount
+        );
+        if (hasIncompleteItem) {
+          missingFields.push('지원사항 필드');
+        }
+      }
+      
+      console.log('✅ [정책수정-요금제유형별정책] 검증 완료');
+    }
     
-    // 일반 정책 검증 (구두정책, 부가차감지원정책, 부가추가지원정책이 아닌 경우)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy) {
+    // 일반 정책 검증 (구두정책, 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아닌 경우)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicyForUpdate) {
       console.log('🔍 [정책수정-일반정책] 검증 시작');
       if (!amountType) missingFields.push('amountType');
       console.log('✅ [정책수정-일반정책] 검증 완료');
@@ -18912,7 +18978,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
     }
     
     // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && amountType !== 'in_content' && !policyAmount) {
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',

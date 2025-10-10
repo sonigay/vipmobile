@@ -99,7 +99,9 @@ function PolicyInputModal({
       vas2Both: false,             // VAS 2종 동시유치
       vas2Either: false,           // VAS 2종중 1개유치
       addon3All: false             // 부가3종 모두유치
-    }
+    },
+    // 요금제유형별정책 전용 필드
+    rateSupports: []  // 동적 배열: { modelType, rateGrade, activationType, amount }
   });
   
   const [errors, setErrors] = useState({});
@@ -307,6 +309,47 @@ function PolicyInputModal({
     }
   }, [formData.addSupport, formData.supportConditionalOptions, formData.isDirectInput, categoryId]);
 
+  // 요금제유형별정책 내용 자동생성
+  useEffect(() => {
+    if ((categoryId === 'wireless_rate' || categoryId === 'wired_rate') && !formData.isDirectInput) {
+      if (formData.rateSupports && formData.rateSupports.length > 0) {
+        // 요금제군/유형/금액이 동일한 것끼리 그룹핑
+        const grouped = {};
+        
+        formData.rateSupports.forEach(item => {
+          if (item.modelType && item.rateGrade && item.activationType && item.amount) {
+            const key = `${item.rateGrade}|${item.activationType}|${item.amount}`;
+            if (!grouped[key]) {
+              grouped[key] = {
+                models: [],
+                rateGrade: item.rateGrade,
+                activationType: item.activationType,
+                amount: item.amount
+              };
+            }
+            grouped[key].models.push(item.modelType);
+          }
+        });
+        
+        // 자동문구 생성
+        const lines = Object.values(grouped).map(group => {
+          const models = group.models.join(', ');
+          const amount = Number(group.amount).toLocaleString();
+          return `💰 ${models} / ${group.rateGrade} / ${group.activationType} / ${amount}원`;
+        });
+        
+        if (lines.length > 0) {
+          const content = lines.join('\n');
+          setFormData(prev => ({ ...prev, policyContent: content }));
+        } else {
+          setFormData(prev => ({ ...prev, policyContent: '' }));
+        }
+      } else {
+        setFormData(prev => ({ ...prev, policyContent: '' }));
+      }
+    }
+  }, [formData.rateSupports, formData.isDirectInput, categoryId]);
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -374,6 +417,21 @@ function PolicyInputModal({
       }
     }
 
+    // 요금제유형별정책 지원사항 검사 (직접입력이 아닐 때만)
+    if ((categoryId === 'wireless_rate' || categoryId === 'wired_rate') && !formData.isDirectInput) {
+      if (!formData.rateSupports || formData.rateSupports.length === 0) {
+        newErrors.rateSupports = '지원사항을 최소 1개 이상 추가해주세요.';
+      } else {
+        // 각 행의 필드 검증
+        const hasIncompleteRow = formData.rateSupports.some(item => 
+          !item.modelType || !item.rateGrade || !item.activationType || !item.amount
+        );
+        if (hasIncompleteRow) {
+          newErrors.rateSupports = '모든 지원사항의 필드를 입력해주세요.';
+        }
+      }
+    }
+
     // 구두정책 개통유형 검사
     if (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe') {
       const hasAnyActivationType = formData.activationType.new010 || formData.activationType.mnp || formData.activationType.change;
@@ -392,18 +450,19 @@ function PolicyInputModal({
       }
     }
     
-    // 정책내용 검사 - 구두정책이나 부가차감지원정책, 부가추가지원정책이 아니거나 직접입력이 체크된 경우에만 필수
+    // 정책내용 검사 - 구두정책이나 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아니거나 직접입력이 체크된 경우에만 필수
     const isShoePolicy = categoryId === 'wireless_shoe' || categoryId === 'wired_shoe';
     const isAddDeductPolicy = categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct';
     const isAddSupportPolicy = categoryId === 'wireless_add_support' || categoryId === 'wired_add_support';
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy || formData.isDirectInput) {
+    const isRatePolicy = categoryId === 'wireless_rate' || categoryId === 'wired_rate';
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy || formData.isDirectInput) {
       if (!formData.policyContent.trim()) {
         newErrors.policyContent = '정책내용을 입력해주세요.';
       }
     }
     
-    // 금액 입력 방식에 따른 검증 (구두정책이나 부가차감지원정책, 부가추가지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && formData.amountType !== 'in_content') {
+    // 금액 입력 방식에 따른 검증 (구두정책이나 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && formData.amountType !== 'in_content') {
       if (!formData.policyAmount.trim()) {
         newErrors.policyAmount = '금액을 입력해주세요.';
       } else if (isNaN(Number(formData.policyAmount))) {
@@ -411,8 +470,8 @@ function PolicyInputModal({
       }
     }
     
-    // 금액 유형 검사 (구두정책이나 부가차감지원정책, 부가추가지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !formData.amountType) {
+    // 금액 유형 검사 (구두정책이나 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아닌 경우에만)
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && !formData.amountType) {
       newErrors.amountType = '금액 유형을 선택해주세요.';
     }
     
@@ -456,8 +515,8 @@ function PolicyInputModal({
           policyEndDate: formData.policyEndDate,
           policyStore: formData.policyStore,
           policyContent: formData.policyContent.trim(),
-          policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' || categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
-          amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' || categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') ? '' : formData.amountType,
+          policyAmount: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' || categoryId === 'wireless_add_support' || categoryId === 'wired_add_support' || categoryId === 'wireless_rate' || categoryId === 'wired_rate') ? '' : (formData.amountType === 'in_content' ? '' : Number(formData.policyAmount)),
+          amountType: (categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' || categoryId === 'wireless_add_support' || categoryId === 'wired_add_support' || categoryId === 'wireless_rate' || categoryId === 'wired_rate') ? '' : formData.amountType,
           policyType: isWireless ? '무선' : '유선',
           category: categoryId,
           yearMonth: yearMonth,
@@ -479,7 +538,9 @@ function PolicyInputModal({
           conditionalOptions: formData.conditionalOptions,
           // 부가추가지원정책 데이터
           addSupport: formData.addSupport,
-          supportConditionalOptions: formData.supportConditionalOptions
+          supportConditionalOptions: formData.supportConditionalOptions,
+          // 요금제유형별정책 데이터
+          rateSupports: formData.rateSupports
         };
 
         await onSave(policy.id, updateData);
@@ -524,6 +585,8 @@ function PolicyInputModal({
             // 부가추가지원정책 데이터 추가
             addSupport: formData.addSupport,
             supportConditionalOptions: formData.supportConditionalOptions,
+            // 요금제유형별정책 데이터 추가
+            rateSupports: formData.rateSupports,
             multipleStoreName: formData.multipleStoreName || ''
           };
 
@@ -568,7 +631,9 @@ function PolicyInputModal({
             conditionalOptions: formData.conditionalOptions,
             // 부가추가지원정책 데이터 추가
             addSupport: formData.addSupport,
-            supportConditionalOptions: formData.supportConditionalOptions
+            supportConditionalOptions: formData.supportConditionalOptions,
+            // 요금제유형별정책 데이터 추가
+            rateSupports: formData.rateSupports
           }));
 
           // 각 정책을 순차적으로 저장
@@ -1226,6 +1291,136 @@ function PolicyInputModal({
             </>
           ) : null}
 
+          {/* 요금제유형별정책 전용: 지원사항 */}
+          {categoryId === 'wireless_rate' || categoryId === 'wired_rate' ? (
+            <>
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2">
+                    지원사항 *
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      const newSupports = [...(formData.rateSupports || []), { modelType: '', rateGrade: '', activationType: '', amount: '' }];
+                      handleInputChange('rateSupports', newSupports);
+                    }}
+                  >
+                    추가
+                  </Button>
+                </Box>
+                
+                {formData.rateSupports && formData.rateSupports.map((item, index) => (
+                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center' }}>
+                    <TextField
+                      label="모델유형"
+                      value={item.modelType || ''}
+                      onChange={(e) => {
+                        const newSupports = [...formData.rateSupports];
+                        newSupports[index].modelType = e.target.value;
+                        handleInputChange('rateSupports', newSupports);
+                      }}
+                      sx={{ width: 150 }}
+                      placeholder="예: 갤럭시 S24"
+                      size="small"
+                    />
+                    <FormControl sx={{ width: 130 }} size="small">
+                      <InputLabel>요금제군</InputLabel>
+                      <Select
+                        value={item.rateGrade || ''}
+                        label="요금제군"
+                        onChange={(e) => {
+                          const newSupports = [...formData.rateSupports];
+                          newSupports[index].rateGrade = e.target.value;
+                          handleInputChange('rateSupports', newSupports);
+                        }}
+                      >
+                        <MenuItem value="115군">115군</MenuItem>
+                        <MenuItem value="105군">105군</MenuItem>
+                        <MenuItem value="95군">95군</MenuItem>
+                        <MenuItem value="85군">85군</MenuItem>
+                        <MenuItem value="75군">75군</MenuItem>
+                        <MenuItem value="69군">69군</MenuItem>
+                        <MenuItem value="61군">61군</MenuItem>
+                        <MenuItem value="55군">55군</MenuItem>
+                        <MenuItem value="44군">44군</MenuItem>
+                        <MenuItem value="33군">33군</MenuItem>
+                        <MenuItem value="33군 미만">33군 미만</MenuItem>
+                        <MenuItem value="시니어 Ⅰ군">시니어 Ⅰ군</MenuItem>
+                        <MenuItem value="시니어 Ⅱ군">시니어 Ⅱ군</MenuItem>
+                        <MenuItem value="청소년 Ⅰ군">청소년 Ⅰ군</MenuItem>
+                        <MenuItem value="청소년 Ⅱ군">청소년 Ⅱ군</MenuItem>
+                        <MenuItem value="청소년 Ⅲ군">청소년 Ⅲ군</MenuItem>
+                        <MenuItem value="키즈군">키즈군</MenuItem>
+                        <MenuItem value="키즈22군">키즈22군</MenuItem>
+                        <MenuItem value="2nd군">2nd군</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <FormControl sx={{ width: 100 }} size="small">
+                      <InputLabel>유형</InputLabel>
+                      <Select
+                        value={item.activationType || ''}
+                        label="유형"
+                        onChange={(e) => {
+                          const newSupports = [...formData.rateSupports];
+                          newSupports[index].activationType = e.target.value;
+                          handleInputChange('rateSupports', newSupports);
+                        }}
+                      >
+                        <MenuItem value="010신규">010신규</MenuItem>
+                        <MenuItem value="MNP">MNP</MenuItem>
+                        <MenuItem value="보상">보상</MenuItem>
+                        <MenuItem value="기변">기변</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      label="금액"
+                      value={item.amount || ''}
+                      onChange={(e) => {
+                        const newSupports = [...formData.rateSupports];
+                        newSupports[index].amount = e.target.value;
+                        handleInputChange('rateSupports', newSupports);
+                      }}
+                      type="number"
+                      inputProps={{ min: 0 }}
+                      sx={{ width: 120 }}
+                      placeholder="금액 입력"
+                      size="small"
+                    />
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        const newSupports = formData.rateSupports.filter((_, i) => i !== index);
+                        handleInputChange('rateSupports', newSupports);
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                ))}
+                
+                {errors.rateSupports && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {errors.rateSupports}
+                  </Typography>
+                )}
+                
+                {/* 직접입력 체크박스 */}
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.isDirectInput}
+                      onChange={(e) => handleInputChange('isDirectInput', e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Grid>
+            </>
+          ) : null}
+
           <Grid item xs={12}>
             <TextField
               fullWidth
@@ -1257,10 +1452,11 @@ function PolicyInputModal({
             />
           </Grid>
           
-          {/* 구두정책과 부가차감지원정책, 부가추가지원정책이 아닌 경우에만 금액 입력 필드 표시 */}
+          {/* 구두정책과 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아닌 경우에만 금액 입력 필드 표시 */}
           {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
              categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' ||
-             categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') && (
+             categoryId === 'wireless_add_support' || categoryId === 'wired_add_support' ||
+             categoryId === 'wireless_rate' || categoryId === 'wired_rate') && (
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -1277,10 +1473,11 @@ function PolicyInputModal({
             </Grid>
           )}
           
-          {/* 구두정책과 부가차감지원정책이 아닌 경우에만 금액 유형 선택 표시 */}
+          {/* 구두정책과 부가차감지원정책, 부가추가지원정책, 요금제유형별정책이 아닌 경우에만 금액 유형 선택 표시 */}
           {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
              categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' ||
-             categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') && (
+             categoryId === 'wireless_add_support' || categoryId === 'wired_add_support' ||
+             categoryId === 'wireless_rate' || categoryId === 'wired_rate') && (
             <Grid item xs={12} sm={6}>
               <FormControl component="fieldset" error={!!errors.amountType}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
