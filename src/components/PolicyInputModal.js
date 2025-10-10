@@ -1257,9 +1257,10 @@ function PolicyInputModal({
             />
           </Grid>
           
-          {/* 구두정책과 부가차감지원정책이 아닌 경우에만 금액 입력 필드 표시 */}
+          {/* 구두정책과 부가차감지원정책, 부가추가지원정책이 아닌 경우에만 금액 입력 필드 표시 */}
           {!(categoryId === 'wireless_shoe' || categoryId === 'wired_shoe' || 
-             categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && (
+             categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct' ||
+             categoryId === 'wireless_add_support' || categoryId === 'wired_add_support') && (
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
