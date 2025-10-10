@@ -802,7 +802,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '정책_기본정보 ') {
-      range = `${safeSheetName}!A:AJ`;
+      range = `${safeSheetName}!A:AR`;  // 요금제유형별정책 AR열까지 확장
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -18721,7 +18721,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-          range: '정책_기본정보 !A:AJ',
+          range: '정책_기본정보 !A:AR',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18733,7 +18733,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
-        const targetRange = `정책_기본정보 !A${nextRowIndex}:AJ${nextRowIndex}`;
+        const targetRange = `정책_기본정보 !A${nextRowIndex}:AR${nextRowIndex}`;
         response = await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
           range: targetRange,
@@ -19029,7 +19029,25 @@ app.put('/api/policies/:policyId', async (req, res) => {
       new Date().toISOString(),    // L열: 입력일시 (수정일시로 업데이트)
       yearMonth,                   // X열: 대상년월
       req.body.amount95Above || '', // AB열: 95군이상금액
-      req.body.amount95Below || ''  // AC열: 95군미만금액
+      req.body.amount95Below || '', // AC열: 95군미만금액
+      // 부가차감지원정책 데이터
+      JSON.stringify(req.body.deductSupport || {}), // AD열
+      (req.body.conditionalOptions?.option1 ? 'Y' : 'N'), // AE열
+      (req.body.conditionalOptions?.option2 ? 'Y' : 'N'), // AF열
+      (req.body.conditionalOptions?.option3 ? 'Y' : 'N'), // AG열
+      // 부가추가지원정책 데이터
+      req.body.addSupport?.ktClubAmount || '', // AH열
+      req.body.addSupport?.musicBellAmount || '', // AI열
+      req.body.addSupport?.uplayBasicAmount || '', // AJ열
+      req.body.addSupport?.uplayPremiumAmount || '', // AK열
+      req.body.addSupport?.phoneExchangePassAmount || '', // AL열
+      req.body.addSupport?.musicAmount || '', // AM열
+      req.body.addSupport?.numberFilteringAmount || '', // AN열
+      (req.body.supportConditionalOptions?.vas2Both ? 'Y' : 'N'), // AO열
+      (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N'), // AP열
+      (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N'), // AQ열
+      // 요금제유형별정책 데이터
+      JSON.stringify(req.body.rateSupports || []) // AR열
     ];
     
     // 각 필드를 개별적으로 업데이트
@@ -19047,7 +19065,22 @@ app.put('/api/policies/:policyId', async (req, res) => {
       `'정책_기본정보 '!L${rowNumber}`,  // 입력일시
       `'정책_기본정보 '!X${rowNumber}`,  // 대상년월
       `'정책_기본정보 '!AB${rowNumber}`, // 95군이상금액
-      `'정책_기본정보 '!AC${rowNumber}`  // 95군미만금액
+      `'정책_기본정보 '!AC${rowNumber}`, // 95군미만금액
+      `'정책_기본정보 '!AD${rowNumber}`, // 부가차감지원 데이터
+      `'정책_기본정보 '!AE${rowNumber}`, // 조건옵션1
+      `'정책_기본정보 '!AF${rowNumber}`, // 조건옵션2
+      `'정책_기본정보 '!AG${rowNumber}`, // 조건옵션3
+      `'정책_기본정보 '!AH${rowNumber}`, // KT클럽
+      `'정책_기본정보 '!AI${rowNumber}`, // 뮤직벨
+      `'정책_기본정보 '!AJ${rowNumber}`, // 유플레이(기본)
+      `'정책_기본정보 '!AK${rowNumber}`, // 유플레이(프리미엄)
+      `'정책_기본정보 '!AL${rowNumber}`, // 폰교체패스
+      `'정책_기본정보 '!AM${rowNumber}`, // 음악감상
+      `'정책_기본정보 '!AN${rowNumber}`, // 지정번호필터링
+      `'정책_기본정보 '!AO${rowNumber}`, // VAS 2종 동시유치
+      `'정책_기본정보 '!AP${rowNumber}`, // VAS 2종중 1개유치
+      `'정책_기본정보 '!AQ${rowNumber}`, // 부가3종 모두유치
+      `'정책_기본정보 '!AR${rowNumber}`  // 요금제유형별정책 데이터
     ];
     
     // 배치 업데이트 실행

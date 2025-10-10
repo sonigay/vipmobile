@@ -1345,6 +1345,7 @@ function PolicyInputModal({
                           handleInputChange('rateSupports', newSupports);
                         }}
                       >
+                        <MenuItem value="전요금제">전요금제</MenuItem>
                         <MenuItem value="115군">115군</MenuItem>
                         <MenuItem value="105군">105군</MenuItem>
                         <MenuItem value="95군">95군</MenuItem>
@@ -1395,6 +1396,7 @@ function PolicyInputModal({
                           handleInputChange('rateSupports', newSupports);
                         }}
                       >
+                        <MenuItem value="전유형">전유형</MenuItem>
                         <MenuItem value="010신규">010신규</MenuItem>
                         <MenuItem value="MNP">MNP</MenuItem>
                         <MenuItem value="보상">보상</MenuItem>
