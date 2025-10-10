@@ -395,7 +395,7 @@ function PolicyInputModal({
       }
       
       // 2. 연합대상하부점
-      if (formData.unionTargetStores && formData.unionTargetStores.length > 0) {
+      if (formData.unionTargetStores?.length > 0) {
         parts.push('\n🏪 연합대상하부점:');
         formData.unionTargetStores.forEach(store => {
           parts.push(`   - ${store}`);
@@ -414,8 +414,8 @@ function PolicyInputModal({
       
       // 4. 조건
       const conditions = [];
-      if (formData.unionConditions.individualInput) conditions.push('개별 입력');
-      if (formData.unionConditions.postSettlement) conditions.push('후정산 입력');
+      if (formData.unionConditions?.individualInput) conditions.push('개별 입력');
+      if (formData.unionConditions?.postSettlement) conditions.push('후정산 입력');
       
       if (conditions.length > 0) {
         parts.push(`\n📌 조건: ${conditions.join(', ')}`);
@@ -519,7 +519,7 @@ function PolicyInputModal({
       if (!formData.unionSettlementStore) {
         newErrors.unionSettlementStore = '정산 입금처를 선택해주세요.';
       }
-      if (!formData.unionTargetStores || formData.unionTargetStores.length === 0) {
+      if (!formData.unionTargetStores?.length) {
         newErrors.unionTargetStores = '연합대상하부점을 최소 1개 이상 선택해주세요.';
       }
     }
