@@ -1578,7 +1578,7 @@ function PolicyInputModal({
                   multiple
                   options={stores}
                   getOptionLabel={(option) => option.storeName || ''}
-                  value={stores.filter(s => formData.unionTargetStores.includes(s.storeName))}
+                  value={stores.filter(s => (formData.unionTargetStores || []).includes(s.storeName))}
                   onChange={(event, newValue) => {
                     handleInputChange('unionTargetStores', newValue.map(v => v.storeName));
                   }}
