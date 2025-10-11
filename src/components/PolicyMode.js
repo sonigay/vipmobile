@@ -1242,7 +1242,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             정책일자
                           </TableCell>
                           {/* 연합정책이 아닐 때만 복수점명/적용점/업체명 컬럼 표시 */}
-                          {selectedCategory !== 'wireless_union' && selectedCategory !== 'wired_union' && (
+                          {selectedCategoryForList !== 'wireless_union' && selectedCategoryForList !== 'wired_union' && (
                             <>
                               <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                                 복수점명
@@ -1262,7 +1262,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             내용
                           </TableCell>
                           {/* 요금제유형별정책이 아닐 때만 개통유형 컬럼 표시 */}
-                          {selectedCategory !== 'wireless_rate' && selectedCategory !== 'wired_rate' && (
+                          {selectedCategoryForList !== 'wireless_rate' && selectedCategoryForList !== 'wired_rate' && (
                             <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
                               개통유형
                             </TableCell>
@@ -1331,7 +1331,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             </TableCell>
                             <TableCell>{policy.policyDate}</TableCell>
                             {/* 연합정책이 아닐 때만 복수점명/적용점/업체명 셀 표시 */}
-                            {selectedCategory !== 'wireless_union' && selectedCategory !== 'wired_union' && (
+                            {selectedCategoryForList !== 'wireless_union' && selectedCategoryForList !== 'wired_union' && (
                               <>
                                 <TableCell>
                                   {policy.isMultiple ? (
@@ -1478,7 +1478,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               </Box>
                             </TableCell>
                             {/* 요금제유형별정책이 아닐 때만 개통유형 셀 표시 */}
-                            {selectedCategory !== 'wireless_rate' && selectedCategory !== 'wired_rate' && (
+                            {selectedCategoryForList !== 'wireless_rate' && selectedCategoryForList !== 'wired_rate' && (
                               <TableCell>
                                 {(() => {
                                   // 개통유형 표시 로직
