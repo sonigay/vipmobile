@@ -18403,7 +18403,9 @@ app.post('/api/policies', async (req, res) => {
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
-    if (!policyStore) missingFields.push('policyStore');
+    // 연합정책이 아닐 때만 policyStore 검증
+    const isUnionPolicy = category === 'wireless_union' || category === 'wired_union';
+    if (!isUnionPolicy && !policyStore) missingFields.push('policyStore');
     if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
@@ -18886,7 +18888,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
-    if (!policyStore) missingFields.push('policyStore');
+    // 연합정책이 아닐 때만 policyStore 검증
+    const isUnionPolicyForUpdate = category === 'wireless_union' || category === 'wired_union';
+    if (!isUnionPolicyForUpdate && !policyStore) missingFields.push('policyStore');
     if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
