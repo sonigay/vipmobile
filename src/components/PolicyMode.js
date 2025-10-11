@@ -213,14 +213,18 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   const loadManagers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/inventory/agent-filters`);
+      // 장표모드와 동일한 API 사용 (이번달 개통실적이 있는 담당자만)
+      const response = await fetch(`${API_BASE_URL}/api/agent-closing-agents`);
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.data) {
-          // 담당자 이름만 추출 (target 필드 사용, 중복 제거 및 정렬)
-          const managerNames = [...new Set(data.data.map(agent => agent.target))].filter(Boolean).sort();
-          setManagers(managerNames);
-          console.log('담당자 목록 로드 완료:', managerNames);
+        if (data.success && data.agents) {
+          // 담당자 이름에서 괄호 제거하고 그룹핑 (ChartMode와 동일한 방식)
+          const uniqueNames = [...new Set(data.agents.map(name => {
+            // 괄호 제거 (예: "홍기현(직영)" → "홍기현")
+            return name.replace(/\([^)]*\)/g, '').trim();
+          }))].filter(Boolean).sort();
+          setManagers(uniqueNames);
+          console.log('담당자 목록 로드 완료:', uniqueNames.length + '명');
         }
       }
     } catch (error) {
