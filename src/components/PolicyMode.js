@@ -113,6 +113,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   // 담당자 관리
   const [managers, setManagers] = useState([]); // 담당자 목록
   const [selectedManager, setSelectedManager] = useState('전체'); // 선택된 담당자 (기본값: 전체)
+  const [managerPolicyCounts, setManagerPolicyCounts] = useState({}); // 담당자별 정책 개수
   
   // 필터링 상태 추가
   const [selectedTeamFilter, setSelectedTeamFilter] = useState('all');
@@ -284,6 +285,14 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       // 서버에서 이미 teamName을 제공하므로 추가 변환 불필요
       const policiesWithTeamNames = filteredPolicies;
+      
+      // 담당자별 정책 개수 계산 (전체 정책 기준)
+      const managerCounts = { '전체': policiesWithTeamNames.length };
+      policiesWithTeamNames.forEach(policy => {
+        const manager = policy.manager || '미지정';
+        managerCounts[manager] = (managerCounts[manager] || 0) + 1;
+      });
+      setManagerPolicyCounts(managerCounts);
       
       // 담당자 필터링 적용
       const managerFilteredPolicies = selectedManager === '전체'
@@ -1001,7 +1010,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Chip
-              label="전체"
+              label={`전체 (${managerPolicyCounts['전체'] || 0})`}
               onClick={() => setSelectedManager('전체')}
               color={selectedManager === '전체' ? 'primary' : 'default'}
               variant={selectedManager === '전체' ? 'filled' : 'outlined'}
@@ -1010,7 +1019,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             {managers.map((manager) => (
               <Chip
                 key={manager}
-                label={manager}
+                label={`${manager} (${managerPolicyCounts[manager] || 0})`}
                 onClick={() => setSelectedManager(manager)}
                 color={selectedManager === manager ? 'primary' : 'default'}
                 variant={selectedManager === manager ? 'filled' : 'outlined'}
