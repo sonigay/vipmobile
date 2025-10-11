@@ -110,7 +110,14 @@ function PolicyInputModal({
     unionConditions: {
       individualInput: false,  // 개별 입력
       postSettlement: false    // 후정산 입력
-    }
+    },
+    // 개별소급정책 전용 필드
+    individualTarget: {
+      activationDate: new Date(),  // 개통일
+      customerName: '',            // 고객명
+      deviceSerial: ''             // 단말일련번호
+    },
+    individualActivationType: ''  // 개통유형 (라디오: 'new010', 'mnp', 'change')
   });
   
   const [errors, setErrors] = useState({});
@@ -171,7 +178,13 @@ function PolicyInputModal({
           unionConditions: policy.unionConditions || {
             individualInput: false,
             postSettlement: false
-          }
+          },
+          individualTarget: policy.individualTarget || {
+            activationDate: new Date(),
+            customerName: '',
+            deviceSerial: ''
+          },
+          individualActivationType: policy.individualActivationType || ''
         });
       } else {
         // 새 정책 생성 모드: 빈 폼으로 초기화
@@ -430,6 +443,36 @@ function PolicyInputModal({
     }
   }, [formData.unionSettlementStore, formData.unionTargetStores, formData.policyAmount, formData.amountType, formData.unionConditions, formData.isDirectInput, categoryId]);
 
+  // 개별소급정책 내용 자동생성
+  useEffect(() => {
+    if ((categoryId === 'wireless_individual' || categoryId === 'wired_individual') && !formData.isDirectInput) {
+      const parts = [];
+      
+      // 1. 개통일
+      if (formData.individualTarget?.activationDate) {
+        const dateStr = new Date(formData.individualTarget.activationDate).toLocaleDateString('ko-KR');
+        parts.push(`📅 개통일: ${dateStr}`);
+      }
+      
+      // 2. 고객명
+      if (formData.individualTarget?.customerName) {
+        parts.push(`👤 고객명: ${formData.individualTarget.customerName}`);
+      }
+      
+      // 3. 단말일련번호
+      if (formData.individualTarget?.deviceSerial) {
+        parts.push(`📱 단말일련번호: ${formData.individualTarget.deviceSerial}`);
+      }
+      
+      if (parts.length > 0) {
+        const content = parts.join('\n');
+        setFormData(prev => ({ ...prev, policyContent: content }));
+      } else {
+        setFormData(prev => ({ ...prev, policyContent: '' }));
+      }
+    }
+  }, [formData.individualTarget, formData.isDirectInput, categoryId]);
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -450,8 +493,9 @@ function PolicyInputModal({
       newErrors.policyEndDate = '종료일은 시작일보다 늦어야 합니다.';
     }
     
-    // 연합정책이 아닐 때만 정책적용점 검증
-    if (categoryId !== 'wireless_union' && categoryId !== 'wired_union') {
+    // 연합정책, 개별소급정책이 아닐 때만 정책적용점 검증
+    if (categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
+        categoryId !== 'wireless_individual' && categoryId !== 'wired_individual') {
       if (formData.storeType === 'single' && !formData.policyStore) {
         newErrors.policyStore = '정책적용점을 선택해주세요.';
       }
@@ -522,6 +566,22 @@ function PolicyInputModal({
       }
       if (!formData.unionTargetStores?.length) {
         newErrors.unionTargetStores = '연합대상하부점을 최소 1개 이상 선택해주세요.';
+      }
+    }
+
+    // 개별소급정책 필드 검사 (직접입력이 아닐 때만)
+    if ((categoryId === 'wireless_individual' || categoryId === 'wired_individual') && !formData.isDirectInput) {
+      if (!formData.individualTarget?.activationDate) {
+        newErrors.individualActivationDate = '개통일을 선택해주세요.';
+      }
+      if (!formData.individualTarget?.customerName?.trim()) {
+        newErrors.individualCustomerName = '고객명을 입력해주세요.';
+      }
+      if (!formData.individualTarget?.deviceSerial?.trim()) {
+        newErrors.individualDeviceSerial = '단말일련번호를 입력해주세요.';
+      }
+      if (!formData.individualActivationType) {
+        newErrors.individualActivationType = '개통유형을 선택해주세요.';
       }
     }
 
@@ -637,7 +697,10 @@ function PolicyInputModal({
           // 연합정책 데이터
           unionSettlementStore: formData.unionSettlementStore,
           unionTargetStores: formData.unionTargetStores,
-          unionConditions: formData.unionConditions
+          unionConditions: formData.unionConditions,
+          // 개별소급정책 데이터
+          individualTarget: formData.individualTarget,
+          individualActivationType: formData.individualActivationType
         };
 
         await onSave(policy.id, updateData);
@@ -688,6 +751,9 @@ function PolicyInputModal({
             unionSettlementStore: formData.unionSettlementStore,
             unionTargetStores: formData.unionTargetStores,
             unionConditions: formData.unionConditions,
+            // 개별소급정책 데이터 추가
+            individualTarget: formData.individualTarget,
+            individualActivationType: formData.individualActivationType,
             multipleStoreName: formData.multipleStoreName || ''
           };
 
@@ -738,7 +804,10 @@ function PolicyInputModal({
             // 연합정책 데이터 추가
             unionSettlementStore: formData.unionSettlementStore,
             unionTargetStores: formData.unionTargetStores,
-            unionConditions: formData.unionConditions
+            unionConditions: formData.unionConditions,
+            // 개별소급정책 데이터 추가
+            individualTarget: formData.individualTarget,
+            individualActivationType: formData.individualActivationType
           }));
 
           // 각 정책을 순차적으로 저장
@@ -934,8 +1003,9 @@ function PolicyInputModal({
             </LocalizationProvider>
           </Grid>
           
-          {/* 연합정책이 아닐 때만 적용점 타입 선택 표시 */}
-          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && (
+          {/* 연합정책, 개별소급정책이 아닐 때만 적용점 타입 선택 표시 */}
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
+           categoryId !== 'wireless_individual' && categoryId !== 'wired_individual' && (
             <Grid item xs={12}>
               <FormControl component="fieldset">
                 <Typography variant="subtitle2" gutterBottom>
@@ -962,7 +1032,8 @@ function PolicyInputModal({
           )}
 
           {/* 단일점 선택 */}
-          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && formData.storeType === 'single' && (
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
+           categoryId !== 'wireless_individual' && categoryId !== 'wired_individual' && formData.storeType === 'single' && (
             <Grid item xs={12}>
               <Autocomplete
                 options={stores}
@@ -990,7 +1061,8 @@ function PolicyInputModal({
           )}
 
           {/* 복수점 선택 */}
-          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && formData.storeType === 'multiple' && (
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
+           categoryId !== 'wireless_individual' && categoryId !== 'wired_individual' && formData.storeType === 'multiple' && (
             <>
               <Grid item xs={12}>
                 <TextField
@@ -1636,6 +1708,103 @@ function PolicyInputModal({
                     label="후정산 입력"
                   />
                 </Box>
+              </Grid>
+
+              {/* 직접입력 체크박스 */}
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.isDirectInput}
+                      onChange={(e) => handleInputChange('isDirectInput', e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Grid>
+            </>
+          ) : null}
+
+          {/* 개별소급정책 전용: 적용대상 + 개통유형 */}
+          {categoryId === 'wireless_individual' || categoryId === 'wired_individual' ? (
+            <>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                  적용대상 *
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+                    <DatePicker
+                      label="개통일"
+                      value={formData.individualTarget?.activationDate || new Date()}
+                      onChange={(newValue) => {
+                        handleInputChange('individualTarget', {
+                          ...(formData.individualTarget || {}),
+                          activationDate: newValue
+                        });
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                          error={!!errors.individualActivationDate}
+                          helperText={errors.individualActivationDate}
+                        />
+                      )}
+                    />
+                  </LocalizationProvider>
+                  
+                  <TextField
+                    fullWidth
+                    label="고객명"
+                    value={formData.individualTarget?.customerName || ''}
+                    onChange={(e) => {
+                      handleInputChange('individualTarget', {
+                        ...(formData.individualTarget || {}),
+                        customerName: e.target.value
+                      });
+                    }}
+                    error={!!errors.individualCustomerName}
+                    helperText={errors.individualCustomerName}
+                    placeholder="고객명을 입력하세요"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="단말일련번호"
+                    value={formData.individualTarget?.deviceSerial || ''}
+                    onChange={(e) => {
+                      handleInputChange('individualTarget', {
+                        ...(formData.individualTarget || {}),
+                        deviceSerial: e.target.value
+                      });
+                    }}
+                    error={!!errors.individualDeviceSerial}
+                    helperText={errors.individualDeviceSerial}
+                    placeholder="단말일련번호를 입력하세요"
+                  />
+                </Box>
+              </Grid>
+
+              <Grid item xs={12}>
+                <FormControl component="fieldset" error={!!errors.individualActivationType}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    개통유형 *
+                  </Typography>
+                  <RadioGroup
+                    value={formData.individualActivationType}
+                    onChange={(e) => handleInputChange('individualActivationType', e.target.value)}
+                  >
+                    <FormControlLabel value="new010" control={<Radio />} label="010신규" />
+                    <FormControlLabel value="mnp" control={<Radio />} label="MNP" />
+                    <FormControlLabel value="change" control={<Radio />} label="기변" />
+                  </RadioGroup>
+                  {errors.individualActivationType && (
+                    <Typography variant="caption" color="error">
+                      {errors.individualActivationType}
+                    </Typography>
+                  )}
+                </FormControl>
               </Grid>
 
               {/* 직접입력 체크박스 */}

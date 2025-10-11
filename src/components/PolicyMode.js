@@ -1267,6 +1267,12 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               개통유형
                             </TableCell>
                           )}
+                          {/* 개별소급정책일 때만 금액 컬럼 표시 */}
+                          {(selectedCategoryForList === 'wireless_individual' || selectedCategoryForList === 'wired_individual') && (
+                            <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
+                              금액
+                            </TableCell>
+                          )}
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
                             입력자
                           </TableCell>
@@ -1481,6 +1487,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             {selectedCategoryForList !== 'wireless_rate' && selectedCategoryForList !== 'wired_rate' && (
                               <TableCell>
                                 {(() => {
+                                  // 개별소급정책은 individualActivationType 사용 (라디오 버튼)
+                                  if (policy.category === 'wireless_individual' || policy.category === 'wired_individual') {
+                                    if (!policy.individualActivationType) return '-';
+                                    const typeMap = {
+                                      'new010': '010신규',
+                                      'mnp': 'MNP',
+                                      'change': '기변'
+                                    };
+                                    return typeMap[policy.individualActivationType] || '-';
+                                  }
+                                  
                                   // 개통유형 표시 로직
                                   // 부가차감/추가지원정책, 연합정책은 개통유형 선택 필드가 없으므로 "전유형"으로 표시
                                   if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct' || 
@@ -1502,6 +1519,20 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                                   if (types.length === 3) return '전유형';
                                   
                                   return types.join(', ');
+                                })()}
+                              </TableCell>
+                            )}
+                            {/* 개별소급정책일 때만 금액 셀 표시 */}
+                            {(selectedCategoryForList === 'wireless_individual' || selectedCategoryForList === 'wired_individual') && (
+                              <TableCell>
+                                {(() => {
+                                  if (!policy.policyAmount) return '-';
+                                  const amountNum = Number(policy.policyAmount);
+                                  const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
+                                    ? `${amountNum / 10000}만원`
+                                    : `${amountNum.toLocaleString()}원`;
+                                  const typeText = policy.amountType === 'total' ? '총금액' : '건당금액';
+                                  return `${amountText} (${typeText})`;
                                 })()}
                               </TableCell>
                             )}

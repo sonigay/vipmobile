@@ -802,7 +802,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '정책_기본정보 ') {
-      range = `${safeSheetName}!A:AU`;  // 연합정책 AU열까지 확장
+      range = `${safeSheetName}!A:AW`;  // 개별소급정책 AW열까지 확장
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -18250,6 +18250,15 @@ app.get('/api/policies', async (req, res) => {
             return {};
           }
         })(),
+        // 개별소급정책 관련 데이터
+        individualTarget: (() => {
+          try {
+            return JSON.parse(row[47] || '{}');  // AV열: 적용대상 (JSON)
+          } catch (error) {
+            return {};
+          }
+        })(),
+        individualActivationType: row[48] || '',  // AW열: 개통유형
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18403,9 +18412,10 @@ app.post('/api/policies', async (req, res) => {
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
-    // 연합정책이 아닐 때만 policyStore 검증
+    // 연합정책, 개별소급정책이 아닐 때만 policyStore 검증
     const isUnionPolicy = category === 'wireless_union' || category === 'wired_union';
-    if (!isUnionPolicy && !policyStore) missingFields.push('policyStore');
+    const isIndividualPolicy = category === 'wireless_individual' || category === 'wired_individual';
+    if (!isUnionPolicy && !isIndividualPolicy && !policyStore) missingFields.push('policyStore');
     if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
@@ -18721,7 +18731,11 @@ app.post('/api/policies', async (req, res) => {
       // AT열: 연합정책 연합대상하부점 (JSON 문자열)
       (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionTargetStores || []) : '',
       // AU열: 연합정책 조건 (JSON 문자열)
-      (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionConditions || {}) : ''
+      (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionConditions || {}) : '',
+      // AV열: 개별소급정책 적용대상 (JSON 문자열)
+      (category === 'wireless_individual' || category === 'wired_individual') ? JSON.stringify(req.body.individualTarget || {}) : '',
+      // AW열: 개별소급정책 개통유형
+      (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : ''
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -18745,7 +18759,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-          range: '정책_기본정보 !A:AU',
+          range: '정책_기본정보 !A:AW',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18757,7 +18771,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
-        const targetRange = `정책_기본정보 !A${nextRowIndex}:AU${nextRowIndex}`;
+        const targetRange = `정책_기본정보 !A${nextRowIndex}:AW${nextRowIndex}`;
         response = await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
           range: targetRange,
@@ -18888,9 +18902,10 @@ app.put('/api/policies/:policyId', async (req, res) => {
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
-    // 연합정책이 아닐 때만 policyStore 검증
+    // 연합정책, 개별소급정책이 아닐 때만 policyStore 검증
     const isUnionPolicyForUpdate = category === 'wireless_union' || category === 'wired_union';
-    if (!isUnionPolicyForUpdate && !policyStore) missingFields.push('policyStore');
+    const isIndividualPolicyForUpdate = category === 'wireless_individual' || category === 'wired_individual';
+    if (!isUnionPolicyForUpdate && !isIndividualPolicyForUpdate && !policyStore) missingFields.push('policyStore');
     if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
@@ -19077,7 +19092,10 @@ app.put('/api/policies/:policyId', async (req, res) => {
       // 연합정책 데이터
       req.body.unionSettlementStore || '', // AS열
       JSON.stringify(req.body.unionTargetStores || []), // AT열
-      JSON.stringify(req.body.unionConditions || {}) // AU열
+      JSON.stringify(req.body.unionConditions || {}), // AU열
+      // 개별소급정책 데이터
+      JSON.stringify(req.body.individualTarget || {}), // AV열
+      req.body.individualActivationType || '' // AW열
     ];
     
     // 각 필드를 개별적으로 업데이트
@@ -19113,7 +19131,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
       `'정책_기본정보 '!AR${rowNumber}`, // 요금제유형별정책 데이터
       `'정책_기본정보 '!AS${rowNumber}`, // 연합정책 정산 입금처
       `'정책_기본정보 '!AT${rowNumber}`, // 연합정책 연합대상하부점
-      `'정책_기본정보 '!AU${rowNumber}`  // 연합정책 조건
+      `'정책_기본정보 '!AU${rowNumber}`, // 연합정책 조건
+      `'정책_기본정보 '!AV${rowNumber}`, // 개별소급정책 적용대상
+      `'정책_기본정보 '!AW${rowNumber}`  // 개별소급정책 개통유형
     ];
     
     // 배치 업데이트 실행
