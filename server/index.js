@@ -18412,10 +18412,9 @@ app.post('/api/policies', async (req, res) => {
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
-    // 연합정책, 개별소급정책이 아닐 때만 policyStore 검증
+    // 연합정책이 아닐 때만 policyStore 검증
     const isUnionPolicy = category === 'wireless_union' || category === 'wired_union';
-    const isIndividualPolicy = category === 'wireless_individual' || category === 'wired_individual';
-    if (!isUnionPolicy && !isIndividualPolicy && !policyStore) missingFields.push('policyStore');
+    if (!isUnionPolicy && !policyStore) missingFields.push('policyStore');
     if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수
@@ -18902,10 +18901,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
     if (!policyName) missingFields.push('policyName');
     if (!policyStartDate) missingFields.push('policyStartDate');
     if (!policyEndDate) missingFields.push('policyEndDate');
-    // 연합정책, 개별소급정책이 아닐 때만 policyStore 검증
+    // 연합정책이 아닐 때만 policyStore 검증
     const isUnionPolicyForUpdate = category === 'wireless_union' || category === 'wired_union';
-    const isIndividualPolicyForUpdate = category === 'wireless_individual' || category === 'wired_individual';
-    if (!isUnionPolicyForUpdate && !isIndividualPolicyForUpdate && !policyStore) missingFields.push('policyStore');
+    if (!isUnionPolicyForUpdate && !policyStore) missingFields.push('policyStore');
     if (!policyTeam || !policyTeam.trim()) missingFields.push('policyTeam');
     
     // 구두정책이나 부가차감지원정책이 아닌 경우에만 policyContent 필수

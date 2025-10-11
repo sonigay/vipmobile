@@ -493,9 +493,8 @@ function PolicyInputModal({
       newErrors.policyEndDate = '종료일은 시작일보다 늦어야 합니다.';
     }
     
-    // 연합정책, 개별소급정책이 아닐 때만 정책적용점 검증
-    if (categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
-        categoryId !== 'wireless_individual' && categoryId !== 'wired_individual') {
+    // 연합정책이 아닐 때만 정책적용점 검증
+    if (categoryId !== 'wireless_union' && categoryId !== 'wired_union') {
       if (formData.storeType === 'single' && !formData.policyStore) {
         newErrors.policyStore = '정책적용점을 선택해주세요.';
       }
@@ -1003,9 +1002,8 @@ function PolicyInputModal({
             </LocalizationProvider>
           </Grid>
           
-          {/* 연합정책, 개별소급정책이 아닐 때만 적용점 타입 선택 표시 */}
-          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
-           categoryId !== 'wireless_individual' && categoryId !== 'wired_individual' && (
+          {/* 연합정책이 아닐 때만 적용점 타입 선택 표시 */}
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && (
             <Grid item xs={12}>
               <FormControl component="fieldset">
                 <Typography variant="subtitle2" gutterBottom>
@@ -1032,8 +1030,7 @@ function PolicyInputModal({
           )}
 
           {/* 단일점 선택 */}
-          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
-           categoryId !== 'wireless_individual' && categoryId !== 'wired_individual' && formData.storeType === 'single' && (
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && formData.storeType === 'single' && (
             <Grid item xs={12}>
               <Autocomplete
                 options={stores}
@@ -1061,8 +1058,7 @@ function PolicyInputModal({
           )}
 
           {/* 복수점 선택 */}
-          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' &&
-           categoryId !== 'wireless_individual' && categoryId !== 'wired_individual' && formData.storeType === 'multiple' && (
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && formData.storeType === 'multiple' && (
             <>
               <Grid item xs={12}>
                 <TextField
