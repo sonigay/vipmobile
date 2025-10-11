@@ -450,16 +450,19 @@ function PolicyInputModal({
       newErrors.policyEndDate = '종료일은 시작일보다 늦어야 합니다.';
     }
     
-    if (formData.storeType === 'single' && !formData.policyStore) {
-      newErrors.policyStore = '정책적용점을 선택해주세요.';
-    }
-    
-    if (formData.storeType === 'multiple' && formData.multipleStores.length === 0) {
-      newErrors.multipleStores = '적용점을 최소 1개 이상 선택해주세요.';
-    }
-    
-    if (formData.storeType === 'multiple' && !formData.multipleStoreName.trim()) {
-      newErrors.multipleStoreName = '복수점명을 입력해주세요.';
+    // 연합정책이 아닐 때만 정책적용점 검증
+    if (categoryId !== 'wireless_union' && categoryId !== 'wired_union') {
+      if (formData.storeType === 'single' && !formData.policyStore) {
+        newErrors.policyStore = '정책적용점을 선택해주세요.';
+      }
+      
+      if (formData.storeType === 'multiple' && formData.multipleStores.length === 0) {
+        newErrors.multipleStores = '적용점을 최소 1개 이상 선택해주세요.';
+      }
+      
+      if (formData.storeType === 'multiple' && !formData.multipleStoreName.trim()) {
+        newErrors.multipleStoreName = '복수점명을 입력해주세요.';
+      }
     }
     
     // 단일점 선택일 때는 복수점명 검증하지 않음
