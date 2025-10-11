@@ -18151,7 +18151,22 @@ app.get('/api/policies', async (req, res) => {
         policyStore: policyStore,      // D열: 정책적용점 (코드)
         policyStoreName: storeName,    // 매장명 (매핑된 업체명)
         policyContent: row[4],         // E열: 정책내용
-        policyAmount: row[5],          // F열: 금액 (금액 + 유형)
+        policyAmount: (() => {         // F열: 금액 (금액 + 유형)
+          const amountStr = row[5] || '';
+          // "100,000원 (총금액)" 형식에서 숫자만 추출
+          const match = amountStr.match(/^([\d,]+)원/);
+          if (match) {
+            return match[1].replace(/,/g, ''); // 쉼표 제거하고 숫자만 반환
+          }
+          return amountStr;
+        })(),
+        amountType: (() => {           // F열에서 금액 유형 추출
+          const amountStr = row[5] || '';
+          if (amountStr.includes('총금액')) return 'total';
+          if (amountStr.includes('건당금액')) return 'per_case';
+          if (amountStr.includes('내용에 직접입력')) return 'in_content';
+          return 'total';
+        })(),
         policyType: row[6],            // G열: 정책유형
         wirelessWired: row[7],         // H열: 무선/유선
         category: row[8],              // I열: 하위카테고리

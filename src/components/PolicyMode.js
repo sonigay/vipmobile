@@ -1527,10 +1527,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               <TableCell>
                                 {(() => {
                                   if (!policy.policyAmount) return '-';
+                                  
+                                  // 숫자로 변환
                                   const amountNum = Number(policy.policyAmount);
+                                  if (isNaN(amountNum) || amountNum === 0) return '-';
+                                  
+                                  // 금액 포맷팅
                                   const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
                                     ? `${amountNum / 10000}만원`
                                     : `${amountNum.toLocaleString()}원`;
+                                  
+                                  // 금액 유형 표시
                                   const typeText = policy.amountType === 'total' ? '총금액' : '건당금액';
                                   return `${amountText} (${typeText})`;
                                 })()}
