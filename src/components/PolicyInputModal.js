@@ -55,7 +55,8 @@ function PolicyInputModal({
   onSave,
   loggedInUser,
   teams = [], // 소속정책팀 목록 추가
-  policy // 수정할 정책 데이터 추가
+  policy, // 수정할 정책 데이터 추가
+  selectedManager = '전체' // 선택된 담당자
 }) {
   const [formData, setFormData] = useState({
     policyName: '',
@@ -672,6 +673,7 @@ function PolicyInputModal({
           policyType: isWireless ? '무선' : '유선',
           category: categoryId,
           yearMonth: yearMonth,
+          manager: selectedManager !== '전체' ? selectedManager : '',
           policyTeam: (() => {
             // 팀 코드를 팀 이름으로 변환
             const selectedTeam = teams.find(team => team.code === formData.team);
@@ -719,6 +721,7 @@ function PolicyInputModal({
             policyType: isWireless ? '무선' : '유선',
             category: categoryId,
             yearMonth: yearMonth,
+            manager: selectedManager !== '전체' ? selectedManager : '',
             inputUserId: loggedInUser?.contactId || loggedInUser?.id,
             inputUserName: loggedInUser?.target || loggedInUser?.name,
             inputDateTime: new Date().toISOString(),
@@ -771,6 +774,7 @@ function PolicyInputModal({
             policyType: isWireless ? '무선' : '유선',
             category: categoryId,
             yearMonth: yearMonth,
+            manager: selectedManager !== '전체' ? selectedManager : '',
             inputUserId: loggedInUser?.contactId || loggedInUser?.id,
             inputUserName: loggedInUser?.target || loggedInUser?.name,
             inputDateTime: new Date().toISOString(),

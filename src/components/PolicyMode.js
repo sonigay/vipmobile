@@ -110,6 +110,10 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [teams, setTeams] = useState([]); // 소속정책팀 목록 추가
   const [loading, setLoading] = useState(false);
   
+  // 담당자 관리
+  const [managers, setManagers] = useState([]); // 담당자 목록
+  const [selectedManager, setSelectedManager] = useState('전체'); // 선택된 담당자 (기본값: 전체)
+  
   // 필터링 상태 추가
   const [selectedTeamFilter, setSelectedTeamFilter] = useState('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
@@ -172,12 +176,15 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     // 팀 데이터 로드
     loadTeams();
     
+    // 담당자 데이터 로드
+    loadManagers();
+    
     // 카테고리 데이터 로드
     loadCategories();
     
     // 정책 데이터 로드
     loadPolicyData();
-  }, [policyType, selectedYearMonth]);
+  }, [policyType, selectedYearMonth, selectedManager]);
 
   const loadStores = async () => {
     try {
@@ -201,6 +208,23 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       }
     } catch (error) {
       console.error('팀 목록 로드 실패:', error);
+    }
+  };
+
+  const loadManagers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/inventory/agent-filters`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          // 담당자 이름만 추출 (중복 제거 및 정렬)
+          const managerNames = [...new Set(data.data.map(agent => agent.name))].filter(Boolean).sort();
+          setManagers(managerNames);
+          console.log('담당자 목록 로드 완료:', managerNames);
+        }
+      }
+    } catch (error) {
+      console.error('담당자 목록 로드 실패:', error);
     }
   };
 
@@ -250,12 +274,17 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 서버에서 이미 teamName을 제공하므로 추가 변환 불필요
       const policiesWithTeamNames = filteredPolicies;
       
-      // 전체 정책 목록 저장 (필터링된 정책들)
-      setPolicies(policiesWithTeamNames);
+      // 담당자 필터링 적용
+      const managerFilteredPolicies = selectedManager === '전체'
+        ? policiesWithTeamNames
+        : policiesWithTeamNames.filter(policy => policy.manager === selectedManager);
       
-      // 카테고리별 개수 계산 (필터링된 정책들 기준)
+      // 전체 정책 목록 저장 (담당자 필터링된 정책들)
+      setPolicies(managerFilteredPolicies);
+      
+      // 카테고리별 개수 계산 (담당자 필터링된 정책들 기준)
       const counts = {};
-      policiesWithTeamNames.forEach(policy => {
+      managerFilteredPolicies.forEach(policy => {
         const category = policy.category;
         counts[category] = (counts[category] || 0) + 1;
       });
@@ -954,6 +983,32 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       </AppBar>
       
       <Container maxWidth={false} sx={{ flex: 1, py: 4, px: 2 }}>
+        {/* 담당자 선택 탭 */}
+        <Paper sx={{ mb: 2, p: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+            👥 담당자
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Chip
+              label="전체"
+              onClick={() => setSelectedManager('전체')}
+              color={selectedManager === '전체' ? 'primary' : 'default'}
+              variant={selectedManager === '전체' ? 'filled' : 'outlined'}
+              sx={{ fontWeight: selectedManager === '전체' ? 'bold' : 'normal' }}
+            />
+            {managers.map((manager) => (
+              <Chip
+                key={manager}
+                label={manager}
+                onClick={() => setSelectedManager(manager)}
+                color={selectedManager === manager ? 'primary' : 'default'}
+                variant={selectedManager === manager ? 'filled' : 'outlined'}
+                sx={{ fontWeight: selectedManager === manager ? 'bold' : 'normal' }}
+              />
+            ))}
+          </Box>
+        </Paper>
+
         {/* 정책 타입 선택 탭 */}
         <Paper sx={{ mb: 3 }}>
           <Tabs 
@@ -1045,17 +1100,20 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                         variant="outlined"
                         size="small"
                       />
-                      <Button
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddPolicy(category.id);
-                        }}
-                        sx={{ minWidth: 'auto' }}
-                      >
-                        추가
-                      </Button>
+                      {/* 전체 탭이 아닐 때만 추가 버튼 표시 */}
+                      {selectedManager !== '전체' && (
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddPolicy(category.id);
+                          }}
+                          sx={{ minWidth: 'auto' }}
+                        >
+                          추가
+                        </Button>
+                      )}
                     </Box>
                   </CardContent>
                                  </Card>
@@ -1767,6 +1825,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         yearMonth={selectedYearMonth}
         stores={stores}
         teams={teams}
+        selectedManager={selectedManager}
         onSave={handleSavePolicy}
         loggedInUser={loggedInStore}
       />
@@ -1782,6 +1841,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               yearMonth={selectedYearMonth}
               stores={stores}
               teams={teams}
+              selectedManager={selectedPolicyForEdit?.manager || selectedManager}
               onSave={handleEditPolicy}
               loggedInUser={loggedInStore}
               policy={selectedPolicyForEdit}

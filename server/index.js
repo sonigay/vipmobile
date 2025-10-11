@@ -802,7 +802,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     } else if (sheetName === '폰클홈데이터') {
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '정책_기본정보 ') {
-      range = `${safeSheetName}!A:AW`;  // 개별소급정책 AW열까지 확장
+      range = `${safeSheetName}!A:AX`;  // 담당자 AX열까지 확장
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -18274,6 +18274,7 @@ app.get('/api/policies', async (req, res) => {
           }
         })(),
         individualActivationType: row[48] || '',  // AW열: 개통유형
+        manager: row[49] || '',  // AX열: 담당자명
         // activationType을 객체로 파싱
         activationType: (() => {
           const activationTypeStr = row[26] || '';
@@ -18749,7 +18750,9 @@ app.post('/api/policies', async (req, res) => {
       // AV열: 개별소급정책 적용대상 (JSON 문자열)
       (category === 'wireless_individual' || category === 'wired_individual') ? JSON.stringify(req.body.individualTarget || {}) : '',
       // AW열: 개별소급정책 개통유형
-      (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : ''
+      (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : '',
+      // AX열: 담당자명
+      req.body.manager || ''
     ];
     
     console.log('📝 [정책생성] 구글시트 저장 데이터:', {
@@ -18773,7 +18776,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 시트가 비어있어 헤더와 함께 데이터 추가');
       response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-          range: '정책_기본정보 !A:AW',
+          range: '정책_기본정보 !A:AX',
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -18785,7 +18788,7 @@ app.post('/api/policies', async (req, res) => {
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
-        const targetRange = `정책_기본정보 !A${nextRowIndex}:AW${nextRowIndex}`;
+        const targetRange = `정책_기본정보 !A${nextRowIndex}:AX${nextRowIndex}`;
         response = await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
           range: targetRange,
@@ -19108,7 +19111,9 @@ app.put('/api/policies/:policyId', async (req, res) => {
       JSON.stringify(req.body.unionConditions || {}), // AU열
       // 개별소급정책 데이터
       JSON.stringify(req.body.individualTarget || {}), // AV열
-      req.body.individualActivationType || '' // AW열
+      req.body.individualActivationType || '', // AW열
+      // 담당자
+      req.body.manager || '' // AX열
     ];
     
     // 각 필드를 개별적으로 업데이트
@@ -19146,7 +19151,8 @@ app.put('/api/policies/:policyId', async (req, res) => {
       `'정책_기본정보 '!AT${rowNumber}`, // 연합정책 연합대상하부점
       `'정책_기본정보 '!AU${rowNumber}`, // 연합정책 조건
       `'정책_기본정보 '!AV${rowNumber}`, // 개별소급정책 적용대상
-      `'정책_기본정보 '!AW${rowNumber}`  // 개별소급정책 개통유형
+      `'정책_기본정보 '!AW${rowNumber}`, // 개별소급정책 개통유형
+      `'정책_기본정보 '!AX${rowNumber}`  // 담당자명
     ];
     
     // 배치 업데이트 실행
