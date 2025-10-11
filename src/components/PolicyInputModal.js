@@ -412,15 +412,13 @@ function PolicyInputModal({
         parts.push(`\n💰 지원금액: ${amountText} (${amountTypeText})`);
       }
       
-      // 4. 조건
+      // 4. 조건 (조건이 있을 때만 표시)
       const conditions = [];
       if (formData.unionConditions?.individualInput) conditions.push('개별 입력');
       if (formData.unionConditions?.postSettlement) conditions.push('후정산 입력');
       
       if (conditions.length > 0) {
         parts.push(`\n📌 조건: ${conditions.join(', ')}`);
-      } else {
-        parts.push('\n📌 조건: 없음');
       }
       
       if (parts.length > 0) {
@@ -933,33 +931,35 @@ function PolicyInputModal({
             </LocalizationProvider>
           </Grid>
           
-          {/* 적용점 타입 선택 */}
-          <Grid item xs={12}>
-            <FormControl component="fieldset">
-              <Typography variant="subtitle2" gutterBottom>
-                적용점 선택 방식
-              </Typography>
-              <RadioGroup
-                row
-                value={formData.storeType}
-                onChange={(e) => {
-                  handleInputChange('storeType', e.target.value);
-                  // 타입 변경 시 기존 선택 초기화
-                  if (e.target.value === 'single') {
-                    handleInputChange('multipleStores', []);
-                  } else {
-                    handleInputChange('policyStore', '');
-                  }
-                }}
-              >
-                <FormControlLabel value="single" control={<Radio />} label="단일점" />
-                <FormControlLabel value="multiple" control={<Radio />} label="복수점" />
-              </RadioGroup>
-            </FormControl>
-          </Grid>
+          {/* 연합정책이 아닐 때만 적용점 타입 선택 표시 */}
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && (
+            <Grid item xs={12}>
+              <FormControl component="fieldset">
+                <Typography variant="subtitle2" gutterBottom>
+                  적용점 선택 방식
+                </Typography>
+                <RadioGroup
+                  row
+                  value={formData.storeType}
+                  onChange={(e) => {
+                    handleInputChange('storeType', e.target.value);
+                    // 타입 변경 시 기존 선택 초기화
+                    if (e.target.value === 'single') {
+                      handleInputChange('multipleStores', []);
+                    } else {
+                      handleInputChange('policyStore', '');
+                    }
+                  }}
+                >
+                  <FormControlLabel value="single" control={<Radio />} label="단일점" />
+                  <FormControlLabel value="multiple" control={<Radio />} label="복수점" />
+                </RadioGroup>
+              </FormControl>
+            </Grid>
+          )}
 
           {/* 단일점 선택 */}
-          {formData.storeType === 'single' && (
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && formData.storeType === 'single' && (
             <Grid item xs={12}>
               <Autocomplete
                 options={stores}
@@ -987,7 +987,7 @@ function PolicyInputModal({
           )}
 
           {/* 복수점 선택 */}
-          {formData.storeType === 'multiple' && (
+          {categoryId !== 'wireless_union' && categoryId !== 'wired_union' && formData.storeType === 'multiple' && (
             <>
               <Grid item xs={12}>
                 <TextField
@@ -1554,10 +1554,10 @@ function PolicyInputModal({
                 </Typography>
                 <Autocomplete
                   options={stores}
-                  getOptionLabel={(option) => option.storeName || ''}
-                  value={stores.find(s => s.storeName === formData.unionSettlementStore) || null}
+                  getOptionLabel={(option) => option.name || ''}
+                  value={stores.find(s => s.name === formData.unionSettlementStore) || null}
                   onChange={(event, newValue) => {
-                    handleInputChange('unionSettlementStore', newValue ? newValue.storeName : '');
+                    handleInputChange('unionSettlementStore', newValue ? newValue.name : '');
                   }}
                   renderInput={(params) => (
                     <TextField
@@ -1567,6 +1567,11 @@ function PolicyInputModal({
                       helperText={errors.unionSettlementStore}
                     />
                   )}
+                  filterOptions={(options, { inputValue }) => {
+                    return options.filter((option) =>
+                      option.name.toLowerCase().includes(inputValue.toLowerCase())
+                    );
+                  }}
                 />
               </Grid>
 
@@ -1577,10 +1582,10 @@ function PolicyInputModal({
                 <Autocomplete
                   multiple
                   options={stores}
-                  getOptionLabel={(option) => option.storeName || ''}
-                  value={stores.filter(s => (formData.unionTargetStores || []).includes(s.storeName))}
+                  getOptionLabel={(option) => option.name || ''}
+                  value={stores.filter(s => (formData.unionTargetStores || []).includes(s.name))}
                   onChange={(event, newValue) => {
-                    handleInputChange('unionTargetStores', newValue.map(v => v.storeName));
+                    handleInputChange('unionTargetStores', newValue.map(v => v.name));
                   }}
                   renderInput={(params) => (
                     <TextField
@@ -1590,6 +1595,11 @@ function PolicyInputModal({
                       helperText={errors.unionTargetStores}
                     />
                   )}
+                  filterOptions={(options, { inputValue }) => {
+                    return options.filter((option) =>
+                      option.name.toLowerCase().includes(inputValue.toLowerCase())
+                    );
+                  }}
                 />
               </Grid>
 
