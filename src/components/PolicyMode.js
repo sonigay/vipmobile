@@ -217,8 +217,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data) {
-          // 담당자 이름만 추출 (중복 제거 및 정렬)
-          const managerNames = [...new Set(data.data.map(agent => agent.name))].filter(Boolean).sort();
+          // 담당자 이름만 추출 (target 필드 사용, 중복 제거 및 정렬)
+          const managerNames = [...new Set(data.data.map(agent => agent.target))].filter(Boolean).sort();
           setManagers(managerNames);
           console.log('담당자 목록 로드 완료:', managerNames);
         }
