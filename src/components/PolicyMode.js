@@ -1241,15 +1241,20 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             정책일자
                           </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
-                            복수점명
-                          </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
-                            적용점
-                          </TableCell>
-                          <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
-                            업체명
-                          </TableCell>
+                          {/* 연합정책이 아닐 때만 복수점명/적용점/업체명 컬럼 표시 */}
+                          {selectedCategory !== 'wireless_union' && selectedCategory !== 'wired_union' && (
+                            <>
+                              <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
+                                복수점명
+                              </TableCell>
+                              <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 80 }}>
+                                적용점
+                              </TableCell>
+                              <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 120 }}>
+                                업체명
+                              </TableCell>
+                            </>
+                          )}
                           <TableCell sx={{ color: 'white', fontWeight: 'bold', borderBottom: '2px solid white', minWidth: 100 }}>
                             소속정책팀
                           </TableCell>
@@ -1325,21 +1330,26 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               </Box>
                             </TableCell>
                             <TableCell>{policy.policyDate}</TableCell>
-                            <TableCell>
-                              {policy.isMultiple ? (
-                                <Chip 
-                                  label={policy.multipleStoreName && policy.multipleStoreName.trim() ? policy.multipleStoreName : '단일점'} 
-                                  size="small" 
-                                  color="primary" 
-                                  variant="outlined"
-                                  sx={{ fontSize: '0.7rem' }}
-                                />
-                              ) : (
-                                '단일점'
-                              )}
-                            </TableCell>
-                            <TableCell>{policy.policyStore}</TableCell>
-                            <TableCell>{policy.policyStoreName || '-'}</TableCell>
+                            {/* 연합정책이 아닐 때만 복수점명/적용점/업체명 셀 표시 */}
+                            {selectedCategory !== 'wireless_union' && selectedCategory !== 'wired_union' && (
+                              <>
+                                <TableCell>
+                                  {policy.isMultiple ? (
+                                    <Chip 
+                                      label={policy.multipleStoreName && policy.multipleStoreName.trim() ? policy.multipleStoreName : '단일점'} 
+                                      size="small" 
+                                      color="primary" 
+                                      variant="outlined"
+                                      sx={{ fontSize: '0.7rem' }}
+                                    />
+                                  ) : (
+                                    '단일점'
+                                  )}
+                                </TableCell>
+                                <TableCell>{policy.policyStore}</TableCell>
+                                <TableCell>{policy.policyStoreName || '-'}</TableCell>
+                              </>
+                            )}
                             <TableCell>{policy.teamName}</TableCell>
                             <TableCell>
                               <Box>
@@ -1472,9 +1482,10 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                               <TableCell>
                                 {(() => {
                                   // 개통유형 표시 로직
-                                  // 부가차감/추가지원정책은 개통유형 선택 필드가 없으므로 "전유형"으로 표시
+                                  // 부가차감/추가지원정책, 연합정책은 개통유형 선택 필드가 없으므로 "전유형"으로 표시
                                   if (policy.category === 'wireless_add_deduct' || policy.category === 'wired_add_deduct' || 
-                                      policy.category === 'wireless_add_support' || policy.category === 'wired_add_support') {
+                                      policy.category === 'wireless_add_support' || policy.category === 'wired_add_support' ||
+                                      policy.category === 'wireless_union' || policy.category === 'wired_union') {
                                     return '전유형';
                                   }
                                   
