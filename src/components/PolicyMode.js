@@ -213,16 +213,23 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
   const loadManagers = async () => {
     try {
-      // 장표모드와 동일한 API 사용 (이번달 개통실적이 있는 담당자만)
-      const response = await fetch(`${API_BASE_URL}/api/agent-closing-agents`);
+      // 재고나 개통실적이 있는 모든 담당자 (개통실적 없어도 OK)
+      const response = await fetch(`${API_BASE_URL}/api/inventory/agent-filters`);
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.agents) {
-          // 담당자 이름에서 괄호 제거하고 그룹핑 (ChartMode와 동일한 방식)
-          const uniqueNames = [...new Set(data.agents.map(name => {
+        if (data.success && data.data) {
+          // 제외할 담당자 목록
+          const excludedNames = ['VIP직영', '인천사무실', '안산사무실', '평택사무실'];
+          
+          // 담당자 이름에서 괄호 제거하고 그룹핑
+          const allNames = data.data.map(agent => agent.target).filter(Boolean);
+          const uniqueNames = [...new Set(allNames.map(name => {
             // 괄호 제거 (예: "홍기현(직영)" → "홍기현")
             return name.replace(/\([^)]*\)/g, '').trim();
-          }))].filter(Boolean).sort();
+          }))]
+          .filter(name => name && !excludedNames.includes(name)) // 제외 목록 필터링
+          .sort();
+          
           setManagers(uniqueNames);
           console.log('담당자 목록 로드 완료:', uniqueNames.length + '명');
         }
