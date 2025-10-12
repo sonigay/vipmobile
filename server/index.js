@@ -18191,12 +18191,14 @@ app.get('/api/policies', async (req, res) => {
         yearMonth: row[23] || '',               // X열: 대상년월
         multipleStoreName: (() => {
           const value = row[24];
-          // 첫 번째 정책만 로그 출력
-          if (row[0] === dataRows[0][0]) {
+          // 새로 저장된 정책 로그 출력
+          if (row[0] === 'POL_1760243517056_ushvjqq8t') {
             console.log('🔍 [정책조회] Y열(24인덱스) 복수점명 확인:', {
               policyId: row[0],
               rowLength: row.length,
               row24Value: value,
+              row24Type: typeof value,
+              row24IsEmpty: value === '',
               row23: row[23], // X열
               row25: row[25], // Z열
               row26: row[26]  // AA열
