@@ -694,6 +694,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         category: originalPolicy.category,
         yearMonth: targetYearMonth,
         team: originalPolicy.team, // 소속정책팀 그대로 복사
+        manager: originalPolicy.manager, // 담당자 그대로 복사
         inputUserId: loggedInStore?.contactId || loggedInStore?.id,
         inputUserName: loggedInStore?.target || loggedInStore?.name,
         inputDateTime: new Date().toISOString(),
@@ -701,7 +702,29 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
           total: '대기',
           settlement: '대기',
           team: '대기'
-        }
+        },
+        // 정책별 특수 필드들 복사
+        activationType: originalPolicy.activationType,
+        multipleStoreName: originalPolicy.multipleStoreName,
+        isMultiple: originalPolicy.isMultiple,
+        // 구두정책
+        amount95Above: originalPolicy.amount95Above,
+        amount95Below: originalPolicy.amount95Below,
+        // 부가차감지원정책
+        deductSupport: originalPolicy.deductSupport,
+        conditionalOptions: originalPolicy.conditionalOptions,
+        // 부가추가지원정책
+        addSupport: originalPolicy.addSupport,
+        supportConditionalOptions: originalPolicy.supportConditionalOptions,
+        // 요금제유형별정책
+        rateSupports: originalPolicy.rateSupports,
+        // 연합정책
+        unionSettlementStore: originalPolicy.unionSettlementStore,
+        unionTargetStores: originalPolicy.unionTargetStores,
+        unionConditions: originalPolicy.unionConditions,
+        // 개별소급정책
+        individualTarget: originalPolicy.individualTarget,
+        individualActivationType: originalPolicy.individualActivationType
       };
 
       await PolicyService.createPolicy(copyData);
