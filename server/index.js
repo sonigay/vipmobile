@@ -18342,12 +18342,13 @@ app.get('/api/policies', async (req, res) => {
           });
         });
       } else {
-        // 단일점 정책인 경우
+        // 단일 그룹이지만 복수점명이 있는 경우 (시트에 복수점명이 저장된 경우)
         group.policies.forEach(policy => {
+          const hasMultipleStoreName = policy.multipleStoreName && policy.multipleStoreName.trim();
           processedPolicies.push({
             ...policy,
-            isMultiple: false,
-            multipleStoreName: null
+            isMultiple: hasMultipleStoreName ? true : false,
+            multipleStoreName: hasMultipleStoreName ? policy.multipleStoreName : null
           });
         });
       }
