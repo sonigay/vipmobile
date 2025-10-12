@@ -694,6 +694,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         category: originalPolicy.category,
         yearMonth: targetYearMonth,
         team: originalPolicy.team, // 소속정책팀 그대로 복사
+        policyTeam: originalPolicy.team || originalPolicy.teamName, // 백엔드가 요구하는 policyTeam
         manager: originalPolicy.manager, // 담당자 그대로 복사
         inputUserId: loggedInStore?.contactId || loggedInStore?.id,
         inputUserName: loggedInStore?.target || loggedInStore?.name,

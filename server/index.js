@@ -19085,7 +19085,7 @@ app.put('/api/policies/:policyId', async (req, res) => {
     }
     
     // amountType이 'in_content'가 아닐 때만 policyAmount 필수 (구두정책, 부가차감지원정책이 아닌 경우에만)
-    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicy && amountType !== 'in_content' && !policyAmount) {
+    if (!isShoePolicy && !isAddDeductPolicy && !isAddSupportPolicy && !isRatePolicyForUpdate && amountType !== 'in_content' && !policyAmount) {
       return res.status(400).json({
         success: false,
         error: '금액이 입력되지 않았습니다.',
