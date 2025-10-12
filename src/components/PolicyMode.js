@@ -1431,9 +1431,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                             {selectedCategoryForList !== 'wireless_union' && selectedCategoryForList !== 'wired_union' && (
                               <>
                                 <TableCell>
-                                  {policy.isMultiple ? (
+                                  {policy.multipleStoreName && policy.multipleStoreName.trim() ? (
                                     <Chip 
-                                      label={policy.multipleStoreName && policy.multipleStoreName.trim() ? policy.multipleStoreName : '단일점'} 
+                                      label={policy.multipleStoreName} 
                                       size="small" 
                                       color="primary" 
                                       variant="outlined"
