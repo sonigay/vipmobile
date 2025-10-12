@@ -18814,7 +18814,24 @@ app.post('/api/policies', async (req, res) => {
         }
       });
     } else {
-        // 기존 데이터가 있으면 정책만 추가 (다음 행의 A열부터 정확히 기록)
+        // 기존 데이터가 있는 경우
+        // 1. 헤더가 누락되어 있으면 업데이트
+        const currentHeader = existingData[0];
+        const needsHeaderUpdate = !currentHeader[24] || !currentHeader[25] || !currentHeader[26]; // Y, Z, AA열 확인
+        
+        if (needsHeaderUpdate) {
+          console.log('📝 [정책생성] 헤더 업데이트 필요 - Y~AX열 헤더 추가');
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: '정책_기본정보 !A1:AX1',
+            valueInputOption: 'RAW',
+            resource: {
+              values: [headerRow]
+            }
+          });
+        }
+        
+        // 2. 정책 데이터 추가 (다음 행의 A열부터 정확히 기록)
       console.log('📝 [정책생성] 기존 데이터에 정책 추가');
         // existingData에는 헤더를 포함한 전체 행이 들어있다고 가정
         const nextRowIndex = existingData.length + 1; // 1-based index
