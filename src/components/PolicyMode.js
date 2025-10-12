@@ -303,6 +303,16 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       // 전체 정책 목록 저장 (담당자 필터링된 정책들)
       setPolicies(managerFilteredPolicies);
       
+      // 디버깅: 복수점명 확인
+      console.log('📊 정책 데이터 샘플 (복수점명 확인):', 
+        managerFilteredPolicies.slice(0, 3).map(p => ({
+          id: p.id,
+          name: p.policyName,
+          multipleStoreName: p.multipleStoreName,
+          isMultiple: p.isMultiple
+        }))
+      );
+      
       // 카테고리별 개수 계산 (담당자 필터링된 정책들 기준)
       const counts = {};
       managerFilteredPolicies.forEach(policy => {
