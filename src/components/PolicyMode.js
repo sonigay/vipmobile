@@ -1113,6 +1113,18 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
                       </Typography>
                     </Box>
                     
+                    {/* 구두정책 경고문구 */}
+                    {(category.id === 'wireless_shoe' || category.id === 'wired_shoe') && (
+                      <Alert severity="warning" sx={{ mb: 2, fontSize: '0.75rem', py: 0.5 }}>
+                        <Typography variant="caption" display="block" sx={{ fontWeight: 'bold' }}>
+                          신규점이나 변동사항이 있을시만 입력해주세요!
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          폰클에 등록되어있는점은 입력안해주셔도 됩니다!
+                        </Typography>
+                      </Alert>
+                    )}
+                    
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Chip 
                         label={`${policyData[category.id] || 0}건`}
