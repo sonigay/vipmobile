@@ -305,13 +305,29 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       
       // 디버깅: 복수점명 확인
       console.log('📊 정책 데이터 샘플 (복수점명 확인):', 
-        managerFilteredPolicies.slice(0, 3).map(p => ({
+        managerFilteredPolicies.slice(0, 10).map(p => ({
           id: p.id,
           name: p.policyName,
           multipleStoreName: p.multipleStoreName,
           isMultiple: p.isMultiple
         }))
       );
+      
+      // 새로 저장된 정책 찾기
+      const newPolicy = managerFilteredPolicies.find(p => p.id === 'POL_1760243517056_ushvjqq8t');
+      if (newPolicy) {
+        console.log('🎯 새로 저장된 정책 발견:', {
+          id: newPolicy.id,
+          multipleStoreName: newPolicy.multipleStoreName,
+          isMultiple: newPolicy.isMultiple,
+          manager: newPolicy.manager
+        });
+      } else {
+        console.log('❌ 새로 저장된 정책이 필터링된 목록에 없습니다.');
+        console.log('전체 정책 수:', policiesWithTeamNames.length);
+        console.log('선택된 담당자:', selectedManager);
+        console.log('필터링 후 정책 수:', managerFilteredPolicies.length);
+      }
       
       // 카테고리별 개수 계산 (담당자 필터링된 정책들 기준)
       const counts = {};
