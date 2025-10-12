@@ -18190,6 +18190,7 @@ app.get('/api/policies', async (req, res) => {
         settlementUserId: row[22] || '',       // W열: 정산반영자ID
         yearMonth: row[23] || '',               // X열: 대상년월
         multipleStoreName: row[24] || '단일점',       // Y열: 복수점명 (빈 공란일 때 "단일점"으로 표시)
+        isMultiple: (row[24] && row[24].trim() && row[24] !== '단일점') ? true : false, // 복수점명이 있으면 복수점
         storeNameFromSheet: row[25] || '',       // Z열: 업체명 (시트에서 직접 읽은 값)
         activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
         amount95Above: row[27] || '',            // AB열: 95군이상금액
