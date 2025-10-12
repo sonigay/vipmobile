@@ -18189,7 +18189,21 @@ app.get('/api/policies', async (req, res) => {
         settlementDateTime: row[21] || '',     // V열: 정산반영일시
         settlementUserId: row[22] || '',       // W열: 정산반영자ID
         yearMonth: row[23] || '',               // X열: 대상년월
-        multipleStoreName: row[24] || '',       // Y열: 복수점명
+        multipleStoreName: (() => {
+          const value = row[24];
+          // 첫 번째 정책만 로그 출력
+          if (row[0] === dataRows[0][0]) {
+            console.log('🔍 [정책조회] Y열(24인덱스) 복수점명 확인:', {
+              policyId: row[0],
+              rowLength: row.length,
+              row24Value: value,
+              row23: row[23], // X열
+              row25: row[25], // Z열
+              row26: row[26]  // AA열
+            });
+          }
+          return value || null;
+        })(),       // Y열: 복수점명
         isMultiple: (row[24] && row[24].trim()) ? true : false, // 복수점명이 있으면 복수점
         storeNameFromSheet: row[25] || '',       // Z열: 업체명 (시트에서 직접 읽은 값)
         activationTypeFromSheet: row[26] || '',   // AA열: 개통유형 (시트에서 직접 읽은 값)
@@ -18779,9 +18793,10 @@ app.post('/api/policies', async (req, res) => {
       activationType: req.body.activationType,
       multipleStoreName: req.body.multipleStoreName,
       storeName,
-      newPolicyRow,
       arrayLength: newPolicyRow.length
     });
+    
+    console.log('🔍 [정책생성] newPolicyRow Y열(24인덱스) 확인:', newPolicyRow[24]);
     
     let response;
     
