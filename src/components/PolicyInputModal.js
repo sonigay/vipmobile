@@ -280,8 +280,8 @@ function PolicyInputModal({
           // 조건부가 있는 경우
           content = `🎯 조건부: ${conditions.join(', ')}\n💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
         } else {
-          // 조건부가 없는 경우 - 모든 차감지원 금액 표시
-          content = `💰 ${deductItems.join('/')} ${amountText} 차감금액지원`;
+          // 조건부가 없는 경우 - 모든 차감지원 금액 표시 + 조건: 없음 추가
+          content = `💰 ${deductItems.join('/')} ${amountText} 차감금액지원\n📌 조건: 없음`;
         }
         setFormData(prev => ({ ...prev, policyContent: content }));
       } else {
@@ -517,20 +517,14 @@ function PolicyInputModal({
     
     // 부가차감지원정책 차감지원설정 검사 (직접입력이 아닐 때만)
     if ((categoryId === 'wireless_add_deduct' || categoryId === 'wired_add_deduct') && !formData.isDirectInput) {
-      const hasAnyAmount = (formData.deductSupport?.addServiceAmount || '').trim() || 
-                          (formData.deductSupport?.insuranceAmount || '').trim() || 
+      const hasAnyAmount = (formData.deductSupport?.addServiceAmount || '').trim() ||
+                          (formData.deductSupport?.insuranceAmount || '').trim() ||
                           (formData.deductSupport?.connectionAmount || '').trim();
       if (!hasAnyAmount) {
         newErrors.deductSupport = '차감지원 금액을 최소 하나 입력해주세요.';
       }
       
-      // 조건부 옵션 검사
-      const hasAnyCondition = (formData.conditionalOptions?.addServiceAcquired || false) || 
-                             (formData.conditionalOptions?.insuranceAcquired || false) || 
-                             (formData.conditionalOptions?.connectionAcquired || false);
-      if (!hasAnyCondition) {
-        newErrors.conditionalOptions = '조건부 옵션을 최소 하나 선택해주세요.';
-      }
+      // 조건부 옵션은 선택사항 (검증 제거)
     }
 
     // 부가추가지원정책 추가지원설정 검사 (직접입력이 아닐 때만)
