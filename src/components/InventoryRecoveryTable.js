@@ -209,6 +209,32 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
     return lightColors.includes(color) ? '1px solid #ccc' : 'none';
   };
 
+  // 경과일 계산 함수
+  const calculateElapsedDays = (releaseDate) => {
+    if (!releaseDate) return '-';
+    
+    try {
+      // 출고일 파싱 (YYYY-MM-DD 또는 YYYY. MM. DD. 형식)
+      const releaseDateStr = releaseDate.replace(/\./g, '-').replace(/\s/g, '');
+      const release = new Date(releaseDateStr);
+      const today = new Date();
+      
+      // 시간 부분 제거하고 날짜만 비교
+      release.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      
+      // 경과일 계산 (오늘 - 출고일)
+      const diffTime = today - release;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      // 마이너스 표시와 함께 반환
+      return `-${diffDays}일`;
+    } catch (error) {
+      console.error('경과일 계산 오류:', error);
+      return '-';
+    }
+  };
+
   // 실시간 반영을 위한 최적화된 데이터 그룹화
   const groupedData = useMemo(() => {
     const cacheKey = generateCacheKey(data, tabIndex);
@@ -281,6 +307,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
     '색상',
     '일련번호',
     '출고일',
+    '경과일',
     '상태'
   ];
 
@@ -581,14 +608,47 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
                 </TableRow>
               </TableHead>
               <TableBody>
-                {items.map((item, itemIndex) => (
-                  <TableRow 
-                    key={itemIndex}
-                    sx={{ 
-                      '&:nth-of-type(odd)': { backgroundColor: '#fafafa' },
-                      '&:hover': { backgroundColor: '#f0f8ff' }
-                    }}
-                  >
+                {items.map((item, itemIndex) => {
+                  // 업체명별 색상 배경 (다양한 색상 사용)
+                  const storeColors = [
+                    '#fff3e0', // 연한 주황
+                    '#e8f5e9', // 연한 초록
+                    '#e3f2fd', // 연한 파랑
+                    '#f3e5f5', // 연한 보라
+                    '#fff9c4', // 연한 노랑
+                    '#fce4ec', // 연한 핑크
+                    '#e0f2f1', // 연한 청록
+                    '#f1f8e9', // 연한 라임
+                  ];
+                  
+                  // 이전 아이템과 업체명이 다른지 확인
+                  const isNewStore = itemIndex === 0 || items[itemIndex - 1].storeName !== item.storeName;
+                  
+                  // 업체명으로 색상 인덱스 결정 (일관된 색상 유지)
+                  const storeIndex = items.findIndex(i => i.storeName === item.storeName);
+                  let colorIndex = 0;
+                  let uniqueStoreCount = 0;
+                  for (let i = 0; i <= storeIndex; i++) {
+                    if (i === 0 || items[i].storeName !== items[i - 1].storeName) {
+                      if (i === storeIndex) colorIndex = uniqueStoreCount;
+                      uniqueStoreCount++;
+                    }
+                  }
+                  const backgroundColor = storeColors[colorIndex % storeColors.length];
+                  
+                  return (
+                    <TableRow 
+                      key={itemIndex}
+                      sx={{ 
+                        backgroundColor: backgroundColor,
+                        borderTop: isNewStore ? '3px solid #1976d2' : 'none', // 업체명 변경 시 굵은 상단 테두리
+                        '&:hover': { 
+                          backgroundColor: '#e3f2fd',
+                          filter: 'brightness(0.95)'
+                        }
+                      }}
+                    >
+                  
                     <TableCell sx={{ 
                       fontWeight: 'bold',
                       width: '10.7%',
@@ -666,6 +726,16 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
                       whiteSpace: 'nowrap'
                     }}>
                       {item.recentShipmentDate || '출고일 정보 없음'}
+                    </TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'center',
+                      width: '10.7%',
+                      color: '#d32f2f',
+                      fontWeight: 'bold',
+                      border: '2px solid #d32f2f',
+                      backgroundColor: '#ffebee'
+                    }}>
+                      {calculateElapsedDays(item.recentShipmentDate)}
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
@@ -775,7 +845,8 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
                        </TableCell>
                      )}
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
