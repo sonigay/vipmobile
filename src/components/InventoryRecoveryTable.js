@@ -753,8 +753,8 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
                       width: '10.7%',
                       color: '#d32f2f',
                       fontWeight: 'bold',
-                      border: '2px solid #d32f2f',
-                      backgroundColor: '#ffebee'
+                      borderLeft: '2px solid #d32f2f',
+                      borderRight: '2px solid #d32f2f'
                     }}>
                       {calculateElapsedDays(item.recentShipmentDate)}
                     </TableCell>
