@@ -247,6 +247,22 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
       }
     }
     
+    // 각 담당자별 데이터 정렬: 업체명 → 모델명 → 색상 순으로 오름차순
+    Object.keys(groups).forEach(manager => {
+      groups[manager].sort((a, b) => {
+        // 1순위: 업체명 (storeName) 오름차순
+        const storeCompare = (a.storeName || '').localeCompare(b.storeName || '', 'ko-KR');
+        if (storeCompare !== 0) return storeCompare;
+        
+        // 2순위: 모델명 (modelName) 오름차순
+        const modelCompare = (a.modelName || '').localeCompare(b.modelName || '', 'ko-KR');
+        if (modelCompare !== 0) return modelCompare;
+        
+        // 3순위: 색상 (color) 오름차순
+        return (a.color || '').localeCompare(b.color || '', 'ko-KR');
+      });
+    });
+    
     // 캐시에 저장 (실시간 데이터 우선)
     dataCacheRef.current.set(cacheKey, {
       data: groups,
@@ -584,7 +600,7 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
                     </TableCell>
                     <TableCell sx={{ 
                       textAlign: 'center',
-                      width: '10.7%',
+                      width: '18%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
