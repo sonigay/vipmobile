@@ -345,28 +345,29 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
     // 탭별로 다른 형식으로 복사
     if (tabIndex === 0) { // 총 회수대상
       copyText = `📦 총 회수대상 - ${manager}\n`;
-      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호/경과일\n`;
       copyText += `─`.repeat(50) + '\n';
     } else if (tabIndex === 1) { // 금일 회수대상
       copyText = `🎯 금일 회수대상 - ${manager}\n`;
-      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호/경과일\n`;
       copyText += `─`.repeat(50) + '\n';
     } else if (tabIndex === 2) { // 금일 회수완료
       copyText = `✅ 금일 회수완료 - ${manager}\n`;
-      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호/경과일\n`;
       copyText += `─`.repeat(50) + '\n';
     } else if (tabIndex === 3) { // 위경도좌표없는곳
       copyText = `⚠️ 위경도좌표없는곳 - ${manager}\n`;
-      copyText += `담당자명/업체명/모델명/색상/일련번호\n`;
+      copyText += `담당자명/업체명/모델명/색상/일련번호/경과일\n`;
       copyText += `─`.repeat(50) + '\n';
     }
 
     // 데이터 추가
     items.forEach(item => {
+      const elapsedDays = calculateElapsedDays(item.recentShipmentDate);
       if (tabIndex === 3) { // 위경도좌표없는곳
-        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}/${item.address || '주소없음'}\n`;
+        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}/${elapsedDays}/${item.address || '주소없음'}\n`;
       } else {
-        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}\n`;
+        copyText += `${item.manager}/${item.storeName}/${item.modelName}/${item.color}/${item.serialNumber}/${elapsedDays}\n`;
       }
     });
 
