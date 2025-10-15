@@ -1326,6 +1326,7 @@ const InventoryMode = ({
                 startIcon={<RefreshIcon />}
                 onClick={onModeChange}
                 sx={{
+                  ml: 2,
                   backgroundColor: 'rgba(255,255,255,0.1)',
                   '&:hover': {
                     backgroundColor: 'rgba(255,255,255,0.2)'
