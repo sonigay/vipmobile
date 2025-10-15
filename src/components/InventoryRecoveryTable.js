@@ -578,8 +578,29 @@ function InventoryRecoveryTable({ data, tabIndex, onStatusUpdate, onRefresh, pri
           </Box>
 
           {/* 테이블 */}
-          <TableContainer component={Paper} sx={{ boxShadow: 2 }}>
-            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+          <TableContainer 
+            component={Paper} 
+            sx={{ 
+              boxShadow: 2,
+              overflowX: 'auto', // 가로 스크롤 활성화
+              width: '100%',
+              // 모바일에서 스크롤바 스타일 개선
+              '&::-webkit-scrollbar': {
+                height: '8px'
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: '#f1f1f1'
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: '#888',
+                borderRadius: '4px'
+              },
+              '&::-webkit-scrollbar-thumb:hover': {
+                backgroundColor: '#555'
+              }
+            }}
+          >
+            <Table size="small" sx={{ minWidth: 1000 }}> {/* 최소 너비 설정으로 스크롤 보장 */}
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
                   {getTableHeaders().map((header, index) => (
