@@ -52,7 +52,9 @@ const MODE_COLORS = {
   'budget': '#795548',     // 갈색 (예산모드)
   'sales': '#e91e63',      // 핑크색 (영업모드)
   'inventoryRecovery': '#8bc34a',  // 초록색 (재고회수모드)
-  'dataCollection': '#9c27b0'  // 보라색 (정보수집모드)
+  'dataCollection': '#9c27b0',  // 보라색 (정보수집모드)
+  'smsManagement': '#00897B',  // 틸색 (SMS 관리모드)
+  'obManagement': '#5E35B1'   // 보라색 (OB 관리모드)
 };
 
 // 모드별 제목
@@ -69,7 +71,9 @@ const MODE_TITLES = {
   'budget': '예산 모드',
   'sales': '영업 모드',
   'inventoryRecovery': '재고회수 모드',
-  'dataCollection': '정보수집 모드'
+  'dataCollection': '정보수집 모드',
+  'smsManagement': 'SMS 관리 모드',
+  'obManagement': 'OB 관리 모드'
 };
 
 function AppUpdatePopup({ 
