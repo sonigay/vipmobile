@@ -28048,14 +28048,10 @@ app.post('/api/sms/cleanup', async (req, res) => {
         deletedCount += dataRows.length - filteredRows.length;
         
         // 시트 전체를 헤더 + 필터링된 데이터로 교체
-        await sheets.spreadsheets.values.clear({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SMS_SHEET_NAME}!A:I`,
-        });
-        
+        // clear 대신 update로 덮어쓰기 (충분히 큰 범위로)
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SMS_SHEET_NAME}!A1`,
+          range: `${SMS_SHEET_NAME}!A1:I${Math.max(rows.length, 1000)}`,
           valueInputOption: 'RAW',
           resource: {
             values: [header, ...filteredRows]
@@ -28086,14 +28082,10 @@ app.post('/api/sms/cleanup', async (req, res) => {
         deletedCount += dataRows.length - filteredRows.length;
         
         // 시트 전체를 헤더 + 필터링된 데이터로 교체
-        await sheets.spreadsheets.values.clear({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
-        });
-        
+        // clear 대신 update로 덮어쓰기 (충분히 큰 범위로)
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SMS_HISTORY_SHEET_NAME}!A1`,
+          range: `${SMS_HISTORY_SHEET_NAME}!A1:H${Math.max(rows.length, 1000)}`,
           valueInputOption: 'RAW',
           resource: {
             values: [header, ...filteredRows]
