@@ -25,7 +25,9 @@ import {
   AccountBalance as BudgetIcon,
   TrendingUp as SalesIcon,
   Refresh as RefreshIcon,
-  DataUsage as DataUsageIcon
+  DataUsage as DataUsageIcon,
+  Message as MessageIcon,
+  Phone as PhoneIcon
 } from '@mui/icons-material';
 
 const ModeSelectionPopup = ({ 
@@ -180,6 +182,30 @@ const ModeSelectionPopup = ({
         '정보 분석 및 통계',
         '자동화된 데이터 처리',
         '실시간 모니터링'
+      ]
+    },
+    smsManagement: {
+      title: 'SMS 관리 모드',
+      description: 'SMS 수신 및 전달 관리 시스템',
+      icon: <MessageIcon sx={{ fontSize: 40, color: '#00897B' }} />,
+      color: '#00897B',
+      features: [
+        'SMS 자동 수신',
+        '번호별 전달 설정',
+        '전송 이력 관리',
+        '실시간 모니터링'
+      ]
+    },
+    obManagement: {
+      title: 'OB 관리 모드',
+      description: 'OB(Outbound) 관리 및 추적 시스템',
+      icon: <PhoneIcon sx={{ fontSize: 40, color: '#5E35B1' }} />,
+      color: '#5E35B1',
+      features: [
+        'OB 데이터 관리',
+        '발신 현황 추적',
+        '성과 분석',
+        '자동화 설정'
       ]
     }
   };

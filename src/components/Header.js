@@ -107,6 +107,10 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
         return '#2e7d32'; // 초록색
       case '관리자':
         return '#1976d2'; // 파란색
+      case 'SMS 관리':
+        return '#00897B'; // 틸색
+      case 'OB 관리':
+        return '#5E35B1'; // 보라색
       default:
         return '#1976d2'; // 기본 파란색
     }

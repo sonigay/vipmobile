@@ -9,6 +9,8 @@ import Login from './components/Login';
 import InventoryMode from './components/InventoryMode';
 import SettlementMode from './components/SettlementMode';
 import DataCollectionMode from './components/DataCollectionMode';
+import SmsManagementMode from './components/SmsManagementMode';
+import ObManagementMode from './components/ObManagementMode';
 import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
@@ -143,6 +145,8 @@ function AppContent() {
   const [isBudgetMode, setIsBudgetMode] = useState(false);
   const [isInventoryRecoveryMode, setIsInventoryRecoveryMode] = useState(false);
   const [isDataCollectionMode, setIsDataCollectionMode] = useState(false);
+  const [isSmsManagementMode, setIsSmsManagementMode] = useState(false);
+  const [isObManagementMode, setIsObManagementMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1555,6 +1559,8 @@ function AppContent() {
     modifiedStore.isReservation = false;
     modifiedStore.isBudget = false;
     modifiedStore.isInventoryRecovery = false;
+    modifiedStore.isSmsManagement = false;
+    modifiedStore.isObManagement = false;
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1590,6 +1596,12 @@ function AppContent() {
         break;
       case 'dataCollection':
         modifiedStore.isDataCollection = true;
+        break;
+      case 'smsManagement':
+        modifiedStore.isSmsManagement = true;
+        break;
+      case 'obManagement':
+        modifiedStore.isObManagement = true;
         break;
       default:
         break;
@@ -1637,6 +1649,8 @@ function AppContent() {
     setIsSalesMode(false);
     setIsInventoryRecoveryMode(false);
     setIsDataCollectionMode(false);
+    setIsSmsManagementMode(false);
+    setIsObManagementMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1695,6 +1709,14 @@ function AppContent() {
       case 'dataCollection':
         // console.log('정보수집 모드로 전환');
         setIsDataCollectionMode(true);
+        break;
+      case 'smsManagement':
+        // console.log('SMS 관리 모드로 전환');
+        setIsSmsManagementMode(true);
+        break;
+      case 'obManagement':
+        // console.log('OB 관리 모드로 전환');
+        setIsObManagementMode(true);
         break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
@@ -1756,6 +1778,10 @@ function AppContent() {
     setIsInventoryRecoveryMode(false);
     // 정보수집모드 상태 초기화
     setIsDataCollectionMode(false);
+    // SMS 관리모드 상태 초기화
+    setIsSmsManagementMode(false);
+    // OB 관리모드 상태 초기화
+    setIsObManagementMode(false);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -2512,6 +2538,48 @@ ${requestList}
             setAvailableModes(currentModes);
             // 현재 모드 비활성화
             setIsDataCollectionMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // SMS 관리모드일 때는 별도 화면 렌더링
+  if (isSmsManagementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <SmsManagementMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsSmsManagementMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // OB 관리모드일 때는 별도 화면 렌더링
+  if (isObManagementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ObManagementMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsObManagementMode(false);
             setShowModeSelection(true);
           }}
           availableModes={availableModes}

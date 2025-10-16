@@ -2768,6 +2768,8 @@ app.post('/api/login', async (req, res) => {
         const hasSalesPermission = agent[18] === 'O'; // S열: 영업모드 권한
         const hasInventoryRecoveryPermission = agent[19] === 'O'; // T열: 재고회수모드 권한
         const hasDataCollectionPermission = agent[20] === 'O'; // U열: 정보수집모드 권한
+        const hasSmsManagementPermission = agent[21] === 'O'; // V열: SMS 관리모드 권한
+        const hasObManagementPermission = agent[22] === 'O'; // W열: OB 관리모드 권한
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -2800,7 +2802,9 @@ app.post('/api/login', async (req, res) => {
           budget: hasBudgetPermission, // 예산모드 권한
           sales: hasSalesPermission, // 영업모드 권한
           inventoryRecovery: hasInventoryRecoveryPermission, // 재고회수모드 권한
-          dataCollection: hasDataCollectionPermission // 정보수집모드 권한
+          dataCollection: hasDataCollectionPermission, // 정보수집모드 권한
+          smsManagement: hasSmsManagementPermission, // SMS 관리모드 권한
+          obManagement: hasObManagementPermission // OB 관리모드 권한
         };
         
         // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
@@ -2813,7 +2817,7 @@ app.post('/api/login', async (req, res) => {
             fields: [
               {
                 name: '관리자 정보',
-                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}\n재고회수권한: ${hasInventoryRecoveryPermission ? 'O' : 'X'}`
+                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}\n재고회수권한: ${hasInventoryRecoveryPermission ? 'O' : 'X'}\nSMS관리권한: ${hasSmsManagementPermission ? 'O' : 'X'}\nOB관리권한: ${hasObManagementPermission ? 'O' : 'X'}`
               },
               {
                 name: '접속 정보',
@@ -17690,7 +17694,9 @@ app.post('/api/app-updates', async (req, res) => {
       'budget': 11,    // L열: 예산모드
       'sales': 12,     // M열: 영업모드
       'inventoryRecovery': 13, // N열: 재고회수모드
-      'dataCollection': 14     // O열: 정보수집모드 (새로 추가)
+      'dataCollection': 14,    // O열: 정보수집모드
+      'smsManagement': 15,     // P열: SMS 관리모드
+      'obManagement': 16       // Q열: OB 관리모드
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -17702,14 +17708,14 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(15).fill(''); // A~O열 (15개 컬럼)
+    const newRow = new Array(17).fill(''); // A~Q열 (17개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:O`,
+      range: `${UPDATE_SHEET_NAME}!A:Q`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
