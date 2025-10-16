@@ -576,6 +576,9 @@ const PREVIOUS_MONTH_ACTIVATION_SHEET_NAME = '폰클개통데이터(전월)';  /
 const UPDATE_SHEET_NAME = '어플업데이트';  // 업데이트 내용 관리 시트 추가
 const MANUAL_DATA_SHEET_NAME = '수기초';  // 수기초 데이터
 const INSPECTION_RESULT_SHEET_NAME = '검수결과';  // 검수 결과 데이터
+const SMS_SHEET_NAME = 'SMS관리';  // SMS 수신 데이터
+const SMS_RULES_SHEET_NAME = 'SMS전달규칙';  // SMS 전달 규칙
+const SMS_HISTORY_SHEET_NAME = 'SMS전달이력';  // SMS 전달 이력
 const NORMALIZATION_HISTORY_SHEET_NAME = '정규화이력';  // 정규화 이력 데이터
 const INSPECTION_MEMO_SHEET_NAME = '여직원검수데이터메모';  // 여직원 검수 데이터 메모 시트 추가
 const INSPECTION_SETTINGS_SHEET_NAME = '검수설정';  // 검수 설정 시트
@@ -27474,6 +27477,465 @@ app.get('/api/data-collection-updates', async (req, res) => {
     
   } catch (error) {
     console.error('정보수집모드 앱 업데이트 데이터 가져오기 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// SMS 관리 API
+// ============================================
+
+// SMS 수신 데이터 조회 API
+app.get('/api/sms/received', async (req, res) => {
+  try {
+    const { limit = 100, status = 'all' } = req.query;
+    
+    console.log(`SMS 수신 데이터 조회: limit=${limit}, status=${status}`);
+    
+    // SMS관리 시트에서 데이터 가져오기
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:I`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    // 헤더 제외하고 데이터만 파싱
+    const header = rows[0];
+    const dataRows = rows.slice(1);
+    
+    // 데이터를 객체 배열로 변환
+    let smsData = dataRows.map(row => ({
+      id: row[0] || '',
+      receivedAt: row[1] || '',
+      sender: row[2] || '',
+      receiver: row[3] || '',
+      message: row[4] || '',
+      forwardStatus: row[5] || '대기중',
+      forwardedAt: row[6] || '',
+      forwardTargets: row[7] || '',
+      memo: row[8] || ''
+    }));
+    
+    // 상태 필터링
+    if (status !== 'all') {
+      smsData = smsData.filter(sms => sms.forwardStatus === status);
+    }
+    
+    // 최신순 정렬 (ID 내림차순)
+    smsData.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+    
+    // 제한 적용
+    smsData = smsData.slice(0, parseInt(limit));
+    
+    res.json({ success: true, data: smsData });
+    
+  } catch (error) {
+    console.error('SMS 수신 데이터 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 전달 규칙 조회 API
+app.get('/api/sms/rules', async (req, res) => {
+  try {
+    console.log('SMS 전달 규칙 조회');
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const dataRows = rows.slice(1);
+    const rules = dataRows.map(row => ({
+      id: row[0] || '',
+      name: row[1] || '',
+      senderFilter: row[2] || '',
+      keywordFilter: row[3] || '',
+      targetNumbers: row[4] || '',
+      autoForward: row[5] === 'O',
+      active: row[6] === 'O',
+      createdAt: row[7] || '',
+      updatedAt: row[8] || '',
+      memo: row[9] || ''
+    }));
+    
+    res.json({ success: true, data: rules });
+    
+  } catch (error) {
+    console.error('SMS 전달 규칙 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 전달 규칙 추가 API
+app.post('/api/sms/rules', async (req, res) => {
+  try {
+    const { name, senderFilter, keywordFilter, targetNumbers, autoForward, active, memo } = req.body;
+    
+    console.log('SMS 전달 규칙 추가:', name);
+    
+    // 기존 데이터 가져오기 (ID 생성용)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A:A`,
+    });
+    
+    const rows = response.data.values || [];
+    const newId = rows.length; // 헤더 포함이므로 length가 곧 새 ID
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const targetNumbersStr = Array.isArray(targetNumbers) ? targetNumbers.join(',') : targetNumbers;
+    
+    const newRow = [
+      newId,
+      name,
+      senderFilter || '',
+      keywordFilter || '',
+      targetNumbersStr,
+      autoForward ? 'O' : 'X',
+      active ? 'O' : 'X',
+      now,
+      now,
+      memo || ''
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    res.json({ success: true, id: newId });
+    
+  } catch (error) {
+    console.error('SMS 전달 규칙 추가 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 전달 규칙 수정 API
+app.put('/api/sms/rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, senderFilter, keywordFilter, targetNumbers, autoForward, active, memo } = req.body;
+    
+    console.log(`SMS 전달 규칙 수정: ID=${id}`);
+    
+    // 기존 데이터 가져오기
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+    });
+    
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === id);
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '규칙을 찾을 수 없습니다.' });
+    }
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const targetNumbersStr = Array.isArray(targetNumbers) ? targetNumbers.join(',') : targetNumbers;
+    const createdAt = rows[rowIndex][7] || now;
+    
+    const updatedRow = [
+      id,
+      name,
+      senderFilter || '',
+      keywordFilter || '',
+      targetNumbersStr,
+      autoForward ? 'O' : 'X',
+      active ? 'O' : 'X',
+      createdAt,
+      now,
+      memo || ''
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A${rowIndex + 1}:J${rowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('SMS 전달 규칙 수정 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 전달 규칙 삭제 API
+app.delete('/api/sms/rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`SMS 전달 규칙 삭제: ID=${id}`);
+    
+    // 구글 시트는 행 삭제가 복잡하므로, 활성화를 X로 변경하는 방식으로 처리
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+    });
+    
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === id);
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '규칙을 찾을 수 없습니다.' });
+    }
+    
+    // 활성화를 X로 변경
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!G${rowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['X']]
+      }
+    });
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('SMS 전달 규칙 삭제 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 전달 이력 조회 API
+app.get('/api/sms/history', async (req, res) => {
+  try {
+    const { smsId } = req.query;
+    
+    console.log(`SMS 전달 이력 조회: smsId=${smsId}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const dataRows = rows.slice(1);
+    let history = dataRows.map(row => ({
+      id: row[0] || '',
+      smsId: row[1] || '',
+      forwardedAt: row[2] || '',
+      targetNumber: row[3] || '',
+      status: row[4] || '',
+      errorMessage: row[5] || '',
+      processType: row[6] || '',
+      ruleId: row[7] || ''
+    }));
+    
+    // SMS ID로 필터링
+    if (smsId) {
+      history = history.filter(h => h.smsId === smsId);
+    }
+    
+    // 최신순 정렬
+    history.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+    
+    res.json({ success: true, data: history });
+    
+  } catch (error) {
+    console.error('SMS 전달 이력 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 수동 전달 API
+app.post('/api/sms/forward', async (req, res) => {
+  try {
+    const { smsId, targetNumbers, memo } = req.body;
+    
+    console.log(`SMS 수동 전달: ID=${smsId}, 대상=${targetNumbers.length}개`);
+    
+    if (!smsId || !targetNumbers || targetNumbers.length === 0) {
+      return res.status(400).json({ success: false, error: '필수 파라미터가 누락되었습니다.' });
+    }
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    // 이력 ID 생성용
+    const historyResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_HISTORY_SHEET_NAME}!A:A`,
+    });
+    
+    let historyId = (historyResponse.data.values || []).length;
+    
+    // 각 대상 번호별로 이력 추가
+    const historyRows = [];
+    let successCount = 0;
+    
+    for (const targetNumber of targetNumbers) {
+      const historyRow = [
+        historyId++,
+        smsId,
+        now,
+        targetNumber,
+        '성공', // 실제로는 전송 결과에 따라 달라짐
+        '',
+        '수동',
+        ''
+      ];
+      
+      historyRows.push(historyRow);
+      successCount++;
+    }
+    
+    // 이력 시트에 추가
+    if (historyRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: historyRows
+        }
+      });
+    }
+    
+    // SMS관리 시트 업데이트
+    const smsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:I`,
+    });
+    
+    const smsRows = smsResponse.data.values || [];
+    const smsRowIndex = smsRows.findIndex(row => row[0] === smsId);
+    
+    if (smsRowIndex !== -1) {
+      const forwardStatus = successCount === targetNumbers.length ? '전달완료' : 
+                           successCount > 0 ? '부분실패' : '실패';
+      const targetNumbersStr = targetNumbers.join(',');
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[forwardStatus, now, targetNumbersStr, memo || '']]
+        }
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      successCount,
+      totalCount: targetNumbers.length
+    });
+    
+  } catch (error) {
+    console.error('SMS 수동 전달 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 안드로이드 앱용 SMS 등록 API
+app.post('/api/sms/register', async (req, res) => {
+  try {
+    const { sender, receiver, message, timestamp } = req.body;
+    
+    console.log(`SMS 등록: 발신=${sender}, 수신=${receiver}`);
+    
+    if (!sender || !receiver || !message) {
+      return res.status(400).json({ success: false, error: '필수 파라미터가 누락되었습니다.' });
+    }
+    
+    // ID 생성
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:A`,
+    });
+    
+    const newId = (response.data.values || []).length;
+    const receivedAt = timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    // SMS관리 시트에 추가
+    const newRow = [
+      newId,
+      receivedAt,
+      sender,
+      receiver,
+      message,
+      '대기중',
+      '',
+      '',
+      ''
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:I`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    // 활성화된 전달 규칙 확인 (추후 구현)
+    // TODO: 자동 전달 로직 구현
+    
+    res.json({ success: true, id: newId });
+    
+  } catch (error) {
+    console.error('SMS 등록 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 통계 API (선택)
+app.get('/api/sms/stats', async (req, res) => {
+  try {
+    console.log('SMS 통계 조회');
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:I`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, stats: { total: 0, pending: 0, forwarded: 0, failed: 0 } });
+    }
+    
+    const dataRows = rows.slice(1);
+    
+    const stats = {
+      total: dataRows.length,
+      pending: dataRows.filter(row => row[5] === '대기중').length,
+      forwarded: dataRows.filter(row => row[5] === '전달완료').length,
+      failed: dataRows.filter(row => row[5] === '실패' || row[5] === '부분실패').length
+    };
+    
+    res.json({ success: true, stats });
+    
+  } catch (error) {
+    console.error('SMS 통계 조회 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
