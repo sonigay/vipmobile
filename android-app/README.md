@@ -233,6 +233,7 @@ Android Studio에서 로그 확인:
 ---
 
 **제작:** VIP Plus
-**버전:** 1.0
+**버전:** 1.0.1
 **최종 업데이트:** 2024-10-17
+**서버 URL:** https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app
 
