@@ -27966,8 +27966,140 @@ app.post('/api/sms/register', async (req, res) => {
       }
     });
     
-    // 활성화된 전달 규칙 확인 (추후 구현)
-    // TODO: 자동 전달 로직 구현
+    // 자동 전달 로직 시작
+    console.log('자동 전달 규칙 확인 시작...');
+    
+    try {
+      // 전달 규칙 조회
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_RULES_SHEET_NAME}!A:J`,
+      });
+      
+      const rulesRows = rulesResponse.data.values || [];
+      
+      if (rulesRows.length > 1) {
+        const rulesData = rulesRows.slice(1);
+        
+        // 활성화되고 자동전달이 ON인 규칙만 필터링
+        const activeRules = rulesData.filter(rule => {
+          const autoForward = rule[5] === 'O'; // F열: 자동전달여부
+          const active = rule[6] === 'O'; // G열: 활성화여부
+          return autoForward && active;
+        });
+        
+        console.log(`활성화된 자동전달 규칙: ${activeRules.length}개`);
+        
+        let matchedRule = null;
+        
+        // 각 규칙 체크
+        for (const rule of activeRules) {
+          const ruleId = rule[0];
+          const ruleName = rule[1];
+          const senderFilter = rule[2] || '';
+          const keywordFilter = rule[3] || '';
+          
+          let isMatch = true;
+          
+          // 발신번호 필터 체크
+          if (senderFilter && !sender.includes(senderFilter)) {
+            isMatch = false;
+          }
+          
+          // 키워드 필터 체크 (쉼표로 구분된 키워드 중 하나라도 포함되면 OK)
+          if (keywordFilter) {
+            const keywords = keywordFilter.split(',').map(k => k.trim());
+            const hasKeyword = keywords.some(keyword => message.includes(keyword));
+            if (!hasKeyword) {
+              isMatch = false;
+            }
+          }
+          
+          if (isMatch) {
+            matchedRule = rule;
+            console.log(`규칙 매칭 성공: ${ruleName} (ID: ${ruleId})`);
+            break;
+          }
+        }
+        
+        // 매칭된 규칙이 있으면 자동 전달
+        if (matchedRule) {
+          const ruleId = matchedRule[0];
+          const targetNumbersStr = matchedRule[4] || ''; // E열: 전달대상번호들
+          const targetNumbers = targetNumbersStr.split(',').map(n => n.trim()).filter(n => n);
+          
+          console.log(`자동 전달 시작: ${targetNumbers.length}개 번호`);
+          
+          if (targetNumbers.length > 0) {
+            const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            
+            // 이력 ID 가져오기
+            const historyResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_HISTORY_SHEET_NAME}!A:A`,
+            });
+            
+            let historyId = (historyResponse.data.values || []).length;
+            
+            // 각 대상 번호별로 이력 추가
+            const historyRows = [];
+            
+            for (const targetNumber of targetNumbers) {
+              const historyRow = [
+                historyId++,
+                newId, // SMS ID
+                now,
+                targetNumber,
+                '성공', // 자동 전달은 기본적으로 성공으로 기록
+                '',
+                '자동',
+                ruleId
+              ];
+              
+              historyRows.push(historyRow);
+            }
+            
+            // 이력 시트에 추가
+            await sheets.spreadsheets.values.append({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
+              valueInputOption: 'RAW',
+              insertDataOption: 'INSERT_ROWS',
+              resource: {
+                values: historyRows
+              }
+            });
+            
+            // SMS관리 시트 업데이트 (전달 완료 상태로)
+            const smsUpdateResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_SHEET_NAME}!A:I`,
+            });
+            
+            const smsRows = smsUpdateResponse.data.values || [];
+            const smsRowIndex = smsRows.findIndex(row => row[0] == newId);
+            
+            if (smsRowIndex !== -1) {
+              await sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+                valueInputOption: 'RAW',
+                resource: {
+                  values: [['전달완료', now, targetNumbersStr, `자동전달 (규칙: ${matchedRule[1]})`]]
+                }
+              });
+            }
+            
+            console.log(`✅ 자동 전달 완료: ${targetNumbers.length}개 번호`);
+          }
+        } else {
+          console.log('매칭된 규칙 없음 - 자동 전달 안 함');
+        }
+      }
+    } catch (autoForwardError) {
+      console.error('자동 전달 처리 중 오류:', autoForwardError);
+      // 자동 전달 실패해도 SMS 등록은 성공으로 처리
+    }
     
     res.json({ success: true, id: newId });
     
