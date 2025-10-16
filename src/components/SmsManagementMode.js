@@ -888,18 +888,51 @@ const SmsManagementMode = ({
             선택한 기간 이전의 데이터가 영구적으로 삭제됩니다.
           </Alert>
           
+          <Typography variant="subtitle2" gutterBottom>삭제 기준 날짜</Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+            <Button
+              variant={cleanupDays === 0 ? 'contained' : 'outlined'}
+              onClick={() => setCleanupDays(0)}
+              size="small"
+              color="error"
+            >
+              전체 삭제
+            </Button>
+            <Button
+              variant={cleanupDays === 7 ? 'contained' : 'outlined'}
+              onClick={() => setCleanupDays(7)}
+              size="small"
+            >
+              7일 이전
+            </Button>
+            <Button
+              variant={cleanupDays === 30 ? 'contained' : 'outlined'}
+              onClick={() => setCleanupDays(30)}
+              size="small"
+            >
+              30일 이전
+            </Button>
+            <Button
+              variant={cleanupDays === 90 ? 'contained' : 'outlined'}
+              onClick={() => setCleanupDays(90)}
+              size="small"
+            >
+              90일 이전
+            </Button>
+          </Box>
+          
           <TextField
             fullWidth
             type="number"
-            label="삭제할 데이터 기간 (일)"
+            label="사용자 지정 (일)"
             value={cleanupDays}
-            onChange={(e) => setCleanupDays(parseInt(e.target.value))}
-            helperText={`${cleanupDays}일 이전의 데이터가 삭제됩니다`}
+            onChange={(e) => setCleanupDays(parseInt(e.target.value) || 0)}
+            helperText={cleanupDays === 0 ? '⚠️ 모든 데이터가 삭제됩니다!' : `${cleanupDays}일 이전의 데이터가 삭제됩니다`}
             sx={{ mb: 2 }}
           />
           
           <Typography variant="subtitle2" gutterBottom>정리 대상</Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
             <Button
               variant={cleanupTarget === 'sms' ? 'contained' : 'outlined'}
               onClick={() => setCleanupTarget('sms')}
@@ -920,18 +953,21 @@ const SmsManagementMode = ({
               size="small"
               color="error"
             >
-              전체
+              SMS + 이력
             </Button>
           </Box>
           
-          <Typography variant="caption" color="textSecondary" sx={{ mt: 2, display: 'block' }}>
+          <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
             * 전달 규칙은 삭제되지 않습니다.
+          </Typography>
+          <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+            * 헤더는 항상 유지됩니다.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowCleanupDialog(false)}>취소</Button>
           <Button onClick={handleCleanupData} variant="contained" color="error">
-            삭제
+            {cleanupDays === 0 ? '전체 삭제' : `${cleanupDays}일 이전 삭제`}
           </Button>
         </DialogActions>
       </Dialog>

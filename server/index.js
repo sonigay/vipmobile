@@ -28179,7 +28179,7 @@ app.post('/api/sms/cleanup', async (req, res) => {
     
     console.log(`SMS 데이터 정리: ${days}일 이전, 대상=${target}`);
     
-    if (!days || !target) {
+    if (days === undefined || days === null || !target) {
       return res.status(400).json({ success: false, error: '필수 파라미터가 누락되었습니다.' });
     }
     
@@ -28188,6 +28188,10 @@ app.post('/api/sms/cleanup', async (req, res) => {
     const cutoffDateStr = cutoffDate.toISOString().substring(0, 10);
     
     let deletedCount = 0;
+    
+    // days가 0이면 전체 삭제
+    const isDeleteAll = days === 0;
+    console.log(`삭제 모드: ${isDeleteAll ? '전체 삭제' : `${days}일 이전 삭제`}`);
     
     // SMS 데이터 정리
     if (target === 'sms' || target === 'all') {
@@ -28203,8 +28207,8 @@ app.post('/api/sms/cleanup', async (req, res) => {
         
         console.log(`SMS 데이터 정리 전: ${dataRows.length}개`);
         
-        // 날짜가 cutoffDate 이후인 데이터만 유지
-        const filteredRows = dataRows.filter(row => {
+        // 날짜가 cutoffDate 이후인 데이터만 유지 (0일이면 모두 삭제)
+        const filteredRows = isDeleteAll ? [] : dataRows.filter(row => {
           const receivedAt = row[1] || '';
           const receivedDate = receivedAt.substring(0, 10);
           return receivedDate >= cutoffDateStr;
@@ -28264,8 +28268,8 @@ app.post('/api/sms/cleanup', async (req, res) => {
         
         console.log(`이력 데이터 정리 전: ${dataRows.length}개`);
         
-        // 날짜가 cutoffDate 이후인 데이터만 유지
-        const filteredRows = dataRows.filter(row => {
+        // 날짜가 cutoffDate 이후인 데이터만 유지 (0일이면 모두 삭제)
+        const filteredRows = isDeleteAll ? [] : dataRows.filter(row => {
           const forwardedAt = row[2] || '';
           const forwardedDate = forwardedAt.substring(0, 10);
           return forwardedDate >= cutoffDateStr;
