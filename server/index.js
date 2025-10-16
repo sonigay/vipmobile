@@ -27934,6 +27934,37 @@ app.post('/api/sms/register', async (req, res) => {
       return res.status(400).json({ success: false, error: '필수 파라미터가 누락되었습니다.' });
     }
     
+    // 중복 체크: 발신번호 + 수신번호 + 메시지 내용으로 확인
+    const existingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:E`,
+    });
+    
+    const existingRows = existingResponse.data.values || [];
+    
+    // 헤더 제외하고 데이터만
+    if (existingRows.length > 1) {
+      const dataRows = existingRows.slice(1);
+      
+      // 같은 발신번호, 수신번호, 메시지가 이미 있는지 확인
+      const isDuplicate = dataRows.some(row => {
+        const existingSender = row[2] || '';
+        const existingReceiver = row[3] || '';
+        const existingMessage = row[4] || '';
+        
+        return existingSender === sender && 
+               existingReceiver === receiver && 
+               existingMessage === message;
+      });
+      
+      if (isDuplicate) {
+        console.log('⚠️ 중복된 SMS - 등록 스킵');
+        return res.json({ success: true, duplicate: true, message: '이미 등록된 SMS입니다.' });
+      }
+    }
+    
+    console.log('✅ 중복 아님 - 새 SMS 등록 진행');
+    
     // ID 생성
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -28170,6 +28201,8 @@ app.post('/api/sms/cleanup', async (req, res) => {
         const header = rows[0];
         const dataRows = rows.slice(1);
         
+        console.log(`SMS 데이터 정리 전: ${dataRows.length}개`);
+        
         // 날짜가 cutoffDate 이후인 데이터만 유지
         const filteredRows = dataRows.filter(row => {
           const receivedAt = row[1] || '';
@@ -28178,17 +28211,42 @@ app.post('/api/sms/cleanup', async (req, res) => {
         });
         
         deletedCount += dataRows.length - filteredRows.length;
+        console.log(`SMS 데이터 정리 후: ${filteredRows.length}개, 삭제: ${deletedCount}개`);
         
-        // 시트 전체를 헤더 + 필터링된 데이터로 교체
-        // clear 대신 update로 덮어쓰기 (충분히 큰 범위로)
+        // 전체 범위를 먼저 빈 값으로 덮어쓰기 (기존 데이터 완전 제거)
+        const totalRows = Math.max(rows.length + 100, 1000); // 충분히 큰 범위
+        const emptyRows = Array(totalRows).fill(null).map(() => Array(9).fill(''));
+        
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SMS_SHEET_NAME}!A1:I${Math.max(rows.length, 1000)}`,
+          range: `${SMS_SHEET_NAME}!A1:I${totalRows}`,
           valueInputOption: 'RAW',
           resource: {
-            values: [header, ...filteredRows]
+            values: emptyRows
           }
         });
+        
+        // 헤더 + 필터링된 데이터만 다시 쓰기
+        if (filteredRows.length > 0 || header) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SMS_SHEET_NAME}!A1:I${filteredRows.length + 1}`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [header, ...filteredRows]
+            }
+          });
+        } else {
+          // 데이터가 없으면 헤더만
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SMS_SHEET_NAME}!A1:I1`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [header]
+            }
+          });
+        }
       }
     }
     
@@ -28204,6 +28262,8 @@ app.post('/api/sms/cleanup', async (req, res) => {
         const header = rows[0];
         const dataRows = rows.slice(1);
         
+        console.log(`이력 데이터 정리 전: ${dataRows.length}개`);
+        
         // 날짜가 cutoffDate 이후인 데이터만 유지
         const filteredRows = dataRows.filter(row => {
           const forwardedAt = row[2] || '';
@@ -28211,18 +28271,44 @@ app.post('/api/sms/cleanup', async (req, res) => {
           return forwardedDate >= cutoffDateStr;
         });
         
-        deletedCount += dataRows.length - filteredRows.length;
+        const historyDeletedCount = dataRows.length - filteredRows.length;
+        deletedCount += historyDeletedCount;
+        console.log(`이력 데이터 정리 후: ${filteredRows.length}개, 삭제: ${historyDeletedCount}개`);
         
-        // 시트 전체를 헤더 + 필터링된 데이터로 교체
-        // clear 대신 update로 덮어쓰기 (충분히 큰 범위로)
+        // 전체 범위를 먼저 빈 값으로 덮어쓰기 (기존 데이터 완전 제거)
+        const totalRows = Math.max(rows.length + 100, 1000); // 충분히 큰 범위
+        const emptyRows = Array(totalRows).fill(null).map(() => Array(8).fill(''));
+        
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SMS_HISTORY_SHEET_NAME}!A1:H${Math.max(rows.length, 1000)}`,
+          range: `${SMS_HISTORY_SHEET_NAME}!A1:H${totalRows}`,
           valueInputOption: 'RAW',
           resource: {
-            values: [header, ...filteredRows]
+            values: emptyRows
           }
         });
+        
+        // 헤더 + 필터링된 데이터만 다시 쓰기
+        if (filteredRows.length > 0 || header) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SMS_HISTORY_SHEET_NAME}!A1:H${filteredRows.length + 1}`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [header, ...filteredRows]
+            }
+          });
+        } else {
+          // 데이터가 없으면 헤더만
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SMS_HISTORY_SHEET_NAME}!A1:H1`,
+            valueInputOption: 'RAW',
+            resource: {
+              values: [header]
+            }
+          });
+        }
       }
     }
     
