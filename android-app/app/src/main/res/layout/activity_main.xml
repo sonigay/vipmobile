@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center_horizontal">
+
+    <!-- 앱 제목 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📱 SMS Forwarder"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginTop="32dp"
+        android:layout_marginBottom="32dp" />
+
+    <!-- 상태 표시 -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔴 서비스 중지됨"
+        android:textSize="16sp"
+        android:padding="16dp"
+        android:background="#F5F5F5"
+        android:layout_marginBottom="16dp" />
+
+    <!-- 서버 URL 입력 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="서버 URL"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp" />
+
+    <EditText
+        android:id="@+id/serverUrlInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="https://your-server.cloudtype.app"
+        android:inputType="textUri"
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- 저장 버튼 -->
+    <Button
+        android:id="@+id/saveButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="💾 저장 및 서비스 시작"
+        android:textSize="16sp"
+        android:padding="12dp" />
+
+    <!-- 테스트 버튼 -->
+    <Button
+        android:id="@+id/testButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🧪 연결 테스트"
+        android:textSize="16sp"
+        android:padding="12dp"
+        android:layout_marginTop="8dp" />
+
+    <!-- 마지막 SMS 정보 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="마지막 SMS 정보"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="32dp" />
+
+    <TextView
+        android:id="@+id/lastSmsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="수신된 SMS 없음"
+        android:textSize="12sp"
+        android:padding="16dp"
+        android:background="#F5F5F5"
+        android:layout_marginTop="8dp"
+        android:minHeight="100dp" />
+
+    <!-- 안내 문구 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ℹ️ 이 앱은 백그라운드에서 자동으로 SMS를 수신하여 서버로 전송합니다.\n\n배터리 최적화에서 이 앱을 제외하고, 자동 실행 권한을 허용해주세요."
+        android:textSize="12sp"
+        android:textColor="#666666"
+        android:layout_marginTop="32dp"
+        android:lineSpacingMultiplier="1.3" />
+
+</LinearLayout>
+
