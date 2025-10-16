@@ -43,7 +43,8 @@ class MainActivity : AppCompatActivity() {
         
         // 저장된 서버 URL 불러오기
         val prefs = getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
-        val savedUrl = prefs.getString("SERVER_URL", "")
+        val defaultUrl = "https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app"
+        val savedUrl = prefs.getString("SERVER_URL", defaultUrl)
         serverUrlInput.setText(savedUrl)
         
         // 저장 버튼
