@@ -44,7 +44,9 @@ import {
   Search as SearchIcon,
   Close as CloseIcon,
   CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  Settings as SettingsIcon,
+  CleaningServices as CleaningServicesIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 
@@ -96,6 +98,11 @@ const SmsManagementMode = ({
   
   // 통계 상태
   const [stats, setStats] = useState({ total: 0, pending: 0, forwarded: 0, failed: 0 });
+  
+  // 데이터 정리 상태
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [cleanupDays, setCleanupDays] = useState(30);
+  const [cleanupTarget, setCleanupTarget] = useState('all');
 
   // SMS 관리모드 진입 시 업데이트 팝업 표시
   useEffect(() => {
@@ -324,6 +331,40 @@ const SmsManagementMode = ({
     }
   };
 
+  // 데이터 정리 함수
+  const handleCleanupData = async () => {
+    if (!window.confirm(`정말 ${cleanupDays}일 이전 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/cleanup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          days: cleanupDays,
+          target: cleanupTarget
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`${result.deletedCount}개의 데이터가 삭제되었습니다.`);
+        setShowCleanupDialog(false);
+        await loadData();
+      } else {
+        setError('데이터 정리에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('데이터 정리 실패:', error);
+      setError('데이터 정리 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 필터링된 SMS 목록
   const filteredSmsList = smsList.filter(sms => {
     if (smsSearch) {
@@ -424,6 +465,7 @@ const SmsManagementMode = ({
           <Tab label="SMS 목록" />
           <Tab label="전달 규칙" />
           <Tab label="전달 이력" />
+          <Tab label="설정" icon={<SettingsIcon />} iconPosition="start" />
         </Tabs>
       </Box>
 
@@ -736,8 +778,163 @@ const SmsManagementMode = ({
               </TableContainer>
             </Box>
           )}
+
+          {/* 탭 3: 설정 */}
+          {activeTab === 3 && (
+            <Box>
+              <Typography variant="h5" gutterBottom>설정</Typography>
+              
+              <Grid container spacing={3}>
+                {/* 시스템 상태 카드 */}
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>시스템 상태</Typography>
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          자동 헤더 체크: <Chip label="활성화" size="small" color="success" />
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          시트 초기화: 자동 (첫 API 호출 시)
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          자동 새로고침: 30초
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* 통계 카드 */}
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>데이터 현황</Typography>
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          전체 SMS: <strong>{stats.total}개</strong>
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          전달 규칙: <strong>{rules.length}개</strong>
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          전달 이력: <strong>{history.length}개</strong>
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* 데이터 정리 카드 */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>데이터 정리</Typography>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        오래된 SMS 데이터와 전달 이력을 삭제하여 시스템 성능을 유지할 수 있습니다.
+                      </Typography>
+                      <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
+                        ⚠️ 삭제된 데이터는 복구할 수 없습니다. 신중하게 선택해주세요.
+                      </Alert>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<CleaningServicesIcon />}
+                        onClick={() => setShowCleanupDialog(true)}
+                      >
+                        데이터 정리
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* 안드로이드 앱 연동 안내 */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>📱 안드로이드 앱 연동</Typography>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        SMS 자동 수신을 위해서는 안드로이드 앱 설치가 필요합니다.
+                      </Typography>
+                      <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>앱 설치 방법:</strong>
+                        </Typography>
+                        <Typography variant="body2" component="div">
+                          1. APK 파일을 구형 안드로이드폰에 설치<br/>
+                          2. SMS 읽기 권한 허용<br/>
+                          3. 백그라운드 실행 권한 허용<br/>
+                          4. 서버 URL 입력<br/>
+                          5. 완료!
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="textSecondary" sx={{ mt: 2, display: 'block' }}>
+                        * 안드로이드 앱은 Phase 2에서 제공됩니다.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
         </Container>
       </Box>
+
+      {/* 데이터 정리 모달 */}
+      <Dialog open={showCleanupDialog} onClose={() => setShowCleanupDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>데이터 정리</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            선택한 기간 이전의 데이터가 영구적으로 삭제됩니다.
+          </Alert>
+          
+          <TextField
+            fullWidth
+            type="number"
+            label="삭제할 데이터 기간 (일)"
+            value={cleanupDays}
+            onChange={(e) => setCleanupDays(parseInt(e.target.value))}
+            helperText={`${cleanupDays}일 이전의 데이터가 삭제됩니다`}
+            sx={{ mb: 2 }}
+          />
+          
+          <Typography variant="subtitle2" gutterBottom>정리 대상</Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={cleanupTarget === 'sms' ? 'contained' : 'outlined'}
+              onClick={() => setCleanupTarget('sms')}
+              size="small"
+            >
+              SMS만
+            </Button>
+            <Button
+              variant={cleanupTarget === 'history' ? 'contained' : 'outlined'}
+              onClick={() => setCleanupTarget('history')}
+              size="small"
+            >
+              이력만
+            </Button>
+            <Button
+              variant={cleanupTarget === 'all' ? 'contained' : 'outlined'}
+              onClick={() => setCleanupTarget('all')}
+              size="small"
+              color="error"
+            >
+              전체
+            </Button>
+          </Box>
+          
+          <Typography variant="caption" color="textSecondary" sx={{ mt: 2, display: 'block' }}>
+            * 전달 규칙은 삭제되지 않습니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCleanupDialog(false)}>취소</Button>
+          <Button onClick={handleCleanupData} variant="contained" color="error">
+            삭제
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 수동 전달 모달 */}
       <Dialog open={showForwardDialog} onClose={() => setShowForwardDialog(false)} maxWidth="sm" fullWidth>

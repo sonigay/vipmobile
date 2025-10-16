@@ -27485,8 +27485,74 @@ app.get('/api/data-collection-updates', async (req, res) => {
 // SMS 관리 API
 // ============================================
 
+// SMS 시트 헤더 자동 초기화 함수
+async function ensureSmsSheetHeaders() {
+  try {
+    // SMS관리 시트 헤더 체크
+    const smsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A1:I1`,
+    });
+    
+    if (!smsResponse.data.values || smsResponse.data.values.length === 0) {
+      console.log('SMS관리 시트 헤더 추가 중...');
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_SHEET_NAME}!A1:I1`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [['ID', '수신일시', '발신번호', '수신번호', '메시지내용', '전달상태', '전달일시', '전달대상번호들', '처리메모']]
+        }
+      });
+    }
+    
+    // SMS전달규칙 시트 헤더 체크
+    const rulesResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_RULES_SHEET_NAME}!A1:J1`,
+    });
+    
+    if (!rulesResponse.data.values || rulesResponse.data.values.length === 0) {
+      console.log('SMS전달규칙 시트 헤더 추가 중...');
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_RULES_SHEET_NAME}!A1:J1`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [['규칙ID', '규칙명', '발신번호필터', '키워드필터', '전달대상번호들', '자동전달여부', '활성화여부', '생성일시', '수정일시', '메모']]
+        }
+      });
+    }
+    
+    // SMS전달이력 시트 헤더 체크
+    const historyResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_HISTORY_SHEET_NAME}!A1:H1`,
+    });
+    
+    if (!historyResponse.data.values || historyResponse.data.values.length === 0) {
+      console.log('SMS전달이력 시트 헤더 추가 중...');
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_HISTORY_SHEET_NAME}!A1:H1`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [['이력ID', 'SMS ID', '전달일시', '전달번호', '전달상태', '오류메시지', '처리방식', '규칙ID']]
+        }
+      });
+    }
+    
+    console.log('SMS 시트 헤더 체크 완료');
+  } catch (error) {
+    console.error('SMS 시트 헤더 초기화 실패:', error);
+  }
+}
+
 // SMS 수신 데이터 조회 API
 app.get('/api/sms/received', async (req, res) => {
+  // 헤더 자동 체크
+  await ensureSmsSheetHeaders();
+  
   try {
     const { limit = 100, status = 'all' } = req.query;
     
@@ -27541,6 +27607,9 @@ app.get('/api/sms/received', async (req, res) => {
 
 // SMS 전달 규칙 조회 API
 app.get('/api/sms/rules', async (req, res) => {
+  // 헤더 자동 체크
+  await ensureSmsSheetHeaders();
+  
   try {
     console.log('SMS 전달 규칙 조회');
     
@@ -27936,6 +28005,107 @@ app.get('/api/sms/stats', async (req, res) => {
     
   } catch (error) {
     console.error('SMS 통계 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 데이터 정리 API
+app.post('/api/sms/cleanup', async (req, res) => {
+  try {
+    const { days, target } = req.body; // days: 며칠 이전 데이터 삭제, target: 'sms' | 'history' | 'all'
+    
+    console.log(`SMS 데이터 정리: ${days}일 이전, 대상=${target}`);
+    
+    if (!days || !target) {
+      return res.status(400).json({ success: false, error: '필수 파라미터가 누락되었습니다.' });
+    }
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const cutoffDateStr = cutoffDate.toISOString().substring(0, 10);
+    
+    let deletedCount = 0;
+    
+    // SMS 데이터 정리
+    if (target === 'sms' || target === 'all') {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_SHEET_NAME}!A:I`,
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length > 1) {
+        const header = rows[0];
+        const dataRows = rows.slice(1);
+        
+        // 날짜가 cutoffDate 이후인 데이터만 유지
+        const filteredRows = dataRows.filter(row => {
+          const receivedAt = row[1] || '';
+          const receivedDate = receivedAt.substring(0, 10);
+          return receivedDate >= cutoffDateStr;
+        });
+        
+        deletedCount += dataRows.length - filteredRows.length;
+        
+        // 시트 전체를 헤더 + 필터링된 데이터로 교체
+        await sheets.spreadsheets.values.clear({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_SHEET_NAME}!A:I`,
+        });
+        
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_SHEET_NAME}!A1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [header, ...filteredRows]
+          }
+        });
+      }
+    }
+    
+    // 이력 데이터 정리
+    if (target === 'history' || target === 'all') {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length > 1) {
+        const header = rows[0];
+        const dataRows = rows.slice(1);
+        
+        // 날짜가 cutoffDate 이후인 데이터만 유지
+        const filteredRows = dataRows.filter(row => {
+          const forwardedAt = row[2] || '';
+          const forwardedDate = forwardedAt.substring(0, 10);
+          return forwardedDate >= cutoffDateStr;
+        });
+        
+        deletedCount += dataRows.length - filteredRows.length;
+        
+        // 시트 전체를 헤더 + 필터링된 데이터로 교체
+        await sheets.spreadsheets.values.clear({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
+        });
+        
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_HISTORY_SHEET_NAME}!A1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [header, ...filteredRows]
+          }
+        });
+      }
+    }
+    
+    res.json({ success: true, deletedCount });
+    
+  } catch (error) {
+    console.error('SMS 데이터 정리 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
