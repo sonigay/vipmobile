@@ -37,31 +37,4 @@ jobs:
       with:
         name: sms-forwarder-apk
         path: android-app/app/build/outputs/apk/debug/app-debug.apk
-        
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v1
-      with:
-        files: android-app/app/build/outputs/apk/debug/app-debug.apk
-        tag_name: sms-forwarder-v${{ github.run_number }}
-        name: SMS Forwarder v${{ github.run_number }}
-        body: |
-          ## SMS Forwarder APK
-          
-          자동으로 빌드된 APK 파일입니다.
-          
-          ### 설치 방법
-          1. app-debug.apk 다운로드
-          2. 안드로이드폰으로 전송
-          3. 설치
-          4. 권한 허용
-          5. 완료!
-          
-          ### 서버 URL (미리 설정됨)
-          https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app
-          
-          빌드 번호: ${{ github.run_number }}
-          커밋: ${{ github.sha }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
