@@ -11,12 +11,7 @@ buildscript {
     }
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+// allprojects 제거 - settings.gradle에서 처리
 
 task clean(type: Delete) {
     delete rootProject.buildDir
