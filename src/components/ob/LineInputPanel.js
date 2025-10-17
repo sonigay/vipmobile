@@ -5,11 +5,16 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 const CONTRACT_TYPES = ['지원금약정', '선택약정'];
 
-export default function LineInputPanel({ inputs, onChange, planData }) {
+export default function LineInputPanel({ inputs, onChange, planData, onCustomerNameChange }) {
   const handleLineChange = (index, field, value) => {
     const newLines = [...inputs.lines];
     newLines[index] = { ...newLines[index], [field]: value };
     onChange({ ...inputs, lines: newLines });
+    
+    // 고객명 변경 시 양쪽 동기화
+    if (field === 'customerName' && onCustomerNameChange) {
+      onCustomerNameChange(index, value);
+    }
   };
 
   const handleAddLine = () => {
@@ -56,6 +61,13 @@ export default function LineInputPanel({ inputs, onChange, planData }) {
               renderInput={(params) => <TextField {...params} label="요금제" />}
               sx={{ flex: 3, minWidth: 250 }}
               isOptionEqualToValue={(option, value) => option.planName === value?.planName}
+              filterOptions={(options, { inputValue }) => {
+                const searchTerm = inputValue.toLowerCase().replace(/,/g, '');
+                return options.filter(option => {
+                  const label = `${option.planName} ${option.planGroup} ${option.baseFee}`.toLowerCase();
+                  return label.includes(searchTerm);
+                });
+              }}
             />
             <TextField
               select

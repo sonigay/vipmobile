@@ -10,9 +10,7 @@ const EXISTING_BUNDLE_TYPES = [
 
 export default function BundleOptionsPanel({ inputs, onChange }) {
   return (
-    <Box sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1, backgroundColor: '#fff3e0' }}>
-      <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>기존결합 옵션</Typography>
-      <Box sx={{ display: 'flex', gap: 2 }}>
+    <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
         <TextField
           select
           size="small"
@@ -37,7 +35,6 @@ export default function BundleOptionsPanel({ inputs, onChange }) {
           <MenuItem value="포함">포함</MenuItem>
           <MenuItem value="미포함">미포함</MenuItem>
         </TextField>
-      </Box>
     </Box>
   );
 }

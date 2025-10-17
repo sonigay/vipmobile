@@ -2,18 +2,25 @@ import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import LineInputPanel from './LineInputPanel';
 
-export default function TogetherCalculatorPanel({ inputs, result, onSave, onInputChange, planData }) {
+export default function TogetherCalculatorPanel({ inputs, result, onSave, onInputChange, planData, onCustomerNameSync }) {
+  const handleLineUpdate = (updated) => {
+    onInputChange({ ...inputs, togetherLines: updated.lines });
+  };
+
   return (
     <Box sx={{ border: '1px solid #ddd', borderRadius: 1, overflow: 'hidden', backgroundColor: '#fff' }}>
       <Box sx={{ p: 1.5, backgroundColor: '#fce4ec', borderBottom: '1px solid #ddd' }}>
         <Typography variant="subtitle1" fontWeight="bold">투게더결합 계산식</Typography>
+        {/* 공간 확보용 빈 영역 */}
+        <Box sx={{ height: 56 }} />
       </Box>
       <Box sx={{ p: 1.5 }}>
         <LineInputPanel
           inputs={{ lines: inputs.togetherLines || [] }}
-          onChange={(updated) => onInputChange({ ...inputs, togetherLines: updated.lines })}
+          onChange={handleLineUpdate}
           planData={planData}
           panelType="together"
+          onCustomerNameChange={onCustomerNameSync}
         />
       </Box>
       <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>

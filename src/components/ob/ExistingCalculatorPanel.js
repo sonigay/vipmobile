@@ -3,21 +3,24 @@ import { Box, Typography, Button } from '@mui/material';
 import LineInputPanel from './LineInputPanel';
 import BundleOptionsPanel from './BundleOptionsPanel';
 
-export default function ExistingCalculatorPanel({ inputs, result, onSave, onInputChange, planData }) {
+export default function ExistingCalculatorPanel({ inputs, result, onSave, onInputChange, planData, onCustomerNameSync }) {
+  const handleLineUpdate = (updated) => {
+    onInputChange({ ...inputs, existingLines: updated.lines });
+  };
+
   return (
     <Box sx={{ border: '1px solid #ddd', borderRadius: 1, overflow: 'hidden', backgroundColor: '#fff' }}>
       <Box sx={{ p: 1.5, backgroundColor: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
-        <Typography variant="subtitle1" fontWeight="bold">기존결합 계산식</Typography>
-      </Box>
-      <Box sx={{ p: 1.5 }}>
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>기존결합 계산식</Typography>
         <BundleOptionsPanel inputs={inputs} onChange={onInputChange} />
       </Box>
       <Box sx={{ p: 1.5 }}>
         <LineInputPanel
           inputs={{ lines: inputs.existingLines || [] }}
-          onChange={(updated) => onInputChange({ ...inputs, existingLines: updated.lines })}
+          onChange={handleLineUpdate}
           planData={planData}
           panelType="existing"
+          onCustomerNameChange={onCustomerNameSync}
         />
       </Box>
       <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>

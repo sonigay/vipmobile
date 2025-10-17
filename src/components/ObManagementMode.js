@@ -97,6 +97,21 @@ const ObManagementMode = ({
 
   const { existing, together, diff } = useObCalculation(inputs, planData, discountData, segDiscountData);
 
+  // 고객명 동기화 핸들러
+  const handleCustomerNameSync = (index, value) => {
+    setInputs(prev => {
+      const newInputs = { ...prev };
+      // 기존결합과 투게더결합 양쪽 모두 업데이트
+      if (newInputs.existingLines[index]) {
+        newInputs.existingLines[index] = { ...newInputs.existingLines[index], customerName: value };
+      }
+      if (newInputs.togetherLines[index]) {
+        newInputs.togetherLines[index] = { ...newInputs.togetherLines[index], customerName: value };
+      }
+      return newInputs;
+    });
+  };
+
   const handleSave = async (chosen) => {
     try {
       const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
@@ -343,12 +358,14 @@ const ObManagementMode = ({
                   result={existing} 
                   onInputChange={setInputs}
                   planData={planData}
+                  onCustomerNameSync={handleCustomerNameSync}
                 />
                 <TogetherCalculatorPanel 
                   inputs={inputs} 
                   result={together} 
                   onInputChange={setInputs}
                   planData={planData}
+                  onCustomerNameSync={handleCustomerNameSync}
                 />
               </Box>
               <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 1 }}>
