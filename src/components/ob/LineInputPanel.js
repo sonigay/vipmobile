@@ -62,10 +62,21 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
               sx={{ flex: 3, minWidth: 250 }}
               isOptionEqualToValue={(option, value) => option.planName === value?.planName}
               filterOptions={(options, { inputValue }) => {
-                const searchTerm = inputValue.toLowerCase().replace(/,/g, '');
+                const searchTerm = inputValue.toLowerCase().replace(/,/g, '').trim();
+                if (!searchTerm) return options;
+                
                 return options.filter(option => {
-                  const label = `${option.planName} ${option.planGroup} ${option.baseFee}`.toLowerCase();
-                  return label.includes(searchTerm);
+                  const planName = option.planName.toLowerCase();
+                  const planGroup = (option.planGroup || '').toLowerCase();
+                  const baseFee = String(option.baseFee || 0);
+                  
+                  // 숫자만 입력한 경우 기본료로 검색
+                  if (/^\d+$/.test(searchTerm)) {
+                    return baseFee === searchTerm;
+                  }
+                  
+                  // 일반 검색
+                  return planName.includes(searchTerm) || planGroup.includes(searchTerm) || baseFee.includes(searchTerm);
                 });
               }}
             />

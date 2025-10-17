@@ -25,10 +25,37 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
   const memberCount = (lines || []).length;
   
-  const rows = (lines || []).map((line, idx) => {
+  // 먼저 기본료 합계 계산
+  let baseFeeSum = 0;
+  const tempRows = (lines || []).map((line, idx) => {
     const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
     const baseFee = Number(plan.baseFee || 0);
-    
+    baseFeeSum += baseFee;
+    return { line, plan, baseFee, idx };
+  });
+  
+  // 결합할인 계산 (전체)
+  const totalBundleDiscount = calculateExistingBundleDiscount(
+    existingBundleType,
+    memberCount,
+    baseFeeSum,
+    internetIncluded,
+    segDiscountData
+  );
+  
+  console.log('[OB CALC] Existing Bundle Discount:', {
+    bundleType: existingBundleType,
+    memberCount,
+    baseFeeSum,
+    internetIncluded,
+    totalBundleDiscount,
+    hasSegData: !!segDiscountData
+  });
+  
+  // 결합할인을 회선별로 분배
+  const perLineBundleDiscount = memberCount > 0 ? totalBundleDiscount / memberCount : 0;
+  
+  const rows = tempRows.map(({ line, plan, baseFee, idx }) => {
     const discounts = [];
     
     // 선택약정할인 (기본료 * -0.25)
@@ -39,6 +66,11 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     // 프리미어약정할인 (회선별, 85,000원 이상만)
     if (baseFee >= 85000) {
       discounts.push({ name: '프리미어약정할인', amount: -5250 });
+    }
+    
+    // 결합할인 (회선별 분배)
+    if (perLineBundleDiscount !== 0) {
+      discounts.push({ name: '결합할인', amount: perLineBundleDiscount });
     }
     
     const totalDiscount = discounts.reduce((s, d) => s + (d.amount || 0), 0);
@@ -56,33 +88,12 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     };
   });
   
-  // 기본료 합계
-  const baseFeeSum = rows.reduce((s, r) => s + r.baseFee, 0);
-  
-  // 결합할인 계산 (상품별 로직)
-  const bundleDiscount = calculateExistingBundleDiscount(
-    existingBundleType,
-    memberCount,
-    baseFeeSum,
-    internetIncluded,
-    segDiscountData
-  );
-  
-  console.log('[OB CALC] Existing Bundle Discount:', {
-    bundleType: existingBundleType,
-    memberCount,
-    baseFeeSum,
-    internetIncluded,
-    bundleDiscount,
-    hasSegData: !!segDiscountData
-  });
-  
-  const amount = rows.reduce((s, r) => s + r.total, 0) + bundleDiscount;
+  const amount = rows.reduce((s, r) => s + r.total, 0);
   
   return {
     amount,
     rows,
-    bundleDiscount,
+    bundleDiscount: totalBundleDiscount,
     breakdown: []
   };
 }
@@ -93,6 +104,17 @@ function computeTogether(lines, planData, segDiscountData) {
   const memberCount = (lines || []).length;
   
   let totalPremierDiscount = 0;
+  
+  // 투게더결합할인 계산 (전체)
+  const totalTogetherBundleDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
+  const perLineTogetherDiscount = memberCount > 0 ? totalTogetherBundleDiscount / memberCount : 0;
+  
+  console.log('[OB CALC] Together Bundle Discount:', {
+    memberCount,
+    totalTogetherBundleDiscount,
+    perLineTogetherDiscount,
+    hasSegData: !!segDiscountData
+  });
   
   const rows = (lines || []).map((line, idx) => {
     const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
@@ -111,6 +133,11 @@ function computeTogether(lines, planData, segDiscountData) {
       totalPremierDiscount += -5250;
     }
     
+    // 투게더결합할인 (회선별 분배)
+    if (perLineTogetherDiscount !== 0) {
+      discounts.push({ name: '투게더할인', amount: perLineTogetherDiscount });
+    }
+    
     const totalDiscount = discounts.reduce((s, d) => s + (d.amount || 0), 0);
     const total = baseFee + totalDiscount;
     
@@ -126,23 +153,13 @@ function computeTogether(lines, planData, segDiscountData) {
     };
   });
   
-  // 투게더결합할인 (seg)할인 C2:D7에서 구성원 수로 조회)
-  const togetherBundleDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
-  
-  console.log('[OB CALC] Together Bundle Discount:', {
-    memberCount,
-    togetherBundleDiscount,
-    premierDiscount: totalPremierDiscount,
-    hasSegData: !!segDiscountData
-  });
-  
-  const amount = rows.reduce((s, r) => s + r.total, 0) + togetherBundleDiscount;
+  const amount = rows.reduce((s, r) => s + r.total, 0);
   
   return {
     amount,
     rows,
     premierDiscount: totalPremierDiscount,
-    togetherBundleDiscount,
+    togetherBundleDiscount: totalTogetherBundleDiscount,
     breakdown: []
   };
 }
