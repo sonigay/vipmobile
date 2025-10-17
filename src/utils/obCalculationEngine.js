@@ -2,29 +2,30 @@
 
 export function initialInputs() {
   return {
-    lines: [
-      { lineId: 'L1', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+    existingLines: [
+      { lineId: 'E1', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
     ],
-    household: {},
+    togetherLines: [
+      { lineId: 'T1', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+    ],
     existingBundleType: '', // 기존결합 상품명
     internetIncluded: '미포함' // 인터넷 포함여부
   };
 }
 
 export function useObCalculation(inputs, planData, discountData, segDiscountData) {
-  const existing = computeExisting(inputs, planData, segDiscountData);
-  const together = computeTogether(inputs, planData, segDiscountData);
+  const existing = computeExisting(inputs.existingLines, inputs.existingBundleType, inputs.internetIncluded, planData, segDiscountData);
+  const together = computeTogether(inputs.togetherLines, planData, segDiscountData);
   const diff = (existing.amount || 0) - (together.amount || 0);
   return { existing, together, diff };
 }
 
 // 기존결합 계산
-function computeExisting(inputs, planData, segDiscountData) {
+function computeExisting(lines, existingBundleType, internetIncluded, planData, segDiscountData) {
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
-  const lines = inputs?.lines || [];
-  const memberCount = lines.length;
+  const memberCount = (lines || []).length;
   
-  const rows = lines.map((line, idx) => {
+  const rows = (lines || []).map((line, idx) => {
     const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
     const baseFee = Number(plan.baseFee || 0);
     
@@ -33,6 +34,11 @@ function computeExisting(inputs, planData, segDiscountData) {
     // 선택약정할인 (기본료 * -0.25)
     if (line.contractType === '선택약정') {
       discounts.push({ name: '선택약정할인', amount: baseFee * -0.25 });
+    }
+    
+    // 프리미어약정할인 (회선별, 85,000원 이상만)
+    if (baseFee >= 85000) {
+      discounts.push({ name: '프리미어약정할인', amount: -5250 });
     }
     
     const totalDiscount = discounts.reduce((s, d) => s + (d.amount || 0), 0);
@@ -54,10 +60,10 @@ function computeExisting(inputs, planData, segDiscountData) {
   
   // 결합할인 계산 (상품별 로직)
   const bundleDiscount = calculateExistingBundleDiscount(
-    inputs.existingBundleType,
+    existingBundleType,
     memberCount,
     baseFeeSum,
-    inputs.internetIncluded,
+    internetIncluded,
     segDiscountData
   );
   
@@ -72,12 +78,13 @@ function computeExisting(inputs, planData, segDiscountData) {
 }
 
 // 투게더결합 계산
-function computeTogether(inputs, planData, segDiscountData) {
+function computeTogether(lines, planData, segDiscountData) {
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
-  const lines = inputs?.lines || [];
-  const memberCount = lines.length;
+  const memberCount = (lines || []).length;
   
-  const rows = lines.map((line, idx) => {
+  let totalPremierDiscount = 0;
+  
+  const rows = (lines || []).map((line, idx) => {
     const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
     const baseFee = Number(plan.baseFee || 0);
     
@@ -86,6 +93,12 @@ function computeTogether(inputs, planData, segDiscountData) {
     // 선택약정할인
     if (line.contractType === '선택약정') {
       discounts.push({ name: '선택약정할인', amount: baseFee * -0.25 });
+    }
+    
+    // 프리미어약정할인 (회선별, 85,000원 이상만)
+    if (baseFee >= 85000) {
+      discounts.push({ name: '프리미어약정할인', amount: -5250 });
+      totalPremierDiscount += -5250;
     }
     
     const totalDiscount = discounts.reduce((s, d) => s + (d.amount || 0), 0);
@@ -102,20 +115,15 @@ function computeTogether(inputs, planData, segDiscountData) {
     };
   });
   
-  const baseFeeSum = rows.reduce((s, r) => s + r.baseFee, 0);
-  
-  // 프리미어약정할인 (투게더 전체에 적용)
-  const premierDiscount = baseFeeSum >= 85000 ? -5250 : 0;
-  
   // 투게더결합할인 (seg)할인 C2:D7에서 구성원 수로 조회)
   const togetherBundleDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
   
-  const amount = rows.reduce((s, r) => s + r.total, 0) + premierDiscount + togetherBundleDiscount;
+  const amount = rows.reduce((s, r) => s + r.total, 0) + togetherBundleDiscount;
   
   return {
     amount,
     rows,
-    premierDiscount,
+    premierDiscount: totalPremierDiscount,
     togetherBundleDiscount,
     breakdown: []
   };
@@ -123,42 +131,57 @@ function computeTogether(inputs, planData, segDiscountData) {
 
 // 기존결합 할인 계산
 function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, internetIncluded, segData) {
-  if (!bundleType || !segData) return 0;
+  if (!bundleType || !segData || !Array.isArray(segData)) return 0;
   
-  // seg)할인 데이터를 파싱 (C2:D7, C9:E15, C17:F27, C30:M37)
-  const data = segData || [];
+  // seg)할인 시트 구조:
+  // Row 9-14(idx 9-14): 가무사 무무선 - C(인원수) D(48400원↑) E(22000~48400)
+  // Row 18-22(idx 18-22): 참쉬운 결합 - C(인원수) D(69000↓) E(69000↑) F(88000↑)
+  // Row 31-36(idx 31-36): 가무사 유무선 - C(인원수) D(미포함) E(포함)
   
-  // 가무사 무무선 (C9:E15, row 9-15 in sheet = index 8-14 in array)
+  // 가무사 무무선
   if (bundleType === '가무사 무무선') {
-    const table = extractTable(data, 8, 2, 4); // C9:E15 = rows 8-14, cols C-E (2-4)
-    if (baseFeeSum >= 48400) {
-      return vlookup(memberCount, table, 1); // 2nd column (D)
-    } else if (baseFeeSum > 0) {
-      return vlookup(memberCount, table, 2); // 3rd column (E)
+    for (let i = 10; i <= 14; i++) {
+      const row = segData[i] || [];
+      const personCount = Number(row[2]) || 0;
+      if (personCount === memberCount) {
+        if (baseFeeSum >= 48400) {
+          return parseNumber(row[3]); // D열: 48400원↑
+        } else if (baseFeeSum > 0) {
+          return parseNumber(row[4]); // E열: 22000~48400
+        }
+      }
     }
   }
   
-  // 참쉬운 결합 (C17:F27)
+  // 참쉬운 결합
   if (bundleType === '참쉬운 결합') {
-    const table = extractTable(data, 16, 2, 5); // C17:F27 = rows 16-26, cols C-F (2-5)
-    if (baseFeeSum >= 80000) {
-      return vlookup(memberCount, table, 3); // 4th column (F)
-    } else if (baseFeeSum >= 62000) {
-      return vlookup(memberCount, table, 2); // 3rd column (E)
-    } else if (baseFeeSum < 62000) {
-      return vlookup(memberCount, table, 1); // 2nd column (D)
+    for (let i = 19; i <= 22; i++) {
+      const row = segData[i] || [];
+      const personCount = Number(row[2]) || 0;
+      if (personCount === memberCount) {
+        if (baseFeeSum >= 88000) {
+          return parseNumber(row[5]); // F열: 88000↑
+        } else if (baseFeeSum >= 69000) {
+          return parseNumber(row[4]); // E열: 69000↑
+        } else {
+          return parseNumber(row[3]); // D열: 69000↓
+        }
+      }
     }
   }
   
-  // 가무사 유무선 (C30:M37)
+  // 가무사 유무선
   if (bundleType === '가무사 유무선') {
-    const table = extractTable(data, 29, 2, 12); // C30:M37 = rows 29-36, cols C-M (2-12)
-    if (internetIncluded === '포함') {
-      const discount = vlookup(memberCount, table, 2); // 3rd column (E)
-      return discount / memberCount; // 인당 할인
-    } else {
-      const discount = vlookup(memberCount, table, 1); // 2nd column (D)
-      return discount / memberCount;
+    for (let i = 32; i <= 36; i++) {
+      const row = segData[i] || [];
+      const personCount = Number(row[2]) || 0;
+      if (personCount === memberCount) {
+        if (internetIncluded === '포함') {
+          return parseNumber(row[4]); // E열: 포함
+        } else {
+          return parseNumber(row[3]); // D열: 미포함
+        }
+      }
     }
   }
   
@@ -172,11 +195,21 @@ function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, in
 
 // 투게더결합 할인 계산
 function calculateTogetherBundleDiscount(memberCount, segData) {
-  if (!segData) return 0;
-  const data = segData || [];
-  // C2:D7 = rows 1-6, cols C-D (2-3)
-  const table = extractTable(data, 1, 2, 3);
-  return vlookup(memberCount, table, 1); // 2nd column (D)
+  if (!segData || !Array.isArray(segData)) return 0;
+  // seg)할인 시트 구조:
+  // Row 1(idx 1): 헤더 ['', '', '투게더', '할인금액', ...]
+  // Row 2-6(idx 2-6): 1~5명 데이터
+  // Col C(idx 2): 인원수, Col D(idx 3): 할인금액
+  
+  for (let i = 2; i < Math.min(segData.length, 7); i++) {
+    const row = segData[i] || [];
+    const personCount = Number(row[2]) || 0;
+    if (personCount === memberCount) {
+      const discount = row[3] || '0';
+      return parseNumber(discount);
+    }
+  }
+  return 0;
 }
 
 // 헬퍼: 시트 데이터에서 특정 범위 추출
@@ -201,10 +234,17 @@ function vlookup(lookupValue, table, colIndex) {
     const key = Number(row[0]) || 0;
     if (key === lookupValue) {
       const val = row[colIndex] || 0;
-      return typeof val === 'number' ? val : (Number((val + '').replace(/,/g, '')) || 0);
+      return parseNumber(val);
     }
   }
   return 0;
+}
+
+// 숫자 파싱 헬퍼
+function parseNumber(val) {
+  if (typeof val === 'number') return val;
+  const str = (val + '').replace(/,/g, '').replace(/\s/g, '').trim();
+  return Number(str) || 0;
 }
 
 

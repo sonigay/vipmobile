@@ -344,10 +344,21 @@ const ObManagementMode = ({
                 )}
               </Box>
               <BundleOptionsPanel inputs={inputs} onChange={setInputs} />
-              <LineInputPanel inputs={inputs} onChange={setInputs} planData={planData} />
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                <ExistingCalculatorPanel inputs={inputs} result={existing} onSave={() => handleSave('existing')} />
-                <TogetherCalculatorPanel inputs={inputs} result={together} onSave={() => handleSave('together')} />
+                <ExistingCalculatorPanel 
+                  inputs={inputs} 
+                  result={existing} 
+                  onSave={() => handleSave('existing')} 
+                  onInputChange={setInputs}
+                  planData={planData}
+                />
+                <TogetherCalculatorPanel 
+                  inputs={inputs} 
+                  result={together} 
+                  onSave={() => handleSave('together')} 
+                  onInputChange={setInputs}
+                  planData={planData}
+                />
               </Box>
               <Box sx={{ mt: 2, p: 1, backgroundColor: '#fff', border: '1px solid #eee', borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
                 <Typography>[기존] {existing.amount?.toLocaleString()}</Typography>

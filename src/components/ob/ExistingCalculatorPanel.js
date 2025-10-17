@@ -1,12 +1,21 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
+import LineInputPanel from './LineInputPanel';
 
-export default function ExistingCalculatorPanel({ inputs, result, onSave }) {
+export default function ExistingCalculatorPanel({ inputs, result, onSave, onInputChange, planData }) {
   return (
     <Box sx={{ border: '1px solid #ddd', borderRadius: 1, overflow: 'hidden', backgroundColor: '#fff' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, backgroundColor: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
         <Typography variant="subtitle1" fontWeight="bold">기존결합 계산식</Typography>
         <Button variant="contained" size="small" onClick={onSave}>저장</Button>
+      </Box>
+      <Box sx={{ p: 1.5 }}>
+        <LineInputPanel
+          inputs={{ lines: inputs.existingLines || [] }}
+          onChange={(updated) => onInputChange({ ...inputs, existingLines: updated.lines })}
+          planData={planData}
+          panelType="existing"
+        />
       </Box>
       <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
@@ -15,7 +24,7 @@ export default function ExistingCalculatorPanel({ inputs, result, onSave }) {
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">회선수</Typography>
-          <Typography variant="h6">{inputs?.lines?.length || 0}개</Typography>
+          <Typography variant="h6">{inputs?.existingLines?.length || 0}개</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">결합할인</Typography>

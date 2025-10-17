@@ -13,9 +13,10 @@ export default function LineInputPanel({ inputs, onChange, planData }) {
   };
 
   const handleAddLine = () => {
+    const prefix = inputs.lines[0]?.lineId?.charAt(0) || 'L';
     onChange({
       ...inputs,
-      lines: [...inputs.lines, { lineId: `L${inputs.lines.length + 1}`, planName: '', planGroup: '', segmentCode: '', contractType: '', deviceSupport: 0, addons: [] }]
+      lines: [...inputs.lines, { lineId: `${prefix}${inputs.lines.length + 1}`, planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] }]
     });
   };
 
@@ -27,11 +28,11 @@ export default function LineInputPanel({ inputs, onChange, planData }) {
   };
 
   return (
-    <Box sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1, backgroundColor: '#fafafa' }}>
+    <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="subtitle1" fontWeight="bold">회선 입력</Typography>
+        <Typography variant="body2" fontWeight="bold">회선 입력</Typography>
         <Button size="small" startIcon={<AddIcon />} onClick={handleAddLine} variant="outlined">
-          회선 추가
+          추가
         </Button>
       </Box>
       {inputs.lines.map((line, idx) => (
@@ -72,4 +73,5 @@ export default function LineInputPanel({ inputs, onChange, planData }) {
     </Box>
   );
 }
+
 
