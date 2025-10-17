@@ -161,9 +161,24 @@ function setupObRoutes(app) {
         });
         const rows = response.data.values || [];
         const header = rows[0] || HEADERS_RESULTS;
+        
+        // 헤더에 subscriptionNumber가 있는지 확인
+        const hasSubscriptionNumber = header.includes('subscriptionNumber');
+        
         let items = rows.slice(1)
           .map((r, idx) => {
             const obj = Object.fromEntries(header.map((h, i) => [h, r[i] || '']));
+            
+            // subscriptionNumber 컬럼이 없는 기존 데이터 처리
+            if (!hasSubscriptionNumber && !obj.subscriptionNumber) {
+              obj.subscriptionNumber = '';
+            }
+            
+            // status 컬럼이 없는 기존 데이터 처리
+            if (!obj.status) {
+              obj.status = '';
+            }
+            
             return { rowIndex: idx + 2, ...obj };
           });
         
