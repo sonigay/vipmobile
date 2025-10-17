@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ExistingCalculatorPanel from './ob/ExistingCalculatorPanel';
 import TogetherCalculatorPanel from './ob/TogetherCalculatorPanel';
+import LineInputPanel from './ob/LineInputPanel';
 import { api } from '../api';
 import { initialInputs, useObCalculation } from '../utils/obCalculationEngine';
 import {
@@ -243,6 +244,7 @@ const ObManagementMode = ({
                   </Button>
                 )}
               </Box>
+              <LineInputPanel inputs={inputs} onChange={setInputs} planData={planData} />
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <ExistingCalculatorPanel inputs={inputs} result={existing} onSave={() => handleSave('existing')} />
                 <TogetherCalculatorPanel inputs={inputs} result={together} onSave={() => handleSave('together')} />
