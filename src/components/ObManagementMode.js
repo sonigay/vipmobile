@@ -151,6 +151,40 @@ const ObManagementMode = ({
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               OB 관리 모드
             </Typography>
+            
+            {/* 업데이트 확인 버튼 */}
+            <Button
+              color="inherit"
+              startIcon={<UpdateIcon />}
+              onClick={() => setShowUpdatePopup(true)}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              업데이트 확인
+            </Button>
+            
+            {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+            {onModeChange && availableModes && availableModes.length > 1 && (
+              <Button
+                color="inherit"
+                startIcon={<RefreshIcon />}
+                onClick={onModeChange}
+                sx={{
+                  ml: 2,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)'
+                  }
+                }}
+              >
+                모드 변경
+              </Button>
+            )}
+            
             <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
               로그아웃
             </Button>
@@ -173,6 +207,40 @@ const ObManagementMode = ({
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               OB 관리 모드
             </Typography>
+            
+            {/* 업데이트 확인 버튼 */}
+            <Button
+              color="inherit"
+              startIcon={<UpdateIcon />}
+              onClick={() => setShowUpdatePopup(true)}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              업데이트 확인
+            </Button>
+            
+            {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
+            {onModeChange && availableModes && availableModes.length > 1 && (
+              <Button
+                color="inherit"
+                startIcon={<RefreshIcon />}
+                onClick={onModeChange}
+                sx={{
+                  ml: 2,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)'
+                  }
+                }}
+              >
+                모드 변경
+              </Button>
+            )}
+            
             <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
               로그아웃
             </Button>
