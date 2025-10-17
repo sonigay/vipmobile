@@ -82,6 +82,42 @@ function setupObRoutes(app) {
     }
   });
 
+  // GET /api/ob/dev-sheet-data (개발용 - 나중에 제거)
+  router.get('/dev-sheet-data', async (req, res) => {
+    try {
+      const { sheets } = createSheetsClient();
+      const devSpreadsheetId = '13CoBlIKqFDr0cjf3tC2GiZv3fhoxfCVzCHlR-WVjj1Y';
+      
+      // 모든 시트 읽기
+      const [mainSheet, segDiscount, planList] = await Promise.all([
+        sheets.spreadsheets.values.get({
+          spreadsheetId: devSpreadsheetId,
+          range: '투게더결합 컨설팅!A1:Z50'
+        }),
+        sheets.spreadsheets.values.get({
+          spreadsheetId: devSpreadsheetId,
+          range: 'seg)할인!A1:N40'
+        }),
+        sheets.spreadsheets.values.get({
+          spreadsheetId: devSpreadsheetId,
+          range: '별첨)요금제 리스트!A1:Z100'
+        })
+      ]);
+      
+      res.json({
+        success: true,
+        data: {
+          mainSheet: mainSheet.data.values || [],
+          segDiscount: segDiscount.data.values || [],
+          planList: planList.data.values || []
+        }
+      });
+    } catch (error) {
+      console.error('[OB] dev-sheet-data error:', error);
+      res.status(500).json({ success: false, error: 'Failed to load dev sheet data', message: error.message });
+    }
+  });
+
   // GET /api/ob/discount-data
   router.get('/discount-data', async (req, res) => {
     try {

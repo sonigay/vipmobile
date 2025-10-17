@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ExistingCalculatorPanel from './ob/ExistingCalculatorPanel';
 import TogetherCalculatorPanel from './ob/TogetherCalculatorPanel';
 import LineInputPanel from './ob/LineInputPanel';
+import BundleOptionsPanel from './ob/BundleOptionsPanel';
 import { api } from '../api';
 import { initialInputs, useObCalculation } from '../utils/obCalculationEngine';
 import {
@@ -35,6 +36,7 @@ const ObManagementMode = ({
   const [error, setError] = useState(null);
   const [planData, setPlanData] = useState([]);
   const [discountData, setDiscountData] = useState([]);
+  const [segDiscountData, setSegDiscountData] = useState([]);
   const [inputs, setInputs] = useState(initialInputs());
   const [results, setResults] = useState([]);
   const [scenarioName, setScenarioName] = useState('');
@@ -53,12 +55,19 @@ const ObManagementMode = ({
         console.log('[OB] Loading with userId:', userId, 'loggedInStore:', loggedInStore);
         
         // 요금제/할인 데이터는 항상 로드
-        const [plansRes, discountsRes] = await Promise.all([
+        const [plansRes, discountsRes, devSheetRes] = await Promise.all([
           api.getObPlanData(),
-          api.getObDiscountData()
+          api.getObDiscountData(),
+          api.getObDevSheetData()
         ]);
         setPlanData(plansRes.data || []);
         setDiscountData(discountsRes.data || []);
+        setSegDiscountData(devSheetRes.data?.segDiscount || []);
+        
+        // 개발용: 시트 분석 로그
+        console.log('[OB DEV] Main Sheet:', devSheetRes.data?.mainSheet);
+        console.log('[OB DEV] Seg Discount:', devSheetRes.data?.segDiscount);
+        console.log('[OB DEV] Plan List:', devSheetRes.data?.planList);
         
         // 결과 목록은 userId가 있을 때만 로드
         if (userId) {
@@ -87,7 +96,7 @@ const ObManagementMode = ({
     }
   }, [loggedInStore]);
 
-  const { existing, together, diff } = useObCalculation(inputs, planData, discountData);
+  const { existing, together, diff } = useObCalculation(inputs, planData, discountData, segDiscountData);
 
   const handleSave = async (chosen) => {
     try {
@@ -334,6 +343,7 @@ const ObManagementMode = ({
                   </Button>
                 )}
               </Box>
+              <BundleOptionsPanel inputs={inputs} onChange={setInputs} />
               <LineInputPanel inputs={inputs} onChange={setInputs} planData={planData} />
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <ExistingCalculatorPanel inputs={inputs} result={existing} onSave={() => handleSave('existing')} />

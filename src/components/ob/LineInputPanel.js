@@ -3,6 +3,8 @@ import { Box, Typography, Button, IconButton, TextField, MenuItem } from '@mui/m
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 
+const CONTRACT_TYPES = ['지원금약정', '선택약정'];
+
 export default function LineInputPanel({ inputs, onChange, planData }) {
   const handleLineChange = (index, field, value) => {
     const newLines = [...inputs.lines];
@@ -41,13 +43,25 @@ export default function LineInputPanel({ inputs, onChange, planData }) {
             label="요금제"
             value={line.planName}
             onChange={(e) => handleLineChange(idx, 'planName', e.target.value)}
-            sx={{ flex: 1, minWidth: 200 }}
+            sx={{ flex: 2, minWidth: 200 }}
           >
             <MenuItem value="">선택안함</MenuItem>
             {(planData || []).map(p => (
               <MenuItem key={p.planName} value={p.planName}>
                 {p.planName} ({p.planGroup}) - {Number(p.baseFee || 0).toLocaleString()}원
               </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="약정구분"
+            value={line.contractType || '지원금약정'}
+            onChange={(e) => handleLineChange(idx, 'contractType', e.target.value)}
+            sx={{ flex: 1, minWidth: 120 }}
+          >
+            {CONTRACT_TYPES.map(type => (
+              <MenuItem key={type} value={type}>{type}</MenuItem>
             ))}
           </TextField>
           <IconButton size="small" onClick={() => handleRemoveLine(idx)} disabled={inputs.lines.length <= 1}>
