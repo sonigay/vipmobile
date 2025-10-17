@@ -40,6 +40,7 @@ const ObManagementMode = ({
   const [inputs, setInputs] = useState(initialInputs());
   const [results, setResults] = useState([]);
   const [selectedResultId, setSelectedResultId] = useState(null);
+  const [subscriptionNumber, setSubscriptionNumber] = useState('');
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // OB 관리모드 진입 시 데이터 로드 + 업데이트 팝업 표시 (숨김 설정 확인 후)
@@ -125,12 +126,15 @@ const ObManagementMode = ({
       const existingNames = (inputs.existingLines || []).map(l => l.customerName).filter(Boolean);
       const togetherNames = (inputs.togetherLines || []).map(l => l.customerName).filter(Boolean);
       const customerNames = existingNames.length >= togetherNames.length ? existingNames : togetherNames;
-      const scenarioName = customerNames.length > 0 ? customerNames.join(', ') : `시나리오_${new Date().toLocaleString('ko-KR')}`;
+      const customerNamesStr = customerNames.length > 0 ? customerNames.join(', ') : '';
       
       const payload = {
         userId,
-        scenarioName,
-        inputs,
+        scenarioName: customerNamesStr || `시나리오_${new Date().toLocaleString('ko-KR')}`,
+        inputs: {
+          ...inputs,
+          subscriptionNumber // 가입번호 추가
+        },
         existingAmount: existing.amount,
         togetherAmount: together.amount,
         diff,
@@ -162,6 +166,7 @@ const ObManagementMode = ({
     try {
       const restored = JSON.parse(row.inputsJson || '{}');
       setInputs(restored.existingLines ? restored : initialInputs());
+      setSubscriptionNumber(restored.subscriptionNumber || '');
       setSelectedResultId(row.id);
     } catch (e) {
       console.error('Failed to restore inputs:', e);
@@ -338,20 +343,29 @@ const ObManagementMode = ({
         <Box sx={{ p: 2 }}>
           <Card>
             <CardContent>
-              {selectedResultId && (
-                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ minWidth: 80 }}>가입번호:</Typography>
+                <TextField
+                  size="small"
+                  value={subscriptionNumber}
+                  onChange={(e) => setSubscriptionNumber(e.target.value)}
+                  placeholder="가입번호 입력"
+                  sx={{ flex: 1 }}
+                />
+                {selectedResultId && (
                   <Button
                     variant="outlined"
                     size="small"
                     onClick={() => {
                       setInputs(initialInputs());
+                      setSubscriptionNumber('');
                       setSelectedResultId(null);
                     }}
                   >
                     신규 작성
                   </Button>
-                </Box>
-              )}
+                )}
+              </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <ExistingCalculatorPanel 
                   inputs={inputs} 
@@ -396,11 +410,12 @@ const ObManagementMode = ({
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>scenario</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>existing total</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>together total</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>diff</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>createdAt</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>가입번호</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>고객명</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>기존 총액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>투게더 총액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>차액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>등록일시</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -413,6 +428,7 @@ const ObManagementMode = ({
                             backgroundColor: selectedResultId === row.id ? '#e3f2fd' : 'transparent'
                           }}
                         >
+                          <td style={{ border: '1px solid #eee', padding: 6 }}>{row.subscriptionNumber || '-'}</td>
                           <td style={{ border: '1px solid #eee', padding: 6 }}>{row.scenarioName || '-'}</td>
                           <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
                           <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>

@@ -9,7 +9,7 @@ const SHEET_SEGMENTS = 'OB_세그';
 const SHEET_PLANS = '무선요금제군';
 
 // Standard headers
-const HEADERS_RESULTS = ['id', 'userId', 'createdAt', 'scenarioName', 'inputsJson', 'existingAmount', 'togetherAmount', 'diff', 'chosenType', 'notes'];
+const HEADERS_RESULTS = ['id', 'userId', 'createdAt', 'subscriptionNumber', 'scenarioName', 'inputsJson', 'existingAmount', 'togetherAmount', 'diff', 'chosenType', 'notes'];
 const HEADERS_DISCOUNTS = ['discountCode', 'name', 'scope', 'type', 'value', 'conditionsJson'];
 const HEADERS_SEGMENTS = ['segmentCode', 'name', 'rulesJson'];
 
@@ -185,10 +185,12 @@ function setupObRoutes(app) {
       const id = uuidv4();
       const createdAt = new Date().toISOString();
       const inputsJson = JSON.stringify(inputs || {});
+      const subscriptionNumber = (inputs && inputs.subscriptionNumber) || '';
       const row = [
         id,
         userId,
         createdAt,
+        subscriptionNumber,
         scenarioName || '',
         inputsJson,
         Number(existingAmount || 0),
