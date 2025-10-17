@@ -39,7 +39,8 @@ const ObManagementMode = ({
   const [discountData, setDiscountData] = useState([]);
   const [segDiscountData, setSegDiscountData] = useState([]);
   const [inputs, setInputs] = useState(initialInputs());
-  const [results, setResults] = useState([]);
+  const [allResults, setAllResults] = useState([]); // 전체 데이터 캐시
+  const [results, setResults] = useState([]); // 현재 표시되는 데이터
   const [selectedResultId, setSelectedResultId] = useState(null);
   const [subscriptionNumber, setSubscriptionNumber] = useState('');
   const [selectedUser, setSelectedUser] = useState('me'); // 'me' or 'all' or userId
@@ -71,12 +72,17 @@ const ObManagementMode = ({
         console.log('[OB DEV] Seg Discount:', devSheetRes.data?.segDiscount);
         console.log('[OB DEV] Plan List:', devSheetRes.data?.planList);
         
-        // 결과 목록은 userId가 있을 때만 로드
+        // 결과 목록은 전체 데이터 로드
         if (userId) {
-          const listRes = await api.getObResults(userId, selectedUser === 'all');
-          setResults(listRes.data || []);
+          const listRes = await api.getObResults(userId, true); // 항상 전체 로드
+          const allData = listRes.data || [];
+          setAllResults(allData);
+          // 초기에는 내 데이터만 표시
+          setResults(allData.filter(r => r.userId === userId));
+          setSelectedUser('me');
         } else {
           console.warn('[OB] No userId found, skipping results load');
+          setAllResults([]);
           setResults([]);
         }
       } catch (e) {
@@ -130,8 +136,11 @@ const ObManagementMode = ({
       const customerNames = existingNames.length >= togetherNames.length ? existingNames : togetherNames;
       const customerNamesStr = customerNames.length > 0 ? customerNames.join(', ') : '';
       
+      const userName = loggedInStore?.name || loggedInStore?.userId || '';
+      
       const payload = {
         userId,
+        userName,
         scenarioName: customerNamesStr || `시나리오_${new Date().toLocaleString('ko-KR')}`,
         inputs: {
           ...inputs,
@@ -154,8 +163,20 @@ const ObManagementMode = ({
       }
       
       if (res?.success) {
-        const listRes = await api.getObResults(userId, selectedUser === 'all');
-        setResults(listRes.data || []);
+        // 전체 데이터 다시 로드
+        const listRes = await api.getObResults(userId, true);
+        const allData = listRes.data || [];
+        setAllResults(allData);
+        
+        // 현재 선택된 필터로 재필터링
+        if (selectedUser === 'me') {
+          setResults(allData.filter(r => r.userId === userId));
+        } else if (selectedUser === 'all') {
+          setResults(allData);
+        } else {
+          setResults(allData.filter(r => (r.userName || '(이름없음)') === selectedUser));
+        }
+        
         setSelectedResultId(null);
         setSubscriptionNumber('');
       }
@@ -346,6 +367,7 @@ const ObManagementMode = ({
         <Box sx={{ p: 2 }}>
           <Card>
             <CardContent>
+              {/* 가입번호 입력 */}
               <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
                 <Typography variant="body2" sx={{ minWidth: 80 }}>가입번호:</Typography>
                 <TextField
@@ -369,6 +391,32 @@ const ObManagementMode = ({
                   </Button>
                 )}
               </Box>
+              
+              {/* 인터넷 옵션 (공통) */}
+              <Box sx={{ mb: 2, p: 2, backgroundColor: '#fffde7', borderRadius: 1, border: '1px solid #fdd835' }}>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>인터넷 옵션 (기존결합 & 투게더결합 공통)</Typography>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={inputs.hasInternet || false}
+                      onChange={(e) => setInputs(prev => ({ ...prev, hasInternet: e.target.checked }))}
+                    />
+                    <span>인터넷 회선 포함</span>
+                  </label>
+                  <select
+                    value={inputs.internetSpeed || '500M'}
+                    onChange={(e) => setInputs(prev => ({ ...prev, internetSpeed: e.target.value }))}
+                    disabled={!inputs.hasInternet}
+                    style={{ padding: 6, fontSize: 14, border: '1px solid #ccc', borderRadius: 4, minWidth: 100 }}
+                  >
+                    <option value="100M">100M</option>
+                    <option value="500M">500M</option>
+                    <option value="1G">1G</option>
+                  </select>
+                </Box>
+              </Box>
+              
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <ExistingCalculatorPanel 
                   inputs={inputs} 
@@ -408,41 +456,62 @@ const ObManagementMode = ({
                 </Box>
               </Box>
               <Box sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="h6">저장된 시나리오</Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant={selectedUser === 'me' ? 'contained' : 'outlined'}
-                      onClick={async () => {
-                        setSelectedUser('me');
-                        const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
-                        if (userId) {
-                          const listRes = await api.getObResults(userId, false);
-                          setResults(listRes.data || []);
-                        }
-                      }}
-                    >
-                      내 데이터
-                    </Button>
-                    <Button
-                      size="small"
-                      variant={selectedUser === 'all' ? 'contained' : 'outlined'}
-                      onClick={async () => {
-                        setSelectedUser('all');
-                        const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
-                        const listRes = await api.getObResults(userId, true);
-                        setResults(listRes.data || []);
-                      }}
-                    >
-                      전체
-                    </Button>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="h6" sx={{ mb: 1 }}>저장된 시나리오</Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {(() => {
+                      const userCounts = {};
+                      (allResults || []).forEach(row => {
+                        const name = row.userName || '(이름없음)';
+                        userCounts[name] = (userCounts[name] || 0) + 1;
+                      });
+                      const currentUserId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+                      
+                      return (
+                        <>
+                          <Button
+                            size="small"
+                            variant={selectedUser === 'me' ? 'contained' : 'outlined'}
+                            onClick={() => {
+                              setSelectedUser('me');
+                              setResults(allResults.filter(r => r.userId === currentUserId));
+                            }}
+                          >
+                            내 데이터 ({allResults.filter(r => r.userId === currentUserId).length})
+                          </Button>
+                          {Object.entries(userCounts).filter(([name]) => name !== '(이름없음)').map(([name, count]) => (
+                            <Button
+                              key={name}
+                              size="small"
+                              variant={selectedUser === name ? 'contained' : 'outlined'}
+                              onClick={() => {
+                                setSelectedUser(name);
+                                setResults(allResults.filter(r => (r.userName || '(이름없음)') === name));
+                              }}
+                            >
+                              {name} ({count})
+                            </Button>
+                          ))}
+                          <Button
+                            size="small"
+                            variant={selectedUser === 'all' ? 'contained' : 'outlined'}
+                            onClick={() => {
+                              setSelectedUser('all');
+                              setResults(allResults);
+                            }}
+                          >
+                            전체 ({(allResults || []).length})
+                          </Button>
+                        </>
+                      );
+                    })()}
                   </Box>
                 </Box>
                 <Box sx={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>저장자</th>
                         <th style={{ border: '1px solid #eee', padding: 6 }}>가입번호</th>
                         <th style={{ border: '1px solid #eee', padding: 6 }}>고객명</th>
                         <th style={{ border: '1px solid #eee', padding: 6 }}>기존 총액</th>
@@ -472,6 +541,7 @@ const ObManagementMode = ({
                               backgroundColor: bgColor
                             }}
                           >
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.userName || '-'}</td>
                             <td style={{ border: '1px solid #eee', padding: 6 }}>{row.subscriptionNumber || '-'}</td>
                             <td style={{ border: '1px solid #eee', padding: 6 }}>{row.scenarioName || '-'}</td>
                             <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
@@ -484,9 +554,18 @@ const ObManagementMode = ({
                                   const newStatus = e.target.value;
                                   try {
                                     await api.updateObResult(row.id, { status: newStatus });
-                                    const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
-                                    const listRes = await api.getObResults(userId, selectedUser === 'all');
-                                    setResults(listRes.data || []);
+                                    
+                                    // allResults 업데이트 (캐시)
+                                    const updatedAll = allResults.map(r => 
+                                      r.id === row.id ? { ...r, status: newStatus } : r
+                                    );
+                                    setAllResults(updatedAll);
+                                    
+                                    // results도 업데이트
+                                    const updatedResults = results.map(r => 
+                                      r.id === row.id ? { ...r, status: newStatus } : r
+                                    );
+                                    setResults(updatedResults);
                                   } catch (err) {
                                     setError(err.message);
                                   }

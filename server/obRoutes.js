@@ -9,7 +9,7 @@ const SHEET_SEGMENTS = 'OB_세그';
 const SHEET_PLANS = '무선요금제군';
 
 // Standard headers
-const HEADERS_RESULTS = ['id', 'userId', 'createdAt', 'subscriptionNumber', 'scenarioName', 'inputsJson', 'existingAmount', 'togetherAmount', 'diff', 'chosenType', 'status', 'notes'];
+const HEADERS_RESULTS = ['id', 'userId', 'userName', 'createdAt', 'subscriptionNumber', 'scenarioName', 'inputsJson', 'existingAmount', 'togetherAmount', 'diff', 'chosenType', 'status', 'notes'];
 const HEADERS_DISCOUNTS = ['discountCode', 'name', 'scope', 'type', 'value', 'conditionsJson'];
 const HEADERS_SEGMENTS = ['segmentCode', 'name', 'rulesJson'];
 
@@ -197,7 +197,7 @@ function setupObRoutes(app) {
   // POST /api/ob/results
   router.post('/results', async (req, res) => {
     try {
-      const { userId, scenarioName, inputs, existingAmount, togetherAmount, diff, chosenType, notes } = req.body || {};
+      const { userId, userName, scenarioName, inputs, existingAmount, togetherAmount, diff, chosenType, notes } = req.body || {};
       if (!userId) {
         return res.status(400).json({ success: false, error: 'userId is required' });
       }
@@ -211,6 +211,7 @@ function setupObRoutes(app) {
       const row = [
         id,
         userId,
+        userName || '',
         createdAt,
         subscriptionNumber,
         scenarioName || '',

@@ -134,25 +134,29 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
 // 투게더결합 계산
 function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscountData) {
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
-  const memberCount = (lines || []).length;
+  
+  // 85000원 이상 회선만 카운트
+  const tempRows = (lines || []).map((line, idx) => {
+    const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
+    const baseFee = Number(plan.baseFee || 0);
+    return { line, plan, baseFee, idx };
+  });
+  
+  const eligibleCount = tempRows.filter(r => r.baseFee >= 85000).length;
   
   let totalPremierDiscount = 0;
   
-  // 투게더결합할인 계산 (회선당 할인액)
-  const perLineTogetherDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
-  const totalTogetherBundleDiscount = perLineTogetherDiscount * memberCount;
+  // 투게더결합할인 계산 (85000원 이상 회선 수로 계산)
+  const perLineTogetherDiscount = calculateTogetherBundleDiscount(eligibleCount, segDiscountData);
   
   console.log('[OB CALC] Together Bundle Discount:', {
-    memberCount,
+    totalLines: lines.length,
+    eligibleCount,
     perLineTogetherDiscount,
-    totalTogetherBundleDiscount,
     hasSegData: !!segDiscountData
   });
   
-  const rows = (lines || []).map((line, idx) => {
-    const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
-    const baseFee = Number(plan.baseFee || 0);
-    
+  const rows = tempRows.map(({ line, plan, baseFee, idx }) => {
     const discounts = [];
     
     // 선택약정할인
@@ -166,8 +170,8 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
       totalPremierDiscount += -5250;
     }
     
-    // 투게더결합할인 (회선별 분배)
-    if (perLineTogetherDiscount !== 0) {
+    // 투게더결합할인 (85000원 이상 회선만 적용)
+    if (perLineTogetherDiscount !== 0 && baseFee >= 85000) {
       discounts.push({ name: '투게더할인', amount: perLineTogetherDiscount });
     }
     
@@ -190,6 +194,8 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
   const internetDiscount = hasInternet ? calculateTogetherInternetDiscount(internetSpeed) : 0;
   
   const amount = rows.reduce((s, r) => s + r.total, 0) + internetDiscount;
+  
+  const totalTogetherBundleDiscount = perLineTogetherDiscount * eligibleCount;
   
   return {
     amount,
@@ -225,17 +231,21 @@ function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, ha
     }
   }
   
-  // 참쉬운 결합
+  // 참쉬운 결합 (회선당 기본료, 전체 합이 아님)
   if (bundleType === '참쉬운 결합') {
     for (let i = 19; i <= 22; i++) {
       const row = segData[i] || [];
       const personCount = Number(row[2]) || 0;
       if (personCount === memberCount) {
-        if (baseFeeSum >= 88000) {
+        // 각 회선의 기본료를 확인 (baseFeeSum이 아니라 개별 회선 기본료)
+        // 하지만 여기서는 memberCount당 평균 기본료로 판단
+        const avgBaseFee = memberCount > 0 ? baseFeeSum / memberCount : 0;
+        
+        if (avgBaseFee >= 88000) {
           return parseNumber(row[5]); // F열: 88000↑
-        } else if (baseFeeSum >= 69000) {
+        } else if (avgBaseFee >= 69000) {
           return parseNumber(row[4]); // E열: 69000↑
-        } else {
+        } else if (avgBaseFee < 69000) {
           return parseNumber(row[3]); // D열: 69000↓
         }
       }
