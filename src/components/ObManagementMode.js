@@ -36,6 +36,8 @@ const ObManagementMode = ({
   const [discountData, setDiscountData] = useState([]);
   const [inputs, setInputs] = useState(initialInputs());
   const [results, setResults] = useState([]);
+  const [scenarioName, setScenarioName] = useState('');
+  const [selectedResultId, setSelectedResultId] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // OB 관리모드 진입 시 데이터 로드 + 업데이트 팝업 표시 (숨김 설정 확인 후)
@@ -76,7 +78,7 @@ const ObManagementMode = ({
     try {
       const payload = {
         userId: loggedInStore?.userId || '',
-        scenarioName: '',
+        scenarioName: scenarioName || `시나리오_${new Date().toLocaleString('ko-KR')}`,
         inputs,
         existingAmount: existing.amount,
         togetherAmount: together.amount,
@@ -84,13 +86,35 @@ const ObManagementMode = ({
         chosenType: chosen,
         notes: ''
       };
-      const res = await api.saveObResult(payload);
+      
+      let res;
+      if (selectedResultId) {
+        // Update existing
+        res = await api.updateObResult(selectedResultId, payload);
+      } else {
+        // Create new
+        res = await api.saveObResult(payload);
+      }
+      
       if (res?.success) {
         const listRes = await api.getObResults(loggedInStore?.userId || '');
         setResults(listRes.data || []);
+        setScenarioName('');
+        setSelectedResultId(null);
       }
     } catch (e) {
       setError(e.message);
+    }
+  };
+
+  const handleRowClick = (row) => {
+    try {
+      const restored = JSON.parse(row.inputsJson || '{}');
+      setInputs(restored.lines ? restored : initialInputs());
+      setScenarioName(row.scenarioName || '');
+      setSelectedResultId(row.id);
+    } catch (e) {
+      console.error('Failed to restore inputs:', e);
     }
   };
 
@@ -196,6 +220,29 @@ const ObManagementMode = ({
         <Container maxWidth="lg" sx={{ py: 4 }}>
           <Card>
             <CardContent>
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ minWidth: 80 }}>시나리오명:</Typography>
+                <input
+                  type="text"
+                  value={scenarioName}
+                  onChange={(e) => setScenarioName(e.target.value)}
+                  placeholder="시나리오명 입력 (선택)"
+                  style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: 4 }}
+                />
+                {selectedResultId && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setInputs(initialInputs());
+                      setScenarioName('');
+                      setSelectedResultId(null);
+                    }}
+                  >
+                    신규 작성
+                  </Button>
+                )}
+              </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <ExistingCalculatorPanel inputs={inputs} result={existing} onSave={() => handleSave('existing')} />
                 <TogetherCalculatorPanel inputs={inputs} result={together} onSave={() => handleSave('together')} />
@@ -219,7 +266,14 @@ const ObManagementMode = ({
                     </thead>
                     <tbody>
                       {(results || []).map(row => (
-                        <tr key={row.id}>
+                        <tr
+                          key={row.id}
+                          onClick={() => handleRowClick(row)}
+                          style={{
+                            cursor: 'pointer',
+                            backgroundColor: selectedResultId === row.id ? '#e3f2fd' : 'transparent'
+                          }}
+                        >
                           <td style={{ border: '1px solid #eee', padding: 6 }}>{row.scenarioName || '-'}</td>
                           <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
                           <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>
