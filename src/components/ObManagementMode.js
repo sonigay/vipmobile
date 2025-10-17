@@ -47,15 +47,29 @@ const ObManagementMode = ({
       try {
         setLoading(true);
         setError(null);
-        const [plansRes, discountsRes, listRes] = await Promise.all([
+        
+        // userId 확인 (userId 또는 name 필드 사용)
+        const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+        console.log('[OB] Loading with userId:', userId, 'loggedInStore:', loggedInStore);
+        
+        // 요금제/할인 데이터는 항상 로드
+        const [plansRes, discountsRes] = await Promise.all([
           api.getObPlanData(),
-          api.getObDiscountData(),
-          api.getObResults(loggedInStore?.userId || '')
+          api.getObDiscountData()
         ]);
         setPlanData(plansRes.data || []);
         setDiscountData(discountsRes.data || []);
-        setResults(listRes.data || []);
+        
+        // 결과 목록은 userId가 있을 때만 로드
+        if (userId) {
+          const listRes = await api.getObResults(userId);
+          setResults(listRes.data || []);
+        } else {
+          console.warn('[OB] No userId found, skipping results load');
+          setResults([]);
+        }
       } catch (e) {
+        console.error('[OB] Load error:', e);
         setError(e.message);
       } finally {
         setLoading(false);
@@ -77,8 +91,15 @@ const ObManagementMode = ({
 
   const handleSave = async (chosen) => {
     try {
+      const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+      
+      if (!userId) {
+        setError('사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+        return;
+      }
+      
       const payload = {
-        userId: loggedInStore?.userId || '',
+        userId,
         scenarioName: scenarioName || `시나리오_${new Date().toLocaleString('ko-KR')}`,
         inputs,
         existingAmount: existing.amount,
@@ -98,12 +119,13 @@ const ObManagementMode = ({
       }
       
       if (res?.success) {
-        const listRes = await api.getObResults(loggedInStore?.userId || '');
+        const listRes = await api.getObResults(userId);
         setResults(listRes.data || []);
         setScenarioName('');
         setSelectedResultId(null);
       }
     } catch (e) {
+      console.error('[OB] Save error:', e);
       setError(e.message);
     }
   };
