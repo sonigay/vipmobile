@@ -21,7 +21,7 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
           onCustomerNameChange={onCustomerNameSync}
         />
       </Box>
-      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
+      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">총액</Typography>
           <Typography variant="h6">{Number(result?.amount || 0).toLocaleString()}원</Typography>
@@ -32,11 +32,15 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">프리미어할인</Typography>
-          <Typography variant="h6">{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6" sx={{ fontSize: 14 }}>{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">투게더할인</Typography>
-          <Typography variant="h6">{Number(result?.togetherBundleDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6" sx={{ fontSize: 14 }}>{Number(result?.togetherBundleDiscount || 0).toLocaleString()}원</Typography>
+        </Box>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+          <Typography variant="caption" color="text.secondary">인터넷할인</Typography>
+          <Typography variant="h6" sx={{ fontSize: 14 }}>{Number(result?.internetDiscount || 0).toLocaleString()}원</Typography>
         </Box>
       </Box>
       <Box sx={{ p: 1.5, overflowX: 'auto' }}>

@@ -9,19 +9,35 @@ export function initialInputs() {
       { lineId: 'T1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
     ],
     existingBundleType: '', // 기존결합 상품명
-    internetIncluded: '미포함' // 인터넷 포함여부
+    internetIncluded: '미포함', // 인터넷 포함여부 (가무사 유무선용)
+    internetSpeed: '', // 인터넷 속도 (100M, 500M, 1G)
+    hasInternet: false // 인터넷 회선 포함 여부
   };
 }
 
 export function useObCalculation(inputs, planData, discountData, segDiscountData) {
-  const existing = computeExisting(inputs.existingLines, inputs.existingBundleType, inputs.internetIncluded, planData, segDiscountData);
-  const together = computeTogether(inputs.togetherLines, planData, segDiscountData);
+  const existing = computeExisting(
+    inputs.existingLines, 
+    inputs.existingBundleType, 
+    inputs.internetIncluded,
+    inputs.internetSpeed,
+    inputs.hasInternet,
+    planData, 
+    segDiscountData
+  );
+  const together = computeTogether(
+    inputs.togetherLines, 
+    inputs.internetSpeed,
+    inputs.hasInternet,
+    planData, 
+    segDiscountData
+  );
   const diff = (existing.amount || 0) - (together.amount || 0);
   return { existing, together, diff };
 }
 
 // 기존결합 계산
-function computeExisting(lines, existingBundleType, internetIncluded, planData, segDiscountData) {
+function computeExisting(lines, existingBundleType, internetIncluded, internetSpeed, hasInternet, planData, segDiscountData) {
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
   const memberCount = (lines || []).length;
   
@@ -88,18 +104,29 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     };
   });
   
-  const amount = rows.reduce((s, r) => s + r.total, 0);
+  // 인터넷 할인 계산
+  const internetDiscount = hasInternet ? calculateInternetDiscount(
+    existingBundleType,
+    memberCount,
+    baseFeeSum,
+    internetIncluded,
+    internetSpeed,
+    segDiscountData
+  ) : 0;
+  
+  const amount = rows.reduce((s, r) => s + r.total, 0) + internetDiscount;
   
   return {
     amount,
     rows,
     bundleDiscount: totalBundleDiscount,
+    internetDiscount,
     breakdown: []
   };
 }
 
 // 투게더결합 계산
-function computeTogether(lines, planData, segDiscountData) {
+function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscountData) {
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
   const memberCount = (lines || []).length;
   
@@ -153,13 +180,17 @@ function computeTogether(lines, planData, segDiscountData) {
     };
   });
   
-  const amount = rows.reduce((s, r) => s + r.total, 0);
+  // 투게더 인터넷 할인
+  const internetDiscount = hasInternet ? calculateTogetherInternetDiscount(internetSpeed) : 0;
+  
+  const amount = rows.reduce((s, r) => s + r.total, 0) + internetDiscount;
   
   return {
     amount,
     rows,
     premierDiscount: totalPremierDiscount,
     togetherBundleDiscount: totalTogetherBundleDiscount,
+    internetDiscount,
     breakdown: []
   };
 }
@@ -280,6 +311,75 @@ function parseNumber(val) {
   if (typeof val === 'number') return val;
   const str = (val + '').replace(/,/g, '').replace(/\s/g, '').trim();
   return Number(str) || 0;
+}
+
+// 참쉬운 결합 인터넷 할인 계산
+function calculateChamSweInternetDiscount(internetSpeed) {
+  // seg)할인 Row 23-26: 100M/-5500, 500M/-9900, 1G/-13200
+  const discountMap = {
+    '100M': -5500,
+    '500M': -9900,
+    '1G': -13200,
+    '1기가': -13200
+  };
+  return discountMap[internetSpeed] || 0;
+}
+
+// 가무사 유무선 인터넷 할인 계산
+function calculateGamusaInternetDiscount(memberCount, baseFeeSum, internetIncluded, internetSpeed, segData) {
+  if (!segData || !Array.isArray(segData)) return 0;
+  
+  // seg)할인 Row 31-36 (idx 31-36): 가무사 유무선 인터넷 할인
+  // 65890원 기준, 포함/미포함, 인터넷 속도, 회선수에 따라
+  const is65890Above = baseFeeSum >= 65890;
+  
+  // Row 31: 헤더, Row 32-36: 미포함/포함 데이터
+  // Col H(7)=1명, I(8)=2명, J(9)=3명, K(10)=4명, L(11)=5명
+  
+  let targetRow = -1;
+  const speedMap = { '100M': 0, '500M': 1, '1기가': 2, '1G': 2 };
+  const speedOffset = speedMap[internetSpeed] !== undefined ? speedMap[internetSpeed] : -1;
+  
+  if (speedOffset === -1) return 0;
+  
+  if (internetIncluded === '포함') {
+    targetRow = 34 + speedOffset; // Row 34-36 (포함)
+  } else {
+    targetRow = 31 + speedOffset; // Row 31-33 (미포함)
+  }
+  
+  if (targetRow < 0 || targetRow >= segData.length) return 0;
+  
+  const row = segData[targetRow] || [];
+  const memberColIndex = 7 + (memberCount - 1); // H=7(1명), I=8(2명)...
+  
+  if (memberColIndex >= row.length) return 0;
+  
+  return parseNumber(row[memberColIndex]);
+}
+
+// 기존결합 인터넷 할인 통합
+function calculateInternetDiscount(bundleType, memberCount, baseFeeSum, internetIncluded, internetSpeed, segData) {
+  if (!internetSpeed) return 0;
+  
+  if (bundleType === '참쉬운 결합') {
+    return calculateChamSweInternetDiscount(internetSpeed);
+  }
+  
+  if (bundleType === '가무사 유무선') {
+    return calculateGamusaInternetDiscount(memberCount, baseFeeSum, internetIncluded, internetSpeed, segData);
+  }
+  
+  return 0;
+}
+
+// 투게더 인터넷 할인
+function calculateTogetherInternetDiscount(internetSpeed) {
+  // 500M: -11000, 1G: -11000
+  if (internetSpeed === '500M' || internetSpeed === '1G' || internetSpeed === '1기가') {
+    return -11000;
+  }
+  return 0;
 }
 
 

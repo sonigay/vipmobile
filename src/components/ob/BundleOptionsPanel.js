@@ -8,33 +8,55 @@ const EXISTING_BUNDLE_TYPES = [
   '한방에YO'
 ];
 
+const INTERNET_SPEEDS = ['100M', '500M', '1G'];
+
 export default function BundleOptionsPanel({ inputs, onChange }) {
   return (
-    <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-        <TextField
-          select
-          size="small"
-          label="기존결합 상품"
-          value={inputs.existingBundleType || ''}
-          onChange={(e) => onChange({ ...inputs, existingBundleType: e.target.value })}
-          sx={{ flex: 1 }}
-        >
-          <MenuItem value="">선택안함</MenuItem>
-          {EXISTING_BUNDLE_TYPES.map(type => (
-            <MenuItem key={type} value={type}>{type}</MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="인터넷 포함여부"
-          value={inputs.internetIncluded || '미포함'}
-          onChange={(e) => onChange({ ...inputs, internetIncluded: e.target.value })}
-          sx={{ flex: 1 }}
-        >
-          <MenuItem value="포함">포함</MenuItem>
-          <MenuItem value="미포함">미포함</MenuItem>
-        </TextField>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, mt: 1 }}>
+      <TextField
+        select
+        size="small"
+        label="기존결합 상품"
+        value={inputs.existingBundleType || ''}
+        onChange={(e) => onChange({ ...inputs, existingBundleType: e.target.value })}
+      >
+        <MenuItem value="">선택안함</MenuItem>
+        {EXISTING_BUNDLE_TYPES.map(type => (
+          <MenuItem key={type} value={type}>{type}</MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        select
+        size="small"
+        label="인터넷 포함여부 (가무사용)"
+        value={inputs.internetIncluded || '미포함'}
+        onChange={(e) => onChange({ ...inputs, internetIncluded: e.target.value })}
+      >
+        <MenuItem value="포함">포함</MenuItem>
+        <MenuItem value="미포함">미포함</MenuItem>
+      </TextField>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <input
+          type="checkbox"
+          checked={inputs.hasInternet || false}
+          onChange={(e) => onChange({ ...inputs, hasInternet: e.target.checked })}
+          id="hasInternet"
+        />
+        <label htmlFor="hasInternet" style={{ fontSize: 14 }}>인터넷 회선 포함</label>
+      </Box>
+      <TextField
+        select
+        size="small"
+        label="인터넷 속도"
+        value={inputs.internetSpeed || ''}
+        onChange={(e) => onChange({ ...inputs, internetSpeed: e.target.value })}
+        disabled={!inputs.hasInternet}
+      >
+        <MenuItem value="">선택안함</MenuItem>
+        {INTERNET_SPEEDS.map(speed => (
+          <MenuItem key={speed} value={speed}>{speed}</MenuItem>
+        ))}
+      </TextField>
     </Box>
   );
 }
