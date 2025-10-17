@@ -34,8 +34,8 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     return { line, plan, baseFee, idx };
   });
   
-  // 결합할인 계산 (전체)
-  const totalBundleDiscount = calculateExistingBundleDiscount(
+  // 결합할인 계산 (회선당 할인액)
+  const perLineBundleDiscount = calculateExistingBundleDiscount(
     existingBundleType,
     memberCount,
     baseFeeSum,
@@ -43,17 +43,17 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     segDiscountData
   );
   
+  const totalBundleDiscount = perLineBundleDiscount * memberCount;
+  
   console.log('[OB CALC] Existing Bundle Discount:', {
     bundleType: existingBundleType,
     memberCount,
     baseFeeSum,
     internetIncluded,
+    perLineBundleDiscount,
     totalBundleDiscount,
     hasSegData: !!segDiscountData
   });
-  
-  // 결합할인을 회선별로 분배
-  const perLineBundleDiscount = memberCount > 0 ? totalBundleDiscount / memberCount : 0;
   
   const rows = tempRows.map(({ line, plan, baseFee, idx }) => {
     const discounts = [];
@@ -105,14 +105,14 @@ function computeTogether(lines, planData, segDiscountData) {
   
   let totalPremierDiscount = 0;
   
-  // 투게더결합할인 계산 (전체)
-  const totalTogetherBundleDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
-  const perLineTogetherDiscount = memberCount > 0 ? totalTogetherBundleDiscount / memberCount : 0;
+  // 투게더결합할인 계산 (회선당 할인액)
+  const perLineTogetherDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
+  const totalTogetherBundleDiscount = perLineTogetherDiscount * memberCount;
   
   console.log('[OB CALC] Together Bundle Discount:', {
     memberCount,
-    totalTogetherBundleDiscount,
     perLineTogetherDiscount,
+    totalTogetherBundleDiscount,
     hasSegData: !!segDiscountData
   });
   
