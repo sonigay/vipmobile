@@ -10,6 +10,7 @@ const monthlyAwardAPI = require('./monthlyAwardAPI');
 const setupTeamRoutes = require('./teamRoutes');
 const UserSheetManager = require('./UserSheetManager');
 const PhoneklDataManager = require('./PhoneklDataManager');
+const setupObRoutes = require('./obRoutes');
 
 // 기본 설정
 const app = express();
@@ -4304,6 +4305,14 @@ app.get('/api/inventory/activation-status', async (req, res) => {
 
 // 팀 라우트 설정
 setupTeamRoutes(app, getSheetValuesWithoutCache);
+
+// OB 관리모드 라우트 설정
+try {
+  setupObRoutes(app);
+  console.log('✅ [OB] OB routes mounted at /api/ob');
+} catch (e) {
+  console.error('❌ [OB] Failed to mount OB routes:', e.message);
+}
 
 // 정책그룹 목록 가져오기 API
 app.get('/api/budget/policy-groups', async (req, res) => {

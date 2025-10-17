@@ -3,6 +3,50 @@ export const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://port-0-jeg
 
 // API 호출 함수들
 export const api = {
+  // OB: 요금제 데이터
+  getObPlanData: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/ob/plan-data`);
+    if (!response.ok) throw new Error('OB plan data load failed');
+    return response.json();
+  },
+
+  // OB: 할인 데이터
+  getObDiscountData: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/ob/discount-data`);
+    if (!response.ok) throw new Error('OB discount data load failed');
+    return response.json();
+  },
+
+  // OB: 결과 목록(사용자별)
+  getObResults: async (userId) => {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    const response = await fetch(`${API_BASE_URL}/api/ob/results?${params.toString()}`);
+    if (!response.ok) throw new Error('OB results load failed');
+    return response.json();
+  },
+
+  // OB: 결과 저장
+  saveObResult: async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/api/ob/results`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('OB result save failed');
+    return response.json();
+  },
+
+  // OB: 결과 수정
+  updateObResult: async (id, payload) => {
+    const response = await fetch(`${API_BASE_URL}/api/ob/results/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('OB result update failed');
+    return response.json();
+  },
   // 월간시상 데이터 가져오기
   getMonthlyAwardData: async () => {
     try {
