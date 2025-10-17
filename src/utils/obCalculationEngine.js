@@ -41,12 +41,16 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
   const planByName = new Map((planData || []).map(p => [p.planName, p]));
   const memberCount = (lines || []).length;
   
-  // 먼저 기본료 합계 계산
+  // 먼저 기본료 합계 계산 + 65890원 이상 회선 확인
   let baseFeeSum = 0;
+  let has65890Above = false;
   const tempRows = (lines || []).map((line, idx) => {
     const plan = planByName.get(line.planName) || { baseFee: 0, planGroup: '' };
     const baseFee = Number(plan.baseFee || 0);
     baseFeeSum += baseFee;
+    if (baseFee >= 65890) {
+      has65890Above = true;
+    }
     return { line, plan, baseFee, idx };
   });
   
@@ -55,6 +59,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     existingBundleType,
     memberCount,
     baseFeeSum,
+    has65890Above, // 가무사 유무선용
     internetIncluded,
     segDiscountData
   );
@@ -65,6 +70,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     bundleType: existingBundleType,
     memberCount,
     baseFeeSum,
+    has65890Above,
     internetIncluded,
     perLineBundleDiscount,
     totalBundleDiscount,
@@ -108,7 +114,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
   const internetDiscount = hasInternet ? calculateInternetDiscount(
     existingBundleType,
     memberCount,
-    baseFeeSum,
+    has65890Above, // 가무사 유무선용
     internetIncluded,
     internetSpeed,
     segDiscountData
@@ -196,7 +202,7 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
 }
 
 // 기존결합 할인 계산
-function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, internetIncluded, segData) {
+function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, has65890Above, internetIncluded, segData) {
   if (!bundleType || !segData || !Array.isArray(segData)) return 0;
   
   // seg)할인 시트 구조:
@@ -236,13 +242,14 @@ function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, in
     }
   }
   
-  // 가무사 유무선
+  // 가무사 유무선 (회선 중 하나라도 65890원 이상이면 "포함" 적용)
   if (bundleType === '가무사 유무선') {
     for (let i = 32; i <= 36; i++) {
       const row = segData[i] || [];
       const personCount = Number(row[2]) || 0;
       if (personCount === memberCount) {
-        if (internetIncluded === '포함') {
+        // 회선 중 하나라도 65890원 이상이면 "포함" 컬럼 사용
+        if (has65890Above) {
           return parseNumber(row[4]); // E열: 포함
         } else {
           return parseNumber(row[3]); // D열: 미포함
@@ -326,12 +333,11 @@ function calculateChamSweInternetDiscount(internetSpeed) {
 }
 
 // 가무사 유무선 인터넷 할인 계산
-function calculateGamusaInternetDiscount(memberCount, baseFeeSum, internetIncluded, internetSpeed, segData) {
+function calculateGamusaInternetDiscount(memberCount, has65890Above, internetIncluded, internetSpeed, segData) {
   if (!segData || !Array.isArray(segData)) return 0;
   
   // seg)할인 Row 31-36 (idx 31-36): 가무사 유무선 인터넷 할인
-  // 65890원 기준, 포함/미포함, 인터넷 속도, 회선수에 따라
-  const is65890Above = baseFeeSum >= 65890;
+  // 회선 중 하나라도 65890원 이상이면 "포함" 적용
   
   // Row 31: 헤더, Row 32-36: 미포함/포함 데이터
   // Col H(7)=1명, I(8)=2명, J(9)=3명, K(10)=4명, L(11)=5명
@@ -342,7 +348,8 @@ function calculateGamusaInternetDiscount(memberCount, baseFeeSum, internetInclud
   
   if (speedOffset === -1) return 0;
   
-  if (internetIncluded === '포함') {
+  // 회선 중 하나라도 65890원 이상이면 "포함" 적용
+  if (has65890Above) {
     targetRow = 34 + speedOffset; // Row 34-36 (포함)
   } else {
     targetRow = 31 + speedOffset; // Row 31-33 (미포함)
@@ -359,7 +366,7 @@ function calculateGamusaInternetDiscount(memberCount, baseFeeSum, internetInclud
 }
 
 // 기존결합 인터넷 할인 통합
-function calculateInternetDiscount(bundleType, memberCount, baseFeeSum, internetIncluded, internetSpeed, segData) {
+function calculateInternetDiscount(bundleType, memberCount, has65890Above, internetIncluded, internetSpeed, segData) {
   if (!internetSpeed) return 0;
   
   if (bundleType === '참쉬운 결합') {
@@ -367,7 +374,7 @@ function calculateInternetDiscount(bundleType, memberCount, baseFeeSum, internet
   }
   
   if (bundleType === '가무사 유무선') {
-    return calculateGamusaInternetDiscount(memberCount, baseFeeSum, internetIncluded, internetSpeed, segData);
+    return calculateGamusaInternetDiscount(memberCount, has65890Above, internetIncluded, internetSpeed, segData);
   }
   
   return 0;
