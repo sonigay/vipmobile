@@ -24,10 +24,11 @@ export const api = {
     return response.json();
   },
 
-  // OB: 결과 목록(사용자별)
-  getObResults: async (userId) => {
+  // OB: 결과 목록(사용자별 또는 전체)
+  getObResults: async (userId, showAll = false) => {
     const params = new URLSearchParams();
-    if (userId) params.append('userId', userId);
+    if (userId && !showAll) params.append('userId', userId);
+    if (showAll) params.append('showAll', 'true');
     const response = await fetch(`${API_BASE_URL}/api/ob/results?${params.toString()}`);
     if (!response.ok) throw new Error('OB results load failed');
     return response.json();

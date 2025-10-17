@@ -41,6 +41,7 @@ const ObManagementMode = ({
   const [results, setResults] = useState([]);
   const [selectedResultId, setSelectedResultId] = useState(null);
   const [subscriptionNumber, setSubscriptionNumber] = useState('');
+  const [selectedUser, setSelectedUser] = useState('me'); // 'me' or 'all' or userId
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // OB 관리모드 진입 시 데이터 로드 + 업데이트 팝업 표시 (숨김 설정 확인 후)
@@ -71,7 +72,7 @@ const ObManagementMode = ({
         
         // 결과 목록은 userId가 있을 때만 로드
         if (userId) {
-          const listRes = await api.getObResults(userId);
+          const listRes = await api.getObResults(userId, selectedUser === 'all');
           setResults(listRes.data || []);
         } else {
           console.warn('[OB] No userId found, skipping results load');
@@ -152,9 +153,10 @@ const ObManagementMode = ({
       }
       
       if (res?.success) {
-        const listRes = await api.getObResults(userId);
+        const listRes = await api.getObResults(userId, selectedUser === 'all');
         setResults(listRes.data || []);
         setSelectedResultId(null);
+        setSubscriptionNumber('');
       }
     } catch (e) {
       console.error('[OB] Save error:', e);
@@ -405,7 +407,37 @@ const ObManagementMode = ({
                 </Box>
               </Box>
               <Box sx={{ mt: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>저장된 시나리오</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="h6">저장된 시나리오</Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      variant={selectedUser === 'me' ? 'contained' : 'outlined'}
+                      onClick={async () => {
+                        setSelectedUser('me');
+                        const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+                        if (userId) {
+                          const listRes = await api.getObResults(userId, false);
+                          setResults(listRes.data || []);
+                        }
+                      }}
+                    >
+                      내 데이터
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={selectedUser === 'all' ? 'contained' : 'outlined'}
+                      onClick={async () => {
+                        setSelectedUser('all');
+                        const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+                        const listRes = await api.getObResults(userId, true);
+                        setResults(listRes.data || []);
+                      }}
+                    >
+                      전체
+                    </Button>
+                  </Box>
+                </Box>
                 <Box sx={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
@@ -415,27 +447,61 @@ const ObManagementMode = ({
                         <th style={{ border: '1px solid #eee', padding: 6 }}>기존 총액</th>
                         <th style={{ border: '1px solid #eee', padding: 6 }}>투게더 총액</th>
                         <th style={{ border: '1px solid #eee', padding: 6 }}>차액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6 }}>상태</th>
                         <th style={{ border: '1px solid #eee', padding: 6 }}>등록일시</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(results || []).map(row => (
-                        <tr
-                          key={row.id}
-                          onClick={() => handleRowClick(row)}
-                          style={{
-                            cursor: 'pointer',
-                            backgroundColor: selectedResultId === row.id ? '#e3f2fd' : 'transparent'
-                          }}
-                        >
-                          <td style={{ border: '1px solid #eee', padding: 6 }}>{row.subscriptionNumber || '-'}</td>
-                          <td style={{ border: '1px solid #eee', padding: 6 }}>{row.scenarioName || '-'}</td>
-                          <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
-                          <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>
-                          <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.diff || 0).toLocaleString()}</td>
-                          <td style={{ border: '1px solid #eee', padding: 6 }}>{row.createdAt}</td>
-                        </tr>
-                      ))}
+                      {(results || []).map(row => {
+                        const statusColors = {
+                          '성공': '#e3f2fd',
+                          '실패': '#fce4ec',
+                          '보류': '#f1f8e9',
+                        };
+                        const bgColor = selectedResultId === row.id 
+                          ? '#fff3e0' 
+                          : (statusColors[row.status] || 'transparent');
+                        
+                        return (
+                          <tr
+                            key={row.id}
+                            onClick={() => handleRowClick(row)}
+                            style={{
+                              cursor: 'pointer',
+                              backgroundColor: bgColor
+                            }}
+                          >
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.subscriptionNumber || '-'}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.scenarioName || '-'}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.diff || 0).toLocaleString()}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6 }} onClick={(e) => e.stopPropagation()}>
+                              <select
+                                value={row.status || ''}
+                                onChange={async (e) => {
+                                  const newStatus = e.target.value;
+                                  try {
+                                    await api.updateObResult(row.id, { status: newStatus });
+                                    const userId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+                                    const listRes = await api.getObResults(userId, selectedUser === 'all');
+                                    setResults(listRes.data || []);
+                                  } catch (err) {
+                                    setError(err.message);
+                                  }
+                                }}
+                                style={{ padding: 4, fontSize: 12, border: '1px solid #ccc', borderRadius: 4 }}
+                              >
+                                <option value="">-</option>
+                                <option value="성공">성공</option>
+                                <option value="실패">실패</option>
+                                <option value="보류">보류</option>
+                              </select>
+                            </td>
+                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.createdAt}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </Box>

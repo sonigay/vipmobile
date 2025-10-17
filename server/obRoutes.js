@@ -9,7 +9,7 @@ const SHEET_SEGMENTS = 'OB_세그';
 const SHEET_PLANS = '무선요금제군';
 
 // Standard headers
-const HEADERS_RESULTS = ['id', 'userId', 'createdAt', 'subscriptionNumber', 'scenarioName', 'inputsJson', 'existingAmount', 'togetherAmount', 'diff', 'chosenType', 'notes'];
+const HEADERS_RESULTS = ['id', 'userId', 'createdAt', 'subscriptionNumber', 'scenarioName', 'inputsJson', 'existingAmount', 'togetherAmount', 'diff', 'chosenType', 'status', 'notes'];
 const HEADERS_DISCOUNTS = ['discountCode', 'name', 'scope', 'type', 'value', 'conditionsJson'];
 const HEADERS_SEGMENTS = ['segmentCode', 'name', 'rulesJson'];
 
@@ -144,11 +144,13 @@ function setupObRoutes(app) {
     }
   });
 
-  // GET /api/ob/results?userId=...
+  // GET /api/ob/results?userId=...&showAll=true
   router.get('/results', async (req, res) => {
       const userId = (req.query.userId || '').toString().trim();
-      if (!userId) {
-        return res.status(400).json({ success: false, error: 'userId is required' });
+      const showAll = req.query.showAll === 'true';
+      
+      if (!userId && !showAll) {
+        return res.status(400).json({ success: false, error: 'userId is required or set showAll=true' });
       }
       try {
         const { sheets, SPREADSHEET_ID } = createSheetsClient();
@@ -159,12 +161,17 @@ function setupObRoutes(app) {
         });
         const rows = response.data.values || [];
         const header = rows[0] || HEADERS_RESULTS;
-        const items = rows.slice(1)
+        let items = rows.slice(1)
           .map((r, idx) => {
             const obj = Object.fromEntries(header.map((h, i) => [h, r[i] || '']));
             return { rowIndex: idx + 2, ...obj };
-          })
-          .filter(item => item.userId === userId);
+          });
+        
+        // showAll이 아니면 userId 필터
+        if (!showAll) {
+          items = items.filter(item => item.userId === userId);
+        }
+        
         res.json({ success: true, data: items });
       } catch (error) {
         console.error('[OB] results GET error:', error);
@@ -197,6 +204,7 @@ function setupObRoutes(app) {
         Number(togetherAmount || 0),
         Number(diff || 0),
         chosenType || '',
+        '', // status (성공/실패/보류)
         notes || ''
       ];
 
