@@ -5,9 +5,8 @@ import LineInputPanel from './LineInputPanel';
 export default function TogetherCalculatorPanel({ inputs, result, onSave, onInputChange, planData }) {
   return (
     <Box sx={{ border: '1px solid #ddd', borderRadius: 1, overflow: 'hidden', backgroundColor: '#fff' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, backgroundColor: '#e3f2fd', borderBottom: '1px solid #ddd' }}>
+      <Box sx={{ p: 1.5, backgroundColor: '#fce4ec', borderBottom: '1px solid #ddd' }}>
         <Typography variant="subtitle1" fontWeight="bold">투게더결합 계산식</Typography>
-        <Button variant="contained" size="small" onClick={onSave} color="primary">저장</Button>
       </Box>
       <Box sx={{ p: 1.5 }}>
         <LineInputPanel
@@ -35,7 +34,8 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ backgroundColor: '#f3f4f6' }}>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>line#</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>회선</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>고객명</th>
               <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>요금제</th>
               <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>약정</th>
               <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>기본료</th>
@@ -49,6 +49,7 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
               return (
                 <tr key={row.lineNo}>
                   <td style={{ border: '1px solid #e5e7eb', padding: 6 }}>{row.lineNo}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, fontSize: 11 }}>{row.customerName || '-'}</td>
                   <td style={{ border: '1px solid #e5e7eb', padding: 6 }}>{row.planName || '-'}</td>
                   <td style={{ border: '1px solid #e5e7eb', padding: 6, fontSize: 11 }}>{row.contractType || '-'}</td>
                   <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'right' }}>{Number(row.baseFee || 0).toLocaleString()}</td>

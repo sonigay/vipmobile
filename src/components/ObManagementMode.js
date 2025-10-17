@@ -39,7 +39,6 @@ const ObManagementMode = ({
   const [segDiscountData, setSegDiscountData] = useState([]);
   const [inputs, setInputs] = useState(initialInputs());
   const [results, setResults] = useState([]);
-  const [scenarioName, setScenarioName] = useState('');
   const [selectedResultId, setSelectedResultId] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
@@ -107,9 +106,15 @@ const ObManagementMode = ({
         return;
       }
       
+      // 고객명 목록 생성 (기존결합 또는 투게더결합 중 더 많은 쪽 사용)
+      const existingNames = (inputs.existingLines || []).map(l => l.customerName).filter(Boolean);
+      const togetherNames = (inputs.togetherLines || []).map(l => l.customerName).filter(Boolean);
+      const customerNames = existingNames.length >= togetherNames.length ? existingNames : togetherNames;
+      const scenarioName = customerNames.length > 0 ? customerNames.join(', ') : `시나리오_${new Date().toLocaleString('ko-KR')}`;
+      
       const payload = {
         userId,
-        scenarioName: scenarioName || `시나리오_${new Date().toLocaleString('ko-KR')}`,
+        scenarioName,
         inputs,
         existingAmount: existing.amount,
         togetherAmount: together.amount,
@@ -130,7 +135,6 @@ const ObManagementMode = ({
       if (res?.success) {
         const listRes = await api.getObResults(userId);
         setResults(listRes.data || []);
-        setScenarioName('');
         setSelectedResultId(null);
       }
     } catch (e) {
@@ -142,8 +146,7 @@ const ObManagementMode = ({
   const handleRowClick = (row) => {
     try {
       const restored = JSON.parse(row.inputsJson || '{}');
-      setInputs(restored.lines ? restored : initialInputs());
-      setScenarioName(row.scenarioName || '');
+      setInputs(restored.existingLines ? restored : initialInputs());
       setSelectedResultId(row.id);
     } catch (e) {
       console.error('Failed to restore inputs:', e);
@@ -317,52 +320,58 @@ const ObManagementMode = ({
 
       {/* 콘텐츠 */}
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ p: 2 }}>
           <Card>
             <CardContent>
-              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-                <Typography variant="body2" sx={{ minWidth: 80 }}>시나리오명:</Typography>
-                <input
-                  type="text"
-                  value={scenarioName}
-                  onChange={(e) => setScenarioName(e.target.value)}
-                  placeholder="시나리오명 입력 (선택)"
-                  style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: 4 }}
-                />
-                {selectedResultId && (
+              {selectedResultId && (
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
                   <Button
                     variant="outlined"
                     size="small"
                     onClick={() => {
                       setInputs(initialInputs());
-                      setScenarioName('');
                       setSelectedResultId(null);
                     }}
                   >
                     신규 작성
                   </Button>
-                )}
-              </Box>
-              <BundleOptionsPanel inputs={inputs} onChange={setInputs} />
+                </Box>
+              )}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                 <ExistingCalculatorPanel 
                   inputs={inputs} 
                   result={existing} 
-                  onSave={() => handleSave('existing')} 
                   onInputChange={setInputs}
                   planData={planData}
                 />
                 <TogetherCalculatorPanel 
                   inputs={inputs} 
                   result={together} 
-                  onSave={() => handleSave('together')} 
                   onInputChange={setInputs}
                   planData={planData}
                 />
               </Box>
-              <Box sx={{ mt: 2, p: 1, backgroundColor: '#fff', border: '1px solid #eee', borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
-                <Typography>[기존] {existing.amount?.toLocaleString()}</Typography>
-                <Typography>[투게더] {together.amount?.toLocaleString()} | 차액 {diff?.toLocaleString()}</Typography>
+              <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 3 }}>
+                    <Typography variant="body1">
+                      [기존] <strong>{existing.amount?.toLocaleString()}원</strong>
+                    </Typography>
+                    <Typography variant="body1">
+                      [투게더] <strong>{together.amount?.toLocaleString()}원</strong>
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: diff < 0 ? '#d32f2f' : '#2e7d32' }}>
+                      차액 <strong>{diff?.toLocaleString()}원</strong>
+                    </Typography>
+                  </Box>
+                  <Button 
+                    variant="contained" 
+                    onClick={() => handleSave(diff < 0 ? 'together' : 'existing')}
+                    size="large"
+                  >
+                    저장
+                  </Button>
+                </Box>
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>저장된 시나리오</Typography>
@@ -400,7 +409,7 @@ const ObManagementMode = ({
               </Box>
             </CardContent>
           </Card>
-        </Container>
+        </Box>
       </Box>
 
       {/* 업데이트 팝업 */}

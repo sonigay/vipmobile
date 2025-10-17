@@ -3,10 +3,10 @@
 export function initialInputs() {
   return {
     existingLines: [
-      { lineId: 'E1', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+      { lineId: 'E1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
     ],
     togetherLines: [
-      { lineId: 'T1', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+      { lineId: 'T1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
     ],
     existingBundleType: '', // 기존결합 상품명
     internetIncluded: '미포함' // 인터넷 포함여부
@@ -46,6 +46,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     
     return {
       lineNo: idx + 1,
+      customerName: line.customerName || '',
       planName: line.planName || '',
       planGroup: plan.planGroup || '',
       baseFee,
@@ -66,6 +67,15 @@ function computeExisting(lines, existingBundleType, internetIncluded, planData, 
     internetIncluded,
     segDiscountData
   );
+  
+  console.log('[OB CALC] Existing Bundle Discount:', {
+    bundleType: existingBundleType,
+    memberCount,
+    baseFeeSum,
+    internetIncluded,
+    bundleDiscount,
+    hasSegData: !!segDiscountData
+  });
   
   const amount = rows.reduce((s, r) => s + r.total, 0) + bundleDiscount;
   
@@ -106,6 +116,7 @@ function computeTogether(lines, planData, segDiscountData) {
     
     return {
       lineNo: idx + 1,
+      customerName: line.customerName || '',
       planName: line.planName || '',
       planGroup: plan.planGroup || '',
       baseFee,
@@ -117,6 +128,13 @@ function computeTogether(lines, planData, segDiscountData) {
   
   // 투게더결합할인 (seg)할인 C2:D7에서 구성원 수로 조회)
   const togetherBundleDiscount = calculateTogetherBundleDiscount(memberCount, segDiscountData);
+  
+  console.log('[OB CALC] Together Bundle Discount:', {
+    memberCount,
+    togetherBundleDiscount,
+    premierDiscount: totalPremierDiscount,
+    hasSegData: !!segDiscountData
+  });
   
   const amount = rows.reduce((s, r) => s + r.total, 0) + togetherBundleDiscount;
   
