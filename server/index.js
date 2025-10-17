@@ -28062,46 +28062,9 @@ app.post('/api/sms/register', async (req, res) => {
           console.log(`자동 전달 시작: ${targetNumbers.length}개 번호`);
           
           if (targetNumbers.length > 0) {
-            const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            // 이력은 앱이 실제 전송 후에 생성됨 - 여기서는 대상 번호만 기록
             
-            // 이력 ID 가져오기
-            const historyResponse = await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${SMS_HISTORY_SHEET_NAME}!A:A`,
-            });
-            
-            let historyId = (historyResponse.data.values || []).length;
-            
-            // 각 대상 번호별로 이력 추가
-            const historyRows = [];
-            
-            for (const targetNumber of targetNumbers) {
-              const historyRow = [
-                historyId++,
-                newId, // SMS ID
-                now,
-                targetNumber,
-                '성공', // 자동 전달은 기본적으로 성공으로 기록
-                '',
-                '자동',
-                ruleId
-              ];
-              
-              historyRows.push(historyRow);
-            }
-            
-            // 이력 시트에 추가
-            await sheets.spreadsheets.values.append({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
-              valueInputOption: 'RAW',
-              insertDataOption: 'INSERT_ROWS',
-              resource: {
-                values: historyRows
-              }
-            });
-            
-            // SMS관리 시트 업데이트 (전달 완료 상태로)
+            // SMS관리 시트 업데이트 (대기중 상태로 - 앱이 실제 전송할 것임)
             const smsUpdateResponse = await sheets.spreadsheets.values.get({
               spreadsheetId: SPREADSHEET_ID,
               range: `${SMS_SHEET_NAME}!A:I`,
@@ -28113,15 +28076,15 @@ app.post('/api/sms/register', async (req, res) => {
             if (smsRowIndex !== -1) {
               await sheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
-                range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+                range: `${SMS_SHEET_NAME}!H${smsRowIndex + 1}:I${smsRowIndex + 1}`,
                 valueInputOption: 'RAW',
                 resource: {
-                  values: [['전달완료', now, targetNumbersStr, `자동전달 (규칙: ${matchedRule[1]})`]]
+                  values: [[targetNumbersStr, `자동전달 대기 (규칙: ${matchedRule[1]})`]]
                 }
               });
             }
             
-            console.log(`✅ 자동 전달 완료: ${targetNumbers.length}개 번호`);
+            console.log(`✅ 자동 전달 준비 완료: ${targetNumbers.length}개 번호 (앱이 실제 전송할 예정)`);
           }
         } else {
           console.log('매칭된 규칙 없음 - 자동 전달 안 함');
@@ -28168,6 +28131,107 @@ app.get('/api/sms/stats', async (req, res) => {
     
   } catch (error) {
     console.error('SMS 통계 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// SMS 전달 상태 업데이트 API (안드로이드 앱용)
+app.post('/api/sms/update-forward-status', async (req, res) => {
+  try {
+    const { smsId, results } = req.body;
+    
+    console.log(`SMS 전달 상태 업데이트: SMS ID=${smsId}, 결과=${results.length}개`);
+    
+    if (!smsId || !results || results.length === 0) {
+      return res.status(400).json({ success: false, error: '필수 파라미터가 누락되었습니다.' });
+    }
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    // 이력 ID 생성용
+    const historyResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_HISTORY_SHEET_NAME}!A:A`,
+    });
+    
+    let historyId = (historyResponse.data.values || []).length;
+    
+    // 각 전달 결과별로 이력 추가
+    const historyRows = [];
+    let successCount = 0;
+    let failCount = 0;
+    const targetNumbers = [];
+    
+    for (const result of results) {
+      const historyRow = [
+        historyId++,
+        smsId,
+        now,
+        result.targetNumber,
+        result.success ? '성공' : '실패',
+        result.errorMessage || '',
+        '앱전송',
+        ''
+      ];
+      
+      historyRows.push(historyRow);
+      targetNumbers.push(result.targetNumber);
+      
+      if (result.success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+    
+    // 이력 시트에 추가
+    if (historyRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_HISTORY_SHEET_NAME}!A:H`,
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: historyRows
+        }
+      });
+    }
+    
+    // SMS관리 시트 업데이트
+    const smsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:I`,
+    });
+    
+    const smsRows = smsResponse.data.values || [];
+    const smsRowIndex = smsRows.findIndex(row => row[0] === smsId);
+    
+    if (smsRowIndex !== -1) {
+      const forwardStatus = failCount === 0 ? '전달완료' : 
+                           successCount > 0 ? '부분실패' : '실패';
+      const targetNumbersStr = targetNumbers.join(',');
+      const memo = `앱전송 (성공:${successCount}, 실패:${failCount})`;
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[forwardStatus, now, targetNumbersStr, memo]]
+        }
+      });
+    }
+    
+    console.log(`✅ 전달 상태 업데이트 완료: 성공=${successCount}, 실패=${failCount}`);
+    
+    res.json({ 
+      success: true, 
+      successCount,
+      failCount
+    });
+    
+  } catch (error) {
+    console.error('SMS 전달 상태 업데이트 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

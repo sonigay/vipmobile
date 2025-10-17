@@ -27,6 +27,26 @@
         android:background="#F5F5F5"
         android:layout_marginBottom="16dp" />
 
+    <!-- 이 폰의 전화번호 입력 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="이 폰의 전화번호"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp" />
+
+    <EditText
+        android:id="@+id/phoneNumberInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="010-1234-5678"
+        android:inputType="phone"
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp" />
+
     <!-- 서버 URL 입력 -->
     <TextView
         android:layout_width="match_parent"
@@ -34,7 +54,7 @@
         android:text="서버 URL"
         android:textSize="14sp"
         android:textStyle="bold"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="8dp" />
 
     <EditText
         android:id="@+id/serverUrlInput"

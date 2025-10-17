@@ -28,6 +28,10 @@ class SmsService : Service() {
         
         // 포그라운드 서비스로 실행
         startForeground(NOTIFICATION_ID, createNotification())
+        
+        // SMS 전달 체커 시작
+        SmsForwardChecker.start(this)
+        Log.d(TAG, "SMS 전달 체커 시작됨")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

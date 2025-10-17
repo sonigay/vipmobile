@@ -23,6 +23,7 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
     
     private lateinit var serverUrlInput: EditText
+    private lateinit var phoneNumberInput: EditText
     private lateinit var saveButton: Button
     private lateinit var testButton: Button
     private lateinit var statusText: TextView
@@ -36,26 +37,41 @@ class MainActivity : AppCompatActivity() {
         
         // UI 초기화
         serverUrlInput = findViewById(R.id.serverUrlInput)
+        phoneNumberInput = findViewById(R.id.phoneNumberInput)
         saveButton = findViewById(R.id.saveButton)
         testButton = findViewById(R.id.testButton)
         statusText = findViewById(R.id.statusText)
         lastSmsText = findViewById(R.id.lastSmsText)
         
-        // 저장된 서버 URL 불러오기
+        // 저장된 설정 불러오기
         val prefs = getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
         val defaultUrl = "https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app"
         val savedUrl = prefs.getString("SERVER_URL", defaultUrl)
+        val savedPhoneNumber = prefs.getString("PHONE_NUMBER", "")
+        
         serverUrlInput.setText(savedUrl)
+        phoneNumberInput.setText(savedPhoneNumber)
         
         // 저장 버튼
         saveButton.setOnClickListener {
             val url = serverUrlInput.text.toString().trim()
+            val phoneNumber = phoneNumberInput.text.toString().trim()
+            
             if (url.isEmpty()) {
                 Toast.makeText(this, "서버 URL을 입력해주세요", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             
-            prefs.edit().putString("SERVER_URL", url).apply()
+            if (phoneNumber.isEmpty()) {
+                Toast.makeText(this, "이 폰의 전화번호를 입력해주세요", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            prefs.edit()
+                .putString("SERVER_URL", url)
+                .putString("PHONE_NUMBER", phoneNumber)
+                .apply()
+            
             Toast.makeText(this, "저장되었습니다", Toast.LENGTH_SHORT).show()
             
             // 서비스 시작

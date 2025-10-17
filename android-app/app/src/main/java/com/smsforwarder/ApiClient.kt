@@ -74,5 +74,81 @@ object ApiClient {
             return false
         }
     }
+    
+    /**
+     * 대기중인 SMS 조회
+     */
+    fun getPendingSms(serverUrl: String): List<PendingSmsData> {
+        try {
+            val url = "${serverUrl.trimEnd('/')}/api/sms/received?status=대기중&limit=50"
+            
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            
+            if (!response.isSuccessful) {
+                Log.e(TAG, "대기중인 SMS 조회 실패: ${response.code}")
+                return emptyList()
+            }
+            
+            // JSON 파싱
+            val jsonResponse = gson.fromJson(responseBody, Map::class.java)
+            val dataList = jsonResponse["data"] as? List<*> ?: return emptyList()
+            
+            return dataList.mapNotNull { item ->
+                val smsMap = item as? Map<*, *> ?: return@mapNotNull null
+                
+                PendingSmsData(
+                    id = smsMap["id"]?.toString() ?: "",
+                    message = smsMap["message"]?.toString() ?: "",
+                    targetNumbers = smsMap["forwardTargets"]?.toString() ?: ""
+                )
+            }.filter { it.targetNumbers.isNotEmpty() }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "대기중인 SMS 조회 실패: ${e.message}", e)
+            return emptyList()
+        }
+    }
+    
+    /**
+     * SMS 전달 상태 업데이트
+     */
+    fun updateForwardStatus(serverUrl: String, smsId: String, results: List<ForwardResult>): Boolean {
+        try {
+            val url = "${serverUrl.trimEnd('/')}/api/sms/update-forward-status"
+            
+            val data = mapOf(
+                "smsId" to smsId,
+                "results" to results.map { mapOf(
+                    "targetNumber" to it.targetNumber,
+                    "success" to it.success,
+                    "errorMessage" to (it.errorMessage ?: "")
+                )}
+            )
+            
+            val jsonBody = gson.toJson(data)
+            val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+            
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            
+            Log.d(TAG, "상태 업데이트 응답: ${response.code}, $responseBody")
+            
+            return response.isSuccessful
+        } catch (e: Exception) {
+            Log.e(TAG, "상태 업데이트 실패: ${e.message}", e)
+            return false
+        }
+    }
 }
 
