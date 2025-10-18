@@ -22,7 +22,10 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
       <Box sx={{ 
         p: 2, 
         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 
-        borderBottom: '1px solid #e0e0e0'
+        borderBottom: '1px solid #e0e0e0',
+        minHeight: 106,
+        display: 'flex',
+        alignItems: 'center'
       }}>
         <Typography variant="subtitle1" fontWeight="bold" sx={{ color: '#fff' }}>투게더결합 계산식</Typography>
       </Box>

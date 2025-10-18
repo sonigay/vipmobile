@@ -12,27 +12,25 @@ const INTERNET_SPEEDS = ['100M', '500M', '1G'];
 
 export default function BundleOptionsPanel({ inputs, onChange }) {
   return (
-    <Box sx={{ mt: 1 }}>
+    <Box>
       <TextField
         select
         size="small"
-        label="기존결합 상품"
+        placeholder="기존결합 상품 선택"
         value={inputs.existingBundleType || ''}
         onChange={(e) => onChange({ ...inputs, existingBundleType: e.target.value })}
         fullWidth
         sx={{ 
           backgroundColor: '#fff',
-          borderRadius: 1,
-          '& .MuiOutlinedInput-root': {
-            '& fieldset': {
-              borderColor: 'rgba(255,255,255,0.3)'
+          borderRadius: 1
+        }}
+        SelectProps={{
+          displayEmpty: true,
+          renderValue: (selected) => {
+            if (!selected) {
+              return <span style={{ color: '#9e9e9e' }}>기존결합 상품 선택</span>;
             }
-          },
-          '& .MuiInputLabel-root': {
-            color: 'rgba(255,255,255,0.9)'
-          },
-          '& .MuiSelect-icon': {
-            color: '#fff'
+            return selected;
           }
         }}
       >
