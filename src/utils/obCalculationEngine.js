@@ -54,17 +54,19 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     return { line, plan, baseFee, idx };
   });
   
-  // 결합할인 계산 (회선당 할인액)
-  const perLineBundleDiscount = calculateExistingBundleDiscount(
-    existingBundleType,
-    memberCount,
-    baseFeeSum,
-    has65890Above, // 가무사 유무선용
-    internetIncluded,
-    segDiscountData
+  // 결합할인 계산 준비 (회선별로 다른 할인 적용)
+  const bundleDiscountsPerLine = tempRows.map(({ baseFee }) => 
+    calculateExistingBundleDiscountPerLine(
+      existingBundleType,
+      memberCount,
+      baseFee,
+      has65890Above,
+      internetIncluded,
+      segDiscountData
+    )
   );
   
-  const totalBundleDiscount = perLineBundleDiscount * memberCount;
+  const totalBundleDiscount = bundleDiscountsPerLine.reduce((sum, d) => sum + d, 0);
   
   console.log('[OB CALC] Existing Bundle Discount:', {
     bundleType: existingBundleType,
@@ -72,7 +74,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     baseFeeSum,
     has65890Above,
     internetIncluded,
-    perLineBundleDiscount,
+    bundleDiscountsPerLine,
     totalBundleDiscount,
     hasSegData: !!segDiscountData
   });
@@ -90,9 +92,10 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
       discounts.push({ name: '프리미어약정할인', amount: -5250 });
     }
     
-    // 결합할인 (회선별 분배)
-    if (perLineBundleDiscount !== 0) {
-      discounts.push({ name: '결합할인', amount: perLineBundleDiscount });
+    // 결합할인 (회선별로 다른 금액)
+    const lineDiscount = bundleDiscountsPerLine[idx];
+    if (lineDiscount !== 0) {
+      discounts.push({ name: '결합할인', amount: lineDiscount });
     }
     
     const totalDiscount = discounts.reduce((s, d) => s + (d.amount || 0), 0);
@@ -207,8 +210,8 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
   };
 }
 
-// 기존결합 할인 계산
-function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, has65890Above, internetIncluded, segData) {
+// 기존결합 할인 계산 (회선별)
+function calculateExistingBundleDiscountPerLine(bundleType, memberCount, lineBaseFee, has65890Above, internetIncluded, segData) {
   if (!bundleType || !segData || !Array.isArray(segData)) return 0;
   
   // seg)할인 시트 구조:
@@ -216,36 +219,32 @@ function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, ha
   // Row 18-22(idx 18-22): 참쉬운 결합 - C(인원수) D(69000↓) E(69000↑) F(88000↑)
   // Row 31-36(idx 31-36): 가무사 유무선 - C(인원수) D(미포함) E(포함)
   
-  // 가무사 무무선
+  // 가무사 무무선 (회선당 기본료 기준)
   if (bundleType === '가무사 무무선') {
     for (let i = 10; i <= 14; i++) {
       const row = segData[i] || [];
       const personCount = Number(row[2]) || 0;
       if (personCount === memberCount) {
-        if (baseFeeSum >= 48400) {
+        if (lineBaseFee >= 48400) {
           return parseNumber(row[3]); // D열: 48400원↑
-        } else if (baseFeeSum > 0) {
+        } else if (lineBaseFee >= 22000) {
           return parseNumber(row[4]); // E열: 22000~48400
         }
       }
     }
   }
   
-  // 참쉬운 결합 (회선당 기본료, 전체 합이 아님)
+  // 참쉬운 결합 (회선당 기본료 기준)
   if (bundleType === '참쉬운 결합') {
     for (let i = 19; i <= 22; i++) {
       const row = segData[i] || [];
       const personCount = Number(row[2]) || 0;
       if (personCount === memberCount) {
-        // 각 회선의 기본료를 확인 (baseFeeSum이 아니라 개별 회선 기본료)
-        // 하지만 여기서는 memberCount당 평균 기본료로 판단
-        const avgBaseFee = memberCount > 0 ? baseFeeSum / memberCount : 0;
-        
-        if (avgBaseFee >= 88000) {
+        if (lineBaseFee >= 88000) {
           return parseNumber(row[5]); // F열: 88000↑
-        } else if (avgBaseFee >= 69000) {
+        } else if (lineBaseFee >= 69000) {
           return parseNumber(row[4]); // E열: 69000↑
-        } else if (avgBaseFee < 69000) {
+        } else if (lineBaseFee < 69000) {
           return parseNumber(row[3]); // D열: 69000↓
         }
       }
@@ -268,9 +267,9 @@ function calculateExistingBundleDiscount(bundleType, memberCount, baseFeeSum, ha
     }
   }
   
-  // 한방에YO
+  // 한방에YO (회선당 기본료 기준)
   if (bundleType === '한방에YO') {
-    return baseFeeSum > 48400 ? -8800 : -5500;
+    return lineBaseFee > 48400 ? -8800 : -5500;
   }
   
   return 0;
