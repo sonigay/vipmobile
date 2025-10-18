@@ -2774,6 +2774,7 @@ app.post('/api/login', async (req, res) => {
         const hasDataCollectionPermission = agent[20] === 'O'; // U열: 정보수집모드 권한
         const hasSmsManagementPermission = agent[21] === 'O'; // V열: SMS 관리모드 권한
         const hasObManagementPermission = agent[22] === 'O'; // W열: OB 관리모드 권한
+        const hasAgentModePermission = agent[23] === 'O'; // X열: 관리자모드 권한
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -2793,7 +2794,7 @@ app.post('/api/login', async (req, res) => {
         
         // 다중 권한이 있는 경우 권한 정보 포함
         const modePermissions = {
-          agent: true, // 관리자 모드는 기본
+          agent: hasAgentModePermission, // 관리자 모드도 권한 확인
           inventory: hasInventoryPermission,
           settlement: hasSettlementPermission,
           inspection: hasInspectionPermission,
@@ -2821,7 +2822,7 @@ app.post('/api/login', async (req, res) => {
             fields: [
               {
                 name: '관리자 정보',
-                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}\n재고회수권한: ${hasInventoryRecoveryPermission ? 'O' : 'X'}\nSMS관리권한: ${hasSmsManagementPermission ? 'O' : 'X'}\nOB관리권한: ${hasObManagementPermission ? 'O' : 'X'}`
+                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n관리자권한: ${hasAgentModePermission ? 'O' : 'X'}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}\n재고회수권한: ${hasInventoryRecoveryPermission ? 'O' : 'X'}\nSMS관리권한: ${hasSmsManagementPermission ? 'O' : 'X'}\nOB관리권한: ${hasObManagementPermission ? 'O' : 'X'}`
               },
               {
                 name: '접속 정보',
