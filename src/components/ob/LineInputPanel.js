@@ -5,7 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 const CONTRACT_TYPES = ['지원금약정', '선택약정'];
 
-export default function LineInputPanel({ inputs, onChange, planData, onCustomerNameChange }) {
+export default function LineInputPanel({ inputs, onChange, planData, onCustomerNameChange, panelType }) {
   const handleLineChange = (index, field, value) => {
     const newLines = [...inputs.lines];
     newLines[index] = { ...newLines[index], [field]: value };
@@ -19,9 +19,24 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
 
   const handleAddLine = () => {
     const prefix = inputs.lines[0]?.lineId?.charAt(0) || 'L';
+    const newLine = { 
+      lineId: `${prefix}${inputs.lines.length + 1}`, 
+      customerName: '', 
+      planName: '', 
+      planGroup: '', 
+      contractType: '지원금약정', 
+      deviceSupport: 0, 
+      addons: [] 
+    };
+    
+    // 기존결합일 경우 premierDiscount 추가
+    if (panelType === 'existing') {
+      newLine.premierDiscount = false;
+    }
+    
     onChange({
       ...inputs,
-      lines: [...inputs.lines, { lineId: `${prefix}${inputs.lines.length + 1}`, customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] }]
+      lines: [...inputs.lines, newLine]
     });
   };
 
@@ -92,6 +107,17 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
                 <MenuItem key={type} value={type}>{type}</MenuItem>
               ))}
             </TextField>
+            {panelType === 'existing' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <input
+                  type="checkbox"
+                  checked={line.premierDiscount || false}
+                  onChange={(e) => handleLineChange(idx, 'premierDiscount', e.target.checked)}
+                  id={`premier-${idx}`}
+                />
+                <label htmlFor={`premier-${idx}`} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>프리미어</label>
+              </Box>
+            )}
             <IconButton size="small" onClick={() => handleRemoveLine(idx)} disabled={inputs.lines.length <= 1}>
               <DeleteIcon fontSize="small" />
             </IconButton>

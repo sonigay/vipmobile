@@ -3,7 +3,7 @@
 export function initialInputs() {
   return {
     existingLines: [
-      { lineId: 'E1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+      { lineId: 'E1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', premierDiscount: false, deviceSupport: 0, addons: [] },
     ],
     togetherLines: [
       { lineId: 'T1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
@@ -79,6 +79,8 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     hasSegData: !!segDiscountData
   });
   
+  let totalPremierDiscount = 0;
+  
   const rows = tempRows.map(({ line, plan, baseFee, idx }) => {
     const discounts = [];
     
@@ -87,9 +89,10 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
       discounts.push({ name: '선택약정할인', amount: baseFee * -0.25 });
     }
     
-    // 프리미어약정할인 (회선별, 85,000원 이상만)
-    if (baseFee >= 85000) {
+    // 프리미어약정할인 (회선별 선택, 85,000원 이상 & premierDiscount=true만)
+    if (baseFee >= 85000 && line.premierDiscount === true) {
       discounts.push({ name: '프리미어약정할인', amount: -5250 });
+      totalPremierDiscount += -5250;
     }
     
     // 결합할인 (회선별로 다른 금액)
@@ -129,6 +132,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     amount,
     rows,
     bundleDiscount: totalBundleDiscount,
+    premierDiscount: totalPremierDiscount,
     internetDiscount,
     breakdown: []
   };

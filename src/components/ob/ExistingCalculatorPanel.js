@@ -23,7 +23,7 @@ export default function ExistingCalculatorPanel({ inputs, result, onSave, onInpu
           onCustomerNameChange={onCustomerNameSync}
         />
       </Box>
-      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
+      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">총액</Typography>
           <Typography variant="h6">{Number(result?.amount || 0).toLocaleString()}원</Typography>
@@ -35,6 +35,10 @@ export default function ExistingCalculatorPanel({ inputs, result, onSave, onInpu
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">결합할인</Typography>
           <Typography variant="h6">{Number(result?.bundleDiscount || 0).toLocaleString()}원</Typography>
+        </Box>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+          <Typography variant="caption" color="text.secondary">프리미어할인</Typography>
+          <Typography variant="h6">{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">인터넷할인</Typography>
