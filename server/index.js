@@ -26999,6 +26999,155 @@ app.get('/api/sim-duplicates', async (req, res) => {
   }
 });
 
+// 폰클입고가상이값 API
+app.get('/api/price-discrepancies', async (req, res) => {
+  try {
+    console.log('💰 폰클입고가상이값 API 호출 시작');
+    
+    // 폰클재고데이터와 폰클개통데이터 시트에서 데이터 가져오기
+    const inventoryData = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '폰클재고데이터!A4:AC',
+    });
+
+    const activationData = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: '폰클개통데이터!A4:BZ',
+    });
+
+    const inventoryRows = inventoryData.data.values || [];
+    const activationRows = activationData.data.values || [];
+
+    console.log(`💰 폰클재고데이터 행 수: ${inventoryRows.length}`);
+    console.log(`💰 폰클개통데이터 행 수: ${activationRows.length}`);
+
+    // 모델명별 입고가 데이터 수집
+    const modelPriceMap = new Map();
+
+    // 폰클재고데이터에서 데이터 추출
+    inventoryRows.forEach((row, index) => {
+      const modelName = (row[13] || '').toString().trim(); // N열(13) - 모델명
+      const inPrice = (row[17] || '').toString().trim(); // R열(17) - 입고가
+      
+      // 모델명과 입고가가 모두 있는 경우만 처리
+      if (modelName && inPrice) {
+        if (!modelPriceMap.has(modelName)) {
+          modelPriceMap.set(modelName, []);
+        }
+        
+        modelPriceMap.get(modelName).push({
+          sheetName: '폰클재고데이터',
+          rowIndex: index + 4, // 4행부터 시작
+          modelName: modelName,
+          inPrice: inPrice,
+          outStore: (row[21] || '').toString().trim(), // V열(21) - 출고처
+          serial: (row[11] || '').toString().trim(), // L열(11) - 일련번호
+          processDate: (row[22] || '').toString().trim(), // W열(22) - 최종처리일
+          employee: (row[28] || '').toString().trim() // AC열(28) - 최종작업자
+        });
+      }
+    });
+
+    // 폰클개통데이터에서 데이터 추출
+    activationRows.forEach((row, index) => {
+      const modelName = (row[21] || '').toString().trim(); // V열(21) - 모델명
+      const inPrice = (row[35] || '').toString().trim(); // AJ열(35) - 입고가
+      
+      // 모델명과 입고가가 모두 있는 경우만 처리
+      if (modelName && inPrice) {
+        if (!modelPriceMap.has(modelName)) {
+          modelPriceMap.set(modelName, []);
+        }
+        
+        modelPriceMap.get(modelName).push({
+          sheetName: '폰클개통데이터',
+          rowIndex: index + 4, // 4행부터 시작
+          modelName: modelName,
+          inPrice: inPrice,
+          outStore: (row[14] || '').toString().trim(), // O열(14) - 출고처
+          serial: (row[23] || '').toString().trim(), // X열(23) - 일련번호
+          processDate: (row[9] || '').toString().trim(), // J열(9) - 최종처리일
+          employee: (row[77] || '').toString().trim() // BZ열(77) - 최종작업자
+        });
+      }
+    });
+
+    console.log(`💰 모델명 종류: ${modelPriceMap.size}개`);
+
+    // 입고가가 상이한 모델명만 필터링
+    const discrepancies = [];
+
+    modelPriceMap.forEach((items, modelName) => {
+      // 입고가별로 그룹화
+      const priceGroups = new Map();
+      
+      items.forEach(item => {
+        // 입고가 정규화 (숫자만 추출, 콤마 및 공백 제거)
+        const normalizedPrice = item.inPrice.replace(/[,\s]/g, '');
+        
+        if (!priceGroups.has(normalizedPrice)) {
+          priceGroups.set(normalizedPrice, []);
+        }
+        priceGroups.get(normalizedPrice).push(item);
+      });
+
+      // 입고가가 2개 이상인 경우만 상이값으로 판단
+      if (priceGroups.size > 1) {
+        // 입고가별 건수 집계
+        const priceBreakdown = Array.from(priceGroups.entries())
+          .map(([price, items]) => ({
+            price: price,
+            count: items.length
+          }))
+          .sort((a, b) => b.count - a.count); // 건수 많은 순으로 정렬
+
+        // 가장 많이 나오는 입고가를 추천 입고가로 설정
+        const recommendedPrice = priceBreakdown[0].price;
+        const totalCount = items.length;
+        const recommendedCount = priceBreakdown[0].count;
+        const confidence = ((recommendedCount / totalCount) * 100).toFixed(1);
+
+        discrepancies.push({
+          modelName: modelName,
+          recommendedPrice: recommendedPrice,
+          confidence: parseFloat(confidence),
+          priceBreakdown: priceBreakdown,
+          items: items.sort((a, b) => {
+            // 추천 입고가가 아닌 항목을 먼저 표시
+            const aNormalized = a.inPrice.replace(/[,\s]/g, '');
+            const bNormalized = b.inPrice.replace(/[,\s]/g, '');
+            if (aNormalized !== recommendedPrice && bNormalized === recommendedPrice) return -1;
+            if (aNormalized === recommendedPrice && bNormalized !== recommendedPrice) return 1;
+            return a.sheetName.localeCompare(b.sheetName);
+          })
+        });
+      }
+    });
+
+    // 모델명 기준으로 정렬
+    discrepancies.sort((a, b) => a.modelName.localeCompare(b.modelName));
+
+    console.log(`💰 입고가 상이값 발견: ${discrepancies.length}개 모델명`);
+    console.log(`💰 총 상이값 항목 수: ${discrepancies.reduce((sum, d) => sum + d.items.length, 0)}개`);
+
+    res.json({
+      success: true,
+      data: {
+        discrepancies: discrepancies,
+        totalDiscrepancies: discrepancies.length,
+        totalItems: discrepancies.reduce((sum, d) => sum + d.items.length, 0)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ 폰클입고가상이값 API 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // ============================================================
 // 무선단말검수 관련 API
 // ============================================================

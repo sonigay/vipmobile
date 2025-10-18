@@ -64,6 +64,306 @@ import {
 const AssignmentSettingsScreen = lazy(() => import('./screens/AssignmentSettingsScreen'));
 const AppUpdatePopup = lazy(() => import('./AppUpdatePopup'));
 
+// 폰클입고가상이값 컴포넌트
+const PriceDiscrepancyTab = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  const fetchPriceDiscrepancies = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/price-discrepancies`);
+      const result = await response.json();
+      if (result.success) {
+        setData(result.data);
+      }
+    } catch (error) {
+      console.error('입고가 상이값 조회 오류:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPriceDiscrepancies();
+    setLastUpdate(new Date());
+    
+    // 1시간마다 자동 새로고침
+    const interval = setInterval(() => {
+      fetchPriceDiscrepancies();
+      setLastUpdate(new Date());
+    }, 3600000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // 엑셀 다운로드 함수
+  const handleExcelDownload = () => {
+    if (!data || !data.discrepancies) return;
+
+    const csvData = [
+      ['시트명', '모델명', '입고가', '추천입고가', '신뢰도(%)', '출고처', '일련번호', '처리일', '작업자']
+    ];
+
+    data.discrepancies.forEach(discrepancy => {
+      discrepancy.items.forEach(item => {
+        csvData.push([
+          item.sheetName,
+          item.modelName,
+          item.inPrice,
+          discrepancy.recommendedPrice,
+          discrepancy.confidence,
+          item.outStore,
+          item.serial,
+          item.processDate,
+          item.employee
+        ]);
+      });
+    });
+
+    const csvContent = csvData.map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `입고가상이값_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  // 신뢰도에 따른 색상 결정
+  const getConfidenceColor = (confidence) => {
+    if (confidence >= 90) return 'success';
+    if (confidence >= 70) return 'warning';
+    return 'error';
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* 헤더 */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: '#FF9800' }}>
+          💰 폰클입고가상이값 검사
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {lastUpdate && (
+            <Typography variant="caption" color="text.secondary">
+              마지막 업데이트: {lastUpdate.toLocaleTimeString()}
+            </Typography>
+          )}
+          <Button
+            variant="outlined"
+            onClick={fetchPriceDiscrepancies}
+            disabled={loading}
+            startIcon={<RefreshIcon />}
+          >
+            새로고침
+          </Button>
+        </Box>
+      </Box>
+
+      {/* 로딩 */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* 콘텐츠 */}
+      {!loading && data && (
+        <PriceDiscrepancyContent 
+          data={data} 
+          onExcelDownload={handleExcelDownload}
+          getConfidenceColor={getConfidenceColor}
+        />
+      )}
+    </Box>
+  );
+};
+
+// 입고가 상이값 콘텐츠 컴포넌트
+const PriceDiscrepancyContent = ({ data, onExcelDownload, getConfidenceColor }) => {
+  if (!data) {
+    return (
+      <Alert severity="info">
+        데이터를 불러오는 중입니다...
+      </Alert>
+    );
+  }
+
+  if (data.discrepancies.length === 0) {
+    return (
+      <Alert severity="success" sx={{ fontSize: '1.1rem', py: 2 }}>
+        🎉 입고가 상이값이 없습니다! 모든 데이터가 정상입니다.
+      </Alert>
+    );
+  }
+
+  // 평균 신뢰도 계산
+  const avgConfidence = (
+    data.discrepancies.reduce((sum, d) => sum + d.confidence, 0) / data.discrepancies.length
+  ).toFixed(1);
+
+  return (
+    <Box>
+      {/* 통계 카드 */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#FFF3E0' }}>
+            <Typography variant="h4" color="#FF9800" fontWeight="bold">
+              {data.totalDiscrepancies}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              상이값이 있는 모델명 수
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#FFEBEE' }}>
+            <Typography variant="h4" color="error" fontWeight="bold">
+              {data.totalItems}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              총 상이값 항목 수
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 2, textAlign: 'center', backgroundColor: '#E8F5E9' }}>
+            <Typography variant="h4" color="success.main" fontWeight="bold">
+              {avgConfidence}%
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              평균 신뢰도
+            </Typography>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* 엑셀 다운로드 버튼 */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<UpdateIcon />}
+          onClick={onExcelDownload}
+        >
+          엑셀 다운로드
+        </Button>
+      </Box>
+
+      {/* 상이값 그룹 목록 */}
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            🔍 모델명별 입고가 상이값 상세
+          </Typography>
+          {data.discrepancies.map((discrepancy, index) => (
+            <Accordion key={index} sx={{ mb: 1 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', flexWrap: 'wrap' }}>
+                  <Typography variant="body1" fontWeight="bold" sx={{ minWidth: 200 }}>
+                    {discrepancy.modelName}
+                  </Typography>
+                  <Chip 
+                    label={`추천: ${Number(discrepancy.recommendedPrice).toLocaleString()}원`} 
+                    color="primary" 
+                    size="small"
+                  />
+                  <Chip 
+                    label={`신뢰도: ${discrepancy.confidence}%`} 
+                    color={getConfidenceColor(discrepancy.confidence)}
+                    size="small"
+                  />
+                  <Chip 
+                    label={`${discrepancy.items.length}개 항목`} 
+                    size="small"
+                    variant="outlined"
+                  />
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                {/* 입고가 분포 */}
+                <Box sx={{ mb: 2, p: 2, backgroundColor: '#F5F5F5', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+                    입고가 분포:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {discrepancy.priceBreakdown.map((breakdown, idx) => (
+                      <Chip
+                        key={idx}
+                        label={`${Number(breakdown.price).toLocaleString()}원 (${breakdown.count}건)`}
+                        color={breakdown.price === discrepancy.recommendedPrice ? 'success' : 'default'}
+                        variant={breakdown.price === discrepancy.recommendedPrice ? 'filled' : 'outlined'}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* 상세 항목 테이블 */}
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>시트명</TableCell>
+                        <TableCell>모델명</TableCell>
+                        <TableCell>입고가</TableCell>
+                        <TableCell>출고처</TableCell>
+                        <TableCell>일련번호</TableCell>
+                        <TableCell>처리일</TableCell>
+                        <TableCell>작업자</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {discrepancy.items.map((item, itemIndex) => {
+                        const normalizedPrice = item.inPrice.replace(/[,\s]/g, '');
+                        const isWrongPrice = normalizedPrice !== discrepancy.recommendedPrice;
+                        
+                        return (
+                          <TableRow 
+                            key={itemIndex}
+                            sx={{ 
+                              backgroundColor: isWrongPrice ? '#FFEBEE' : 'transparent'
+                            }}
+                          >
+                            <TableCell>
+                              <Chip 
+                                label={item.sheetName} 
+                                size="small" 
+                                color={item.sheetName === '폰클재고데이터' ? 'secondary' : 'primary'}
+                              />
+                            </TableCell>
+                            <TableCell>{item.modelName}</TableCell>
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  color: isWrongPrice ? 'error.main' : 'inherit',
+                                  fontWeight: isWrongPrice ? 'bold' : 'normal'
+                                }}
+                              >
+                                {Number(item.inPrice.replace(/[,\s]/g, '')).toLocaleString()}원
+                                {isWrongPrice && ' ⚠️'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{item.outStore || '-'}</TableCell>
+                            <TableCell>{item.serial || '-'}</TableCell>
+                            <TableCell>{item.processDate || '-'}</TableCell>
+                            <TableCell>{item.employee || '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </AccordionDetails>
+            </Accordion>
+          ))}
+        </CardContent>
+      </Card>
+    </Box>
+  );
+};
+
 // 폰클중복값 컴포넌트
 const PhoneDuplicateTab = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -1198,7 +1498,7 @@ const InventoryMode = ({
   const [error, setError] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedMenu, setSelectedMenu] = useState(null);
-  const [currentScreen, setCurrentScreen] = useState('duplicate');
+  const [currentScreen, setCurrentScreen] = useState('price-discrepancy');
   const [preloadedScreens, setPreloadedScreens] = useState(new Set());
   
   // 검색 관련 상태
@@ -1293,7 +1593,7 @@ const InventoryMode = ({
   }
 
   // 메인 화면 (탭 화면들)
-  if (currentScreen === 'duplicate' || currentScreen === 'master' || currentScreen === 'assignment') {
+  if (currentScreen === 'price-discrepancy' || currentScreen === 'duplicate' || currentScreen === 'master' || currentScreen === 'assignment') {
     return (
       <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* 헤더 */}
@@ -1369,6 +1669,17 @@ const InventoryMode = ({
               }}
             >
               <Tab
+                label="폰클입고가상이값"
+                value="price-discrepancy"
+                icon={<CompareIcon />}
+                iconPosition="start"
+                sx={{ 
+                  textTransform: 'none',
+                  minHeight: 64,
+                  py: 1
+                }}
+              />
+              <Tab
                 label="폰클중복값"
                 value="duplicate"
                 icon={<WarningIcon />}
@@ -1407,6 +1718,10 @@ const InventoryMode = ({
 
         {/* 탭 콘텐츠 */}
         <Box sx={{ flex: 1, overflow: 'auto' }}>
+          {currentScreen === 'price-discrepancy' && (
+            <PriceDiscrepancyTab />
+          )}
+
           {currentScreen === 'duplicate' && (
             <PhoneDuplicateTab />
           )}
@@ -1419,7 +1734,7 @@ const InventoryMode = ({
             <Suspense fallback={<LoadingSkeleton />}>
               <AssignmentSettingsScreen 
                 data={data}
-                onBack={() => setCurrentScreen('duplicate')}
+                onBack={() => setCurrentScreen('price-discrepancy')}
                 onLogout={onLogout}
               />
             </Suspense>
