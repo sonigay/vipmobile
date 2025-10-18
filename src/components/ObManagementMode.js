@@ -18,7 +18,8 @@ import {
   Card,
   CardContent,
   Container,
-  TextField
+  TextField,
+  MenuItem
 } from '@mui/material';
 import {
   Phone as PhoneIcon,
@@ -44,6 +45,10 @@ const ObManagementMode = ({
   const [selectedResultId, setSelectedResultId] = useState(null);
   const [subscriptionNumber, setSubscriptionNumber] = useState('');
   const [selectedUser, setSelectedUser] = useState('me'); // 'me' or 'all' or userId
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // OB 관리모드 진입 시 데이터 로드 + 업데이트 팝업 표시 (숨김 설정 확인 후)
@@ -72,8 +77,9 @@ const ObManagementMode = ({
           const listRes = await api.getObResults(userId, true); // 항상 전체 로드
           const allData = listRes.data || [];
           setAllResults(allData);
-          // 초기에는 내 데이터만 표시
-          setResults(allData.filter(r => r.userId === userId));
+          // 초기에는 내 데이터 + 당월만 표시
+          const monthFiltered = filterByMonth(allData, selectedMonth);
+          setResults(monthFiltered.filter(r => r.userId === userId));
           setSelectedUser('me');
         } else {
           console.warn('[OB] No userId found, skipping results load');
@@ -100,6 +106,29 @@ const ObManagementMode = ({
   }, [loggedInStore]);
 
   const { existing, together, diff } = useObCalculation(inputs, planData, discountData, segDiscountData);
+
+  // 월별 필터링 함수
+  const filterByMonth = (data, month) => {
+    if (!month) return data;
+    return data.filter(row => {
+      const createdAt = row.createdAt || '';
+      const rowMonth = createdAt.substring(0, 7); // YYYY-MM 추출
+      return rowMonth === month;
+    });
+  };
+
+  // 월 목록 생성 (최근 12개월)
+  const getMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+      options.push({ value, label });
+    }
+    return options;
+  };
 
   // 고객명/연락처 동기화 핸들러
   const handleCustomerNameSync = (index, field, value) => {
@@ -167,13 +196,16 @@ const ObManagementMode = ({
         const allData = listRes.data || [];
         setAllResults(allData);
         
-        // 현재 선택된 필터로 재필터링
+        // 월별 필터 적용
+        const monthFiltered = filterByMonth(allData, selectedMonth);
+        
+        // 현재 선택된 사용자 필터로 재필터링
         if (selectedUser === 'me') {
-          setResults(allData.filter(r => r.userId === userId));
+          setResults(monthFiltered.filter(r => r.userId === userId));
         } else if (selectedUser === 'all') {
-          setResults(allData);
+          setResults(monthFiltered);
         } else {
-          setResults(allData.filter(r => (r.userName || '(이름없음)') === selectedUser));
+          setResults(monthFiltered.filter(r => (r.userName || '(이름없음)') === selectedUser));
         }
         
         setSelectedResultId(null);
@@ -502,11 +534,42 @@ const ObManagementMode = ({
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Box sx={{ mb: 1 }}>
-                  <Typography variant="h6" sx={{ mb: 1 }}>가입번호별 리스트</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="h6">가입번호별 리스트</Typography>
+                    <TextField
+                      select
+                      size="small"
+                      value={selectedMonth}
+                      onChange={(e) => {
+                        const newMonth = e.target.value;
+                        setSelectedMonth(newMonth);
+                        const monthFiltered = filterByMonth(allResults, newMonth);
+                        
+                        // 현재 선택된 사용자 필터 유지
+                        const currentUserId = loggedInStore?.userId || loggedInStore?.name || loggedInStore?.id || '';
+                        if (selectedUser === 'me') {
+                          setResults(monthFiltered.filter(r => r.userId === currentUserId));
+                        } else if (selectedUser === 'all') {
+                          setResults(monthFiltered);
+                        } else {
+                          setResults(monthFiltered.filter(r => (r.userName || '(이름없음)') === selectedUser));
+                        }
+                      }}
+                      sx={{ minWidth: 150 }}
+                    >
+                      {getMonthOptions().map(option => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Box>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {(() => {
+                      // 월별 필터링된 데이터로 카운트
+                      const monthFiltered = filterByMonth(allResults, selectedMonth);
                       const userCounts = {};
-                      (allResults || []).forEach(row => {
+                      monthFiltered.forEach(row => {
                         const name = row.userName || '(이름없음)';
                         userCounts[name] = (userCounts[name] || 0) + 1;
                       });
@@ -519,10 +582,11 @@ const ObManagementMode = ({
                             variant={selectedUser === 'me' ? 'contained' : 'outlined'}
                             onClick={() => {
                               setSelectedUser('me');
-                              setResults(allResults.filter(r => r.userId === currentUserId));
+                              const monthFiltered = filterByMonth(allResults, selectedMonth);
+                              setResults(monthFiltered.filter(r => r.userId === currentUserId));
                             }}
                           >
-                            내 데이터 ({allResults.filter(r => r.userId === currentUserId).length})
+                            내 데이터 ({filterByMonth(allResults, selectedMonth).filter(r => r.userId === currentUserId).length})
                           </Button>
                           {Object.entries(userCounts).filter(([name]) => name !== '(이름없음)').map(([name, count]) => (
                             <Button
@@ -531,10 +595,11 @@ const ObManagementMode = ({
                               variant={selectedUser === name ? 'contained' : 'outlined'}
                               onClick={() => {
                                 setSelectedUser(name);
-                                setResults(allResults.filter(r => (r.userName || '(이름없음)') === name));
+                                const monthFiltered = filterByMonth(allResults, selectedMonth);
+                                setResults(monthFiltered.filter(r => (r.userName || '(이름없음)') === name));
                               }}
                             >
-                              {name} ({count})
+                              {name} ({filterByMonth(allResults, selectedMonth).filter(r => (r.userName || '(이름없음)') === name).length})
                             </Button>
                           ))}
                           <Button
@@ -542,10 +607,10 @@ const ObManagementMode = ({
                             variant={selectedUser === 'all' ? 'contained' : 'outlined'}
                             onClick={() => {
                               setSelectedUser('all');
-                              setResults(allResults);
+                              setResults(filterByMonth(allResults, selectedMonth));
                             }}
                           >
-                            전체 ({(allResults || []).length})
+                            전체 ({filterByMonth(allResults, selectedMonth).length})
                           </Button>
                         </>
                       );
