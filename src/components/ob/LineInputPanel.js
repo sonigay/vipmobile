@@ -11,9 +11,9 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
     newLines[index] = { ...newLines[index], [field]: value };
     onChange({ ...inputs, lines: newLines });
     
-    // 고객명 변경 시 양쪽 동기화
-    if (field === 'customerName' && onCustomerNameChange) {
-      onCustomerNameChange(index, value);
+    // 고객명 또는 연락처 변경 시 양쪽 동기화
+    if ((field === 'customerName' || field === 'phone') && onCustomerNameChange) {
+      onCustomerNameChange(index, field, value);
     }
   };
 

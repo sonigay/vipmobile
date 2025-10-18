@@ -106,16 +106,16 @@ const ObManagementMode = ({
 
   const { existing, together, diff } = useObCalculation(inputs, planData, discountData, segDiscountData);
 
-  // 고객명 동기화 핸들러
-  const handleCustomerNameSync = (index, value) => {
+  // 고객명/연락처 동기화 핸들러
+  const handleCustomerNameSync = (index, field, value) => {
     setInputs(prev => {
       const newInputs = { ...prev };
       // 기존결합과 투게더결합 양쪽 모두 업데이트
       if (newInputs.existingLines[index]) {
-        newInputs.existingLines[index] = { ...newInputs.existingLines[index], customerName: value };
+        newInputs.existingLines[index] = { ...newInputs.existingLines[index], [field]: value };
       }
       if (newInputs.togetherLines[index]) {
-        newInputs.togetherLines[index] = { ...newInputs.togetherLines[index], customerName: value };
+        newInputs.togetherLines[index] = { ...newInputs.togetherLines[index], [field]: value };
       }
       return newInputs;
     });
@@ -547,7 +547,9 @@ const ObManagementMode = ({
                           >
                             <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.userName || '-'}</td>
                             <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.subscriptionNumber || '-'}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.scenarioName || '-'}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center', whiteSpace: 'pre-line' }}>
+                              {(row.scenarioName || '-').replace(/, /g, '\n')}
+                            </td>
                             <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
                             <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>
                             <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{Number(row.diff || 0).toLocaleString()}</td>
