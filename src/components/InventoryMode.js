@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, useRef, memo } from 'react';
 import {
   Box,
   Paper,
@@ -70,7 +70,7 @@ const PriceDiscrepancyTab = () => {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  const fetchPriceDiscrepancies = async () => {
+  const fetchPriceDiscrepancies = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/price-discrepancies`);
@@ -83,7 +83,7 @@ const PriceDiscrepancyTab = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPriceDiscrepancies();
@@ -96,10 +96,10 @@ const PriceDiscrepancyTab = () => {
     }, 3600000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchPriceDiscrepancies]);
 
-  // 엑셀 다운로드 함수
-  const handleExcelDownload = () => {
+  // 엑셀 다운로드 함수 - useCallback으로 메모이제이션
+  const handleExcelDownload = useCallback(() => {
     if (!data || !data.discrepancies) return;
 
     const csvData = [
@@ -128,14 +128,14 @@ const PriceDiscrepancyTab = () => {
     link.href = URL.createObjectURL(blob);
     link.download = `입고가상이값_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-  };
+  }, [data]);
 
-  // 신뢰도에 따른 색상 결정
-  const getConfidenceColor = (confidence) => {
+  // 신뢰도에 따른 색상 결정 - useCallback으로 메모이제이션
+  const getConfidenceColor = useCallback((confidence) => {
     if (confidence >= 90) return 'success';
     if (confidence >= 70) return 'warning';
     return 'error';
-  };
+  }, []);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -180,8 +180,8 @@ const PriceDiscrepancyTab = () => {
   );
 };
 
-// 입고가 상이값 콘텐츠 컴포넌트
-const PriceDiscrepancyContent = ({ data, onExcelDownload, getConfidenceColor }) => {
+// 입고가 상이값 콘텐츠 컴포넌트 - React.memo로 메모이제이션
+const PriceDiscrepancyContent = memo(({ data, onExcelDownload, getConfidenceColor }) => {
   if (!data) {
     return (
       <Alert severity="info">
@@ -198,10 +198,12 @@ const PriceDiscrepancyContent = ({ data, onExcelDownload, getConfidenceColor }) 
     );
   }
 
-  // 평균 신뢰도 계산
-  const avgConfidence = (
-    data.discrepancies.reduce((sum, d) => sum + d.confidence, 0) / data.discrepancies.length
-  ).toFixed(1);
+  // 평균 신뢰도 계산 - useMemo로 메모이제이션
+  const avgConfidence = useMemo(() => {
+    return (
+      data.discrepancies.reduce((sum, d) => sum + d.confidence, 0) / data.discrepancies.length
+    ).toFixed(1);
+  }, [data.discrepancies]);
 
   return (
     <Box>
@@ -362,7 +364,7 @@ const PriceDiscrepancyContent = ({ data, onExcelDownload, getConfidenceColor }) 
       </Card>
     </Box>
   );
-};
+});
 
 // 폰클중복값 컴포넌트
 const PhoneDuplicateTab = () => {

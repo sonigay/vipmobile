@@ -27004,22 +27004,26 @@ app.get('/api/price-discrepancies', async (req, res) => {
   try {
     console.log('💰 폰클입고가상이값 API 호출 시작');
     
-    // 폰클재고데이터와 폰클개통데이터 시트에서 데이터 가져오기
-    const inventoryData = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.SHEET_ID,
-      range: '폰클재고데이터!A4:AC',
-    });
+    // 캐싱된 getSheetValues 함수를 사용하여 데이터 가져오기
+    const [inventoryValues, activationValues] = await Promise.all([
+      getSheetValues('폰클재고데이터'),
+      getSheetValues('폰클개통데이터')
+    ]);
 
-    const activationData = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.SHEET_ID,
-      range: '폰클개통데이터!A4:BZ',
-    });
+    if (!inventoryValues || inventoryValues.length === 0) {
+      throw new Error('폰클재고데이터를 가져올 수 없습니다.');
+    }
 
-    const inventoryRows = inventoryData.data.values || [];
-    const activationRows = activationData.data.values || [];
+    if (!activationValues || activationValues.length === 0) {
+      throw new Error('폰클개통데이터를 가져올 수 없습니다.');
+    }
 
-    console.log(`💰 폰클재고데이터 행 수: ${inventoryRows.length}`);
-    console.log(`💰 폰클개통데이터 행 수: ${activationRows.length}`);
+    // 헤더 제거 (폰클재고데이터: 3행 헤더, 폰클개통데이터: 3행 헤더)
+    const inventoryRows = inventoryValues.slice(3);
+    const activationRows = activationValues.slice(3);
+
+    console.log(`💰 폰클재고데이터 행 수: ${inventoryRows.length} (캐시 사용)`);
+    console.log(`💰 폰클개통데이터 행 수: ${activationRows.length} (캐시 사용)`);
 
     // 모델명별 입고가 데이터 수집
     const modelPriceMap = new Map();
