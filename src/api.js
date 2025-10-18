@@ -17,13 +17,6 @@ export const api = {
     return response.json();
   },
 
-  // OB: 개발용 시트 데이터 (나중에 제거)
-  getObDevSheetData: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/ob/dev-sheet-data`);
-    if (!response.ok) throw new Error('OB dev sheet data load failed');
-    return response.json();
-  },
-
   // OB: 결과 목록(사용자별 또는 전체)
   getObResults: async (userId, showAll = false) => {
     const params = new URLSearchParams();

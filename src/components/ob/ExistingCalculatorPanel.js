@@ -9,9 +9,23 @@ export default function ExistingCalculatorPanel({ inputs, result, onSave, onInpu
   };
 
   return (
-    <Box sx={{ border: '1px solid #ddd', borderRadius: 1, overflow: 'hidden', backgroundColor: '#fff' }}>
-      <Box sx={{ p: 1.5, backgroundColor: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
-        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>기존결합 계산식</Typography>
+    <Box sx={{ 
+      border: '1px solid #e0e0e0', 
+      borderRadius: 2, 
+      overflow: 'hidden', 
+      backgroundColor: '#fff',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      transition: 'box-shadow 0.3s ease',
+      '&:hover': {
+        boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+      }
+    }}>
+      <Box sx={{ 
+        p: 2, 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderBottom: '1px solid #e0e0e0'
+      }}>
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5, color: '#fff' }}>기존결합 계산식</Typography>
         <BundleOptionsPanel inputs={inputs} onChange={onInputChange} />
       </Box>
       <Box sx={{ p: 1.5 }}>
@@ -23,32 +37,39 @@ export default function ExistingCalculatorPanel({ inputs, result, onSave, onInpu
           onCustomerNameChange={onCustomerNameSync}
         />
       </Box>
-      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
-        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
-          <Typography variant="caption" color="text.secondary">총액</Typography>
-          <Typography variant="h6">{Number(result?.amount || 0).toLocaleString()}원</Typography>
+      <Box sx={{ p: 2, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5, borderBottom: '1px solid #f0f0f0' }}>
+        <Box sx={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+          p: 1.5, 
+          borderRadius: 1.5, 
+          boxShadow: '0 2px 6px rgba(102,126,234,0.3)',
+          transition: 'transform 0.2s',
+          '&:hover': { transform: 'translateY(-2px)' }
+        }}>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>총액</Typography>
+          <Typography variant="h6" sx={{ color: '#fff', fontWeight: 'bold' }}>{Number(result?.amount || 0).toLocaleString()}원</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">회선수</Typography>
           <Typography variant="h6">{inputs?.existingLines?.length || 0}개</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">결합할인</Typography>
-          <Typography variant="h6">{Number(result?.bundleDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.bundleDiscount || 0).toLocaleString()}원</Typography>
         </Box>
       </Box>
-      <Box sx={{ p: 1.5, pt: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
-        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+      <Box sx={{ p: 2, pt: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5, borderBottom: '1px solid #f0f0f0' }}>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">선택약정할인</Typography>
-          <Typography variant="h6">{Number(result?.selectionDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.selectionDiscount || 0).toLocaleString()}원</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">프리미어할인</Typography>
-          <Typography variant="h6">{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">인터넷할인</Typography>
-          <Typography variant="h6">{Number(result?.internetDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.internetDiscount || 0).toLocaleString()}원</Typography>
         </Box>
       </Box>
       <Box sx={{ p: 1.5, overflowX: 'auto' }}>

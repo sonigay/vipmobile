@@ -58,19 +58,14 @@ const ObManagementMode = ({
         console.log('[OB] Loading with userId:', userId, 'loggedInStore:', loggedInStore);
         
         // 요금제/할인 데이터는 항상 로드
-        const [plansRes, discountsRes, devSheetRes] = await Promise.all([
+        const [plansRes, discountsRes] = await Promise.all([
           api.getObPlanData(),
-          api.getObDiscountData(),
-          api.getObDevSheetData()
+          api.getObDiscountData()
         ]);
         setPlanData(plansRes.data || []);
         setDiscountData(discountsRes.data || []);
-        setSegDiscountData(devSheetRes.data?.segDiscount || []);
-        
-        // 개발용: 시트 분석 로그
-        console.log('[OB DEV] Main Sheet:', devSheetRes.data?.mainSheet);
-        console.log('[OB DEV] Seg Discount:', devSheetRes.data?.segDiscount);
-        console.log('[OB DEV] Plan List:', devSheetRes.data?.planList);
+        // OB_할인 시트의 원본 데이터를 segDiscountData로 사용
+        setSegDiscountData(discountsRes.data || []);
         
         // 결과 목록은 전체 데이터 로드
         if (userId) {
@@ -397,8 +392,17 @@ const ObManagementMode = ({
               </Box>
               
               {/* 인터넷 옵션 (공통) */}
-              <Box sx={{ mb: 2, p: 2, backgroundColor: '#fffde7', borderRadius: 1, border: '1px solid #fdd835' }}>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>인터넷 옵션 (기존결합 & 투게더결합 공통)</Typography>
+              <Box sx={{ 
+                mb: 2, 
+                p: 2, 
+                background: 'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)', 
+                borderRadius: 2, 
+                border: '1px solid #fdd835',
+                boxShadow: '0 2px 6px rgba(253,203,110,0.3)'
+              }}>
+                <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 'bold', color: '#2d3436' }}>
+                  🌐 인터넷 옵션 (기존결합 & 투게더결합 공통)
+                </Typography>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <input
@@ -437,25 +441,62 @@ const ObManagementMode = ({
                   onCustomerNameSync={handleCustomerNameSync}
                 />
               </Box>
-              <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: 1 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ display: 'flex', gap: 3 }}>
-                    <Typography variant="body1">
-                      [기존] <strong>{existing.amount?.toLocaleString()}원</strong>
-                    </Typography>
-                    <Typography variant="body1">
-                      [투게더] <strong>{together.amount?.toLocaleString()}원</strong>
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: diff < 0 ? '#d32f2f' : '#2e7d32' }}>
-                      차액 <strong>{diff?.toLocaleString()}원</strong>
-                    </Typography>
+              <Box sx={{ 
+                mt: 3, 
+                p: 2.5, 
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', 
+                border: '2px solid #2196f3', 
+                borderRadius: 2,
+                boxShadow: '0 4px 12px rgba(33,150,243,0.2)'
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 'bold' }}>기존결합</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#0d47a1' }}>
+                        {existing.amount?.toLocaleString()}원
+                      </Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ color: '#1976d2', fontWeight: 'bold' }}>VS</Typography>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" sx={{ color: '#c2185b', fontWeight: 'bold' }}>투게더결합</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#880e4f' }}>
+                        {together.amount?.toLocaleString()}원
+                      </Typography>
+                    </Box>
+                    <Box sx={{ 
+                      ml: 2, 
+                      p: 1.5, 
+                      borderRadius: 2, 
+                      backgroundColor: diff < 0 ? '#c8e6c9' : '#ffccbc',
+                      border: `2px solid ${diff < 0 ? '#4caf50' : '#ff5722'}`
+                    }}>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>차액</Typography>
+                      <Typography variant="h5" sx={{ color: diff < 0 ? '#2e7d32' : '#d32f2f', fontWeight: 'bold' }}>
+                        {diff?.toLocaleString()}원
+                      </Typography>
+                    </Box>
                   </Box>
                   <Button 
                     variant="contained" 
                     onClick={() => handleSave(diff < 0 ? 'together' : 'existing')}
                     size="large"
+                    sx={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      px: 4,
+                      py: 1.5,
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                        boxShadow: '0 6px 16px rgba(102,126,234,0.5)',
+                        transform: 'translateY(-2px)'
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
                   >
-                    저장
+                    💾 저장
                   </Button>
                 </Box>
               </Box>

@@ -82,62 +82,16 @@ function setupObRoutes(app) {
     }
   });
 
-  // GET /api/ob/dev-sheet-data (개발용 - 나중에 제거)
-  router.get('/dev-sheet-data', async (req, res) => {
-    try {
-      const { sheets } = createSheetsClient();
-      const devSpreadsheetId = '13CoBlIKqFDr0cjf3tC2GiZv3fhoxfCVzCHlR-WVjj1Y';
-      
-      // 모든 시트 읽기
-      const [mainSheet, segDiscount, planList] = await Promise.all([
-        sheets.spreadsheets.values.get({
-          spreadsheetId: devSpreadsheetId,
-          range: '투게더결합 컨설팅!A1:Z50'
-        }),
-        sheets.spreadsheets.values.get({
-          spreadsheetId: devSpreadsheetId,
-          range: 'seg)할인!A1:N40'
-        }),
-        sheets.spreadsheets.values.get({
-          spreadsheetId: devSpreadsheetId,
-          range: '별첨)요금제 리스트!A1:Z100'
-        })
-      ]);
-      
-      res.json({
-        success: true,
-        data: {
-          mainSheet: mainSheet.data.values || [],
-          segDiscount: segDiscount.data.values || [],
-          planList: planList.data.values || []
-        }
-      });
-    } catch (error) {
-      console.error('[OB] dev-sheet-data error:', error);
-      res.status(500).json({ success: false, error: 'Failed to load dev sheet data', message: error.message });
-    }
-  });
-
-  // GET /api/ob/discount-data
+  // GET /api/ob/discount-data (seg)할인 원본 데이터 - 배열 그대로 반환)
   router.get('/discount-data', async (req, res) => {
     try {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_DISCOUNTS, HEADERS_DISCOUNTS);
+      // OB_할인 시트 전체 읽기 (seg)할인 데이터)
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_DISCOUNTS
+        range: 'OB_할인!A1:N40'
       });
-      const rows = response.data.values || [];
-      const header = rows[0] || HEADERS_DISCOUNTS;
-      const items = rows.slice(1).map(r => ({
-        discountCode: r[header.indexOf('discountCode')] || '',
-        name: r[header.indexOf('name')] || '',
-        scope: r[header.indexOf('scope')] || '',
-        type: r[header.indexOf('type')] || '',
-        value: Number((r[header.indexOf('value')] || '0').toString().replace(/,/g, '')) || 0,
-        conditionsJson: r[header.indexOf('conditionsJson')] || ''
-      }));
-      res.json({ success: true, data: items });
+      res.json({ success: true, data: response.data.values || [] });
     } catch (error) {
       console.error('[OB] discount-data error:', error);
       res.status(500).json({ success: false, error: 'Failed to load discount data', message: error.message });
