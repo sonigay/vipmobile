@@ -35,6 +35,12 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
       newLine.premierDiscount = false;
     }
     
+    // 투게더결합일 경우 청소년할인 필드 추가
+    if (panelType === 'together') {
+      newLine.youthGeneral = false;
+      newLine.youthSignature = false;
+    }
+    
     onChange({
       ...inputs,
       lines: [...inputs.lines, newLine]
@@ -125,6 +131,28 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
                   id={`premier-${idx}`}
                 />
                 <label htmlFor={`premier-${idx}`} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>프리미어</label>
+              </Box>
+            )}
+            {panelType === 'together' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={line.youthGeneral || false}
+                    onChange={(e) => handleLineChange(idx, 'youthGeneral', e.target.checked)}
+                    id={`youth-general-${idx}`}
+                  />
+                  <label htmlFor={`youth-general-${idx}`} style={{ fontSize: 11, whiteSpace: 'nowrap' }}>청소년일반</label>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={line.youthSignature || false}
+                    onChange={(e) => handleLineChange(idx, 'youthSignature', e.target.checked)}
+                    id={`youth-sig-${idx}`}
+                  />
+                  <label htmlFor={`youth-sig-${idx}`} style={{ fontSize: 11, whiteSpace: 'nowrap' }}>청소년시그니처</label>
+                </Box>
               </Box>
             )}
             <IconButton size="small" onClick={() => handleRemoveLine(idx)} disabled={inputs.lines.length <= 1}>

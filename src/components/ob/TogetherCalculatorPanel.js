@@ -59,7 +59,7 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
           <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.togetherBundleDiscount || 0).toLocaleString()}원</Typography>
         </Box>
       </Box>
-      <Box sx={{ p: 2, pt: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5, borderBottom: '1px solid #f0f0f0' }}>
+      <Box sx={{ p: 2, pt: 0, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5, borderBottom: '1px solid #f0f0f0' }}>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">선택약정할인</Typography>
           <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.selectionDiscount || 0).toLocaleString()}원</Typography>
@@ -67,6 +67,10 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
         <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">프리미어할인</Typography>
           <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
+        </Box>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
+          <Typography variant="caption" color="text.secondary">청소년추가할인</Typography>
+          <Typography variant="h6" sx={{ color: '#d32f2f' }}>{Number(result?.youthDiscount || 0).toLocaleString()}원</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1.5, borderRadius: 1.5, border: '1px solid #e0e0e0' }}>
           <Typography variant="caption" color="text.secondary">인터넷할인</Typography>

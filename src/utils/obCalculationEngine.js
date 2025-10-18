@@ -6,7 +6,7 @@ export function initialInputs() {
       { lineId: 'E1', customerName: '', phone: '', planName: '', planGroup: '', contractType: '지원금약정', premierDiscount: false, deviceSupport: 0, addons: [] },
     ],
     togetherLines: [
-      { lineId: 'T1', customerName: '', phone: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+      { lineId: 'T1', customerName: '', phone: '', planName: '', planGroup: '', contractType: '지원금약정', youthGeneral: false, youthSignature: false, deviceSupport: 0, addons: [] },
     ],
     existingBundleType: '', // 기존결합 상품명
     internetIncluded: '미포함', // 인터넷 포함여부 (가무사 유무선용)
@@ -157,6 +157,7 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
   
   let totalPremierDiscount = 0;
   let totalSelectionDiscount = 0;
+  let totalYouthDiscount = 0;
   
   // 투게더결합할인 계산 (85000원 이상 회선 수로 계산)
   const perLineTogetherDiscount = calculateTogetherBundleDiscount(eligibleCount, segDiscountData);
@@ -182,6 +183,16 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
     if (baseFee >= 85000) {
       discounts.push({ name: '프리미어약정할인', amount: -5250 });
       totalPremierDiscount += -5250;
+    }
+    
+    // 청소년추가할인 (투게더 전용)
+    if (line.youthGeneral) {
+      discounts.push({ name: '청소년추가할인(일반)', amount: -10000 });
+      totalYouthDiscount += -10000;
+    }
+    if (line.youthSignature) {
+      discounts.push({ name: '청소년추가할인(시그니처)', amount: -43000 });
+      totalYouthDiscount += -43000;
     }
     
     // 투게더결합할인 (85000원 이상 회선만 적용)
@@ -216,6 +227,7 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
     rows,
     selectionDiscount: totalSelectionDiscount,
     premierDiscount: totalPremierDiscount,
+    youthDiscount: totalYouthDiscount,
     togetherBundleDiscount: totalTogetherBundleDiscount,
     internetDiscount,
     breakdown: []
