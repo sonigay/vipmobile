@@ -3,10 +3,10 @@
 export function initialInputs() {
   return {
     existingLines: [
-      { lineId: 'E1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', premierDiscount: false, deviceSupport: 0, addons: [] },
+      { lineId: 'E1', customerName: '', phone: '', planName: '', planGroup: '', contractType: '지원금약정', premierDiscount: false, deviceSupport: 0, addons: [] },
     ],
     togetherLines: [
-      { lineId: 'T1', customerName: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
+      { lineId: 'T1', customerName: '', phone: '', planName: '', planGroup: '', contractType: '지원금약정', deviceSupport: 0, addons: [] },
     ],
     existingBundleType: '', // 기존결합 상품명
     internetIncluded: '미포함', // 인터넷 포함여부 (가무사 유무선용)
@@ -80,13 +80,16 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
   });
   
   let totalPremierDiscount = 0;
+  let totalSelectionDiscount = 0;
   
   const rows = tempRows.map(({ line, plan, baseFee, idx }) => {
     const discounts = [];
     
     // 선택약정할인 (기본료 * -0.25)
     if (line.contractType === '선택약정') {
-      discounts.push({ name: '선택약정할인', amount: baseFee * -0.25 });
+      const selectionDiscount = baseFee * -0.25;
+      discounts.push({ name: '선택약정할인', amount: selectionDiscount });
+      totalSelectionDiscount += selectionDiscount;
     }
     
     // 프리미어약정할인 (회선별 선택, 85,000원 이상 & premierDiscount=true만)
@@ -132,6 +135,7 @@ function computeExisting(lines, existingBundleType, internetIncluded, internetSp
     amount,
     rows,
     bundleDiscount: totalBundleDiscount,
+    selectionDiscount: totalSelectionDiscount,
     premierDiscount: totalPremierDiscount,
     internetDiscount,
     breakdown: []
@@ -152,6 +156,7 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
   const eligibleCount = tempRows.filter(r => r.baseFee >= 85000).length;
   
   let totalPremierDiscount = 0;
+  let totalSelectionDiscount = 0;
   
   // 투게더결합할인 계산 (85000원 이상 회선 수로 계산)
   const perLineTogetherDiscount = calculateTogetherBundleDiscount(eligibleCount, segDiscountData);
@@ -168,7 +173,9 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
     
     // 선택약정할인
     if (line.contractType === '선택약정') {
-      discounts.push({ name: '선택약정할인', amount: baseFee * -0.25 });
+      const selectionDiscount = baseFee * -0.25;
+      discounts.push({ name: '선택약정할인', amount: selectionDiscount });
+      totalSelectionDiscount += selectionDiscount;
     }
     
     // 프리미어약정할인 (회선별, 85,000원 이상만)
@@ -207,6 +214,7 @@ function computeTogether(lines, internetSpeed, hasInternet, planData, segDiscoun
   return {
     amount,
     rows,
+    selectionDiscount: totalSelectionDiscount,
     premierDiscount: totalPremierDiscount,
     togetherBundleDiscount: totalTogetherBundleDiscount,
     internetDiscount,

@@ -21,7 +21,7 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
           onCustomerNameChange={onCustomerNameSync}
         />
       </Box>
-      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
+      <Box sx={{ p: 1.5, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">총액</Typography>
           <Typography variant="h6">{Number(result?.amount || 0).toLocaleString()}원</Typography>
@@ -31,29 +31,35 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
           <Typography variant="h6">{inputs?.togetherLines?.length || 0}개</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
-          <Typography variant="caption" color="text.secondary">프리미어할인</Typography>
-          <Typography variant="h6" sx={{ fontSize: 14 }}>{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="caption" color="text.secondary">투게더할인</Typography>
+          <Typography variant="h6">{Number(result?.togetherBundleDiscount || 0).toLocaleString()}원</Typography>
+        </Box>
+      </Box>
+      <Box sx={{ p: 1.5, pt: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderBottom: '1px solid #eee' }}>
+        <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
+          <Typography variant="caption" color="text.secondary">선택약정할인</Typography>
+          <Typography variant="h6">{Number(result?.selectionDiscount || 0).toLocaleString()}원</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
-          <Typography variant="caption" color="text.secondary">투게더할인</Typography>
-          <Typography variant="h6" sx={{ fontSize: 14 }}>{Number(result?.togetherBundleDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="caption" color="text.secondary">프리미어할인</Typography>
+          <Typography variant="h6">{Number(result?.premierDiscount || 0).toLocaleString()}원</Typography>
         </Box>
         <Box sx={{ backgroundColor: '#f9fafb', p: 1, borderRadius: 1, border: '1px solid #eee' }}>
           <Typography variant="caption" color="text.secondary">인터넷할인</Typography>
-          <Typography variant="h6" sx={{ fontSize: 14 }}>{Number(result?.internetDiscount || 0).toLocaleString()}원</Typography>
+          <Typography variant="h6">{Number(result?.internetDiscount || 0).toLocaleString()}원</Typography>
         </Box>
       </Box>
       <Box sx={{ p: 1.5, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ backgroundColor: '#f3f4f6' }}>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>회선</th>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>고객명</th>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>요금제</th>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>약정</th>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>기본료</th>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>할인</th>
-              <th style={{ border: '1px solid #e5e7eb', padding: 6 }}>합계</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>회선</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>고객명</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>요금제</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>약정</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>기본료</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>할인</th>
+              <th style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>합계</th>
             </tr>
           </thead>
           <tbody>
@@ -61,15 +67,15 @@ export default function TogetherCalculatorPanel({ inputs, result, onSave, onInpu
               const discountSum = (row.discounts || []).reduce((s, d) => s + (d.amount || 0), 0);
               return (
                 <tr key={row.lineNo}>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6 }}>{row.lineNo}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6, fontSize: 11 }}>{row.customerName || '-'}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6 }}>{row.planName || '-'}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6, fontSize: 11 }}>{row.contractType || '-'}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'right' }}>{Number(row.baseFee || 0).toLocaleString()}</td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'right', color: discountSum < 0 ? '#d32f2f' : '#000' }}>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>{row.lineNo}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, fontSize: 11, textAlign: 'center' }}>{row.customerName || '-'}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>{row.planName || '-'}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, fontSize: 11, textAlign: 'center' }}>{row.contractType || '-'}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center' }}>{Number(row.baseFee || 0).toLocaleString()}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center', color: discountSum < 0 ? '#d32f2f' : '#000' }}>
                     {discountSum.toLocaleString()}
                   </td>
-                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'right', fontWeight: 'bold' }}>{Number(row.total || 0).toLocaleString()}</td>
+                  <td style={{ border: '1px solid #e5e7eb', padding: 6, textAlign: 'center', fontWeight: 'bold' }}>{Number(row.total || 0).toLocaleString()}</td>
                 </tr>
               );
             })}

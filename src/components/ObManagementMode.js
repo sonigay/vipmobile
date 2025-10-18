@@ -131,10 +131,14 @@ const ObManagementMode = ({
       }
       
       // 고객명 목록 생성 (기존결합 또는 투게더결합 중 더 많은 쪽 사용)
-      const existingNames = (inputs.existingLines || []).map(l => l.customerName).filter(Boolean);
-      const togetherNames = (inputs.togetherLines || []).map(l => l.customerName).filter(Boolean);
-      const customerNames = existingNames.length >= togetherNames.length ? existingNames : togetherNames;
-      const customerNamesStr = customerNames.length > 0 ? customerNames.join(', ') : '';
+      const existingLines = inputs.existingLines || [];
+      const togetherLines = inputs.togetherLines || [];
+      const lines = existingLines.length >= togetherLines.length ? existingLines : togetherLines;
+      
+      const customerNamesStr = lines
+        .filter(l => l.customerName)
+        .map(l => l.phone ? `${l.customerName}(${l.phone})` : l.customerName)
+        .join(', ');
       
       const userName = loggedInStore?.name || loggedInStore?.userId || '';
       
@@ -457,7 +461,7 @@ const ObManagementMode = ({
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Box sx={{ mb: 1 }}>
-                  <Typography variant="h6" sx={{ mb: 1 }}>저장된 시나리오</Typography>
+                  <Typography variant="h6" sx={{ mb: 1 }}>가입번호별 리스트</Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {(() => {
                       const userCounts = {};
@@ -511,14 +515,14 @@ const ObManagementMode = ({
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>저장자</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>가입번호</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>고객명</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>기존 총액</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>투게더 총액</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>차액</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>상태</th>
-                        <th style={{ border: '1px solid #eee', padding: 6 }}>등록일시</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>저장자</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>가입번호</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>고객명</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>기존 총액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>투게더 총액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>차액</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>상태</th>
+                        <th style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>등록일시</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -541,13 +545,13 @@ const ObManagementMode = ({
                               backgroundColor: bgColor
                             }}
                           >
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.userName || '-'}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.subscriptionNumber || '-'}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.scenarioName || '-'}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{Number(row.diff || 0).toLocaleString()}</td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }} onClick={(e) => e.stopPropagation()}>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.userName || '-'}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.subscriptionNumber || '-'}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.scenarioName || '-'}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{Number(row.existingAmount || 0).toLocaleString()}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{Number(row.togetherAmount || 0).toLocaleString()}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{Number(row.diff || 0).toLocaleString()}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                               <select
                                 value={row.status || ''}
                                 onChange={async (e) => {
@@ -578,7 +582,7 @@ const ObManagementMode = ({
                                 <option value="보류">보류</option>
                               </select>
                             </td>
-                            <td style={{ border: '1px solid #eee', padding: 6 }}>{row.createdAt}</td>
+                            <td style={{ border: '1px solid #eee', padding: 6, textAlign: 'center' }}>{row.createdAt}</td>
                           </tr>
                         );
                       })}

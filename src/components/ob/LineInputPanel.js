@@ -22,6 +22,7 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
     const newLine = { 
       lineId: `${prefix}${inputs.lines.length + 1}`, 
       customerName: '', 
+      phone: '',
       planName: '', 
       planGroup: '', 
       contractType: '지원금약정', 
@@ -66,6 +67,14 @@ export default function LineInputPanel({ inputs, onChange, planData, onCustomerN
               value={line.customerName || ''}
               onChange={(e) => handleLineChange(idx, 'customerName', e.target.value)}
               sx={{ flex: 1, minWidth: 100 }}
+            />
+            <TextField
+              size="small"
+              label="연락처"
+              value={line.phone || ''}
+              onChange={(e) => handleLineChange(idx, 'phone', e.target.value)}
+              sx={{ flex: 1, minWidth: 120 }}
+              placeholder="010-1234-5678"
             />
             <Autocomplete
               size="small"
