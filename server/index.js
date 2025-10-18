@@ -27526,10 +27526,10 @@ async function ensureSmsSheetHeaders() {
       console.log('SMS전달규칙 시트 헤더 추가 중...');
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SMS_RULES_SHEET_NAME}!A1:J1`,
+        range: `${SMS_RULES_SHEET_NAME}!A1:K1`,
         valueInputOption: 'RAW',
         resource: {
-          values: [['규칙ID', '규칙명', '발신번호필터', '키워드필터', '전달대상번호들', '자동전달여부', '활성화여부', '생성일시', '수정일시', '메모']]
+          values: [['규칙ID', '규칙명', '수신번호필터', '발신번호필터', '키워드필터', '전달대상번호들', '자동전달여부', '활성화여부', '생성일시', '수정일시', '메모']]
         }
       });
     }
@@ -27625,7 +27625,7 @@ app.get('/api/sms/rules', async (req, res) => {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+      range: `${SMS_RULES_SHEET_NAME}!A:K`,
     });
     
     const rows = response.data.values || [];
@@ -27637,14 +27637,15 @@ app.get('/api/sms/rules', async (req, res) => {
     const rules = dataRows.map(row => ({
       id: row[0] || '',
       name: row[1] || '',
-      senderFilter: row[2] || '',
-      keywordFilter: row[3] || '',
-      targetNumbers: row[4] || '',
-      autoForward: row[5] === 'O',
-      active: row[6] === 'O',
-      createdAt: row[7] || '',
-      updatedAt: row[8] || '',
-      memo: row[9] || ''
+      receiverFilter: row[2] || '',
+      senderFilter: row[3] || '',
+      keywordFilter: row[4] || '',
+      targetNumbers: row[5] || '',
+      autoForward: row[6] === 'O',
+      active: row[7] === 'O',
+      createdAt: row[8] || '',
+      updatedAt: row[9] || '',
+      memo: row[10] || ''
     }));
     
     res.json({ success: true, data: rules });
@@ -27658,7 +27659,7 @@ app.get('/api/sms/rules', async (req, res) => {
 // SMS 전달 규칙 추가 API
 app.post('/api/sms/rules', async (req, res) => {
   try {
-    const { name, senderFilter, keywordFilter, targetNumbers, autoForward, active, memo } = req.body;
+    const { name, receiverFilter, senderFilter, keywordFilter, targetNumbers, autoForward, active, memo } = req.body;
     
     console.log('SMS 전달 규칙 추가:', name);
     
@@ -27677,6 +27678,7 @@ app.post('/api/sms/rules', async (req, res) => {
     const newRow = [
       newId,
       name,
+      receiverFilter || '',
       senderFilter || '',
       keywordFilter || '',
       targetNumbersStr,
@@ -27689,7 +27691,7 @@ app.post('/api/sms/rules', async (req, res) => {
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+      range: `${SMS_RULES_SHEET_NAME}!A:K`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
@@ -27709,14 +27711,14 @@ app.post('/api/sms/rules', async (req, res) => {
 app.put('/api/sms/rules/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, senderFilter, keywordFilter, targetNumbers, autoForward, active, memo } = req.body;
+    const { name, receiverFilter, senderFilter, keywordFilter, targetNumbers, autoForward, active, memo } = req.body;
     
     console.log(`SMS 전달 규칙 수정: ID=${id}`);
     
     // 기존 데이터 가져오기
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+      range: `${SMS_RULES_SHEET_NAME}!A:K`,
     });
     
     const rows = response.data.values || [];
@@ -27728,11 +27730,12 @@ app.put('/api/sms/rules/:id', async (req, res) => {
     
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const targetNumbersStr = Array.isArray(targetNumbers) ? targetNumbers.join(',') : targetNumbers;
-    const createdAt = rows[rowIndex][7] || now;
+    const createdAt = rows[rowIndex][8] || now; // createdAt은 이제 8번 인덱스
     
     const updatedRow = [
       id,
       name,
+      receiverFilter || '',
       senderFilter || '',
       keywordFilter || '',
       targetNumbersStr,
@@ -27745,7 +27748,7 @@ app.put('/api/sms/rules/:id', async (req, res) => {
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_RULES_SHEET_NAME}!A${rowIndex + 1}:J${rowIndex + 1}`,
+      range: `${SMS_RULES_SHEET_NAME}!A${rowIndex + 1}:K${rowIndex + 1}`,
       valueInputOption: 'RAW',
       resource: {
         values: [updatedRow]
@@ -27770,7 +27773,7 @@ app.delete('/api/sms/rules/:id', async (req, res) => {
     // 구글 시트는 행 삭제가 복잡하므로, 활성화를 X로 변경하는 방식으로 처리
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_RULES_SHEET_NAME}!A:J`,
+      range: `${SMS_RULES_SHEET_NAME}!A:K`,
     });
     
     const rows = response.data.values || [];
@@ -28014,7 +28017,7 @@ app.post('/api/sms/register', async (req, res) => {
       // 전달 규칙 조회
       const rulesResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SMS_RULES_SHEET_NAME}!A:J`,
+        range: `${SMS_RULES_SHEET_NAME}!A:K`,
       });
       
       const rulesRows = rulesResponse.data.values || [];
@@ -28024,8 +28027,8 @@ app.post('/api/sms/register', async (req, res) => {
         
         // 활성화되고 자동전달이 ON인 규칙만 필터링
         const activeRules = rulesData.filter(rule => {
-          const autoForward = rule[5] === 'O'; // F열: 자동전달여부
-          const active = rule[6] === 'O'; // G열: 활성화여부
+          const autoForward = rule[6] === 'O'; // G열: 자동전달여부
+          const active = rule[7] === 'O'; // H열: 활성화여부
           return autoForward && active;
         });
         
@@ -28033,32 +28036,44 @@ app.post('/api/sms/register', async (req, res) => {
         
         let matchedRule = null;
         
-        // 각 규칙 체크
+        // 각 규칙 체크 (3단계 필터링)
         for (const rule of activeRules) {
           const ruleId = rule[0];
           const ruleName = rule[1];
-          const senderFilter = rule[2] || '';
-          const keywordFilter = rule[3] || '';
+          const receiverFilter = rule[2] || ''; // C열: 수신번호 필터 ⭐ NEW!
+          const senderFilter = rule[3] || '';   // D열: 발신번호 필터
+          const keywordFilter = rule[4] || '';  // E열: 키워드 필터
           
           let isMatch = true;
           
-          // 발신번호 필터 체크
-          if (senderFilter && !sender.includes(senderFilter)) {
+          // 1단계: 수신번호 필터 체크 ⭐ NEW!
+          if (receiverFilter && !receiver.includes(receiverFilter)) {
+            console.log(`  ✗ 수신번호 불일치: 규칙=${receiverFilter}, 실제=${receiver}`);
             isMatch = false;
           }
           
-          // 키워드 필터 체크 (쉼표로 구분된 키워드 중 하나라도 포함되면 OK)
-          if (keywordFilter) {
+          // 2단계: 발신번호 필터 체크
+          if (isMatch && senderFilter && !sender.includes(senderFilter)) {
+            console.log(`  ✗ 발신번호 불일치: 규칙=${senderFilter}, 실제=${sender}`);
+            isMatch = false;
+          }
+          
+          // 3단계: 키워드 필터 체크 (쉼표로 구분된 키워드 중 하나라도 포함되면 OK)
+          if (isMatch && keywordFilter) {
             const keywords = keywordFilter.split(',').map(k => k.trim());
             const hasKeyword = keywords.some(keyword => message.includes(keyword));
             if (!hasKeyword) {
+              console.log(`  ✗ 키워드 불일치: 규칙=[${keywords.join(',')}], 메시지=${message.substring(0, 30)}...`);
               isMatch = false;
             }
           }
           
           if (isMatch) {
             matchedRule = rule;
-            console.log(`규칙 매칭 성공: ${ruleName} (ID: ${ruleId})`);
+            console.log(`✅ 규칙 매칭 성공: ${ruleName} (ID: ${ruleId})`);
+            console.log(`   수신번호: ${receiver} ✓`);
+            console.log(`   발신번호: ${sender} ✓`);
+            console.log(`   키워드: ${keywordFilter || '(필터 없음)'} ✓`);
             break;
           }
         }
@@ -28066,7 +28081,7 @@ app.post('/api/sms/register', async (req, res) => {
         // 매칭된 규칙이 있으면 자동 전달
         if (matchedRule) {
           const ruleId = matchedRule[0];
-          const targetNumbersStr = matchedRule[4] || ''; // E열: 전달대상번호들
+          const targetNumbersStr = matchedRule[5] || ''; // F열: 전달대상번호들
           const targetNumbers = targetNumbersStr.split(',').map(n => n.trim()).filter(n => n);
           
           console.log(`자동 전달 시작: ${targetNumbers.length}개 번호`);

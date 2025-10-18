@@ -14,7 +14,7 @@
     <application
         android:allowBackup="true"
         android:icon="@android:drawable/ic_dialog_email"
-        android:label="SMS Forwarder"
+        android:label="VIP 안드로이드 매니저"
         android:roundIcon="@android:drawable/ic_dialog_email"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">

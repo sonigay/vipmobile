@@ -72,6 +72,7 @@ const SmsManagementMode = ({
   const [editingRule, setEditingRule] = useState(null);
   const [ruleForm, setRuleForm] = useState({
     name: '',
+    receiverFilter: '',
     senderFilter: '',
     keywordFilter: '',
     targetNumbers: [],
@@ -215,6 +216,7 @@ const SmsManagementMode = ({
         setEditingRule(null);
         setRuleForm({
           name: '',
+          receiverFilter: '',
           senderFilter: '',
           keywordFilter: '',
           targetNumbers: [],
@@ -645,6 +647,7 @@ const SmsManagementMode = ({
                     setEditingRule(null);
                     setRuleForm({
                       name: '',
+                      receiverFilter: '',
                       senderFilter: '',
                       keywordFilter: '',
                       targetNumbers: [],
@@ -673,6 +676,7 @@ const SmsManagementMode = ({
                                 setEditingRule(rule);
                                 setRuleForm({
                                   name: rule.name,
+                                  receiverFilter: rule.receiverFilter || '',
                                   senderFilter: rule.senderFilter,
                                   keywordFilter: rule.keywordFilter,
                                   targetNumbers: rule.targetNumbers.split(',').filter(n => n),
@@ -694,13 +698,16 @@ const SmsManagementMode = ({
                           </Box>
                         </Box>
                         <Typography variant="body2" color="textSecondary" gutterBottom>
-                          발신번호: {rule.senderFilter || '전체'}
+                          📱 수신번호: {rule.receiverFilter || '모든 폰'}
                         </Typography>
                         <Typography variant="body2" color="textSecondary" gutterBottom>
-                          키워드: {rule.keywordFilter || '전체'}
+                          📞 발신번호: {rule.senderFilter || '모든 번호'}
                         </Typography>
                         <Typography variant="body2" color="textSecondary" gutterBottom>
-                          전달대상: {rule.targetNumbers.split(',').filter(n => n).length}개
+                          🔍 키워드: {rule.keywordFilter || '모든 내용'}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          ➡️ 전달대상: {rule.targetNumbers.split(',').filter(n => n).length}개
                         </Typography>
                         <Box sx={{ mt: 2 }}>
                           <Chip
@@ -1052,19 +1059,31 @@ const SmsManagementMode = ({
           
           <TextField
             fullWidth
-            label="발신번호 필터 (선택사항)"
-            value={ruleForm.senderFilter}
-            onChange={(e) => setRuleForm({ ...ruleForm, senderFilter: e.target.value })}
-            placeholder="010-1234-5678"
+            label="수신번호 필터 (어느 폰) - 선택사항"
+            value={ruleForm.receiverFilter}
+            onChange={(e) => setRuleForm({ ...ruleForm, receiverFilter: e.target.value })}
+            placeholder="010-9999-9999 (특정 폰에서 받은 것만)"
+            helperText="비워두면 모든 폰에서 수신한 SMS 확인"
             sx={{ mb: 2 }}
           />
           
           <TextField
             fullWidth
-            label="키워드 필터 (쉼표로 구분)"
+            label="발신번호 필터 (누가 보낸) - 선택사항"
+            value={ruleForm.senderFilter}
+            onChange={(e) => setRuleForm({ ...ruleForm, senderFilter: e.target.value })}
+            placeholder="010-1234-5678 (특정 발신번호만)"
+            helperText="비워두면 모든 발신번호 허용"
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label="키워드 필터 (무슨 내용) - 선택사항"
             value={ruleForm.keywordFilter}
             onChange={(e) => setRuleForm({ ...ruleForm, keywordFilter: e.target.value })}
-            placeholder="긴급,중요,알림"
+            placeholder="긴급,중요,알림 (키워드 중 하나라도 포함되면 OK)"
+            helperText="비워두면 모든 내용 허용"
             sx={{ mb: 2 }}
           />
           

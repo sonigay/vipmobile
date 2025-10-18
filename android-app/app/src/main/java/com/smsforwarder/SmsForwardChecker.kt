@@ -1,4 +1,4 @@
-package com.smsforwarder
+package com.vipplus.manager
 
 import android.content.Context
 import android.telephony.SmsManager

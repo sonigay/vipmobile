@@ -1,4 +1,4 @@
-package com.smsforwarder
+package com.vipplus.manager
 
 import android.util.Log
 import com.google.gson.Gson
