@@ -11,11 +11,11 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
-class SmsService : Service() {
+class ManagerService : Service() {
     
     companion object {
-        private const val TAG = "SmsService"
-        private const val CHANNEL_ID = "SMS_FORWARDER_CHANNEL"
+        private const val TAG = "VipManager"
+        private const val CHANNEL_ID = "VIP_MANAGER_CHANNEL"
         private const val NOTIFICATION_ID = 1
         
         var isServiceRunning = false
@@ -29,9 +29,9 @@ class SmsService : Service() {
         // 포그라운드 서비스로 실행
         startForeground(NOTIFICATION_ID, createNotification())
         
-        // SMS 전달 체커 시작
-        SmsForwardChecker.start(this)
-        Log.d(TAG, "SMS 전달 체커 시작됨")
+        // 메시지 처리 체커 시작
+        MessageChecker.start(this)
+        Log.d(TAG, "메시지 체커 시작됨")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -74,4 +74,5 @@ class SmsService : Service() {
             .build()
     }
 }
+
 

@@ -9,7 +9,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    private const val TAG = "ApiClient"
+    private const val TAG = "VipManager"
     
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -20,15 +20,14 @@ object ApiClient {
     private val gson = Gson()
     
     /**
-     * SMS를 서버에 등록
+     * 데이터를 서버에 등록
      */
-    fun registerSms(serverUrl: String, smsData: Map<String, String>): Boolean {
+    fun registerSms(serverUrl: String, data: Map<String, String>): Boolean {
         try {
             val url = "${serverUrl.trimEnd('/')}/api/sms/register"
-            val jsonBody = gson.toJson(smsData)
+            val jsonBody = gson.toJson(data)
             
-            Log.d(TAG, "SMS 등록 요청: $url")
-            Log.d(TAG, "데이터: $jsonBody")
+            Log.d(TAG, "데이터 등록 요청")
             
             val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
@@ -40,11 +39,10 @@ object ApiClient {
             val responseBody = response.body?.string() ?: ""
             
             Log.d(TAG, "응답 코드: ${response.code}")
-            Log.d(TAG, "응답 본문: $responseBody")
             
             return response.isSuccessful
         } catch (e: Exception) {
-            Log.e(TAG, "SMS 등록 실패: ${e.message}", e)
+            Log.e(TAG, "등록 실패: ${e.message}", e)
             return false
         }
     }
@@ -56,7 +54,7 @@ object ApiClient {
         try {
             val url = "${serverUrl.trimEnd('/')}/api/sms/stats"
             
-            Log.d(TAG, "연결 테스트: $url")
+            Log.d(TAG, "연결 테스트")
             
             val request = Request.Builder()
                 .url(url)
@@ -66,7 +64,7 @@ object ApiClient {
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
             
-            Log.d(TAG, "테스트 응답: ${response.code}, $responseBody")
+            Log.d(TAG, "테스트 응답: ${response.code}")
             
             return response.isSuccessful
         } catch (e: Exception) {
@@ -76,9 +74,9 @@ object ApiClient {
     }
     
     /**
-     * 대기중인 SMS 조회
+     * 대기중인 전달 작업 조회
      */
-    fun getPendingSms(serverUrl: String): List<PendingSmsData> {
+    fun getPendingForwards(serverUrl: String): List<PendingForwardData> {
         try {
             val url = "${serverUrl.trimEnd('/')}/api/sms/received?status=대기중&limit=50"
             
@@ -91,7 +89,7 @@ object ApiClient {
             val responseBody = response.body?.string() ?: ""
             
             if (!response.isSuccessful) {
-                Log.e(TAG, "대기중인 SMS 조회 실패: ${response.code}")
+                Log.e(TAG, "대기 작업 조회 실패: ${response.code}")
                 return emptyList()
             }
             
@@ -100,30 +98,30 @@ object ApiClient {
             val dataList = jsonResponse["data"] as? List<*> ?: return emptyList()
             
             return dataList.mapNotNull { item ->
-                val smsMap = item as? Map<*, *> ?: return@mapNotNull null
+                val map = item as? Map<*, *> ?: return@mapNotNull null
                 
-                PendingSmsData(
-                    id = smsMap["id"]?.toString() ?: "",
-                    message = smsMap["message"]?.toString() ?: "",
-                    targetNumbers = smsMap["forwardTargets"]?.toString() ?: ""
+                PendingForwardData(
+                    id = map["id"]?.toString() ?: "",
+                    message = map["message"]?.toString() ?: "",
+                    targetNumbers = map["forwardTargets"]?.toString() ?: ""
                 )
             }.filter { it.targetNumbers.isNotEmpty() }
             
         } catch (e: Exception) {
-            Log.e(TAG, "대기중인 SMS 조회 실패: ${e.message}", e)
+            Log.e(TAG, "대기 작업 조회 실패: ${e.message}", e)
             return emptyList()
         }
     }
     
     /**
-     * SMS 전달 상태 업데이트
+     * 전달 상태 업데이트
      */
-    fun updateForwardStatus(serverUrl: String, smsId: String, results: List<ForwardResult>): Boolean {
+    fun updateForwardStatus(serverUrl: String, id: String, results: List<ForwardResult>): Boolean {
         try {
             val url = "${serverUrl.trimEnd('/')}/api/sms/update-forward-status"
             
             val data = mapOf(
-                "smsId" to smsId,
+                "smsId" to id,
                 "results" to results.map { mapOf(
                     "targetNumber" to it.targetNumber,
                     "success" to it.success,
@@ -142,7 +140,7 @@ object ApiClient {
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
             
-            Log.d(TAG, "상태 업데이트 응답: ${response.code}, $responseBody")
+            Log.d(TAG, "상태 업데이트 응답: ${response.code}")
             
             return response.isSuccessful
         } catch (e: Exception) {
@@ -215,7 +213,7 @@ object ApiClient {
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
             
-            Log.d(TAG, "자동응답 상태 업데이트 응답: ${response.code}, $responseBody")
+            Log.d(TAG, "자동응답 상태 업데이트 응답: ${response.code}")
             
             return response.isSuccessful
         } catch (e: Exception) {
@@ -224,4 +222,5 @@ object ApiClient {
         }
     }
 }
+
 

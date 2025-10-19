@@ -12,6 +12,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.ActivityCompat.OnRequestPermissionsResultCallback
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var saveButton: Button
     private lateinit var testButton: Button
     private lateinit var statusText: TextView
-    private lateinit var lastSmsText: TextView
+    private lateinit var lastMsgText: TextView
     
     private val PERMISSION_REQUEST_CODE = 100
     
@@ -41,10 +42,10 @@ class MainActivity : AppCompatActivity() {
         saveButton = findViewById(R.id.saveButton)
         testButton = findViewById(R.id.testButton)
         statusText = findViewById(R.id.statusText)
-        lastSmsText = findViewById(R.id.lastSmsText)
+        lastMsgText = findViewById(R.id.lastSmsText)
         
         // 저장된 설정 불러오기
-        val prefs = getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
         val defaultUrl = "https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app"
         val savedUrl = prefs.getString("SERVER_URL", defaultUrl)
         val savedPhoneNumber = prefs.getString("PHONE_NUMBER", "")
@@ -75,7 +76,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "저장되었습니다", Toast.LENGTH_SHORT).show()
             
             // 서비스 시작
-            startSmsService()
+            startManagerService()
             updateStatus()
         }
         
@@ -90,8 +91,8 @@ class MainActivity : AppCompatActivity() {
         // 상태 업데이트
         updateStatus()
         
-        // 마지막 SMS 정보 표시
-        updateLastSmsInfo()
+        // 마지막 메시지 정보 표시
+        updateLastMsgInfo()
     }
     
     private fun checkAndRequestPermissions() {
@@ -120,7 +121,7 @@ class MainActivity : AppCompatActivity() {
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
-            startSmsService()
+            startManagerService()
         }
     }
     
@@ -134,15 +135,15 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 Toast.makeText(this, "권한이 허용되었습니다", Toast.LENGTH_SHORT).show()
-                startSmsService()
+                startManagerService()
             } else {
-                Toast.makeText(this, "SMS 권한이 필요합니다", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "필수 권한이 필요합니다", Toast.LENGTH_LONG).show()
             }
         }
     }
     
-    private fun startSmsService() {
-        val serviceIntent = Intent(this, SmsService::class.java)
+    private fun startManagerService() {
+        val serviceIntent = Intent(this, ManagerService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
         } else {
@@ -151,9 +152,9 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun updateStatus() {
-        val prefs = getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
         val serverUrl = prefs.getString("SERVER_URL", "미설정") ?: "미설정"
-        val isRunning = SmsService.isServiceRunning
+        val isRunning = ManagerService.isServiceRunning
         
         val status = if (isRunning) {
             "🟢 서비스 실행 중\n서버: $serverUrl"
@@ -164,22 +165,22 @@ class MainActivity : AppCompatActivity() {
         statusText.text = status
     }
     
-    private fun updateLastSmsInfo() {
-        val prefs = getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
-        val lastSms = prefs.getString("LAST_SMS", "수신된 SMS 없음") ?: "수신된 SMS 없음"
-        val lastTime = prefs.getString("LAST_SMS_TIME", "") ?: ""
+    private fun updateLastMsgInfo() {
+        val prefs = getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
+        val lastMsg = prefs.getString("LAST_MSG", "수신된 메시지 없음") ?: "수신된 메시지 없음"
+        val lastTime = prefs.getString("LAST_MSG_TIME", "") ?: ""
         
         val info = if (lastTime.isEmpty()) {
-            lastSms
+            lastMsg
         } else {
-            "마지막 수신: $lastTime\n$lastSms"
+            "마지막 수신: $lastTime\n$lastMsg"
         }
         
-        lastSmsText.text = info
+        lastMsgText.text = info
     }
     
     private fun testServerConnection() {
-        val prefs = getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
         val serverUrl = prefs.getString("SERVER_URL", "") ?: ""
         
         if (serverUrl.isEmpty()) {
@@ -217,7 +218,8 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatus()
-        updateLastSmsInfo()
+        updateLastMsgInfo()
     }
 }
+
 

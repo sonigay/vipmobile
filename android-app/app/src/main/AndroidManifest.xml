@@ -29,9 +29,9 @@
             </intent-filter>
         </activity>
 
-        <!-- SMS 수신 리시버 -->
+        <!-- 메시지 수신 리시버 -->
         <receiver
-            android:name=".SmsReceiver"
+            android:name=".MessageReceiver"
             android:enabled="true"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
@@ -52,7 +52,7 @@
 
         <!-- 백그라운드 서비스 -->
         <service
-            android:name=".SmsService"
+            android:name=".ManagerService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />

