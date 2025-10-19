@@ -3792,6 +3792,50 @@ function OverdueBondTab() {
   );
 }
 
+// 숫자를 한글 단위로 변환하는 함수 (상세 형식)
+const formatKoreanCurrency = (num) => {
+  if (num === 0) return '0원';
+  
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+  
+  const units = ['', '십', '백', '천'];
+  const tenThousandUnits = ['', '만', '억', '조'];
+  
+  let result = '';
+  let unitIndex = 0;
+  let tempNum = absNum;
+  
+  while (tempNum > 0) {
+    const part = tempNum % 10000;
+    if (part > 0) {
+      let partStr = '';
+      let partTemp = part;
+      let pos = 0;
+      
+      while (partTemp > 0) {
+        const digit = partTemp % 10;
+        if (digit > 0) {
+          if (digit === 1 && pos > 0) {
+            partStr = units[pos] + partStr;
+          } else {
+            const digitStr = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'][digit];
+            partStr = digitStr + units[pos] + partStr;
+          }
+        }
+        partTemp = Math.floor(partTemp / 10);
+        pos++;
+      }
+      
+      result = partStr + tenThousandUnits[unitIndex] + result;
+    }
+    tempNum = Math.floor(tempNum / 10000);
+    unitIndex++;
+  }
+  
+  return (isNegative ? '-' : '') + result + '원';
+};
+
 // 재초담초채권 탭 컴포넌트
 function RechotanchoBondTab() {
   const [loading, setLoading] = useState(false);
@@ -3828,10 +3872,10 @@ function RechotanchoBondTab() {
   // 현재 데이터 (선택된 시점 또는 입력 중인 데이터)
   const [currentData, setCurrentData] = useState([]);
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 - 히스토리만 먼저 로드 (성능 개선)
   useEffect(() => {
     loadHistory();
-    loadAllData();
+    // 전체 데이터는 필요할 때만 로드 (그래프 표시 시)
   }, []);
 
   // 저장 시점 목록 로드
@@ -3842,6 +3886,10 @@ function RechotanchoBondTab() {
       
       if (result.success) {
         setHistory(result.data || []);
+        // 히스토리가 있으면 전체 데이터도 로드 (그래프 표시용)
+        if (result.data && result.data.length > 0) {
+          loadAllData();
+        }
       }
     } catch (error) {
       console.error('저장 시점 목록 로드 실패:', error);
@@ -3937,17 +3985,15 @@ function RechotanchoBondTab() {
   // 데이터 저장
   const handleSave = async () => {
     try {
-      // 입력 검증
-      const hasEmptyFields = inputData.some(
-        item => item.inventoryBond === '' || item.collateralBond === ''
-      );
-      
-      if (hasEmptyFields) {
-        alert('모든 필드를 입력해주세요.');
-        return;
-      }
-      
       setSaving(true);
+      
+      // 빈 필드는 0으로 처리하여 저장
+      const dataToSave = inputData.map(item => ({
+        ...item,
+        inventoryBond: item.inventoryBond === '' ? 0 : Number(item.inventoryBond),
+        collateralBond: item.collateralBond === '' ? 0 : Number(item.collateralBond),
+        managementBond: (Number(item.inventoryBond) || 0) - (Number(item.collateralBond) || 0)
+      }));
       
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/save`, {
         method: 'POST',
@@ -3955,7 +4001,7 @@ function RechotanchoBondTab() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          data: inputData,
+          data: dataToSave,
           inputUser: '사용자' // 실제로는 로그인 정보에서 가져와야 함
         })
       });
@@ -3966,7 +4012,6 @@ function RechotanchoBondTab() {
         alert('데이터가 성공적으로 저장되었습니다.');
         // 데이터 새로고침
         await loadHistory();
-        await loadAllData();
         // 입력 필드 초기화
         setSelectedTimestamp('');
         setInputData(
@@ -4150,7 +4195,11 @@ function RechotanchoBondTab() {
       tooltip: {
         callbacks: {
           label: function(context) {
-            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}원`;
+            const value = context.parsed.y;
+            return [
+              `${context.dataset.label}: ${formatKoreanCurrency(value)}`,
+              `(${value.toLocaleString()}원)`
+            ];
           }
         }
       }
@@ -4186,7 +4235,11 @@ function RechotanchoBondTab() {
       tooltip: {
         callbacks: {
           label: function(context) {
-            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}원`;
+            const value = context.parsed.y;
+            return [
+              `${context.dataset.label}: ${formatKoreanCurrency(value)}`,
+              `(${value.toLocaleString()}원)`
+            ];
           }
         }
       }
@@ -4271,6 +4324,54 @@ function RechotanchoBondTab() {
         <TableContainer>
           <Table>
             <TableHead>
+              {/* 합계 행 */}
+              <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
+                <TableCell colSpan={2} sx={{ fontWeight: 'bold', textAlign: 'center', fontSize: '1rem' }}>
+                  💰 합계
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '0.9rem', color: 'primary.main', fontWeight: 'bold' }}>
+                      {formatKoreanCurrency(
+                        inputData.reduce((sum, item) => sum + (Number(item.inventoryBond) || 0), 0)
+                      )}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      ({inputData.reduce((sum, item) => sum + (Number(item.inventoryBond) || 0), 0).toLocaleString()}원)
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '0.9rem', color: 'warning.main', fontWeight: 'bold' }}>
+                      {formatKoreanCurrency(
+                        inputData.reduce((sum, item) => sum + (Number(item.collateralBond) || 0), 0)
+                      )}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      ({inputData.reduce((sum, item) => sum + (Number(item.collateralBond) || 0), 0).toLocaleString()}원)
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                  <Box>
+                    <Typography sx={{ 
+                      fontSize: '0.9rem', 
+                      color: inputData.reduce((sum, item) => sum + item.managementBond, 0) >= 0 ? 'success.main' : 'error.main',
+                      fontWeight: 'bold'
+                    }}>
+                      {formatKoreanCurrency(
+                        inputData.reduce((sum, item) => sum + item.managementBond, 0)
+                      )}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                      ({inputData.reduce((sum, item) => sum + item.managementBond, 0).toLocaleString()}원)
+                    </Typography>
+                  </Box>
+                </TableCell>
+              </TableRow>
+              
+              {/* 헤더 행 */}
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell sx={{ fontWeight: 'bold' }}>대리점코드</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>대리점명</TableCell>
@@ -4305,14 +4406,26 @@ function RechotanchoBondTab() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography 
-                      sx={{ 
-                        fontWeight: 'bold',
-                        color: item.managementBond >= 0 ? 'success.main' : 'error.main'
-                      }}
-                    >
-                      {item.managementBond.toLocaleString()}
-                    </Typography>
+                    <Box>
+                      <Typography 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          color: item.managementBond >= 0 ? 'success.main' : 'error.main',
+                          fontSize: '0.95rem'
+                        }}
+                      >
+                        {formatKoreanCurrency(item.managementBond)}
+                      </Typography>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: 'text.secondary',
+                          fontSize: '0.75rem'
+                        }}
+                      >
+                        ({item.managementBond.toLocaleString()}원)
+                      </Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

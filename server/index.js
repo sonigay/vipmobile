@@ -6113,10 +6113,10 @@ app.post('/api/rechotancho-bond/save', async (req, res) => {
   try {
     const { data, inputUser } = req.body;
     
-    if (!data || !Array.isArray(data) || data.length !== 5) {
+    if (!data || !Array.isArray(data)) {
       return res.status(400).json({
         success: false,
-        error: '5개 대리점 데이터가 필요합니다.'
+        error: '데이터가 올바르지 않습니다.'
       });
     }
     
@@ -6128,7 +6128,7 @@ app.post('/api/rechotancho-bond/save', async (req, res) => {
     const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
     const timestamp = kstTime.toISOString().replace('T', ' ').substring(0, 19);
     
-    // 시트에 저장할 행 생성
+    // 시트에 저장할 행 생성 (빈 값도 허용)
     const rows = data.map(item => [
       timestamp,                          // A: 저장일시
       item.agentCode,                     // B: 대리점코드
@@ -6151,7 +6151,7 @@ app.post('/api/rechotancho-bond/save', async (req, res) => {
       });
     });
     
-    console.log(`✅ 재초담초채권 데이터 저장 완료: ${timestamp}, 입력자: ${inputUser}`);
+    console.log(`✅ 재초담초채권 데이터 저장 완료: ${timestamp}, 입력자: ${inputUser}, ${rows.length}개 대리점`);
     
     res.json({
       success: true,
