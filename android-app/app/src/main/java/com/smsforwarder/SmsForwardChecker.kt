@@ -58,31 +58,44 @@ object SmsForwardChecker {
     private suspend fun checkAndForwardPendingSms(context: Context) {
         val prefs = context.getSharedPreferences("SMS_FORWARDER", Context.MODE_PRIVATE)
         val serverUrl = prefs.getString("SERVER_URL", "") ?: ""
+        val devicePhoneNumber = prefs.getString("PHONE_NUMBER", "") ?: ""
         
-        if (serverUrl.isEmpty()) {
+        if (serverUrl.isEmpty() || devicePhoneNumber.isEmpty()) {
             return
         }
         
         try {
-            // 서버에서 대기중인 SMS 조회
+            // 1. 대기중인 SMS 전달 처리
             val pendingSms = ApiClient.getPendingSms(serverUrl)
             
-            if (pendingSms.isEmpty()) {
-                return
+            if (pendingSms.isNotEmpty()) {
+                Log.d(TAG, "대기중인 SMS 전달: ${pendingSms.size}개")
+                
+                for (sms in pendingSms) {
+                    try {
+                        forwardSms(context, sms, serverUrl)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "SMS 전달 오류 (ID: ${sms.id}): ${e.message}", e)
+                    }
+                }
             }
             
-            Log.d(TAG, "대기중인 SMS: ${pendingSms.size}개")
+            // 2. 대기중인 자동응답 처리 ⭐ NEW!
+            val pendingReplies = ApiClient.getPendingAutoReplies(serverUrl, devicePhoneNumber)
             
-            // 각 SMS 처리
-            for (sms in pendingSms) {
-                try {
-                    forwardSms(context, sms, serverUrl)
-                } catch (e: Exception) {
-                    Log.e(TAG, "SMS 전달 오류 (ID: ${sms.id}): ${e.message}", e)
+            if (pendingReplies.isNotEmpty()) {
+                Log.d(TAG, "대기중인 자동응답: ${pendingReplies.size}개")
+                
+                for (reply in pendingReplies) {
+                    try {
+                        sendAutoReply(context, reply, serverUrl)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "자동응답 전송 오류 (ID: ${reply.id}): ${e.message}", e)
+                    }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "대기중인 SMS 조회 오류: ${e.message}", e)
+            Log.e(TAG, "대기중인 작업 조회 오류: ${e.message}", e)
         }
     }
     
@@ -135,6 +148,45 @@ object SmsForwardChecker {
             }
         }
     }
+    
+    /**
+     * 자동응답 전송 실행 ⭐ NEW!
+     */
+    private fun sendAutoReply(context: Context, reply: PendingAutoReplyData, serverUrl: String) {
+        Log.d(TAG, "자동응답 전송 시작 (ID: ${reply.id}, 대상: ${reply.sender})")
+        
+        val smsManager = SmsManager.getDefault()
+        var success = false
+        var errorMessage: String? = null
+        
+        try {
+            // 자동응답 전송
+            smsManager.sendTextMessage(
+                reply.sender,
+                null,
+                reply.reply,
+                null,
+                null
+            )
+            
+            success = true
+            Log.d(TAG, "✅ 자동응답 전송 성공: ${reply.sender}")
+            
+        } catch (e: Exception) {
+            errorMessage = e.message
+            Log.e(TAG, "❌ 자동응답 전송 실패: ${reply.sender} - ${e.message}")
+        }
+        
+        // 서버에 자동응답 완료 알림
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                ApiClient.updateAutoReplyStatus(serverUrl, reply.id, success, errorMessage)
+                Log.d(TAG, "자동응답 상태 업데이트 완료 (Reply ID: ${reply.id})")
+            } catch (e: Exception) {
+                Log.e(TAG, "자동응답 상태 업데이트 실패: ${e.message}", e)
+            }
+        }
+    }
 }
 
 /**
@@ -144,6 +196,15 @@ data class PendingSmsData(
     val id: String,
     val message: String,
     val targetNumbers: String
+)
+
+/**
+ * 대기중인 자동응답 데이터 ⭐ NEW!
+ */
+data class PendingAutoReplyData(
+    val id: String,
+    val sender: String,
+    val reply: String
 )
 
 /**

@@ -150,5 +150,78 @@ object ApiClient {
             return false
         }
     }
+    
+    /**
+     * 대기중인 자동응답 조회
+     */
+    fun getPendingAutoReplies(serverUrl: String, salesPhone: String): List<PendingAutoReplyData> {
+        try {
+            val url = "${serverUrl.trimEnd('/')}/api/sms/auto-reply/pending?salesPhone=$salesPhone"
+            
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            
+            if (!response.isSuccessful) {
+                Log.e(TAG, "대기중인 자동응답 조회 실패: ${response.code}")
+                return emptyList()
+            }
+            
+            // JSON 파싱
+            val jsonResponse = gson.fromJson(responseBody, Map::class.java)
+            val dataList = jsonResponse["data"] as? List<*> ?: return emptyList()
+            
+            return dataList.mapNotNull { item ->
+                val replyMap = item as? Map<*, *> ?: return@mapNotNull null
+                
+                PendingAutoReplyData(
+                    id = replyMap["id"]?.toString() ?: "",
+                    sender = replyMap["sender"]?.toString() ?: "",
+                    reply = replyMap["reply"]?.toString() ?: ""
+                )
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "대기중인 자동응답 조회 실패: ${e.message}", e)
+            return emptyList()
+        }
+    }
+    
+    /**
+     * 자동응답 발송 상태 업데이트
+     */
+    fun updateAutoReplyStatus(serverUrl: String, replyId: String, success: Boolean, errorMessage: String?): Boolean {
+        try {
+            val url = "${serverUrl.trimEnd('/')}/api/sms/auto-reply/update-status"
+            
+            val data = mapOf(
+                "replyId" to replyId,
+                "success" to success,
+                "errorMessage" to (errorMessage ?: "")
+            )
+            
+            val jsonBody = gson.toJson(data)
+            val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+            
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            
+            Log.d(TAG, "자동응답 상태 업데이트 응답: ${response.code}, $responseBody")
+            
+            return response.isSuccessful
+        } catch (e: Exception) {
+            Log.e(TAG, "자동응답 상태 업데이트 실패: ${e.message}", e)
+            return false
+        }
+    }
 }
 

@@ -59,7 +59,11 @@ const SmsManagementMode = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
+  
+  // 2단계 탭 구조
+  const [mainTab, setMainTab] = useState(0); // 0: 문자전달, 1: 자동응답
+  const [forwardTab, setForwardTab] = useState(0); // 문자전달 서브탭
+  const [replyTab, setReplyTab] = useState(0); // 자동응답 서브탭
   
   // SMS 목록 상태
   const [smsList, setSmsList] = useState([]);
@@ -104,6 +108,36 @@ const SmsManagementMode = ({
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [cleanupDays, setCleanupDays] = useState(30);
   const [cleanupTarget, setCleanupTarget] = useState('all');
+  
+  // 자동응답 규칙 상태
+  const [autoReplyRules, setAutoReplyRules] = useState([]);
+  const [showAutoReplyRuleDialog, setShowAutoReplyRuleDialog] = useState(false);
+  const [editingAutoReplyRule, setEditingAutoReplyRule] = useState(null);
+  const [autoReplyRuleForm, setAutoReplyRuleForm] = useState({
+    name: '',
+    keywords: '',
+    answerType: '템플릿',
+    answerTemplate: '',
+    priceConfig: '',
+    active: true,
+    priority: 10,
+    memo: ''
+  });
+  
+  // 자동응답 거래처 상태
+  const [autoReplyContacts, setAutoReplyContacts] = useState([]);
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    type: '거래처',
+    salesPersonId: '',
+    name: '',
+    contact: '',
+    memo: ''
+  });
+  
+  // 자동응답 이력 상태
+  const [autoReplyHistory, setAutoReplyHistory] = useState([]);
+  const [autoReplyHistoryFilter, setAutoReplyHistoryFilter] = useState('all');
 
   // SMS 관리모드 진입 시 업데이트 팝업 표시
   useEffect(() => {
@@ -120,16 +154,28 @@ const SmsManagementMode = ({
     loadData();
     const interval = setInterval(loadData, 30000); // 30초마다 자동 새로고침
     return () => clearInterval(interval);
-  }, [activeTab, smsFilter]);
+  }, [mainTab, forwardTab, replyTab, smsFilter, autoReplyHistoryFilter]);
 
   const loadData = async () => {
-    if (activeTab === 0) {
-      await loadSms();
-      await loadStats();
-    } else if (activeTab === 1) {
-      await loadRules();
-    } else if (activeTab === 2) {
-      await loadHistory();
+    if (mainTab === 0) {
+      // 문자전달 탭
+      if (forwardTab === 0) {
+        await loadSms();
+        await loadStats();
+      } else if (forwardTab === 1) {
+        await loadRules();
+      } else if (forwardTab === 2) {
+        await loadHistory();
+      }
+    } else if (mainTab === 1) {
+      // 자동응답 탭
+      if (replyTab === 0) {
+        await loadAutoReplyRules();
+      } else if (replyTab === 1) {
+        await loadAutoReplyContacts();
+      } else if (replyTab === 2) {
+        await loadAutoReplyHistory();
+      }
     }
   };
 
@@ -177,6 +223,53 @@ const SmsManagementMode = ({
     } catch (error) {
       console.error('전달 이력 로드 실패:', error);
       setError('전달 이력을 불러오는데 실패했습니다.');
+    }
+  };
+
+  // 자동응답 규칙 로드
+  const loadAutoReplyRules = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/auto-reply/rules`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setAutoReplyRules(result.data);
+      }
+    } catch (error) {
+      console.error('자동응답 규칙 로드 실패:', error);
+      setError('자동응답 규칙을 불러오는데 실패했습니다.');
+    }
+  };
+
+  // 자동응답 거래처 로드
+  const loadAutoReplyContacts = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/auto-reply/contacts`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setAutoReplyContacts(result.data);
+      }
+    } catch (error) {
+      console.error('자동응답 거래처 로드 실패:', error);
+      setError('자동응답 거래처를 불러오는데 실패했습니다.');
+    }
+  };
+
+  // 자동응답 이력 로드
+  const loadAutoReplyHistory = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/sms/auto-reply/history?limit=100&status=${autoReplyHistoryFilter}`
+      );
+      const result = await response.json();
+      
+      if (result.success) {
+        setAutoReplyHistory(result.data);
+      }
+    } catch (error) {
+      console.error('자동응답 이력 로드 실패:', error);
+      setError('자동응답 이력을 불러오는데 실패했습니다.');
     }
   };
 
@@ -367,6 +460,128 @@ const SmsManagementMode = ({
     }
   };
 
+  // ============================================
+  // 자동응답 관련 함수들
+  // ============================================
+
+  // 자동응답 규칙 저장
+  const handleSaveAutoReplyRule = async () => {
+    try {
+      const url = editingAutoReplyRule
+        ? `${process.env.REACT_APP_API_URL}/api/sms/auto-reply/rules/${editingAutoReplyRule.id}`
+        : `${process.env.REACT_APP_API_URL}/api/sms/auto-reply/rules`;
+      
+      const method = editingAutoReplyRule ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(autoReplyRuleForm)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setShowAutoReplyRuleDialog(false);
+        setEditingAutoReplyRule(null);
+        setAutoReplyRuleForm({
+          name: '',
+          keywords: '',
+          answerType: '템플릿',
+          answerTemplate: '',
+          priceConfig: '',
+          active: true,
+          priority: 10,
+          memo: ''
+        });
+        await loadAutoReplyRules();
+      } else {
+        setError('규칙 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('규칙 저장 실패:', error);
+      setError('규칙 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 자동응답 규칙 삭제
+  const handleDeleteAutoReplyRule = async (id) => {
+    if (!window.confirm('정말 이 규칙을 삭제하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/auto-reply/rules/${id}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        await loadAutoReplyRules();
+      } else {
+        setError('규칙 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('규칙 삭제 실패:', error);
+      setError('규칙 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 거래처 연락처 저장
+  const handleSaveContact = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/auto-reply/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactForm)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setShowContactDialog(false);
+        setContactForm({
+          type: '거래처',
+          salesPersonId: '',
+          name: '',
+          contact: '',
+          memo: ''
+        });
+        await loadAutoReplyContacts();
+      } else {
+        setError('연락처 저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('연락처 저장 실패:', error);
+      setError('연락처 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 거래처 연락처 삭제
+  const handleDeleteContact = async (id) => {
+    if (!window.confirm('정말 이 연락처를 삭제하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/auto-reply/contacts/${id}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        await loadAutoReplyContacts();
+      } else {
+        setError('연락처 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('연락처 삭제 실패:', error);
+      setError('연락처 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   // 필터링된 SMS 목록
   const filteredSmsList = smsList.filter(sms => {
     if (smsSearch) {
@@ -461,21 +676,41 @@ const SmsManagementMode = ({
         </Alert>
       )}
 
-      {/* 탭 */}
+      {/* 1단계 메인 탭 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
-        <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
-          <Tab label="SMS 목록" />
-          <Tab label="전달 규칙" />
-          <Tab label="전달 이력" />
-          <Tab label="설정" icon={<SettingsIcon />} iconPosition="start" />
+        <Tabs value={mainTab} onChange={(e, v) => setMainTab(v)} variant="fullWidth">
+          <Tab label="📨 문자전달" />
+          <Tab label="🤖 자동응답" />
         </Tabs>
+      </Box>
+
+      {/* 2단계 서브 탭 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: '#f9f9f9' }}>
+        {mainTab === 0 && (
+          <Tabs value={forwardTab} onChange={(e, v) => setForwardTab(v)}>
+            <Tab label="SMS 목록" />
+            <Tab label="전달 규칙" />
+            <Tab label="전달 이력" />
+            <Tab label="설정" icon={<SettingsIcon />} iconPosition="start" />
+          </Tabs>
+        )}
+        {mainTab === 1 && (
+          <Tabs value={replyTab} onChange={(e, v) => setReplyTab(v)}>
+            <Tab label="규칙 관리" />
+            <Tab label="거래처 관리" />
+            <Tab label="응답 이력" />
+            <Tab label="설정" icon={<SettingsIcon />} iconPosition="start" />
+          </Tabs>
+        )}
       </Box>
 
       {/* 콘텐츠 */}
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5', p: 3 }}>
         <Container maxWidth="xl">
-          {/* 탭 0: SMS 목록 */}
-          {activeTab === 0 && (
+          {/* ============================================ */}
+          {/* 문자전달 탭 콘텐츠 */}
+          {/* ============================================ */}
+          {mainTab === 0 && forwardTab === 0 && (
             <Box>
               {/* 통계 카드 */}
               <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -662,7 +897,7 @@ const SmsManagementMode = ({
           )}
 
           {/* 탭 1: 전달 규칙 */}
-          {activeTab === 1 && (
+          {mainTab === 0 && forwardTab === 1 && (
             <Box>
               <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="h5">전달 규칙 관리</Typography>
@@ -766,7 +1001,7 @@ const SmsManagementMode = ({
           )}
 
           {/* 탭 2: 전달 이력 */}
-          {activeTab === 2 && (
+          {mainTab === 0 && forwardTab === 2 && (
             <Box>
               <Typography variant="h5" gutterBottom>전달 이력</Typography>
               <TableContainer component={Paper}>
@@ -813,7 +1048,7 @@ const SmsManagementMode = ({
           )}
 
           {/* 탭 3: 설정 */}
-          {activeTab === 3 && (
+          {mainTab === 0 && forwardTab === 3 && (
             <Box>
               <Typography variant="h5" gutterBottom>설정</Typography>
               
@@ -910,8 +1145,450 @@ const SmsManagementMode = ({
               </Grid>
             </Box>
           )}
+
+          {/* ============================================ */}
+          {/* 자동응답 탭 콘텐츠 */}
+          {/* ============================================ */}
+
+          {/* 자동응답 탭 0: 규칙 관리 */}
+          {mainTab === 1 && replyTab === 0 && (
+            <Box>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="h5">자동응답 규칙 관리</Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setEditingAutoReplyRule(null);
+                    setAutoReplyRuleForm({
+                      name: '',
+                      keywords: '',
+                      answerType: '템플릿',
+                      answerTemplate: '',
+                      priceConfig: '',
+                      active: true,
+                      priority: 10,
+                      memo: ''
+                    });
+                    setShowAutoReplyRuleDialog(true);
+                  }}
+                >
+                  규칙 추가
+                </Button>
+              </Box>
+
+              <Grid container spacing={2}>
+                {autoReplyRules.map(rule => (
+                  <Grid item xs={12} md={6} lg={4} key={rule.id}>
+                    <Card>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="h6">{rule.name}</Typography>
+                          <Box>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setEditingAutoReplyRule(rule);
+                                setAutoReplyRuleForm({
+                                  name: rule.name,
+                                  keywords: rule.keywords,
+                                  answerType: rule.answerType,
+                                  answerTemplate: rule.answerTemplate,
+                                  priceConfig: rule.priceConfig,
+                                  active: rule.active,
+                                  priority: rule.priority,
+                                  memo: rule.memo
+                                });
+                                setShowAutoReplyRuleDialog(true);
+                              }}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteAutoReplyRule(rule.id)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          🔍 키워드: {rule.keywords || '없음'}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          💬 답변: {rule.answerTemplate.substring(0, 30)}{rule.answerTemplate.length > 30 ? '...' : ''}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          📊 우선순위: {rule.priority}
+                        </Typography>
+                        <Box sx={{ mt: 2 }}>
+                          <Chip
+                            label={rule.answerType}
+                            size="small"
+                            color={rule.answerType === '템플릿' ? 'primary' : 'secondary'}
+                            sx={{ mr: 1 }}
+                          />
+                          <Chip
+                            label={rule.active ? '활성화' : '비활성화'}
+                            size="small"
+                            color={rule.active ? 'success' : 'default'}
+                          />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
+
+          {/* 자동응답 탭 1: 거래처 관리 */}
+          {mainTab === 1 && replyTab === 1 && (
+            <Box>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="h5">거래처 연락처 관리</Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setContactForm({
+                      type: '거래처',
+                      salesPersonId: '',
+                      name: '',
+                      contact: '',
+                      memo: ''
+                    });
+                    setShowContactDialog(true);
+                  }}
+                >
+                  연락처 추가
+                </Button>
+              </Box>
+
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>유형</TableCell>
+                      <TableCell>이름</TableCell>
+                      <TableCell>연락처</TableCell>
+                      <TableCell>담당영업사원</TableCell>
+                      <TableCell>출처</TableCell>
+                      <TableCell>등록일시</TableCell>
+                      <TableCell>액션</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {autoReplyContacts.map((contact) => (
+                      <TableRow key={contact.id}>
+                        <TableCell>
+                          <Chip
+                            label={contact.type}
+                            size="small"
+                            color={contact.type === '영업사원' ? 'primary' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell>{contact.name}</TableCell>
+                        <TableCell>{contact.contact}</TableCell>
+                        <TableCell>{contact.salesPersonId}</TableCell>
+                        <TableCell>
+                          <Chip label={contact.source} size="small" />
+                        </TableCell>
+                        <TableCell>{contact.createdAt || '-'}</TableCell>
+                        <TableCell>
+                          {contact.source === '앱' && (
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteContact(contact.id)}
+                              color="error"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+
+          {/* 자동응답 탭 2: 응답 이력 */}
+          {mainTab === 1 && replyTab === 2 && (
+            <Box>
+              <Typography variant="h5" gutterBottom>자동응답 이력</Typography>
+
+              {/* 필터 */}
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  variant={autoReplyHistoryFilter === 'all' ? 'contained' : 'outlined'}
+                  onClick={() => setAutoReplyHistoryFilter('all')}
+                  size="small"
+                >
+                  전체
+                </Button>
+                <Button
+                  variant={autoReplyHistoryFilter === '대기중' ? 'contained' : 'outlined'}
+                  onClick={() => setAutoReplyHistoryFilter('대기중')}
+                  size="small"
+                  sx={{ ml: 1 }}
+                >
+                  대기중
+                </Button>
+                <Button
+                  variant={autoReplyHistoryFilter === '발송완료' ? 'contained' : 'outlined'}
+                  onClick={() => setAutoReplyHistoryFilter('발송완료')}
+                  size="small"
+                  sx={{ ml: 1 }}
+                >
+                  발송완료
+                </Button>
+                <Button
+                  variant={autoReplyHistoryFilter === '실패' ? 'contained' : 'outlined'}
+                  onClick={() => setAutoReplyHistoryFilter('실패')}
+                  size="small"
+                  sx={{ ml: 1 }}
+                >
+                  실패
+                </Button>
+              </Box>
+
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>수신일시</TableCell>
+                      <TableCell>발신번호</TableCell>
+                      <TableCell>거래처명</TableCell>
+                      <TableCell>문의내용</TableCell>
+                      <TableCell>매칭규칙</TableCell>
+                      <TableCell>답변내용</TableCell>
+                      <TableCell>발송번호</TableCell>
+                      <TableCell>상태</TableCell>
+                      <TableCell>발송일시</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {autoReplyHistory.map((h) => (
+                      <TableRow key={h.id}>
+                        <TableCell>{h.receivedAt}</TableCell>
+                        <TableCell>{h.sender}</TableCell>
+                        <TableCell>{h.clientName}</TableCell>
+                        <TableCell>{h.inquiry.substring(0, 30)}{h.inquiry.length > 30 ? '...' : ''}</TableCell>
+                        <TableCell>{h.matchedRule}</TableCell>
+                        <TableCell>{h.reply.substring(0, 30)}{h.reply.length > 30 ? '...' : ''}</TableCell>
+                        <TableCell>{h.senderPhone}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={h.status}
+                            size="small"
+                            color={
+                              h.status === '발송완료' ? 'success' :
+                              h.status === '대기중' ? 'warning' : 'error'
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>{h.sentAt || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+
+          {/* 자동응답 탭 3: 설정 */}
+          {mainTab === 1 && replyTab === 3 && (
+            <Box>
+              <Typography variant="h5" gutterBottom>자동응답 설정</Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>시스템 안내</Typography>
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        자동응답 시스템은 등록된 거래처/영업사원에게만 응답합니다.<br/>
+                        규칙은 우선순위 순으로 확인되며, 첫 번째 매칭된 규칙으로 답변합니다.
+                      </Alert>
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          활성 규칙: <strong>{autoReplyRules.filter(r => r.active).length}개</strong>
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          등록된 연락처: <strong>{autoReplyContacts.length}개</strong>
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          총 응답 이력: <strong>{autoReplyHistory.length}개</strong>
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
         </Container>
       </Box>
+
+      {/* 자동응답 규칙 추가/수정 모달 */}
+      <Dialog open={showAutoReplyRuleDialog} onClose={() => setShowAutoReplyRuleDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{editingAutoReplyRule ? '규칙 수정' : '규칙 추가'}</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="규칙명"
+            value={autoReplyRuleForm.name}
+            onChange={(e) => setAutoReplyRuleForm({ ...autoReplyRuleForm, name: e.target.value })}
+            sx={{ mt: 1, mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label="키워드 (쉼표로 구분)"
+            value={autoReplyRuleForm.keywords}
+            onChange={(e) => setAutoReplyRuleForm({ ...autoReplyRuleForm, keywords: e.target.value })}
+            placeholder="영업시간,시간,몇시"
+            helperText="여러 키워드를 쉼표로 구분하세요"
+            sx={{ mb: 2 }}
+          />
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>답변 유형</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant={autoReplyRuleForm.answerType === '템플릿' ? 'contained' : 'outlined'}
+                onClick={() => setAutoReplyRuleForm({ ...autoReplyRuleForm, answerType: '템플릿' })}
+                size="small"
+              >
+                템플릿
+              </Button>
+              <Button
+                variant={autoReplyRuleForm.answerType === '실시간가격' ? 'contained' : 'outlined'}
+                onClick={() => setAutoReplyRuleForm({ ...autoReplyRuleForm, answerType: '실시간가격' })}
+                size="small"
+                disabled
+              >
+                실시간가격 (Phase 2)
+              </Button>
+            </Box>
+          </Box>
+          
+          <TextField
+            fullWidth
+            label="답변 템플릿"
+            value={autoReplyRuleForm.answerTemplate}
+            onChange={(e) => setAutoReplyRuleForm({ ...autoReplyRuleForm, answerTemplate: e.target.value })}
+            multiline
+            rows={4}
+            placeholder="안녕하세요! 영업시간은 평일 오전 9시 - 오후 6시입니다."
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            type="number"
+            label="우선순위"
+            value={autoReplyRuleForm.priority}
+            onChange={(e) => setAutoReplyRuleForm({ ...autoReplyRuleForm, priority: parseInt(e.target.value) })}
+            helperText="숫자가 낮을수록 우선순위가 높습니다"
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label="메모"
+            value={autoReplyRuleForm.memo}
+            onChange={(e) => setAutoReplyRuleForm({ ...autoReplyRuleForm, memo: e.target.value })}
+            multiline
+            rows={2}
+            sx={{ mb: 2 }}
+          />
+          
+          <FormControlLabel
+            control={
+              <Switch
+                checked={autoReplyRuleForm.active}
+                onChange={(e) => setAutoReplyRuleForm({ ...autoReplyRuleForm, active: e.target.checked })}
+              />
+            }
+            label="활성화"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAutoReplyRuleDialog(false)}>취소</Button>
+          <Button onClick={handleSaveAutoReplyRule} variant="contained">
+            {editingAutoReplyRule ? '수정' : '추가'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 거래처 연락처 추가 모달 */}
+      <Dialog open={showContactDialog} onClose={() => setShowContactDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>거래처/영업사원 추가</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2, mt: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>유형</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant={contactForm.type === '거래처' ? 'contained' : 'outlined'}
+                onClick={() => setContactForm({ ...contactForm, type: '거래처' })}
+                size="small"
+              >
+                거래처
+              </Button>
+              <Button
+                variant={contactForm.type === '영업사원' ? 'contained' : 'outlined'}
+                onClick={() => setContactForm({ ...contactForm, type: '영업사원' })}
+                size="small"
+              >
+                영업사원
+              </Button>
+            </Box>
+          </Box>
+          
+          <TextField
+            fullWidth
+            label={contactForm.type === '영업사원' ? '영업사원 ID' : '담당 영업사원 ID'}
+            value={contactForm.salesPersonId}
+            onChange={(e) => setContactForm({ ...contactForm, salesPersonId: e.target.value })}
+            placeholder="담당자 연락처 (예: 010-1234-5678)"
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label={contactForm.type === '영업사원' ? '영업사원명' : '거래처명'}
+            value={contactForm.name}
+            onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label="연락처"
+            value={contactForm.contact}
+            onChange={(e) => setContactForm({ ...contactForm, contact: e.target.value })}
+            placeholder="010-9999-9999"
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label="메모"
+            value={contactForm.memo}
+            onChange={(e) => setContactForm({ ...contactForm, memo: e.target.value })}
+            multiline
+            rows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowContactDialog(false)}>취소</Button>
+          <Button onClick={handleSaveContact} variant="contained">
+            추가
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 데이터 정리 모달 */}
       <Dialog open={showCleanupDialog} onClose={() => setShowCleanupDialog(false)} maxWidth="sm" fullWidth>

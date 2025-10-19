@@ -580,6 +580,24 @@ const INSPECTION_RESULT_SHEET_NAME = '검수결과';  // 검수 결과 데이터
 const SMS_SHEET_NAME = 'SMS관리';  // SMS 수신 데이터
 const SMS_RULES_SHEET_NAME = 'SMS전달규칙';  // SMS 전달 규칙
 const SMS_HISTORY_SHEET_NAME = 'SMS전달이력';  // SMS 전달 이력
+const SMS_AUTO_REPLY_RULES_SHEET_NAME = 'SMS자동응답규칙';  // SMS 자동응답 규칙
+const SMS_AUTO_REPLY_CONTACTS_SHEET_NAME = 'SMS자동응답거래처';  // SMS 자동응답 거래처
+const SMS_AUTO_REPLY_HISTORY_SHEET_NAME = 'SMS자동응답이력';  // SMS 자동응답 이력
+
+// 단가표 시트 ID (Phase 2에서 사용)
+const PRICE_SHEET_IDS = {
+  SUPPORT: '12Jx-Y2EXGjsIulWvw9Cr4kVOZQwQPdBQtIRi90rUTJc',      // 이통사지원금
+  PLAN_GROUP: '1vw5BzmtS7vvDqbrWJcqvqwEW63NV2SzQgf9Bt9NExm0',   // 요금제그룹핑
+  MOBILE_PRICE: '1Vy8Qhce3B6_41TxRfVUs883ioLxiGTUjkbD_nKebgrs',  // 무선공지용단가표
+  MOBILE_GSB: '1NrWlDCtvsm8szOwrn505L8f8rhMvAfoVhwwE-loWzqU',   // 무선(GSB)
+  MOBILE_GSA: '1fFDdnmb_kROHzNnGqE6yIgBUkxipHdaFZPqO1_Lon8I',   // 무선(GSA)
+  MOBILE_S: '1zqhmIn9_nyPr2Ar-S4EBjw3ojahcz9csObu9zDHoKgE',     // 무선(S)
+  MOBILE_DIRECT: '1PZJTaVf9ezRHVYyEbIAvQZ-kpXKMJyexTMcWtcs7z2k', // 무선(직영)
+  MOBILE_L: '1aqz-Q3rwE_s0rMWEyeYNhIpEE3V1KXBj3Dw9USiTqAc',     // 무선(L)
+  MOBILE_BK: '1I3Jzq0O5-8u8PzCmGvCuXUcqieSROOYUlZjxg8k0Uio',    // 무선(BK)
+  WIRE_PRICE: '1d0DgeCBL80PCTBkdArFAbQpAe_oPGqkzOVQ-fp_oUTI'    // 유선공지용단가표
+};
+
 const NORMALIZATION_HISTORY_SHEET_NAME = '정규화이력';  // 정규화 이력 데이터
 const INSPECTION_MEMO_SHEET_NAME = '여직원검수데이터메모';  // 여직원 검수 데이터 메모 시트 추가
 const INSPECTION_SETTINGS_SHEET_NAME = '검수설정';  // 검수 설정 시트
@@ -6232,6 +6250,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('✅ [서버시작] SMS 시트 헤더 초기화 완료');
     } catch (error) {
       console.error('❌ [서버시작] SMS 시트 헤더 초기화 실패:', error.message);
+    }
+    
+    // SMS 자동응답 시트 헤더 초기화 (서버 시작 시 한 번만 실행)
+    console.log('🤖 [서버시작] SMS 자동응답 시트 헤더 초기화 시작');
+    try {
+      await ensureAutoReplySheetHeaders();
+      console.log('✅ [서버시작] SMS 자동응답 시트 헤더 초기화 완료');
+    } catch (error) {
+      console.error('❌ [서버시작] SMS 자동응답 시트 헤더 초기화 실패:', error.message);
     }
     
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리 (지연 로딩으로 성능 최적화)
@@ -27675,6 +27702,95 @@ app.get('/api/data-collection-updates', async (req, res) => {
 // SMS 관리 API
 // ============================================
 
+// SMS 자동응답 시트 헤더 초기화 함수
+async function ensureAutoReplySheetHeaders() {
+  try {
+    // SMS자동응답규칙 시트 헤더 체크
+    try {
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A1:K1`,
+      });
+      
+      if (!rulesResponse.data.values || rulesResponse.data.values.length === 0) {
+        console.log('SMS자동응답규칙 시트 헤더 추가 중...');
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A1:K1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['규칙ID', '규칙명', '키워드', '답변유형', '답변템플릿', '가격조회설정', '활성화여부', '우선순위', '생성일시', '수정일시', '메모']]
+          }
+        });
+      }
+    } catch (rulesError) {
+      if (rulesError.code === 429) {
+        console.log('⚠️ [AUTO-REPLY-HEADER] API 할당량 초과 - 헤더 체크 스킵');
+      } else {
+        throw rulesError;
+      }
+    }
+    
+    // SMS자동응답거래처 시트 헤더 체크
+    try {
+      const contactsResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A1:H1`,
+      });
+      
+      if (!contactsResponse.data.values || contactsResponse.data.values.length === 0) {
+        console.log('SMS자동응답거래처 시트 헤더 추가 중...');
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A1:H1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['ID', '유형', '담당영업사원ID', '이름', '연락처', '등록방식', '등록일시', '메모']]
+          }
+        });
+      }
+    } catch (contactsError) {
+      if (contactsError.code === 429) {
+        console.log('⚠️ [AUTO-REPLY-HEADER] API 할당량 초과 - 헤더 체크 스킵');
+      } else {
+        throw contactsError;
+      }
+    }
+    
+    // SMS자동응답이력 시트 헤더 체크
+    try {
+      const historyResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A1:J1`,
+      });
+      
+      if (!historyResponse.data.values || historyResponse.data.values.length === 0) {
+        console.log('SMS자동응답이력 시트 헤더 추가 중...');
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A1:J1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['이력ID', '수신일시', '발신번호', '거래처명', '문의내용', '매칭된규칙', '답변내용', '발송번호', '발송상태', '발송일시']]
+          }
+        });
+      }
+    } catch (historyError) {
+      if (historyError.code === 429) {
+        console.log('⚠️ [AUTO-REPLY-HEADER] API 할당량 초과 - 헤더 체크 스킵');
+      } else {
+        throw historyError;
+      }
+    }
+    
+    console.log('SMS 자동응답 시트 헤더 체크 완료');
+  } catch (error) {
+    if (error.code !== 429) {
+      console.error('SMS 자동응답 시트 헤더 초기화 실패:', error);
+    }
+  }
+}
+
 // SMS 시트 헤더 자동 초기화 함수
 async function ensureSmsSheetHeaders() {
   try {
@@ -28448,6 +28564,168 @@ app.post('/api/sms/register', async (req, res) => {
       // 자동 전달 실패해도 SMS 등록은 성공으로 처리
     }
     
+    // ============================================
+    // 자동응답 로직 시작
+    // ============================================
+    console.log('🤖 자동응답 규칙 확인 시작...');
+    
+    try {
+      // 1. 발신번호가 등록된 거래처/영업사원인지 확인
+      let isRegistered = false;
+      let clientName = '';
+      let responsibleSalesPhone = '';
+      
+      // 1-1. 폰클출고처데이터에서 확인 (W-AA열: 22-26)
+      const storeCheckResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${STORE_SHEET_NAME}!A:AA`,
+      });
+      
+      const storeRows = storeCheckResponse.data.values || [];
+      if (storeRows.length > 1) {
+        for (const row of storeRows.slice(1)) {
+          const storeName = row[14] || '';  // O열(14): 업체명
+          const salesPerson = row[5] || '';  // F열(5): 담당자 연락처
+          
+          // W-AA열(22-26): 휴대폰번호 1-5 확인
+          for (let i = 22; i <= 26; i++) {
+            const phone = row[i] || '';
+            if (phone && phone.trim() === sender) {
+              isRegistered = true;
+              clientName = storeName;
+              responsibleSalesPhone = salesPerson;
+              console.log(`✅ 시트에서 거래처 확인: ${clientName} (담당: ${salesPerson})`);
+              break;
+            }
+          }
+          if (isRegistered) break;
+        }
+      }
+      
+      // 1-2. SMS자동응답거래처 시트에서 확인 (앱 등록)
+      if (!isRegistered) {
+        const contactsCheckResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A:H`,
+        });
+        
+        const contactRows = contactsCheckResponse.data.values || [];
+        if (contactRows.length > 1) {
+          for (const row of contactRows.slice(1)) {
+            const contact = row[4] || '';
+            if (contact && contact.trim() === sender) {
+              isRegistered = true;
+              clientName = row[3] || '';
+              const salesPersonId = row[2] || '';
+              
+              // 담당 영업사원 폰 번호 찾기
+              if (row[1] === '영업사원') {
+                // 유형이 영업사원이면 본인 연락처가 발송 번호
+                responsibleSalesPhone = contact;
+              } else {
+                // 거래처면 담당 영업사원 찾기
+                responsibleSalesPhone = salesPersonId;
+              }
+              
+              console.log(`✅ 앱에서 등록된 연락처 확인: ${clientName} (담당: ${responsibleSalesPhone})`);
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!isRegistered) {
+        console.log('미등록 번호 - 자동응답 스킵:', sender);
+      } else {
+        // 2. 자동응답 규칙 확인
+        const rulesResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A:K`,
+        });
+        
+        const rulesRows = rulesResponse.data.values || [];
+        
+        if (rulesRows.length > 1) {
+          const rulesData = rulesRows.slice(1);
+          
+          // 활성화된 규칙만 필터링하고 우선순위 정렬
+          const activeRules = rulesData
+            .filter(rule => rule[6] === 'O')
+            .sort((a, b) => (parseInt(a[7]) || 999) - (parseInt(b[7]) || 999));
+          
+          console.log(`활성화된 자동응답 규칙: ${activeRules.length}개`);
+          
+          let matchedAutoReplyRule = null;
+          
+          // 우선순위 순으로 규칙 체크
+          for (const rule of activeRules) {
+            const ruleKeywords = rule[2] || '';
+            const keywords = ruleKeywords.split(',').map(k => k.trim()).filter(k => k);
+            
+            // 키워드 매칭
+            const hasKeyword = keywords.some(keyword => message.includes(keyword));
+            
+            if (hasKeyword) {
+              matchedAutoReplyRule = rule;
+              console.log(`✅ 자동응답 규칙 매칭: ${rule[1]} (우선순위: ${rule[7]})`);
+              break;
+            }
+          }
+          
+          if (matchedAutoReplyRule) {
+            // 3. 답변 생성
+            const ruleName = matchedAutoReplyRule[1];
+            const answerType = matchedAutoReplyRule[3] || '템플릿';
+            const answerTemplate = matchedAutoReplyRule[4] || '';
+            
+            let replyMessage = answerTemplate;
+            
+            // TODO: Phase 2에서 실시간가격 처리 추가
+            
+            // 4. 자동응답이력에 기록 (대기중 상태)
+            const historyResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:A`,
+            });
+            
+            const historyRows = historyResponse.data.values || [];
+            const historyId = historyRows.length;
+            const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            
+            const historyRow = [
+              historyId,
+              now,
+              sender,
+              clientName,
+              message.substring(0, 100), // 문의내용 (최대 100자)
+              ruleName,
+              replyMessage,
+              responsibleSalesPhone,
+              '대기중',
+              ''
+            ];
+            
+            await sheets.spreadsheets.values.append({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:J`,
+              valueInputOption: 'RAW',
+              insertDataOption: 'INSERT_ROWS',
+              resource: {
+                values: [historyRow]
+              }
+            });
+            
+            console.log(`✅ 자동응답 준비 완료: ${sender}에게 "${replyMessage.substring(0, 30)}..." 발송 예정 (발송번호: ${responsibleSalesPhone})`);
+          } else {
+            console.log('매칭된 자동응답 규칙 없음');
+          }
+        }
+      }
+    } catch (autoReplyError) {
+      console.error('자동응답 처리 중 오류:', autoReplyError);
+      // 자동응답 실패해도 SMS 등록은 성공으로 처리
+    }
+    
     res.json({ success: true, id: newId });
     
   } catch (error) {
@@ -28748,6 +29026,475 @@ app.post('/api/sms/cleanup', async (req, res) => {
     
   } catch (error) {
     console.error('SMS 데이터 정리 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// SMS 자동응답 API
+// ============================================
+
+// 자동응답 규칙 조회 API
+app.get('/api/sms/auto-reply/rules', async (req, res) => {
+  try {
+    console.log('자동응답 규칙 조회');
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A:K`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const dataRows = rows.slice(1);
+    const rules = dataRows.map(row => ({
+      id: row[0] || '',
+      name: row[1] || '',
+      keywords: row[2] || '',
+      answerType: row[3] || '템플릿',
+      answerTemplate: row[4] || '',
+      priceConfig: row[5] || '',
+      active: row[6] === 'O',
+      priority: parseInt(row[7]) || 999,
+      createdAt: row[8] || '',
+      updatedAt: row[9] || '',
+      memo: row[10] || ''
+    }));
+    
+    res.json({ success: true, data: rules });
+    
+  } catch (error) {
+    console.error('자동응답 규칙 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 자동응답 규칙 추가 API
+app.post('/api/sms/auto-reply/rules', async (req, res) => {
+  try {
+    const { name, keywords, answerType, answerTemplate, priceConfig, active, priority, memo } = req.body;
+    
+    console.log('자동응답 규칙 추가:', name);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A:A`,
+    });
+    
+    const rows = response.data.values || [];
+    const newId = rows.length;
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    const newRow = [
+      newId,
+      name,
+      keywords,
+      answerType || '템플릿',
+      answerTemplate || '',
+      priceConfig || '',
+      active ? 'O' : 'X',
+      priority || 999,
+      now,
+      now,
+      memo || ''
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A:K`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    res.json({ success: true, id: newId });
+    
+  } catch (error) {
+    console.error('자동응답 규칙 추가 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 자동응답 규칙 수정 API
+app.put('/api/sms/auto-reply/rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, keywords, answerType, answerTemplate, priceConfig, active, priority, memo } = req.body;
+    
+    console.log(`자동응답 규칙 수정: ID=${id}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A:K`,
+    });
+    
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === id);
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '규칙을 찾을 수 없습니다.' });
+    }
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const createdAt = rows[rowIndex][8] || now;
+    
+    const updatedRow = [
+      id,
+      name,
+      keywords,
+      answerType || '템플릿',
+      answerTemplate || '',
+      priceConfig || '',
+      active ? 'O' : 'X',
+      priority || 999,
+      createdAt,
+      now,
+      memo || ''
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A${rowIndex + 1}:K${rowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('자동응답 규칙 수정 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 자동응답 규칙 삭제 API
+app.delete('/api/sms/auto-reply/rules/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`자동응답 규칙 삭제: ID=${id}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!A:K`,
+    });
+    
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === id);
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '규칙을 찾을 수 없습니다.' });
+    }
+    
+    // 활성화를 X로 변경
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_RULES_SHEET_NAME}!G${rowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['X']]
+      }
+    });
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('자동응답 규칙 삭제 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 거래처 연락처 조회 API
+app.get('/api/sms/auto-reply/contacts', async (req, res) => {
+  try {
+    console.log('자동응답 거래처 연락처 조회');
+    
+    // 1. 폰클출고처데이터에서 거래처 연락처 로드 (W-AA열: 22-26인덱스)
+    const storeResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${STORE_SHEET_NAME}!A:AA`,
+    });
+    
+    const storeRows = storeResponse.data.values || [];
+    const storeContacts = [];
+    
+    if (storeRows.length > 1) {
+      storeRows.slice(1).forEach((row, index) => {
+        const storeName = row[14] || '';  // O열(14): 업체명
+        const salesPerson = row[5] || ''; // F열(5): 담당자
+        
+        // W-AA열(22-26): 휴대폰번호 1-5
+        for (let i = 22; i <= 26; i++) {
+          const phone = row[i] || '';
+          if (phone && phone.trim()) {
+            storeContacts.push({
+              id: `store_${index}_${i}`,
+              type: '거래처',
+              salesPersonId: salesPerson,
+              name: storeName,
+              contact: phone.trim(),
+              source: '시트'
+            });
+          }
+        }
+      });
+    }
+    
+    // 2. SMS자동응답거래처 시트에서 앱 등록 연락처 로드
+    const appContactsResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A:H`,
+    });
+    
+    const appRows = appContactsResponse.data.values || [];
+    const appContacts = [];
+    
+    if (appRows.length > 1) {
+      appRows.slice(1).forEach(row => {
+        appContacts.push({
+          id: row[0] || '',
+          type: row[1] || '',
+          salesPersonId: row[2] || '',
+          name: row[3] || '',
+          contact: row[4] || '',
+          source: row[5] || '앱',
+          createdAt: row[6] || '',
+          memo: row[7] || ''
+        });
+      });
+    }
+    
+    // 3. 합치기
+    const allContacts = [...storeContacts, ...appContacts];
+    
+    res.json({ success: true, data: allContacts });
+    
+  } catch (error) {
+    console.error('자동응답 거래처 연락처 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 거래처 연락처 추가 API (앱에서 추가 등록)
+app.post('/api/sms/auto-reply/contacts', async (req, res) => {
+  try {
+    const { type, salesPersonId, name, contact, memo } = req.body;
+    
+    console.log('자동응답 거래처 추가:', name);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A:A`,
+    });
+    
+    const rows = response.data.values || [];
+    const newId = rows.length;
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    const newRow = [
+      newId,
+      type || '거래처',
+      salesPersonId || '',
+      name || '',
+      contact || '',
+      '앱',
+      now,
+      memo || ''
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A:H`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    res.json({ success: true, id: newId });
+    
+  } catch (error) {
+    console.error('자동응답 거래처 추가 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 거래처 연락처 삭제 API
+app.delete('/api/sms/auto-reply/contacts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`자동응답 거래처 삭제: ID=${id}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A:H`,
+    });
+    
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === id);
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '거래처를 찾을 수 없습니다.' });
+    }
+    
+    // 해당 행 삭제 (빈 값으로 덮어쓰기)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_CONTACTS_SHEET_NAME}!A${rowIndex + 1}:H${rowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['', '', '', '', '', '', '', '']]
+      }
+    });
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('자동응답 거래처 삭제 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 자동응답 이력 조회 API
+app.get('/api/sms/auto-reply/history', async (req, res) => {
+  try {
+    const { limit = 100, status = 'all' } = req.query;
+    
+    console.log(`자동응답 이력 조회: limit=${limit}, status=${status}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:J`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const dataRows = rows.slice(1);
+    
+    let historyData = dataRows.map(row => ({
+      id: row[0] || '',
+      receivedAt: row[1] || '',
+      sender: row[2] || '',
+      clientName: row[3] || '',
+      inquiry: row[4] || '',
+      matchedRule: row[5] || '',
+      reply: row[6] || '',
+      senderPhone: row[7] || '',
+      status: row[8] || '',
+      sentAt: row[9] || ''
+    }));
+    
+    // 상태 필터링
+    if (status !== 'all') {
+      historyData = historyData.filter(h => (h.status || '').startsWith(status));
+    }
+    
+    // 최신순 정렬
+    historyData.sort((a, b) => {
+      if (b.receivedAt > a.receivedAt) return 1;
+      if (b.receivedAt < a.receivedAt) return -1;
+      return 0;
+    });
+    
+    // 제한 적용
+    historyData = historyData.slice(0, parseInt(limit));
+    
+    res.json({ success: true, data: historyData });
+    
+  } catch (error) {
+    console.error('자동응답 이력 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 자동응답 발송 대기 목록 API (안드로이드 앱용)
+app.get('/api/sms/auto-reply/pending', async (req, res) => {
+  try {
+    const { salesPhone } = req.query;
+    
+    console.log(`자동응답 발송 대기 목록 조회: salesPhone=${salesPhone}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:J`,
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+    
+    const dataRows = rows.slice(1);
+    
+    // 대기중 상태이고 발송번호가 일치하는 것만 필터링
+    const pendingReplies = dataRows
+      .map((row, index) => ({
+        id: row[0] || '',
+        sender: row[2] || '',
+        reply: row[6] || '',
+        senderPhone: row[7] || '',
+        status: row[8] || '',
+        rowIndex: index + 2
+      }))
+      .filter(r => r.status === '대기중' && r.senderPhone === salesPhone);
+    
+    res.json({ success: true, data: pendingReplies });
+    
+  } catch (error) {
+    console.error('자동응답 발송 대기 목록 조회 실패:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 자동응답 발송 상태 업데이트 API (안드로이드 앱용)
+app.post('/api/sms/auto-reply/update-status', async (req, res) => {
+  try {
+    const { replyId, success, errorMessage } = req.body;
+    
+    console.log(`자동응답 발송 상태 업데이트: ID=${replyId}, success=${success}`);
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:J`,
+    });
+    
+    const rows = response.data.values || [];
+    const rowIndex = rows.findIndex(row => row[0] === replyId);
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ success: false, error: '이력을 찾을 수 없습니다.' });
+    }
+    
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const status = success ? '발송완료' : '실패';
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!I${rowIndex + 1}:J${rowIndex + 1}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[status, now]]
+      }
+    });
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('자동응답 발송 상태 업데이트 실패:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
