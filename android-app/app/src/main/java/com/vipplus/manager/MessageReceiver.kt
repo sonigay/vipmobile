@@ -93,7 +93,7 @@ class MessageReceiver : BroadcastReceiver() {
                     "timestamp" to timestamp
                 )
                 
-                val success = ApiClient.registerData(serverUrl, data)
+                val success = ApiClient.registerSms(serverUrl, data)
                 
                 if (success) {
                     Log.d(TAG, "✅ 서버 전송 성공")
