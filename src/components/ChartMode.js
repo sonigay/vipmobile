@@ -4216,8 +4216,8 @@ function RechotanchoBondTab({ loggedInStore }) {
       },
       datalabels: {
         display: true,
-        align: 'end',
-        anchor: 'end',
+        align: 'center',
+        anchor: 'center',
         formatter: function(value) {
           if (value === 0) return '';
           // 억 단위
@@ -4243,7 +4243,7 @@ function RechotanchoBondTab({ loggedInStore }) {
           size: 11,
           weight: 'bold'
         },
-        color: '#333'
+        color: '#fff'
       }
     },
     scales: {
