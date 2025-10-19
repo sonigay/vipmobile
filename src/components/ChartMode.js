@@ -4127,7 +4127,7 @@ function RechotanchoBondTab({ loggedInStore }) {
     agents.forEach((agent, idx) => {
       const color = colors[idx];
       
-      // 재고초과채권
+      // 재고초과채권 (기본적으로 숨김)
       datasets.push({
         label: `${agent.name} - 재고초과채권`,
         data: timestamps.map(ts => {
@@ -4140,10 +4140,11 @@ function RechotanchoBondTab({ loggedInStore }) {
         borderWidth: 2,
         tension: 0.1,
         pointRadius: 3,
-        pointHoverRadius: 5
+        pointHoverRadius: 5,
+        hidden: true  // 기본적으로 숨김
       });
       
-      // 담보초과채권
+      // 담보초과채권 (기본적으로 숨김)
       datasets.push({
         label: `${agent.name} - 담보초과채권`,
         data: timestamps.map(ts => {
@@ -4157,10 +4158,11 @@ function RechotanchoBondTab({ loggedInStore }) {
         borderDash: [5, 5],
         tension: 0.1,
         pointRadius: 2,
-        pointHoverRadius: 4
+        pointHoverRadius: 4,
+        hidden: true  // 기본적으로 숨김
       });
       
-      // 관리대상채권
+      // 관리대상채권 (기본적으로 표시)
       datasets.push({
         label: `${agent.name} - 관리대상채권`,
         data: timestamps.map(ts => {
@@ -4173,7 +4175,8 @@ function RechotanchoBondTab({ loggedInStore }) {
         borderWidth: 3,
         tension: 0.1,
         pointRadius: 4,
-        pointHoverRadius: 6
+        pointHoverRadius: 6,
+        hidden: false  // 기본적으로 표시
       });
     });
 
@@ -4285,13 +4288,24 @@ function RechotanchoBondTab({ loggedInStore }) {
         position: 'top',
         labels: {
           font: { size: 10 },
-          boxWidth: 20
+          boxWidth: 20,
+          usePointStyle: true,
+          padding: 10
+        },
+        onClick: function(e, legendItem, legend) {
+          // 기본 범례 클릭 동작 (선 표시/숨김)
+          const index = legendItem.datasetIndex;
+          const ci = legend.chart;
+          const meta = ci.getDatasetMeta(index);
+          
+          meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+          ci.update();
         }
       },
       title: {
         display: true,
-        text: '시간별 채권 변화 추이',
-        font: { size: 16, weight: 'bold' }
+        text: '시간별 채권 변화 추이 (기본: 관리대상채권만 표시, 범례 클릭으로 추가 선택)',
+        font: { size: 14, weight: 'bold' }
       },
       tooltip: {
         callbacks: {
@@ -4314,6 +4328,10 @@ function RechotanchoBondTab({ loggedInStore }) {
           }
         }
       }
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false
     }
   };
 
