@@ -154,7 +154,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab />,
+      component: <BondChartTab loggedInStore={loggedInStore} />,
       hasPermission: loggedInStore?.modePermissions?.bondChart
     },
     {
@@ -292,7 +292,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 }
 
 // 채권장표 탭 컴포넌트
-function BondChartTab() {
+function BondChartTab({ loggedInStore }) {
   const [activeSubTab, setActiveSubTab] = useState(0);
 
   const subTabs = [
