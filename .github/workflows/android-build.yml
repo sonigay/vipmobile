@@ -52,4 +52,41 @@ jobs:
       with:
         name: vip-manager-apk
         path: android-app/app/build/outputs/apk/release/app-release.apk
+    
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v2.1.1-${{ steps.date.outputs.date }}
+        name: VIP Manager v2.1.1 (${{ steps.date.outputs.date }})
+        body: |
+          ## 📱 VIP 안드로이드 매니저 v2.1.1
+          
+          ### ✨ 기능
+          - SMS 자동 수신 및 전송
+          - SMS 자동 전달 (규칙 기반)
+          - SMS 자동응답 (FAQ 기반)
+          - 백그라운드 실행
+          
+          ### 📥 설치 방법
+          1. 아래 APK 다운로드
+          2. 파일 관리자에서 실행
+          3. "무시하고 설치" 클릭
+          4. 권한 모두 허용
+          
+          ### 🔧 설정
+          - 서버 URL: https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app
+          - 본인 핸드폰 번호 입력
+          
+          ### ⚠️ 주의사항
+          - Google Play Protect 경고 무시
+          - SMS 권한 필수
+        files: android-app/app/build/outputs/apk/release/app-release.apk
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
