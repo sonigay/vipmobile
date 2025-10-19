@@ -28217,6 +28217,25 @@ app.post('/api/sms/register', async (req, res) => {
     // ⚠️ 중요: 발신번호 = 수신번호인 경우 자동 전달 차단 (무한 루프 방지)
     if (sender === receiver) {
       console.log('⚠️ 자가 전송 감지 (발신=수신) - 자동 전달 스킵:', sender);
+      
+      // 상태를 "수신만"으로 업데이트
+      const smsUpdateResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_SHEET_NAME}!A:I`,
+      });
+      const smsRows = smsUpdateResponse.data.values || [];
+      const smsRowIndex = smsRows.findIndex(row => row[0] == newId);
+      if (smsRowIndex !== -1) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['수신만', '', '', '자가전송 감지 (전달스킵)']]
+          }
+        });
+      }
+      
       return res.json({ success: true, id: newId, skipped: true, reason: 'self-send' });
     }
     
@@ -28242,6 +28261,25 @@ app.post('/api/sms/register', async (req, res) => {
         
         if (allTargetNumbers.has(receiver)) {
           console.log('⚠️ 전달 대상 폰에서 수신한 SMS - 자동 전달 스킵 (무한 루프 방지):', receiver);
+          
+          // 상태를 "수신만"으로 업데이트
+          const smsUpdateResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SMS_SHEET_NAME}!A:I`,
+          });
+          const smsRows = smsUpdateResponse.data.values || [];
+          const smsRowIndex = smsRows.findIndex(row => row[0] == newId);
+          if (smsRowIndex !== -1) {
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+              valueInputOption: 'RAW',
+              resource: {
+                values: [['수신만', '', '', '전달대상 폰에서 수신 (전달스킵)']]
+              }
+            });
+          }
+          
           return res.json({ success: true, id: newId, skipped: true, reason: 'forward-target-receiver' });
         }
         
