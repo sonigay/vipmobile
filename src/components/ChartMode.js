@@ -4243,7 +4243,26 @@ function RechotanchoBondTab({ loggedInStore }) {
           size: 11,
           weight: 'bold'
         },
-        color: '#fff'
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: 4,
+        padding: {
+          top: 4,
+          bottom: 4,
+          left: 6,
+          right: 6
+        },
+        color: function(context) {
+          // 각 데이터셋의 색상을 진하게
+          const datasetIndex = context.datasetIndex;
+          if (datasetIndex === 0) {
+            return 'rgba(54, 162, 235, 1)'; // 재고초과채권 - 파란색
+          } else if (datasetIndex === 1) {
+            return 'rgba(255, 159, 64, 1)'; // 담보초과채권 - 주황색
+          } else if (datasetIndex === 2) {
+            return 'rgba(75, 192, 192, 1)'; // 관리대상채권 - 녹색
+          }
+          return '#333';
+        }
       }
     },
     scales: {
