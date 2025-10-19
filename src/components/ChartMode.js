@@ -3794,29 +3794,545 @@ function OverdueBondTab() {
 
 // 재초담초채권 탭 컴포넌트
 function RechotanchoBondTab() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  
+  // 5개 대리점 정보
+  const agents = [
+    { code: '306891', name: '경수' },
+    { code: '315835', name: '경인' },
+    { code: '316558', name: '동서울' },
+    { code: '314942', name: '호남' },
+    { code: '316254', name: '호남2' }
+  ];
+  
+  // 입력 데이터 상태
+  const [inputData, setInputData] = useState(
+    agents.map(agent => ({
+      agentCode: agent.code,
+      agentName: agent.name,
+      inventoryBond: '',
+      collateralBond: '',
+      managementBond: 0
+    }))
+  );
+  
+  // 저장 시점 목록
+  const [history, setHistory] = useState([]);
+  const [selectedTimestamp, setSelectedTimestamp] = useState('');
+  
+  // 전체 데이터 (그래프용)
+  const [allData, setAllData] = useState([]);
+  
+  // 현재 데이터 (선택된 시점 또는 입력 중인 데이터)
+  const [currentData, setCurrentData] = useState([]);
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    loadHistory();
+    loadAllData();
+  }, []);
+
+  // 저장 시점 목록 로드
+  const loadHistory = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/history`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setHistory(result.data || []);
+      }
+    } catch (error) {
+      console.error('저장 시점 목록 로드 실패:', error);
+    }
+  };
+
+  // 전체 데이터 로드 (그래프용)
+  const loadAllData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/all-data`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setAllData(result.data || []);
+        setCurrentData(result.data || []);
+      }
+    } catch (error) {
+      console.error('전체 데이터 로드 실패:', error);
+      setError('데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 특정 시점 데이터 로드
+  const loadDataByTimestamp = async (timestamp) => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/rechotancho-bond/data/${encodeURIComponent(timestamp)}`
+      );
+      const result = await response.json();
+      
+      if (result.success && result.data.length > 0) {
+        // 입력 필드에 데이터 반영
+        const loadedData = agents.map(agent => {
+          const found = result.data.find(d => d.agentCode === agent.code);
+          return found || {
+            agentCode: agent.code,
+            agentName: agent.name,
+            inventoryBond: '',
+            collateralBond: '',
+            managementBond: 0
+          };
+        });
+        setInputData(loadedData);
+      }
+    } catch (error) {
+      console.error('데이터 로드 실패:', error);
+      setError('데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 시점 선택 핸들러
+  const handleTimestampChange = (event) => {
+    const timestamp = event.target.value;
+    setSelectedTimestamp(timestamp);
+    
+    if (timestamp) {
+      loadDataByTimestamp(timestamp);
+    } else {
+      // 빈 값 선택 시 초기화
+      setInputData(
+        agents.map(agent => ({
+          agentCode: agent.code,
+          agentName: agent.name,
+          inventoryBond: '',
+          collateralBond: '',
+          managementBond: 0
+        }))
+      );
+    }
+  };
+
+  // 입력 값 변경 핸들러
+  const handleInputChange = (index, field, value) => {
+    const newData = [...inputData];
+    newData[index][field] = value;
+    
+    // 관리대상채권 자동 계산
+    if (field === 'inventoryBond' || field === 'collateralBond') {
+      const inventory = Number(newData[index].inventoryBond) || 0;
+      const collateral = Number(newData[index].collateralBond) || 0;
+      newData[index].managementBond = inventory - collateral;
+    }
+    
+    setInputData(newData);
+  };
+
+  // 데이터 저장
+  const handleSave = async () => {
+    try {
+      // 입력 검증
+      const hasEmptyFields = inputData.some(
+        item => item.inventoryBond === '' || item.collateralBond === ''
+      );
+      
+      if (hasEmptyFields) {
+        alert('모든 필드를 입력해주세요.');
+        return;
+      }
+      
+      setSaving(true);
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          data: inputData,
+          inputUser: '사용자' // 실제로는 로그인 정보에서 가져와야 함
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('데이터가 성공적으로 저장되었습니다.');
+        // 데이터 새로고침
+        await loadHistory();
+        await loadAllData();
+        // 입력 필드 초기화
+        setSelectedTimestamp('');
+        setInputData(
+          agents.map(agent => ({
+            agentCode: agent.code,
+            agentName: agent.name,
+            inventoryBond: '',
+            collateralBond: '',
+            managementBond: 0
+          }))
+        );
+      } else {
+        alert(`저장 실패: ${result.error || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error('데이터 저장 실패:', error);
+      alert('데이터 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 현재 데이터로 막대 그래프 데이터 생성
+  const getBarChartData = () => {
+    // 입력 중인 데이터 또는 최신 데이터 사용
+    const dataToShow = inputData.some(d => d.inventoryBond !== '' || d.collateralBond !== '')
+      ? inputData
+      : allData.length > 0
+      ? agents.map(agent => {
+          // 최신 데이터 찾기
+          const latestData = [...allData]
+            .filter(d => d.agentCode === agent.code)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+          
+          return latestData || {
+            agentCode: agent.code,
+            agentName: agent.name,
+            inventoryBond: 0,
+            collateralBond: 0,
+            managementBond: 0
+          };
+        })
+      : inputData;
+
+    return {
+      labels: agents.map(a => a.name),
+      datasets: [
+        {
+          label: '재고초과채권',
+          data: dataToShow.map(d => Number(d.inventoryBond) || 0),
+          backgroundColor: 'rgba(54, 162, 235, 0.8)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        },
+        {
+          label: '담보초과채권',
+          data: dataToShow.map(d => Number(d.collateralBond) || 0),
+          backgroundColor: 'rgba(255, 159, 64, 0.8)',
+          borderColor: 'rgba(255, 159, 64, 1)',
+          borderWidth: 1
+        },
+        {
+          label: '관리대상채권',
+          data: dataToShow.map(d => Number(d.managementBond) || 0),
+          backgroundColor: 'rgba(75, 192, 192, 0.8)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
+        }
+      ]
+    };
+  };
+
+  // 시계열 선 그래프 데이터 생성
+  const getLineChartData = () => {
+    if (allData.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    // 시점별로 그룹화
+    const timestampMap = new Map();
+    allData.forEach(item => {
+      if (!timestampMap.has(item.timestamp)) {
+        timestampMap.set(item.timestamp, []);
+      }
+      timestampMap.get(item.timestamp).push(item);
+    });
+
+    // 시점 정렬
+    const timestamps = Array.from(timestampMap.keys())
+      .sort((a, b) => new Date(a) - new Date(b));
+
+    // 대리점별 색상
+    const colors = [
+      { r: 255, g: 99, b: 132 },   // 경수
+      { r: 54, g: 162, b: 235 },   // 경인
+      { r: 255, g: 206, b: 86 },   // 동서울
+      { r: 75, g: 192, b: 192 },   // 호남
+      { r: 153, g: 102, b: 255 }   // 호남2
+    ];
+
+    // 각 대리점별로 3개 선 생성 (재고초과, 담보초과, 관리대상)
+    const datasets = [];
+    
+    agents.forEach((agent, idx) => {
+      const color = colors[idx];
+      
+      // 재고초과채권
+      datasets.push({
+        label: `${agent.name} - 재고초과채권`,
+        data: timestamps.map(ts => {
+          const items = timestampMap.get(ts);
+          const found = items.find(item => item.agentCode === agent.code);
+          return found ? found.inventoryBond : 0;
+        }),
+        borderColor: `rgba(${color.r}, ${color.g}, ${color.b}, 1)`,
+        backgroundColor: `rgba(${color.r}, ${color.g}, ${color.b}, 0.1)`,
+        borderWidth: 2,
+        tension: 0.1,
+        pointRadius: 3,
+        pointHoverRadius: 5
+      });
+      
+      // 담보초과채권
+      datasets.push({
+        label: `${agent.name} - 담보초과채권`,
+        data: timestamps.map(ts => {
+          const items = timestampMap.get(ts);
+          const found = items.find(item => item.agentCode === agent.code);
+          return found ? found.collateralBond : 0;
+        }),
+        borderColor: `rgba(${color.r}, ${color.g}, ${color.b}, 0.6)`,
+        backgroundColor: `rgba(${color.r}, ${color.g}, ${color.b}, 0.05)`,
+        borderWidth: 2,
+        borderDash: [5, 5],
+        tension: 0.1,
+        pointRadius: 2,
+        pointHoverRadius: 4
+      });
+      
+      // 관리대상채권
+      datasets.push({
+        label: `${agent.name} - 관리대상채권`,
+        data: timestamps.map(ts => {
+          const items = timestampMap.get(ts);
+          const found = items.find(item => item.agentCode === agent.code);
+          return found ? found.managementBond : 0;
+        }),
+        borderColor: `rgba(${color.r}, ${color.g}, ${color.b}, 0.8)`,
+        backgroundColor: `rgba(${color.r}, ${color.g}, ${color.b}, 0.2)`,
+        borderWidth: 3,
+        tension: 0.1,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      });
+    });
+
+    return {
+      labels: timestamps.map(ts => {
+        const date = new Date(ts);
+        return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+      }),
+      datasets
+    };
+  };
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          font: { size: 12 }
+        }
+      },
+      title: {
+        display: true,
+        text: '대리점별 현재 채권 현황',
+        font: { size: 16, weight: 'bold' }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}원`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return value.toLocaleString() + '원';
+          }
+        }
+      }
+    }
+  };
+
+  const lineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          font: { size: 10 },
+          boxWidth: 20
+        }
+      },
+      title: {
+        display: true,
+        text: '시간별 채권 변화 추이',
+        font: { size: 16, weight: 'bold' }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}원`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return value.toLocaleString() + '원';
+          }
+        }
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
-        textAlign: 'center',
-        background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-        color: '#333',
-        borderRadius: 3
-      }}
-    >
-      <AccountBalanceWalletIcon sx={{ fontSize: 80, mb: 3, opacity: 0.8, color: '#4ecdc4' }} />
-      <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold' }}>
-        재초담초채권
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <AccountBalanceWalletIcon sx={{ fontSize: 32, color: '#4ecdc4' }} />
+        재초담초채권 관리
       </Typography>
-      <Typography variant="h6" sx={{ mb: 3, opacity: 0.9 }}>
-        준비 중입니다
-      </Typography>
-      <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 600, mx: 'auto' }}>
-        재초담초채권 관련 데이터를 관리할 수 있는 기능을 개발 중입니다.<br />
-        더 나은 사용자 경험을 제공하기 위해 준비하고 있습니다.
-      </Typography>
-    </Paper>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {/* 상단: 막대 그래프 */}
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ height: 400 }}>
+          <Bar data={getBarChartData()} options={barChartOptions} />
+        </Box>
+      </Paper>
+
+      {/* 중단: 선 그래프 */}
+      {allData.length > 0 && (
+        <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+          <Box sx={{ height: 500 }}>
+            <Line data={getLineChartData()} options={lineChartOptions} />
+          </Box>
+        </Paper>
+      )}
+
+      {/* 하단: 데이터 입력 테이블 */}
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            데이터 입력
+          </Typography>
+          
+          {/* 저장 시점 선택 */}
+          <FormControl sx={{ minWidth: 250 }}>
+            <InputLabel>저장 시점 선택</InputLabel>
+            <Select
+              value={selectedTimestamp}
+              label="저장 시점 선택"
+              onChange={handleTimestampChange}
+              size="small"
+            >
+              <MenuItem value="">
+                <em>새로 입력</em>
+              </MenuItem>
+              {history.map((item, idx) => (
+                <MenuItem key={idx} value={item.timestamp}>
+                  {item.timestamp} ({item.inputUser})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>대리점코드</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>대리점명</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>재고초과채권 (원)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>담보초과채권 (원)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>관리대상채권 (원)</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {inputData.map((item, index) => (
+                <TableRow key={item.agentCode}>
+                  <TableCell>{item.agentCode}</TableCell>
+                  <TableCell>{item.agentName}</TableCell>
+                  <TableCell>
+                    <TextField
+                      type="number"
+                      value={item.inventoryBond}
+                      onChange={(e) => handleInputChange(index, 'inventoryBond', e.target.value)}
+                      size="small"
+                      fullWidth
+                      placeholder="0"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <TextField
+                      type="number"
+                      value={item.collateralBond}
+                      onChange={(e) => handleInputChange(index, 'collateralBond', e.target.value)}
+                      size="small"
+                      fullWidth
+                      placeholder="0"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        color: item.managementBond >= 0 ? 'success.main' : 'error.main'
+                      }}
+                    >
+                      {item.managementBond.toLocaleString()}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSave}
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+          >
+            {saving ? '저장 중...' : '저장'}
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
 

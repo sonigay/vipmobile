@@ -6104,6 +6104,254 @@ async function calculateAndUpdateTotals(spreadsheetId, sheetName, yearMonthIndex
   }
 }
 
+// ============================================
+// 재초담초채권 API
+// ============================================
+
+// 재초담초채권 데이터 저장
+app.post('/api/rechotancho-bond/save', async (req, res) => {
+  try {
+    const { data, inputUser } = req.body;
+    
+    if (!data || !Array.isArray(data) || data.length !== 5) {
+      return res.status(400).json({
+        success: false,
+        error: '5개 대리점 데이터가 필요합니다.'
+      });
+    }
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    const sheetName = '재초담초채권_내역';
+    
+    // 현재 시간 생성 (KST)
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    const timestamp = kstTime.toISOString().replace('T', ' ').substring(0, 19);
+    
+    // 시트에 저장할 행 생성
+    const rows = data.map(item => [
+      timestamp,                          // A: 저장일시
+      item.agentCode,                     // B: 대리점코드
+      item.agentName,                     // C: 대리점명
+      Number(item.inventoryBond) || 0,    // D: 재고초과채권
+      Number(item.collateralBond) || 0,   // E: 담보초과채권
+      Number(item.managementBond) || 0,   // F: 관리대상채권
+      inputUser || ''                     // G: 입력자
+    ]);
+    
+    // Google Sheets에 데이터 추가
+    await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${sheetName}!A:G`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: rows
+        }
+      });
+    });
+    
+    console.log(`✅ 재초담초채권 데이터 저장 완료: ${timestamp}, 입력자: ${inputUser}`);
+    
+    res.json({
+      success: true,
+      message: '데이터가 성공적으로 저장되었습니다.',
+      timestamp
+    });
+    
+  } catch (error) {
+    console.error('❌ 재초담초채권 데이터 저장 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '데이터 저장에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 재초담초채권 저장 시점 목록 조회
+app.get('/api/rechotancho-bond/history', async (req, res) => {
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    const sheetName = '재초담초채권_내역';
+    
+    // 시트 데이터 조회
+    const response = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:G`
+      });
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // 헤더 제외하고 데이터 행만 처리
+    const dataRows = rows.slice(1);
+    
+    // 저장 시점별로 그룹화 (중복 제거)
+    const timestampMap = new Map();
+    
+    dataRows.forEach(row => {
+      const timestamp = row[0];
+      const inputUser = row[6];
+      
+      if (timestamp && !timestampMap.has(timestamp)) {
+        timestampMap.set(timestamp, {
+          timestamp,
+          inputUser: inputUser || '미상'
+        });
+      }
+    });
+    
+    // 최신순으로 정렬
+    const history = Array.from(timestampMap.values())
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    console.log(`✅ 재초담초채권 저장 시점 조회 완료: ${history.length}개`);
+    
+    res.json({
+      success: true,
+      data: history
+    });
+    
+  } catch (error) {
+    console.error('❌ 재초담초채권 저장 시점 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '저장 시점 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 특정 시점의 재초담초채권 데이터 조회
+app.get('/api/rechotancho-bond/data/:timestamp', async (req, res) => {
+  try {
+    const { timestamp } = req.params;
+    
+    if (!timestamp) {
+      return res.status(400).json({
+        success: false,
+        error: '시점 정보가 필요합니다.'
+      });
+    }
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    const sheetName = '재초담초채권_내역';
+    
+    // 시트 데이터 조회
+    const response = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:G`
+      });
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // 헤더 제외하고 해당 시점의 데이터만 필터링
+    const dataRows = rows.slice(1).filter(row => row[0] === timestamp);
+    
+    if (dataRows.length === 0) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // 데이터 변환
+    const data = dataRows.map(row => ({
+      timestamp: row[0] || '',
+      agentCode: row[1] || '',
+      agentName: row[2] || '',
+      inventoryBond: Number(row[3]) || 0,
+      collateralBond: Number(row[4]) || 0,
+      managementBond: Number(row[5]) || 0,
+      inputUser: row[6] || ''
+    }));
+    
+    console.log(`✅ 재초담초채권 데이터 조회 완료: ${timestamp}, ${data.length}개`);
+    
+    res.json({
+      success: true,
+      data
+    });
+    
+  } catch (error) {
+    console.error('❌ 재초담초채권 데이터 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '데이터 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 모든 재초담초채권 데이터 조회 (그래프용)
+app.get('/api/rechotancho-bond/all-data', async (req, res) => {
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    const sheetName = '재초담초채권_내역';
+    
+    // 시트 데이터 조회
+    const response = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:G`
+      });
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // 헤더 제외하고 데이터 변환
+    const data = rows.slice(1).map(row => ({
+      timestamp: row[0] || '',
+      agentCode: row[1] || '',
+      agentName: row[2] || '',
+      inventoryBond: Number(row[3]) || 0,
+      collateralBond: Number(row[4]) || 0,
+      managementBond: Number(row[5]) || 0,
+      inputUser: row[6] || ''
+    }));
+    
+    console.log(`✅ 재초담초채권 전체 데이터 조회 완료: ${data.length}개`);
+    
+    res.json({
+      success: true,
+      data
+    });
+    
+  } catch (error) {
+    console.error('❌ 재초담초채권 전체 데이터 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '전체 데이터 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
