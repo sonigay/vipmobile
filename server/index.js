@@ -179,7 +179,7 @@ const concurrentRequestLimit = {
 
 // API 호출 제한 설정 (트래픽 최적화)
 const API_RATE_LIMIT = {
-  maxRequestsPerMinute: 120, // 분당 최대 요청 수 증가 (60 → 120)
+  maxRequestsPerMinute: 45, // Google Sheets API 무료 한도(60회)보다 낮게 설정
   requests: [],
   isRateLimited: false
 };
@@ -869,6 +869,24 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     
     return data;
   } catch (error) {
+    // 429 에러 (Rate Limit) 처리 - Exponential Backoff
+    if (error.code === 429 || error.message?.includes('rateLimitExceeded')) {
+      console.log(`⚠️ [API-LIMIT] Google API 할당량 초과 (429). 60초 대기 후 재시도...`);
+      await new Promise(resolve => setTimeout(resolve, 60000)); // 60초 대기
+      
+      // 재시도
+      try {
+        const retryResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: spreadsheetId,
+          range: range
+        });
+        return retryResponse.data.values || [];
+      } catch (retryError) {
+        console.error(`❌ [API-LIMIT] 재시도 실패:`, retryError);
+        throw retryError;
+      }
+    }
+    
     console.error(`Error fetching sheet ${sheetName}:`, error);
     
     // 첫 번째 시도가 실패하면 시트 목록을 가져와서 정확한 이름 확인
