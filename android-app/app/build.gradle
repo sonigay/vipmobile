@@ -11,16 +11,30 @@ android {
         applicationId "com.vipplus.manager"
         minSdk 21
         targetSdk 33
-        versionCode 3
-        versionName "2.1.0"
+        versionCode 4
+        versionName "2.1.1"
     }
     
     namespace 'com.vipplus.manager'
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "vipmanager2024"
+            keyAlias System.getenv("KEY_ALIAS") ?: "vipmanager"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "vipmanager2024"
+            
+            // v1, v2 서명 모두 적용
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
     

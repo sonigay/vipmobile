@@ -27,14 +27,29 @@ jobs:
       with:
         gradle-version: 7.5
         
-    - name: Build APK
+    - name: Generate Release Keystore
+      run: |
+        cd android-app/app
+        keytool -genkey -v -keystore release.keystore \
+          -alias vipmanager \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -storepass vipmanager2024 \
+          -keypass vipmanager2024 \
+          -dname "CN=VIP Manager, OU=VIPPlus, O=VIPPlus, L=Seoul, ST=Seoul, C=KR"
+        
+    - name: Build Release APK
+      env:
+        KEYSTORE_FILE: app/release.keystore
+        KEYSTORE_PASSWORD: vipmanager2024
+        KEY_ALIAS: vipmanager
+        KEY_PASSWORD: vipmanager2024
       run: |
         cd android-app
-        gradle assembleDebug --stacktrace
+        gradle assembleRelease --stacktrace
         
-    - name: Upload APK
+    - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
         name: vip-manager-apk
-        path: android-app/app/build/outputs/apk/debug/app-debug.apk
+        path: android-app/app/build/outputs/apk/release/app-release.apk
 

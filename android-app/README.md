@@ -235,7 +235,7 @@ Android Studio에서 로그 확인:
 ---
 
 **제작:** VIP Plus
-**버전:** 2.1.0 (자동응답 기능 추가)
+**버전:** 2.1.1 (서명된 Release APK)
 **최종 업데이트:** 2025-10-19
 **서버 URL:** https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app
 
