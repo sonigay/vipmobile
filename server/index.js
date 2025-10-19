@@ -27669,63 +27669,90 @@ app.get('/api/data-collection-updates', async (req, res) => {
 // SMS 시트 헤더 자동 초기화 함수
 async function ensureSmsSheetHeaders() {
   try {
-    // SMS관리 시트 헤더 체크
-    const smsResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_SHEET_NAME}!A1:I1`,
-    });
-    
-    if (!smsResponse.data.values || smsResponse.data.values.length === 0) {
-      console.log('SMS관리 시트 헤더 추가 중...');
-      await sheets.spreadsheets.values.update({
+    // SMS관리 시트 헤더 체크 (429 에러 시 무시)
+    try {
+      const smsResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: `${SMS_SHEET_NAME}!A1:I1`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [['ID', '수신일시', '발신번호', '수신번호', '메시지내용', '전달상태', '전달일시', '전달대상번호들', '처리메모']]
-        }
       });
+      
+      if (!smsResponse.data.values || smsResponse.data.values.length === 0) {
+        console.log('SMS관리 시트 헤더 추가 중...');
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_SHEET_NAME}!A1:I1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['ID', '수신일시', '발신번호', '수신번호', '메시지내용', '전달상태', '전달일시', '전달대상번호들', '처리메모']]
+          }
+        });
+      }
+    } catch (smsError) {
+      if (smsError.code === 429) {
+        console.log('⚠️ [SMS-HEADER] API 할당량 초과 - 헤더 체크 스킵 (이미 있을 가능성 높음)');
+      } else {
+        throw smsError;
+      }
     }
     
-    // SMS전달규칙 시트 헤더 체크
-    const rulesResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_RULES_SHEET_NAME}!A1:J1`,
-    });
-    
-    if (!rulesResponse.data.values || rulesResponse.data.values.length === 0) {
-      console.log('SMS전달규칙 시트 헤더 추가 중...');
-      await sheets.spreadsheets.values.update({
+    // SMS전달규칙 시트 헤더 체크 (429 에러 시 무시)
+    try {
+      const rulesResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SMS_RULES_SHEET_NAME}!A1:K1`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [['규칙ID', '규칙명', '수신번호필터', '발신번호필터', '키워드필터', '전달대상번호들', '자동전달여부', '활성화여부', '생성일시', '수정일시', '메모']]
-        }
+        range: `${SMS_RULES_SHEET_NAME}!A1:J1`,
       });
+      
+      if (!rulesResponse.data.values || rulesResponse.data.values.length === 0) {
+        console.log('SMS전달규칙 시트 헤더 추가 중...');
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_RULES_SHEET_NAME}!A1:K1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['규칙ID', '규칙명', '수신번호필터', '발신번호필터', '키워드필터', '전달대상번호들', '자동전달여부', '활성화여부', '생성일시', '수정일시', '메모']]
+          }
+        });
+      }
+    } catch (rulesError) {
+      if (rulesError.code === 429) {
+        console.log('⚠️ [SMS-HEADER] API 할당량 초과 - 헤더 체크 스킵 (이미 있을 가능성 높음)');
+      } else {
+        throw rulesError;
+      }
     }
     
-    // SMS전달이력 시트 헤더 체크
-    const historyResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_HISTORY_SHEET_NAME}!A1:H1`,
-    });
-    
-    if (!historyResponse.data.values || historyResponse.data.values.length === 0) {
-      console.log('SMS전달이력 시트 헤더 추가 중...');
-      await sheets.spreadsheets.values.update({
+    // SMS전달이력 시트 헤더 체크 (429 에러 시 무시)
+    try {
+      const historyResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: `${SMS_HISTORY_SHEET_NAME}!A1:H1`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [['이력ID', 'SMS ID', '전달일시', '전달번호', '전달상태', '오류메시지', '처리방식', '규칙ID']]
-        }
       });
+      
+      if (!historyResponse.data.values || historyResponse.data.values.length === 0) {
+        console.log('SMS전달이력 시트 헤더 추가 중...');
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_HISTORY_SHEET_NAME}!A1:H1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['이력ID', 'SMS ID', '전달일시', '전달번호', '전달상태', '오류메시지', '처리방식', '규칙ID']]
+          }
+        });
+      }
+    } catch (historyError) {
+      if (historyError.code === 429) {
+        console.log('⚠️ [SMS-HEADER] API 할당량 초과 - 헤더 체크 스킵 (이미 있을 가능성 높음)');
+      } else {
+        throw historyError;
+      }
     }
     
     console.log('SMS 시트 헤더 체크 완료');
   } catch (error) {
-    console.error('SMS 시트 헤더 초기화 실패:', error);
+    // 429 에러가 아닌 경우만 로그 출력
+    if (error.code !== 429) {
+      console.error('SMS 시트 헤더 초기화 실패:', error);
+    }
   }
 }
 
