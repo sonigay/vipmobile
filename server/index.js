@@ -28230,9 +28230,9 @@ app.post('/api/sms/register', async (req, res) => {
           spreadsheetId: SPREADSHEET_ID,
           range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
           valueInputOption: 'RAW',
-          resource: {
-            values: [['수신만', '', '', '자가전송 감지 (전달스킵)']]
-          }
+              resource: {
+                values: [['수신만 (자가전송)', '', '', '발신번호와 수신번호가 동일 (전달스킵)']]
+              }
         });
       }
       
@@ -28275,7 +28275,7 @@ app.post('/api/sms/register', async (req, res) => {
               range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
               valueInputOption: 'RAW',
               resource: {
-                values: [['수신만', '', '', '전달대상 폰에서 수신 (전달스킵)']]
+                values: [['수신만 (전달대상 폰)', '', '', '전달 대상 폰에서 수신 (무한루프 방지)']]
               }
             });
           }
@@ -28293,6 +28293,7 @@ app.post('/api/sms/register', async (req, res) => {
         console.log(`활성화된 자동전달 규칙: ${activeRules.length}개`);
         
         let matchedRule = null;
+        let unmatchReasons = []; // 불일치 이유 수집
         
         // 각 규칙 체크 (3단계 필터링)
         for (const rule of activeRules) {
@@ -28303,16 +28304,19 @@ app.post('/api/sms/register', async (req, res) => {
           const keywordFilter = rule[4] || '';  // E열: 키워드 필터
           
           let isMatch = true;
+          let currentRuleUnmatchReason = null;
           
           // 1단계: 수신번호 필터 체크 ⭐ NEW!
           if (receiverFilter && !receiver.includes(receiverFilter)) {
             console.log(`  ✗ 수신번호 불일치: 규칙=${receiverFilter}, 실제=${receiver}`);
+            currentRuleUnmatchReason = '수신번호 불일치';
             isMatch = false;
           }
           
           // 2단계: 발신번호 필터 체크
           if (isMatch && senderFilter && !sender.includes(senderFilter)) {
             console.log(`  ✗ 발신번호 불일치: 규칙=${senderFilter}, 실제=${sender}`);
+            currentRuleUnmatchReason = '발신번호 불일치';
             isMatch = false;
           }
           
@@ -28322,6 +28326,7 @@ app.post('/api/sms/register', async (req, res) => {
             const hasKeyword = keywords.some(keyword => message.includes(keyword));
             if (!hasKeyword) {
               console.log(`  ✗ 키워드 불일치: 규칙=[${keywords.join(',')}], 메시지=${message.substring(0, 30)}...`);
+              currentRuleUnmatchReason = '키워드 불일치';
               isMatch = false;
             }
           }
@@ -28333,6 +28338,8 @@ app.post('/api/sms/register', async (req, res) => {
             console.log(`   발신번호: ${sender} ✓`);
             console.log(`   키워드: ${keywordFilter || '(필터 없음)'} ✓`);
             break;
+          } else if (currentRuleUnmatchReason) {
+            unmatchReasons.push(currentRuleUnmatchReason);
           }
         }
         
@@ -28370,7 +28377,53 @@ app.post('/api/sms/register', async (req, res) => {
             console.log(`✅ 자동 전달 준비 완료: ${targetNumbers.length}개 번호 (앱이 실제 전송할 예정)`);
           }
         } else {
+          // 매칭 실패: 상태를 "수신만 (이유)"로 업데이트
           console.log('매칭된 규칙 없음 - 자동 전달 안 함');
+          
+          let unmatchStatus = '수신만';
+          let unmatchMemo = '';
+          
+          if (activeRules.length === 0) {
+            unmatchStatus = '수신만 (규칙 없음)';
+            unmatchMemo = '활성화된 자동전달 규칙이 없습니다';
+          } else {
+            // 가장 많이 발생한 불일치 이유 찾기
+            const reasonCounts = {};
+            unmatchReasons.forEach(reason => {
+              reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+            });
+            
+            const mainReason = Object.keys(reasonCounts).reduce((a, b) => 
+              reasonCounts[a] > reasonCounts[b] ? a : b
+            , unmatchReasons[0] || '필터 불일치');
+            
+            unmatchStatus = `수신만 (${mainReason})`;
+            unmatchMemo = `${activeRules.length}개 규칙 확인 - ${mainReason}`;
+          }
+          
+          // 상태 업데이트
+          try {
+            const smsUpdateResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SMS_SHEET_NAME}!A:I`,
+            });
+            
+            const smsRows = smsUpdateResponse.data.values || [];
+            const smsRowIndex = smsRows.findIndex(row => row[0] == newId);
+            
+            if (smsRowIndex !== -1) {
+              await sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+                valueInputOption: 'RAW',
+                resource: {
+                  values: [[unmatchStatus, '', '', unmatchMemo]]
+                }
+              });
+            }
+          } catch (updateError) {
+            console.error('상태 업데이트 실패:', updateError);
+          }
         }
       }
     } catch (autoForwardError) {
