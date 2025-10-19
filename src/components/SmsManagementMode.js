@@ -98,7 +98,7 @@ const SmsManagementMode = ({
   const [detailHistory, setDetailHistory] = useState([]);
   
   // 통계 상태
-  const [stats, setStats] = useState({ total: 0, pending: 0, forwarded: 0, failed: 0 });
+  const [stats, setStats] = useState({ total: 0, pending: 0, forwarded: 0, failed: 0, receiveOnly: 0 });
   
   // 데이터 정리 상태
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
@@ -479,7 +479,7 @@ const SmsManagementMode = ({
             <Box>
               {/* 통계 카드 */}
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={3}>
+                <Grid item xs={12} sm={6} md={2.4}>
                   <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -489,7 +489,7 @@ const SmsManagementMode = ({
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid item xs={12} sm={6} md={2.4}>
                   <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -499,7 +499,7 @@ const SmsManagementMode = ({
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid item xs={12} sm={6} md={2.4}>
                   <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -509,7 +509,17 @@ const SmsManagementMode = ({
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="textSecondary" gutterBottom>
+                        수신만
+                      </Typography>
+                      <Typography variant="h4" color="info.main">{stats.receiveOnly}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
                   <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -522,7 +532,7 @@ const SmsManagementMode = ({
               </Grid>
 
               {/* 필터 및 검색 */}
-              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Box>
                   <Button
                     variant={smsFilter === 'all' ? 'contained' : 'outlined'}
@@ -546,6 +556,22 @@ const SmsManagementMode = ({
                     sx={{ ml: 1 }}
                   >
                     전달완료
+                  </Button>
+                  <Button
+                    variant={smsFilter === '수신만' ? 'contained' : 'outlined'}
+                    onClick={() => setSmsFilter('수신만')}
+                    size="small"
+                    sx={{ ml: 1 }}
+                  >
+                    수신만
+                  </Button>
+                  <Button
+                    variant={smsFilter === '실패' ? 'contained' : 'outlined'}
+                    onClick={() => setSmsFilter('실패')}
+                    size="small"
+                    sx={{ ml: 1 }}
+                  >
+                    실패
                   </Button>
                 </Box>
                 <TextField

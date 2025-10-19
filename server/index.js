@@ -27800,9 +27800,9 @@ app.get('/api/sms/received', async (req, res) => {
       memo: row[8] || ''
     }));
     
-    // 상태 필터링
+    // 상태 필터링 (상세 상태도 지원: "대기중 (규칙: xxx)" → "대기중"으로 필터링)
     if (status !== 'all') {
-      smsData = smsData.filter(sms => sms.forwardStatus === status);
+      smsData = smsData.filter(sms => (sms.forwardStatus || '').startsWith(status));
     }
     
     // 최신순 정렬 (ID 내림차순)
@@ -28346,8 +28346,25 @@ app.post('/api/sms/register', async (req, res) => {
         // 매칭된 규칙이 있으면 자동 전달
         if (matchedRule) {
           const ruleId = matchedRule[0];
+          const ruleName = matchedRule[1];
+          const receiverFilter = matchedRule[2] || '';
+          const senderFilter = matchedRule[3] || '';
+          const keywordFilter = matchedRule[4] || '';
           const targetNumbersStr = matchedRule[5] || ''; // F열: 전달대상번호들
           const targetNumbers = targetNumbersStr.split(',').map(n => n.trim()).filter(n => n);
+          
+          // 매칭된 필터 정보 수집
+          const matchedFilters = [];
+          if (receiverFilter) matchedFilters.push(`수신번호:${receiverFilter}`);
+          if (senderFilter) matchedFilters.push(`발신번호:${senderFilter}`);
+          if (keywordFilter) {
+            const keywords = keywordFilter.split(',').map(k => k.trim());
+            matchedFilters.push(`키워드:${keywords.join(',')}`);
+          }
+          
+          const matchInfo = matchedFilters.length > 0 
+            ? ` | 일치: ${matchedFilters.join(', ')}` 
+            : '';
           
           console.log(`자동 전달 시작: ${targetNumbers.length}개 번호`);
           
@@ -28366,10 +28383,10 @@ app.post('/api/sms/register', async (req, res) => {
             if (smsRowIndex !== -1) {
               await sheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
-                range: `${SMS_SHEET_NAME}!H${smsRowIndex + 1}:I${smsRowIndex + 1}`,
+                range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
                 valueInputOption: 'RAW',
                 resource: {
-                  values: [[targetNumbersStr, `자동전달 대기 (규칙: ${matchedRule[1]})`]]
+                  values: [[`대기중 (규칙: ${ruleName})`, '', targetNumbersStr, `자동전달 준비${matchInfo}`]]
                 }
               });
             }
@@ -28458,9 +28475,13 @@ app.get('/api/sms/stats', async (req, res) => {
     
     const stats = {
       total: dataRows.length,
-      pending: dataRows.filter(row => row[5] === '대기중').length,
-      forwarded: dataRows.filter(row => row[5] === '전달완료').length,
-      failed: dataRows.filter(row => row[5] === '실패' || row[5] === '부분실패').length
+      pending: dataRows.filter(row => (row[5] || '').startsWith('대기중')).length,
+      forwarded: dataRows.filter(row => (row[5] || '').startsWith('전달완료')).length,
+      failed: dataRows.filter(row => {
+        const status = row[5] || '';
+        return status.startsWith('실패') || status.startsWith('부분실패');
+      }).length,
+      receiveOnly: dataRows.filter(row => (row[5] || '').startsWith('수신만')).length
     };
     
     res.json({ success: true, stats });
@@ -28546,7 +28567,14 @@ app.post('/api/sms/update-forward-status', async (req, res) => {
       const forwardStatus = failCount === 0 ? '전달완료' : 
                            successCount > 0 ? '부분실패' : '실패';
       const targetNumbersStr = targetNumbers.join(',');
-      const memo = `앱전송 (성공:${successCount}, 실패:${failCount})`;
+      
+      // 기존 메모에서 규칙 매칭 정보 추출 (있으면 유지)
+      const existingMemo = smsRows[smsRowIndex][8] || ''; // I열: 처리메모
+      const matchInfo = existingMemo.includes('일치:') 
+        ? existingMemo.split('자동전달 준비')[1] || '' 
+        : '';
+      
+      const memo = `전송완료 (성공:${successCount}, 실패:${failCount})${matchInfo}`;
       
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
