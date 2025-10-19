@@ -4011,7 +4011,7 @@ function RechotanchoBondTab({ loggedInStore }) {
         },
         body: JSON.stringify({
           data: dataToSave,
-          inputUser: loggedInStore?.target || loggedInStore?.name || '사용자'
+          inputUser: loggedInStore?.name || loggedInStore?.target || '사용자'
         })
       });
       
