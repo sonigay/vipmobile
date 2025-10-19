@@ -349,7 +349,7 @@ function BondChartTab() {
 
       {/* 서브 탭 컨텐츠 */}
       {activeSubTab === 0 && <OverdueBondTab />}
-      {activeSubTab === 1 && <RechotanchoBondTab />}
+      {activeSubTab === 1 && <RechotanchoBondTab loggedInStore={loggedInStore} />}
       {activeSubTab === 2 && <SubscriberIncreaseTab />}
     </Box>
   );
@@ -3837,7 +3837,7 @@ const formatKoreanCurrency = (num) => {
 };
 
 // 재초담초채권 탭 컴포넌트
-function RechotanchoBondTab() {
+function RechotanchoBondTab({ loggedInStore }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -3969,8 +3969,11 @@ function RechotanchoBondTab() {
 
   // 입력 값 변경 핸들러
   const handleInputChange = (index, field, value) => {
+    // 콤마 제거하고 숫자만 추출
+    const numericValue = value.replace(/,/g, '');
+    
     const newData = [...inputData];
-    newData[index][field] = value;
+    newData[index][field] = numericValue;
     
     // 관리대상채권 자동 계산
     if (field === 'inventoryBond' || field === 'collateralBond') {
@@ -3980,6 +3983,12 @@ function RechotanchoBondTab() {
     }
     
     setInputData(newData);
+  };
+
+  // 숫자를 콤마 형식으로 변환
+  const formatNumberWithComma = (num) => {
+    if (!num) return '';
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
 
   // 데이터 저장
@@ -4002,7 +4011,7 @@ function RechotanchoBondTab() {
         },
         body: JSON.stringify({
           data: dataToSave,
-          inputUser: '사용자' // 실제로는 로그인 정보에서 가져와야 함
+          inputUser: loggedInStore?.target || loggedInStore?.name || '사용자'
         })
       });
       
@@ -4189,7 +4198,9 @@ function RechotanchoBondTab() {
       },
       title: {
         display: true,
-        text: '대리점별 현재 채권 현황',
+        text: selectedTimestamp 
+          ? `대리점별 채권 현황 (${selectedTimestamp.split(' ')[0]})`
+          : '대리점별 현재 채권 현황',
         font: { size: 16, weight: 'bold' }
       },
       tooltip: {
@@ -4202,6 +4213,37 @@ function RechotanchoBondTab() {
             ];
           }
         }
+      },
+      datalabels: {
+        display: true,
+        align: 'end',
+        anchor: 'end',
+        formatter: function(value) {
+          if (value === 0) return '';
+          // 억 단위
+          if (value >= 100000000) {
+            const eok = Math.floor(value / 100000000);
+            const man = Math.floor((value % 100000000) / 10000);
+            if (man > 0) {
+              return `${eok}억${man}만`;
+            }
+            return `${eok}억`;
+          }
+          // 천만 단위
+          if (value >= 10000000) {
+            return `${Math.floor(value / 10000)}만`;
+          }
+          // 만 단위
+          if (value >= 10000) {
+            return `${Math.floor(value / 10000)}만`;
+          }
+          return value.toLocaleString();
+        },
+        font: {
+          size: 11,
+          weight: 'bold'
+        },
+        color: '#333'
       }
     },
     scales: {
@@ -4387,22 +4429,30 @@ function RechotanchoBondTab() {
                   <TableCell>{item.agentName}</TableCell>
                   <TableCell>
                     <TextField
-                      type="number"
-                      value={item.inventoryBond}
+                      type="text"
+                      value={formatNumberWithComma(item.inventoryBond)}
                       onChange={(e) => handleInputChange(index, 'inventoryBond', e.target.value)}
                       size="small"
                       fullWidth
                       placeholder="0"
+                      inputProps={{
+                        inputMode: 'numeric',
+                        pattern: '[0-9,]*'
+                      }}
                     />
                   </TableCell>
                   <TableCell>
                     <TextField
-                      type="number"
-                      value={item.collateralBond}
+                      type="text"
+                      value={formatNumberWithComma(item.collateralBond)}
                       onChange={(e) => handleInputChange(index, 'collateralBond', e.target.value)}
                       size="small"
                       fullWidth
                       placeholder="0"
+                      inputProps={{
+                        inputMode: 'numeric',
+                        pattern: '[0-9,]*'
+                      }}
                     />
                   </TableCell>
                   <TableCell>
