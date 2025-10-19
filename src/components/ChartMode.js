@@ -4223,24 +4223,36 @@ function RechotanchoBondTab({ loggedInStore }) {
         anchor: 'center',
         formatter: function(value) {
           if (value === 0) return '';
+          
+          // 음수 처리
+          const isNegative = value < 0;
+          const absValue = Math.abs(value);
+          
+          let result = '';
+          
           // 억 단위
-          if (value >= 100000000) {
-            const eok = Math.floor(value / 100000000);
-            const man = Math.floor((value % 100000000) / 10000);
+          if (absValue >= 100000000) {
+            const eok = Math.floor(absValue / 100000000);
+            const man = Math.floor((absValue % 100000000) / 10000);
             if (man > 0) {
-              return `${eok}억${man}만`;
+              result = `${eok}억${man}만`;
+            } else {
+              result = `${eok}억`;
             }
-            return `${eok}억`;
           }
           // 천만 단위
-          if (value >= 10000000) {
-            return `${Math.floor(value / 10000)}만`;
+          else if (absValue >= 10000000) {
+            result = `${Math.floor(absValue / 10000)}만`;
           }
           // 만 단위
-          if (value >= 10000) {
-            return `${Math.floor(value / 10000)}만`;
+          else if (absValue >= 10000) {
+            result = `${Math.floor(absValue / 10000)}만`;
           }
-          return value.toLocaleString();
+          else {
+            result = absValue.toLocaleString();
+          }
+          
+          return isNegative ? `-${result}` : result;
         },
         font: {
           size: 11,
