@@ -39,7 +39,7 @@ jobs:
         
     - name: Build Release APK
       env:
-        KEYSTORE_FILE: app/release.keystore
+        KEYSTORE_FILE: release.keystore
         KEYSTORE_PASSWORD: vipmanager2024
         KEY_ALIAS: vipmanager
         KEY_PASSWORD: vipmanager2024
