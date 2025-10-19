@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy, useRef, memo } from 'react';
 import {
   Box,
   Paper,
@@ -182,6 +182,11 @@ const PriceDiscrepancyTab = () => {
 
 // 입고가 상이값 콘텐츠 컴포넌트 - React.memo로 메모이제이션
 const PriceDiscrepancyContent = memo(({ data, onExcelDownload, getConfidenceColor }) => {
+  // 평균 신뢰도 계산 - Hooks는 early return 이전에 호출
+  const avgConfidence = data?.discrepancies?.length > 0
+    ? (data.discrepancies.reduce((sum, d) => sum + d.confidence, 0) / data.discrepancies.length).toFixed(1)
+    : 0;
+
   if (!data) {
     return (
       <Alert severity="info">
@@ -197,13 +202,6 @@ const PriceDiscrepancyContent = memo(({ data, onExcelDownload, getConfidenceColo
       </Alert>
     );
   }
-
-  // 평균 신뢰도 계산 - useMemo로 메모이제이션
-  const avgConfidence = useMemo(() => {
-    return (
-      data.discrepancies.reduce((sum, d) => sum + d.confidence, 0) / data.discrepancies.length
-    ).toFixed(1);
-  }, [data.discrepancies]);
 
   return (
     <Box>
