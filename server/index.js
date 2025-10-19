@@ -6225,6 +6225,15 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.error('❌ [서버시작] 푸시 구독 초기화 실패:', error.message);
     }
     
+    // SMS 시트 헤더 초기화 (서버 시작 시 한 번만 실행)
+    console.log('📱 [서버시작] SMS 시트 헤더 초기화 시작');
+    try {
+      await ensureSmsSheetHeaders();
+      console.log('✅ [서버시작] SMS 시트 헤더 초기화 완료');
+    } catch (error) {
+      console.error('❌ [서버시작] SMS 시트 헤더 초기화 실패:', error.message);
+    }
+    
     // 서버 시작 시 배정완료된 재고 자동 저장 및 중복 정리 (지연 로딩으로 성능 최적화)
     console.log('💾 [서버시작] 배정완료된 재고 자동 저장 및 중복 정리 시작 (백그라운드에서 실행)');
     
@@ -27758,9 +27767,6 @@ async function ensureSmsSheetHeaders() {
 
 // SMS 수신 데이터 조회 API
 app.get('/api/sms/received', async (req, res) => {
-  // 헤더 자동 체크
-  await ensureSmsSheetHeaders();
-  
   try {
     const { limit = 100, status = 'all' } = req.query;
     
@@ -27815,9 +27821,6 @@ app.get('/api/sms/received', async (req, res) => {
 
 // SMS 전달 규칙 조회 API
 app.get('/api/sms/rules', async (req, res) => {
-  // 헤더 자동 체크
-  await ensureSmsSheetHeaders();
-  
   try {
     console.log('SMS 전달 규칙 조회');
     
