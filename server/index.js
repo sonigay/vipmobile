@@ -28214,6 +28214,12 @@ app.post('/api/sms/register', async (req, res) => {
     // 자동 전달 로직 시작
     console.log('자동 전달 규칙 확인 시작...');
     
+    // ⚠️ 중요: 발신번호 = 수신번호인 경우 자동 전달 차단 (무한 루프 방지)
+    if (sender === receiver) {
+      console.log('⚠️ 자가 전송 감지 (발신=수신) - 자동 전달 스킵:', sender);
+      return res.json({ success: true, id: newId, skipped: true, reason: 'self-send' });
+    }
+    
     try {
       // 전달 규칙 조회
       const rulesResponse = await sheets.spreadsheets.values.get({
