@@ -28594,13 +28594,27 @@ app.post('/api/sms/register', async (req, res) => {
         });
         
         const contactRows = contactsCheckResponse.data.values || [];
+        
+        // 먼저 영업사원 맵 생성 (이름 → 연락처)
+        const salesPersonMap = new Map();
+        if (contactRows.length > 1) {
+          contactRows.slice(1).forEach(row => {
+            if (row[1] === '영업사원') {
+              const salesName = row[3] || ''; // 이름
+              const salesContact = row[4] || ''; // 연락처
+              if (salesName && salesContact) {
+                salesPersonMap.set(salesName.trim(), salesContact.trim());
+              }
+              if (salesContact) {
+                salesPhoneSet.add(salesContact.trim());
+              }
+            }
+          });
+        }
+        
         if (contactRows.length > 1) {
           for (const row of contactRows.slice(1)) {
             const contact = row[4] || '';
-            // 영업사원 번호 수집 (수신번호가 영업사원폰인지 판별 용도)
-            if (row[1] === '영업사원' && contact) {
-              salesPhoneSet.add(contact.trim());
-            }
             if (contact && contact.trim() === sender) {
               isRegistered = true;
               clientName = row[3] || '';
@@ -28611,8 +28625,19 @@ app.post('/api/sms/register', async (req, res) => {
                 // 유형이 영업사원이면 본인 연락처가 발송 번호
                 responsibleSalesPhone = contact;
               } else {
-                // 거래처면 담당 영업사원 찾기
-                responsibleSalesPhone = salesPersonId;
+                // 거래처면 담당 영업사원의 연락처 찾기
+                // salesPersonId가 폰번호 형식이면 그대로, 아니면 이름으로 조회
+                if (salesPersonId && /^0\d{9,10}$/.test(salesPersonId.trim())) {
+                  // 폰번호 형식
+                  responsibleSalesPhone = salesPersonId.trim();
+                } else if (salesPersonId && salesPersonMap.has(salesPersonId.trim())) {
+                  // 이름으로 영업사원 찾기
+                  responsibleSalesPhone = salesPersonMap.get(salesPersonId.trim());
+                  console.log(`✅ 담당영업사원 이름(${salesPersonId})으로 연락처 찾음: ${responsibleSalesPhone}`);
+                } else {
+                  // 못 찾으면 일단 그대로
+                  responsibleSalesPhone = salesPersonId;
+                }
               }
               
               console.log(`✅ 앱에서 등록된 연락처 확인: ${clientName} (담당: ${responsibleSalesPhone})`);
