@@ -28548,10 +28548,15 @@ app.post('/api/sms/register', async (req, res) => {
     // ============================================
     console.log('🤖 자동응답 규칙 확인 시작...');
     try {
-      // 자동응답 루프 방지: 자동응답 표시가 포함된 메시지는 재매칭 금지
+      // 🚫 루프 방지 1: 자동응답 표시가 포함된 메시지는 재매칭 금지
       if ((message || '').includes('[자동응답]')) {
         console.log('⚠️ 자동응답 표시가 포함된 메시지 - 자동응답 스킵');
-      } else {
+      } 
+      // 🚫 루프 방지 2: 자기 자신에게 보낸 메시지는 자동응답 금지
+      else if (sender === receiver) {
+        console.log('⚠️ 자기 자신에게 보낸 메시지 - 자동응답 스킵');
+      } 
+      else {
       // 1. 발신번호가 등록된 거래처/영업사원인지 확인
       let isRegistered = false;
       let clientName = '';
@@ -28658,6 +28663,10 @@ app.post('/api/sms/register', async (req, res) => {
       if (!isRegistered) {
         console.log('미등록 번호 - 자동응답 스킵:', sender);
       } else {
+        // 🚫 루프 방지 3: 발신자가 발송번호(영업사원)와 같으면 스킵 (자기가 보낸 자동응답 재수신)
+        if (sender === responsibleSalesPhone) {
+          console.log('⚠️ 발신자가 발송번호와 동일 - 자동응답 스킵 (자기 자신에게 보낸 메시지):', sender);
+        } else {
         // 2. 자동응답 규칙 확인
         const rulesResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -28742,6 +28751,7 @@ app.post('/api/sms/register', async (req, res) => {
             console.log('매칭된 자동응답 규칙 없음');
           }
         }
+      }
       }
       }
     } catch (autoReplyError) {
