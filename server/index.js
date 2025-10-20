@@ -28541,169 +28541,10 @@ app.post('/api/sms/register', async (req, res) => {
       }
     }
     
-    console.log('✅ 중복 아님 - 규칙 매칭 체크 시작...');
-    
-    // ⚠️ 중요: 발신번호 = 수신번호인 경우 바로 스킵 (무한 루프 방지)
-    if (sender === receiver) {
-      console.log('⚠️ 자가 전송 감지 (발신=수신) - 시트 저장 스킵:', sender);
-      return res.json({ success: true, skipped: true, reason: 'self-send' });
-    }
-    
-    // ==================================================
-    // 📋 1단계: 규칙 매칭 체크 (시트 저장 전)
-    // ==================================================
-    let matchedRule = null;
-    let matchedFilters = [];
-    let matchInfo = '';
-    
-    try {
-      // 전달 규칙 조회
-      const rulesResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SMS_RULES_SHEET_NAME}!A:K`,
-      });
-      
-      const rulesRows = rulesResponse.data.values || [];
-      
-      if (rulesRows.length > 1) {
-        const rulesData = rulesRows.slice(1);
-        
-        // 활성화되고 자동전달이 ON인 규칙만 필터링
-        const activeRules = rulesData.filter(rule => {
-          const autoForward = rule[6] === 'O'; // G열: 자동전달여부
-          const active = rule[7] === 'O'; // H열: 활성화여부
-          return autoForward && active;
-        });
-        
-        console.log(`활성화된 자동전달 규칙: ${activeRules.length}개`);
-        
-        // 규칙이 없으면 바로 스킵
-        if (activeRules.length === 0) {
-          console.log('❌ 활성화된 규칙 없음 - 시트 저장 스킵');
-          return res.json({ success: true, skipped: true, reason: 'no-active-rules' });
-        }
-        
-        // 각 규칙 체크 (3단계 필터링)
-        for (const rule of activeRules) {
-          const ruleId = rule[0];
-          const ruleName = rule[1];
-          const receiverFilter = rule[2] || ''; // C열: 수신번호 필터
-          const senderFilter = rule[3] || '';   // D열: 발신번호 필터
-          const keywordFilter = rule[4] || '';  // E열: 키워드 필터
-          
-          let isMatch = true;
-          
-          // 1단계: 수신번호 필터 체크
-          if (receiverFilter && !receiver.includes(receiverFilter)) {
-            console.log(`  ✗ 수신번호 불일치: 규칙=${receiverFilter}, 실제=${receiver}`);
-            isMatch = false;
-          }
-          
-          // 2단계: 발신번호 필터 체크
-          if (isMatch && senderFilter && !sender.includes(senderFilter)) {
-            console.log(`  ✗ 발신번호 불일치: 규칙=${senderFilter}, 실제=${sender}`);
-            isMatch = false;
-          }
-          
-          // 3단계: 키워드 필터 체크 (쉼표로 구분된 키워드 중 하나라도 포함되면 OK)
-          if (isMatch && keywordFilter) {
-            const keywords = keywordFilter.split(',').map(k => k.trim());
-            const hasKeyword = keywords.some(keyword => message.includes(keyword));
-            if (!hasKeyword) {
-              console.log(`  ✗ 키워드 불일치: 규칙=[${keywords.join(',')}], 메시지=${message.substring(0, 30)}...`);
-              isMatch = false;
-            }
-          }
-          
-          if (isMatch) {
-            matchedRule = rule;
-            console.log(`✅ 규칙 매칭 성공: ${ruleName} (ID: ${ruleId})`);
-            console.log(`   수신번호: ${receiver} ✓`);
-            console.log(`   발신번호: ${sender} ✓`);
-            console.log(`   키워드: ${keywordFilter || '(필터 없음)'} ✓`);
-            
-            // 매칭 정보 수집
-            if (receiverFilter) matchedFilters.push(`수신번호:${receiverFilter}`);
-            if (senderFilter) matchedFilters.push(`발신번호:${senderFilter}`);
-            if (keywordFilter) {
-              const keywords = keywordFilter.split(',').map(k => k.trim());
-              matchedFilters.push(`키워드:${keywords.join(',')}`);
-            }
-            matchInfo = matchedFilters.length > 0 
-              ? ` | 일치: ${matchedFilters.join(', ')}` 
-              : '';
-            
-            break;
-          }
-        }
-        
-        // 매칭 실패 시 바로 리턴 (시트에 저장 안 함)
-        if (!matchedRule) {
-          console.log('❌ 매칭된 규칙 없음 - 시트 저장 스킵');
-          return res.json({ success: true, skipped: true, reason: 'no-match' });
-        }
-      } else {
-        console.log('❌ 규칙 없음 - 시트 저장 스킵');
-        return res.json({ success: true, skipped: true, reason: 'no-rules' });
-      }
-    } catch (ruleError) {
-      console.error('규칙 조회 실패:', ruleError);
-      return res.json({ success: true, skipped: true, reason: 'rule-check-error' });
-    }
-    
-    // ==================================================
-    // 📝 2단계: 매칭 성공 - 시트에 저장
-    // ==================================================
-    console.log('✅ 규칙 매칭 성공 - 시트에 저장 시작');
-    
-    // ID 생성
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_SHEET_NAME}!A:A`,
-    });
-    
-    const newId = (response.data.values || []).length;
-    const receivedAt = timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19);
-    
-    // 매칭된 규칙 정보 추출
-    const ruleId = matchedRule[0];
-    const ruleName = matchedRule[1];
-    const targetNumbersStr = matchedRule[5] || ''; // F열: 전달대상번호들
-    const targetNumbers = targetNumbersStr.split(',').map(n => n.trim()).filter(n => n);
-    
-    // SMS관리 시트에 추가 (바로 "대기중" 상태로)
-    const matchInfoForStatus = matchInfo.replace(/^ \| /, '').trim();
-    const newRow = [
-      newId,
-      receivedAt,
-      sender,
-      receiver,
-      message,
-      `대기중 (규칙: ${ruleName}, ${matchInfoForStatus})`,
-      '',
-      targetNumbersStr,
-      `자동전달 준비`
-    ];
-    
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SMS_SHEET_NAME}!A:I`,
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      resource: {
-        values: [newRow]
-      }
-    });
-    
-    console.log(`✅ 시트 저장 완료 (ID: ${newId}) - 자동 전달 대기중`);
-    
-    // ==================================================
-    // 🚀 3단계: 자동 전달 준비 완료
-    // ==================================================
-    console.log(`✅ 자동 전달 준비 완료: ${targetNumbers.length}개 번호 (앱이 실제 전송할 예정)`);
+    console.log('✅ 중복 아님 - 자동응답 먼저 체크...');
     
     // ============================================
-    // 자동응답 로직 시작
+    // 🤖 자동응답 로직 (전달 규칙과 독립적으로 먼저 실행)
     // ============================================
     console.log('🤖 자동응답 규칙 확인 시작...');
     try {
@@ -28880,8 +28721,167 @@ app.post('/api/sms/register', async (req, res) => {
       }
     } catch (autoReplyError) {
       console.error('자동응답 처리 중 오류:', autoReplyError);
-      // 자동응답 실패해도 SMS 등록은 성공으로 처리
+      // 자동응답 실패해도 계속 진행
     }
+    
+    // ⚠️ 중요: 발신번호 = 수신번호인 경우 바로 스킵 (무한 루프 방지)
+    if (sender === receiver) {
+      console.log('⚠️ 자가 전송 감지 (발신=수신) - 시트 저장 스킵:', sender);
+      return res.json({ success: true, skipped: true, reason: 'self-send' });
+    }
+    
+    // ==================================================
+    // 📋 1단계: 규칙 매칭 체크 (시트 저장 전)
+    // ==================================================
+    let matchedRule = null;
+    let matchedFilters = [];
+    let matchInfo = '';
+    
+    try {
+      // 전달 규칙 조회
+      const rulesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SMS_RULES_SHEET_NAME}!A:K`,
+      });
+      
+      const rulesRows = rulesResponse.data.values || [];
+      
+      if (rulesRows.length > 1) {
+        const rulesData = rulesRows.slice(1);
+        
+        // 활성화되고 자동전달이 ON인 규칙만 필터링
+        const activeRules = rulesData.filter(rule => {
+          const autoForward = rule[6] === 'O'; // G열: 자동전달여부
+          const active = rule[7] === 'O'; // H열: 활성화여부
+          return autoForward && active;
+        });
+        
+        console.log(`활성화된 자동전달 규칙: ${activeRules.length}개`);
+        
+        // 규칙이 없으면 바로 스킵
+        if (activeRules.length === 0) {
+          console.log('❌ 활성화된 규칙 없음 - 시트 저장 스킵');
+          return res.json({ success: true, skipped: true, reason: 'no-active-rules' });
+        }
+        
+        // 각 규칙 체크 (3단계 필터링)
+        for (const rule of activeRules) {
+          const ruleId = rule[0];
+          const ruleName = rule[1];
+          const receiverFilter = rule[2] || ''; // C열: 수신번호 필터
+          const senderFilter = rule[3] || '';   // D열: 발신번호 필터
+          const keywordFilter = rule[4] || '';  // E열: 키워드 필터
+          
+          let isMatch = true;
+          
+          // 1단계: 수신번호 필터 체크
+          if (receiverFilter && !receiver.includes(receiverFilter)) {
+            console.log(`  ✗ 수신번호 불일치: 규칙=${receiverFilter}, 실제=${receiver}`);
+            isMatch = false;
+          }
+          
+          // 2단계: 발신번호 필터 체크
+          if (isMatch && senderFilter && !sender.includes(senderFilter)) {
+            console.log(`  ✗ 발신번호 불일치: 규칙=${senderFilter}, 실제=${sender}`);
+            isMatch = false;
+          }
+          
+          // 3단계: 키워드 필터 체크 (쉼표로 구분된 키워드 중 하나라도 포함되면 OK)
+          if (isMatch && keywordFilter) {
+            const keywords = keywordFilter.split(',').map(k => k.trim());
+            const hasKeyword = keywords.some(keyword => message.includes(keyword));
+            if (!hasKeyword) {
+              console.log(`  ✗ 키워드 불일치: 규칙=[${keywords.join(',')}], 메시지=${message.substring(0, 30)}...`);
+              isMatch = false;
+            }
+          }
+          
+          if (isMatch) {
+            matchedRule = rule;
+            console.log(`✅ 규칙 매칭 성공: ${ruleName} (ID: ${ruleId})`);
+            console.log(`   수신번호: ${receiver} ✓`);
+            console.log(`   발신번호: ${sender} ✓`);
+            console.log(`   키워드: ${keywordFilter || '(필터 없음)'} ✓`);
+            
+            // 매칭 정보 수집
+            if (receiverFilter) matchedFilters.push(`수신번호:${receiverFilter}`);
+            if (senderFilter) matchedFilters.push(`발신번호:${senderFilter}`);
+            if (keywordFilter) {
+              const keywords = keywordFilter.split(',').map(k => k.trim());
+              matchedFilters.push(`키워드:${keywords.join(',')}`);
+            }
+            matchInfo = matchedFilters.length > 0 
+              ? ` | 일치: ${matchedFilters.join(', ')}` 
+              : '';
+            
+            break;
+          }
+        }
+        
+        // 매칭 실패 시 바로 리턴 (시트에 저장 안 함)
+        if (!matchedRule) {
+          console.log('❌ 매칭된 규칙 없음 - 시트 저장 스킵');
+          return res.json({ success: true, skipped: true, reason: 'no-match' });
+        }
+      } else {
+        console.log('❌ 규칙 없음 - 시트 저장 스킵');
+        return res.json({ success: true, skipped: true, reason: 'no-rules' });
+      }
+    } catch (ruleError) {
+      console.error('규칙 조회 실패:', ruleError);
+      return res.json({ success: true, skipped: true, reason: 'rule-check-error' });
+    }
+    
+    // ==================================================
+    // 📝 2단계: 매칭 성공 - 시트에 저장
+    // ==================================================
+    console.log('✅ 규칙 매칭 성공 - 시트에 저장 시작');
+    
+    // ID 생성
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:A`,
+    });
+    
+    const newId = (response.data.values || []).length;
+    const receivedAt = timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19);
+    
+    // 매칭된 규칙 정보 추출
+    const ruleId = matchedRule[0];
+    const ruleName = matchedRule[1];
+    const targetNumbersStr = matchedRule[5] || ''; // F열: 전달대상번호들
+    const targetNumbers = targetNumbersStr.split(',').map(n => n.trim()).filter(n => n);
+    
+    // SMS관리 시트에 추가 (바로 "대기중" 상태로)
+    const matchInfoForStatus = matchInfo.replace(/^ \| /, '').trim();
+    const newRow = [
+      newId,
+      receivedAt,
+      sender,
+      receiver,
+      message,
+      `대기중 (규칙: ${ruleName}, ${matchInfoForStatus})`,
+      '',
+      targetNumbersStr,
+      `자동전달 준비`
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SMS_SHEET_NAME}!A:I`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
+        values: [newRow]
+      }
+    });
+    
+    console.log(`✅ 시트 저장 완료 (ID: ${newId}) - 자동 전달 대기중`);
+    
+    // ==================================================
+    // 🚀 3단계: 자동 전달 준비 완료
+    // ==================================================
+    console.log(`✅ 자동 전달 준비 완료: ${targetNumbers.length}개 번호 (앱이 실제 전송할 예정)`);
     
     res.json({ success: true, id: newId });
     
