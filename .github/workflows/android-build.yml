@@ -63,10 +63,10 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v2.1.2-${{ steps.date.outputs.date }}
-        name: VIP Manager v2.1.2 (${{ steps.date.outputs.date }})
+        tag_name: v2.1.3-${{ steps.date.outputs.date }}
+        name: VIP Manager v2.1.3 (${{ steps.date.outputs.date }})
         body: |
-          ## 📱 VIP 안드로이드 매니저 v2.1.2
+          ## 📱 VIP 안드로이드 매니저 v2.1.3
           
           ### ✨ 기능
           - SMS 자동 수신 및 전송
