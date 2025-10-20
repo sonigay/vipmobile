@@ -28981,9 +28981,9 @@ app.post('/api/sms/update-forward-status', async (req, res) => {
     
     if (smsRowIndex !== -1) {
       // 전달상태에 상세 정보 + 매칭 정보 포함
-      const existingMemo = smsRows[smsRowIndex][8] || ''; // I열: 처리메모
-      const matchInfoRaw = existingMemo.includes('일치:') 
-        ? existingMemo.split('일치:')[1].trim() 
+      const existingStatus = smsRows[smsRowIndex][5] || ''; // F열: 전달상태
+      const matchInfoRaw = existingStatus.includes('일치:') 
+        ? existingStatus.split('일치:')[1].trim() 
         : '';
       const matchInfoForStatus = matchInfoRaw ? `, 일치: ${matchInfoRaw}` : '';
       const forwardStatus = failCount === 0 
