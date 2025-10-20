@@ -28728,7 +28728,7 @@ app.post('/api/sms/register', async (req, res) => {
               now,
               sender,
               clientName,
-              message.substring(0, 100), // 문의내용 (최대 100자)
+              message, // 문의내용 전체 저장
               ruleName,
               replyMessage,
               responsibleSalesPhone,
