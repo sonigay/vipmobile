@@ -28884,7 +28884,7 @@ app.get('/api/sms/stats', async (req, res) => {
     
     const rows = response.data.values || [];
     if (rows.length <= 1) {
-      return res.json({ success: true, stats: { total: 0, pending: 0, forwarded: 0, failed: 0 } });
+      return res.json({ success: true, stats: { total: 0, pending: 0, forwarded: 0, failed: 0, receiveOnly: 0 } });
     }
     
     const dataRows = rows.slice(1);
