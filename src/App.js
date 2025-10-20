@@ -1416,8 +1416,10 @@ function AppContent() {
       }));
     }
     // 관리자 모드인지 확인
-    else if (store.isAgent) {
-      // console.log('로그인: 관리자 모드');
+    else if (store.modePermissions && store.modePermissions.agent) {
+      console.log('로그인: 관리자 모드');
+      console.log('store.modePermissions:', store.modePermissions);
+      console.log('store.modePermissions.agent:', store.modePermissions.agent);
       setIsAgentMode(true);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -1498,6 +1500,145 @@ function AppContent() {
         isMeeting: false,
         isReservation: false,
         isBudget: false,
+        isSales: false,
+        store: store
+      }));
+    }
+    // 예산 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.budget) {
+      console.log('로그인: 예산 모드');
+      setIsBudgetMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setCurrentMode('budget');
+      
+      localStorage.setItem('loginState', JSON.stringify({
+        isBudget: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        isInventoryRecovery: false,
+        isSales: false,
+        store: store
+      }));
+    }
+    // SMS 관리 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.smsManagement) {
+      console.log('로그인: SMS 관리 모드');
+      setIsSmsManagementMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsObManagementMode(false);
+      setCurrentMode('sms-management');
+      
+      localStorage.setItem('loginState', JSON.stringify({
+        isSmsManagement: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
+        isSales: false,
+        store: store
+      }));
+    }
+    // OB 관리 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.obManagement) {
+      console.log('로그인: OB 관리 모드');
+      setIsObManagementMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setCurrentMode('ob-management');
+      
+      localStorage.setItem('loginState', JSON.stringify({
+        isObManagement: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
+        isSales: false,
+        store: store
+      }));
+    }
+    // 정보수집 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.dataCollection) {
+      console.log('로그인: 정보수집 모드');
+      setIsDataCollectionMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setCurrentMode('data-collection');
+      
+      localStorage.setItem('loginState', JSON.stringify({
+        isDataCollection: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
         isSales: false,
         store: store
       }));
