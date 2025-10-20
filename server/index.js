@@ -28706,8 +28706,11 @@ app.post('/api/sms/register', async (req, res) => {
     // 자동응답 로직 시작
     // ============================================
     console.log('🤖 자동응답 규칙 확인 시작...');
-    
     try {
+      // 자동응답 루프 방지: 자동응답 표시가 포함된 메시지는 재매칭 금지
+      if ((message || '').includes('[자동응답]')) {
+        console.log('⚠️ 자동응답 표시가 포함된 메시지 - 자동응답 스킵');
+      } else {
       // 1. 발신번호가 등록된 거래처/영업사원인지 확인
       let isRegistered = false;
       let clientName = '';
@@ -28720,10 +28723,12 @@ app.post('/api/sms/register', async (req, res) => {
       });
       
       const storeRows = storeCheckResponse.data.values || [];
+      const salesPhoneSet = new Set();
       if (storeRows.length > 1) {
         for (const row of storeRows.slice(1)) {
           const storeName = row[14] || '';  // O열(14): 업체명
           const salesPerson = row[5] || '';  // F열(5): 담당자 연락처
+          if (salesPerson) salesPhoneSet.add(salesPerson.trim());
           
           // W-AA열(22-26): 휴대폰번호 1-5 확인
           for (let i = 22; i <= 26; i++) {
@@ -28751,6 +28756,10 @@ app.post('/api/sms/register', async (req, res) => {
         if (contactRows.length > 1) {
           for (const row of contactRows.slice(1)) {
             const contact = row[4] || '';
+            // 영업사원 번호 수집 (수신번호가 영업사원폰인지 판별 용도)
+            if (row[1] === '영업사원' && contact) {
+              salesPhoneSet.add(contact.trim());
+            }
             if (contact && contact.trim() === sender) {
               isRegistered = true;
               clientName = row[3] || '';
@@ -28770,6 +28779,14 @@ app.post('/api/sms/register', async (req, res) => {
             }
           }
         }
+      }
+
+      // 1-3. 발신자가 미등록이어도, 수신번호가 등록된 영업사원 폰이면 자동응답 허용
+      if (!isRegistered && salesPhoneSet.has((receiver || '').trim())) {
+        isRegistered = true;
+        clientName = '미등록';
+        responsibleSalesPhone = (receiver || '').trim();
+        console.log(`✅ 수신번호가 영업사원폰이므로 자동응답 허용: 발송번호=${responsibleSalesPhone}`);
       }
       
       if (!isRegistered) {
@@ -28816,7 +28833,8 @@ app.post('/api/sms/register', async (req, res) => {
             const answerType = matchedAutoReplyRule[3] || '템플릿';
             const answerTemplate = matchedAutoReplyRule[4] || '';
             
-            let replyMessage = answerTemplate;
+            // 루프 방지용 태그를 앞에 부착
+            let replyMessage = `[자동응답] ${answerTemplate}`;
             
             // TODO: Phase 2에서 실시간가격 처리 추가
             
@@ -28858,6 +28876,7 @@ app.post('/api/sms/register', async (req, res) => {
             console.log('매칭된 자동응답 규칙 없음');
           }
         }
+      }
       }
     } catch (autoReplyError) {
       console.error('자동응답 처리 중 오류:', autoReplyError);

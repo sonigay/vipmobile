@@ -127,6 +127,7 @@ const SmsManagementMode = ({
   // 자동응답 거래처 상태
   const [autoReplyContacts, setAutoReplyContacts] = useState([]);
   const [showContactDialog, setShowContactDialog] = useState(false);
+  const [editingContact, setEditingContact] = useState(null);
   const [contactForm, setContactForm] = useState({
     type: '거래처',
     salesPersonId: '',
@@ -177,6 +178,18 @@ const SmsManagementMode = ({
         await loadAutoReplyHistory();
       }
     }
+  };
+
+  const handleEditContact = (contact) => {
+    setEditingContact(contact);
+    setContactForm({
+      type: contact.type || '거래처',
+      salesPersonId: contact.salesPersonId || '',
+      name: contact.name || '',
+      contact: contact.contact || '',
+      memo: contact.memo || ''
+    });
+    setShowContactDialog(true);
   };
 
   // SMS 목록 로드
@@ -531,8 +544,13 @@ const SmsManagementMode = ({
   // 거래처 연락처 저장
   const handleSaveContact = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sms/auto-reply/contacts`, {
-        method: 'POST',
+      const url = editingContact
+        ? `${process.env.REACT_APP_API_URL}/api/sms/auto-reply/contacts/${editingContact.id}`
+        : `${process.env.REACT_APP_API_URL}/api/sms/auto-reply/contacts`;
+      const method = editingContact ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contactForm)
       });
@@ -541,6 +559,7 @@ const SmsManagementMode = ({
       
       if (result.success) {
         setShowContactDialog(false);
+        setEditingContact(null);
         setContactForm({
           type: '거래처',
           salesPersonId: '',
@@ -1308,13 +1327,23 @@ const SmsManagementMode = ({
                         <TableCell>{contact.createdAt || '-'}</TableCell>
                         <TableCell>
                           {contact.source === '앱' && (
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteContact(contact.id)}
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
+                            <>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleEditContact(contact)}
+                                color="primary"
+                                sx={{ mr: 1 }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteContact(contact.id)}
+                                color="error"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </>
                           )}
                         </TableCell>
                       </TableRow>
