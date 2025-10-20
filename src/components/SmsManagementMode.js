@@ -851,14 +851,25 @@ const SmsManagementMode = ({
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={sms.forwardStatus}
-                            color={
-                              sms.forwardStatus === '전달완료' ? 'success' :
-                              sms.forwardStatus === '대기중' ? 'warning' : 'error'
-                            }
-                            size="small"
-                          />
+                          {(() => {
+                            const status = sms.forwardStatus || '';
+                            const color = status.startsWith('전달완료')
+                              ? 'success'
+                              : status.startsWith('대기중')
+                                ? 'warning'
+                                : status.startsWith('수신만')
+                                  ? 'info'
+                                  : (status.startsWith('부분실패') || status.startsWith('실패'))
+                                    ? 'error'
+                                    : 'default';
+                            return (
+                              <Chip
+                                label={status}
+                                color={color}
+                                size="small"
+                              />
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           {sms.forwardTargets ? sms.forwardTargets.split(',').length + '개' : '-'}
