@@ -28979,8 +28979,10 @@ app.post('/api/sms/update-forward-status', async (req, res) => {
     const smsRowIndex = smsRows.findIndex(row => row[0] === smsId);
     
     if (smsRowIndex !== -1) {
-      const forwardStatus = failCount === 0 ? '전달완료' : 
-                           successCount > 0 ? '부분실패' : '실패';
+      // 전달상태에 상세 정보 포함
+      const forwardStatus = failCount === 0 ? `전달완료 (성공:${successCount}, 실패:0)` : 
+                           successCount > 0 ? `부분실패 (성공:${successCount}, 실패:${failCount})` : 
+                           `실패 (성공:0, 실패:${failCount})`;
       const targetNumbersStr = targetNumbers.join(',');
       
       // 기존 메모에서 규칙 매칭 정보 추출 (있으면 유지)
@@ -28989,7 +28991,8 @@ app.post('/api/sms/update-forward-status', async (req, res) => {
         ? existingMemo.split('자동전달 준비')[1] || '' 
         : '';
       
-      const memo = `전송완료 (성공:${successCount}, 실패:${failCount})${matchInfo}`;
+      // 처리메모에는 매칭 정보만 (상세한 전송 결과는 전달상태로 이동)
+      const memo = matchInfo ? matchInfo.trim() : '전송 완료';
       
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
