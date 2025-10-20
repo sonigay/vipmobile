@@ -28615,38 +28615,6 @@ app.post('/api/sms/register', async (req, res) => {
       if (rulesRows.length > 1) {
         const rulesData = rulesRows.slice(1);
         
-        // ⚠️ 중요: 수신번호가 다른 규칙의 전달 대상인 경우 차단 (무한 루프 방지)
-        const allTargetNumbers = new Set();
-        rulesData.forEach(rule => {
-          const targetNumbersStr = rule[5] || ''; // F열: 전달대상번호들
-          const targetNumbers = targetNumbersStr.split(',').map(n => n.trim()).filter(n => n);
-          targetNumbers.forEach(num => allTargetNumbers.add(num));
-        });
-        
-        if (allTargetNumbers.has(receiver)) {
-          console.log('⚠️ 전달 대상 폰에서 수신한 SMS - 자동 전달 스킵 (무한 루프 방지):', receiver);
-          
-          // 상태를 "수신만"으로 업데이트
-          const smsUpdateResponse = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SMS_SHEET_NAME}!A:I`,
-          });
-          const smsRows = smsUpdateResponse.data.values || [];
-          const smsRowIndex = smsRows.findIndex(row => row[0] == newId);
-          if (smsRowIndex !== -1) {
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${SMS_SHEET_NAME}!F${smsRowIndex + 1}:I${smsRowIndex + 1}`,
-              valueInputOption: 'RAW',
-              resource: {
-                values: [['수신만 (전달대상 폰)', '', '', '전달 대상 폰에서 수신 (무한루프 방지)']]
-              }
-            });
-          }
-          
-          return res.json({ success: true, id: newId, skipped: true, reason: 'forward-target-receiver' });
-        }
-        
         // 활성화되고 자동전달이 ON인 규칙만 필터링
         const activeRules = rulesData.filter(rule => {
           const autoForward = rule[6] === 'O'; // G열: 자동전달여부
