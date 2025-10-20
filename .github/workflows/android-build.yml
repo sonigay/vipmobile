@@ -60,13 +60,20 @@ jobs:
       id: date
       run: echo "date=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
     
+    - name: Extract version from build.gradle
+      id: version
+      run: |
+        VERSION_NAME=$(grep 'versionName' android-app/app/build.gradle | awk -F'"' '{print $2}')
+        echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION_NAME"
+    
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v2.1.3-${{ steps.date.outputs.date }}
-        name: VIP Manager v2.1.3 (${{ steps.date.outputs.date }})
+        tag_name: v${{ steps.version.outputs.version }}-${{ steps.date.outputs.date }}
+        name: VIP Manager v${{ steps.version.outputs.version }} (${{ steps.date.outputs.date }})
         body: |
-          ## 📱 VIP 안드로이드 매니저 v2.1.3
+          ## 📱 VIP 안드로이드 매니저 v${{ steps.version.outputs.version }}
           
           ### ✨ 기능
           - SMS 자동 수신 및 전송
