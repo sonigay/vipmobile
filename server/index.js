@@ -28667,6 +28667,32 @@ app.post('/api/sms/register', async (req, res) => {
         if (sender === responsibleSalesPhone) {
           console.log('⚠️ 발신자가 발송번호와 동일 - 자동응답 스킵 (자기 자신에게 보낸 메시지):', sender);
         } else {
+        
+        // 🚫 루프 방지 4: 최근 1분 내 같은 발신자에게 답변했으면 스킵 (멀티파트 재매칭 방지)
+        const historyCheckResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:J`,
+        });
+        
+        const historyRows = historyCheckResponse.data.values || [];
+        if (historyRows.length > 1) {
+          const recentHistory = historyRows.slice(1).reverse(); // 최신순
+          const oneMinuteAgo = new Date(Date.now() - 60000).toISOString().replace('T', ' ').substring(0, 19);
+          
+          const recentReply = recentHistory.find(row => {
+            const historyTime = row[1] || '';
+            const historySender = row[2] || '';
+            const historySalesPhone = row[7] || '';
+            
+            return historyTime > oneMinuteAgo && 
+                   historySender === sender && 
+                   historySalesPhone === responsibleSalesPhone;
+          });
+          
+          if (recentReply) {
+            console.log(`⚠️ 최근 1분 내 같은 발신자(${sender})에게 답변함 - 자동응답 스킵 (멀티파트 재매칭 방지)`);
+          } else {
+        
         // 2. 자동응답 규칙 확인
         const rulesResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -28751,6 +28777,8 @@ app.post('/api/sms/register', async (req, res) => {
             console.log('매칭된 자동응답 규칙 없음');
           }
         }
+      }
+      }
       }
       }
       }
