@@ -305,7 +305,7 @@ function Login({ onLogin }) {
           {/* Chrome 및 확장 프로그램 안내 */}
           <Alert severity="warning" sx={{ mb: 2, bgcolor: '#fff3e0', border: '2px solid #ff9800' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#e65100' }}>
-              ⚠️ 일반모드 사용자 필수 조건
+              ⚠️ 매장 사용자 필수 조건
             </Typography>
             <Typography variant="body2" sx={{ mb: 1, color: '#663c00' }}>
               • <strong>Chrome 브라우저</strong> 사용 필수
