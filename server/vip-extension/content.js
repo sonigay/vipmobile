@@ -112,8 +112,8 @@
       }
     });
     
-    // 4. 회사명 표시 (3초간 표시 후 사라짐)
-    if (modified && !document.getElementById('vip-company-indicator')) {
+    // 4. 회사명 표시 (계속 떠있음, 깜빡이지 않음)
+    if (!document.getElementById('vip-company-indicator')) {
       const indicator = document.createElement('div');
       indicator.id = 'vip-company-indicator';
       indicator.style.cssText = `
@@ -133,13 +133,7 @@
       `;
       indicator.textContent = '(주)브이아이피플러스';
       document.body.appendChild(indicator);
-      
-      // 3초 후 자동 제거
-      setTimeout(() => {
-        indicator.style.opacity = '0';
-        indicator.style.transition = 'opacity 0.5s';
-        setTimeout(() => indicator.remove(), 500);
-      }, 3000);
+      console.log('📌 회사명 인디케이터 생성 (계속 표시)');
     }
     
     if (modified) {
