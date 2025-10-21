@@ -6986,8 +6986,8 @@ app.get('/api/download-chrome-extension', (req, res) => {
     const path = require('path');
     const fs = require('fs');
     
-    // chrome-extension 폴더 경로 (server 폴더 기준 상위)
-    const extensionPath = path.join(__dirname, '..', 'chrome-extension');
+    // chrome-extension 폴더 경로 (server 폴더 내부)
+    const extensionPath = path.join(__dirname, 'chrome-extension');
     
     // 폴더 존재 확인
     if (!fs.existsSync(extensionPath)) {
