@@ -18,7 +18,9 @@ const UPDATE_SHEET_COLUMNS = {
   INVENTORY_RECOVERY: 13,  // N열: 재고회수모드 업데이트내용
   DATA_COLLECTION: 14,     // O열: 정보수집모드 업데이트내용
   SMS_MANAGEMENT: 15,      // P열: SMS 관리모드 업데이트내용
-  OB_MANAGEMENT: 16        // Q열: OB 관리모드 업데이트내용
+  OB_MANAGEMENT: 16,       // Q열: OB 관리모드 업데이트내용
+  ONSALE_MANAGEMENT: 17,   // R열: 온세일관리모드 업데이트내용
+  ONSALE_RECEPTION: 18     // S열: 온세일접수모드 업데이트내용
 };
 
 // 모드별 컬럼 매핑
@@ -37,7 +39,9 @@ const MODE_COLUMN_MAP = {
   'inventoryRecovery': UPDATE_SHEET_COLUMNS.INVENTORY_RECOVERY,
   'dataCollection': UPDATE_SHEET_COLUMNS.DATA_COLLECTION,
   'smsManagement': UPDATE_SHEET_COLUMNS.SMS_MANAGEMENT,
-  'obManagement': UPDATE_SHEET_COLUMNS.OB_MANAGEMENT
+  'obManagement': UPDATE_SHEET_COLUMNS.OB_MANAGEMENT,
+  'onSaleManagement': UPDATE_SHEET_COLUMNS.ONSALE_MANAGEMENT,
+  'onSaleReception': UPDATE_SHEET_COLUMNS.ONSALE_RECEPTION
 };
 
 // 캐시 설정

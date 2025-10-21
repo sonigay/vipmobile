@@ -11,6 +11,8 @@ import SettlementMode from './components/SettlementMode';
 import DataCollectionMode from './components/DataCollectionMode';
 import SmsManagementMode from './components/SmsManagementMode';
 import ObManagementMode from './components/ObManagementMode';
+import OnSaleManagementMode from './components/OnSaleManagementMode';
+import OnSaleReceptionMode from './components/OnSaleReceptionMode';
 import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
@@ -147,6 +149,8 @@ function AppContent() {
   const [isDataCollectionMode, setIsDataCollectionMode] = useState(false);
   const [isSmsManagementMode, setIsSmsManagementMode] = useState(false);
   const [isObManagementMode, setIsObManagementMode] = useState(false);
+  const [isOnSaleManagementMode, setIsOnSaleManagementMode] = useState(false);
+  const [isOnSaleReceptionMode, setIsOnSaleReceptionMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -1608,6 +1612,42 @@ function AppContent() {
         store: store
       }));
     }
+    // 온세일관리 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.onSaleManagement) {
+      console.log('로그인: 온세일관리 모드');
+      setIsOnSaleManagementMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setCurrentMode('onsale-management');
+      
+      localStorage.setItem('loginState', JSON.stringify({
+        isOnSaleManagement: true,
+        isAgent: false,
+        isInventory: false,
+        isSettlement: false,
+        isInspection: false,
+        isChart: false,
+        isPolicy: false,
+        isMeeting: false,
+        isReservation: false,
+        isBudget: false,
+        isInventoryRecovery: false,
+        isSales: false,
+        store: store
+      }));
+    }
     // 정보수집 모드인지 확인
     else if (store.modePermissions && store.modePermissions.dataCollection) {
       console.log('로그인: 정보수집 모드');
@@ -1642,9 +1682,11 @@ function AppContent() {
         isSales: false,
         store: store
       }));
-    } else {
-      // 일반 매장 모드
-      // console.log('로그인: 일반 매장 모드');
+    }
+    // 온세일접수 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.onSaleReception && store.isOnSaleReception) {
+      console.log('로그인: 온세일접수 모드');
+      setIsOnSaleReceptionMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -1656,7 +1698,72 @@ function AppContent() {
       setIsBudgetMode(false);
       setIsInventoryRecoveryMode(false);
       setIsDataCollectionMode(false);
-      setCurrentMode('general');
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setCurrentMode('onsale-reception');
+      
+      localStorage.setItem('loginState', JSON.stringify({
+        isOnSaleReception: true,
+        isAgent: false,
+        store: store
+      }));
+    }
+    // 기본 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.basicMode && store.isBasicMode) {
+      console.log('로그인: 기본 모드 (일반 매장)');
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('basic');
+      
+      // 기본 모드인 경우 위치 설정
+      if (store.latitude && store.longitude) {
+        setUserLocation({
+          lat: parseFloat(store.latitude),
+          lng: parseFloat(store.longitude)
+        });
+      }
+      
+      // 로그인 상태 저장
+      localStorage.setItem('loginState', JSON.stringify({
+        isBasicMode: true,
+        isAgent: false,
+        store: store
+      }));
+    }
+    // 권한이 없는 일반 매장 (레거시 - 기본 모드로 처리)
+    else {
+      console.log('로그인: 레거시 일반 매장 모드');
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('basic');
+      
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
         setUserLocation({
@@ -1667,16 +1774,8 @@ function AppContent() {
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
+        isBasicMode: true,
         isAgent: false,
-        isInventory: false,
-        isSettlement: false,
-        isInspection: false,
-        isChart: false,
-        isPolicy: false,
-        isMeeting: false,
-        isReservation: false,
-        isBudget: false,
-        isInventoryRecovery: false,
         store: store
       }));
     }
@@ -1744,6 +1843,15 @@ function AppContent() {
       case 'obManagement':
         modifiedStore.isObManagement = true;
         break;
+      case 'onSaleManagement':
+        modifiedStore.isOnSaleManagement = true;
+        break;
+      case 'basicMode':
+        modifiedStore.isBasicMode = true;
+        break;
+      case 'onSaleReception':
+        modifiedStore.isOnSaleReception = true;
+        break;
       default:
         break;
     }
@@ -1792,6 +1900,8 @@ function AppContent() {
     setIsDataCollectionMode(false);
     setIsSmsManagementMode(false);
     setIsObManagementMode(false);
+    setIsOnSaleManagementMode(false);
+    setIsOnSaleReceptionMode(false);
     
     // 선택된 모드만 true로 설정
     switch (selectedMode) {
@@ -1859,6 +1969,18 @@ function AppContent() {
         // console.log('OB 관리 모드로 전환');
         setIsObManagementMode(true);
         break;
+      case 'onSaleManagement':
+        // console.log('온세일관리 모드로 전환');
+        setIsOnSaleManagementMode(true);
+        break;
+      case 'basicMode':
+        // console.log('기본 모드로 전환');
+        // 기본 모드는 상태가 모두 false일 때 (default 상태)
+        break;
+      case 'onSaleReception':
+        // console.log('온세일접수 모드로 전환');
+        setIsOnSaleReceptionMode(true);
+        break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
         break;
@@ -1923,6 +2045,10 @@ function AppContent() {
     setIsSmsManagementMode(false);
     // OB 관리모드 상태 초기화
     setIsObManagementMode(false);
+    // 온세일 관리모드 상태 초기화
+    setIsOnSaleManagementMode(false);
+    // 온세일 접수모드 상태 초기화
+    setIsOnSaleReceptionMode(false);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -2724,6 +2850,40 @@ ${requestList}
             setShowModeSelection(true);
           }}
           availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 온세일관리모드일 때는 별도 화면 렌더링
+  if (isOnSaleManagementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <OnSaleManagementMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsOnSaleManagementMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  // 온세일접수모드일 때는 별도 화면 렌더링
+  if (isOnSaleReceptionMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <OnSaleReceptionMode 
+          onLogout={handleLogout} 
+          loggedInStore={loggedInStore} 
         />
       </ThemeProvider>
     );

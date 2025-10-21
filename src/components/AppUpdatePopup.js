@@ -54,7 +54,10 @@ const MODE_COLORS = {
   'inventoryRecovery': '#8bc34a',  // 초록색 (재고회수모드)
   'dataCollection': '#9c27b0',  // 보라색 (정보수집모드)
   'smsManagement': '#00897B',  // 틸색 (SMS 관리모드)
-  'obManagement': '#5E35B1'   // 보라색 (OB 관리모드)
+  'obManagement': '#5E35B1',   // 보라색 (OB 관리모드)
+  'onSaleManagement': '#667eea',  // 보라파란색 (온세일관리모드)
+  'onSaleReception': '#667eea',   // 보라파란색 (온세일접수모드)
+  'basicMode': '#1976d2'   // 파란색 (기본모드)
 };
 
 // 모드별 제목
@@ -73,7 +76,10 @@ const MODE_TITLES = {
   'inventoryRecovery': '재고회수 모드',
   'dataCollection': '정보수집 모드',
   'smsManagement': 'SMS 관리 모드',
-  'obManagement': 'OB 관리 모드'
+  'obManagement': 'OB 관리 모드',
+  'onSaleManagement': '온세일관리 모드',
+  'onSaleReception': '온세일접수 모드',
+  'basicMode': '기본 모드'
 };
 
 function AppUpdatePopup({ 

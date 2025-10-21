@@ -207,6 +207,42 @@ const ModeSelectionPopup = ({
         '성과 분석',
         '자동화 설정'
       ]
+    },
+    onSaleManagement: {
+      title: '온세일관리 모드',
+      description: '온세일 가입 링크 관리 시스템',
+      icon: <PhoneIcon sx={{ fontSize: 40, color: '#667eea' }} />,
+      color: '#667eea',
+      features: [
+        '가입 링크 등록/수정',
+        '대리점 정보 숨김 설정',
+        '링크 활성화 관리',
+        '접근 권한 제어'
+      ]
+    },
+    basicMode: {
+      title: '기본 모드',
+      description: '매장 재고 확인 및 주변 매장 검색',
+      icon: <BusinessIcon sx={{ fontSize: 40, color: '#1976d2' }} />,
+      color: '#1976d2',
+      features: [
+        '지도 기반 매장 검색',
+        '재고 확인 및 요청',
+        '주변 매장 찾기',
+        '실시간 재고 현황'
+      ]
+    },
+    onSaleReception: {
+      title: '온세일접수 모드',
+      description: '온세일 가입 신청 접수',
+      icon: <PhoneIcon sx={{ fontSize: 40, color: '#667eea' }} />,
+      color: '#667eea',
+      features: [
+        '온세일 가입 링크 접근',
+        '대리점 정보 보호',
+        '비밀번호 기반 인증',
+        '안전한 가입 접수'
+      ]
     }
   };
 

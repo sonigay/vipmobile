@@ -2811,6 +2811,7 @@ app.post('/api/login', async (req, res) => {
         const hasSmsManagementPermission = agent[21] === 'O'; // V열: SMS 관리모드 권한
         const hasObManagementPermission = agent[22] === 'O'; // W열: OB 관리모드 권한
         const hasAgentModePermission = agent[23] === 'O'; // X열: 관리자모드 권한
+        const hasOnSaleManagementPermission = agent[24] === 'O'; // Y열: 온세일관리모드 권한
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -2845,7 +2846,8 @@ app.post('/api/login', async (req, res) => {
           inventoryRecovery: hasInventoryRecoveryPermission, // 재고회수모드 권한
           dataCollection: hasDataCollectionPermission, // 정보수집모드 권한
           smsManagement: hasSmsManagementPermission, // SMS 관리모드 권한
-          obManagement: hasObManagementPermission // OB 관리모드 권한
+          obManagement: hasObManagementPermission, // OB 관리모드 권한
+          onSaleManagement: hasOnSaleManagementPermission // 온세일관리모드 권한
         };
         
         // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
@@ -2858,7 +2860,7 @@ app.post('/api/login', async (req, res) => {
             fields: [
               {
                 name: '관리자 정보',
-                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n관리자권한: ${hasAgentModePermission ? 'O' : 'X'}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}\n재고회수권한: ${hasInventoryRecoveryPermission ? 'O' : 'X'}\nSMS관리권한: ${hasSmsManagementPermission ? 'O' : 'X'}\nOB관리권한: ${hasObManagementPermission ? 'O' : 'X'}`
+                value: `ID: ${agent[2]}\n대상: ${agent[0]}\n자격: ${agent[1]}\n관리자권한: ${hasAgentModePermission ? 'O' : 'X'}\n재고권한: ${hasInventoryPermission ? 'O' : 'X'}\n정산권한: ${hasSettlementPermission ? 'O' : 'X'}\n검수권한: ${hasInspectionPermission ? 'O' : 'X'}\n채권장표권한: ${hasBondChartPermission ? 'O' : 'X'}\n장표권한: ${hasChartPermission ? 'O' : 'X'}\n정책권한: ${hasPolicyPermission ? 'O' : 'X'}\n검수전체현황권한: ${hasInspectionOverviewPermission ? 'O' : 'X'}\n회의권한: ${hasMeetingPermission ? 'O' : 'X'}\n사전예약권한: ${hasReservationPermission ? 'O' : 'X'}\n예산권한: ${hasBudgetPermission ? 'O' : 'X'}\n영업권한: ${hasSalesPermission ? 'O' : 'X'}\n재고회수권한: ${hasInventoryRecoveryPermission ? 'O' : 'X'}\nSMS관리권한: ${hasSmsManagementPermission ? 'O' : 'X'}\nOB관리권한: ${hasObManagementPermission ? 'O' : 'X'}\n온세일관리권한: ${hasOnSaleManagementPermission ? 'O' : 'X'}`
               },
               {
                 name: '접속 정보',
@@ -2900,71 +2902,128 @@ app.post('/api/login', async (req, res) => {
       }
     }
     
-    // 3. 대리점 관리자가 아닌 경우 일반 매장으로 검색 (이미 가져온 데이터 사용)
+    // 3. 대리점 관리자가 아닌 경우 일반모드권한관리 시트에서 검색
+    console.log('Step 3: 일반모드권한관리 시트에서 검색 시작');
     
-    if (!storeValues) {
-      throw new Error('Failed to fetch data from store sheet');
-    }
+    const generalModeSheetName = '일반모드권한관리';
+    const generalModeRange = 'A:F'; // A~F열
     
-    const storeRows = storeValues.slice(1);
+    const generalModeResponse = await rateLimitedSheetsCall(() => 
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${generalModeSheetName}!${generalModeRange}`,
+      })
+    );
     
-    const foundStoreRow = storeRows.find(row => {
-      const rowId = row[15]; // H열: 매장 ID (7+8)
-      return rowId === storeId;
-    });
+    const generalModeValues = generalModeResponse.data.values || [];
+    console.log(`일반모드권한관리 시트 행 수: ${generalModeValues.length}`);
     
-    if (foundStoreRow) {
-      const store = {
-        id: foundStoreRow[15],                      // H열: 매장 ID (7+8)
-        name: foundStoreRow[14],                    // G열: 업체명 (6+8)
-        manager: foundStoreRow[21] || '',          // N열: 담당자 (13+8)
-        address: foundStoreRow[11] || '',          // D열: 주소 (3+8)
-        latitude: parseFloat(foundStoreRow[8] || '0'),  // A열: 위도 (0+8)
-        longitude: parseFloat(foundStoreRow[9] || '0'),  // B열: 경도 (1+8)
-        phone: foundStoreRow[19] || ''              // L열: 연락처 추가 (11+8)
-      };
+    // 헤더는 3행(인덱스 2), 데이터는 4행(인덱스 3)부터
+    if (generalModeValues.length > 3) {
+      const generalModeRows = generalModeValues.slice(3); // 4행부터 데이터
       
-      // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
-      if (DISCORD_LOGGING_ENABLED) {
-        const embedData = {
-          title: '매장 로그인',
-          color: 5763719, // 초록색
-          timestamp: new Date().toISOString(),
-          userType: 'store', // 일반 매장 타입 지정
-          fields: [
-            {
-              name: '매장 정보',
-              value: `ID: ${store.id}\n매장명: ${store.name}\n담당자: ${store.manager || '없음'}`
-            },
-            {
-              name: '접속 정보',
-              value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
-            }
-          ],
-          footer: {
-            text: '(주)브이아이피플러스 매장 로그인'
+      const foundGeneralUser = generalModeRows.find(row => {
+        const rowId = row[0]; // A열: 사용자ID(POS코드)
+        return rowId === storeId;
+      });
+      
+      if (foundGeneralUser) {
+        console.log('일반모드 사용자 발견:', foundGeneralUser[0]);
+        
+        // 권한 확인
+        const hasBasicMode = foundGeneralUser[3] === 'O'; // D열: 기본 모드
+        const hasOnSaleMode = foundGeneralUser[4] === 'O'; // E열: 온세일접수 모드
+        
+        console.log('권한 확인:', {
+          basicMode: hasBasicMode,
+          onSaleMode: hasOnSaleMode
+        });
+        
+        // 권한이 하나도 없으면 로그인 거부
+        if (!hasBasicMode && !hasOnSaleMode) {
+          console.log('권한 없음: 로그인 거부');
+          return res.status(403).json({
+            success: false,
+            error: '접근 권한이 없습니다.'
+          });
+        }
+        
+        // 폰클출고처데이터에서 추가 정보 가져오기 (위도, 경도 등)
+        let storeDetails = {
+          latitude: 0,
+          longitude: 0,
+          address: '',
+          phone: ''
+        };
+        
+        if (storeValues) {
+          const storeRows = storeValues.slice(1);
+          const foundStoreRow = storeRows.find(row => row[15] === storeId);
+          
+          if (foundStoreRow) {
+            storeDetails = {
+              address: foundStoreRow[11] || '',
+              latitude: parseFloat(foundStoreRow[8] || '0'),
+              longitude: parseFloat(foundStoreRow[9] || '0'),
+              phone: foundStoreRow[19] || ''
+            };
+          }
+        }
+        
+        const store = {
+          id: foundGeneralUser[0],           // A열: 사용자ID(POS코드)
+          name: foundGeneralUser[1] || '',   // B열: 업체명
+          manager: foundGeneralUser[2] || '', // C열: 영업담당
+          ...storeDetails,
+          modePermissions: {
+            basicMode: hasBasicMode,         // D열: 기본 모드
+            onSaleReception: hasOnSaleMode    // E열: 온세일접수 모드
           }
         };
         
-        // 비동기로 로그 전송 (응답 지연 방지)
-        sendLogToDiscord(embedData).catch(logError => {
-          console.error('로그인 로그 전송 실패:', logError.message);
+        // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
+        if (DISCORD_LOGGING_ENABLED) {
+          const embedData = {
+            title: '일반모드 로그인',
+            color: 5763719, // 초록색
+            timestamp: new Date().toISOString(),
+            userType: 'general', // 일반모드 타입 지정
+            fields: [
+              {
+                name: '사용자 정보',
+                value: `ID: ${store.id}\n업체명: ${store.name}\n담당자: ${store.manager || '없음'}\n기본모드: ${hasBasicMode ? 'O' : 'X'}\n온세일접수: ${hasOnSaleMode ? 'O' : 'X'}`
+              },
+              {
+                name: '접속 정보',
+                value: `IP: ${ipAddress || '알 수 없음'}\n위치: ${location || '알 수 없음'}\n기기: ${deviceInfo || '알 수 없음'}`
+              }
+            ],
+            footer: {
+              text: '(주)브이아이피플러스 일반모드 로그인'
+            }
+          };
+          
+          // 비동기로 로그 전송 (응답 지연 방지)
+          sendLogToDiscord(embedData).catch(logError => {
+            console.error('로그인 로그 전송 실패:', logError.message);
+          });
+        }
+        
+        const loginResult = {
+          success: true,
+          isAgent: false,
+          storeInfo: store,
+          modePermissions: store.modePermissions
+        };
+        
+        // 로그인 결과 캐시 저장 (성능 최적화)
+        loginCache.set(cacheKey, {
+          data: loginResult,
+          ttl: Date.now() + LOGIN_CACHE_TTL
         });
+        
+        return res.json(loginResult);
       }
-      
-      const loginResult = {
-        success: true,
-        isAgent: false,
-        storeInfo: store
-      };
-      
-      // 로그인 결과 캐시 저장 (성능 최적화)
-      loginCache.set(cacheKey, {
-        data: loginResult,
-        ttl: Date.now() + LOGIN_CACHE_TTL
-      });
-      
-      return res.json(loginResult);
     }
     
     // 3. 매장 ID도 아닌 경우
@@ -6349,6 +6408,423 @@ app.get('/api/rechotancho-bond/all-data', async (req, res) => {
       error: '전체 데이터 조회에 실패했습니다.',
       message: error.message
     });
+  }
+});
+
+// ==================== 온세일 관리 API ====================
+
+// 온세일 링크 관리 - 전체 링크 조회 (관리자모드용)
+app.get('/api/onsale/links', async (req, res) => {
+  try {
+    console.log('📋 [온세일] 전체 링크 목록 조회 시작');
+    
+    const sheetName = '온세일링크관리';
+    const range = 'A:E'; // A~E열: 링크URL, 버튼명, 대리점정보숨김, 대리점코드, 활성화여부
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      // 헤더만 있거나 데이터 없음
+      return res.json({ success: true, links: [] });
+    }
+    
+    const links = rows.slice(1).map((row, index) => ({
+      rowIndex: index + 2, // 구글 시트의 실제 행 번호 (헤더 제외, 1-based)
+      url: row[0] || '',
+      buttonName: row[1] || '',
+      hideAgentInfo: row[2] === 'O',
+      agentCode: row[3] || '',
+      isActive: row[4] === 'O'
+    }));
+    
+    console.log(`✅ [온세일] 링크 조회 완료: ${links.length}개`);
+    res.json({ success: true, links });
+    
+  } catch (error) {
+    console.error('❌ [온세일] 링크 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '링크 조회에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 온세일 링크 관리 - 활성화된 링크만 조회 (일반모드용)
+app.get('/api/onsale/active-links', async (req, res) => {
+  try {
+    console.log('📋 [온세일] 활성화 링크 목록 조회 시작');
+    
+    const sheetName = '온세일링크관리';
+    const range = 'A:E';
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      return res.json({ success: true, links: [] });
+    }
+    
+    const activeLinks = rows.slice(1)
+      .filter(row => row[4] === 'O') // 활성화여부가 'O'인 것만
+      .map(row => ({
+        url: row[0] || '',
+        buttonName: row[1] || '',
+        hideAgentInfo: row[2] === 'O',
+        agentCode: row[3] || ''
+      }));
+    
+    console.log(`✅ [온세일] 활성화 링크 조회 완료: ${activeLinks.length}개`);
+    res.json({ success: true, links: activeLinks });
+    
+  } catch (error) {
+    console.error('❌ [온세일] 활성화 링크 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '링크 조회에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 온세일 링크 관리 - 새 링크 추가
+app.post('/api/onsale/links', async (req, res) => {
+  try {
+    console.log('➕ [온세일] 새 링크 추가 시작');
+    const { url, buttonName, hideAgentInfo, agentCode, isActive } = req.body;
+    
+    if (!url || !buttonName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'URL과 버튼명은 필수입니다.' 
+      });
+    }
+    
+    const sheetName = '온세일링크관리';
+    const newRow = [
+      url,
+      buttonName,
+      hideAgentInfo ? 'O' : 'X',
+      agentCode || '',
+      isActive ? 'O' : 'X'
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A:E`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [newRow]
+      }
+    });
+    
+    console.log(`✅ [온세일] 링크 추가 완료: ${buttonName}`);
+    res.json({ success: true, message: '링크가 추가되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [온세일] 링크 추가 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '링크 추가에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 온세일 링크 관리 - 링크 수정
+app.put('/api/onsale/links/:rowIndex', async (req, res) => {
+  try {
+    const { rowIndex } = req.params;
+    const { url, buttonName, hideAgentInfo, agentCode, isActive } = req.body;
+    
+    console.log(`✏️ [온세일] 링크 수정 시작: 행 ${rowIndex}`);
+    
+    if (!url || !buttonName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'URL과 버튼명은 필수입니다.' 
+      });
+    }
+    
+    const sheetName = '온세일링크관리';
+    const updatedRow = [
+      url,
+      buttonName,
+      hideAgentInfo ? 'O' : 'X',
+      agentCode || '',
+      isActive ? 'O' : 'X'
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [updatedRow]
+      }
+    });
+    
+    console.log(`✅ [온세일] 링크 수정 완료: ${buttonName}`);
+    res.json({ success: true, message: '링크가 수정되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [온세일] 링크 수정 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '링크 수정에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 온세일 링크 관리 - 링크 삭제
+app.delete('/api/onsale/links/:rowIndex', async (req, res) => {
+  try {
+    const { rowIndex } = req.params;
+    
+    console.log(`🗑️ [온세일] 링크 삭제 시작: 행 ${rowIndex}`);
+    
+    const sheetName = '온세일링크관리';
+    
+    // 구글 시트에서는 행을 완전히 삭제하는 대신 빈 값으로 만듭니다
+    // 또는 활성화여부를 'X'로 변경
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['', '', '', '', '']]
+      }
+    });
+    
+    console.log(`✅ [온세일] 링크 삭제 완료: 행 ${rowIndex}`);
+    res.json({ success: true, message: '링크가 삭제되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [온세일] 링크 삭제 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '링크 삭제에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// ==================== 일반모드 온세일접수 API ====================
+
+// 일반모드 온세일 권한 확인
+app.post('/api/check-onsale-permission', async (req, res) => {
+  try {
+    const { userId, password } = req.body;
+    
+    console.log(`🔐 [온세일권한] 권한 확인 시작: ${userId}`);
+    
+    if (!userId || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        hasPermission: false,
+        error: '사용자 ID와 비밀번호를 입력해주세요.' 
+      });
+    }
+    
+    const sheetName = '일반모드권한관리';
+    const range = 'A:F'; // A~F열: 사용자ID(POS코드), 업체명, 영업담당, 기본모드, 온세일접수모드, 비밀번호
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    // 헤더는 3행(인덱스 2), 데이터는 4행(인덱스 3)부터
+    if (rows.length <= 3) {
+      console.log('⚠️ [온세일권한] 일반모드권한관리 시트에 데이터가 없습니다.');
+      return res.json({ success: true, hasPermission: false });
+    }
+    
+    // 4행부터 데이터
+    const dataRows = rows.slice(3);
+    const userRow = dataRows.find(row => row[0] === userId);
+    
+    if (!userRow) {
+      console.log(`⚠️ [온세일권한] 사용자를 찾을 수 없습니다: ${userId}`);
+      return res.json({ success: true, hasPermission: false });
+    }
+    
+    const storeName = userRow[1] || '';
+    const hasPermission = userRow[4] === 'O'; // E열(4인덱스): 온세일접수 모드
+    const storedPassword = userRow[5] || ''; // F열(5인덱스): 비밀번호
+    
+    if (!hasPermission) {
+      console.log(`⚠️ [온세일권한] 권한 없음: ${userId}`);
+      return res.json({ success: true, hasPermission: false });
+    }
+    
+    if (storedPassword !== password) {
+      console.log(`⚠️ [온세일권한] 비밀번호 불일치: ${userId}`);
+      return res.json({ success: true, hasPermission: false, error: '비밀번호가 일치하지 않습니다.' });
+    }
+    
+    console.log(`✅ [온세일권한] 권한 확인 성공: ${userId} (${storeName})`);
+    res.json({ 
+      success: true, 
+      hasPermission: true,
+      storeName 
+    });
+    
+  } catch (error) {
+    console.error('❌ [온세일권한] 권한 확인 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      hasPermission: false,
+      error: '권한 확인에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 온세일 프록시 - U+ 페이지 가져오기 및 대리점 정보 제거
+app.post('/api/onsale-proxy', async (req, res) => {
+  try {
+    const { url, agentCode } = req.body;
+    
+    console.log(`🌐 [온세일프록시] 페이지 가져오기 시작: ${url}`);
+    
+    if (!url) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'URL이 필요합니다.' 
+      });
+    }
+    
+    // axios와 cheerio import (파일 상단에 이미 있어야 하지만, 여기서 require)
+    const axios = require('axios');
+    const cheerio = require('cheerio');
+    
+    // U+ 페이지 가져오기
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    let html = response.data;
+    const $ = cheerio.load(html);
+    
+    console.log(`📄 [온세일프록시] HTML 파싱 시작`);
+    
+    // 대리점 정보 제거 패턴들
+    const replacements = [
+      { pattern: /\(주\)브이아이피플러스/gi, replacement: '가입대리점' },
+      { pattern: /브이아이피플러스/gi, replacement: '가입대리점' },
+      { pattern: /VIP플러스/gi, replacement: '가입대리점' },
+      { pattern: /대리점코드\[\d+\]/gi, replacement: '' },
+      { pattern: agentCode, replacement: '******' },
+      { pattern: /경기도 평택시 평택로 23.*?\)/gi, replacement: '주소 확인 중)' },
+      { pattern: /070-5038-4437/gi, replacement: '000-0000-0000' },
+      { pattern: /125-86-06495/gi, replacement: '***-**-*****' }
+    ];
+    
+    // HTML 텍스트 내용 수정
+    html = replacements.reduce((modifiedHtml, { pattern, replacement }) => {
+      return modifiedHtml.replace(pattern, replacement);
+    }, html);
+    
+    // "신청서 작성 시작" 또는 유사한 버튼을 찾아서 새 창으로 열리도록 수정
+    $('a, button').each((index, element) => {
+      const text = $(element).text().trim();
+      const href = $(element).attr('href');
+      
+      // "신청서", "작성", "시작" 등의 키워드가 있으면
+      if (text.includes('신청서') || text.includes('작성') || text.includes('시작')) {
+        console.log(`🔗 [온세일프록시] 버튼 발견: "${text}"`);
+        
+        // 원본 URL로 새 창에서 열리도록 설정
+        if (href && !href.startsWith('#')) {
+          $(element).attr('target', '_blank');
+        } else if (!href) {
+          // href가 없으면 onclick에 원본 URL 설정
+          $(element).attr('onclick', `window.open('${url}', '_blank'); return false;`);
+        }
+      }
+    });
+    
+    // 수정된 HTML 반환
+    const modifiedHtml = $.html();
+    
+    console.log(`✅ [온세일프록시] HTML 수정 완료`);
+    
+    res.send(modifiedHtml);
+    
+  } catch (error) {
+    console.error('❌ [온세일프록시] 프록시 처리 실패:', error);
+    
+    // 에러 발생 시 간단한 안내 페이지 반환
+    const errorHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>페이지 로드 실패</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+          }
+          .error-container {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          }
+          h1 { color: #d32f2f; }
+          p { color: #666; }
+          button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+          }
+          button:hover {
+            background-color: #1565c0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="error-container">
+          <h1>페이지를 불러올 수 없습니다</h1>
+          <p>일시적인 오류가 발생했습니다.</p>
+          <p>아래 버튼을 클릭하여 원본 페이지에서 진행해주세요.</p>
+          <button onclick="window.open('${req.body.url}', '_blank')">
+            원본 페이지에서 열기
+          </button>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    res.send(errorHtml);
   }
 });
 
