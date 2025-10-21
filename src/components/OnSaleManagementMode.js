@@ -29,7 +29,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 
@@ -205,15 +206,48 @@ const OnSaleManagementMode = ({
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             온세일 관리 모드
           </Typography>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {loggedInStore?.name || loggedInStore?.target}
-          </Typography>
-          {availableModes && availableModes.length > 1 && (
-            <Button color="inherit" onClick={onModeChange} sx={{ mr: 1 }}>
-              모드 전환
+          
+          <Button
+            color="inherit"
+            startIcon={<RefreshIcon />}
+            onClick={fetchLinks}
+            sx={{
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            새로고침
+          </Button>
+          
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
+            sx={{
+              ml: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            업데이트 확인
+          </Button>
+          
+          {onModeChange && availableModes && availableModes.length > 1 && (
+            <Button
+              color="inherit"
+              startIcon={<RefreshIcon />}
+              onClick={onModeChange}
+              sx={{
+                ml: 2,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+              }}
+            >
+              모드 변경
             </Button>
           )}
-          <Button color="inherit" onClick={onLogout}>
+          
+          <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
             로그아웃
           </Button>
         </Toolbar>

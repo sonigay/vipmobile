@@ -24,13 +24,17 @@ import {
   Link as LinkIcon,
   OpenInNew as OpenInNewIcon,
   Visibility as VisibilityIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Update as UpdateIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 
 const OnSaleReceptionMode = ({ 
   loggedInStore, 
-  onLogout 
+  onLogout,
+  onModeChange,
+  availableModes
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -172,10 +176,35 @@ const OnSaleReceptionMode = ({
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
               온세일접수 모드
             </Typography>
-            <Typography variant="body2" sx={{ mr: 2 }}>
-              {loggedInStore?.name}
-            </Typography>
-            <Button color="inherit" onClick={onLogout}>
+            
+            <Button
+              color="inherit"
+              startIcon={<UpdateIcon />}
+              onClick={() => setShowUpdatePopup(true)}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+              }}
+            >
+              업데이트 확인
+            </Button>
+            
+            {onModeChange && availableModes && availableModes.length > 1 && (
+              <Button
+                color="inherit"
+                startIcon={<RefreshIcon />}
+                onClick={onModeChange}
+                sx={{
+                  ml: 2,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+                }}
+              >
+                모드 변경
+              </Button>
+            )}
+            
+            <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
               로그아웃
             </Button>
           </Toolbar>
@@ -304,10 +333,48 @@ const OnSaleReceptionMode = ({
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             온세일접수 모드
           </Typography>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {loggedInStore?.name}
-          </Typography>
-          <Button color="inherit" onClick={onLogout}>
+          
+          <Button
+            color="inherit"
+            startIcon={<RefreshIcon />}
+            onClick={fetchActiveLinks}
+            sx={{
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            새로고침
+          </Button>
+          
+          <Button
+            color="inherit"
+            startIcon={<UpdateIcon />}
+            onClick={() => setShowUpdatePopup(true)}
+            sx={{
+              ml: 2,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            업데이트 확인
+          </Button>
+          
+          {onModeChange && availableModes && availableModes.length > 1 && (
+            <Button
+              color="inherit"
+              startIcon={<RefreshIcon />}
+              onClick={onModeChange}
+              sx={{
+                ml: 2,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.2)' }
+              }}
+            >
+              모드 변경
+            </Button>
+          )}
+          
+          <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
             로그아웃
           </Button>
         </Toolbar>

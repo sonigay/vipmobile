@@ -1976,6 +1976,13 @@ function AppContent() {
       case 'basicMode':
         // console.log('기본 모드로 전환');
         // 기본 모드는 상태가 모두 false일 때 (default 상태)
+        // 위치 설정
+        if (loggedInStore?.latitude && loggedInStore?.longitude) {
+          setUserLocation({
+            lat: parseFloat(loggedInStore.latitude),
+            lng: parseFloat(loggedInStore.longitude)
+          });
+        }
         break;
       case 'onSaleReception':
         // console.log('온세일접수 모드로 전환');
@@ -2883,7 +2890,15 @@ ${requestList}
         <CssBaseline />
         <OnSaleReceptionMode 
           onLogout={handleLogout} 
-          loggedInStore={loggedInStore} 
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            // 현재 모드 비활성화
+            setIsOnSaleReceptionMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
         />
       </ThemeProvider>
     );
