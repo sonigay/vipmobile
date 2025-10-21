@@ -6986,12 +6986,12 @@ app.get('/api/download-chrome-extension', (req, res) => {
     const path = require('path');
     const fs = require('fs');
     
-    // chrome-extension 폴더 경로 (server 폴더 내부)
-    const extensionPath = path.join(__dirname, 'chrome-extension');
+    // vip-extension 폴더 경로 (server 폴더 내부)
+    const extensionPath = path.join(__dirname, 'vip-extension');
     
     // 폴더 존재 확인
     if (!fs.existsSync(extensionPath)) {
-      console.error('❌ [확장다운로드] chrome-extension 폴더를 찾을 수 없습니다:', extensionPath);
+      console.error('❌ [확장다운로드] vip-extension 폴더를 찾을 수 없습니다:', extensionPath);
       return res.status(404).json({ 
         success: false, 
         error: 'Chrome 확장 프로그램 파일을 찾을 수 없습니다.' 
@@ -7019,7 +7019,7 @@ app.get('/api/download-chrome-extension', (req, res) => {
     // archive를 response에 파이프
     archive.pipe(res);
     
-    // chrome-extension 폴더의 모든 파일 추가 (.md 파일 포함)
+    // vip-extension 폴더의 모든 파일 추가 (.md 파일 포함)
     archive.directory(extensionPath, false);
     
     // ZIP 생성 완료
