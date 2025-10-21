@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIP 대리점 정보 보호</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 320px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      font-size: 40px;
+      margin-bottom: 10px;
+    }
+    
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .version {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    
+    .status {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .status-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .status-label {
+      font-size: 14px;
+    }
+    
+    .status-value {
+      font-size: 14px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.3);
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+    
+    .status-value.active {
+      background: #4caf50;
+    }
+    
+    .info {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 15px;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      opacity: 0.7;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: white;
+      color: #667eea;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🔒</div>
+    <h1>VIP 대리점 정보 보호</h1>
+    <p class="version">v1.0.0</p>
+  </div>
+  
+  <div class="status">
+    <div class="status-item">
+      <span class="status-label">확장 프로그램</span>
+      <span class="status-value active">활성화</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">보호 상태</span>
+      <span class="status-value" id="protection-status">대기 중</span>
+    </div>
+  </div>
+  
+  <div class="info">
+    ℹ️ 이 확장 프로그램은 U+ 온라인 가입 페이지에서 대리점 정보를 자동으로 숨깁니다.
+    <br><br>
+    <strong>숨겨지는 정보:</strong><br>
+    • 대리점명 및 코드<br>
+    • 대리점 주소<br>
+    • 대리점 연락처<br>
+    • 사업자등록번호
+  </div>
+  
+  <button class="btn" id="test-btn">테스트 페이지 열기</button>
+  
+  <div class="footer">
+    (주)브이아이피플러스<br>
+    내부 직원 전용
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+

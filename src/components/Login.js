@@ -11,7 +11,8 @@ import {
   FormControlLabel,
   Alert,
   Collapse,
-  Divider
+  Divider,
+  Link
 } from '@mui/material';
 import axios from 'axios';
 
@@ -123,6 +124,19 @@ function Login({ onLogin }) {
   // 업데이트 진행 팝업 닫기 핸들러
 
 
+  // Chrome 브라우저 감지
+  const isChrome = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    return userAgent.includes('chrome') && !userAgent.includes('edg'); // Edge는 제외
+  };
+
+  // 확장 프로그램 설치 감지
+  const isExtensionInstalled = () => {
+    return window.VIP_AGENT_PROTECTION_ENABLED === true ||
+           document.documentElement.getAttribute('data-vip-extension') === 'installed' ||
+           document.querySelector('meta[name="vip-extension-installed"]') !== null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!storeId.trim()) {
@@ -202,13 +216,33 @@ function Login({ onLogin }) {
             isInventory: false
           });
         } else {
-          // 일반 매장인 경우
-          onLogin({
-            ...data.storeInfo,
-            isAgent: false,
-            isInventory: false,
-            isSettlement: false
-          });
+          // 일반 매장인 경우 - Chrome 브라우저 및 확장 프로그램 체크
+          
+          // 1. Chrome 브라우저 체크
+          if (!isChrome()) {
+            setError('❌ Chrome 브라우저만 사용 가능합니다.\n\nChrome 다운로드: https://www.google.com/chrome/');
+            setLoading(false);
+            return;
+          }
+          
+          // 2. 확장 프로그램 설치 체크 (0.5초 대기 후 체크)
+          setTimeout(() => {
+            if (!isExtensionInstalled()) {
+              setError('❌ VIP 대리점 정보 보호 확장 프로그램이 필요합니다.\n\n설치 방법:\n1. 관리자에게 확장 프로그램 파일 요청\n2. Chrome 확장 프로그램 설치\n3. 페이지 새로고침 후 다시 로그인');
+              setLoading(false);
+              return;
+            }
+            
+            // 체크 통과 - 로그인 처리
+            console.log('✅ Chrome 브라우저 및 확장 프로그램 확인 완료');
+            onLogin({
+              ...data.storeInfo,
+              isAgent: false,
+              isInventory: false,
+              isSettlement: false
+            });
+            setLoading(false);
+          }, 500);
         }
       } else {
         setError('존재하지 않는 ID입니다.');
@@ -267,6 +301,37 @@ function Login({ onLogin }) {
               </Box>
             </Collapse>
           )}
+
+          {/* Chrome 및 확장 프로그램 안내 */}
+          <Alert severity="warning" sx={{ mb: 2, bgcolor: '#fff3e0', border: '2px solid #ff9800' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#e65100' }}>
+              ⚠️ 일반모드 사용자 필수 조건
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1, color: '#663c00' }}>
+              • <strong>Chrome 브라우저</strong> 사용 필수
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1, color: '#663c00' }}>
+              • <strong>VIP 확장 프로그램</strong> 설치 필수
+            </Typography>
+            <Box sx={{ mt: 1.5 }}>
+              <Link 
+                href="https://www.google.com/chrome/" 
+                target="_blank" 
+                sx={{ 
+                  fontSize: '0.85rem',
+                  display: 'block',
+                  mb: 0.5,
+                  color: '#1976d2',
+                  fontWeight: 600
+                }}
+              >
+                🌐 Chrome 다운로드 →
+              </Link>
+              <Typography variant="caption" sx={{ color: '#663c00' }}>
+                확장 프로그램은 관리자에게 문의하세요
+              </Typography>
+            </Box>
+          </Alert>
 
           <form onSubmit={handleSubmit}>
             <TextField

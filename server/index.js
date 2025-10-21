@@ -6859,8 +6859,25 @@ app.post('/api/onsale-proxy', async (req, res) => {
           </p>
           
           <div class="notice">
-            <h3>📋 안내사항</h3>
+            <h3>⚠️ 필수 요구사항</h3>
             <ul>
+              <li><strong>Chrome 브라우저 사용 필수</strong></li>
+              <li><strong>VIP 확장 프로그램 설치 필수</strong></li>
+            </ul>
+          </div>
+          
+          <div class="notice" style="border-left-color: #ff9800;">
+            <h3>🔒 보안 안내</h3>
+            <ul>
+              <li>확장 프로그램으로 정보가 보호됩니다</li>
+              <li>대리점 정보가 자동으로 숨겨집니다</li>
+              <li>안전한 가입 처리가 진행됩니다</li>
+            </ul>
+          </div>
+          
+          <div class="notice" style="background: #fff3cd; border-left-color: #ffc107;">
+            <h3 style="color: #856404;">📋 안내사항</h3>
+            <ul style="color: #856404;">
               <li>공식 인증 대리점을 통한 가입입니다</li>
               <li>본사가 보증하는 안전한 거래입니다</li>
               <li>가입 정보는 안전하게 보호됩니다</li>
