@@ -6693,12 +6693,12 @@ app.post('/api/check-onsale-permission', async (req, res) => {
   }
 });
 
-// 온세일 프록시 - U+ 페이지 가져오기 및 대리점 정보 제거
+// 온세일 프록시 - 안내 페이지 생성 (방안 2)
 app.post('/api/onsale-proxy', async (req, res) => {
   try {
     const { url, agentCode } = req.body;
     
-    console.log(`🌐 [온세일프록시] 페이지 가져오기 시작: ${url}`);
+    console.log(`📄 [온세일프록시] 안내 페이지 생성 시작: ${url}`);
     
     if (!url) {
       return res.status(400).json({ 
@@ -6707,97 +6707,194 @@ app.post('/api/onsale-proxy', async (req, res) => {
       });
     }
     
-    // axios와 cheerio import (파일 상단에 이미 있어야 하지만, 여기서 require)
-    const axios = require('axios');
-    const cheerio = require('cheerio');
-    
-    // U+ 페이지 가져오기
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-    
-    let html = response.data;
-    const $ = cheerio.load(html);
-    
-    console.log(`📄 [온세일프록시] HTML 파싱 시작`);
-    
-    // 대리점 정보 제거 패턴들
-    const replacements = [
-      { pattern: /\(주\)브이아이피플러스/gi, replacement: '가입대리점' },
-      { pattern: /브이아이피플러스/gi, replacement: '가입대리점' },
-      { pattern: /VIP플러스/gi, replacement: '가입대리점' },
-      { pattern: /대리점코드\[\d+\]/gi, replacement: '' },
-      { pattern: agentCode, replacement: '******' },
-      { pattern: /경기도 평택시 평택로 23.*?\)/gi, replacement: '주소 확인 중)' },
-      { pattern: /070-5038-4437/gi, replacement: '000-0000-0000' },
-      { pattern: /125-86-06495/gi, replacement: '***-**-*****' }
-    ];
-    
-    // HTML 텍스트 내용 수정
-    html = replacements.reduce((modifiedHtml, { pattern, replacement }) => {
-      return modifiedHtml.replace(pattern, replacement);
-    }, html);
-    
-    // URL에서 base URL 추출
-    const urlObj = new URL(url);
-    const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
-    
-    console.log(`🌐 [온세일프록시] Base URL: ${baseUrl}`);
-    
-    // 상대 경로를 절대 경로로 변환
-    $('script[src]').each((index, element) => {
-      const src = $(element).attr('src');
-      if (src && !src.startsWith('http') && !src.startsWith('//')) {
-        const absoluteSrc = src.startsWith('/') ? `${baseUrl}${src}` : `${baseUrl}/${src}`;
-        console.log(`🔗 [온세일프록시] Script 경로 변환: ${src} → ${absoluteSrc}`);
-        $(element).attr('src', absoluteSrc);
-      }
-    });
-    
-    $('link[href]').each((index, element) => {
-      const href = $(element).attr('href');
-      if (href && !href.startsWith('http') && !href.startsWith('//')) {
-        const absoluteHref = href.startsWith('/') ? `${baseUrl}${href}` : `${baseUrl}/${href}`;
-        console.log(`🔗 [온세일프록시] Link 경로 변환: ${href} → ${absoluteHref}`);
-        $(element).attr('href', absoluteHref);
-      }
-    });
-    
-    $('img[src]').each((index, element) => {
-      const src = $(element).attr('src');
-      if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith('data:')) {
-        const absoluteSrc = src.startsWith('/') ? `${baseUrl}${src}` : `${baseUrl}/${src}`;
-        $(element).attr('src', absoluteSrc);
-      }
-    });
-    
-    // "신청서 작성 시작" 또는 유사한 버튼을 찾아서 새 창으로 열리도록 수정
-    $('a, button').each((index, element) => {
-      const text = $(element).text().trim();
-      const href = $(element).attr('href');
-      
-      // "신청서", "작성", "시작" 등의 키워드가 있으면
-      if (text.includes('신청서') || text.includes('작성') || text.includes('시작')) {
-        console.log(`🔗 [온세일프록시] 버튼 발견: "${text}"`);
+    // 깔끔한 안내 페이지 HTML
+    const guidePage = `
+      <!DOCTYPE html>
+      <html lang="ko">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>U+ 온라인 가입 안내</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+          }
+          
+          .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 60px 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+          }
+          
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+          }
+          
+          h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 700;
+          }
+          
+          .subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 40px;
+            line-height: 1.6;
+          }
+          
+          .notice {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+            border-radius: 8px;
+          }
+          
+          .notice h3 {
+            font-size: 14px;
+            color: #667eea;
+            margin-bottom: 12px;
+            font-weight: 600;
+          }
+          
+          .notice ul {
+            list-style: none;
+            padding-left: 0;
+          }
+          
+          .notice li {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+          }
+          
+          .notice li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+          }
+          
+          .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 50px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            margin-top: 20px;
+          }
+          
+          .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+          }
+          
+          .btn-start:active {
+            transform: translateY(0);
+          }
+          
+          .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #999;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">📱</div>
+          
+          <h1>U+ 온라인 가입</h1>
+          <p class="subtitle">
+            LG 유플러스 공식 대리점을 통해<br>
+            안전하고 편리하게 가입하실 수 있습니다.
+          </p>
+          
+          <div class="notice">
+            <h3>📋 안내사항</h3>
+            <ul>
+              <li>공식 인증 대리점을 통한 가입입니다</li>
+              <li>본사가 보증하는 안전한 거래입니다</li>
+              <li>가입 정보는 안전하게 보호됩니다</li>
+              <li>문의사항은 담당자에게 연락주세요</li>
+            </ul>
+          </div>
+          
+          <button class="btn-start" onclick="startApplication()">
+            가입 신청 시작하기
+          </button>
+          
+          <p class="footer">
+            본 서비스는 LG유플러스 공식 대리점을 통해 제공됩니다
+          </p>
+        </div>
         
-        // 원본 URL로 새 창에서 열리도록 설정
-        if (href && !href.startsWith('#')) {
-          $(element).attr('target', '_blank');
-        } else if (!href) {
-          // href가 없으면 onclick에 원본 URL 설정
-          $(element).attr('onclick', `window.open('${url}', '_blank'); return false;`);
-        }
-      }
-    });
+        <script>
+          function startApplication() {
+            // 원본 URL을 새 창에서 열기
+            window.open('${url}', '_blank', 'noopener,noreferrer');
+            
+            // 부모 창에 메시지 전달 (선택적)
+            if (window.parent) {
+              window.parent.postMessage({ type: 'APPLICATION_STARTED' }, '*');
+            }
+          }
+        </script>
+      </body>
+      </html>
+    `;
     
-    // 수정된 HTML 반환
-    const modifiedHtml = $.html();
+    console.log(`✅ [온세일프록시] 안내 페이지 생성 완료`);
     
-    console.log(`✅ [온세일프록시] HTML 수정 완료`);
-    
-    res.send(modifiedHtml);
+    res.send(guidePage);
     
   } catch (error) {
     console.error('❌ [온세일프록시] 프록시 처리 실패:', error);
