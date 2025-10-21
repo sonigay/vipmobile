@@ -322,6 +322,7 @@ function Login({ onLogin }) {
               sx={{ 
                 bgcolor: '#667eea',
                 fontWeight: 600,
+                mb: 1.5,
                 '&:hover': {
                   bgcolor: '#5a67d8'
                 }
@@ -330,8 +331,12 @@ function Login({ onLogin }) {
               📥 VIP 확장 프로그램 다운로드
             </Button>
             
-            <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#663c00' }}>
-              💡 압축 해제 → Chrome/Edge에서 확장 설치 → 페이지 새로고침
+            <Typography variant="caption" sx={{ display: 'block', color: '#663c00', lineHeight: 1.5 }}>
+              <strong>설치 방법:</strong><br/>
+              1. 압축 해제<br/>
+              2. 브라우저 주소창에 <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>chrome://extensions/</code> 또는 <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>edge://extensions/</code> 입력<br/>
+              3. 개발자 모드 켜기 → 압축 해제한 폴더 로드<br/>
+              4. 페이지 새로고침 후 로그인
             </Typography>
           </Alert>
 

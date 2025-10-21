@@ -7013,7 +7013,7 @@ app.get('/api/download-chrome-extension', (req, res) => {
     });
     
     // 응답 헤더 설정
-    res.attachment('vip-chrome-extension.zip');
+    res.attachment('vip-extension.zip');
     res.setHeader('Content-Type', 'application/zip');
     
     // archive를 response에 파이프
