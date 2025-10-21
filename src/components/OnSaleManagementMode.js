@@ -55,7 +55,6 @@ const OnSaleManagementMode = ({
     url: '',
     buttonName: '',
     hideAgentInfo: false,
-    agentCode: '',
     isActive: true
   });
   
@@ -97,7 +96,6 @@ const OnSaleManagementMode = ({
       url: '',
       buttonName: '',
       hideAgentInfo: false,
-      agentCode: '',
       isActive: true
     });
     setShowLinkDialog(true);
@@ -109,7 +107,6 @@ const OnSaleManagementMode = ({
       url: link.url,
       buttonName: link.buttonName,
       hideAgentInfo: link.hideAgentInfo,
-      agentCode: link.agentCode,
       isActive: link.isActive
     });
     setShowLinkDialog(true);
@@ -120,11 +117,6 @@ const OnSaleManagementMode = ({
       // 유효성 검사
       if (!linkForm.url || !linkForm.buttonName) {
         setError('URL과 버튼명은 필수입니다.');
-        return;
-      }
-
-      if (linkForm.hideAgentInfo && !linkForm.agentCode) {
-        setError('대리점 정보를 숨기려면 대리점 코드가 필요합니다.');
         return;
       }
 
@@ -316,7 +308,6 @@ const OnSaleManagementMode = ({
                     <TableCell><strong>버튼명</strong></TableCell>
                     <TableCell><strong>링크 URL</strong></TableCell>
                     <TableCell align="center"><strong>대리점정보숨김</strong></TableCell>
-                    <TableCell><strong>대리점코드</strong></TableCell>
                     <TableCell align="center"><strong>활성화</strong></TableCell>
                     <TableCell align="center"><strong>작업</strong></TableCell>
                   </TableRow>
@@ -345,7 +336,6 @@ const OnSaleManagementMode = ({
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>{link.agentCode || '-'}</TableCell>
                       <TableCell align="center">
                         <Chip 
                           label={link.isActive ? 'O' : 'X'} 
@@ -417,22 +407,9 @@ const OnSaleManagementMode = ({
                   onChange={(e) => setLinkForm({ ...linkForm, hideAgentInfo: e.target.checked })}
                 />
               }
-              label="대리점 정보 숨기기 (프록시 사용)"
+              label="대리점 정보 숨기기 (확장 프로그램 사용)"
               sx={{ mt: 2, mb: 1 }}
             />
-            
-            {linkForm.hideAgentInfo && (
-              <TextField
-                fullWidth
-                label="대리점 코드"
-                value={linkForm.agentCode}
-                onChange={(e) => setLinkForm({ ...linkForm, agentCode: e.target.value })}
-                margin="normal"
-                placeholder="306891"
-                required
-                helperText="URL에 포함된 대리점 코드를 입력하세요"
-              />
-            )}
             
             <FormControlLabel
               control={

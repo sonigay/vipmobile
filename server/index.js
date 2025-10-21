@@ -6419,7 +6419,7 @@ app.get('/api/onsale/links', async (req, res) => {
     console.log('📋 [온세일] 전체 링크 목록 조회 시작');
     
     const sheetName = '온세일링크관리';
-    const range = 'A:E'; // A~E열: 링크URL, 버튼명, 대리점정보숨김, 대리점코드, 활성화여부
+    const range = 'A:D'; // A~D열: 링크URL, 버튼명, 대리점정보숨김, 활성화여부
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -6438,8 +6438,7 @@ app.get('/api/onsale/links', async (req, res) => {
       url: row[0] || '',
       buttonName: row[1] || '',
       hideAgentInfo: row[2] === 'O',
-      agentCode: row[3] || '',
-      isActive: row[4] === 'O'
+      isActive: row[3] === 'O'
     }));
     
     console.log(`✅ [온세일] 링크 조회 완료: ${links.length}개`);
@@ -6461,7 +6460,7 @@ app.get('/api/onsale/active-links', async (req, res) => {
     console.log('📋 [온세일] 활성화 링크 목록 조회 시작');
     
     const sheetName = '온세일링크관리';
-    const range = 'A:E';
+    const range = 'A:D';
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -6475,12 +6474,11 @@ app.get('/api/onsale/active-links', async (req, res) => {
     }
     
     const activeLinks = rows.slice(1)
-      .filter(row => row[4] === 'O') // 활성화여부가 'O'인 것만
+      .filter(row => row[3] === 'O') // 활성화여부가 'O'인 것만
       .map(row => ({
         url: row[0] || '',
         buttonName: row[1] || '',
-        hideAgentInfo: row[2] === 'O',
-        agentCode: row[3] || ''
+        hideAgentInfo: row[2] === 'O'
       }));
     
     console.log(`✅ [온세일] 활성화 링크 조회 완료: ${activeLinks.length}개`);
@@ -6500,7 +6498,7 @@ app.get('/api/onsale/active-links', async (req, res) => {
 app.post('/api/onsale/links', async (req, res) => {
   try {
     console.log('➕ [온세일] 새 링크 추가 시작');
-    const { url, buttonName, hideAgentInfo, agentCode, isActive } = req.body;
+    const { url, buttonName, hideAgentInfo, isActive } = req.body;
     
     if (!url || !buttonName) {
       return res.status(400).json({ 
@@ -6514,13 +6512,12 @@ app.post('/api/onsale/links', async (req, res) => {
       url,
       buttonName,
       hideAgentInfo ? 'O' : 'X',
-      agentCode || '',
       isActive ? 'O' : 'X'
     ];
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:E`,
+      range: `${sheetName}!A:D`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [newRow]
@@ -6544,7 +6541,7 @@ app.post('/api/onsale/links', async (req, res) => {
 app.put('/api/onsale/links/:rowIndex', async (req, res) => {
   try {
     const { rowIndex } = req.params;
-    const { url, buttonName, hideAgentInfo, agentCode, isActive } = req.body;
+    const { url, buttonName, hideAgentInfo, isActive } = req.body;
     
     console.log(`✏️ [온세일] 링크 수정 시작: 행 ${rowIndex}`);
     
@@ -6560,13 +6557,12 @@ app.put('/api/onsale/links/:rowIndex', async (req, res) => {
       url,
       buttonName,
       hideAgentInfo ? 'O' : 'X',
-      agentCode || '',
       isActive ? 'O' : 'X'
     ];
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:D${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [updatedRow]
@@ -6599,10 +6595,10 @@ app.delete('/api/onsale/links/:rowIndex', async (req, res) => {
     // 또는 활성화여부를 'X'로 변경
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:D${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [['', '', '', '', '']]
+        values: [['', '', '', '']]
       }
     });
     
@@ -6858,32 +6854,6 @@ app.post('/api/onsale-proxy', async (req, res) => {
             안전하고 편리하게 가입하실 수 있습니다.
           </p>
           
-          <div class="notice">
-            <h3>⚠️ 필수 요구사항</h3>
-            <ul>
-              <li><strong>Chrome 브라우저 사용 필수</strong></li>
-              <li><strong>VIP 확장 프로그램 설치 필수</strong></li>
-            </ul>
-          </div>
-          
-          <div class="notice" style="border-left-color: #ff9800;">
-            <h3>🔒 보안 안내</h3>
-            <ul>
-              <li>확장 프로그램으로 정보가 보호됩니다</li>
-              <li>대리점 정보가 자동으로 숨겨집니다</li>
-              <li>안전한 가입 처리가 진행됩니다</li>
-            </ul>
-          </div>
-          
-          <div class="notice" style="background: #fff3cd; border-left-color: #ffc107;">
-            <h3 style="color: #856404;">📋 안내사항</h3>
-            <ul style="color: #856404;">
-              <li>공식 인증 대리점을 통한 가입입니다</li>
-              <li>본사가 보증하는 안전한 거래입니다</li>
-              <li>가입 정보는 안전하게 보호됩니다</li>
-              <li>문의사항은 담당자에게 연락주세요</li>
-            </ul>
-          </div>
           
           <button class="btn-start" onclick="startApplication()">
             가입 신청 시작하기

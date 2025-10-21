@@ -28,21 +28,9 @@
   function hideAgentInfo() {
     let modified = false;
     
-    // 1. URL에서 agentId 숨기기
-    try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.has('agentId')) {
-        const originalAgentId = url.searchParams.get('agentId');
-        console.log('🔍 원본 agentId 감지:', originalAgentId);
-        
-        // URL은 그대로 두고 (기능 유지) 표시만 변경
-        // 실제로는 history API로 변경하지 않음 (세션 유지)
-      }
-    } catch (error) {
-      console.error('URL 파싱 오류:', error);
-    }
+    // URL은 그대로 유지 (기능 유지를 위해 변경하지 않음)
     
-    // 2. 텍스트 패턴 치환 (옵션 3: 해당 요소 제거)
+    // 1. 텍스트 패턴 치환
     const textPatterns = [
       { pattern: /\(주\)브이아이피플러스/gi, replacement: '' },
       { pattern: /브이아이피플러스/gi, replacement: '' },
@@ -55,7 +43,7 @@
       { pattern: /125-86-06495/gi, replacement: '' }
     ];
     
-    // 3. DOM 텍스트 노드 순회하며 치환
+    // 2. DOM 텍스트 노드 순회하며 치환
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
@@ -84,38 +72,29 @@
       modified = true;
     });
     
-    // 4. 특정 요소 완전 제거 (옵션 3)
-    // 대리점 정보가 포함된 div, p 태그 찾아서 제거
-    const elementsToRemove = [];
-    
-    document.querySelectorAll('div, p, span, td, th').forEach(element => {
+    // 3. 특정 요소 숨김 (display: none) - 제거하면 페이지가 깨질 수 있음
+    document.querySelectorAll('div, p, span, td, th, li').forEach(element => {
       const text = element.textContent || '';
       
-      // 대리점명, 주소, 전화번호가 포함된 요소 찾기
-      if (
+      // 대리점 정보만 포함하고 다른 중요 정보가 없는 작은 요소만 숨김
+      const hasDealerInfo = 
         text.includes('가입대리점명') ||
         text.includes('판매점명') ||
-        text.includes('브이아이피') ||
-        text.includes('평택시 평택로') ||
-        text.includes('070-5038') ||
+        (text.includes('브이아이피') && text.length < 100) ||
+        (text.includes('평택시 평택로') && text.length < 200) ||
+        text.includes('070-5038-4437') ||
         text.includes('125-86-06495') ||
-        text.includes('대리점코드')
-      ) {
-        // 해당 요소의 직계 부모가 아닌 경우에만 제거
-        // (너무 큰 요소를 제거하면 레이아웃이 깨질 수 있음)
-        if (element.children.length < 3) {
-          elementsToRemove.push(element);
-        }
+        (text.includes('대리점코드') && text.length < 100);
+      
+      // 작은 요소만 숨김 (children이 적고, 텍스트가 짧은 경우)
+      if (hasDealerInfo && element.children.length < 2 && text.length < 300) {
+        element.style.display = 'none';
+        console.log('🙈 요소 숨김:', text.substring(0, 50));
+        modified = true;
       }
     });
     
-    elementsToRemove.forEach(element => {
-      console.log('🗑️ 요소 제거:', element.textContent.substring(0, 50));
-      element.remove();
-      modified = true;
-    });
-    
-    // 5. 확장 프로그램 작동 표시
+    // 4. 확장 프로그램 작동 표시
     if (modified) {
       console.log('✅ 대리점 정보 숨김 완료');
       
