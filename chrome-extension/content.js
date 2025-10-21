@@ -4,7 +4,7 @@
 (function() {
   'use strict';
   
-  console.log('🔒 VIP 대리점 정보 보호 확장 프로그램 활성화');
+  console.log('🔧 VIP 필수 확장프로그램 활성화');
 
   // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
@@ -18,9 +18,9 @@
     document.head.appendChild(metaTag);
   }
 
-  // U+ 페이지에서만 대리점 정보 숨김 처리
+  // U+ 페이지에서만 처리 실행
   if (!window.location.href.includes('onsalemobile.uplus.co.kr')) {
-    console.log('✅ VIP 확장 프로그램 활성 표시 완료 (대리점 정보 숨김은 U+ 페이지에서만)');
+    console.log('✅ VIP 확장프로그램 활성화 완료');
     return;
   }
 
@@ -136,7 +136,7 @@
           box-shadow: 0 2px 10px rgba(0,0,0,0.2);
           font-family: Arial, sans-serif;
         `;
-        indicator.textContent = '🔒 정보 보호 활성화';
+        indicator.textContent = '✅ VIP 확장 활성화';
         document.body.appendChild(indicator);
         
         // 3초 후 자동 제거
@@ -173,6 +173,6 @@
     characterData: true
   });
 
-  console.log('🔒 VIP 대리점 정보 보호 확장 프로그램 실행 중...');
+  console.log('✅ VIP 필수 확장프로그램 실행 중...');
 
 })(); // IIFE 끝

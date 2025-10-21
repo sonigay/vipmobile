@@ -228,7 +228,7 @@ function Login({ onLogin }) {
           // 2. 확장 프로그램 설치 체크 (0.5초 대기 후 체크)
           setTimeout(() => {
             if (!isExtensionInstalled()) {
-              setError('❌ VIP 확장 프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 위의 "📥 2단계: VIP 확장 프로그램 다운로드" 버튼 클릭\n2. 다운로드한 ZIP 파일 압축 해제\n3. Chrome 확장 프로그램 설치 (chrome://extensions/)\n4. 페이지 새로고침(F5) 후 다시 로그인\n\n💡 자세한 설치 방법은 다운로드한 폴더의 INSTALL_GUIDE.md 파일을 확인하세요.');
+              setError('❌ VIP 확장프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 위의 "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n2. ZIP 파일 압축 해제\n3. Chrome 확장 설치 (chrome://extensions/)\n4. 페이지 새로고침(F5) 후 로그인\n\n💡 폴더 안의 "설치가이드.html" 파일을 열어보세요 (더블클릭)');
               setLoading(false);
               return;
             }
