@@ -1687,6 +1687,10 @@ function AppContent() {
     // 온세일접수 모드인지 확인
     else if (store.modePermissions && store.modePermissions.onSaleReception && store.isOnSaleReception) {
       console.log('로그인: 온세일접수 모드');
+      
+      // loggedInStore 업데이트 (modePermissions 유지)
+      setLoggedInStore(store);
+      
       setIsOnSaleReceptionMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1716,6 +1720,10 @@ function AppContent() {
     // 기본 모드인지 확인
     else if (store.modePermissions && store.modePermissions.basicMode && store.isBasicMode) {
       console.log('로그인: 기본 모드 (일반 매장)');
+      
+      // loggedInStore 업데이트 (modePermissions 유지)
+      setLoggedInStore(store);
+      
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
@@ -1754,6 +1762,10 @@ function AppContent() {
     // 권한이 없는 일반 매장 (레거시 - 기본 모드로 처리)
     else {
       console.log('로그인: 레거시 일반 매장 모드');
+      
+      // loggedInStore 업데이트 (modePermissions 유지)
+      setLoggedInStore(store);
+      
       setIsAgentMode(false);
       setIsInventoryMode(false);
       setIsSettlementMode(false);
