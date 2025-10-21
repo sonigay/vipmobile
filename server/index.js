@@ -6740,6 +6740,39 @@ app.post('/api/onsale-proxy', async (req, res) => {
       return modifiedHtml.replace(pattern, replacement);
     }, html);
     
+    // URL에서 base URL 추출
+    const urlObj = new URL(url);
+    const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+    
+    console.log(`🌐 [온세일프록시] Base URL: ${baseUrl}`);
+    
+    // 상대 경로를 절대 경로로 변환
+    $('script[src]').each((index, element) => {
+      const src = $(element).attr('src');
+      if (src && !src.startsWith('http') && !src.startsWith('//')) {
+        const absoluteSrc = src.startsWith('/') ? `${baseUrl}${src}` : `${baseUrl}/${src}`;
+        console.log(`🔗 [온세일프록시] Script 경로 변환: ${src} → ${absoluteSrc}`);
+        $(element).attr('src', absoluteSrc);
+      }
+    });
+    
+    $('link[href]').each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && !href.startsWith('http') && !href.startsWith('//')) {
+        const absoluteHref = href.startsWith('/') ? `${baseUrl}${href}` : `${baseUrl}/${href}`;
+        console.log(`🔗 [온세일프록시] Link 경로 변환: ${href} → ${absoluteHref}`);
+        $(element).attr('href', absoluteHref);
+      }
+    });
+    
+    $('img[src]').each((index, element) => {
+      const src = $(element).attr('src');
+      if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith('data:')) {
+        const absoluteSrc = src.startsWith('/') ? `${baseUrl}${src}` : `${baseUrl}/${src}`;
+        $(element).attr('src', absoluteSrc);
+      }
+    });
+    
     // "신청서 작성 시작" 또는 유사한 버튼을 찾아서 새 창으로 열리도록 수정
     $('a, button').each((index, element) => {
       const text = $(element).text().trim();
