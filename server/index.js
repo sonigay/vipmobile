@@ -6975,6 +6975,68 @@ app.post('/api/onsale-proxy', async (req, res) => {
   }
 });
 
+// ==================== Chrome 확장 프로그램 다운로드 API ====================
+
+// Chrome 확장 프로그램 ZIP 다운로드
+app.get('/api/download-chrome-extension', (req, res) => {
+  try {
+    console.log('📥 [확장다운로드] Chrome 확장 프로그램 다운로드 시작');
+    
+    const archiver = require('archiver');
+    const path = require('path');
+    const fs = require('fs');
+    
+    // chrome-extension 폴더 경로 (server 폴더 기준 상위)
+    const extensionPath = path.join(__dirname, '..', 'chrome-extension');
+    
+    // 폴더 존재 확인
+    if (!fs.existsSync(extensionPath)) {
+      console.error('❌ [확장다운로드] chrome-extension 폴더를 찾을 수 없습니다:', extensionPath);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Chrome 확장 프로그램 파일을 찾을 수 없습니다.' 
+      });
+    }
+    
+    // ZIP 파일 생성
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // 최대 압축
+    });
+    
+    // 에러 핸들러
+    archive.on('error', (err) => {
+      console.error('❌ [확장다운로드] ZIP 생성 오류:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: 'ZIP 파일 생성에 실패했습니다.' 
+      });
+    });
+    
+    // 응답 헤더 설정
+    res.attachment('vip-chrome-extension.zip');
+    res.setHeader('Content-Type', 'application/zip');
+    
+    // archive를 response에 파이프
+    archive.pipe(res);
+    
+    // chrome-extension 폴더의 모든 파일 추가 (.md 파일 포함)
+    archive.directory(extensionPath, false);
+    
+    // ZIP 생성 완료
+    archive.finalize();
+    
+    console.log('✅ [확장다운로드] ZIP 생성 완료 및 전송 시작');
+    
+  } catch (error) {
+    console.error('❌ [확장다운로드] 다운로드 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Chrome 확장 프로그램 다운로드에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {

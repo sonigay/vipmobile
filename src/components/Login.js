@@ -228,7 +228,7 @@ function Login({ onLogin }) {
           // 2. 확장 프로그램 설치 체크 (0.5초 대기 후 체크)
           setTimeout(() => {
             if (!isExtensionInstalled()) {
-              setError('❌ VIP 대리점 정보 보호 확장 프로그램이 필요합니다.\n\n설치 방법:\n1. 관리자에게 확장 프로그램 파일 요청\n2. Chrome 확장 프로그램 설치\n3. 페이지 새로고침 후 다시 로그인');
+              setError('❌ VIP 확장 프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 위의 "📥 2단계: VIP 확장 프로그램 다운로드" 버튼 클릭\n2. 다운로드한 ZIP 파일 압축 해제\n3. Chrome 확장 프로그램 설치 (chrome://extensions/)\n4. 페이지 새로고침(F5) 후 다시 로그인\n\n💡 자세한 설치 방법은 다운로드한 폴더의 INSTALL_GUIDE.md 파일을 확인하세요.');
               setLoading(false);
               return;
             }
@@ -310,27 +310,51 @@ function Login({ onLogin }) {
             <Typography variant="body2" sx={{ mb: 1, color: '#663c00' }}>
               • <strong>Chrome 브라우저</strong> 사용 필수
             </Typography>
-            <Typography variant="body2" sx={{ mb: 1, color: '#663c00' }}>
+            <Typography variant="body2" sx={{ mb: 1.5, color: '#663c00' }}>
               • <strong>VIP 확장 프로그램</strong> 설치 필수
             </Typography>
-            <Box sx={{ mt: 1.5 }}>
-              <Link 
-                href="https://www.google.com/chrome/" 
-                target="_blank" 
+            
+            <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                href="https://www.google.com/chrome/"
+                target="_blank"
                 sx={{ 
-                  fontSize: '0.85rem',
-                  display: 'block',
-                  mb: 0.5,
+                  borderColor: '#1976d2',
                   color: '#1976d2',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  '&:hover': {
+                    borderColor: '#1565c0',
+                    bgcolor: '#e3f2fd'
+                  }
                 }}
               >
-                🌐 Chrome 다운로드 →
-              </Link>
-              <Typography variant="caption" sx={{ color: '#663c00' }}>
-                확장 프로그램은 관리자에게 문의하세요
-              </Typography>
+                🌐 1단계: Chrome 브라우저 다운로드
+              </Button>
+              
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => {
+                  const API_URL = process.env.REACT_APP_API_URL;
+                  window.open(`${API_URL}/api/download-chrome-extension`, '_blank');
+                }}
+                sx={{ 
+                  bgcolor: '#667eea',
+                  fontWeight: 600,
+                  '&:hover': {
+                    bgcolor: '#5a67d8'
+                  }
+                }}
+              >
+                📥 2단계: VIP 확장 프로그램 다운로드
+              </Button>
             </Box>
+            
+            <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#663c00' }}>
+              💡 다운로드 후 압축 해제 → Chrome 확장 프로그램 설치 → 페이지 새로고침
+            </Typography>
           </Alert>
 
           <form onSubmit={handleSubmit}>
