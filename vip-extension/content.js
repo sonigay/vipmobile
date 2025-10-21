@@ -37,17 +37,24 @@
         pattern: /고객님은 LG유플러스의 대리점인[^를]*를 통해 가입이 됩니다\./gi, 
         replacement: '고객님은 LG유플러스 공식 인증 대리점을 통해 가입이 됩니다.' 
       },
-      // 포괄적 패턴 - 모든 회사명 교체
-      { pattern: /주식회사\s*[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // 주식회사로 시작하는 모든 회사명
-      { pattern: /\(주\)[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // (주)로 시작하는 모든 회사명
-      { pattern: /\(유\)[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // (유)로 시작하는 회사명
-      { pattern: /\(사\)[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // (사)로 시작하는 회사명
-      // 개별 패턴 (백업)
-      { pattern: /브이아이피플러스/gi, replacement: '공식인증대리점' },
-      { pattern: /VIP플러스/gi, replacement: '공식인증대리점' },
+      // 포괄적 패턴 - 브이아이피 제외한 다른 회사명만 교체
+      { 
+        pattern: /주식회사\s*(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
+        replacement: '공식인증대리점' 
+      },  // 주식회사 (브이아이피 제외)
+      { 
+        pattern: /\(주\)(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
+        replacement: '공식인증대리점' 
+      },  // (주) (브이아이피 제외)
+      { 
+        pattern: /\(유\)(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
+        replacement: '공식인증대리점' 
+      },  // (유) 회사명
+      { 
+        pattern: /\(사\)(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
+        replacement: '공식인증대리점' 
+      },  // (사) 회사명
       { pattern: /대리점코드\s*\[\d+\]/gi, replacement: '' },
-      { pattern: /\[브이아이피\d+_[^\]]+\]/gi, replacement: '' },
-      { pattern: /\[[^\]]*전략온라인[^\]]*\]/gi, replacement: '' },  // [브이아이피1_전략온라인] 등
       { pattern: /\([^)]*평택[^)]*\)/gi, replacement: '' },
       { pattern: /070-5038-4437/gi, replacement: '' },
       { pattern: /125-86-06495/gi, replacement: '' },
@@ -105,37 +112,38 @@
       }
     });
     
-    // 4. 확장 프로그램 작동 표시
-    if (modified) {
-      console.log('✅ 대리점 정보 숨김 완료');
+    // 4. 회사명 표시 (3초간 표시 후 사라짐)
+    if (modified && !document.getElementById('vip-company-indicator')) {
+      const indicator = document.createElement('div');
+      indicator.id = 'vip-company-indicator';
+      indicator.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: white;
+        color: black;
+        padding: 8px 15px;
+        border-radius: 20px;
+        border: 2px solid black;
+        font-size: 12px;
+        z-index: 999999;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        font-family: Arial, sans-serif;
+        font-weight: 500;
+      `;
+      indicator.textContent = '(주)브이아이피플러스';
+      document.body.appendChild(indicator);
       
-      // 페이지 상단에 작은 표시 추가 (선택적)
-      if (!document.getElementById('vip-protection-indicator')) {
-        const indicator = document.createElement('div');
-        indicator.id = 'vip-protection-indicator';
-        indicator.style.cssText = `
-          position: fixed;
-          top: 10px;
-          right: 10px;
-          background: #667eea;
-          color: white;
-          padding: 8px 15px;
-          border-radius: 20px;
-          font-size: 12px;
-          z-index: 999999;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-          font-family: Arial, sans-serif;
-        `;
-        indicator.textContent = '✅ VIP 확장 활성화';
-        document.body.appendChild(indicator);
-        
-        // 3초 후 자동 제거
-        setTimeout(() => {
-          indicator.style.opacity = '0';
-          indicator.style.transition = 'opacity 0.5s';
-          setTimeout(() => indicator.remove(), 500);
-        }, 3000);
-      }
+      // 3초 후 자동 제거
+      setTimeout(() => {
+        indicator.style.opacity = '0';
+        indicator.style.transition = 'opacity 0.5s';
+        setTimeout(() => indicator.remove(), 500);
+      }, 3000);
+    }
+    
+    if (modified) {
+      console.log('✅ 대리점 정보 처리 완료');
     }
     
     return modified;
