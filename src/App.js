@@ -822,8 +822,22 @@ function AppContent() {
             lng: 126.9780,
           });
           setSelectedRadius(50000);
+        } else if (parsedState.isOnSaleReception) {
+          // 온세일접수모드 상태 복원
+          console.log('💾 온세일접수 모드 복원');
+          setIsOnSaleReceptionMode(true);
+        } else if (parsedState.isBasicMode) {
+          // 기본모드 상태 복원
+          console.log('💾 기본 모드 복원');
+          const store = parsedState.store;
+          if (store.latitude && store.longitude) {
+            setUserLocation({
+              lat: parseFloat(store.latitude),
+              lng: parseFloat(store.longitude)
+            });
+          }
         } else if (parsedState.store) {
-          // 일반 매장 모드 위치 설정
+          // 일반 매장 모드 위치 설정 (레거시)
           const store = parsedState.store;
           if (store.latitude && store.longitude) {
             setUserLocation({
@@ -1056,8 +1070,12 @@ function AppContent() {
         //   재고: updatedStore.inventory
         // });
         
-        // 로그인 매장 정보 업데이트
-        setLoggedInStore(updatedStore);
+        // 로그인 매장 정보 업데이트 (modePermissions 보존!)
+        setLoggedInStore({
+          ...updatedStore,
+          modePermissions: loggedInStore.modePermissions, // 기존 modePermissions 유지
+          manager: loggedInStore.manager // 관리자 정보도 유지
+        });
       }
     }
   }, [isLoggedIn, data, loggedInStore?.id]);
