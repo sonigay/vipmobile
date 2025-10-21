@@ -215,23 +215,23 @@ function AppContent() {
   // 현재 사용자의 사용 가능한 모드 목록 가져오기
   const getCurrentUserAvailableModes = () => {
     if (!loggedInStore) {
-      console.log('getCurrentUserAvailableModes: loggedInStore가 없음');
+      console.log('🔍 getCurrentUserAvailableModes: loggedInStore가 없음');
       return [];
     }
     
-    console.log('getCurrentUserAvailableModes: loggedInStore =', loggedInStore);
-    console.log('getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
+    console.log('🔍 getCurrentUserAvailableModes: loggedInStore =', loggedInStore);
+    console.log('🔍 getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
     
     if (loggedInStore.modePermissions) {
       const availableModes = Object.entries(loggedInStore.modePermissions)
-        .filter(([mode, hasPermission]) => hasPermission)
+        .filter(([mode, hasPermission]) => hasPermission === true || hasPermission === 'O')
         .map(([mode]) => mode);
       
-      console.log('getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
+      console.log('✅ getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
       return availableModes;
     }
     
-    console.log('getCurrentUserAvailableModes: modePermissions가 없음');
+    console.log('⚠️ getCurrentUserAvailableModes: modePermissions가 없음');
     return [];
   };
   
@@ -1148,8 +1148,9 @@ function AppContent() {
   }, [data, selectedRadius, userLocation, isAgentMode, currentView, agentTarget]);
 
   const handleLogin = (store) => {
-    console.log('handleLogin 호출됨:', store);
-    console.log('store.modePermissions:', store.modePermissions);
+    console.log('🔍 handleLogin 호출됨:', store);
+    console.log('🔍 store.modePermissions:', store.modePermissions);
+    console.log('🔍 store 전체:', JSON.stringify(store, null, 2));
     
     setIsLoggedIn(true);
     setLoggedInStore(store);
@@ -2872,9 +2873,9 @@ ${requestList}
           loggedInStore={loggedInStore} 
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
+            console.log('🔍 OnSaleManagementMode 모드변경: currentModes =', currentModes);
             setAvailableModes(currentModes);
-            // 현재 모드 비활성화
-            setIsOnSaleManagementMode(false);
+            // 현재 모드는 유지하고 팝업만 표시
             setShowModeSelection(true);
           }}
           availableModes={availableModes}
@@ -2893,9 +2894,9 @@ ${requestList}
           loggedInStore={loggedInStore}
           onModeChange={() => {
             const currentModes = getCurrentUserAvailableModes();
+            console.log('🔍 OnSaleReceptionMode 모드변경: currentModes =', currentModes);
             setAvailableModes(currentModes);
-            // 현재 모드 비활성화
-            setIsOnSaleReceptionMode(false);
+            // 현재 모드는 유지하고 팝업만 표시
             setShowModeSelection(true);
           }}
           availableModes={availableModes}
