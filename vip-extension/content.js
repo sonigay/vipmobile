@@ -32,15 +32,26 @@
     
     // 1. 텍스트 패턴 치환
     const textPatterns = [
-      { pattern: /\(주\)브이아이피플러스/gi, replacement: '' },
-      { pattern: /브이아이피플러스/gi, replacement: '' },
-      { pattern: /VIP플러스/gi, replacement: '' },
+      // 팝업 문구 전체 교체 (자연스럽게)
+      { 
+        pattern: /고객님은 LG유플러스의 대리점인[^를]*를 통해 가입이 됩니다\./gi, 
+        replacement: '고객님은 LG유플러스 공식 인증 대리점을 통해 가입이 됩니다.' 
+      },
+      // 포괄적 패턴 - 모든 회사명 교체
+      { pattern: /주식회사\s*[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // 주식회사로 시작하는 모든 회사명
+      { pattern: /\(주\)[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // (주)로 시작하는 모든 회사명
+      { pattern: /\(유\)[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // (유)로 시작하는 회사명
+      { pattern: /\(사\)[가-힣A-Za-z0-9\s]+/gi, replacement: '공식인증대리점' },  // (사)로 시작하는 회사명
+      // 개별 패턴 (백업)
+      { pattern: /브이아이피플러스/gi, replacement: '공식인증대리점' },
+      { pattern: /VIP플러스/gi, replacement: '공식인증대리점' },
       { pattern: /대리점코드\s*\[\d+\]/gi, replacement: '' },
       { pattern: /\[브이아이피\d+_[^\]]+\]/gi, replacement: '' },
-      { pattern: /경기도\s*평택시\s*평택로\s*23[^)]*\)/gi, replacement: '' },
-      { pattern: /\(17917\)[^)]*평택[^)]*\)/gi, replacement: '' },
+      { pattern: /\[[^\]]*전략온라인[^\]]*\]/gi, replacement: '' },  // [브이아이피1_전략온라인] 등
+      { pattern: /\([^)]*평택[^)]*\)/gi, replacement: '' },
       { pattern: /070-5038-4437/gi, replacement: '' },
-      { pattern: /125-86-06495/gi, replacement: '' }
+      { pattern: /125-86-06495/gi, replacement: '' },
+      { pattern: /\(\s*-\s*\[P\d+\]\)/gi, replacement: '' }  // ( - [P384168]) 제거
     ];
     
     // 2. DOM 텍스트 노드 순회하며 치환
