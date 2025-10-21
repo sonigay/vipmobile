@@ -1707,7 +1707,10 @@ function AppContent() {
       localStorage.setItem('loginState', JSON.stringify({
         isOnSaleReception: true,
         isAgent: false,
-        store: store
+        store: {
+          ...store,
+          modePermissions: store.modePermissions // modePermissions 보존
+        }
       }));
     }
     // 기본 모드인지 확인
@@ -1742,7 +1745,10 @@ function AppContent() {
       localStorage.setItem('loginState', JSON.stringify({
         isBasicMode: true,
         isAgent: false,
-        store: store
+        store: {
+          ...store,
+          modePermissions: store.modePermissions // modePermissions 보존
+        }
       }));
     }
     // 권한이 없는 일반 매장 (레거시 - 기본 모드로 처리)
@@ -1777,7 +1783,10 @@ function AppContent() {
       localStorage.setItem('loginState', JSON.stringify({
         isBasicMode: true,
         isAgent: false,
-        store: store
+        store: {
+          ...store,
+          modePermissions: store.modePermissions // modePermissions 보존
+        }
       }));
     }
   };
@@ -2878,7 +2887,8 @@ ${requestList}
             const currentModes = getCurrentUserAvailableModes();
             console.log('🔍 OnSaleManagementMode 모드변경: currentModes =', currentModes);
             setAvailableModes(currentModes);
-            // 현재 모드는 유지하고 팝업만 표시
+            // 현재 모드 비활성화 (이래야 팝업이 보임)
+            setIsOnSaleManagementMode(false);
             setShowModeSelection(true);
           }}
           availableModes={availableModes}
@@ -2899,7 +2909,8 @@ ${requestList}
             const currentModes = getCurrentUserAvailableModes();
             console.log('🔍 OnSaleReceptionMode 모드변경: currentModes =', currentModes);
             setAvailableModes(currentModes);
-            // 현재 모드는 유지하고 팝업만 표시
+            // 현재 모드 비활성화 (이래야 팝업이 보임)
+            setIsOnSaleReceptionMode(false);
             setShowModeSelection(true);
           }}
           availableModes={availableModes}
