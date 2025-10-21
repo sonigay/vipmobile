@@ -76,9 +76,9 @@ object ApiClient {
     /**
      * 대기중인 전달 작업 조회
      */
-    fun getPendingForwards(serverUrl: String): List<PendingForwardData> {
+    fun getPendingForwards(serverUrl: String, phoneNumber: String): List<PendingForwardData> {
         try {
-            val url = "${serverUrl.trimEnd('/')}/api/sms/received?status=대기중&limit=50"
+            val url = "${serverUrl.trimEnd('/')}/api/sms/received?status=대기중&limit=50&receiver=$phoneNumber"
             
             val request = Request.Builder()
                 .url(url)

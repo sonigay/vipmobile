@@ -65,8 +65,8 @@ object MessageChecker {
         }
         
         try {
-            // 1. 대기중인 전달 처리
-            val pendingForwards = ApiClient.getPendingForwards(serverUrl)
+            // 1. 대기중인 전달 처리 (자기 폰에서 받은 SMS만)
+            val pendingForwards = ApiClient.getPendingForwards(serverUrl, devicePhoneNumber)
             
             if (pendingForwards.isNotEmpty()) {
                 Log.d(TAG, "대기중인 전달: ${pendingForwards.size}개")

@@ -28132,9 +28132,9 @@ async function ensureSmsSheetHeaders() {
 // SMS 수신 데이터 조회 API
 app.get('/api/sms/received', async (req, res) => {
   try {
-    const { limit = 100, status = 'all' } = req.query;
+    const { limit = 100, status = 'all', receiver = '' } = req.query;
     
-    console.log(`SMS 수신 데이터 조회: limit=${limit}, status=${status}`);
+    console.log(`SMS 수신 데이터 조회: limit=${limit}, status=${status}, receiver=${receiver}`);
     
     // SMS관리 시트에서 데이터 가져오기
     const response = await sheets.spreadsheets.values.get({
@@ -28167,6 +28167,12 @@ app.get('/api/sms/received', async (req, res) => {
     // 상태 필터링 (상세 상태도 지원: "대기중 (규칙: xxx)" → "대기중"으로 필터링)
     if (status !== 'all') {
       smsData = smsData.filter(sms => (sms.forwardStatus || '').startsWith(status));
+    }
+    
+    // 수신번호 필터링 (앱이 자기 폰에서 받은 SMS만 가져오기)
+    if (receiver) {
+      smsData = smsData.filter(sms => sms.receiver === receiver);
+      console.log(`  → 수신번호 필터링 적용: ${receiver}, 결과: ${smsData.length}건`);
     }
     
     // 최신순 정렬 (ID 내림차순)
