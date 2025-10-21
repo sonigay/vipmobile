@@ -1857,6 +1857,9 @@ function AppContent() {
         break;
     }
     
+    // loggedInStore 업데이트 (modePermissions 유지)
+    setLoggedInStore(modifiedStore);
+    
     // 수정된 store로 로그인 처리
     processLogin(modifiedStore);
     
@@ -1876,15 +1879,16 @@ function AppContent() {
 
   // 모드 전환 핸들러 (이미 로그인된 상태에서)
   const handleModeSwitch = (selectedMode) => {
-      // console.log('handleModeSwitch 호출됨:', selectedMode);
-  // console.log('현재 loggedInStore:', loggedInStore);
+    console.log('🔍 handleModeSwitch 호출됨:', selectedMode);
+    console.log('🔍 현재 loggedInStore:', loggedInStore);
+    console.log('🔍 loggedInStore.modePermissions:', loggedInStore?.modePermissions);
     
     if (!loggedInStore) {
-          // console.log('loggedInStore가 없어서 모드 전환 불가');
-    return;
-  }
+      console.log('⚠️ loggedInStore가 없어서 모드 전환 불가');
+      return;
+    }
 
-  // console.log('모드 전환 시작:', selectedMode);
+    console.log('✅ 모드 전환 시작:', selectedMode);
     
     // 모든 모드 상태 초기화
     setIsAgentMode(false);
@@ -1994,20 +1998,19 @@ function AppContent() {
         break;
     }
     
+    // 모드 전환 완료 - 팝업 닫기
+    setShowModeSelection(false);
+    
     // 모드 진입 시 업데이트 팝업 표시 (검수모드 제외)
-    // 로그 최소화 (성능 최적화)
-    // console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
+    console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
     setCurrentMode(selectedMode);
     
     // 검수모드는 자체 업데이트 팝업을 사용하므로 App.js에서 표시하지 않음
     if (selectedMode !== 'inspection') {
       setShowAppUpdatePopup(true);
-      // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
-      // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
+      //       console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     }
     
-    // 모드 선택 팝업 닫기
-    setShowModeSelection(false);
     setModeSelectionRequired(false);
     
     // console.log('모드 전환 완료');
