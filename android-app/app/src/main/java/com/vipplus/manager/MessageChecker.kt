@@ -160,32 +160,17 @@ object MessageChecker {
         var errorMessage: String? = null
         
         try {
-            // 긴 메시지 자동 분할 전송
-            val parts = smsManager.divideMessage(reply.reply)
-            
-            if (parts.size == 1) {
-                // 단일 메시지
-                smsManager.sendTextMessage(
-                    reply.sender,
-                    null,
-                    reply.reply,
-                    null,
-                    null
-                )
-                Log.d(TAG, "✅ 자동응답 전송 성공 (단일 메시지)")
-            } else {
-                // 멀티파트 메시지
-                smsManager.sendMultipartTextMessage(
-                    reply.sender,
-                    null,
-                    parts,
-                    null,
-                    null
-                )
-                Log.d(TAG, "✅ 자동응답 전송 성공 (${parts.size}개 파트)")
-            }
+            // 자동응답 전송 (통신사가 자동으로 LMS 처리)
+            smsManager.sendTextMessage(
+                reply.sender,
+                null,
+                reply.reply,
+                null,
+                null
+            )
             
             success = true
+            Log.d(TAG, "✅ 자동응답 전송 성공")
             
         } catch (e: Exception) {
             errorMessage = e.message

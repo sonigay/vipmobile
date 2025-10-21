@@ -1522,6 +1522,12 @@ const SmsManagementMode = ({
             multiline
             rows={4}
             placeholder="안녕하세요! 영업시간은 평일 오전 9시 - 오후 6시입니다."
+            helperText={
+              autoReplyRuleForm.answerTemplate.length > 0 
+                ? `${autoReplyRuleForm.answerTemplate.length}자 ${autoReplyRuleForm.answerTemplate.length > 200 ? '⚠️ 200자 초과 시 분할 전송될 수 있습니다' : ''}`
+                : '답변 템플릿을 입력하세요 (권장: 200자 이내)'
+            }
+            error={autoReplyRuleForm.answerTemplate.length > 200}
             sx={{ mb: 2 }}
           />
           
