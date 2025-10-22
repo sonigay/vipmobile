@@ -122,9 +122,10 @@ const OnSaleReceptionMode = ({
   };
 
   const handleLinkClick = async (link) => {
+    // URL에 업체명 파라미터 추가 (워터마크용)
+    let targetUrl = link.url;
+    
     try {
-      // URL에 업체명 파라미터 추가 (워터마크용)
-      let targetUrl = link.url;
       
       if (loggedInStore && loggedInStore.name) {
         const urlObj = new URL(targetUrl);
