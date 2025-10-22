@@ -3,7 +3,6 @@
   "name": "VIP 필수 확장프로그램",
   "description": "VIP 앱 사용을 위한 필수 확장 프로그램",
   "version": "1.1.0",
-  "_comment_version": "AI가 확장 수정 시마다 자동으로 업데이트: 버그수정(+0.0.1), 기능추가(+0.1.0), 큰변경(+1.0.0)",
   "permissions": [
     "activeTab",
     "scripting",
