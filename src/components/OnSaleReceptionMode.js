@@ -141,10 +141,11 @@ const OnSaleReceptionMode = ({
       let targetUrl = link.url;
       
       if (loggedInStore && loggedInStore.name) {
-        const urlObj = new URL(targetUrl);
-        urlObj.searchParams.set('vipCompany', encodeURIComponent(loggedInStore.name));
-        targetUrl = urlObj.toString();
+        // URL에 vipCompany 파라미터 추가
+        const separator = targetUrl.includes('?') ? '&' : '?';
+        targetUrl = `${targetUrl}${separator}vipCompany=${encodeURIComponent(loggedInStore.name)}`;
         console.log('💾 업체명 URL에 추가:', loggedInStore.name);
+        console.log('🔗 최종 URL:', targetUrl);
       }
       
       // 모든 링크를 직접 새 창에서 열기 (확장 프로그램이 처리)
