@@ -212,12 +212,20 @@ const OnSaleReceptionMode = ({
             p: 3
           }}
         >
-          <Paper sx={{ p: 4, maxWidth: 500, width: '100%', textAlign: 'center' }}>
-            <LockIcon sx={{ fontSize: 60, color: '#667eea', mb: 2 }} />
-            <Typography variant="h5" gutterBottom>
-              온세일접수 모드 접근
+          <Paper sx={{ 
+            p: 4, 
+            maxWidth: 500, 
+            width: '100%', 
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #f8f9ff 0%, #e8eaf6 100%)',
+            border: '1px solid #e1bee7',
+            boxShadow: '0 8px 32px rgba(142, 36, 170, 0.15)'
+          }}>
+            <LockIcon sx={{ fontSize: 60, color: '#8e24aa', mb: 2 }} />
+            <Typography variant="h5" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
+              🔐 온세일접수 모드 접근
             </Typography>
-            <Typography variant="body2" color="textSecondary" paragraph>
+            <Typography variant="body2" sx={{ color: '#8e24aa', mb: 3 }}>
               이 모드에 접근하려면 비밀번호가 필요합니다.
             </Typography>
             <Button
@@ -226,22 +234,41 @@ const OnSaleReceptionMode = ({
               onClick={() => setShowPasswordDialog(true)}
               sx={{ 
                 mt: 2,
-                bgcolor: '#667eea',
-                '&:hover': { bgcolor: '#5a67d8' }
+                background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)',
+                  transform: 'translateY(-2px)'
+                },
+                boxShadow: '0 6px 20px rgba(142, 36, 170, 0.4)',
+                transition: 'all 0.3s ease',
+                px: 4,
+                py: 1.5
               }}
             >
-              비밀번호 입력
+              🔑 비밀번호 입력
             </Button>
           </Paper>
         </Box>
 
         {/* 비밀번호 입력 다이얼로그 */}
-        <Dialog open={showPasswordDialog} onClose={() => setShowPasswordDialog(false)}>
-          <DialogTitle>비밀번호 입력</DialogTitle>
+        <Dialog 
+          open={showPasswordDialog} 
+          onClose={() => setShowPasswordDialog(false)}
+          PaperProps={{
+            sx: {
+              background: 'linear-gradient(135deg, #f8f9ff 0%, #e8eaf6 100%)',
+              border: '1px solid #e1bee7',
+              boxShadow: '0 8px 32px rgba(142, 36, 170, 0.15)'
+            }
+          }}
+        >
+          <DialogTitle sx={{ color: '#5e35b1', fontWeight: 'bold', textAlign: 'center' }}>
+            🔐 비밀번호 입력
+          </DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 1, minWidth: 300 }}>
               {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
+                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
                   {error}
                 </Alert>
               )}
@@ -258,18 +285,35 @@ const OnSaleReceptionMode = ({
                 }}
                 autoFocus
                 disabled={loading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '&:hover fieldset': { borderColor: '#8e24aa' },
+                    '&.Mui-focused fieldset': { borderColor: '#8e24aa' }
+                  },
+                  '& .MuiInputLabel-root.Mui-focused': { color: '#8e24aa' }
+                }}
               />
             </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowPasswordDialog(false)}>
+          <DialogActions sx={{ p: 3, gap: 1 }}>
+            <Button 
+              onClick={() => setShowPasswordDialog(false)}
+              sx={{ color: '#8e24aa' }}
+            >
               취소
             </Button>
             <Button 
               onClick={handlePasswordSubmit}
               variant="contained"
               disabled={loading}
-              sx={{ bgcolor: '#667eea', '&:hover': { bgcolor: '#5a67d8' } }}
+              sx={{ 
+                background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+                },
+                boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)',
+                px: 3
+              }}
             >
               {loading ? <CircularProgress size={24} /> : '확인'}
             </Button>

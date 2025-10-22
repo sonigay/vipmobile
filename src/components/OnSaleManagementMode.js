@@ -299,24 +299,32 @@ const OnSaleManagementMode = ({
         </Box>
 
         {/* 링크 목록 테이블 */}
-        <Paper>
+        <Paper sx={{ 
+          background: 'linear-gradient(135deg, #f8f9ff 0%, #e8eaf6 100%)',
+          border: '1px solid #e1bee7',
+          boxShadow: '0 4px 20px rgba(142, 36, 170, 0.1)',
+          borderRadius: 3
+        }}>
           {loading && links.length === 0 ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
-              <CircularProgress />
+              <CircularProgress sx={{ color: '#8e24aa' }} />
             </Box>
           ) : links.length === 0 ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Typography color="textSecondary">
-                등록된 링크가 없습니다.
+              <Typography sx={{ color: '#8e24aa', fontSize: '1.1rem' }}>
+                📝 등록된 링크가 없습니다.
               </Typography>
             </Box>
           ) : (
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                    <TableCell><strong>버튼명</strong></TableCell>
-                    <TableCell><strong>링크 URL</strong></TableCell>
+                  <TableRow sx={{ 
+                    background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                    '& .MuiTableCell-head': { color: 'white', fontWeight: 'bold' }
+                  }}>
+                    <TableCell><strong>🔗 버튼명</strong></TableCell>
+                    <TableCell><strong>🌐 링크 URL</strong></TableCell>
                     <TableCell align="center"><strong>대리점정보숨김</strong></TableCell>
                     <TableCell align="center"><strong>활성화</strong></TableCell>
                     <TableCell align="center"><strong>작업</strong></TableCell>
