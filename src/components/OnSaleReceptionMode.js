@@ -154,7 +154,7 @@ const OnSaleReceptionMode = ({
       setError('페이지를 불러오는데 실패했습니다.');
       
       // 에러 발생 시 원본 링크로 직접 열기
-      window.open(targetUrl, '_blank');
+      window.open(link.url, '_blank');
     } finally {
       setLoading(false);
     }
