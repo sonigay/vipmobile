@@ -3,6 +3,13 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const statusEl = document.getElementById('protection-status');
   const testBtn = document.getElementById('test-btn');
+  const versionEl = document.querySelector('.version');
+  
+  // 버전 정보 동적으로 표시
+  const manifest = chrome.runtime.getManifest();
+  if (versionEl) {
+    versionEl.textContent = `v${manifest.version}`;
+  }
   
   // 현재 탭 확인
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
