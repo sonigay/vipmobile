@@ -173,8 +173,8 @@ const ActivationInfoPage = () => {
         
         // 2초 후 U+ 페이지로 이동
         setTimeout(() => {
-          const targetUrl = `${urlParams.targetUrl}?vipCompany=${encodeURIComponent(urlParams.vipCompany)}`;
-          window.open(targetUrl, '_blank');
+          // targetUrl에 이미 vipCompany 파라미터가 포함되어 있으므로 그대로 사용
+          window.open(urlParams.targetUrl, '_blank');
         }, 2000);
       } else {
         setError(result.error || '개통정보 저장에 실패했습니다.');

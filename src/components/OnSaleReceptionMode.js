@@ -125,12 +125,19 @@ const OnSaleReceptionMode = ({
     try {
       // 개통양식 사용 여부 확인
       if (link.useActivationForm && link.activationSheetId && link.activationSheetName) {
+        // targetUrl에 vipCompany 파라미터 추가
+        let targetUrl = link.url;
+        if (loggedInStore && loggedInStore.name) {
+          const separator = targetUrl.includes('?') ? '&' : '?';
+          targetUrl = `${targetUrl}${separator}vipCompany=${encodeURIComponent(loggedInStore.name)}`;
+        }
+        
         // 개통정보 입력 페이지로 이동
         const params = new URLSearchParams({
           vipCompany: encodeURIComponent(loggedInStore.name),
           activationSheetId: link.activationSheetId,
           activationSheetName: link.activationSheetName,
-          targetUrl: link.url,
+          targetUrl: targetUrl,
           storeId: loggedInStore.id
         });
         window.location.href = `/?${params.toString()}`;
