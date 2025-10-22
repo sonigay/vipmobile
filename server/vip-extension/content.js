@@ -227,7 +227,7 @@
     
     // URL은 그대로 유지 (기능 유지를 위해 변경하지 않음)
     
-    // 1. 텍스트 패턴 치환
+    // 1. 텍스트 패턴 치환 (보호 로직 적용)
     const textPatterns = [
       // 팝업 문구 전체 교체 (자연스럽게)
       { 
@@ -309,15 +309,7 @@
         console.log(`📍 위치:`, node.parentElement?.tagName, node.parentElement?.className);
       }
       
-      // 기본 패턴 적용
-      textPatterns.forEach(({ pattern, replacement }) => {
-        if (pattern.test(newText)) {
-          console.log(`✅ 패턴 매치:`, pattern, '→', replacement);
-          newText = newText.replace(pattern, replacement);
-        }
-      });
-      
-      // 회사명 교체 (VIP 관련, 접속 사용자 업체명, LG U+ 공식 회사명 제외)
+      // 🛡️ 강력한 보호 로직 - 치환 전에 먼저 확인
       const vipCompany = urlParams.get('vipCompany');
       const isVipRelated = originalText.includes('브이아이피') || originalText.includes('VIP');
       const isUserCompany = vipCompany && originalText.includes(vipCompany);
@@ -331,8 +323,27 @@
         isLgUplus
       });
       
-      if (!isVipRelated && !isUserCompany && !isLgUplus) {
-        // 다른 회사명만 교체
+      // 🚫 보호 대상이면 아예 치환하지 않음
+      if (isVipRelated || isUserCompany || isLgUplus) {
+        if (isUserCompany) {
+          console.log(`🛡️ 사용자 업체명 강력 보호:`, vipCompany, '→ 치환하지 않음');
+        } else if (isLgUplus) {
+          console.log(`🛡️ LG U+ 공식 회사명 강력 보호: → 치환하지 않음`);
+        } else if (isVipRelated) {
+          console.log(`🛡️ VIP 관련 회사명 강력 보호: → 치환하지 않음`);
+        }
+        // 보호 대상이면 아예 치환하지 않음
+        newText = originalText;
+      } else {
+        // 보호 대상이 아닌 경우에만 패턴 치환
+        textPatterns.forEach(({ pattern, replacement }) => {
+          if (pattern.test(newText)) {
+            console.log(`✅ 패턴 매치:`, pattern, '→', replacement);
+            newText = newText.replace(pattern, replacement);
+          }
+        });
+        
+        // 회사명 치환 (보호 대상이 아닌 경우에만)
         const beforeReplace = newText;
         newText = newText.replace(/주식회사\s+[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
         newText = newText.replace(/\(주\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
@@ -342,10 +353,6 @@
         if (beforeReplace !== newText) {
           console.log(`🔄 회사명 치환:`, beforeReplace, '→', newText);
         }
-      } else if (isUserCompany) {
-        console.log(`사용자 업체명 보호:`, vipCompany, '→ 치환하지 않음');
-      } else if (isLgUplus) {
-        console.log(`LG U+ 공식 회사명 보호: → 치환하지 않음`);
       }
       
       if (newText !== originalText) {
@@ -383,21 +390,33 @@
         let newHTML = originalHTML;
         
         
-        // HTML 내에서도 치환
-        textPatterns.forEach(({ pattern, replacement }) => {
-          if (pattern.test(newHTML)) {
-            console.log(`🔧 HTML 패턴 매치 [${selector}]:`, pattern, '→', replacement);
-            newHTML = newHTML.replace(pattern, replacement);
-          }
-        });
-        
-        // 회사명 치환 (VIP 관련, 접속 사용자 업체명, LG U+ 공식 회사명 제외)
+        // 🛡️ 강력한 HTML 보호 로직 - 치환 전에 먼저 확인
         const vipCompany = urlParams.get('vipCompany');
         const isVipRelated = newHTML.includes('브이아이피') || newHTML.includes('VIP');
         const isUserCompany = vipCompany && newHTML.includes(vipCompany);
         const isLgUplus = newHTML.includes('엘지유플러스') || newHTML.includes('LG유플러스') || newHTML.includes('(주)엘지유플러스') || newHTML.includes('유플러스') || newHTML.includes('(주)유플러스');
         
-        if (!isVipRelated && !isUserCompany && !isLgUplus) {
+        // 🚫 보호 대상이면 아예 치환하지 않음
+        if (isVipRelated || isUserCompany || isLgUplus) {
+          if (isUserCompany) {
+            console.log(`🛡️ 사용자 업체명 HTML 강력 보호:`, vipCompany, '→ 치환하지 않음');
+          } else if (isLgUplus) {
+            console.log(`🛡️ LG U+ 공식 회사명 HTML 강력 보호: → 치환하지 않음`);
+          } else if (isVipRelated) {
+            console.log(`🛡️ VIP 관련 회사명 HTML 강력 보호: → 치환하지 않음`);
+          }
+          // 보호 대상이면 아예 치환하지 않음
+          newHTML = originalHTML;
+        } else {
+          // 보호 대상이 아닌 경우에만 패턴 치환
+          textPatterns.forEach(({ pattern, replacement }) => {
+            if (pattern.test(newHTML)) {
+              console.log(`🔧 HTML 패턴 매치 [${selector}]:`, pattern, '→', replacement);
+              newHTML = newHTML.replace(pattern, replacement);
+            }
+          });
+          
+          // 회사명 치환 (보호 대상이 아닌 경우에만)
           const beforeReplace = newHTML;
           newHTML = newHTML.replace(/주식회사\s*에프원/gi, '공식인증대리점');
           newHTML = newHTML.replace(/\(주\)에프원/gi, '공식인증대리점');
@@ -406,10 +425,6 @@
           if (beforeReplace !== newHTML) {
             console.log(`🔧 회사명 HTML 치환 [${selector}]:`, beforeReplace, '→', newHTML);
           }
-        } else if (isUserCompany) {
-          console.log(`사용자 업체명 HTML 보호:`, vipCompany, '→ 치환하지 않음');
-        } else if (isLgUplus) {
-          console.log(`LG U+ 공식 회사명 HTML 보호: → 치환하지 않음`);
         }
         
         if (newHTML !== originalHTML) {
@@ -437,21 +452,33 @@
           
           console.log(`🔍 대리점 input 발견 [${selector}]:`, originalValue);
           
-          // input value에서 치환
-          textPatterns.forEach(({ pattern, replacement }) => {
-            if (pattern.test(newValue)) {
-              console.log(`🔧 대리점 INPUT 패턴 매치:`, pattern, '→', replacement);
-              newValue = newValue.replace(pattern, replacement);
-            }
-          });
-          
-          // 회사명 치환 (VIP 관련, 접속 사용자 업체명, LG U+ 공식 회사명 제외)
+          // 🛡️ 강력한 INPUT 보호 로직 - 치환 전에 먼저 확인
           const vipCompany = urlParams.get('vipCompany');
           const isVipRelated = newValue.includes('브이아이피') || newValue.includes('VIP');
           const isUserCompany = vipCompany && newValue.includes(vipCompany);
           const isLgUplus = newValue.includes('엘지유플러스') || newValue.includes('LG유플러스') || newValue.includes('(주)엘지유플러스') || newValue.includes('유플러스') || newValue.includes('(주)유플러스');
           
-          if (!isVipRelated && !isUserCompany && !isLgUplus) {
+          // 🚫 보호 대상이면 아예 치환하지 않음
+          if (isVipRelated || isUserCompany || isLgUplus) {
+            if (isUserCompany) {
+              console.log(`🛡️ 사용자 업체명 INPUT 강력 보호:`, vipCompany, '→ 치환하지 않음');
+            } else if (isLgUplus) {
+              console.log(`🛡️ LG U+ 공식 회사명 INPUT 강력 보호: → 치환하지 않음`);
+            } else if (isVipRelated) {
+              console.log(`🛡️ VIP 관련 회사명 INPUT 강력 보호: → 치환하지 않음`);
+            }
+            // 보호 대상이면 아예 치환하지 않음
+            newValue = originalValue;
+          } else {
+            // 보호 대상이 아닌 경우에만 패턴 치환
+            textPatterns.forEach(({ pattern, replacement }) => {
+              if (pattern.test(newValue)) {
+                console.log(`🔧 대리점 INPUT 패턴 매치:`, pattern, '→', replacement);
+                newValue = newValue.replace(pattern, replacement);
+              }
+            });
+            
+            // 회사명 치환 (보호 대상이 아닌 경우에만)
             const beforeReplace = newValue;
             newValue = newValue.replace(/주식회사\s*에프원/gi, '공식인증대리점');
             newValue = newValue.replace(/\(주\)에프원/gi, '공식인증대리점');
@@ -460,10 +487,6 @@
             if (beforeReplace !== newValue) {
               console.log(`🔧 에프원 대리점 INPUT 치환:`, beforeReplace, '→', newValue);
             }
-          } else if (isUserCompany) {
-            console.log(`사용자 업체명 INPUT 보호:`, vipCompany, '→ 치환하지 않음');
-          } else if (isLgUplus) {
-            console.log(`LG U+ 공식 회사명 INPUT 보호: → 치환하지 않음`);
           }
           
           if (newValue !== originalValue) {
