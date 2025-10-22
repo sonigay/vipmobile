@@ -7,6 +7,7 @@
 // v1.1.1 - 버그 수정: 인디케이터 사라짐 수정, U+ 색상 수정, 콘솔 로그 제거
 // v1.1.2 - 인디케이터 영구 수정: MutationObserver 밖으로 이동, !important 추가
 // v1.2.0 - 워터마크 개선: localStorage → URL 파라미터로 변경 (도메인 간 전달)
+// v1.2.1 - 버그 수정: 요소 숨김 로직에서 인디케이터 제외, document.body 대기 추가
 //
 // 버전 관리 규칙 (AI 자동 업데이트):
 // - 버그 수정: patch 버전 증가 (예: 1.1.0 → 1.1.1)
@@ -20,9 +21,9 @@
 
   // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
-  window.VIP_EXTENSION_VERSION = '1.2.0'; // 버전 정보 노출
+  window.VIP_EXTENSION_VERSION = '1.2.1'; // 버전 정보 노출
   document.documentElement.setAttribute('data-vip-extension', 'installed');
-  document.documentElement.setAttribute('data-vip-extension-version', '1.2.0');
+  document.documentElement.setAttribute('data-vip-extension-version', '1.2.1');
 
   // 메타 태그도 추가 (추가 감지 방법)
   const metaTag = document.createElement('meta');
@@ -40,8 +41,16 @@
 
   // 인디케이터 & 워터마크는 한 번만 생성 (MutationObserver 밖)
   function createIndicatorAndWatermark() {
+    // document.body가 없으면 대기
+    if (!document.body) {
+      console.log('⚠️ document.body 대기 중...');
+      setTimeout(createIndicatorAndWatermark, 100);
+      return;
+    }
+    
     // 1. 회사명 인디케이터 표시 (우측 상단)
     if (!document.getElementById('vip-company-indicator')) {
+      console.log('🔨 인디케이터 생성 시작');
       const indicator = document.createElement('div');
       indicator.id = 'vip-company-indicator';
       indicator.className = 'vip-permanent-element'; // 보호용 클래스
@@ -59,10 +68,14 @@
         box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
         font-family: Arial, sans-serif !important;
         font-weight: 500 !important;
+        display: block !important;
+        visibility: visible !important;
       `;
       indicator.textContent = '(주)브이아이피플러스';
       document.body.appendChild(indicator);
-      console.log('📌 회사명 인디케이터 생성 (계속 표시)');
+      console.log('📌 회사명 인디케이터 생성 완료, DOM 확인:', document.getElementById('vip-company-indicator'));
+    } else {
+      console.log('✅ 인디케이터 이미 존재');
     }
     
     // 2. 워터마크 표시 (대각선, 전체 화면)
@@ -201,6 +214,15 @@
     
     // 3. 특정 요소 숨김 (display: none) - 제거하면 페이지가 깨질 수 있음
     document.querySelectorAll('div, p, span, td, th, li').forEach(element => {
+      // VIP 영구 요소는 건너뛰기
+      if (element.id === 'vip-company-indicator' || 
+          element.id === 'vip-watermark-container' ||
+          element.className === 'vip-permanent-element' ||
+          element.closest('#vip-company-indicator') ||
+          element.closest('#vip-watermark-container')) {
+        return; // 건너뛰기
+      }
+      
       const text = element.textContent || '';
       
       // 대리점 정보만 포함하고 다른 중요 정보가 없는 작은 요소만 숨김
