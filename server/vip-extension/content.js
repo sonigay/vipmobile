@@ -117,14 +117,12 @@
     
     // 2. 워터마크 표시 (대각선, 전체 화면)
     if (!document.getElementById('vip-watermark-container')) {
-      // chrome.storage에서 업체명 가져오기 (도메인 간 공유)
-      console.log('🔍 chrome.storage.local에서 업체명 조회 시작');
-      chrome.storage.local.get(['vipCompanyName'], (result) => {
-        console.log('📦 chrome.storage.local 조회 결과:', result);
-        const companyName = result.vipCompanyName;
-        
-        if (companyName) {
-          console.log('✅ chrome.storage에서 업체명 확인:', companyName);
+      // URL 파라미터에서 업체명 가져오기
+      const urlParams = new URLSearchParams(window.location.search);
+      const companyName = urlParams.get('vipCompany');
+      
+      if (companyName) {
+        console.log('✅ URL 파라미터에서 업체명 확인:', decodeURIComponent(companyName));
         const watermarkContainer = document.createElement('div');
         watermarkContainer.id = 'vip-watermark-container';
         watermarkContainer.className = 'vip-permanent-element'; // 보호용 클래스
@@ -155,16 +153,15 @@
             font-family: Arial, sans-serif;
             user-select: none;
           `;
-          watermark.textContent = companyName;
+          watermark.textContent = decodeURIComponent(companyName);
           watermarkContainer.appendChild(watermark);
         }
         
-          document.body.appendChild(watermarkContainer);
-          console.log('💧 워터마크 생성:', companyName);
-        } else {
-          console.log('⚠️ chrome.storage에 업체명 없음');
-        }
-      });
+        document.body.appendChild(watermarkContainer);
+        console.log('💧 워터마크 생성:', decodeURIComponent(companyName));
+      } else {
+        console.log('⚠️ URL에 업체명 파라미터 없음');
+      }
     }
   }
 
