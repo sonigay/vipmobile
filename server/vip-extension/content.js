@@ -226,6 +226,15 @@
         pattern: /주식회사\s+[^브이아이피][^\s]*/gi, 
         replacement: '공식인증대리점' 
       },
+      // 더 포괄적인 회사명 패턴
+      { 
+        pattern: /주식회사\s+에프원/gi, 
+        replacement: '공식인증대리점' 
+      },
+      { 
+        pattern: /\(주\)에프원/gi, 
+        replacement: '공식인증대리점' 
+      },
       { 
         pattern: /\(유\)[^)]*/gi, 
         replacement: '공식인증대리점' 

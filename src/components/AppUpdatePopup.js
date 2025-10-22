@@ -38,16 +38,16 @@ import {
   addNewUpdate 
 } from '../utils/appUpdateService';
 
-// 모드별 색상 설정
+// U+ 브랜드 색상 설정
 const MODE_COLORS = {
-  'general': '#757575',    // 회색
-  'agent': '#1976d2',      // 파란색
-  'inventory': '#2e7d32',  // 초록색
-  'settlement': '#d32f2f', // 빨간색
-  'inspection': '#7b1fa2', // 보라색
-  'policy': '#00bcd4',     // 청록색
-  'meeting': '#667eea',    // 보라파란색
-  'reservation': '#ff9a9e', // 핑크색
+  'general': '#8e24aa',    // U+ 보라색
+  'agent': '#5e35b1',      // U+ 진한 보라색
+  'inventory': '#7b1fa2',  // U+ 중간 보라색
+  'settlement': '#9c27b0', // U+ 밝은 보라색
+  'inspection': '#673ab7', // U+ 어두운 보라색
+  'policy': '#8e24aa',     // U+ 보라색
+  'meeting': '#667eea',    // U+ 그라데이션 보라색
+  'reservation': '#764ba2', // U+ 그라데이션 보라색
   'chart': '#ff9800',      // 주황색
   'budget': '#795548',     // 갈색 (예산모드)
   'sales': '#e91e63',      // 핑크색 (영업모드)

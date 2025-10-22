@@ -192,7 +192,11 @@ const OnSaleManagementMode = ({
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       {/* 헤더 */}
-      <AppBar position="static" sx={{ bgcolor: '#667eea' }}>
+      <AppBar position="static" sx={{ 
+        bgcolor: 'transparent',
+        background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+      }}>
         <Toolbar>
           <LinkIcon sx={{ mr: 2 }} />
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -281,7 +285,13 @@ const OnSaleManagementMode = ({
               startIcon={<AddIcon />}
               onClick={handleAddLink}
               disabled={loading}
-              sx={{ bgcolor: '#667eea', '&:hover': { bgcolor: '#5a67d8' } }}
+              sx={{ 
+                background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+                },
+                boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
+              }}
             >
               링크 추가
             </Button>
@@ -431,7 +441,13 @@ const OnSaleManagementMode = ({
             onClick={handleSaveLink} 
             variant="contained"
             disabled={loading}
-            sx={{ bgcolor: '#5E35B1', '&:hover': { bgcolor: '#4527A0' } }}
+            sx={{ 
+              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+              '&:hover': { 
+                background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+              },
+              boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
+            }}
           >
             {loading ? <CircularProgress size={24} /> : '저장'}
           </Button>

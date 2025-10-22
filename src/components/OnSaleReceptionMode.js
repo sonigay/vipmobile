@@ -158,7 +158,11 @@ const OnSaleReceptionMode = ({
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
         {/* 헤더 */}
-        <AppBar position="static" sx={{ bgcolor: '#667eea' }}>
+        <AppBar position="static" sx={{ 
+          bgcolor: 'transparent',
+          background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        }}>
           <Toolbar>
             <LockIcon sx={{ mr: 2 }} />
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -280,7 +284,11 @@ const OnSaleReceptionMode = ({
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
         {/* 프록시 페이지 헤더 */}
-        <AppBar position="static" sx={{ bgcolor: '#667eea' }}>
+        <AppBar position="static" sx={{ 
+          bgcolor: 'transparent',
+          background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        }}>
           <Toolbar>
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
               {currentLink?.buttonName}
@@ -315,7 +323,11 @@ const OnSaleReceptionMode = ({
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       {/* 헤더 */}
-      <AppBar position="static" sx={{ bgcolor: '#667eea' }}>
+      <AppBar position="static" sx={{ 
+          bgcolor: 'transparent',
+          background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+        }}>
         <Toolbar>
           <LinkIcon sx={{ mr: 2 }} />
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -394,12 +406,21 @@ const OnSaleReceptionMode = ({
           <Grid container spacing={3}>
             {activeLinks.map((link, index) => (
               <Grid item xs={12} sm={6} md={4} key={index}>
-                <Card>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, #f8f9ff 0%, #e8eaf6 100%)',
+                  border: '1px solid #e1bee7',
+                  boxShadow: '0 4px 20px rgba(142, 36, 170, 0.1)',
+                  '&:hover': { 
+                    boxShadow: '0 8px 30px rgba(142, 36, 170, 0.2)',
+                    transform: 'translateY(-2px)'
+                  },
+                  transition: 'all 0.3s ease'
+                }}>
                   <CardContent>
-                    <Typography variant="h6" gutterBottom>
+                    <Typography variant="h6" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
                       {link.buttonName}
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography variant="body2" sx={{ color: '#8e24aa' }}>
                       {link.hideAgentInfo ? '(대리점 정보 보호)' : '(일반 링크)'}
                     </Typography>
                   </CardContent>
@@ -411,8 +432,13 @@ const OnSaleReceptionMode = ({
                       onClick={() => handleLinkClick(link)}
                       disabled={loading}
                       sx={{ 
-                        bgcolor: '#667eea',
-                        '&:hover': { bgcolor: '#5a67d8' }
+                        background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                        '&:hover': { 
+                          background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)',
+                          transform: 'translateY(-1px)'
+                        },
+                        boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)',
+                        transition: 'all 0.3s ease'
                       }}
                     >
                       가입 신청하기
