@@ -57,6 +57,12 @@
     let node;
     
     while (node = walker.nextNode()) {
+      // 인디케이터 내부 텍스트는 건너뛰기
+      const parentElement = node.parentElement;
+      if (parentElement && parentElement.id === 'vip-company-indicator') {
+        continue;
+      }
+      
       const originalText = node.textContent;
       let newText = originalText;
       
@@ -106,7 +112,7 @@
       }
     });
     
-    // 4. 회사명 표시 (계속 떠있음, 깜빡이지 않음)
+    // 4. 회사명 인디케이터 표시 (우측 상단)
     if (!document.getElementById('vip-company-indicator')) {
       const indicator = document.createElement('div');
       indicator.id = 'vip-company-indicator';
@@ -128,6 +134,48 @@
       indicator.textContent = '(주)브이아이피플러스';
       document.body.appendChild(indicator);
       console.log('📌 회사명 인디케이터 생성 (계속 표시)');
+    }
+    
+    // 5. 워터마크 표시 (대각선, 전체 화면)
+    if (!document.getElementById('vip-watermark-container')) {
+      const companyName = localStorage.getItem('vip_company_name');
+      if (companyName) {
+        const watermarkContainer = document.createElement('div');
+        watermarkContainer.id = 'vip-watermark-container';
+        watermarkContainer.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 999998;
+          overflow: hidden;
+        `;
+        
+        // 대각선으로 여러 개 생성
+        for (let i = 0; i < 15; i++) {
+          const watermark = document.createElement('div');
+          watermark.style.cssText = `
+            position: absolute;
+            top: ${i * 15}%;
+            left: -20%;
+            width: 140%;
+            text-align: center;
+            transform: rotate(-45deg);
+            font-size: 48px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.08);
+            font-family: Arial, sans-serif;
+            user-select: none;
+          `;
+          watermark.textContent = companyName;
+          watermarkContainer.appendChild(watermark);
+        }
+        
+        document.body.appendChild(watermarkContainer);
+        console.log('💧 워터마크 생성:', companyName);
+      }
     }
     
     if (modified) {

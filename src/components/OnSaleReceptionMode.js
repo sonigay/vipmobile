@@ -123,6 +123,12 @@ const OnSaleReceptionMode = ({
 
   const handleLinkClick = async (link) => {
     try {
+      // localStorage에 업체명 저장 (워터마크용)
+      if (loggedInStore && loggedInStore.name) {
+        localStorage.setItem('vip_company_name', loggedInStore.name);
+        console.log('💾 업체명 저장:', loggedInStore.name);
+      }
+      
       if (link.hideAgentInfo) {
         // 프록시 사용
         setLoading(true);
