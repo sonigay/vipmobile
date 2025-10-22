@@ -30,6 +30,15 @@ import {
   Phone as PhoneIcon
 } from '@mui/icons-material';
 
+// 색상 조정 함수
+const adjustColor = (color, amount) => {
+  const num = parseInt(color.replace("#", ""), 16);
+  const r = Math.max(0, Math.min(255, ((num >> 16) & 0xFF) + amount));
+  const g = Math.max(0, Math.min(255, ((num >> 8) & 0xFF) + amount));
+  const b = Math.max(0, Math.min(255, (num & 0xFF) + amount));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+};
+
 const ModeSelectionPopup = ({ 
   open, 
   onClose, 
@@ -43,8 +52,8 @@ const ModeSelectionPopup = ({
     agent: {
       title: '관리자 모드',
       description: '담당 매장들의 재고 현황 관리 및 개통실적 확인',
-      icon: <BusinessIcon sx={{ fontSize: 40, color: '#1976d2' }} />,
-      color: '#1976d2',
+      icon: <BusinessIcon sx={{ fontSize: 40, color: '#8e24aa' }} />,
+      color: '#8e24aa',
       features: [
         '담당 매장 재고 현황',
         '개통실적 확인 및 분석',
@@ -209,15 +218,15 @@ const ModeSelectionPopup = ({
       ]
     },
     onSaleManagement: {
-      title: '온세일관리 모드',
-      description: '온세일 가입 링크 관리 시스템',
-      icon: <PhoneIcon sx={{ fontSize: 40, color: '#667eea' }} />,
-      color: '#667eea',
+      title: '⚙️ 온세일관리 모드',
+      description: 'U+ 온라인 가입 링크 관리 및 보안 설정',
+      icon: <PhoneIcon sx={{ fontSize: 40, color: '#5e35b1' }} />,
+      color: '#5e35b1',
       features: [
-        '가입 링크 등록/수정',
-        '대리점 정보 숨김 설정',
-        '링크 활성화 관리',
-        '접근 권한 제어'
+        '🔗 가입 링크 등록/수정',
+        '🛡️ 대리점 정보 보호 설정',
+        '✅ 링크 활성화 관리',
+        '🔐 접근 권한 제어'
       ]
     },
     basicMode: {
@@ -233,15 +242,15 @@ const ModeSelectionPopup = ({
       ]
     },
     onSaleReception: {
-      title: '온세일접수 모드',
-      description: '온세일 가입 신청 접수',
-      icon: <PhoneIcon sx={{ fontSize: 40, color: '#667eea' }} />,
-      color: '#667eea',
+      title: '📱 온세일접수 모드',
+      description: 'U+ 온라인 가입 링크 접수 및 대리점 정보 보호',
+      icon: <PhoneIcon sx={{ fontSize: 40, color: '#8e24aa' }} />,
+      color: '#8e24aa',
       features: [
-        '온세일 가입 링크 접근',
-        '대리점 정보 보호',
-        '비밀번호 기반 인증',
-        '안전한 가입 접수'
+        '🔗 U+ 온라인 가입 링크 접근',
+        '🛡️ 대리점 정보 보호',
+        '🔐 비밀번호 기반 인증',
+        '✅ 안전한 가입 접수'
       ]
     }
   };
@@ -306,6 +315,11 @@ const ModeSelectionPopup = ({
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
                     border: '2px solid transparent',
+                    background: mode === 'onSaleReception' 
+                      ? 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)'
+                      : mode === 'onSaleManagement'
+                      ? 'linear-gradient(135deg, #5e35b1 0%, #4a2c7a 100%)'
+                      : `linear-gradient(135deg, ${config.color} 0%, ${adjustColor(config.color, -20)} 100%)`,
                     '&:hover': {
                       transform: 'translateY(-8px)',
                       boxShadow: '0 12px 40px rgba(0,0,0,0.15)',

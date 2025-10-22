@@ -122,10 +122,23 @@ const OnSaleReceptionMode = ({
   };
 
   const handleLinkClick = async (link) => {
-    // URL에 업체명 파라미터 추가 (워터마크용)
-    let targetUrl = link.url;
-    
     try {
+      // 개통양식 사용 여부 확인
+      if (link.useActivationForm && link.activationSheetId && link.activationSheetName) {
+        // 개통정보 입력 페이지로 이동
+        const params = new URLSearchParams({
+          vipCompany: encodeURIComponent(loggedInStore.name),
+          activationSheetId: link.activationSheetId,
+          activationSheetName: link.activationSheetName,
+          targetUrl: link.url,
+          storeId: loggedInStore.id
+        });
+        window.location.href = `/?${params.toString()}`;
+        return;
+      }
+      
+      // 개통양식 사용하지 않는 경우: 기존 로직 (U+ 페이지로 바로 이동)
+      let targetUrl = link.url;
       
       if (loggedInStore && loggedInStore.name) {
         const urlObj = new URL(targetUrl);
@@ -432,8 +445,19 @@ const OnSaleReceptionMode = ({
           </Alert>
         )}
 
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-          가입 신청 링크
+        <Typography 
+          variant="h5" 
+          sx={{ 
+            fontWeight: 'bold',
+            background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
+            mb: 3
+          }}
+        >
+          🔗 가입 신청 링크
         </Typography>
 
         {loading && activeLinks.length === 0 ? (

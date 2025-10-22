@@ -6446,7 +6446,7 @@ app.get('/api/onsale/links', async (req, res) => {
     console.log('📋 [온세일] 전체 링크 목록 조회 시작');
     
     const sheetName = '온세일링크관리';
-    const range = 'A:D'; // A~D열: 링크URL, 버튼명, 대리점정보숨김, 활성화여부
+    const range = 'A:G'; // A~G열: 링크URL, 버튼명, 대리점정보숨김, 활성화여부, 개통양식사용여부, 개통양식시트ID, 개통양식시트이름
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -6465,7 +6465,10 @@ app.get('/api/onsale/links', async (req, res) => {
       url: row[0] || '',
       buttonName: row[1] || '',
       hideAgentInfo: row[2] === 'O',
-      isActive: row[3] === 'O'
+      isActive: row[3] === 'O',
+      useActivationForm: row[4] === 'O',
+      activationSheetId: row[5] || '',
+      activationSheetName: row[6] || ''
     }));
     
     console.log(`✅ [온세일] 링크 조회 완료: ${links.length}개`);
@@ -6487,7 +6490,7 @@ app.get('/api/onsale/active-links', async (req, res) => {
     console.log('📋 [온세일] 활성화 링크 목록 조회 시작');
     
     const sheetName = '온세일링크관리';
-    const range = 'A:D';
+    const range = 'A:G';
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -6505,7 +6508,10 @@ app.get('/api/onsale/active-links', async (req, res) => {
       .map(row => ({
         url: row[0] || '',
         buttonName: row[1] || '',
-        hideAgentInfo: row[2] === 'O'
+        hideAgentInfo: row[2] === 'O',
+        useActivationForm: row[4] === 'O',
+        activationSheetId: row[5] || '',
+        activationSheetName: row[6] || ''
       }));
     
     console.log(`✅ [온세일] 활성화 링크 조회 완료: ${activeLinks.length}개`);
@@ -6525,7 +6531,7 @@ app.get('/api/onsale/active-links', async (req, res) => {
 app.post('/api/onsale/links', async (req, res) => {
   try {
     console.log('➕ [온세일] 새 링크 추가 시작');
-    const { url, buttonName, hideAgentInfo, isActive } = req.body;
+    const { url, buttonName, hideAgentInfo, isActive, useActivationForm, activationSheetId, activationSheetName } = req.body;
     
     if (!url || !buttonName) {
       return res.status(400).json({ 
@@ -6539,12 +6545,15 @@ app.post('/api/onsale/links', async (req, res) => {
       url,
       buttonName,
       hideAgentInfo ? 'O' : 'X',
-      isActive ? 'O' : 'X'
+      isActive ? 'O' : 'X',
+      useActivationForm ? 'O' : 'X',
+      activationSheetId || '',
+      activationSheetName || ''
     ];
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:D`,
+      range: `${sheetName}!A:G`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [newRow]
@@ -6568,7 +6577,7 @@ app.post('/api/onsale/links', async (req, res) => {
 app.put('/api/onsale/links/:rowIndex', async (req, res) => {
   try {
     const { rowIndex } = req.params;
-    const { url, buttonName, hideAgentInfo, isActive } = req.body;
+    const { url, buttonName, hideAgentInfo, isActive, useActivationForm, activationSheetId, activationSheetName } = req.body;
     
     console.log(`✏️ [온세일] 링크 수정 시작: 행 ${rowIndex}`);
     
@@ -6584,12 +6593,15 @@ app.put('/api/onsale/links/:rowIndex', async (req, res) => {
       url,
       buttonName,
       hideAgentInfo ? 'O' : 'X',
-      isActive ? 'O' : 'X'
+      isActive ? 'O' : 'X',
+      useActivationForm ? 'O' : 'X',
+      activationSheetId || '',
+      activationSheetName || ''
     ];
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A${rowIndex}:D${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:G${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [updatedRow]
@@ -6622,10 +6634,10 @@ app.delete('/api/onsale/links/:rowIndex', async (req, res) => {
     // 또는 활성화여부를 'X'로 변경
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A${rowIndex}:D${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:G${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [['', '', '', '']]
+        values: [['', '', '', '', '', '', '']]
       }
     });
     
@@ -6637,6 +6649,222 @@ app.delete('/api/onsale/links/:rowIndex', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: '링크 삭제에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// ==================== 개통정보 저장 API ====================
+
+// 개통정보 저장 API
+app.post('/api/onsale/activation-info', async (req, res) => {
+  try {
+    console.log('📝 [개통정보] 개통정보 저장 시작');
+    const { sheetId, sheetName, data } = req.body;
+    
+    if (!sheetId || !sheetName || !data) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '시트 ID, 시트 이름, 데이터는 필수입니다.' 
+      });
+    }
+    
+    // Google Sheets API로 스프레드시트 접근
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId
+    });
+    
+    // 시트 찾기 또는 생성
+    let targetSheet = spreadsheet.data.sheets.find(sheet => sheet.properties.title === sheetName);
+    if (!targetSheet) {
+      console.log(`📄 [개통정보] 시트 생성: ${sheetName}`);
+      const newSheet = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }]
+        }
+      });
+      targetSheet = newSheet.data.replies[0].addSheet;
+    }
+    
+    // 시트 데이터 확인
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!C1:Z1`
+    });
+    
+    const existingHeaders = sheetData.data.values?.[0] || [];
+    
+    // 헤더가 없으면 생성
+    if (existingHeaders.length === 0) {
+      console.log('📋 [개통정보] 헤더 생성');
+      const headers = [
+        '제출일시', '매장명', 'P코드', '개통유형', '전통신사', '고객명', '생년월일', '개통번호',
+        '모델명', '기기일련번호', '색상', '유심모델', '유심일련번호', '약정유형', '전환지원금', '유통망추가지원금',
+        '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항'
+      ];
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${sheetName}!C1:AA1`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [headers]
+        }
+      });
+    }
+    
+    // 데이터 준비
+    const timestamp = new Date().toLocaleString('ko-KR');
+    const rowData = [
+      timestamp,
+      data.storeName || '',
+      data.pCode || '',
+      data.activationType || '',
+      data.previousCarrier || '',
+      data.customerName || '',
+      data.birthDate || '',
+      data.phoneNumber || '',
+      data.modelName || '',
+      data.deviceSerial || '',
+      data.color || '',
+      data.simModel || '',
+      data.simSerial || '',
+      data.contractType || '',
+      data.conversionSubsidy || '',
+      data.additionalSubsidy || '',
+      data.installmentMonths || '',
+      data.installmentAmount || '',
+      data.free || '',
+      data.plan || '',
+      Array.isArray(data.mediaServices) ? data.mediaServices.join(', ') : (data.mediaServices || ''),
+      data.additionalServices || '',
+      data.premierContract || '',
+      data.reservationNumber || '',
+      data.otherRequests || ''
+    ];
+    
+    // 데이터 추가 (C열부터)
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!C:G`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [rowData]
+      }
+    });
+    
+    console.log('✅ [개통정보] 개통정보 저장 완료');
+    res.json({ success: true, message: '개통정보가 저장되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [개통정보] 개통정보 저장 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '개통정보 저장에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// U+ 제출 데이터 저장 API
+app.post('/api/onsale/uplus-submission', async (req, res) => {
+  try {
+    console.log('📤 [U+제출] U+ 제출 데이터 저장 시작');
+    const { sheetId, sheetName, phoneNumber, data } = req.body;
+    
+    if (!sheetId || !sheetName || !data) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '시트 ID, 시트 이름, 데이터는 필수입니다.' 
+      });
+    }
+    
+    // Google Sheets API로 스프레드시트 접근
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId
+    });
+    
+    // 시트 찾기
+    const targetSheet = spreadsheet.data.sheets.find(sheet => sheet.properties.title === sheetName);
+    if (!targetSheet) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '시트를 찾을 수 없습니다.' 
+      });
+    }
+    
+    // 전화번호로 개통양식 데이터 행 찾기 (최근 1시간 이내)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toLocaleString('ko-KR');
+    const searchRange = `${sheetName}!C:G`;
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: searchRange
+    });
+    
+    const rows = sheetData.data.values || [];
+    let targetRowIndex = -1;
+    
+    // 전화번호로 매칭되는 행 찾기
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[7] === phoneNumber) { // 개통번호 컬럼 (8번째, 0-based)
+        targetRowIndex = i + 1; // 1-based 인덱스
+        break;
+      }
+    }
+    
+    if (targetRowIndex === -1) {
+      // 매칭되는 행이 없으면 새 행에 AA열부터 저장
+      console.log('📝 [U+제출] 매칭되는 개통양식 없음, 새 행에 저장');
+      const timestamp = new Date().toLocaleString('ko-KR');
+      const newRowData = [
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // C~Z열 빈 값
+        timestamp, // AA열: 제출일시
+        JSON.stringify(data) // AB열: U+ 제출 데이터 (JSON)
+      ];
+      
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: `${sheetName}!C:AB`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [newRowData]
+        }
+      });
+    } else {
+      // 매칭되는 행이 있으면 AA열부터 U+ 데이터 저장
+      console.log(`📝 [U+제출] 매칭되는 개통양식 발견, 행 ${targetRowIndex}에 U+ 데이터 추가`);
+      const timestamp = new Date().toLocaleString('ko-KR');
+      const uplusData = [
+        timestamp, // AA열: 제출일시
+        JSON.stringify(data) // AB열: U+ 제출 데이터 (JSON)
+      ];
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${sheetName}!AA${targetRowIndex}:AB${targetRowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [uplusData]
+        }
+      });
+    }
+    
+    console.log('✅ [U+제출] U+ 제출 데이터 저장 완료');
+    res.json({ success: true, message: 'U+ 제출 데이터가 저장되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [U+제출] U+ 제출 데이터 저장 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'U+ 제출 데이터 저장에 실패했습니다.',
       message: error.message 
     });
   }

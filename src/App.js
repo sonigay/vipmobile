@@ -13,6 +13,7 @@ import SmsManagementMode from './components/SmsManagementMode';
 import ObManagementMode from './components/ObManagementMode';
 import OnSaleManagementMode from './components/OnSaleManagementMode';
 import OnSaleReceptionMode from './components/OnSaleReceptionMode';
+import ActivationInfoPage from './components/ActivationInfoPage';
 import Header from './components/Header';
 // 배정 관련 Screen import 제거 (재고 모드로 이동)
 import { fetchData, fetchModels, cacheManager } from './api';
@@ -2636,6 +2637,19 @@ ${requestList}
       loadNotifications();
     }
   }, [isAgentMode, loggedInStore, loadNotifications]);
+
+  // 개통정보 페이지 라우팅 (로그인 상태와 무관하게 URL 파라미터로 접근)
+  const urlParams = new URLSearchParams(window.location.search);
+  const showActivationPage = urlParams.get('activationSheetId');
+  
+  if (showActivationPage) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ActivationInfoPage />
+      </ThemeProvider>
+    );
+  }
 
   if (!isLoggedIn) {
     return (

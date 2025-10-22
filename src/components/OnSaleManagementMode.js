@@ -55,7 +55,10 @@ const OnSaleManagementMode = ({
     url: '',
     buttonName: '',
     hideAgentInfo: false,
-    isActive: true
+    isActive: true,
+    useActivationForm: false,
+    activationSheetId: '',
+    activationSheetName: ''
   });
   
   const API_URL = process.env.REACT_APP_API_URL;
@@ -96,7 +99,10 @@ const OnSaleManagementMode = ({
       url: '',
       buttonName: '',
       hideAgentInfo: false,
-      isActive: true
+      isActive: true,
+      useActivationForm: false,
+      activationSheetId: '',
+      activationSheetName: ''
     });
     setShowLinkDialog(true);
   };
@@ -107,7 +113,10 @@ const OnSaleManagementMode = ({
       url: link.url,
       buttonName: link.buttonName,
       hideAgentInfo: link.hideAgentInfo,
-      isActive: link.isActive
+      isActive: link.isActive,
+      useActivationForm: link.useActivationForm || false,
+      activationSheetId: link.activationSheetId || '',
+      activationSheetName: link.activationSheetName || ''
     });
     setShowLinkDialog(true);
   };
@@ -117,6 +126,12 @@ const OnSaleManagementMode = ({
       // 유효성 검사
       if (!linkForm.url || !linkForm.buttonName) {
         setError('URL과 버튼명은 필수입니다.');
+        return;
+      }
+      
+      // 개통양식 사용 시 시트 정보 필수
+      if (linkForm.useActivationForm && (!linkForm.activationSheetId || !linkForm.activationSheetName)) {
+        setError('개통양식을 사용할 경우 시트 ID와 시트 이름을 모두 입력해주세요.');
         return;
       }
 
@@ -267,8 +282,19 @@ const OnSaleManagementMode = ({
 
         {/* 상단 액션 바 */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            온세일 링크 관리
+          <Typography 
+            variant="h5" 
+            sx={{ 
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
+              mb: 3
+            }}
+          >
+            📱 온세일 링크 관리
           </Typography>
           <Box>
             <Button
@@ -326,6 +352,7 @@ const OnSaleManagementMode = ({
                     <TableCell><strong>🔗 버튼명</strong></TableCell>
                     <TableCell><strong>🌐 링크 URL</strong></TableCell>
                     <TableCell align="center"><strong>대리점정보숨김</strong></TableCell>
+                    <TableCell align="center"><strong>개통양식</strong></TableCell>
                     <TableCell align="center"><strong>활성화</strong></TableCell>
                     <TableCell align="center"><strong>작업</strong></TableCell>
                   </TableRow>
@@ -351,6 +378,13 @@ const OnSaleManagementMode = ({
                         <Chip 
                           label={link.hideAgentInfo ? 'O' : 'X'} 
                           color={link.hideAgentInfo ? 'primary' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={link.useActivationForm ? '사용' : '미사용'} 
+                          color={link.useActivationForm ? 'secondary' : 'default'}
                           size="small"
                         />
                       </TableCell>
@@ -437,8 +471,43 @@ const OnSaleManagementMode = ({
                 />
               }
               label="활성화 (일반모드에 표시)"
-              sx={{ mt: 2 }}
+              sx={{ mt: 2, mb: 2 }}
             />
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={linkForm.useActivationForm}
+                  onChange={(e) => setLinkForm({ ...linkForm, useActivationForm: e.target.checked })}
+                />
+              }
+              label="개통양식 사용"
+              sx={{ mt: 2, mb: 1 }}
+            />
+            
+            {linkForm.useActivationForm && (
+              <>
+                <TextField
+                  fullWidth
+                  label="개통양식 시트 ID"
+                  value={linkForm.activationSheetId}
+                  onChange={(e) => setLinkForm({ ...linkForm, activationSheetId: e.target.value })}
+                  margin="normal"
+                  placeholder="1BxiM5m0e..."
+                  helperText="구글 스프레드시트의 ID (URL에서 확인 가능)"
+                />
+                
+                <TextField
+                  fullWidth
+                  label="개통양식 시트 이름"
+                  value={linkForm.activationSheetName}
+                  onChange={(e) => setLinkForm({ ...linkForm, activationSheetName: e.target.value })}
+                  margin="normal"
+                  placeholder="개통정보_2024"
+                  helperText="개통정보가 저장될 시트의 이름"
+                />
+              </>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>

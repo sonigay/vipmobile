@@ -22,6 +22,12 @@
   const urlParams = new URLSearchParams(window.location.search);
   const vipCompany = urlParams.get('vipCompany');
   
+  // 개통정보 페이지 감지
+  const isActivationInfoPage = 
+    (window.location.hostname.includes('vipmobile.netlify.app') || 
+     window.location.hostname.includes('localhost')) &&
+    urlParams.get('activationSheetId');
+  
   let isVipAppAccess = false;
   if (vipCompany) {
     console.log('✅ VIP 앱에서 온 접속 확인:', decodeURIComponent(vipCompany));
@@ -91,6 +97,11 @@
     // VIP 앱에서 온 접속이 아니면 기능 비활성화
     if (!isVipAppAccess) {
       return;
+    }
+    
+    // 개통정보 페이지에서는 회사명 치환/숨김 비활성화
+    if (isActivationInfoPage) {
+      console.log('📝 개통정보 페이지: 워터마크만 표시, 회사명 치환 비활성화');
     }
     
     // document.body가 없으면 대기
@@ -204,6 +215,12 @@
   function hideAgentInfo() {
     // VIP 앱에서 온 접속이 아니면 기능 비활성화
     if (!isVipAppAccess) {
+      return;
+    }
+    
+    // 개통정보 페이지에서는 회사명 치환/숨김 비활성화
+    if (isActivationInfoPage) {
+      console.log('📝 개통정보 페이지: 회사명 치환/숨김 비활성화');
       return;
     }
     let modified = false;
@@ -476,6 +493,86 @@
     subtree: true,
     characterData: true
   });
+
+  // U+ 제출 데이터 수집 기능
+  function collectUplusSubmissionData() {
+    // U+ 페이지에서만 실행
+    if (!window.location.hostname.includes('onsalemobile.uplus.co.kr')) {
+      return;
+    }
+    
+    // vipCompany 파라미터로 VIP 앱에서 온 것 확인
+    const vipCompany = urlParams.get('vipCompany');
+    if (!vipCompany) {
+      return;
+    }
+    
+    // localStorage에서 시트 정보 가져오기 (개통양식 페이지에서 저장해둠)
+    const sheetId = localStorage.getItem('vip_activation_sheetId');
+    const sheetName = localStorage.getItem('vip_activation_sheetName');
+    
+    if (!sheetId || !sheetName) {
+      console.log('시트 정보 없음, U+ 데이터 수집 불가');
+      return;
+    }
+    
+    // 제출 버튼 감지 (U+ 페이지의 submit 버튼)
+    const submitButtons = document.querySelectorAll('button[type="submit"], button.submit, .btn-submit');
+    
+    submitButtons.forEach(button => {
+      button.addEventListener('click', async (e) => {
+        // 약간의 지연을 주어 폼 데이터가 완전히 입력되도록
+        setTimeout(async () => {
+          const formData = {};
+          
+          // 모든 input, select, textarea 수집
+          document.querySelectorAll('input, select, textarea').forEach(field => {
+            if (field.name || field.id) {
+              const key = field.name || field.id;
+              if (field.type === 'checkbox' || field.type === 'radio') {
+                if (field.checked) {
+                  formData[key] = field.value || true;
+                }
+              } else {
+                formData[key] = field.value;
+              }
+            }
+          });
+          
+          // 전화번호 추출 (매칭용)
+          const phoneNumber = formData.phoneNumber || formData.phone || 
+                             formData.tel || formData.contact || '';
+          
+          console.log('U+ 제출 데이터 수집:', formData);
+          
+          // VIP 앱 API로 전송
+          try {
+            const response = await fetch('https://vipmobile.netlify.app/api/onsale/uplus-submission', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sheetId,
+                sheetName,
+                phoneNumber,
+                data: formData
+              })
+            });
+            
+            if (response.ok) {
+              console.log('✅ U+ 제출 데이터 저장 완료');
+            }
+          } catch (error) {
+            console.error('U+ 데이터 저장 실패:', error);
+          }
+        }, 500);
+      });
+    });
+  }
+
+  // U+ 페이지에서 실행
+  if (window.location.hostname.includes('onsalemobile.uplus.co.kr')) {
+    collectUplusSubmissionData();
+  }
 
   // console.log('✅ VIP 필수 확장프로그램 실행 중...');
 
