@@ -317,8 +317,12 @@
         }
       });
       
-      // 회사명 교체 (VIP 관련 제외)
-      if (!originalText.includes('브이아이피') && !originalText.includes('VIP')) {
+      // 회사명 교체 (VIP 관련 및 접속 사용자 업체명 제외)
+      const vipCompany = urlParams.get('vipCompany');
+      const isVipRelated = originalText.includes('브이아이피') || originalText.includes('VIP');
+      const isUserCompany = vipCompany && originalText.includes(vipCompany);
+      
+      if (!isVipRelated && !isUserCompany) {
         // 다른 회사명만 교체
         const beforeReplace = newText;
         newText = newText.replace(/주식회사\s+[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
@@ -329,6 +333,8 @@
         if (beforeReplace !== newText) {
           console.log(`🔄 회사명 치환:`, beforeReplace, '→', newText);
         }
+      } else if (isUserCompany) {
+        console.log(`🚫 사용자 업체명 보호:`, vipCompany, '→ 치환하지 않음');
       }
       
       if (newText !== originalText) {
@@ -368,16 +374,22 @@
           }
         });
         
-        // 에프원 특별 처리
-        if (newHTML.includes('에프원') && !newHTML.includes('브이아이피')) {
+        // 회사명 치환 (VIP 관련 및 접속 사용자 업체명 제외)
+        const vipCompany = urlParams.get('vipCompany');
+        const isVipRelated = newHTML.includes('브이아이피') || newHTML.includes('VIP');
+        const isUserCompany = vipCompany && newHTML.includes(vipCompany);
+        
+        if (!isVipRelated && !isUserCompany) {
           const beforeReplace = newHTML;
           newHTML = newHTML.replace(/주식회사\s*에프원/gi, '공식인증대리점');
           newHTML = newHTML.replace(/\(주\)에프원/gi, '공식인증대리점');
           newHTML = newHTML.replace(/에프원/gi, '공식인증대리점');
           
           if (beforeReplace !== newHTML) {
-            console.log(`🔧 에프원 HTML 치환 [${selector}]:`, beforeReplace, '→', newHTML);
+            console.log(`🔧 회사명 HTML 치환 [${selector}]:`, beforeReplace, '→', newHTML);
           }
+        } else if (isUserCompany) {
+          console.log(`🚫 사용자 업체명 HTML 보호:`, vipCompany, '→ 치환하지 않음');
         }
         
         if (newHTML !== originalHTML) {
@@ -413,8 +425,12 @@
             }
           });
           
-          // 에프원 특별 처리
-          if (newValue.includes('에프원') && !newValue.includes('브이아이피')) {
+          // 회사명 치환 (VIP 관련 및 접속 사용자 업체명 제외)
+          const vipCompany = urlParams.get('vipCompany');
+          const isVipRelated = newValue.includes('브이아이피') || newValue.includes('VIP');
+          const isUserCompany = vipCompany && newValue.includes(vipCompany);
+          
+          if (!isVipRelated && !isUserCompany) {
             const beforeReplace = newValue;
             newValue = newValue.replace(/주식회사\s*에프원/gi, '공식인증대리점');
             newValue = newValue.replace(/\(주\)에프원/gi, '공식인증대리점');
