@@ -123,12 +123,13 @@ const OnSaleReceptionMode = ({
 
   const handleLinkClick = async (link) => {
     try {
-      // localStorage에 업체명 저장 (워터마크용)
+      // URL에 업체명 파라미터 추가 (워터마크용)
+      let targetUrl = link.url;
       if (loggedInStore && loggedInStore.name) {
-        localStorage.setItem('vip_company_name', loggedInStore.name);
-        console.log('💾 업체명 저장:', loggedInStore.name);
-      } else {
-        console.log('⚠️ loggedInStore 정보 없음:', loggedInStore);
+        const urlObj = new URL(targetUrl);
+        urlObj.searchParams.set('vipCompany', encodeURIComponent(loggedInStore.name));
+        targetUrl = urlObj.toString();
+        console.log('💾 업체명 URL에 추가:', loggedInStore.name);
       }
       
       if (link.hideAgentInfo) {
@@ -142,7 +143,7 @@ const OnSaleReceptionMode = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            url: link.url,
+            url: targetUrl,
             agentCode: link.agentCode
           }),
         });
@@ -154,14 +155,14 @@ const OnSaleReceptionMode = ({
         setShowProxyPage(true);
       } else {
         // 직접 새 창에서 열기
-        window.open(link.url, '_blank');
+        window.open(targetUrl, '_blank');
       }
     } catch (error) {
       console.error('링크 열기 실패:', error);
       setError('페이지를 불러오는데 실패했습니다.');
       
       // 에러 발생 시 원본 링크로 직접 열기
-      window.open(link.url, '_blank');
+      window.open(targetUrl, '_blank');
     } finally {
       setLoading(false);
     }

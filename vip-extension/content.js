@@ -6,6 +6,7 @@
 // v1.1.0 - 워터마크 추가: localStorage에서 업체명 읽어 대각선 워터마크 표시
 // v1.1.1 - 버그 수정: 인디케이터 사라짐 수정, U+ 색상 수정, 콘솔 로그 제거
 // v1.1.2 - 인디케이터 영구 수정: MutationObserver 밖으로 이동, !important 추가
+// v1.2.0 - 워터마크 개선: localStorage → URL 파라미터로 변경 (도메인 간 전달)
 //
 // 버전 관리 규칙 (AI 자동 업데이트):
 // - 버그 수정: patch 버전 증가 (예: 1.1.0 → 1.1.1)
@@ -19,9 +20,9 @@
 
   // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
-  window.VIP_EXTENSION_VERSION = '1.1.2'; // 버전 정보 노출
+  window.VIP_EXTENSION_VERSION = '1.2.0'; // 버전 정보 노출
   document.documentElement.setAttribute('data-vip-extension', 'installed');
-  document.documentElement.setAttribute('data-vip-extension-version', '1.1.2');
+  document.documentElement.setAttribute('data-vip-extension-version', '1.2.0');
 
   // 메타 태그도 추가 (추가 감지 방법)
   const metaTag = document.createElement('meta');
@@ -66,7 +67,19 @@
     
     // 2. 워터마크 표시 (대각선, 전체 화면)
     if (!document.getElementById('vip-watermark-container')) {
-      const companyName = localStorage.getItem('vip_company_name');
+      // URL 파라미터에서 업체명 가져오기
+      let companyName = null;
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        companyName = urlParams.get('vipCompany');
+        if (companyName) {
+          companyName = decodeURIComponent(companyName);
+          console.log('✅ URL에서 업체명 확인:', companyName);
+        }
+      } catch (error) {
+        console.error('URL 파라미터 읽기 오류:', error);
+      }
+      
       if (companyName) {
         const watermarkContainer = document.createElement('div');
         watermarkContainer.id = 'vip-watermark-container';
@@ -105,7 +118,7 @@
         document.body.appendChild(watermarkContainer);
         console.log('💧 워터마크 생성:', companyName);
       } else {
-        console.log('⚠️ localStorage에 업체명 없음');
+        console.log('⚠️ URL에 업체명 파라미터 없음');
       }
     }
   }
