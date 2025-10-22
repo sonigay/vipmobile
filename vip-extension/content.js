@@ -36,6 +36,79 @@
     return;
   }
 
+  // 인디케이터 & 워터마크는 한 번만 생성 (MutationObserver 밖)
+  function createIndicatorAndWatermark() {
+    // 1. 회사명 인디케이터 표시 (우측 상단)
+    if (!document.getElementById('vip-company-indicator')) {
+      const indicator = document.createElement('div');
+      indicator.id = 'vip-company-indicator';
+      indicator.className = 'vip-permanent-element'; // 보호용 클래스
+      indicator.style.cssText = `
+        position: fixed !important;
+        top: 10px !important;
+        right: 10px !important;
+        background: white !important;
+        color: black !important;
+        padding: 8px 15px !important;
+        border-radius: 20px !important;
+        border: 2px solid black !important;
+        font-size: 12px !important;
+        z-index: 999999 !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+        font-family: Arial, sans-serif !important;
+        font-weight: 500 !important;
+      `;
+      indicator.textContent = '(주)브이아이피플러스';
+      document.body.appendChild(indicator);
+      console.log('📌 회사명 인디케이터 생성 (계속 표시)');
+    }
+    
+    // 2. 워터마크 표시 (대각선, 전체 화면)
+    if (!document.getElementById('vip-watermark-container')) {
+      const companyName = localStorage.getItem('vip_company_name');
+      if (companyName) {
+        const watermarkContainer = document.createElement('div');
+        watermarkContainer.id = 'vip-watermark-container';
+        watermarkContainer.className = 'vip-permanent-element'; // 보호용 클래스
+        watermarkContainer.style.cssText = `
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          pointer-events: none !important;
+          z-index: 999998 !important;
+          overflow: hidden !important;
+        `;
+        
+        // 대각선으로 여러 개 생성
+        for (let i = 0; i < 15; i++) {
+          const watermark = document.createElement('div');
+          watermark.style.cssText = `
+            position: absolute;
+            top: ${i * 15}%;
+            left: -20%;
+            width: 140%;
+            text-align: center;
+            transform: rotate(-45deg);
+            font-size: 48px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.08);
+            font-family: Arial, sans-serif;
+            user-select: none;
+          `;
+          watermark.textContent = companyName;
+          watermarkContainer.appendChild(watermark);
+        }
+        
+        document.body.appendChild(watermarkContainer);
+        console.log('💧 워터마크 생성:', companyName);
+      } else {
+        console.log('⚠️ localStorage에 업체명 없음');
+      }
+    }
+  }
+
   // 대리점 정보 숨김 처리
   function hideAgentInfo() {
     let modified = false;
@@ -69,11 +142,21 @@
     let node;
     
     while (node = walker.nextNode()) {
-      // 인디케이터 내부 텍스트는 건너뛰기
-      const parentElement = node.parentElement;
-      if (parentElement && parentElement.id === 'vip-company-indicator') {
-        continue;
+      // VIP 영구 요소는 건너뛰기 (인디케이터, 워터마크)
+      let currentElement = node.parentElement;
+      let skip = false;
+      
+      while (currentElement) {
+        if (currentElement.id === 'vip-company-indicator' || 
+            currentElement.id === 'vip-watermark-container' ||
+            currentElement.className === 'vip-permanent-element') {
+          skip = true;
+          break;
+        }
+        currentElement = currentElement.parentElement;
       }
+      
+      if (skip) continue;
       
       const originalText = node.textContent;
       let newText = originalText;
@@ -124,85 +207,17 @@
       }
     });
     
-    // 4. 회사명 인디케이터 표시 (우측 상단)
-    if (!document.getElementById('vip-company-indicator')) {
-      const indicator = document.createElement('div');
-      indicator.id = 'vip-company-indicator';
-      indicator.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: white;
-        color: black;
-        padding: 8px 15px;
-        border-radius: 20px;
-        border: 2px solid black;
-        font-size: 12px;
-        z-index: 999999;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        font-family: Arial, sans-serif;
-        font-weight: 500;
-      `;
-      indicator.textContent = '(주)브이아이피플러스';
-      document.body.appendChild(indicator);
-      console.log('📌 회사명 인디케이터 생성 (계속 표시)');
-    }
-    
-    // 5. 워터마크 표시 (대각선, 전체 화면)
-    if (!document.getElementById('vip-watermark-container')) {
-      const companyName = localStorage.getItem('vip_company_name');
-      if (companyName) {
-        const watermarkContainer = document.createElement('div');
-        watermarkContainer.id = 'vip-watermark-container';
-        watermarkContainer.style.cssText = `
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          z-index: 999998;
-          overflow: hidden;
-        `;
-        
-        // 대각선으로 여러 개 생성
-        for (let i = 0; i < 15; i++) {
-          const watermark = document.createElement('div');
-          watermark.style.cssText = `
-            position: absolute;
-            top: ${i * 15}%;
-            left: -20%;
-            width: 140%;
-            text-align: center;
-            transform: rotate(-45deg);
-            font-size: 48px;
-            font-weight: bold;
-            color: rgba(0, 0, 0, 0.08);
-            font-family: Arial, sans-serif;
-            user-select: none;
-          `;
-          watermark.textContent = companyName;
-          watermarkContainer.appendChild(watermark);
-        }
-        
-        document.body.appendChild(watermarkContainer);
-        console.log('💧 워터마크 생성:', companyName);
-      } else {
-        console.log('⚠️ localStorage에 업체명 없음');
-      }
-    }
-    
-    // if (modified) {
-    //   console.log('✅ 대리점 정보 처리 완료');
-    // }
-    
     return modified;
   }
 
-  // 페이지 로드 시 실행
+  // 인디케이터 & 워터마크 생성 (한 번만)
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', hideAgentInfo);
+    document.addEventListener('DOMContentLoaded', () => {
+      createIndicatorAndWatermark();
+      hideAgentInfo();
+    });
   } else {
+    createIndicatorAndWatermark();
     hideAgentInfo();
   }
 
