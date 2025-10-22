@@ -18,7 +18,9 @@
 
   // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
+  window.VIP_EXTENSION_VERSION = '1.1.1'; // 버전 정보 노출
   document.documentElement.setAttribute('data-vip-extension', 'installed');
+  document.documentElement.setAttribute('data-vip-extension-version', '1.1.1');
 
   // 메타 태그도 추가 (추가 감지 방법)
   const metaTag = document.createElement('meta');

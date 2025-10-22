@@ -137,6 +137,28 @@ function Login({ onLogin }) {
            document.querySelector('meta[name="vip-extension-installed"]') !== null;
   };
 
+  // 확장 프로그램 버전 가져오기
+  const getExtensionVersion = () => {
+    return window.VIP_EXTENSION_VERSION || 
+           document.documentElement.getAttribute('data-vip-extension-version') ||
+           null;
+  };
+
+  // 버전 비교 (semver 간단 비교)
+  const isVersionValid = (current, required) => {
+    if (!current) return false;
+    
+    const parseVersion = (v) => v.split('.').map(Number);
+    const [cMajor, cMinor, cPatch] = parseVersion(current);
+    const [rMajor, rMinor, rPatch] = parseVersion(required);
+    
+    if (cMajor > rMajor) return true;
+    if (cMajor < rMajor) return false;
+    if (cMinor > rMinor) return true;
+    if (cMinor < rMinor) return false;
+    return cPatch >= rPatch;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!storeId.trim()) {
@@ -225,15 +247,35 @@ function Login({ onLogin }) {
             return;
           }
           
-          // 2. 확장 프로그램 설치 체크 (0.5초 대기 후 체크)
-          setTimeout(() => {
+          // 2. 확장 프로그램 설치 및 버전 체크 (0.5초 대기 후 체크)
+          setTimeout(async () => {
             if (!isExtensionInstalled()) {
               setError('❌ VIP 확장프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n2. ZIP 파일 압축 해제\n3. Chrome/Edge에서 확장 설치\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n4. 새로고침(F5) 후 로그인\n\n💡 설치가이드.html 파일 참고');
               setLoading(false);
               return;
             }
             
-            // 체크 통과 - 로그인 처리
+            // 3. 버전 체크
+            try {
+              const versionResponse = await fetch(`${API_URL}/api/extension-version`);
+              const versionData = await versionResponse.json();
+              
+              if (versionData.success) {
+                const currentVersion = getExtensionVersion();
+                const requiredVersion = versionData.requiredVersion;
+                
+                if (!isVersionValid(currentVersion, requiredVersion)) {
+                  setError(`❌ VIP 확장프로그램 버전이 오래되었습니다!\n\n현재 버전: ${currentVersion || '알 수 없음'}\n필요 버전: ${requiredVersion} 이상\n\n📥 업데이트 방법:\n1. 기존 확장 제거 (chrome://extensions/)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. 새 버전 재설치\n4. 새로고침(F5) 후 로그인`);
+                  setLoading(false);
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error('버전 체크 실패:', error);
+              // 버전 체크 실패 시 경고만 하고 진행 (서버 문제로 차단하지 않음)
+            }
+            
+            // 모든 체크 통과 - 로그인 처리
             console.log('✅ Chrome 브라우저 및 확장 프로그램 확인 완료');
             onLogin({
               ...data.storeInfo,

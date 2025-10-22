@@ -6945,7 +6945,19 @@ app.post('/api/onsale-proxy', async (req, res) => {
   }
 });
 
-// ==================== Chrome 확장 프로그램 다운로드 API ====================
+// ==================== Chrome 확장 프로그램 관리 API ====================
+
+// 확장 프로그램 최소 버전 요구사항
+const REQUIRED_EXTENSION_VERSION = '1.1.1';
+
+// 확장 프로그램 최소 버전 조회
+app.get('/api/extension-version', (req, res) => {
+  res.json({
+    success: true,
+    requiredVersion: REQUIRED_EXTENSION_VERSION,
+    message: '확장 프로그램 최소 버전입니다.'
+  });
+});
 
 // Chrome 확장 프로그램 ZIP 다운로드
 app.get('/api/download-chrome-extension', (req, res) => {
