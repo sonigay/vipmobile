@@ -22,12 +22,14 @@
   const urlParams = new URLSearchParams(window.location.search);
   const vipCompany = urlParams.get('vipCompany');
   
-  if (!vipCompany) {
+  let isVipAppAccess = false;
+  if (vipCompany) {
+    console.log('✅ VIP 앱에서 온 접속 확인:', decodeURIComponent(vipCompany));
+    isVipAppAccess = true;
+  } else {
     console.log('🔒 VIP 앱이 아닌 직접 접속으로 기능 비활성화');
-    return; // 확장 프로그램 기능 중단
+    isVipAppAccess = false;
   }
-  
-  console.log('✅ VIP 앱에서 온 접속 확인:', decodeURIComponent(vipCompany));
 
   // 확장 프로그램이 설치되어 있음을 표시 (VIP 앱에서만)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
@@ -86,6 +88,11 @@
 
   // 인디케이터 & 워터마크는 한 번만 생성 (MutationObserver 밖)
   function createIndicatorAndWatermark() {
+    // VIP 앱에서 온 접속이 아니면 기능 비활성화
+    if (!isVipAppAccess) {
+      return;
+    }
+    
     // document.body가 없으면 대기
     if (!document.body) {
       console.log('⚠️ document.body 대기 중...');
@@ -183,6 +190,10 @@
 
   // 대리점 정보 숨김 처리
   function hideAgentInfo() {
+    // VIP 앱에서 온 접속이 아니면 기능 비활성화
+    if (!isVipAppAccess) {
+      return;
+    }
     let modified = false;
     
     // URL은 그대로 유지 (기능 유지를 위해 변경하지 않음)
