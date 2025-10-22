@@ -18,9 +18,18 @@
 (function() {
   'use strict';
   
-  // console.log('🔧 VIP 필수 확장프로그램 활성화');
+  // VIP 앱에서 온 접속인지 확인 (vipCompany 파라미터 체크)
+  const urlParams = new URLSearchParams(window.location.search);
+  const vipCompany = urlParams.get('vipCompany');
+  
+  if (!vipCompany) {
+    console.log('🔒 VIP 앱이 아닌 직접 접속으로 기능 비활성화');
+    return; // 확장 프로그램 기능 중단
+  }
+  
+  console.log('✅ VIP 앱에서 온 접속 확인:', decodeURIComponent(vipCompany));
 
-  // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
+  // 확장 프로그램이 설치되어 있음을 표시 (VIP 앱에서만)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
   window.VIP_EXTENSION_VERSION = '1.3.0'; // 버전 정보 노출
   document.documentElement.setAttribute('data-vip-extension', 'installed');
@@ -137,21 +146,28 @@
           overflow: hidden !important;
         `;
         
-        // 대각선으로 여러 개 생성
-        for (let i = 0; i < 15; i++) {
+        // 화면 전체에 랜덤 위치로 여러 개 생성
+        for (let i = 0; i < 25; i++) {
           const watermark = document.createElement('div');
+          
+          // 랜덤 위치 계산
+          const randomTop = Math.random() * 100;
+          const randomLeft = Math.random() * 100;
+          const randomRotation = (Math.random() - 0.5) * 60; // -30도 ~ +30도
+          
           watermark.style.cssText = `
             position: absolute;
-            top: ${i * 15}%;
-            left: -20%;
-            width: 140%;
+            top: ${randomTop}%;
+            left: ${randomLeft}%;
             text-align: center;
-            transform: rotate(-45deg);
-            font-size: 48px;
+            transform: rotate(${randomRotation}deg);
+            font-size: 96px;
             font-weight: bold;
             color: rgba(0, 0, 0, 0.08);
             font-family: Arial, sans-serif;
             user-select: none;
+            white-space: nowrap;
+            pointer-events: none;
           `;
           watermark.textContent = decodeURIComponent(companyName);
           watermarkContainer.appendChild(watermark);
