@@ -692,26 +692,131 @@ const ActivationInfoPage = () => {
         @media print {
           @page {
             size: A4;
-            margin: 15mm;
+            margin: 8mm;
           }
           
           body {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
           }
           
           .watermark {
             display: block !important;
-            opacity: 0.05 !important;
+            opacity: 0.03 !important;
+            font-size: 60px !important;
           }
           
           .no-print {
             display: none !important;
           }
           
-          input, select, textarea {
+          /* 전체 컨테이너 조정 */
+          .MuiContainer-root {
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          /* Paper 컴포넌트 조정 */
+          .MuiPaper-root {
+            padding: 8px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            background: white !important;
+          }
+          
+          /* Grid 레이아웃 조정 */
+          .MuiGrid-container {
+            margin: 0 !important;
+          }
+          
+          .MuiGrid-item {
+            padding: 2px !important;
+          }
+          
+          /* Card 컴포넌트 조정 */
+          .MuiCard-root {
+            margin: 2px !important;
+            padding: 4px !important;
+            box-shadow: none !important;
+            border: 1px solid #ccc !important;
+          }
+          
+          .MuiCardContent-root {
+            padding: 4px !important;
+          }
+          
+          /* Typography 조정 */
+          .MuiTypography-h6 {
             font-size: 10pt !important;
+            margin: 2px 0 !important;
+          }
+          
+          .MuiTypography-body1 {
+            font-size: 8pt !important;
+            margin: 1px 0 !important;
+          }
+          
+          .MuiTypography-body2 {
+            font-size: 7pt !important;
+            margin: 1px 0 !important;
+          }
+          
+          /* Form 필드 조정 */
+          .MuiTextField-root {
+            margin: 1px !important;
+          }
+          
+          .MuiInputBase-root {
+            font-size: 7pt !important;
+            padding: 2px !important;
+            min-height: 20px !important;
+          }
+          
+          input, select, textarea {
+            font-size: 7pt !important;
             border: 1px solid #000 !important;
+            padding: 1px !important;
+            margin: 0 !important;
+          }
+          
+          /* Radio, Checkbox 조정 */
+          .MuiFormControl-root {
+            margin: 1px !important;
+          }
+          
+          .MuiFormGroup-root {
+            margin: 1px !important;
+          }
+          
+          .MuiFormControlLabel-root {
+            margin: 0 !important;
+            font-size: 7pt !important;
+          }
+          
+          /* Grid spacing 조정 */
+          .MuiGrid-spacing-xs-3 > .MuiGrid-item {
+            padding: 1px !important;
+          }
+          
+          /* Alert 컴포넌트 조정 */
+          .MuiAlert-root {
+            padding: 2px !important;
+            margin: 1px 0 !important;
+            font-size: 7pt !important;
+          }
+          
+          /* Button 영역 숨김 */
+          .MuiButton-root {
+            display: none !important;
+          }
+          
+          /* 헤더 영역 조정 */
+          .MuiBox-root {
+            margin: 0 !important;
+            padding: 0 !important;
           }
         }
       `}</style>
