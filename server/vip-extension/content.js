@@ -8,6 +8,7 @@
 // v1.1.2 - 인디케이터 영구 수정: MutationObserver 밖으로 이동, !important 추가
 // v1.2.0 - 워터마크 개선: localStorage → URL 파라미터로 변경 (도메인 간 전달)
 // v1.2.1 - 버그 수정: 요소 숨김 로직에서 인디케이터 제외, document.body 대기 추가
+// v1.3.0 - 도메인 간 공유: chrome.storage.local 사용, VIP 앱에서 자동 저장, 인디케이터 중앙 정렬
 //
 // 버전 관리 규칙 (AI 자동 업데이트):
 // - 버그 수정: patch 버전 증가 (예: 1.1.0 → 1.1.1)
@@ -21,9 +22,9 @@
 
   // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
-  window.VIP_EXTENSION_VERSION = '1.2.1'; // 버전 정보 노출
+  window.VIP_EXTENSION_VERSION = '1.3.0'; // 버전 정보 노출
   document.documentElement.setAttribute('data-vip-extension', 'installed');
-  document.documentElement.setAttribute('data-vip-extension-version', '1.2.1');
+  document.documentElement.setAttribute('data-vip-extension-version', '1.3.0');
 
   // 메타 태그도 추가 (추가 감지 방법)
   const metaTag = document.createElement('meta');
@@ -31,6 +32,41 @@
   metaTag.content = 'true';
   if (document.head) {
     document.head.appendChild(metaTag);
+  }
+
+  // VIP 앱에서 업체명 저장 (chrome.storage 사용 - 도메인 간 공유)
+  if (window.location.href.includes('vipmobile.netlify.app') || 
+      window.location.href.includes('localhost:3000')) {
+    // VIP 앱에서 로그인 정보 감지 및 저장
+    const checkAndSaveCompanyName = () => {
+      const loginState = localStorage.getItem('loginState');
+      if (loginState) {
+        try {
+          const parsed = JSON.parse(loginState);
+          if (parsed.store && parsed.store.name) {
+            chrome.storage.local.set({ 
+              vipCompanyName: parsed.store.name 
+            }, () => {
+              console.log('💾 chrome.storage에 업체명 저장:', parsed.store.name);
+            });
+          }
+        } catch (e) {
+          console.error('로그인 정보 파싱 오류:', e);
+        }
+      }
+    };
+    
+    // 즉시 실행
+    checkAndSaveCompanyName();
+    
+    // localStorage 변경 감지
+    window.addEventListener('storage', checkAndSaveCompanyName);
+    
+    // 주기적 체크 (1초마다)
+    setInterval(checkAndSaveCompanyName, 1000);
+    
+    console.log('✅ VIP 앱: 업체명 자동 저장 활성화');
+    return;
   }
 
   // U+ 페이지에서만 처리 실행
@@ -56,19 +92,20 @@
       indicator.className = 'vip-permanent-element'; // 보호용 클래스
       indicator.style.cssText = `
         position: fixed !important;
-        top: 10px !important;
-        right: 10px !important;
+        top: 20px !important;
+        right: 20px !important;
         background: white !important;
         color: black !important;
-        padding: 8px 15px !important;
-        border-radius: 20px !important;
+        padding: 8px 12px !important;
+        border-radius: 4px !important;
         border: 2px solid black !important;
         font-size: 12px !important;
         z-index: 999999 !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
         font-family: Arial, sans-serif !important;
         font-weight: 500 !important;
-        display: block !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
         visibility: visible !important;
       `;
       indicator.textContent = '(주)브이아이피플러스';
@@ -80,20 +117,12 @@
     
     // 2. 워터마크 표시 (대각선, 전체 화면)
     if (!document.getElementById('vip-watermark-container')) {
-      // URL 파라미터에서 업체명 가져오기
-      let companyName = null;
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        companyName = urlParams.get('vipCompany');
+      // chrome.storage에서 업체명 가져오기 (도메인 간 공유)
+      chrome.storage.local.get(['vipCompanyName'], (result) => {
+        const companyName = result.vipCompanyName;
+        
         if (companyName) {
-          companyName = decodeURIComponent(companyName);
-          console.log('✅ URL에서 업체명 확인:', companyName);
-        }
-      } catch (error) {
-        console.error('URL 파라미터 읽기 오류:', error);
-      }
-      
-      if (companyName) {
+          console.log('✅ chrome.storage에서 업체명 확인:', companyName);
         const watermarkContainer = document.createElement('div');
         watermarkContainer.id = 'vip-watermark-container';
         watermarkContainer.className = 'vip-permanent-element'; // 보호용 클래스
@@ -128,11 +157,12 @@
           watermarkContainer.appendChild(watermark);
         }
         
-        document.body.appendChild(watermarkContainer);
-        console.log('💧 워터마크 생성:', companyName);
-      } else {
-        console.log('⚠️ URL에 업체명 파라미터 없음');
-      }
+          document.body.appendChild(watermarkContainer);
+          console.log('💧 워터마크 생성:', companyName);
+        } else {
+          console.log('⚠️ chrome.storage에 업체명 없음');
+        }
+      });
     }
   }
 
