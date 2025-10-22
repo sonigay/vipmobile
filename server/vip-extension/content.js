@@ -321,7 +321,7 @@
       const vipCompany = urlParams.get('vipCompany');
       const isVipRelated = originalText.includes('브이아이피') || originalText.includes('VIP');
       const isUserCompany = vipCompany && originalText.includes(vipCompany);
-      const isLgUplus = originalText.includes('엘지유플러스') || originalText.includes('LG유플러스') || originalText.includes('(주)엘지유플러스');
+      const isLgUplus = originalText.includes('엘지유플러스') || originalText.includes('LG유플러스') || originalText.includes('(주)엘지유플러스') || originalText.includes('유플러스') || originalText.includes('(주)유플러스');
       
       console.log(`🔍 회사명 체크:`, {
         originalText: originalText.substring(0, 50) + '...',
@@ -359,9 +359,15 @@
       modified = true;
     });
     
-    // 3. 추가: HTML 요소들에 대한 강제 치환
+    // 3. 추가: 특정 위치의 HTML 요소들만 치환 (대리점 정보 영역)
     const specificSelectors = [
-      'div', 'span', 'p', 'td', 'th', 'label', 'strong', 'b', 'em', 'i', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+      '.dialog-c-text',           // U+ 대화상자 텍스트 영역
+      '.dynamic-data-temp',       // 동적 데이터 표시 영역
+      '[class*="agent"]',         // 대리점 관련 클래스
+      '[class*="store"]',         // 매장 관련 클래스
+      '[class*="dealer"]',        // 딜러 관련 클래스
+      'td[class*="agent"]',       // 대리점 관련 테이블 셀
+      'span[class*="agent"]'      // 대리점 관련 스팬
     ];
     
     specificSelectors.forEach(selector => {
@@ -389,7 +395,7 @@
         const vipCompany = urlParams.get('vipCompany');
         const isVipRelated = newHTML.includes('브이아이피') || newHTML.includes('VIP');
         const isUserCompany = vipCompany && newHTML.includes(vipCompany);
-        const isLgUplus = newHTML.includes('엘지유플러스') || newHTML.includes('LG유플러스') || newHTML.includes('(주)엘지유플러스');
+        const isLgUplus = newHTML.includes('엘지유플러스') || newHTML.includes('LG유플러스') || newHTML.includes('(주)엘지유플러스') || newHTML.includes('유플러스') || newHTML.includes('(주)유플러스');
         
         if (!isVipRelated && !isUserCompany && !isLgUplus) {
           const beforeReplace = newHTML;
@@ -443,7 +449,7 @@
           const vipCompany = urlParams.get('vipCompany');
           const isVipRelated = newValue.includes('브이아이피') || newValue.includes('VIP');
           const isUserCompany = vipCompany && newValue.includes(vipCompany);
-          const isLgUplus = newValue.includes('엘지유플러스') || newValue.includes('LG유플러스') || newValue.includes('(주)엘지유플러스');
+          const isLgUplus = newValue.includes('엘지유플러스') || newValue.includes('LG유플러스') || newValue.includes('(주)엘지유플러스') || newValue.includes('유플러스') || newValue.includes('(주)유플러스');
           
           if (!isVipRelated && !isUserCompany && !isLgUplus) {
             const beforeReplace = newValue;
