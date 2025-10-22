@@ -13,7 +13,7 @@
 (function() {
   'use strict';
   
-  console.log('🔧 VIP 필수 확장프로그램 활성화');
+  // console.log('🔧 VIP 필수 확장프로그램 활성화');
 
   // 확장 프로그램이 설치되어 있음을 표시 (모든 도메인에서)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
@@ -29,7 +29,7 @@
 
   // U+ 페이지에서만 처리 실행
   if (!window.location.href.includes('onsalemobile.uplus.co.kr')) {
-    console.log('✅ VIP 확장프로그램 활성화 완료');
+    // console.log('✅ VIP 확장프로그램 활성화 완료');
     return;
   }
 
@@ -116,7 +116,7 @@
       // 작은 요소만 숨김 (children이 적고, 텍스트가 짧은 경우)
       if (hasDealerInfo && element.children.length < 2 && text.length < 300) {
         element.style.display = 'none';
-        console.log('🙈 요소 숨김:', text.substring(0, 50));
+        // console.log('🙈 요소 숨김:', text.substring(0, 50));
         modified = true;
       }
     });
@@ -142,7 +142,7 @@
       `;
       indicator.textContent = '(주)브이아이피플러스';
       document.body.appendChild(indicator);
-      console.log('📌 회사명 인디케이터 생성 (계속 표시)');
+      // console.log('📌 회사명 인디케이터 생성 (계속 표시)');
     }
     
     // 5. 워터마크 표시 (대각선, 전체 화면)
@@ -183,13 +183,13 @@
         }
         
         document.body.appendChild(watermarkContainer);
-        console.log('💧 워터마크 생성:', companyName);
+        // console.log('💧 워터마크 생성:', companyName);
       }
     }
     
-    if (modified) {
-      console.log('✅ 대리점 정보 처리 완료');
-    }
+    // if (modified) {
+    //   console.log('✅ 대리점 정보 처리 완료');
+    // }
     
     return modified;
   }
@@ -216,6 +216,6 @@
     characterData: true
   });
 
-  console.log('✅ VIP 필수 확장프로그램 실행 중...');
+  // console.log('✅ VIP 필수 확장프로그램 실행 중...');
 
 })(); // IIFE 끝

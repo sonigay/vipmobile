@@ -6727,7 +6727,7 @@ app.post('/api/onsale-proxy', async (req, res) => {
           }
           
           .header {
-            background: #E60028;
+            background: #E6007E;
             padding: 15px 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           }
@@ -6774,7 +6774,7 @@ app.post('/api/onsale-proxy', async (req, res) => {
           .icon-circle {
             width: 100px;
             height: 100px;
-            background: linear-gradient(135deg, #E60028 0%, #FF6B9D 100%);
+            background: linear-gradient(135deg, #E6007E 0%, #FF6B9D 100%);
             border-radius: 50%;
             margin: 0 auto 30px;
             display: flex;
@@ -6798,7 +6798,7 @@ app.post('/api/onsale-proxy', async (req, res) => {
           }
           
           .btn-start {
-            background: linear-gradient(135deg, #E60028 0%, #FF1744 100%);
+            background: linear-gradient(135deg, #E6007E 0%, #FF1493 100%);
             color: white;
             border: none;
             padding: 20px 60px;
@@ -6806,16 +6806,16 @@ app.post('/api/onsale-proxy', async (req, res) => {
             font-weight: 700;
             border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(230, 0, 40, 0.3);
+            box-shadow: 0 4px 15px rgba(230, 0, 126, 0.3);
             transition: all 0.2s ease;
             width: 100%;
             max-width: 400px;
           }
           
           .btn-start:hover {
-            background: linear-gradient(135deg, #C90024 0%, #E6003C 100%);
+            background: linear-gradient(135deg, #CC006B 0%, #E6007E 100%);
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(230, 0, 40, 0.4);
+            box-shadow: 0 6px 20px rgba(230, 0, 126, 0.4);
           }
           
           .btn-start:active {
@@ -6832,7 +6832,7 @@ app.post('/api/onsale-proxy', async (req, res) => {
           }
           
           .uplus-brand {
-            color: #E60028;
+            color: #E6007E;
             font-weight: 700;
           }
         </style>
