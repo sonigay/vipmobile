@@ -6975,7 +6975,7 @@ app.post('/api/onsale-proxy', async (req, res) => {
 // ==================== Chrome 확장 프로그램 관리 API ====================
 
 // 확장 프로그램 최소 버전 요구사항
-const REQUIRED_EXTENSION_VERSION = '1.2.1';
+const REQUIRED_EXTENSION_VERSION = '1.3.0';
 
 // 확장 프로그램 최소 버전 조회
 app.get('/api/extension-version', (req, res) => {
