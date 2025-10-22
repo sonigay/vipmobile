@@ -125,6 +125,7 @@ const OnSaleReceptionMode = ({
     try {
       // URL에 업체명 파라미터 추가 (워터마크용)
       let targetUrl = link.url;
+      
       if (loggedInStore && loggedInStore.name) {
         const urlObj = new URL(targetUrl);
         urlObj.searchParams.set('vipCompany', encodeURIComponent(loggedInStore.name));
@@ -132,8 +133,8 @@ const OnSaleReceptionMode = ({
         console.log('💾 업체명 URL에 추가:', loggedInStore.name);
         
         // chrome.storage.local에 업체명 저장 (확장 프로그램용)
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-          chrome.storage.local.set({ vipCompanyName: loggedInStore.name }, () => {
+        if (typeof window !== 'undefined' && window.chrome && window.chrome.storage && window.chrome.storage.local) {
+          window.chrome.storage.local.set({ vipCompanyName: loggedInStore.name }, () => {
             console.log('💾 chrome.storage.local에 업체명 저장:', loggedInStore.name);
           });
         }
