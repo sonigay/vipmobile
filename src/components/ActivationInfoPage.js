@@ -647,6 +647,15 @@ const ActivationInfoPage = () => {
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
               <Button
                 variant="outlined"
+                startIcon={<ArrowBackIcon />}
+                onClick={handleGoBack}
+                sx={{ minWidth: 120 }}
+              >
+                뒤로가기
+              </Button>
+              
+              <Button
+                variant="outlined"
                 startIcon={<PrintIcon />}
                 onClick={handlePrint}
                 sx={{ minWidth: 120 }}
