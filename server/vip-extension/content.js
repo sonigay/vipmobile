@@ -343,9 +343,9 @@
           console.log(`🔄 회사명 치환:`, beforeReplace, '→', newText);
         }
       } else if (isUserCompany) {
-        console.log(`🚫 사용자 업체명 보호:`, vipCompany, '→ 치환하지 않음');
+        console.log(`사용자 업체명 보호:`, vipCompany, '→ 치환하지 않음');
       } else if (isLgUplus) {
-        console.log(`🚫 LG U+ 공식 회사명 보호: → 치환하지 않음`);
+        console.log(`LG U+ 공식 회사명 보호: → 치환하지 않음`);
       }
       
       if (newText !== originalText) {
@@ -401,9 +401,9 @@
             console.log(`🔧 회사명 HTML 치환 [${selector}]:`, beforeReplace, '→', newHTML);
           }
         } else if (isUserCompany) {
-          console.log(`🚫 사용자 업체명 HTML 보호:`, vipCompany, '→ 치환하지 않음');
+          console.log(`사용자 업체명 HTML 보호:`, vipCompany, '→ 치환하지 않음');
         } else if (isLgUplus) {
-          console.log(`🚫 LG U+ 공식 회사명 HTML 보호: → 치환하지 않음`);
+          console.log(`LG U+ 공식 회사명 HTML 보호: → 치환하지 않음`);
         }
         
         if (newHTML !== originalHTML) {
@@ -455,9 +455,9 @@
               console.log(`🔧 에프원 대리점 INPUT 치환:`, beforeReplace, '→', newValue);
             }
           } else if (isUserCompany) {
-            console.log(`🚫 사용자 업체명 INPUT 보호:`, vipCompany, '→ 치환하지 않음`);
+            console.log(`사용자 업체명 INPUT 보호:`, vipCompany, '→ 치환하지 않음');
           } else if (isLgUplus) {
-            console.log(`🚫 LG U+ 공식 회사명 INPUT 보호: → 치환하지 않음`);
+            console.log(`LG U+ 공식 회사명 INPUT 보호: → 치환하지 않음`);
           }
           
           if (newValue !== originalValue) {
