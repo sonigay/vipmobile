@@ -279,7 +279,7 @@ const ActivationInfoPage = () => {
         {/* 폼 */}
         <Paper 
           sx={{ 
-            p: 4, 
+            p: 2, 
             maxWidth: 1200, 
             mx: 'auto',
             background: 'linear-gradient(135deg, #f8f9ff 0%, #e8eaf6 100%)',
@@ -287,349 +287,371 @@ const ActivationInfoPage = () => {
             boxShadow: '0 8px 32px rgba(142, 36, 170, 0.15)'
           }}
         >
-          <Grid container spacing={3}>
+          <Grid container spacing={1}>
             {/* 매장 정보 */}
             <Grid item xs={12}>
-              <Card sx={{ mb: 3, bgcolor: '#f3e5f5' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
-                    🏪 매장 정보
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="매장명/매장번호"
-                        value={formData.storeName}
-                        InputProps={{ readOnly: true }}
-                        variant="outlined"
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="P코드"
-                        value={formData.pCode}
-                        InputProps={{ readOnly: true }}
-                        variant="outlined"
-                      />
-                    </Grid>
+              <Box sx={{ mb: 1, p: 1, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#5e35b1', fontWeight: 'bold', mb: 1 }}>
+                  🏪 매장 정보
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="매장명/매장번호"
+                      value={formData.storeName}
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                    />
                   </Grid>
-                </CardContent>
-              </Card>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="P코드"
+                      value={formData.pCode}
+                      InputProps={{ readOnly: true }}
+                      variant="outlined"
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
 
             {/* 개통 정보 */}
             <Grid item xs={12}>
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
-                    📋 개통 정보
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">개통유형 *</FormLabel>
-                        <RadioGroup
-                          value={formData.activationType}
-                          onChange={(e) => updateFormData('activationType', e.target.value)}
-                          row
-                        >
-                          <FormControlLabel value="신규" control={<Radio />} label="신규" />
-                          <FormControlLabel value="MNP" control={<Radio />} label="MNP" />
-                          <FormControlLabel value="재가입" control={<Radio />} label="재가입" />
-                          <FormControlLabel value="정책기변" control={<Radio />} label="정책기변" />
-                        </RadioGroup>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">전통신사</FormLabel>
-                        <RadioGroup
-                          value={formData.previousCarrier}
-                          onChange={(e) => updateFormData('previousCarrier', e.target.value)}
-                          row
-                        >
-                          <FormControlLabel value="SKT" control={<Radio />} label="SKT" />
-                          <FormControlLabel value="KT" control={<Radio />} label="KT" />
-                          <FormControlLabel value="알뜰폰" control={<Radio />} label="알뜰폰" />
-                        </RadioGroup>
-                      </FormControl>
-                      {formData.previousCarrier === '알뜰폰' && (
-                        <TextField
-                          fullWidth
-                          label="알뜰폰 상세"
-                          value={formData.previousCarrierOther}
-                          onChange={(e) => updateFormData('previousCarrierOther', e.target.value)}
-                          margin="normal"
-                        />
-                      )}
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="고객명 *"
-                        value={formData.customerName}
-                        onChange={(e) => updateFormData('customerName', e.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="생년월일 *"
-                        value={formData.birthDate}
-                        onChange={(e) => updateFormData('birthDate', e.target.value)}
-                        placeholder="YYMMDD 또는 YYYYMMDD"
-                        helperText="미성년자/외국인전체기재"
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="개통번호 *"
-                        value={formData.phoneNumber}
-                        onChange={(e) => updateFormData('phoneNumber', e.target.value)}
-                        placeholder="010-1234-5678"
-                        required
-                      />
-                    </Grid>
+              <Box sx={{ mb: 1, p: 1, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#5e35b1', fontWeight: 'bold', mb: 1 }}>
+                  📋 개통 정보
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <FormControl component="fieldset" size="small">
+                      <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>개통유형 *</FormLabel>
+                      <RadioGroup
+                        value={formData.activationType}
+                        onChange={(e) => updateFormData('activationType', e.target.value)}
+                        row
+                        sx={{ '& .MuiFormControlLabel-root': { margin: 0, '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } } }}
+                      >
+                        <FormControlLabel value="신규" control={<Radio size="small" />} label="신규" />
+                        <FormControlLabel value="MNP" control={<Radio size="small" />} label="MNP" />
+                        <FormControlLabel value="재가입" control={<Radio size="small" />} label="재가입" />
+                        <FormControlLabel value="정책기변" control={<Radio size="small" />} label="정책기변" />
+                      </RadioGroup>
+                    </FormControl>
                   </Grid>
-                </CardContent>
-              </Card>
+                  <Grid item xs={6}>
+                    <FormControl component="fieldset" size="small">
+                      <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>전통신사</FormLabel>
+                      <RadioGroup
+                        value={formData.previousCarrier}
+                        onChange={(e) => updateFormData('previousCarrier', e.target.value)}
+                        row
+                        sx={{ '& .MuiFormControlLabel-root': { margin: 0, '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } } }}
+                      >
+                        <FormControlLabel value="SKT" control={<Radio size="small" />} label="SKT" />
+                        <FormControlLabel value="KT" control={<Radio size="small" />} label="KT" />
+                        <FormControlLabel value="알뜰폰" control={<Radio size="small" />} label="알뜰폰" />
+                      </RadioGroup>
+                    </FormControl>
+                    {formData.previousCarrier === '알뜰폰' && (
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="알뜰폰 상세"
+                        value={formData.previousCarrierOther}
+                        onChange={(e) => updateFormData('previousCarrierOther', e.target.value)}
+                        sx={{ mt: 0.5 }}
+                      />
+                    )}
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="고객명 *"
+                      value={formData.customerName}
+                      onChange={(e) => updateFormData('customerName', e.target.value)}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="생년월일 *"
+                      value={formData.birthDate}
+                      onChange={(e) => updateFormData('birthDate', e.target.value)}
+                      placeholder="YYMMDD"
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="개통번호 *"
+                      value={formData.phoneNumber}
+                      onChange={(e) => updateFormData('phoneNumber', e.target.value)}
+                      placeholder="010-1234-5678"
+                      required
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
 
             {/* 기기 및 유심 정보 */}
             <Grid item xs={12}>
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
-                    📱 기기 및 유심 정보
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="모델명 *"
-                        value={formData.modelName}
-                        onChange={(e) => updateFormData('modelName', e.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="일련번호(기기) *"
-                        value={formData.deviceSerial}
-                        onChange={(e) => updateFormData('deviceSerial', e.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <TextField
-                        fullWidth
-                        label="색상"
-                        value={formData.color}
-                        onChange={(e) => updateFormData('color', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="유심모델"
-                        value={formData.simModel}
-                        onChange={(e) => updateFormData('simModel', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="일련번호(유심)"
-                        value={formData.simSerial}
-                        onChange={(e) => updateFormData('simSerial', e.target.value)}
-                      />
-                    </Grid>
+              <Box sx={{ mb: 1, p: 1, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#5e35b1', fontWeight: 'bold', mb: 1 }}>
+                  📱 기기 및 유심 정보
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="모델명 *"
+                      value={formData.modelName}
+                      onChange={(e) => updateFormData('modelName', e.target.value)}
+                      required
+                    />
                   </Grid>
-                </CardContent>
-              </Card>
+                  <Grid item xs={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="일련번호(기기) *"
+                      value={formData.deviceSerial}
+                      onChange={(e) => updateFormData('deviceSerial', e.target.value)}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="색상"
+                      value={formData.color}
+                      onChange={(e) => updateFormData('color', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="유심모델"
+                      value={formData.simModel}
+                      onChange={(e) => updateFormData('simModel', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="일련번호(유심)"
+                      value={formData.simSerial}
+                      onChange={(e) => updateFormData('simSerial', e.target.value)}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
 
             {/* 요금 및 약정 정보 */}
             <Grid item xs={12}>
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
-                    💰 요금 및 약정 정보
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">약정유형</FormLabel>
-                        <RadioGroup
-                          value={formData.contractType}
-                          onChange={(e) => updateFormData('contractType', e.target.value)}
-                        >
-                          <FormControlLabel value="공시지원금" control={<Radio />} label="공시지원금" />
-                          <FormControlLabel value="선택약정(24)" control={<Radio />} label="선택약정(24)" />
-                          <FormControlLabel value="선택약정(12)" control={<Radio />} label="선택약정(12)" />
-                          <FormControlLabel value="선택약정(12+12)" control={<Radio />} label="선택약정(12+12)" />
-                        </RadioGroup>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
+              <Box sx={{ mb: 1, p: 1, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#5e35b1', fontWeight: 'bold', mb: 1 }}>
+                  💰 요금 및 약정 정보
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <FormControl component="fieldset" size="small">
+                      <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>약정유형</FormLabel>
+                      <RadioGroup
+                        value={formData.contractType}
+                        onChange={(e) => updateFormData('contractType', e.target.value)}
+                        sx={{ '& .MuiFormControlLabel-root': { margin: 0, '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } } }}
+                      >
+                        <FormControlLabel value="공시지원금" control={<Radio size="small" />} label="공시지원금" />
+                        <FormControlLabel value="선택약정(24)" control={<Radio size="small" />} label="선택약정(24)" />
+                        <FormControlLabel value="선택약정(12)" control={<Radio size="small" />} label="선택약정(12)" />
+                        <FormControlLabel value="선택약정(12+12)" control={<Radio size="small" />} label="선택약정(12+12)" />
+                      </RadioGroup>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
                         <TextField
                           fullWidth
+                          size="small"
                           label="전환지원금"
                           value={formData.conversionSubsidy}
                           onChange={(e) => updateFormData('conversionSubsidy', e.target.value)}
                           type="number"
                         />
+                      </Grid>
+                      <Grid item xs={6}>
                         <TextField
                           fullWidth
+                          size="small"
                           label="유통망추가지원금"
                           value={formData.additionalSubsidy}
                           onChange={(e) => updateFormData('additionalSubsidy', e.target.value)}
                           type="number"
                         />
-                      </Box>
+                      </Grid>
                     </Grid>
-                    <Grid item xs={12} md={6}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">할부개월</FormLabel>
-                        <RadioGroup
-                          value={formData.installmentMonths}
-                          onChange={(e) => updateFormData('installmentMonths', e.target.value)}
-                          row
-                        >
-                          <FormControlLabel value="할부24개월" control={<Radio />} label="24개월" />
-                          <FormControlLabel value="할부30개월" control={<Radio />} label="30개월" />
-                          <FormControlLabel value="할부36개월" control={<Radio />} label="36개월" />
-                          <FormControlLabel value="현금완납" control={<Radio />} label="현금완납" />
-                        </RadioGroup>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <FormControl component="fieldset" size="small">
+                      <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>할부개월</FormLabel>
+                      <RadioGroup
+                        value={formData.installmentMonths}
+                        onChange={(e) => updateFormData('installmentMonths', e.target.value)}
+                        row
+                        sx={{ '& .MuiFormControlLabel-root': { margin: 0, '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } } }}
+                      >
+                        <FormControlLabel value="할부24개월" control={<Radio size="small" />} label="24개월" />
+                        <FormControlLabel value="할부30개월" control={<Radio size="small" />} label="30개월" />
+                        <FormControlLabel value="할부36개월" control={<Radio size="small" />} label="36개월" />
+                        <FormControlLabel value="현금완납" control={<Radio size="small" />} label="현금완납" />
+                      </RadioGroup>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Grid container spacing={1}>
+                      <Grid item xs={6}>
                         <TextField
                           fullWidth
+                          size="small"
                           label="할부원금"
                           value={formData.installmentAmount}
                           onChange={(e) => updateFormData('installmentAmount', e.target.value)}
                           type="number"
                         />
+                      </Grid>
+                      <Grid item xs={6}>
                         <TextField
                           fullWidth
+                          size="small"
                           label="프리"
                           value={formData.free}
                           onChange={(e) => updateFormData('free', e.target.value)}
                         />
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="요금제(OTT명까지) *"
-                        value={formData.plan}
-                        onChange={(e) => updateFormData('plan', e.target.value)}
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">요금제미디어서비스(95이상)</FormLabel>
-                        <FormGroup row>
-                          {mediaServiceOptions.map((service) => (
-                            <FormControlLabel
-                              key={service}
-                              control={
-                                <Checkbox
-                                  checked={formData.mediaServices.includes(service)}
-                                  onChange={() => handleMediaServiceChange(service)}
-                                />
-                              }
-                              label={service}
-                            />
-                          ))}
-                        </FormGroup>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="부가서비스"
-                        value={formData.additionalServices}
-                        onChange={(e) => updateFormData('additionalServices', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <FormControl component="fieldset">
-                        <FormLabel component="legend">프리미어약정(85이상)</FormLabel>
-                        <RadioGroup
-                          value={formData.premierContract}
-                          onChange={(e) => updateFormData('premierContract', e.target.value)}
-                          row
-                        >
-                          <FormControlLabel value="가입" control={<Radio />} label="가입" />
-                          <FormControlLabel value="미가입" control={<Radio />} label="미가입" />
-                        </RadioGroup>
-                      </FormControl>
+                      </Grid>
                     </Grid>
                   </Grid>
-                </CardContent>
-              </Card>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="요금제(OTT명까지) *"
+                      value={formData.plan}
+                      onChange={(e) => updateFormData('plan', e.target.value)}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl component="fieldset" size="small">
+                      <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>요금제미디어서비스(95이상)</FormLabel>
+                      <FormGroup row sx={{ '& .MuiFormControlLabel-root': { margin: 0, '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } } }}>
+                        {mediaServiceOptions.map((service) => (
+                          <FormControlLabel
+                            key={service}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={formData.mediaServices.includes(service)}
+                                onChange={() => handleMediaServiceChange(service)}
+                              />
+                            }
+                            label={service}
+                          />
+                        ))}
+                      </FormGroup>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="부가서비스"
+                      value={formData.additionalServices}
+                      onChange={(e) => updateFormData('additionalServices', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <FormControl component="fieldset" size="small">
+                      <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>프리미어약정(85이상)</FormLabel>
+                      <RadioGroup
+                        value={formData.premierContract}
+                        onChange={(e) => updateFormData('premierContract', e.target.value)}
+                        row
+                        sx={{ '& .MuiFormControlLabel-root': { margin: 0, '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } } }}
+                      >
+                        <FormControlLabel value="가입" control={<Radio size="small" />} label="가입" />
+                        <FormControlLabel value="미가입" control={<Radio size="small" />} label="미가입" />
+                      </RadioGroup>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
 
             {/* 기타 정보 */}
             <Grid item xs={12}>
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#5e35b1', fontWeight: 'bold' }}>
-                    📝 기타 정보
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="예약번호(사전예약시)"
-                        value={formData.reservationNumber}
-                        onChange={(e) => updateFormData('reservationNumber', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={formData.otherRequests}
-                            onChange={(e) => updateFormData('otherRequests', e.target.checked)}
-                          />
-                        }
-                        label="동판여부"
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="기타요청사항"
-                        value={formData.otherRequestsText}
-                        onChange={(e) => updateFormData('otherRequestsText', e.target.value)}
-                        multiline
-                        rows={3}
-                      />
-                    </Grid>
+              <Box sx={{ mb: 1, p: 1, bgcolor: '#f3e5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#5e35b1', fontWeight: 'bold', mb: 1 }}>
+                  📝 기타 정보
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="예약번호(사전예약시)"
+                      value={formData.reservationNumber}
+                      onChange={(e) => updateFormData('reservationNumber', e.target.value)}
+                    />
                   </Grid>
-                </CardContent>
-              </Card>
+                  <Grid item xs={6}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={formData.otherRequests}
+                          onChange={(e) => updateFormData('otherRequests', e.target.checked)}
+                        />
+                      }
+                      label="동판여부"
+                      sx={{ '& .MuiFormControlLabel-label': { fontSize: '0.7rem' } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="기타요청사항"
+                      value={formData.otherRequestsText}
+                      onChange={(e) => updateFormData('otherRequestsText', e.target.value)}
+                      multiline
+                      rows={2}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
             </Grid>
 
             {/* 안내사항 */}
             <Grid item xs={12}>
-              <Alert severity="info" sx={{ mb: 3 }}>
-                <Typography variant="body2">
-                  <strong>안내사항:</strong><br/>
-                  • 보험 및 맘대로폰교체 가입은 서류 별도 접수 필요<br/>
-                  • 복지서류는 별도 접수 시 복지등록 가능
+              <Alert severity="info" sx={{ mb: 1, p: 1 }}>
+                <Typography variant="body2" sx={{ fontSize: '0.7rem' }}>
+                  <strong>안내사항:</strong> 보험 및 맘대로폰교체 가입은 서류 별도 접수 필요, 복지서류는 별도 접수 시 복지등록 가능
                 </Typography>
               </Alert>
             </Grid>
@@ -692,20 +714,20 @@ const ActivationInfoPage = () => {
         @media print {
           @page {
             size: A4;
-            margin: 8mm;
+            margin: 5mm;
           }
           
           body {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
-            font-size: 8pt !important;
-            line-height: 1.2 !important;
+            font-size: 7pt !important;
+            line-height: 1.1 !important;
           }
           
           .watermark {
             display: block !important;
-            opacity: 0.03 !important;
-            font-size: 60px !important;
+            opacity: 0.02 !important;
+            font-size: 50px !important;
           }
           
           .no-print {
@@ -721,7 +743,7 @@ const ActivationInfoPage = () => {
           
           /* Paper 컴포넌트 조정 */
           .MuiPaper-root {
-            padding: 8px !important;
+            padding: 4px !important;
             margin: 0 !important;
             box-shadow: none !important;
             background: white !important;
@@ -733,79 +755,102 @@ const ActivationInfoPage = () => {
           }
           
           .MuiGrid-item {
+            padding: 1px !important;
+          }
+          
+          /* Box 섹션 조정 */
+          .MuiBox-root {
+            margin: 0 !important;
             padding: 2px !important;
           }
           
-          /* Card 컴포넌트 조정 */
-          .MuiCard-root {
-            margin: 2px !important;
-            padding: 4px !important;
-            box-shadow: none !important;
-            border: 1px solid #ccc !important;
-          }
-          
-          .MuiCardContent-root {
-            padding: 4px !important;
-          }
-          
           /* Typography 조정 */
-          .MuiTypography-h6 {
-            font-size: 10pt !important;
-            margin: 2px 0 !important;
+          .MuiTypography-h4 {
+            font-size: 12pt !important;
+            margin: 1px 0 !important;
           }
           
-          .MuiTypography-body1 {
+          .MuiTypography-h6 {
             font-size: 8pt !important;
             margin: 1px 0 !important;
           }
           
-          .MuiTypography-body2 {
+          .MuiTypography-subtitle2 {
             font-size: 7pt !important;
             margin: 1px 0 !important;
+          }
+          
+          .MuiTypography-body1 {
+            font-size: 6pt !important;
+            margin: 0 !important;
+          }
+          
+          .MuiTypography-body2 {
+            font-size: 6pt !important;
+            margin: 0 !important;
           }
           
           /* Form 필드 조정 */
           .MuiTextField-root {
-            margin: 1px !important;
+            margin: 0 !important;
           }
           
           .MuiInputBase-root {
-            font-size: 7pt !important;
-            padding: 2px !important;
-            min-height: 20px !important;
+            font-size: 6pt !important;
+            padding: 1px !important;
+            min-height: 16px !important;
+          }
+          
+          .MuiInputLabel-root {
+            font-size: 6pt !important;
           }
           
           input, select, textarea {
-            font-size: 7pt !important;
+            font-size: 6pt !important;
             border: 1px solid #000 !important;
             padding: 1px !important;
             margin: 0 !important;
+            height: 16px !important;
           }
           
           /* Radio, Checkbox 조정 */
           .MuiFormControl-root {
-            margin: 1px !important;
+            margin: 0 !important;
           }
           
           .MuiFormGroup-root {
-            margin: 1px !important;
+            margin: 0 !important;
           }
           
           .MuiFormControlLabel-root {
             margin: 0 !important;
-            font-size: 7pt !important;
+            font-size: 6pt !important;
+          }
+          
+          .MuiRadio-root {
+            padding: 1px !important;
+            font-size: 6pt !important;
+          }
+          
+          .MuiCheckbox-root {
+            padding: 1px !important;
+            font-size: 6pt !important;
+          }
+          
+          .MuiFormLabel-root {
+            font-size: 6pt !important;
           }
           
           /* Grid spacing 조정 */
-          .MuiGrid-spacing-xs-3 > .MuiGrid-item {
-            padding: 1px !important;
+          .MuiGrid-spacing-xs-1 > .MuiGrid-item {
+            padding: 0 !important;
           }
           
           /* Alert 컴포넌트 조정 */
           .MuiAlert-root {
-            padding: 2px !important;
-            margin: 1px 0 !important;
-            font-size: 7pt !important;
+            padding: 1px !important;
+            margin: 0 !important;
+            font-size: 6pt !important;
           }
           
           /* Button 영역 숨김 */
@@ -817,6 +862,12 @@ const ActivationInfoPage = () => {
           .MuiBox-root {
             margin: 0 !important;
             padding: 0 !important;
+          }
+          
+          /* 섹션별 최적화 */
+          .MuiBox-root[style*="bgcolor"] {
+            padding: 1px !important;
+            margin: 0 !important;
           }
         }
       `}</style>
