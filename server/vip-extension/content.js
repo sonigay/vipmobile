@@ -153,14 +153,26 @@
           overflow: hidden !important;
         `;
         
-        // 화면 전체에 랜덤 위치로 여러 개 생성
-        for (let i = 0; i < 25; i++) {
+        // 화면 전체에 넓게 분포된 랜덤 위치로 여러 개 생성
+        for (let i = 0; i < 20; i++) {
           const watermark = document.createElement('div');
           
-          // 랜덤 위치 계산
-          const randomTop = Math.random() * 100;
-          const randomLeft = Math.random() * 100;
+          // 더 넓은 분포를 위한 위치 계산 (격자 기반 + 랜덤 오프셋)
+          const gridCols = 5; // 5열
+          const gridRows = 4; // 4행
+          const col = i % gridCols;
+          const row = Math.floor(i / gridCols);
+          
+          // 격자 기반 위치 + 랜덤 오프셋
+          const baseTop = (row * 25) + (Math.random() - 0.5) * 20; // ±10% 오프셋
+          const baseLeft = (col * 25) + (Math.random() - 0.5) * 20; // ±10% 오프셋
+          
+          const randomTop = Math.max(0, Math.min(100, baseTop));
+          const randomLeft = Math.max(0, Math.min(100, baseLeft));
           const randomRotation = (Math.random() - 0.5) * 60; // -30도 ~ +30도
+          
+          // 랜덤 글씨 크기 (40px ~ 120px) - 적당히 보기 좋게
+          const randomFontSize = 40 + Math.random() * 80;
           
           watermark.style.cssText = `
             position: absolute;
@@ -168,7 +180,7 @@
             left: ${randomLeft}%;
             text-align: center;
             transform: rotate(${randomRotation}deg);
-            font-size: 96px;
+            font-size: ${randomFontSize}px;
             font-weight: bold;
             color: rgba(0, 0, 0, 0.08);
             font-family: Arial, sans-serif;
@@ -204,6 +216,23 @@
       { 
         pattern: /고객님은 LG유플러스의 대리점인[^를]*를 통해 가입이 됩니다\./gi, 
         replacement: '고객님은 LG유플러스 공식 인증 대리점을 통해 가입이 됩니다.' 
+      },
+      // 회사명 치환 (VIP 관련 회사명 제외)
+      { 
+        pattern: /\(주\)[^브이아이피][^)]*/gi, 
+        replacement: '공식인증대리점' 
+      },
+      { 
+        pattern: /주식회사\s+[^브이아이피][^\s]*/gi, 
+        replacement: '공식인증대리점' 
+      },
+      { 
+        pattern: /\(유\)[^)]*/gi, 
+        replacement: '공식인증대리점' 
+      },
+      { 
+        pattern: /\(사\)[^)]*/gi, 
+        replacement: '공식인증대리점' 
       },
       // 주소, 전화번호 등 제거
       { pattern: /대리점코드\s*\[\d+\]/gi, replacement: '' },
