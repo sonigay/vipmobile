@@ -307,11 +307,7 @@ const ModeSelectionPopup = ({
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
                     border: '2px solid transparent',
-                    background: mode === 'onSaleReception' 
-                      ? 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)'
-                      : mode === 'onSaleManagement'
-                      ? 'linear-gradient(135deg, #5e35b1 0%, #4a2c7a 100%)'
-                      : 'transparent',
+                    background: 'transparent',
                     '&:hover': {
                       transform: 'translateY(-8px)',
                       boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
