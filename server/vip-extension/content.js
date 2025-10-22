@@ -145,7 +145,7 @@
       `;
       indicator.textContent = '(주)브이아이피플러스';
       document.body.appendChild(indicator);
-      // console.log('📌 회사명 인디케이터 생성 (계속 표시)');
+      console.log('📌 회사명 인디케이터 생성 (계속 표시)');
     }
     
     // 5. 워터마크 표시 (대각선, 전체 화면)
@@ -186,7 +186,9 @@
         }
         
         document.body.appendChild(watermarkContainer);
-        // console.log('💧 워터마크 생성:', companyName);
+        console.log('💧 워터마크 생성:', companyName);
+      } else {
+        console.log('⚠️ localStorage에 업체명 없음');
       }
     }
     

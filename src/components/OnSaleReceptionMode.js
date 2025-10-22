@@ -126,7 +126,9 @@ const OnSaleReceptionMode = ({
       // localStorage에 업체명 저장 (워터마크용)
       if (loggedInStore && loggedInStore.name) {
         localStorage.setItem('vip_company_name', loggedInStore.name);
-        // console.log('💾 업체명 저장:', loggedInStore.name);
+        console.log('💾 업체명 저장:', loggedInStore.name);
+      } else {
+        console.log('⚠️ loggedInStore 정보 없음:', loggedInStore);
       }
       
       if (link.hideAgentInfo) {
