@@ -15,7 +15,7 @@ import kotlinx.coroutines.isActive
 object MessageChecker {
     
     private const val TAG = "VipManager"
-    private const val CHECK_INTERVAL = 10000L // 10초마다 체크
+    private const val CHECK_INTERVAL = 30000L // 30초마다 체크 (API 한도 고려)
     
     private var isRunning = false
     
