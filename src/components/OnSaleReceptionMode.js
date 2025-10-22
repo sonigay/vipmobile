@@ -134,31 +134,8 @@ const OnSaleReceptionMode = ({
         console.log('💾 업체명 URL에 추가:', loggedInStore.name);
       }
       
-      if (link.hideAgentInfo) {
-        // 프록시 사용
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(`${API_URL}/api/onsale-proxy`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: targetUrl,
-            agentCode: link.agentCode
-          }),
-        });
-
-        const html = await response.text();
-        
-        setProxyHtml(html);
-        setCurrentLink(link);
-        setShowProxyPage(true);
-      } else {
-        // 직접 새 창에서 열기
-        window.open(targetUrl, '_blank');
-      }
+      // 모든 링크를 직접 새 창에서 열기 (확장 프로그램이 처리)
+      window.open(targetUrl, '_blank');
     } catch (error) {
       console.error('링크 열기 실패:', error);
       setError('페이지를 불러오는데 실패했습니다.');
