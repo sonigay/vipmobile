@@ -118,7 +118,9 @@
     // 2. 워터마크 표시 (대각선, 전체 화면)
     if (!document.getElementById('vip-watermark-container')) {
       // chrome.storage에서 업체명 가져오기 (도메인 간 공유)
+      console.log('🔍 chrome.storage.local에서 업체명 조회 시작');
       chrome.storage.local.get(['vipCompanyName'], (result) => {
+        console.log('📦 chrome.storage.local 조회 결과:', result);
         const companyName = result.vipCompanyName;
         
         if (companyName) {

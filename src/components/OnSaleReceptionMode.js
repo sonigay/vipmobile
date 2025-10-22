@@ -130,6 +130,13 @@ const OnSaleReceptionMode = ({
         urlObj.searchParams.set('vipCompany', encodeURIComponent(loggedInStore.name));
         targetUrl = urlObj.toString();
         console.log('💾 업체명 URL에 추가:', loggedInStore.name);
+        
+        // chrome.storage.local에 업체명 저장 (확장 프로그램용)
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ vipCompanyName: loggedInStore.name }, () => {
+            console.log('💾 chrome.storage.local에 업체명 저장:', loggedInStore.name);
+          });
+        }
       }
       
       if (link.hideAgentInfo) {
