@@ -37,23 +37,7 @@
         pattern: /고객님은 LG유플러스의 대리점인[^를]*를 통해 가입이 됩니다\./gi, 
         replacement: '고객님은 LG유플러스 공식 인증 대리점을 통해 가입이 됩니다.' 
       },
-      // 포괄적 패턴 - 브이아이피 제외한 다른 회사명만 교체
-      { 
-        pattern: /주식회사\s*(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
-        replacement: '공식인증대리점' 
-      },  // 주식회사 (브이아이피 제외)
-      { 
-        pattern: /\(주\)(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
-        replacement: '공식인증대리점' 
-      },  // (주) (브이아이피 제외)
-      { 
-        pattern: /\(유\)(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
-        replacement: '공식인증대리점' 
-      },  // (유) 회사명
-      { 
-        pattern: /\(사\)(?!.*브이아이피|.*VIP)[가-힣A-Za-z0-9\s]+/gi, 
-        replacement: '공식인증대리점' 
-      },  // (사) 회사명
+      // 주소, 전화번호 등 제거
       { pattern: /대리점코드\s*\[\d+\]/gi, replacement: '' },
       { pattern: /\([^)]*평택[^)]*\)/gi, replacement: '' },
       { pattern: /070-5038-4437/gi, replacement: '' },
