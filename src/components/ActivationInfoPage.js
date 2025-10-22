@@ -208,7 +208,7 @@ const ActivationInfoPage = () => {
           width: '100%',
           height: '100%',
           pointerEvents: 'none',
-          zIndex: 1,
+          zIndex: 10,
           opacity: 0.03,
           overflow: 'hidden'
         }}
