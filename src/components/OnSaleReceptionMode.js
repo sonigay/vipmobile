@@ -491,6 +491,11 @@ const OnSaleReceptionMode = ({
                     <Typography variant="body2" sx={{ color: '#8e24aa' }}>
                       {link.hideAgentInfo ? '(대리점 정보 보호)' : '(일반 링크)'}
                     </Typography>
+                    {link.useActivationForm && (
+                      <Typography variant="body2" sx={{ color: '#5e35b1', fontWeight: 'bold', mt: 0.5 }}>
+                        (개통양식 사용)
+                      </Typography>
+                    )}
                   </CardContent>
                   <CardActions>
                     <Button
