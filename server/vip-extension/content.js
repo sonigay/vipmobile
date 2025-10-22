@@ -219,20 +219,24 @@
       },
       // 회사명 치환 (VIP 관련 회사명 제외)
       { 
-        pattern: /\(주\)[^브이아이피][^)]*/gi, 
+        pattern: /\(주\)(?!브이아이피)[^)]*/gi, 
         replacement: '공식인증대리점' 
       },
       { 
-        pattern: /주식회사\s+[^브이아이피][^\s]*/gi, 
+        pattern: /주식회사\s+(?!브이아이피)[^\s]*/gi, 
         replacement: '공식인증대리점' 
       },
-      // 더 포괄적인 회사명 패턴
+      // 에프원 특별 처리
       { 
-        pattern: /주식회사\s+에프원/gi, 
+        pattern: /주식회사\s*에프원/gi, 
         replacement: '공식인증대리점' 
       },
       { 
         pattern: /\(주\)에프원/gi, 
+        replacement: '공식인증대리점' 
+      },
+      { 
+        pattern: /에프원/gi, 
         replacement: '공식인증대리점' 
       },
       { 
@@ -282,21 +286,36 @@
       const originalText = node.textContent;
       let newText = originalText;
       
+      // 디버깅: 에프원이나 주식회사가 포함된 텍스트 찾기
+      if (originalText.includes('에프원') || originalText.includes('주식회사')) {
+        console.log(`🔍 발견된 텍스트:`, originalText);
+        console.log(`📍 위치:`, node.parentElement?.tagName, node.parentElement?.className);
+      }
+      
       // 기본 패턴 적용
       textPatterns.forEach(({ pattern, replacement }) => {
-        newText = newText.replace(pattern, replacement);
+        if (pattern.test(newText)) {
+          console.log(`✅ 패턴 매치:`, pattern, '→', replacement);
+          newText = newText.replace(pattern, replacement);
+        }
       });
       
       // 회사명 교체 (VIP 관련 제외)
       if (!originalText.includes('브이아이피') && !originalText.includes('VIP')) {
         // 다른 회사명만 교체
+        const beforeReplace = newText;
         newText = newText.replace(/주식회사\s+[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
         newText = newText.replace(/\(주\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
         newText = newText.replace(/\(유\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
         newText = newText.replace(/\(사\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
+        
+        if (beforeReplace !== newText) {
+          console.log(`🔄 회사명 치환:`, beforeReplace, '→', newText);
+        }
       }
       
       if (newText !== originalText) {
+        console.log(`✨ 텍스트 변경됨:`, originalText, '→', newText);
         nodesToModify.push({ node, newText });
       }
     }
@@ -304,6 +323,98 @@
     nodesToModify.forEach(({ node, newText }) => {
       node.textContent = newText;
       modified = true;
+    });
+    
+    // 3. 추가: HTML 요소들에 대한 강제 치환
+    const specificSelectors = [
+      'div', 'span', 'p', 'td', 'th', 'label', 'strong', 'b', 'em', 'i', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+    ];
+    
+    specificSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(element => {
+        if (element.id === 'vip-company-indicator' || 
+            element.id === 'vip-watermark-container' ||
+            element.className === 'vip-permanent-element') {
+          return; // VIP 영구 요소는 건너뛰기
+        }
+        
+        const originalHTML = element.innerHTML;
+        let newHTML = originalHTML;
+        
+        
+        // HTML 내에서도 치환
+        textPatterns.forEach(({ pattern, replacement }) => {
+          if (pattern.test(newHTML)) {
+            console.log(`🔧 HTML 패턴 매치 [${selector}]:`, pattern, '→', replacement);
+            newHTML = newHTML.replace(pattern, replacement);
+          }
+        });
+        
+        // 에프원 특별 처리
+        if (newHTML.includes('에프원') && !newHTML.includes('브이아이피')) {
+          const beforeReplace = newHTML;
+          newHTML = newHTML.replace(/주식회사\s*에프원/gi, '공식인증대리점');
+          newHTML = newHTML.replace(/\(주\)에프원/gi, '공식인증대리점');
+          newHTML = newHTML.replace(/에프원/gi, '공식인증대리점');
+          
+          if (beforeReplace !== newHTML) {
+            console.log(`🔧 에프원 HTML 치환 [${selector}]:`, beforeReplace, '→', newHTML);
+          }
+        }
+        
+        if (newHTML !== originalHTML) {
+          element.innerHTML = newHTML;
+          modified = true;
+          console.log(`🔧 HTML 치환됨 [${selector}]:`, originalHTML, '→', newHTML);
+        }
+      });
+    });
+    
+    // 4. 특정 input 필드만 처리 (대리점명 관련 필드만)
+    const dealerInputSelectors = [
+      'input[id="selling-store-name"]',
+      'input[name="agentName"]',
+      'input[title*="대리점"]',
+      'input[title*="판매점"]'
+    ];
+    
+    dealerInputSelectors.forEach(selector => {
+      const inputs = document.querySelectorAll(selector);
+      inputs.forEach(input => {
+        if (input.value) {
+          const originalValue = input.value;
+          let newValue = originalValue;
+          
+          console.log(`🔍 대리점 input 발견 [${selector}]:`, originalValue);
+          
+          // input value에서 치환
+          textPatterns.forEach(({ pattern, replacement }) => {
+            if (pattern.test(newValue)) {
+              console.log(`🔧 대리점 INPUT 패턴 매치:`, pattern, '→', replacement);
+              newValue = newValue.replace(pattern, replacement);
+            }
+          });
+          
+          // 에프원 특별 처리
+          if (newValue.includes('에프원') && !newValue.includes('브이아이피')) {
+            const beforeReplace = newValue;
+            newValue = newValue.replace(/주식회사\s*에프원/gi, '공식인증대리점');
+            newValue = newValue.replace(/\(주\)에프원/gi, '공식인증대리점');
+            newValue = newValue.replace(/에프원/gi, '공식인증대리점');
+            
+            if (beforeReplace !== newValue) {
+              console.log(`🔧 에프원 대리점 INPUT 치환:`, beforeReplace, '→', newValue);
+            }
+          }
+          
+          if (newValue !== originalValue) {
+            input.value = newValue;
+            modified = true;
+            console.log(`🔧 대리점 INPUT 치환됨:`, originalValue, '→', newValue);
+          }
+        }
+      });
     });
     
     // 3. 특정 요소 숨김 (display: none) - 제거하면 페이지가 깨질 수 있음
