@@ -35,6 +35,33 @@ const rateLimitedSheetsCall = async (apiCall) => {
   return await apiCall();
 };
 
+// ===== SMS API 캐싱 시스템 (API 호출 최적화) =====
+const smsApiCache = {
+  pendingForwards: new Map(), // 전달 대기 목록 캐시 (폰번호별)
+  pendingReplies: new Map(),  // 자동응답 대기 목록 캐시 (폰번호별)
+};
+
+const SMS_CACHE_TTL = 10000; // 10초간 캐시 유지
+
+// 캐시 조회 함수
+const getCachedData = (cacheMap, key) => {
+  const cached = cacheMap.get(key);
+  if (cached && Date.now() - cached.timestamp < SMS_CACHE_TTL) {
+    console.log(`  ✅ 캐시 사용 (${key})`);
+    return cached.data;
+  }
+  return null;
+};
+
+// 캐시 저장 함수
+const setCachedData = (cacheMap, key, data) => {
+  cacheMap.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+  console.log(`  💾 캐시 저장 (${key})`);
+};
+
 // 서버 타임아웃 설정 (5분)
 app.use((req, res, next) => {
   req.setTimeout(300000); // 5분
@@ -28803,6 +28830,17 @@ app.get('/api/sms/received', async (req, res) => {
     
     console.log(`SMS 수신 데이터 조회: limit=${limit}, status=${status}, receiver=${receiver}`);
     
+    // 캐시 키 생성 (상태와 수신번호로 구분)
+    const cacheKey = `${status}_${receiver}`;
+    
+    // 캐시 확인 (대기중 상태만 캐싱 - 가장 자주 조회됨)
+    if (status === '대기중' && receiver) {
+      const cached = getCachedData(smsApiCache.pendingForwards, cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached });
+      }
+    }
+    
     // SMS관리 시트에서 데이터 가져오기
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -28847,6 +28885,11 @@ app.get('/api/sms/received', async (req, res) => {
     
     // 제한 적용
     smsData = smsData.slice(0, parseInt(limit));
+    
+    // 캐시 저장 (대기중 상태만)
+    if (status === '대기중' && receiver) {
+      setCachedData(smsApiCache.pendingForwards, cacheKey, smsData);
+    }
     
     res.json({ success: true, data: smsData });
     
@@ -29624,6 +29667,13 @@ app.post('/api/sms/register', async (req, res) => {
     // ==================================================
     console.log(`✅ 자동 전달 준비 완료: ${targetNumbers.length}개 번호 (앱이 실제 전송할 예정)`);
     
+    // 캐시 무효화 (새 SMS 등록 시 해당 수신번호의 캐시 삭제)
+    const cacheKey = `대기중_${receiver}`;
+    if (smsApiCache.pendingForwards.has(cacheKey)) {
+      smsApiCache.pendingForwards.delete(cacheKey);
+      console.log(`  🗑️ 캐시 무효화 (${cacheKey})`);
+    }
+    
     res.json({ success: true, id: newId });
     
   } catch (error) {
@@ -30330,6 +30380,14 @@ app.get('/api/sms/auto-reply/pending', async (req, res) => {
     
     console.log(`자동응답 발송 대기 목록 조회: salesPhone=${salesPhone}`);
     
+    // 캐시 확인
+    if (salesPhone) {
+      const cached = getCachedData(smsApiCache.pendingReplies, salesPhone);
+      if (cached) {
+        return res.json({ success: true, data: cached });
+      }
+    }
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: `${SMS_AUTO_REPLY_HISTORY_SHEET_NAME}!A:J`,
@@ -30353,6 +30411,11 @@ app.get('/api/sms/auto-reply/pending', async (req, res) => {
         rowIndex: index + 2
       }))
       .filter(r => r.status === '대기중' && r.senderPhone === salesPhone);
+    
+    // 캐시 저장
+    if (salesPhone) {
+      setCachedData(smsApiCache.pendingReplies, salesPhone, pendingReplies);
+    }
     
     res.json({ success: true, data: pendingReplies });
     
@@ -30381,6 +30444,9 @@ app.post('/api/sms/auto-reply/update-status', async (req, res) => {
       return res.status(404).json({ success: false, error: '이력을 찾을 수 없습니다.' });
     }
     
+    // 발송번호 추출 (캐시 무효화용)
+    const salesPhone = rows[rowIndex][7] || '';
+    
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const status = success ? '발송완료' : '실패';
     
@@ -30392,6 +30458,12 @@ app.post('/api/sms/auto-reply/update-status', async (req, res) => {
         values: [[status, now]]
       }
     });
+    
+    // 캐시 무효화 (상태 변경 시 해당 발송번호의 캐시 삭제)
+    if (salesPhone && smsApiCache.pendingReplies.has(salesPhone)) {
+      smsApiCache.pendingReplies.delete(salesPhone);
+      console.log(`  🗑️ 자동응답 캐시 무효화 (${salesPhone})`);
+    }
     
     res.json({ success: true });
     
