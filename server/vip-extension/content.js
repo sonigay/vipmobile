@@ -60,9 +60,19 @@
       const originalText = node.textContent;
       let newText = originalText;
       
+      // 기본 패턴 적용
       textPatterns.forEach(({ pattern, replacement }) => {
         newText = newText.replace(pattern, replacement);
       });
+      
+      // 회사명 교체 (VIP 관련 제외)
+      if (!originalText.includes('브이아이피') && !originalText.includes('VIP')) {
+        // 다른 회사명만 교체
+        newText = newText.replace(/주식회사\s+[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
+        newText = newText.replace(/\(주\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
+        newText = newText.replace(/\(유\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
+        newText = newText.replace(/\(사\)[가-힣A-Za-z0-9]+/gi, '공식인증대리점');
+      }
       
       if (newText !== originalText) {
         nodesToModify.push({ node, newText });
