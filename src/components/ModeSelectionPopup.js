@@ -30,14 +30,6 @@ import {
   Phone as PhoneIcon
 } from '@mui/icons-material';
 
-// 색상 조정 함수
-const adjustColor = (color, amount) => {
-  const num = parseInt(color.replace("#", ""), 16);
-  const r = Math.max(0, Math.min(255, ((num >> 16) & 0xFF) + amount));
-  const g = Math.max(0, Math.min(255, ((num >> 8) & 0xFF) + amount));
-  const b = Math.max(0, Math.min(255, (num & 0xFF) + amount));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-};
 
 const ModeSelectionPopup = ({ 
   open, 
@@ -319,7 +311,7 @@ const ModeSelectionPopup = ({
                       ? 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)'
                       : mode === 'onSaleManagement'
                       ? 'linear-gradient(135deg, #5e35b1 0%, #4a2c7a 100%)'
-                      : `linear-gradient(135deg, ${config.color} 0%, ${adjustColor(config.color, -20)} 100%)`,
+                      : 'transparent',
                     '&:hover': {
                       transform: 'translateY(-8px)',
                       boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
