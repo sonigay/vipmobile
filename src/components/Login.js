@@ -265,7 +265,7 @@ function Login({ onLogin }) {
                 const requiredVersion = versionData.requiredVersion;
                 
                 if (!isVersionValid(currentVersion, requiredVersion)) {
-                  setError(`❌ VIP 확장프로그램 버전이 오래되었습니다!\n\n현재 버전: ${currentVersion || '알 수 없음'}\n필요 버전: ${requiredVersion} 이상\n\n📥 업데이트 방법:\n1. 기존 확장 제거 (chrome://extensions/)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. 새 버전 재설치\n4. 새로고침(F5) 후 로그인`);
+                  setError(`❌ 버전이 변경되었습니다. 재설치가 필요합니다.\n\n현재 버전: ${currentVersion || '알 수 없음'}\n최신 버전: ${requiredVersion}\n\n확장프로그램 재설치 후 재접속 부탁드립니다.\n\n1. chrome://extensions/ 접속\n2. 기존 확장 제거\n3. 위의 "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n4. 새 버전 재설치 → 새로고침(F5)`);
                   setLoading(false);
                   return;
                 }
