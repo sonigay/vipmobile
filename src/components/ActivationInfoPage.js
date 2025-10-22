@@ -227,7 +227,7 @@ const ActivationInfoPage = () => {
               userSelect: 'none'
             }}
           >
-            {urlParams.vipCompany}
+            {decodeURIComponent(urlParams.vipCompany || '')}
           </Typography>
         ))}
       </Box>
