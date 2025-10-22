@@ -6719,24 +6719,45 @@ app.post('/api/onsale-proxy', async (req, res) => {
           }
           
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
             min-height: 100vh;
+            padding: 0;
+            margin: 0;
+          }
+          
+          .header {
+            background: #E60028;
+            padding: 15px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          
+          .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
             display: flex;
-            justify-content: center;
             align-items: center;
-            padding: 20px;
+          }
+          
+          .logo-text {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: -0.5px;
           }
           
           .container {
+            max-width: 600px;
+            margin: 80px auto;
+            padding: 20px;
+          }
+          
+          .main-card {
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 60px 40px;
-            max-width: 500px;
-            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 60px 50px;
             text-align: center;
-            animation: fadeIn 0.5s ease-in-out;
           }
           
           @keyframes fadeIn {
@@ -6750,87 +6771,51 @@ app.post('/api/onsale-proxy', async (req, res) => {
             }
           }
           
-          .logo {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          .icon-circle {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #E60028 0%, #FF6B9D 100%);
             border-radius: 50%;
             margin: 0 auto 30px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
-            color: white;
+            font-size: 50px;
           }
           
           h1 {
-            font-size: 28px;
-            color: #333;
+            font-size: 32px;
+            color: #222;
             margin-bottom: 15px;
             font-weight: 700;
           }
           
           .subtitle {
-            font-size: 16px;
+            font-size: 18px;
             color: #666;
-            margin-bottom: 40px;
-            line-height: 1.6;
-          }
-          
-          .notice {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            margin: 30px 0;
-            text-align: left;
-            border-radius: 8px;
-          }
-          
-          .notice h3 {
-            font-size: 14px;
-            color: #667eea;
-            margin-bottom: 12px;
-            font-weight: 600;
-          }
-          
-          .notice ul {
-            list-style: none;
-            padding-left: 0;
-          }
-          
-          .notice li {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 8px;
-            padding-left: 20px;
-            position: relative;
-          }
-          
-          .notice li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #667eea;
-            font-weight: bold;
+            margin-bottom: 50px;
+            line-height: 1.8;
           }
           
           .btn-start {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #E60028 0%, #FF1744 100%);
             color: white;
             border: none;
-            padding: 18px 50px;
-            font-size: 18px;
-            font-weight: 600;
-            border-radius: 50px;
+            padding: 20px 60px;
+            font-size: 20px;
+            font-weight: 700;
+            border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(230, 0, 40, 0.3);
+            transition: all 0.2s ease;
+            width: 100%;
+            max-width: 400px;
           }
           
           .btn-start:hover {
+            background: linear-gradient(135deg, #C90024 0%, #E6003C 100%);
             transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 6px 20px rgba(230, 0, 40, 0.4);
           }
           
           .btn-start:active {
@@ -6838,30 +6823,45 @@ app.post('/api/onsale-proxy', async (req, res) => {
           }
           
           .footer {
-            margin-top: 30px;
-            font-size: 12px;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
             color: #999;
+            line-height: 1.6;
+          }
+          
+          .uplus-brand {
+            color: #E60028;
+            font-weight: 700;
           }
         </style>
       </head>
       <body>
+        <div class="header">
+          <div class="header-content">
+            <div class="logo-text">U+</div>
+          </div>
+        </div>
+        
         <div class="container">
-          <div class="logo">📱</div>
-          
-          <h1>U+ 온라인 가입</h1>
-          <p class="subtitle">
-            LG 유플러스 공식 대리점을 통해<br>
-            안전하고 편리하게 가입하실 수 있습니다.
-          </p>
-          
-          
-          <button class="btn-start" onclick="startApplication()">
-            가입 신청 시작하기
-          </button>
-          
-          <p class="footer">
-            본 서비스는 LG유플러스 공식 대리점을 통해 제공됩니다
-          </p>
+          <div class="main-card">
+            <div class="icon-circle">📱</div>
+            
+            <h1>온라인 가입신청</h1>
+            <p class="subtitle">
+              <span class="uplus-brand">LG U+</span> 공식 인증대리점을 통해<br>
+              안전하고 편리하게 가입하실 수 있습니다.
+            </p>
+            
+            <button class="btn-start" onclick="startApplication()">
+              가입 신청 시작하기
+            </button>
+            
+            <p class="footer">
+              본 서비스는 <span class="uplus-brand">LG유플러스</span> 공식 인증대리점을 통해 제공됩니다
+            </p>
+          </div>
         </div>
         
         <script>
