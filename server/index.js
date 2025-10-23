@@ -6630,19 +6630,25 @@ app.delete('/api/onsale/links/:rowIndex', async (req, res) => {
     
     const sheetName = '온세일링크관리';
     
-    // 구글 시트에서는 행을 완전히 삭제하는 대신 빈 값으로 만듭니다
-    // 또는 활성화여부를 'X'로 변경
-    await sheets.spreadsheets.values.update({
+    // Google Sheets API로 행 자체를 삭제
+    await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A${rowIndex}:G${rowIndex}`,
-      valueInputOption: 'RAW',
       requestBody: {
-        values: [['', '', '', '', '', '', '']]
+        requests: [{
+          deleteDimension: {
+            range: {
+              sheetId: 0, // 첫 번째 시트 (온세일링크관리)
+              dimension: 'ROWS',
+              startIndex: parseInt(rowIndex) - 1, // 0-based index
+              endIndex: parseInt(rowIndex) // 삭제할 행의 끝 인덱스
+            }
+          }
+        }]
       }
     });
     
-    console.log(`✅ [온세일] 링크 삭제 완료: 행 ${rowIndex}`);
-    res.json({ success: true, message: '링크가 삭제되었습니다.' });
+    console.log(`✅ [온세일] 링크 삭제 완료: 행 ${rowIndex} 완전 삭제`);
+    res.json({ success: true, message: '링크가 완전히 삭제되었습니다.' });
     
   } catch (error) {
     console.error('❌ [온세일] 링크 삭제 실패:', error);
