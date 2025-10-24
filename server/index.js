@@ -6671,6 +6671,338 @@ app.delete('/api/rechotancho-bond/delete/:timestamp', async (req, res) => {
   }
 });
 
+// ==================== 개통정보 목록 관리 API ====================
+
+// 개통정보 목록 조회 API
+app.get('/api/onsale/activation-list', async (req, res) => {
+  try {
+    console.log('📋 [개통정보목록] 개통정보 목록 조회 시작');
+    const { storeName, sheetId, allSheets } = req.query;
+    
+    let targetSheets = [];
+    
+    if (allSheets === 'true') {
+      // 모든 개통양식 시트 조회
+      const linksResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '온세일링크관리!A:G',
+      });
+      
+      const links = linksResponse.data.values || [];
+      targetSheets = links.slice(1)
+        .filter(row => row[4] === 'O') // 개통양식 사용 여부가 'O'
+        .map(row => ({
+          sheetId: row[5] || '',
+          sheetName: row[6] || ''
+        }))
+        .filter(sheet => sheet.sheetId && sheet.sheetName);
+    } else if (sheetId) {
+      // 특정 시트만 조회
+      const linksResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: '온세일링크관리!A:G',
+      });
+      
+      const links = linksResponse.data.values || [];
+      const link = links.slice(1).find(row => row[5] === sheetId);
+      if (link) {
+        targetSheets = [{
+          sheetId: link[5],
+          sheetName: link[6]
+        }];
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'sheetId 또는 allSheets 파라미터가 필요합니다.'
+      });
+    }
+    
+    const allData = [];
+    
+    for (const sheet of targetSheets) {
+      try {
+        const sheetData = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheet.sheetId,
+          range: `${sheet.sheetName}!C:AH`,
+        });
+        
+        const rows = sheetData.data.values || [];
+        
+        for (let i = 1; i < rows.length; i++) { // 헤더 제외
+          const row = rows[i];
+          if (row.length === 0) continue;
+          
+          const isCancelled = row[0] === '취소'; // C열
+          const cancelledBy = row[1] || ''; // D열
+          const lastEditor = row[2] || ''; // E열
+          const submittedAt = row[3] || ''; // F열
+          const storeNameFromSheet = row[4] || ''; // G열
+          const customerName = row[8] || ''; // I열
+          const phoneNumber = row[10] || ''; // K열
+          const modelName = row[11] || ''; // L열
+          const plan = row[18] || ''; // S열
+          
+          // storeName 필터링
+          if (storeName && storeNameFromSheet !== storeName) {
+            continue;
+          }
+          
+          allData.push({
+            rowIndex: i + 1,
+            sheetId: sheet.sheetId,
+            sheetName: sheet.sheetName,
+            submittedAt,
+            storeName: storeNameFromSheet,
+            customerName,
+            phoneNumber,
+            modelName,
+            plan,
+            isCancelled,
+            cancelledBy,
+            lastEditor
+          });
+        }
+      } catch (error) {
+        console.error(`❌ [개통정보목록] 시트 ${sheet.sheetName} 조회 실패:`, error);
+        continue;
+      }
+    }
+    
+    // 제출일시 기준 최신순 정렬
+    allData.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+    
+    console.log(`✅ [개통정보목록] 조회 완료: ${allData.length}개`);
+    res.json({ success: true, data: allData });
+    
+  } catch (error) {
+    console.error('❌ [개통정보목록] 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '개통정보 목록 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 개통정보 단건 조회 API
+app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    
+    console.log(`📋 [개통정보단건] 개통정보 조회: ${sheetId}, 행 ${rowIndex}`);
+    
+    // 시트 이름 찾기
+    const linksResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일링크관리!A:G',
+    });
+    
+    const links = linksResponse.data.values || [];
+    const link = links.slice(1).find(row => row[5] === sheetId);
+    
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        error: '시트를 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetName = link[6];
+    
+    // 개통정보 데이터 조회
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!F${rowIndex}:AD${rowIndex}`,
+    });
+    
+    const row = sheetData.data.values?.[0] || [];
+    
+    if (row.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '개통정보를 찾을 수 없습니다.'
+      });
+    }
+    
+    const data = {
+      submittedAt: row[0] || '',
+      storeName: row[1] || '',
+      pCode: row[2] || '',
+      activationType: row[3] || '',
+      previousCarrier: row[4] || '',
+      customerName: row[5] || '',
+      birthDate: row[6] || '',
+      phoneNumber: row[7] || '',
+      modelName: row[8] || '',
+      deviceSerial: row[9] || '',
+      color: row[10] || '',
+      simModel: row[11] || '',
+      simSerial: row[12] || '',
+      contractType: row[13] || '',
+      conversionSubsidy: row[14] || '',
+      additionalSubsidy: row[15] || '',
+      installmentMonths: row[16] || '',
+      installmentAmount: row[17] || '',
+      free: row[18] || '',
+      plan: row[19] || '',
+      mediaServices: row[20] || '',
+      additionalServices: row[21] || '',
+      premierContract: row[22] || '',
+      reservationNumber: row[23] || '',
+      otherRequests: row[24] || ''
+    };
+    
+    console.log(`✅ [개통정보단건] 조회 완료`);
+    res.json({ success: true, data });
+    
+  } catch (error) {
+    console.error('❌ [개통정보단건] 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '개통정보 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 개통정보 수정 API
+app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    const { data, editor } = req.body;
+    
+    console.log(`📝 [개통정보수정] 개통정보 수정: ${sheetId}, 행 ${rowIndex}`);
+    
+    // 시트 이름 찾기
+    const linksResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일링크관리!A:G',
+    });
+    
+    const links = linksResponse.data.values || [];
+    const link = links.slice(1).find(row => row[5] === sheetId);
+    
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        error: '시트를 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetName = link[6];
+    
+    // 수정자 정보 업데이트 (E열)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!E${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[editor || '']]
+      }
+    });
+    
+    // 개통정보 데이터 업데이트 (F~AD열)
+    const timestamp = new Date().toLocaleString('ko-KR');
+    const rowData = [
+      timestamp, // 제출일시는 현재 시간으로 업데이트
+      data.storeName || '',
+      data.pCode || '',
+      data.activationType || '',
+      data.previousCarrier || '',
+      data.customerName || '',
+      data.birthDate || '',
+      data.phoneNumber || '',
+      data.modelName || '',
+      data.deviceSerial || '',
+      data.color || '',
+      data.simModel || '',
+      data.simSerial || '',
+      data.contractType || '',
+      data.conversionSubsidy || '',
+      data.additionalSubsidy || '',
+      data.installmentMonths || '',
+      data.installmentAmount || '',
+      data.free || '',
+      data.plan || '',
+      Array.isArray(data.mediaServices) ? data.mediaServices.join(', ') : (data.mediaServices || ''),
+      data.additionalServices || '',
+      data.premierContract || '',
+      data.reservationNumber || '',
+      data.otherRequests || ''
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!F${rowIndex}:AD${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [rowData]
+      }
+    });
+    
+    console.log(`✅ [개통정보수정] 수정 완료`);
+    res.json({ success: true, message: '개통정보가 수정되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [개통정보수정] 수정 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '개통정보 수정에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 개통정보 취소 처리 API
+app.post('/api/onsale/activation-info/:sheetId/:rowIndex/cancel', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    const { cancelledBy } = req.body;
+    
+    console.log(`🚫 [개통정보취소] 개통정보 취소: ${sheetId}, 행 ${rowIndex}`);
+    
+    // 시트 이름 찾기
+    const linksResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일링크관리!A:G',
+    });
+    
+    const links = linksResponse.data.values || [];
+    const link = links.slice(1).find(row => row[5] === sheetId);
+    
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        error: '시트를 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetName = link[6];
+    
+    // 취소 처리 (C열: 취소여부, D열: 취소자)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!C${rowIndex}:D${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['취소', cancelledBy || '']]
+      }
+    });
+    
+    console.log(`✅ [개통정보취소] 취소 완료`);
+    res.json({ success: true, message: '개통정보가 취소되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [개통정보취소] 취소 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '개통정보 취소에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // ==================== 온세일 관리 API ====================
 
 // 온세일 링크 관리 - 전체 링크 조회 (관리자모드용)
@@ -6951,7 +7283,7 @@ app.post('/api/onsale/activation-info', async (req, res) => {
       
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${sheetName}!C1:AA1`,
+        range: `${sheetName}!F1:AD1`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [headers]
@@ -6989,10 +7321,10 @@ app.post('/api/onsale/activation-info', async (req, res) => {
       data.otherRequests || ''
     ];
     
-    // 데이터 추가 (C열부터)
+    // 데이터 추가 (F열부터)
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${sheetName}!C:G`,
+      range: `${sheetName}!F:AH`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -7041,7 +7373,7 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
     
     // 전화번호로 개통양식 데이터 행 찾기 (최근 1시간 이내)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toLocaleString('ko-KR');
-    const searchRange = `${sheetName}!C:G`;
+    const searchRange = `${sheetName}!F:AH`;
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: searchRange
@@ -7053,42 +7385,42 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
     // 전화번호로 매칭되는 행 찾기
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      if (row[7] === phoneNumber) { // 개통번호 컬럼 (8번째, 0-based)
+      if (row[10] === phoneNumber) { // 개통번호 컬럼 (F열 기준 11번째, 0-based)
         targetRowIndex = i + 1; // 1-based 인덱스
         break;
       }
     }
     
     if (targetRowIndex === -1) {
-      // 매칭되는 행이 없으면 새 행에 AA열부터 저장
+      // 매칭되는 행이 없으면 새 행에 AE열부터 저장
       console.log('📝 [U+제출] 매칭되는 개통양식 없음, 새 행에 저장');
       const timestamp = new Date().toLocaleString('ko-KR');
       const newRowData = [
-        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // C~Z열 빈 값
-        timestamp, // AA열: 제출일시
-        JSON.stringify(data) // AB열: U+ 제출 데이터 (JSON)
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // C~AD열 빈 값 (28개)
+        timestamp, // AE열: 제출일시
+        JSON.stringify(data) // AF열: U+ 제출 데이터 (JSON)
       ];
       
       await sheets.spreadsheets.values.append({
         spreadsheetId: sheetId,
-        range: `${sheetName}!C:AB`,
+        range: `${sheetName}!C:AF`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [newRowData]
         }
       });
     } else {
-      // 매칭되는 행이 있으면 AA열부터 U+ 데이터 저장
+      // 매칭되는 행이 있으면 AE열부터 U+ 데이터 저장
       console.log(`📝 [U+제출] 매칭되는 개통양식 발견, 행 ${targetRowIndex}에 U+ 데이터 추가`);
       const timestamp = new Date().toLocaleString('ko-KR');
       const uplusData = [
-        timestamp, // AA열: 제출일시
-        JSON.stringify(data) // AB열: U+ 제출 데이터 (JSON)
+        timestamp, // AE열: 제출일시
+        JSON.stringify(data) // AF열: U+ 제출 데이터 (JSON)
       ];
       
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${sheetName}!AA${targetRowIndex}:AB${targetRowIndex}`,
+        range: `${sheetName}!AE${targetRowIndex}:AF${targetRowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [uplusData]
