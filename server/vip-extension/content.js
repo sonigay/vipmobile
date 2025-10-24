@@ -315,7 +315,7 @@
       const isUserCompany = vipCompany && originalText.includes(vipCompany);
       const isLgUplus = originalText.includes('엘지유플러스') || originalText.includes('LG유플러스') || originalText.includes('(주)엘지유플러스') || originalText.includes('유플러스') || originalText.includes('(주)유플러스');
       
-      console.log(`🔍 회사명 체크:`, {
+      console.log('🔍 회사명 체크:', {
         originalText: originalText.substring(0, 50) + '...',
         vipCompany,
         isVipRelated,
@@ -369,12 +369,7 @@
     // 3. 추가: 특정 위치의 HTML 요소들만 치환 (대리점 정보 영역)
     const specificSelectors = [
       '.dialog-c-text',           // U+ 대화상자 텍스트 영역
-      '.dynamic-data-temp',       // 동적 데이터 표시 영역
-      '[class*="agent"]',         // 대리점 관련 클래스
-      '[class*="store"]',         // 매장 관련 클래스
-      '[class*="dealer"]',        // 딜러 관련 클래스
-      'td[class*="agent"]',       // 대리점 관련 테이블 셀
-      'span[class*="agent"]'      // 대리점 관련 스팬
+      '.dynamic-data-temp'        // 동적 데이터 표시 영역
     ];
     
     specificSelectors.forEach(selector => {
@@ -384,6 +379,25 @@
             element.id === 'vip-watermark-container' ||
             element.className === 'vip-permanent-element') {
           return; // VIP 영구 요소는 건너뛰기
+        }
+        
+        // 🛡️ 안전성 검증: 스크립트, 스타일, 메타 태그는 절대 건드리지 않음
+        if (element.tagName === 'SCRIPT' || 
+            element.tagName === 'STYLE' || 
+            element.tagName === 'META' ||
+            element.tagName === 'LINK' ||
+            element.tagName === 'TITLE') {
+          return; // 핵심 페이지 요소는 건드리지 않음
+        }
+        
+        // 🛡️ 안전성 검증: HTML에 스크립트나 스타일이 포함된 경우 건드리지 않음
+        if (element.innerHTML.includes('<script') || 
+            element.innerHTML.includes('<style') ||
+            element.innerHTML.includes('function(') ||
+            element.innerHTML.includes('var ') ||
+            element.innerHTML.includes('const ') ||
+            element.innerHTML.includes('let ')) {
+          return; // JavaScript나 CSS가 포함된 요소는 건드리지 않음
         }
         
         const originalHTML = element.innerHTML;
@@ -450,7 +464,7 @@
           const originalValue = input.value;
           let newValue = originalValue;
           
-          console.log(`🔍 대리점 input 발견 [${selector}]:`, originalValue);
+          console.log('🔍 대리점 input 발견 [' + selector + ']:', originalValue);
           
           // 🛡️ 강력한 INPUT 보호 로직 - 치환 전에 먼저 확인
           const vipCompany = urlParams.get('vipCompany');
