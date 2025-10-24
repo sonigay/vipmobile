@@ -225,7 +225,7 @@ const OnSaleReceptionMode = ({
 
   // 개통정보 수정
   const handleEditActivation = (activation) => {
-    const editUrl = `/activation-info?editMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}`;
+    const editUrl = `/activation-info?editMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}&activationSheetId=${activation.sheetId}`;
     window.location.href = editUrl;
   };
 
