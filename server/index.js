@@ -6492,7 +6492,24 @@ app.put('/api/rechotancho-bond/update/:timestamp', async (req, res) => {
       });
     }
     
-    // 기존 데이터 삭제 (뒤에서부터 삭제하여 인덱스 변화 방지)
+    // 시트 메타데이터 조회하여 sheetId 가져오기
+    const sheetMetadata = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.get({
+        spreadsheetId
+      });
+    });
+    
+    const targetSheet = sheetMetadata.data.sheets.find(sheet => sheet.properties.title === sheetName);
+    if (!targetSheet) {
+      return res.status(404).json({
+        success: false,
+        error: '시트를 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetId = targetSheet.properties.sheetId;
+    
+    // 기존 데이터 삭제 - 실제 행 삭제 (뒤에서부터 삭제하여 인덱스 변화 방지)
     for (let i = targetRows.length - 1; i >= 0; i--) {
       await rateLimitedSheetsCall(async () => {
         return await sheets.spreadsheets.batchUpdate({
@@ -6501,7 +6518,7 @@ app.put('/api/rechotancho-bond/update/:timestamp', async (req, res) => {
             requests: [{
               deleteDimension: {
                 range: {
-                  sheetId: 0,
+                  sheetId: sheetId,
                   dimension: 'ROWS',
                   startIndex: targetRows[i] - 1,
                   endIndex: targetRows[i]
@@ -6599,7 +6616,24 @@ app.delete('/api/rechotancho-bond/delete/:timestamp', async (req, res) => {
       });
     }
     
-    // 데이터 삭제 (뒤에서부터 삭제하여 인덱스 변화 방지)
+    // 시트 메타데이터 조회하여 sheetId 가져오기
+    const sheetMetadata = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.get({
+        spreadsheetId
+      });
+    });
+    
+    const targetSheet = sheetMetadata.data.sheets.find(sheet => sheet.properties.title === sheetName);
+    if (!targetSheet) {
+      return res.status(404).json({
+        success: false,
+        error: '시트를 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetId = targetSheet.properties.sheetId;
+    
+    // 데이터 삭제 - 실제 행 삭제 (뒤에서부터 삭제하여 인덱스 변화 방지)
     for (let i = targetRows.length - 1; i >= 0; i--) {
       await rateLimitedSheetsCall(async () => {
         return await sheets.spreadsheets.batchUpdate({
@@ -6608,7 +6642,7 @@ app.delete('/api/rechotancho-bond/delete/:timestamp', async (req, res) => {
             requests: [{
               deleteDimension: {
                 range: {
-                  sheetId: 0,
+                  sheetId: sheetId,
                   dimension: 'ROWS',
                   startIndex: targetRows[i] - 1,
                   endIndex: targetRows[i]
