@@ -7267,7 +7267,7 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     // 시트 데이터 확인
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${sheetName}!C1:Z1`
+      range: `${sheetName}!F1:AD1`
     });
     
     const existingHeaders = sheetData.data.values?.[0] || [];
