@@ -9,14 +9,30 @@
 // v1.2.0 - 워터마크 개선: localStorage → URL 파라미터로 변경 (도메인 간 전달)
 // v1.2.1 - 버그 수정: 요소 숨김 로직에서 인디케이터 제외, document.body 대기 추가
 // v1.3.0 - 도메인 간 공유: chrome.storage.local 사용, VIP 앱에서 자동 저장, 인디케이터 중앙 정렬
+// v1.3.1 - JavaScript 구문 에러 수정: console.log 템플릿 리터럴 문제 해결
+// v1.3.2 - HTML 치환 범위 축소: U+ 페이지 백지 현상 해결, 안전성 검증 강화
 //
 // 버전 관리 규칙 (AI 자동 업데이트):
 // - 버그 수정: patch 버전 증가 (예: 1.1.0 → 1.1.1)
 // - 기능 추가: minor 버전 증가 (예: 1.1.0 → 1.2.0)
 // - 큰 변경: major 버전 증가 (예: 1.1.0 → 2.0.0)
+//
+// 자동 버전 계산: 현재 최신 버전은 v1.3.2
 
 (function() {
   'use strict';
+  
+  // 자동 버전 계산 함수
+  function getCurrentVersion() {
+    const versionHistory = [
+      'v1.0.0', 'v1.1.0', 'v1.1.1', 'v1.1.2', 'v1.2.0', 'v1.2.1', 
+      'v1.3.0', 'v1.3.1', 'v1.3.2'
+    ];
+    return versionHistory[versionHistory.length - 1];
+  }
+  
+  // 현재 버전 자동 계산
+  const CURRENT_VERSION = getCurrentVersion();
   
   // VIP 앱에서 온 접속인지 확인 (vipCompany 파라미터 체크)
   const urlParams = new URLSearchParams(window.location.search);
@@ -39,9 +55,9 @@
 
   // 확장 프로그램이 설치되어 있음을 표시 (VIP 앱에서만)
   window.VIP_AGENT_PROTECTION_ENABLED = true;
-  window.VIP_EXTENSION_VERSION = '1.3.1'; // 버전 정보 노출
+  window.VIP_EXTENSION_VERSION = CURRENT_VERSION; // 자동 계산된 버전 정보
   document.documentElement.setAttribute('data-vip-extension', 'installed');
-  document.documentElement.setAttribute('data-vip-extension-version', '1.3.1');
+  document.documentElement.setAttribute('data-vip-extension-version', CURRENT_VERSION);
 
   // 메타 태그도 추가 (추가 감지 방법)
   const metaTag = document.createElement('meta');
