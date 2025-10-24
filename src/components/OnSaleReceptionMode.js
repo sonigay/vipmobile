@@ -199,12 +199,20 @@ const OnSaleReceptionMode = ({
   const fetchActivationList = async () => {
     try {
       setActivationLoading(true);
-      const response = await fetch(`${API_URL}/api/onsale/activation-list?storeName=${encodeURIComponent(loggedInStore.name)}&allSheets=true`);
+      const url = `${API_URL}/api/onsale/activation-list?storeName=${encodeURIComponent(loggedInStore.name)}&allSheets=true`;
+      console.log('🔍 온세일접수 모드 - 개통정보 목록 요청:', url);
+      console.log('🔍 매장명:', loggedInStore.name);
+      
+      const response = await fetch(url);
       const result = await response.json();
       
+      console.log('🔍 온세일접수 모드 - API 응답:', result);
+      
       if (result.success) {
+        console.log('🔍 온세일접수 모드 - 개통정보 개수:', result.data.length);
         setActivationList(result.data);
       } else {
+        console.error('🔍 온세일접수 모드 - API 에러:', result.error);
         setError('개통정보 목록을 불러오는데 실패했습니다.');
       }
     } catch (error) {
