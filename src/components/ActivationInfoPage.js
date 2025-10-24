@@ -156,7 +156,7 @@ const ActivationInfoPage = () => {
 
   // 유효성 검사
   const validateForm = () => {
-    const required = ['customerName', 'birthDate', 'phoneNumber', 'modelName', 'deviceSerial', 'plan'];
+    const required = ['customerName', 'birthDate', 'phoneNumber', 'modelName', 'plan'];
     const missing = required.filter(field => !formData[field]);
     
     if (missing.length > 0) {
