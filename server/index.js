@@ -7267,7 +7267,7 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     // 시트 데이터 확인
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${sheetName}!F1:AD1`
+      range: `${sheetName}!C1:AF1`
     });
     
     const existingHeaders = sheetData.data.values?.[0] || [];
@@ -7281,12 +7281,19 @@ app.post('/api/onsale/activation-info', async (req, res) => {
         '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항'
       ];
       
+      // 전체 헤더 생성 (C1:AF1)
+      const fullHeaders = [
+        '취소여부', '취소자', '수정자', // C1, D1, E1
+        ...headers, // F1~AD1: 개통정보 25개 필드
+        'U+제출일시', 'U+제출데이터' // AE1, AF1
+      ];
+      
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${sheetName}!F1:AD1`,
+        range: `${sheetName}!C1:AF1`,
         valueInputOption: 'RAW',
         requestBody: {
-          values: [headers]
+          values: [fullHeaders]
         }
       });
     }
@@ -7321,13 +7328,22 @@ app.post('/api/onsale/activation-info', async (req, res) => {
       data.otherRequests || ''
     ];
     
-    // 데이터 추가 (F열부터)
+    // 데이터 추가 (C열부터 - 취소여부, 취소자, 수정자, 개통정보 25개 필드)
+    const fullRowData = [
+      '', // A열: 비워둠
+      '', // B열: 비워둠
+      '', // C열: 취소여부 (신규 입력 시 빈 값)
+      '', // D열: 취소자 (신규 입력 시 빈 값)
+      '', // E열: 수정자 (신규 입력 시 빈 값)
+      ...rowData // F열~AD열: 개통정보 25개 필드
+    ];
+    
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${sheetName}!F:AH`,
+      range: `${sheetName}!C:AF`,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [rowData]
+        values: [fullRowData]
       }
     });
     
@@ -7373,7 +7389,7 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
     
     // 전화번호로 개통양식 데이터 행 찾기 (최근 1시간 이내)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toLocaleString('ko-KR');
-    const searchRange = `${sheetName}!F:AH`;
+    const searchRange = `${sheetName}!C:AF`;
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: searchRange
@@ -7385,7 +7401,7 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
     // 전화번호로 매칭되는 행 찾기
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      if (row[10] === phoneNumber) { // 개통번호 컬럼 (F열 기준 11번째, 0-based)
+      if (row[13] === phoneNumber) { // 개통번호 컬럼 (C열 기준 14번째, 0-based)
         targetRowIndex = i + 1; // 1-based 인덱스
         break;
       }
@@ -7396,7 +7412,7 @@ app.post('/api/onsale/uplus-submission', async (req, res) => {
       console.log('📝 [U+제출] 매칭되는 개통양식 없음, 새 행에 저장');
       const timestamp = new Date().toLocaleString('ko-KR');
       const newRowData = [
-        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // C~AD열 빈 값 (28개)
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // C~AF열 빈 값 (33개)
         timestamp, // AE열: 제출일시
         JSON.stringify(data) // AF열: U+ 제출 데이터 (JSON)
       ];
