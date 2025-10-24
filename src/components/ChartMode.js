@@ -4043,6 +4043,116 @@ function RechotanchoBondTab({ loggedInStore }) {
     }
   };
 
+  // 데이터 수정
+  const handleUpdate = async () => {
+    if (!selectedTimestamp) {
+      alert('수정할 데이터를 선택해주세요.');
+      return;
+    }
+
+    if (!window.confirm('선택한 데이터를 수정하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      // 빈 필드는 0으로 처리하여 저장
+      const dataToSave = inputData.map(item => ({
+        agentCode: item.agentCode,
+        agentName: item.agentName,
+        inventoryBond: Number(item.inventoryBond) || 0,
+        collateralBond: Number(item.collateralBond) || 0,
+        managementBond: Number(item.managementBond) || 0
+      }));
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/update/${selectedTimestamp}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: dataToSave,
+          inputUser: loggedInStore?.name || loggedInStore?.target || '사용자'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('데이터가 성공적으로 수정되었습니다.');
+        // 데이터 새로고침
+        await loadHistory();
+        await loadAllData();
+        // 입력 필드 초기화
+        setSelectedTimestamp('');
+        setInputData(
+          agents.map(agent => ({
+            agentCode: agent.code,
+            agentName: agent.name,
+            inventoryBond: '',
+            collateralBond: '',
+            managementBond: 0
+          }))
+        );
+      } else {
+        alert(`수정 실패: ${result.error || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error('데이터 수정 실패:', error);
+      alert('데이터 수정에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 데이터 삭제
+  const handleDelete = async () => {
+    if (!selectedTimestamp) {
+      alert('삭제할 데이터를 선택해주세요.');
+      return;
+    }
+
+    if (!window.confirm('선택한 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/delete/${selectedTimestamp}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('데이터가 성공적으로 삭제되었습니다.');
+        // 데이터 새로고침
+        await loadHistory();
+        await loadAllData();
+        // 입력 필드 초기화
+        setSelectedTimestamp('');
+        setInputData(
+          agents.map(agent => ({
+            agentCode: agent.code,
+            agentName: agent.name,
+            inventoryBond: '',
+            collateralBond: '',
+            managementBond: 0
+          }))
+        );
+      } else {
+        alert(`삭제 실패: ${result.error || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error('데이터 삭제 실패:', error);
+      alert('데이터 삭제에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // 현재 데이터로 막대 그래프 데이터 생성
   const getBarChartData = () => {
     // 입력 중인 데이터 또는 최신 데이터 사용
@@ -4532,7 +4642,7 @@ function RechotanchoBondTab({ loggedInStore }) {
           </Table>
         </TableContainer>
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
           <Button
             variant="contained"
             color="primary"
@@ -4542,6 +4652,30 @@ function RechotanchoBondTab({ loggedInStore }) {
           >
             {saving ? '저장 중...' : '저장'}
           </Button>
+          
+          {selectedTimestamp && (
+            <>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={handleUpdate}
+                disabled={saving}
+                startIcon={saving ? <CircularProgress size={20} /> : <EditIcon />}
+              >
+                {saving ? '수정 중...' : '수정'}
+              </Button>
+              
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={handleDelete}
+                disabled={saving}
+                startIcon={saving ? <CircularProgress size={20} /> : <DeleteIcon />}
+              >
+                {saving ? '삭제 중...' : '삭제'}
+              </Button>
+            </>
+          )}
         </Box>
       </Paper>
     </Box>

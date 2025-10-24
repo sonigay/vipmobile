@@ -6438,6 +6438,205 @@ app.get('/api/rechotancho-bond/all-data', async (req, res) => {
   }
 });
 
+// 재초담초채권 데이터 수정
+app.put('/api/rechotancho-bond/update/:timestamp', async (req, res) => {
+  try {
+    const { timestamp } = req.params;
+    const { data, inputUser } = req.body;
+    
+    if (!timestamp) {
+      return res.status(400).json({
+        success: false,
+        error: '시점 정보가 필요합니다.'
+      });
+    }
+    
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({
+        success: false,
+        error: '데이터가 올바르지 않습니다.'
+      });
+    }
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    const sheetName = '재초담초채권_내역';
+    
+    // 먼저 해당 시점의 데이터가 있는지 확인
+    const response = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:G`
+      });
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.status(404).json({
+        success: false,
+        error: '수정할 데이터를 찾을 수 없습니다.'
+      });
+    }
+    
+    // 해당 시점의 데이터 행 찾기
+    const targetRows = [];
+    rows.forEach((row, index) => {
+      if (row[0] === timestamp) {
+        targetRows.push(index + 1); // 구글 시트의 실제 행 번호 (1-based)
+      }
+    });
+    
+    if (targetRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '해당 시점의 데이터를 찾을 수 없습니다.'
+      });
+    }
+    
+    // 기존 데이터 삭제 (뒤에서부터 삭제하여 인덱스 변화 방지)
+    for (let i = targetRows.length - 1; i >= 0; i--) {
+      await rateLimitedSheetsCall(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: 0,
+                  dimension: 'ROWS',
+                  startIndex: targetRows[i] - 1,
+                  endIndex: targetRows[i]
+                }
+              }
+            }]
+          }
+        });
+      });
+    }
+    
+    // 새 데이터 추가
+    const newRows = data.map(item => [
+      timestamp,                          // A: 저장일시
+      item.agentCode,                     // B: 대리점코드
+      item.agentName,                     // C: 대리점명
+      Number(item.inventoryBond) || 0,    // D: 재고초과채권
+      Number(item.collateralBond) || 0,   // E: 담보초과채권
+      Number(item.managementBond) || 0,   // F: 관리대상채권
+      inputUser || ''                     // G: 입력자
+    ]);
+    
+    await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${sheetName}!A:G`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: newRows
+        }
+      });
+    });
+    
+    console.log(`✅ 재초담초채권 데이터 수정 완료: ${timestamp}, 입력자: ${inputUser}, ${newRows.length}개 대리점`);
+    
+    res.json({
+      success: true,
+      message: '데이터가 성공적으로 수정되었습니다.',
+      timestamp
+    });
+    
+  } catch (error) {
+    console.error('❌ 재초담초채권 데이터 수정 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '데이터 수정에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 재초담초채권 데이터 삭제
+app.delete('/api/rechotancho-bond/delete/:timestamp', async (req, res) => {
+  try {
+    const { timestamp } = req.params;
+    
+    if (!timestamp) {
+      return res.status(400).json({
+        success: false,
+        error: '시점 정보가 필요합니다.'
+      });
+    }
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || process.env.SHEET_ID;
+    const sheetName = '재초담초채권_내역';
+    
+    // 해당 시점의 데이터가 있는지 확인
+    const response = await rateLimitedSheetsCall(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:G`
+      });
+    });
+    
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.status(404).json({
+        success: false,
+        error: '삭제할 데이터를 찾을 수 없습니다.'
+      });
+    }
+    
+    // 해당 시점의 데이터 행 찾기
+    const targetRows = [];
+    rows.forEach((row, index) => {
+      if (row[0] === timestamp) {
+        targetRows.push(index + 1); // 구글 시트의 실제 행 번호 (1-based)
+      }
+    });
+    
+    if (targetRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '해당 시점의 데이터를 찾을 수 없습니다.'
+      });
+    }
+    
+    // 데이터 삭제 (뒤에서부터 삭제하여 인덱스 변화 방지)
+    for (let i = targetRows.length - 1; i >= 0; i--) {
+      await rateLimitedSheetsCall(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          resource: {
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: 0,
+                  dimension: 'ROWS',
+                  startIndex: targetRows[i] - 1,
+                  endIndex: targetRows[i]
+                }
+              }
+            }]
+          }
+        });
+      });
+    }
+    
+    console.log(`✅ 재초담초채권 데이터 삭제 완료: ${timestamp}, ${targetRows.length}개 행 삭제`);
+    
+    res.json({
+      success: true,
+      message: '데이터가 성공적으로 삭제되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('❌ 재초담초채권 데이터 삭제 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '데이터 삭제에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // ==================== 온세일 관리 API ====================
 
 // 온세일 링크 관리 - 전체 링크 조회 (관리자모드용)
