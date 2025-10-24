@@ -252,7 +252,7 @@ const OnSaleManagementMode = ({
   // 개통정보 수정
   const handleEditActivation = (activation) => {
     const editUrl = `/activation-info?editMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}`;
-    window.open(editUrl, '_blank');
+    window.location.href = editUrl;
   };
 
   // 개통정보 취소
