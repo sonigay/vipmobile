@@ -18,7 +18,8 @@ import {
   Card,
   CardContent,
   Divider,
-  IconButton
+  IconButton,
+  Autocomplete
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -126,6 +127,37 @@ const ActivationInfoPage = () => {
       }));
     }
   }, []);
+
+  // 요금제 데이터 로드
+  useEffect(() => {
+    loadPlanData();
+  }, []);
+
+  // 요금제 옵션 데이터 (동적 로드)
+  const [planOptions, setPlanOptions] = useState([]);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [directInput, setDirectInput] = useState(false);
+
+  // 요금제 데이터 로드 함수
+  const loadPlanData = async () => {
+    try {
+      setPlanLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/ob/plan-data`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setPlanOptions(result.data);
+      } else {
+        console.warn('요금제 데이터 로드 실패:', result.error);
+        setPlanOptions([]);
+      }
+    } catch (error) {
+      console.error('요금제 데이터 로드 실패:', error);
+      setPlanOptions([]);
+    } finally {
+      setPlanLoading(false);
+    }
+  };
 
   // 미디어 서비스 옵션
   const mediaServiceOptions = [
@@ -625,13 +657,79 @@ const ActivationInfoPage = () => {
                       </Box>
                     </Grid>
                     <Grid item xs={12} md={8}>
-                      <TextField
-                        fullWidth
-                        label="요금제(OTT명까지) *"
-                        value={formData.plan}
-                        onChange={(e) => updateFormData('plan', e.target.value)}
-                        required
-                      />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={directInput}
+                              onChange={(e) => setDirectInput(e.target.checked)}
+                              size="small"
+                            />
+                          }
+                          label="직접입력"
+                        />
+                      </Box>
+                      
+                      {directInput ? (
+                        <TextField
+                          fullWidth
+                          label="요금제(OTT명까지) *"
+                          value={formData.plan}
+                          onChange={(e) => updateFormData('plan', e.target.value)}
+                          placeholder="요금제명을 직접 입력하세요"
+                          required
+                        />
+                      ) : (
+                        <Autocomplete
+                          fullWidth
+                          options={planOptions}
+                          value={planOptions.find(option => option.planName === formData.plan) || null}
+                          onChange={(event, newValue) => updateFormData('plan', newValue?.planName || '')}
+                          getOptionLabel={(option) => `${option.planName} (${option.planGroup}) - ${Number(option.baseFee || 0).toLocaleString()}원`}
+                          isOptionEqualToValue={(option, value) => option.planName === value?.planName}
+                          loading={planLoading}
+                          disabled={planOptions.length === 0}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="요금제(OTT명까지) *"
+                              placeholder={planOptions.length === 0 ? "요금제 데이터를 불러오는 중..." : "요금제를 검색하거나 선택하세요"}
+                              required
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <>
+                                    {planLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </>
+                                ),
+                              }}
+                            />
+                          )}
+                          filterOptions={(options, { inputValue }) => {
+                            const searchTerm = inputValue.toLowerCase();
+                            return options.filter(option => {
+                              const planName = option.planName.toLowerCase();
+                              const planGroup = option.planGroup.toLowerCase();
+                              const baseFee = Number(option.baseFee || 0).toLocaleString();
+                              return planName.includes(searchTerm) || planGroup.includes(searchTerm) || baseFee.includes(searchTerm);
+                            });
+                          }}
+                          noOptionsText={planOptions.length === 0 ? "요금제 데이터가 없습니다. 직접입력을 사용하세요." : "검색 결과가 없습니다"}
+                          renderOption={(props, option) => (
+                            <Box component="li" {...props}>
+                              <Box>
+                                <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                  {option.planName}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {option.planGroup} - {Number(option.baseFee || 0).toLocaleString()}원
+                                </Typography>
+                              </Box>
+                            </Box>
+                          )}
+                        />
+                      )}
                     </Grid>
                     <Grid item xs={12}>
                       <FormControl component="fieldset">
