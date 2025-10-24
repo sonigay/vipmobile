@@ -50,6 +50,7 @@ const OnSaleReceptionMode = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   
   // 인증 상태
@@ -548,6 +549,12 @@ const OnSaleReceptionMode = ({
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+            {success}
           </Alert>
         )}
 
