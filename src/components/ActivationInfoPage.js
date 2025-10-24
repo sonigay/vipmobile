@@ -712,7 +712,12 @@ const ActivationInfoPage = () => {
                               const planName = option.planName.toLowerCase();
                               const planGroup = option.planGroup.toLowerCase();
                               const baseFee = Number(option.baseFee || 0).toLocaleString();
-                              return planName.includes(searchTerm) || planGroup.includes(searchTerm) || baseFee.includes(searchTerm);
+                              const baseFeeNumber = (option.baseFee || 0).toString();
+                              
+                              return planName.includes(searchTerm) || 
+                                     planGroup.includes(searchTerm) || 
+                                     baseFee.includes(searchTerm) ||
+                                     baseFeeNumber.includes(searchTerm);
                             });
                           }}
                           noOptionsText={planOptions.length === 0 ? "요금제 데이터가 없습니다. 직접입력을 사용하세요." : "검색 결과가 없습니다"}
