@@ -6724,7 +6724,7 @@ app.get('/api/onsale/activation-list', async (req, res) => {
       try {
         const sheetData = await sheets.spreadsheets.values.get({
           spreadsheetId: sheet.sheetId,
-          range: `${sheet.sheetName}!C:AH`,
+          range: `${sheet.sheetName}!C:AD`,
         });
         
         const rows = sheetData.data.values || [];
@@ -6738,10 +6738,18 @@ app.get('/api/onsale/activation-list', async (req, res) => {
           const lastEditor = row[2] || ''; // E열
           const submittedAt = row[3] || ''; // F열
           const storeNameFromSheet = row[4] || ''; // G열
-          const customerName = row[8] || ''; // I열
-          const phoneNumber = row[10] || ''; // K열
-          const modelName = row[11] || ''; // L열
-          const plan = row[18] || ''; // S열
+          const pCode = row[5] || ''; // H열
+          const activationType = row[6] || ''; // I열
+          const previousCarrier = row[7] || ''; // J열
+          const customerName = row[8] || ''; // K열
+          const birthDate = row[9] || ''; // L열
+          const phoneNumber = row[10] || ''; // M열
+          const modelName = row[11] || ''; // N열
+          const deviceSerial = row[12] || ''; // O열
+          const color = row[13] || ''; // P열
+          const simModel = row[14] || ''; // Q열
+          const simSerial = row[15] || ''; // R열
+          const plan = row[22] || ''; // Y열 (C열 기준 23번째, 0-based)
           
           // storeName 필터링
           if (storeName && storeNameFromSheet !== storeName) {
@@ -6754,9 +6762,17 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             sheetName: sheet.sheetName,
             submittedAt,
             storeName: storeNameFromSheet,
+            pCode,
+            activationType,
+            previousCarrier,
             customerName,
+            birthDate,
             phoneNumber,
             modelName,
+            deviceSerial,
+            color,
+            simModel,
+            simSerial,
             plan,
             isCancelled,
             cancelledBy,

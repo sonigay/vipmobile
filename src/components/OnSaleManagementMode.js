@@ -602,13 +602,17 @@ const OnSaleManagementMode = ({
                   <TableHead>
                     <TableRow>
                       <TableCell>제출일시</TableCell>
+                      <TableCell>작업자</TableCell>
                       <TableCell>매장명</TableCell>
+                      <TableCell>개통유형</TableCell>
                       <TableCell>고객명</TableCell>
                       <TableCell>개통번호</TableCell>
+                      <TableCell>생년월일</TableCell>
                       <TableCell>모델명</TableCell>
-                      <TableCell>요금제</TableCell>
+                      <TableCell>일련번호</TableCell>
+                      <TableCell>유심모델명</TableCell>
+                      <TableCell>유심일련번호</TableCell>
                       <TableCell>상태</TableCell>
-                      <TableCell>수정자</TableCell>
                       <TableCell>작업</TableCell>
                     </TableRow>
                   </TableHead>
@@ -622,11 +626,37 @@ const OnSaleManagementMode = ({
                         }}
                       >
                         <TableCell>{activation.submittedAt}</TableCell>
+                        <TableCell>
+                          {activation.isCancelled ? (
+                            <Box>
+                              <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
+                                취소: {activation.cancelledBy}
+                              </Box>
+                              {activation.lastEditor && (
+                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                                  수정: {activation.lastEditor}
+                                </Box>
+                              )}
+                            </Box>
+                          ) : (
+                            <Box>
+                              {activation.lastEditor && (
+                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                                  수정: {activation.lastEditor}
+                                </Box>
+                              )}
+                            </Box>
+                          )}
+                        </TableCell>
                         <TableCell>{activation.storeName}</TableCell>
+                        <TableCell>{activation.activationType}</TableCell>
                         <TableCell>{activation.customerName}</TableCell>
                         <TableCell>{activation.phoneNumber}</TableCell>
+                        <TableCell>{activation.birthDate}</TableCell>
                         <TableCell>{activation.modelName}</TableCell>
-                        <TableCell>{activation.plan}</TableCell>
+                        <TableCell>{activation.deviceSerial}</TableCell>
+                        <TableCell>{activation.simModel}</TableCell>
+                        <TableCell>{activation.simSerial}</TableCell>
                         <TableCell>
                           {activation.isCancelled ? (
                             <Chip 
@@ -638,7 +668,6 @@ const OnSaleManagementMode = ({
                             <Chip label="정상" color="success" size="small" />
                           )}
                         </TableCell>
-                        <TableCell>{activation.lastEditor || '-'}</TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
                             <IconButton
