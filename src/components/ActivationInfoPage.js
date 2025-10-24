@@ -21,9 +21,9 @@ import {
   IconButton
 } from '@mui/material';
 import {
+  ArrowBack as ArrowBackIcon,
   Print as PrintIcon,
-  Save as SaveIcon,
-  ArrowBack as ArrowBackIcon
+  Save as SaveIcon
 } from '@mui/icons-material';
 
 const ActivationInfoPage = () => {
@@ -33,6 +33,10 @@ const ActivationInfoPage = () => {
   
   // URL 파라미터에서 정보 추출
   const [urlParams, setUrlParams] = useState({});
+  
+  // 수정 모드 상태
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editData, setEditData] = useState(null);
   
   // 폼 데이터 상태
   const [formData, setFormData] = useState({
@@ -73,6 +77,27 @@ const ActivationInfoPage = () => {
     otherRequestsText: ''
   });
 
+  // 수정 데이터 로드 함수
+  const loadEditData = async (sheetId, rowIndex) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/onsale/activation-info/${sheetId}/${rowIndex}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setEditData(result.data);
+        setFormData(result.data);
+      } else {
+        setError('개통정보를 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('수정 데이터 로드 실패:', error);
+      setError('개통정보를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // URL 파라미터 파싱
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -81,16 +106,25 @@ const ActivationInfoPage = () => {
       activationSheetId: params.get('activationSheetId') || '',
       activationSheetName: params.get('activationSheetName') || '',
       targetUrl: params.get('targetUrl') || '',
-      storeId: params.get('storeId') || ''
+      storeId: params.get('storeId') || '',
+      editMode: params.get('editMode'),
+      sheetId: params.get('sheetId'),
+      rowIndex: params.get('rowIndex')
     };
     setUrlParams(paramData);
     
-    // 매장 정보 자동 설정
-    setFormData(prev => ({
-      ...prev,
-      storeName: decodeURIComponent(paramData.vipCompany || ''),
-      pCode: paramData.storeId || ''
-    }));
+    // 수정 모드 확인
+    if (paramData.editMode === 'true' && paramData.sheetId && paramData.rowIndex) {
+      setIsEditMode(true);
+      loadEditData(paramData.sheetId, paramData.rowIndex);
+    } else {
+      // 신규 입력 모드: 매장 정보 자동 설정
+      setFormData(prev => ({
+        ...prev,
+        storeName: decodeURIComponent(paramData.vipCompany || ''),
+        pCode: paramData.storeId || ''
+      }));
+    }
   }, []);
 
   // 미디어 서비스 옵션
@@ -148,40 +182,102 @@ const ActivationInfoPage = () => {
     setError(null);
     
     try {
-      // localStorage에 시트 정보 저장 (확장 프로그램용)
-      localStorage.setItem('vip_activation_sheetId', urlParams.activationSheetId);
-      localStorage.setItem('vip_activation_sheetName', urlParams.activationSheetName);
-      localStorage.setItem('vip_activation_phoneNumber', formData.phoneNumber);
-      
-      // API 호출
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info`, {
+      if (isEditMode) {
+        // 수정 모드: PUT API 호출
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: formData,
+            editor: formData.storeName // 수정자 정보
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          setSuccess('개통정보가 수정되었습니다.');
+          setTimeout(() => {
+            window.history.back();
+          }, 2000);
+        } else {
+          setError(result.error || '개통정보 수정에 실패했습니다.');
+        }
+      } else {
+        // 신규 입력 모드: POST API 호출
+        // localStorage에 시트 정보 저장 (확장 프로그램용)
+        localStorage.setItem('vip_activation_sheetId', urlParams.activationSheetId);
+        localStorage.setItem('vip_activation_sheetName', urlParams.activationSheetName);
+        localStorage.setItem('vip_activation_phoneNumber', formData.phoneNumber);
+        
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sheetId: urlParams.activationSheetId,
+            sheetName: urlParams.activationSheetName,
+            data: formData
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          setSuccess('개통정보가 저장되었습니다. U+ 온세일 접수 페이지로 이동합니다.');
+          
+          // 2초 후 U+ 페이지로 이동
+          setTimeout(() => {
+            window.open(urlParams.targetUrl, '_blank');
+          }, 2000);
+        } else {
+          setError(result.error || '개통정보 저장에 실패했습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('개통정보 처리 실패:', error);
+      setError('개통정보 처리에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 취소 처리 함수
+  const handleCancel = async () => {
+    if (!window.confirm('이 개통정보를 취소 처리하시겠습니까?')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sheetId: urlParams.activationSheetId,
-          sheetName: urlParams.activationSheetName,
-          data: formData
+          cancelledBy: formData.storeName // 취소자 정보
         })
       });
       
       const result = await response.json();
       
       if (result.success) {
-        setSuccess('개통정보가 저장되었습니다. U+ 온세일 접수 페이지로 이동합니다.');
-        
-        // 2초 후 U+ 페이지로 이동
+        setSuccess('개통정보가 취소되었습니다.');
         setTimeout(() => {
-          // targetUrl에 이미 vipCompany 파라미터가 포함되어 있으므로 그대로 사용
-          window.open(urlParams.targetUrl, '_blank');
+          window.history.back();
         }, 2000);
       } else {
-        setError(result.error || '개통정보 저장에 실패했습니다.');
+        setError(result.error || '개통정보 취소에 실패했습니다.');
       }
     } catch (error) {
-      console.error('개통정보 저장 실패:', error);
-      setError('개통정보 저장 중 오류가 발생했습니다.');
+      console.error('개통정보 취소 실패:', error);
+      setError('개통정보 취소에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -645,40 +741,92 @@ const ActivationInfoPage = () => {
             </Alert>
             
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Button
-                variant="outlined"
-                startIcon={<ArrowBackIcon />}
-                onClick={handleGoBack}
-                sx={{ minWidth: 120 }}
-              >
-                뒤로가기
-              </Button>
-              
-              <Button
-                variant="outlined"
-                startIcon={<PrintIcon />}
-                onClick={handlePrint}
-                sx={{ minWidth: 120 }}
-              >
-                인쇄하기
-              </Button>
-              
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handleSubmit}
-                disabled={loading}
-                sx={{ 
-                  minWidth: 200,
-                  background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-                  '&:hover': { 
-                    background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
-                  },
-                  boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
-                }}
-              >
-                {loading ? <CircularProgress size={20} /> : '제출하고 온세일 접수하기'}
-              </Button>
+              {isEditMode ? (
+                // 수정 모드 버튼들
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PrintIcon />}
+                    onClick={handlePrint}
+                    sx={{ minWidth: 120 }}
+                  >
+                    인쇄하기
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    onClick={handleGoBack}
+                    sx={{ minWidth: 120 }}
+                  >
+                    수정 취소
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleCancel}
+                    disabled={loading}
+                    sx={{ minWidth: 120 }}
+                  >
+                    취소
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    sx={{ 
+                      minWidth: 120,
+                      background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                      '&:hover': { 
+                        background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+                      },
+                      boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
+                    }}
+                  >
+                    {loading ? <CircularProgress size={20} /> : '수정 완료'}
+                  </Button>
+                </>
+              ) : (
+                // 신규 입력 모드 버튼들
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleGoBack}
+                    sx={{ minWidth: 120 }}
+                  >
+                    뒤로가기
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    startIcon={<PrintIcon />}
+                    onClick={handlePrint}
+                    sx={{ minWidth: 120 }}
+                  >
+                    인쇄하기
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    sx={{ 
+                      minWidth: 200,
+                      background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                      '&:hover': { 
+                        background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+                      },
+                      boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
+                    }}
+                  >
+                    {loading ? <CircularProgress size={20} /> : '제출하고 온세일 접수하기'}
+                  </Button>
+                </>
+              )}
             </Box>
           </Box>
         </Paper>
