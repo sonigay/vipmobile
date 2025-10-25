@@ -188,9 +188,9 @@ const ActivationInfoPage = () => {
   const handleMediaServiceChange = (service) => {
     setFormData(prev => ({
       ...prev,
-      mediaServices: prev.mediaServices.includes(service)
-        ? prev.mediaServices.filter(s => s !== service)
-        : [...prev.mediaServices, service]
+      mediaServices: (prev.mediaServices || []).includes(service)
+        ? (prev.mediaServices || []).filter(s => s !== service)
+        : [...(prev.mediaServices || []), service]
     }));
   };
 
@@ -722,10 +722,10 @@ const ActivationInfoPage = () => {
                               const baseFee = Number(option.baseFee || 0).toLocaleString();
                               const baseFeeNumber = (option.baseFee || 0).toString();
                               
-                              return planName.includes(searchTerm) || 
-                                     planGroup.includes(searchTerm) || 
-                                     baseFee.includes(searchTerm) ||
-                                     baseFeeNumber.includes(searchTerm);
+                              return (planName || '').includes(searchTerm) || 
+                                     (planGroup || '').includes(searchTerm) || 
+                                     (baseFee || '').includes(searchTerm) ||
+                                     (baseFeeNumber || '').includes(searchTerm);
                             });
                           }}
                           noOptionsText={planOptions.length === 0 ? "요금제 데이터가 없습니다. 직접입력을 사용하세요." : "검색 결과가 없습니다"}
@@ -753,7 +753,7 @@ const ActivationInfoPage = () => {
                               key={service}
                               control={
                                 <Checkbox
-                                  checked={formData.mediaServices.includes(service)}
+                                  checked={(formData.mediaServices || []).includes(service)}
                                   onChange={() => handleMediaServiceChange(service)}
                                 />
                               }
@@ -869,7 +869,7 @@ const ActivationInfoPage = () => {
                     onClick={handleGoBack}
                     sx={{ minWidth: 120 }}
                   >
-                    수정 취소
+                    뒤로가기
                   </Button>
                   
                   <Button
@@ -879,7 +879,7 @@ const ActivationInfoPage = () => {
                     disabled={loading}
                     sx={{ minWidth: 120 }}
                   >
-                    취소
+                    개통 취소
                   </Button>
                   
                   <Button
