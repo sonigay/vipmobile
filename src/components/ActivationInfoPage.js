@@ -81,18 +81,23 @@ const ActivationInfoPage = () => {
   // 수정 데이터 로드 함수
   const loadEditData = async (sheetId, rowIndex) => {
     try {
+      console.log('📝 [ActivationInfoPage] 수정 데이터 로드 시작:', sheetId, rowIndex);
       setLoading(true);
       const response = await fetch(`/api/onsale/activation-info/${sheetId}/${rowIndex}`);
+      console.log('📝 [ActivationInfoPage] API 응답 상태:', response.status);
       const result = await response.json();
+      console.log('📝 [ActivationInfoPage] API 응답 데이터:', result);
       
       if (result.success) {
         setEditData(result.data);
         setFormData(result.data);
+        console.log('✅ [ActivationInfoPage] 수정 데이터 로드 성공');
       } else {
+        console.error('❌ [ActivationInfoPage] API 응답 실패:', result);
         setError('개통정보를 불러오는데 실패했습니다.');
       }
     } catch (error) {
-      console.error('수정 데이터 로드 실패:', error);
+      console.error('❌ [ActivationInfoPage] 수정 데이터 로드 실패:', error);
       setError('개통정보를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
@@ -108,10 +113,12 @@ const ActivationInfoPage = () => {
       activationSheetName: params.get('activationSheetName') || '',
       targetUrl: params.get('targetUrl') || '',
       storeId: params.get('storeId') || '',
-      editMode: params.get('editMode'),
-      sheetId: params.get('sheetId'),
-      rowIndex: params.get('rowIndex')
+      editMode: params.get('editMode') || '',
+      sheetId: params.get('sheetId') || '',
+      rowIndex: params.get('rowIndex') || ''
     };
+    
+    console.log('🔍 [ActivationInfoPage] URL 파라미터:', paramData);
     setUrlParams(paramData);
     
     // 수정 모드 확인
