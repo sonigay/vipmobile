@@ -634,6 +634,7 @@ const OnSaleManagementMode = ({
                       <TableCell>일련번호</TableCell>
                       <TableCell>유심모델명</TableCell>
                       <TableCell>유심일련번호</TableCell>
+                      <TableCell>요금제</TableCell>
                       <TableCell>개통완료</TableCell>
                       <TableCell>개통시간</TableCell>
                       <TableCell>상태</TableCell>

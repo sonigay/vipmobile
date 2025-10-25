@@ -615,38 +615,38 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/complete', async (req, 
       '개통완료',           // A열
       completedBy,          // B열
       completedAt,          // C열
-      existingRow[2] || '', // D열 (기존 C열 데이터 - 취소여부)
-      existingRow[3] || '', // E열 (기존 D열 데이터 - 취소자)
-      existingRow[4] || '', // F열 (기존 E열 데이터 - 취소시간)
-      existingRow[5] || '', // G열 (기존 F열 데이터 - 수정자)
-      existingRow[6] || '', // H열 (기존 G열 데이터 - 수정시간)
-      existingRow[7] || '', // I열 (기존 H열 데이터 - 제출일시)
-      existingRow[8] || '', // J열 (기존 I열 데이터 - 매장명)
-      existingRow[9] || '', // K열 (기존 J열 데이터 - P코드)
-      existingRow[10] || '', // L열 (기존 K열 데이터 - 개통유형)
-      existingRow[11] || '', // M열 (기존 L열 데이터 - 전통신사)
-      existingRow[12] || '', // N열 (기존 M열 데이터 - 고객명)
-      existingRow[13] || '', // O열 (기존 N열 데이터 - 생년월일)
-      existingRow[14] || '', // P열 (기존 O열 데이터 - 개통번호)
-      existingRow[15] || '', // Q열 (기존 P열 데이터 - 모델명)
-      existingRow[16] || '', // R열 (기존 Q열 데이터 - 기기일련번호)
-      existingRow[17] || '', // S열 (기존 R열 데이터 - 색상)
-      existingRow[18] || '', // T열 (기존 S열 데이터 - 유심모델)
-      existingRow[19] || '', // U열 (기존 T열 데이터 - 유심일련번호)
-      existingRow[20] || '', // V열 (기존 U열 데이터 - 약정유형)
-      existingRow[21] || '', // W열 (기존 V열 데이터 - 전환지원금)
-      existingRow[22] || '', // X열 (기존 W열 데이터 - 유통망추가지원금)
-      existingRow[23] || '', // Y열 (기존 X열 데이터 - 할부개월)
-      existingRow[24] || '', // Z열 (기존 Y열 데이터 - 할부원금)
-      existingRow[25] || '', // AA열 (기존 Z열 데이터 - 프리)
-      existingRow[26] || '', // AB열 (기존 AA열 데이터 - 요금제)
-      existingRow[27] || '', // AC열 (기존 AB열 데이터 - 미디어서비스)
-      existingRow[28] || '', // AD열 (기존 AC열 데이터 - 부가서비스)
-      existingRow[29] || '', // AE열 (기존 AD열 데이터 - 프리미어약정)
-      existingRow[30] || '', // AF열 (기존 AE열 데이터 - 예약번호)
-      existingRow[31] || '', // AG열 (기존 AF열 데이터 - 기타요청사항)
-      existingRow[32] || '', // AH열 (기존 AG열 데이터 - U+제출일시)
-      existingRow[33] || '', // AI열 (기존 AH열 데이터 - U+제출데이터)
+      existingRow[3] || '', // D열 (기존 D열 데이터 - 취소여부)
+      existingRow[4] || '', // E열 (기존 E열 데이터 - 취소자)
+      existingRow[5] || '', // F열 (기존 F열 데이터 - 취소시간)
+      existingRow[6] || '', // G열 (기존 G열 데이터 - 수정자)
+      existingRow[7] || '', // H열 (기존 H열 데이터 - 수정시간)
+      existingRow[8] || '', // I열 (기존 I열 데이터 - 제출일시)
+      existingRow[9] || '', // J열 (기존 J열 데이터 - 매장명)
+      existingRow[10] || '', // K열 (기존 K열 데이터 - P코드)
+      existingRow[11] || '', // L열 (기존 L열 데이터 - 개통유형)
+      existingRow[12] || '', // M열 (기존 M열 데이터 - 전통신사)
+      existingRow[13] || '', // N열 (기존 N열 데이터 - 고객명)
+      existingRow[14] || '', // O열 (기존 O열 데이터 - 생년월일)
+      existingRow[15] || '', // P열 (기존 P열 데이터 - 개통번호)
+      existingRow[16] || '', // Q열 (기존 Q열 데이터 - 모델명)
+      existingRow[17] || '', // R열 (기존 R열 데이터 - 기기일련번호)
+      existingRow[18] || '', // S열 (기존 S열 데이터 - 색상)
+      existingRow[19] || '', // T열 (기존 T열 데이터 - 유심모델)
+      existingRow[20] || '', // U열 (기존 U열 데이터 - 유심일련번호)
+      existingRow[21] || '', // V열 (기존 V열 데이터 - 약정유형)
+      existingRow[22] || '', // W열 (기존 W열 데이터 - 전환지원금)
+      existingRow[23] || '', // X열 (기존 X열 데이터 - 유통망추가지원금)
+      existingRow[24] || '', // Y열 (기존 Y열 데이터 - 할부개월)
+      existingRow[25] || '', // Z열 (기존 Z열 데이터 - 할부원금)
+      existingRow[26] || '', // AA열 (기존 AA열 데이터 - 프리)
+      existingRow[27] || '', // AB열 (기존 AB열 데이터 - 요금제)
+      existingRow[28] || '', // AC열 (기존 AC열 데이터 - 미디어서비스)
+      existingRow[29] || '', // AD열 (기존 AD열 데이터 - 부가서비스)
+      existingRow[30] || '', // AE열 (기존 AE열 데이터 - 프리미어약정)
+      existingRow[31] || '', // AF열 (기존 AF열 데이터 - 예약번호)
+      existingRow[32] || '', // AG열 (기존 AG열 데이터 - 기타요청사항)
+      existingRow[33] || '', // AH열 (기존 AH열 데이터 - U+제출일시)
+      existingRow[34] || '', // AI열 (기존 AI열 데이터 - U+제출데이터)
     ];
     
     // 전체 행을 새로운 데이터로 업데이트
@@ -6869,16 +6869,14 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             sheetId: sheet.sheetId,
             sheetName: sheet.sheetName,
             submittedAt,
+            lastEditor,
             storeName: storeNameFromSheet,
-            pCode,
             activationType,
-            previousCarrier,
             customerName,
-            birthDate,
             phoneNumber,
+            birthDate,
             modelName,
             deviceSerial,
-            color,
             simModel,
             simSerial,
             plan,
@@ -6888,7 +6886,6 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             isCancelled,
             cancelledBy,
             cancelledAt,
-            lastEditor,
             editedAt
           });
         }
@@ -7417,9 +7414,7 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     if (existingHeaders.length === 0) {
       console.log('📋 [개통정보] 헤더 생성');
       const headers = [
-        '개통완료', '개통자', '개통시간', '취소여부', '취소자', '취소시간', '수정자', '수정시간', '제출일시', '매장명', 'P코드', '개통유형', '전통신사', '고객명', '생년월일', '개통번호',
-        '모델명', '기기일련번호', '색상', '유심모델', '유심일련번호', '약정유형', '전환지원금', '유통망추가지원금',
-        '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항', 'U+제출일시', 'U+제출데이터'
+        '개통완료', '개통자', '개통시간', '취소여부', '취소자', '취소시간', '수정자', '수정시간', '제출일시', '매장명', 'P코드', '개통유형', '전통신사', '고객명', '생년월일', '개통번호', '모델명', '기기일련번호', '색상', '유심모델', '유심일련번호', '약정유형', '전환지원금', '유통망추가지원금', '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항', 'U+제출일시', 'U+제출데이터'
       ];
       
       // 전체 헤더 생성 (A1:AI1)
