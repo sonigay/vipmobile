@@ -268,6 +268,11 @@ const OnSaleManagementMode = ({
     window.location.href = editUrl;
   };
 
+  const handleViewActivation = (activation) => {
+    const viewUrl = `/activation-info?viewMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}&activationSheetId=${activation.sheetId}`;
+    window.location.href = viewUrl;
+  };
+
   // 개통정보 취소
   const handleCancelActivation = async (activation) => {
     if (!window.confirm('이 개통정보를 취소 처리하시겠습니까?')) {
@@ -625,6 +630,7 @@ const OnSaleManagementMode = ({
                       <TableCell>일련번호</TableCell>
                       <TableCell>유심모델명</TableCell>
                       <TableCell>유심일련번호</TableCell>
+                      <TableCell>개통완료</TableCell>
                       <TableCell>상태</TableCell>
                       <TableCell>작업</TableCell>
                     </TableRow>
@@ -633,9 +639,14 @@ const OnSaleManagementMode = ({
                     {paginatedActivations.map((activation, index) => (
                       <TableRow 
                         key={index}
+                        onClick={() => handleViewActivation(activation)}
                         sx={{ 
                           backgroundColor: activation.isCancelled ? '#f5f5f5' : 'inherit',
-                          opacity: activation.isCancelled ? 0.7 : 1
+                          opacity: activation.isCancelled ? 0.7 : 1,
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: activation.isCancelled ? '#f0f0f0' : '#f8f9fa'
+                          }
                         }}
                       >
                         <TableCell>{activation.submittedAt}</TableCell>
@@ -670,6 +681,22 @@ const OnSaleManagementMode = ({
                         <TableCell>{activation.deviceSerial}</TableCell>
                         <TableCell>{activation.simModel}</TableCell>
                         <TableCell>{activation.simSerial}</TableCell>
+                        <TableCell>
+                          {activation.isCompleted ? (
+                            <Box>
+                              <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                                완료: {activation.completedBy}
+                              </Box>
+                              <Box sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                {activation.completedAt}
+                              </Box>
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              미완료
+                            </Box>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {activation.isCancelled ? (
                             <Chip 

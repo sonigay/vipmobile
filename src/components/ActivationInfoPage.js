@@ -37,6 +37,7 @@ const ActivationInfoPage = () => {
   
   // 수정 모드 상태
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
   const [editData, setEditData] = useState(null);
   
   // 폼 데이터 상태
@@ -115,6 +116,7 @@ const ActivationInfoPage = () => {
       targetUrl: params.get('targetUrl') || '',
       storeId: params.get('storeId') || '',
       editMode: params.get('editMode') || '',
+      viewMode: params.get('viewMode') || '',
       sheetId: params.get('sheetId') || '',
       rowIndex: params.get('rowIndex') || ''
     };
@@ -125,6 +127,12 @@ const ActivationInfoPage = () => {
     // 수정 모드 확인
     if (paramData.editMode === 'true' && paramData.sheetId && paramData.rowIndex) {
       setIsEditMode(true);
+      loadEditData(paramData.sheetId, paramData.rowIndex);
+    }
+    
+    // 조회 모드 확인
+    if (paramData.viewMode === 'true' && paramData.sheetId && paramData.rowIndex) {
+      setIsViewMode(true);
       loadEditData(paramData.sheetId, paramData.rowIndex);
     } else {
       // 신규 입력 모드: 매장 정보 자동 설정
@@ -337,6 +345,50 @@ const ActivationInfoPage = () => {
   // 뒤로가기
   const handleGoBack = () => {
     window.history.back();
+  };
+
+  // 개통완료 처리
+  const handleCompleteActivation = async () => {
+    if (!window.confirm('이 개통정보를 완료 처리하시겠습니까?')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/onsale/activation-info/${urlParams.sheetId}/${urlParams.rowIndex}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          completedBy: urlParams.vipCompany
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccess('개통정보가 완료 처리되었습니다.');
+        
+        // 부모 컴포넌트에 완료 알림
+        if (window.opener) {
+          window.opener.postMessage({ type: 'ACTIVATION_COMPLETED' }, '*');
+        }
+        
+        setTimeout(() => {
+          window.history.back();
+        }, 2000);
+      } else {
+        setError(result.error || '개통정보 완료 처리에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('개통정보 완료 처리 실패:', error);
+      setError('개통정보 완료 처리에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -903,6 +955,43 @@ const ActivationInfoPage = () => {
                     }}
                   >
                     {loading ? <CircularProgress size={20} /> : '수정 완료'}
+                  </Button>
+                </>
+              ) : isViewMode ? (
+                // 조회 모드 버튼들
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PrintIcon />}
+                    onClick={handlePrint}
+                    sx={{ minWidth: 120 }}
+                  >
+                    인쇄하기
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    onClick={handleGoBack}
+                    sx={{ minWidth: 120 }}
+                  >
+                    뒤로가기
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleCompleteActivation}
+                    disabled={loading}
+                    sx={{ 
+                      minWidth: 120,
+                      background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+                      '&:hover': { 
+                        background: 'linear-gradient(135deg, #388e3c 0%, #1b5e20 100%)'
+                      },
+                      boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)'
+                    }}
+                  >
+                    {loading ? <CircularProgress size={20} /> : '개통완료'}
                   </Button>
                 </>
               ) : (

@@ -727,6 +727,7 @@ const OnSaleReceptionMode = ({
                       <TableCell>일련번호</TableCell>
                       <TableCell>유심모델명</TableCell>
                       <TableCell>유심일련번호</TableCell>
+                      <TableCell>개통완료</TableCell>
                       <TableCell>상태</TableCell>
                       <TableCell>작업</TableCell>
                     </TableRow>
@@ -772,6 +773,22 @@ const OnSaleReceptionMode = ({
                         <TableCell>{activation.deviceSerial}</TableCell>
                         <TableCell>{activation.simModel}</TableCell>
                         <TableCell>{activation.simSerial}</TableCell>
+                        <TableCell>
+                          {activation.isCompleted ? (
+                            <Box>
+                              <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                                완료: {activation.completedBy}
+                              </Box>
+                              <Box sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                {activation.completedAt}
+                              </Box>
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              미완료
+                            </Box>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {activation.isCancelled ? (
                             <Chip 

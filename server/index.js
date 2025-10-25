@@ -581,6 +581,55 @@ app.get('/api/test', (req, res) => {
   res.json({ success: true, message: '테스트 API 작동 중' });
 });
 
+// 개통완료 API
+app.post('/api/onsale/activation-info/:sheetId/:rowIndex/complete', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    const { completedBy } = req.body;
+    console.log(`✅ [개통완료] 시트: ${sheetId}, 행: ${rowIndex}, 완료자: ${completedBy}`);
+    
+    const sheetResponse = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const sheetName = sheetResponse.data.sheets[0].properties.title;
+    console.log(`✅ [개통완료] 시트명: ${sheetName}`);
+    
+    const now = new Date();
+    const completedAt = now.toLocaleString('ko-KR', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+    
+    // A열에 "개통완료" 표기
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['개통완료']]
+      }
+    });
+    
+    // B열에 개통자 입력
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!B${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[completedBy]]
+      }
+    });
+    
+    console.log(`✅ [개통완료] 완료 처리 완료`);
+    res.json({ success: true, message: '개통정보가 완료 처리되었습니다.', completedAt });
+  } catch (error) {
+    console.error('❌ [개통완료] 완료 처리 실패:', error);
+    res.status(500).json({ success: false, error: '개통정보 완료 처리에 실패했습니다.', message: error.message });
+  }
+});
+
 console.log('🔧 [서버시작] API 라우트 등록 완료: /api/test');
 
 // 모든 등록된 라우트 확인
