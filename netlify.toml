@@ -4,11 +4,15 @@
 
 # API 요청은 제외하고 나머지만 리다이렉트
 [[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
   force = true
-  conditions = {Path = ["!/api/*"]}
 
 [build.environment]
   CI = "false"
