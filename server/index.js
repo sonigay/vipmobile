@@ -7019,6 +7019,157 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/cancel', async (req, re
   }
 });
 
+// ==================== 개통정보 관리 API ====================
+
+// 개통정보 단건 조회 (수정용)
+app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    console.log(`📋 [개통정보조회] 시트: ${sheetId}, 행: ${rowIndex}`);
+    
+    // 시트 이름 가져오기
+    const sheetResponse = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId
+    });
+    
+    const sheetName = sheetResponse.data.sheets[0].properties.title;
+    console.log(`📋 [개통정보조회] 시트명: ${sheetName}`);
+    
+    // F~AD열 데이터 읽기 (25개 필드)
+    const range = `${sheetName}!F${rowIndex}:AD${rowIndex}`;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: range
+    });
+    
+    const row = response.data.values?.[0] || [];
+    
+    if (row.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '개통정보를 찾을 수 없습니다.'
+      });
+    }
+    
+    // 25개 필드 매핑
+    const data = {
+      submittedAt: row[0] || '', // F열: 제출일시
+      storeName: row[1] || '', // G열: 매장명
+      pCode: row[2] || '', // H열: P코드
+      activationType: row[3] || '', // I열: 개통유형
+      previousCarrier: row[4] || '', // J열: 전통신사
+      customerName: row[5] || '', // K열: 고객명
+      birthDate: row[6] || '', // L열: 생년월일
+      phoneNumber: row[7] || '', // M열: 개통번호
+      modelName: row[8] || '', // N열: 모델명
+      deviceSerial: row[9] || '', // O열: 기기일련번호
+      color: row[10] || '', // P열: 색상
+      simModel: row[11] || '', // Q열: 유심모델
+      simSerial: row[12] || '', // R열: 유심일련번호
+      contractType: row[13] || '', // S열: 약정유형
+      conversionSupport: row[14] || '', // T열: 전환지원금
+      distributionSupport: row[15] || '', // U열: 유통망추가지원금
+      installmentMonths: row[16] || '', // V열: 할부개월
+      installmentAmount: row[17] || '', // W열: 할부원금
+      isFree: row[18] || '', // X열: 프리
+      plan: row[19] || '', // Y열: 요금제
+      mediaService: row[20] || '', // Z열: 미디어서비스
+      additionalService: row[21] || '', // AA열: 부가서비스
+      premierContract: row[22] || '', // AB열: 프리미어약정
+      reservationNumber: row[23] || '', // AC열: 예약번호
+      otherRequests: row[24] || '' // AD열: 기타요청사항
+    };
+    
+    console.log(`✅ [개통정보조회] 조회 완료`);
+    res.json({ success: true, data });
+    
+  } catch (error) {
+    console.error('❌ [개통정보조회] 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '개통정보 조회에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
+// 개통정보 수정
+app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    const { data: formData, editor } = req.body;
+    
+    console.log(`📝 [개통정보수정] 시트: ${sheetId}, 행: ${rowIndex}, 수정자: ${editor}`);
+    
+    // 시트 이름 가져오기
+    const sheetResponse = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId
+    });
+    
+    const sheetName = sheetResponse.data.sheets[0].properties.title;
+    console.log(`📝 [개통정보수정] 시트명: ${sheetName}`);
+    
+    // 수정자 정보 업데이트 (E열)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!E${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[editor || '']]
+      }
+    });
+    
+    // 25개 필드 데이터 업데이트 (F~AD열)
+    const rowData = [
+      formData.submittedAt || '',
+      formData.storeName || '',
+      formData.pCode || '',
+      formData.activationType || '',
+      formData.previousCarrier || '',
+      formData.customerName || '',
+      formData.birthDate || '',
+      formData.phoneNumber || '',
+      formData.modelName || '',
+      formData.deviceSerial || '',
+      formData.color || '',
+      formData.simModel || '',
+      formData.simSerial || '',
+      formData.contractType || '',
+      formData.conversionSupport || '',
+      formData.distributionSupport || '',
+      formData.installmentMonths || '',
+      formData.installmentAmount || '',
+      formData.isFree || '',
+      formData.plan || '',
+      formData.mediaService || '',
+      formData.additionalService || '',
+      formData.premierContract || '',
+      formData.reservationNumber || '',
+      formData.otherRequests || ''
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!F${rowIndex}:AD${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [rowData]
+      }
+    });
+    
+    console.log(`✅ [개통정보수정] 수정 완료`);
+    res.json({ success: true, message: '개통정보가 수정되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [개통정보수정] 수정 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: '개통정보 수정에 실패했습니다.',
+      message: error.message
+    });
+  }
+});
+
 // ==================== 온세일 관리 API ====================
 
 // 온세일 링크 관리 - 전체 링크 조회 (관리자모드용)
