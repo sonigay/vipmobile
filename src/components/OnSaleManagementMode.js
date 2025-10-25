@@ -97,6 +97,10 @@ const OnSaleManagementMode = ({
         console.log('🔄 수정 완료 알림 받음, 목록 새로고침');
         fetchActivationList();
       }
+      if (event.data && event.data.type === 'ACTIVATION_COMPLETED') {
+        console.log('🔄 개통완료 알림 받음, 목록 새로고침');
+        fetchActivationList();
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -641,11 +645,15 @@ const OnSaleManagementMode = ({
                         key={index}
                         onClick={() => handleViewActivation(activation)}
                         sx={{ 
-                          backgroundColor: activation.isCancelled ? '#f5f5f5' : 'inherit',
+                          backgroundColor: activation.isCompleted ? '#e3f2fd' : 
+                                         activation.isCancelled ? '#fce4ec' : 
+                                         activation.lastEditor ? '#f1f8e9' : 'inherit',
                           opacity: activation.isCancelled ? 0.7 : 1,
                           cursor: 'pointer',
                           '&:hover': {
-                            backgroundColor: activation.isCancelled ? '#f0f0f0' : '#f8f9fa'
+                            backgroundColor: activation.isCompleted ? '#bbdefb' : 
+                                           activation.isCancelled ? '#f8bbd9' : 
+                                           activation.lastEditor ? '#dcedc8' : '#f8f9fa'
                           }
                         }}
                       >

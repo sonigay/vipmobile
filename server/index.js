@@ -6790,7 +6790,7 @@ app.get('/api/onsale/activation-list', async (req, res) => {
       try {
         const sheetData = await sheets.spreadsheets.values.get({
           spreadsheetId: sheet.sheetId,
-          range: `${sheet.sheetName}!C:AD`,
+          range: `${sheet.sheetName}!A:AD`,
         });
         
         const rows = sheetData.data.values || [];
@@ -6799,23 +6799,25 @@ app.get('/api/onsale/activation-list', async (req, res) => {
           const row = rows[i];
           if (row.length === 0) continue;
           
-          const isCancelled = row[0] === '취소'; // C열
-          const cancelledBy = row[1] || ''; // D열
-          const lastEditor = row[2] || ''; // E열
-          const submittedAt = row[3] || ''; // F열
-          const storeNameFromSheet = row[4] || ''; // G열
-          const pCode = row[5] || ''; // H열
-          const activationType = row[6] || ''; // I열
-          const previousCarrier = row[7] || ''; // J열
-          const customerName = row[8] || ''; // K열
-          const birthDate = row[9] || ''; // L열
-          const phoneNumber = row[10] || ''; // M열
-          const modelName = row[11] || ''; // N열
-          const deviceSerial = row[12] || ''; // O열
-          const color = row[13] || ''; // P열
-          const simModel = row[14] || ''; // Q열
-          const simSerial = row[15] || ''; // R열
-          const plan = row[22] || ''; // Y열 (C열 기준 23번째, 0-based)
+          const isCompleted = row[0] === '개통완료'; // A열
+          const completedBy = row[1] || ''; // B열
+          const isCancelled = row[2] === '취소'; // C열
+          const cancelledBy = row[3] || ''; // D열
+          const lastEditor = row[4] || ''; // E열
+          const submittedAt = row[5] || ''; // F열
+          const storeNameFromSheet = row[6] || ''; // G열
+          const pCode = row[7] || ''; // H열
+          const activationType = row[8] || ''; // I열
+          const previousCarrier = row[9] || ''; // J열
+          const customerName = row[10] || ''; // K열
+          const birthDate = row[11] || ''; // L열
+          const phoneNumber = row[12] || ''; // M열
+          const modelName = row[13] || ''; // N열
+          const deviceSerial = row[14] || ''; // O열
+          const color = row[15] || ''; // P열
+          const simModel = row[16] || ''; // Q열
+          const simSerial = row[17] || ''; // R열
+          const plan = row[24] || ''; // Y열 (A열 기준 25번째, 0-based)
           
           // storeName 필터링
           if (storeName && storeNameFromSheet !== storeName) {
@@ -6840,6 +6842,8 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             simModel,
             simSerial,
             plan,
+            isCompleted,
+            completedBy,
             isCancelled,
             cancelledBy,
             lastEditor

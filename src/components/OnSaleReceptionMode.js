@@ -95,6 +95,10 @@ const OnSaleReceptionMode = ({
         console.log('🔄 수정 완료 알림 받음, 목록 새로고침');
         fetchActivationList();
       }
+      if (event.data && event.data.type === 'ACTIVATION_COMPLETED') {
+        console.log('🔄 개통완료 알림 받음, 목록 새로고침');
+        fetchActivationList();
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -737,7 +741,9 @@ const OnSaleReceptionMode = ({
                       <TableRow 
                         key={index}
                         sx={{ 
-                          backgroundColor: activation.isCancelled ? '#f5f5f5' : 'inherit',
+                          backgroundColor: activation.isCompleted ? '#e3f2fd' : 
+                                         activation.isCancelled ? '#fce4ec' : 
+                                         activation.lastEditor ? '#f1f8e9' : 'inherit',
                           opacity: activation.isCancelled ? 0.7 : 1
                         }}
                       >
