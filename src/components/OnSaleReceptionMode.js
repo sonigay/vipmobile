@@ -732,6 +732,7 @@ const OnSaleReceptionMode = ({
                       <TableCell>유심모델명</TableCell>
                       <TableCell>유심일련번호</TableCell>
                       <TableCell>개통완료</TableCell>
+                      <TableCell>개통시간</TableCell>
                       <TableCell>상태</TableCell>
                       <TableCell>작업</TableCell>
                     </TableRow>
@@ -789,6 +790,17 @@ const OnSaleReceptionMode = ({
                           ) : (
                             <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
                               미완료
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {activation.completedAt ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
+                              {activation.completedAt}
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              -
                             </Box>
                           )}
                         </TableCell>

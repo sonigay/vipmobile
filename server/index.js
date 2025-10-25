@@ -602,27 +602,62 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/complete', async (req, 
       second: '2-digit' 
     });
     
-    // A열에 "개통완료" 표기
-    await sheets.spreadsheets.values.update({
+    // 기존 데이터를 읽어서 개통시간을 포함한 새로운 데이터로 업데이트
+    const existingData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${sheetName}!A${rowIndex}`,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [['개통완료']]
-      }
+      range: `${sheetName}!A${rowIndex}:AI${rowIndex}`,
     });
     
-    // B열에 개통자 입력
+    const existingRow = existingData.data.values?.[0] || [];
+    
+    // 새로운 데이터 구조: A=개통완료, B=개통자, C=개통시간, D=취소여부, E=취소자, F=취소시간, G=수정자, H=수정시간, I=제출일시, J=매장명, ...
+    const newRowData = [
+      '개통완료',           // A열
+      completedBy,          // B열
+      completedAt,          // C열
+      existingRow[2] || '', // D열 (기존 C열 데이터 - 취소여부)
+      existingRow[3] || '', // E열 (기존 D열 데이터 - 취소자)
+      existingRow[4] || '', // F열 (기존 E열 데이터 - 취소시간)
+      existingRow[5] || '', // G열 (기존 F열 데이터 - 수정자)
+      existingRow[6] || '', // H열 (기존 G열 데이터 - 수정시간)
+      existingRow[7] || '', // I열 (기존 H열 데이터 - 제출일시)
+      existingRow[8] || '', // J열 (기존 I열 데이터 - 매장명)
+      existingRow[9] || '', // K열 (기존 J열 데이터 - P코드)
+      existingRow[10] || '', // L열 (기존 K열 데이터 - 개통유형)
+      existingRow[11] || '', // M열 (기존 L열 데이터 - 전통신사)
+      existingRow[12] || '', // N열 (기존 M열 데이터 - 고객명)
+      existingRow[13] || '', // O열 (기존 N열 데이터 - 생년월일)
+      existingRow[14] || '', // P열 (기존 O열 데이터 - 개통번호)
+      existingRow[15] || '', // Q열 (기존 P열 데이터 - 모델명)
+      existingRow[16] || '', // R열 (기존 Q열 데이터 - 기기일련번호)
+      existingRow[17] || '', // S열 (기존 R열 데이터 - 색상)
+      existingRow[18] || '', // T열 (기존 S열 데이터 - 유심모델)
+      existingRow[19] || '', // U열 (기존 T열 데이터 - 유심일련번호)
+      existingRow[20] || '', // V열 (기존 U열 데이터 - 약정유형)
+      existingRow[21] || '', // W열 (기존 V열 데이터 - 전환지원금)
+      existingRow[22] || '', // X열 (기존 W열 데이터 - 유통망추가지원금)
+      existingRow[23] || '', // Y열 (기존 X열 데이터 - 할부개월)
+      existingRow[24] || '', // Z열 (기존 Y열 데이터 - 할부원금)
+      existingRow[25] || '', // AA열 (기존 Z열 데이터 - 프리)
+      existingRow[26] || '', // AB열 (기존 AA열 데이터 - 요금제)
+      existingRow[27] || '', // AC열 (기존 AB열 데이터 - 미디어서비스)
+      existingRow[28] || '', // AD열 (기존 AC열 데이터 - 부가서비스)
+      existingRow[29] || '', // AE열 (기존 AD열 데이터 - 프리미어약정)
+      existingRow[30] || '', // AF열 (기존 AE열 데이터 - 예약번호)
+      existingRow[31] || '', // AG열 (기존 AF열 데이터 - 기타요청사항)
+      existingRow[32] || '', // AH열 (기존 AG열 데이터 - U+제출일시)
+      existingRow[33] || '', // AI열 (기존 AH열 데이터 - U+제출데이터)
+    ];
+    
+    // 전체 행을 새로운 데이터로 업데이트
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!B${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:AI${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [[completedBy]]
+        values: [newRowData]
       }
     });
-    
-    // 개통시간은 별도로 저장하지 않음 (기존 데이터 구조 유지)
     
     console.log(`✅ [개통완료] 완료 처리 완료`);
     res.json({ success: true, message: '개통정보가 완료 처리되었습니다.', completedAt });
@@ -6792,7 +6827,7 @@ app.get('/api/onsale/activation-list', async (req, res) => {
       try {
         const sheetData = await sheets.spreadsheets.values.get({
           spreadsheetId: sheet.sheetId,
-          range: `${sheet.sheetName}!A:AD`,
+          range: `${sheet.sheetName}!A:AI`,
         });
         
         const rows = sheetData.data.values || [];
@@ -6803,23 +6838,26 @@ app.get('/api/onsale/activation-list', async (req, res) => {
           
           const isCompleted = row[0] === '개통완료'; // A열
           const completedBy = row[1] || ''; // B열
-          const isCancelled = row[2] === '취소'; // C열
-          const cancelledBy = row[3] || ''; // D열
-          const lastEditor = row[4] || ''; // E열
-          const submittedAt = row[5] || ''; // F열
-          const storeNameFromSheet = row[6] || ''; // G열
-          const pCode = row[7] || ''; // H열
-          const activationType = row[8] || ''; // I열
-          const previousCarrier = row[9] || ''; // J열
-          const customerName = row[10] || ''; // K열
-          const birthDate = row[11] || ''; // L열
-          const phoneNumber = row[12] || ''; // M열
-          const modelName = row[13] || ''; // N열
-          const deviceSerial = row[14] || ''; // O열
-          const color = row[15] || ''; // P열
-          const simModel = row[16] || ''; // Q열
-          const simSerial = row[17] || ''; // R열
-          const plan = row[24] || ''; // Y열 (A열 기준 25번째, 0-based)
+          const completedAt = row[2] || ''; // C열
+          const isCancelled = row[3] === '취소'; // D열
+          const cancelledBy = row[4] || ''; // E열
+          const cancelledAt = row[5] || ''; // F열
+          const lastEditor = row[6] || ''; // G열
+          const editedAt = row[7] || ''; // H열
+          const submittedAt = row[8] || ''; // I열
+          const storeNameFromSheet = row[9] || ''; // J열
+          const pCode = row[10] || ''; // K열
+          const activationType = row[11] || ''; // L열
+          const previousCarrier = row[12] || ''; // M열
+          const customerName = row[13] || ''; // N열
+          const birthDate = row[14] || ''; // O열
+          const phoneNumber = row[15] || ''; // P열
+          const modelName = row[16] || ''; // Q열
+          const deviceSerial = row[17] || ''; // R열
+          const color = row[18] || ''; // S열
+          const simModel = row[19] || ''; // T열
+          const simSerial = row[20] || ''; // U열
+          const plan = row[27] || ''; // AB열 (A열 기준 28번째, 0-based)
           
           // storeName 필터링
           if (storeName && storeNameFromSheet !== storeName) {
@@ -6846,9 +6884,12 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             plan,
             isCompleted,
             completedBy,
+            completedAt,
             isCancelled,
             cancelledBy,
-            lastEditor
+            cancelledAt,
+            lastEditor,
+            editedAt
           });
         }
       } catch (error) {
@@ -6901,13 +6942,22 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/cancel', async (req, re
     
     const sheetName = link[6];
     
-    // 취소 처리 (C열: 취소여부, D열: 취소자)
+    // 취소 처리 (D열: 취소여부, E열: 취소자, F열: 취소시간)
+    const cancelledAt = new Date().toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!C${rowIndex}:D${rowIndex}`,
+      range: `${sheetName}!D${rowIndex}:F${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [['취소', cancelledBy || '']]
+        values: [['취소', cancelledBy || '', cancelledAt]]
       }
     });
     
@@ -6940,8 +6990,8 @@ app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     const sheetName = sheetResponse.data.sheets[0].properties.title;
     console.log(`📋 [개통정보조회] 시트명: ${sheetName}`);
     
-    // F~AD열 데이터 읽기 (25개 필드)
-    const range = `${sheetName}!F${rowIndex}:AD${rowIndex}`;
+    // I~AI열 데이터 읽기 (25개 필드)
+    const range = `${sheetName}!I${rowIndex}:AI${rowIndex}`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: range
@@ -7014,17 +7064,36 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     const sheetName = sheetResponse.data.sheets[0].properties.title;
     console.log(`📝 [개통정보수정] 시트명: ${sheetName}`);
     
-    // 수정자 정보 업데이트 (E열)
+    // 수정자 정보 업데이트 (G열)
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!E${rowIndex}`,
+      range: `${sheetName}!G${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [[editor || '']]
       }
     });
     
-    // 25개 필드 데이터 업데이트 (F~AD열)
+    // 수정시간 정보 업데이트 (H열)
+    const editedAt = new Date().toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!H${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[editedAt]]
+      }
+    });
+    
+    // 25개 필드 데이터 업데이트 (I~AI열)
     const rowData = [
       formData.submittedAt || '',
       formData.storeName || '',
@@ -7055,7 +7124,7 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!F${rowIndex}:AD${rowIndex}`,
+      range: `${sheetName}!I${rowIndex}:AI${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
@@ -7339,7 +7408,7 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     // 시트 데이터 확인
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${sheetName}!C1:AD1`
+      range: `${sheetName}!A1:AI1`
     });
     
     const existingHeaders = sheetData.data.values?.[0] || [];
@@ -7348,23 +7417,18 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     if (existingHeaders.length === 0) {
       console.log('📋 [개통정보] 헤더 생성');
       const headers = [
-        '제출일시', '매장명', 'P코드', '개통유형', '전통신사', '고객명', '생년월일', '개통번호',
+        '개통완료', '개통자', '개통시간', '취소여부', '취소자', '취소시간', '수정자', '수정시간', '제출일시', '매장명', 'P코드', '개통유형', '전통신사', '고객명', '생년월일', '개통번호',
         '모델명', '기기일련번호', '색상', '유심모델', '유심일련번호', '약정유형', '전환지원금', '유통망추가지원금',
-        '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항'
+        '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항', 'U+제출일시', 'U+제출데이터'
       ];
       
-      // 전체 헤더 생성 (C1:AD1)
-      const fullHeaders = [
-        '취소여부', '취소자', '수정자', // C1, D1, E1
-        ...headers // F1~AD1: 개통정보 25개 필드
-      ];
-      
+      // 전체 헤더 생성 (A1:AI1)
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${sheetName}!C1:AD1`,
+        range: `${sheetName}!A1:AI1`,
         valueInputOption: 'RAW',
         requestBody: {
-          values: [fullHeaders]
+          values: [headers]
         }
       });
     }
@@ -7399,17 +7463,48 @@ app.post('/api/onsale/activation-info', async (req, res) => {
       data.otherRequests || ''
     ];
     
-    // 데이터 추가 (C열부터 - 취소여부, 취소자, 수정자, 개통정보 25개 필드)
+    // 데이터 추가 (A열부터 - 개통완료, 개통자, 개통시간, 취소여부, 취소자, 취소시간, 수정자, 수정시간, 제출일시, 매장명, ...)
     const fullRowData = [
-      '', // C열: 취소여부 (신규 입력 시 빈 값)
-      '', // D열: 취소자 (신규 입력 시 빈 값)
-      '', // E열: 수정자 (신규 입력 시 빈 값)
-      ...rowData // F열~AD열: 개통정보 25개 필드
+      '', // A열: 개통완료 여부 (신규 입력 시 빈 값)
+      '', // B열: 개통자 (신규 입력 시 빈 값)
+      '', // C열: 개통시간 (신규 입력 시 빈 값)
+      '', // D열: 취소여부 (신규 입력 시 빈 값)
+      '', // E열: 취소자 (신규 입력 시 빈 값)
+      '', // F열: 취소시간 (신규 입력 시 빈 값)
+      '', // G열: 수정자 (신규 입력 시 빈 값)
+      '', // H열: 수정시간 (신규 입력 시 빈 값)
+      submittedAt, // I열: 제출일시
+      storeName, // J열: 매장명
+      pCode, // K열: P코드
+      activationType, // L열: 개통유형
+      previousCarrier, // M열: 전통신사
+      customerName, // N열: 고객명
+      birthDate, // O열: 생년월일
+      phoneNumber, // P열: 개통번호
+      modelName, // Q열: 모델명
+      deviceSerial, // R열: 기기일련번호
+      color, // S열: 색상
+      simModel, // T열: 유심모델
+      simSerial, // U열: 유심일련번호
+      contractType, // V열: 약정유형
+      conversionSupport, // W열: 전환지원금
+      distributionSupport, // X열: 유통망추가지원금
+      installmentMonths, // Y열: 할부개월
+      installmentAmount, // Z열: 할부원금
+      isFree, // AA열: 프리
+      plan, // AB열: 요금제
+      mediaServices, // AC열: 미디어서비스
+      additionalServices, // AD열: 부가서비스
+      premierContract, // AE열: 프리미어약정
+      reservationNumber, // AF열: 예약번호
+      otherRequests, // AG열: 기타요청사항
+      '', // AH열: U+제출일시 (빈 값)
+      '' // AI열: U+제출데이터 (빈 값)
     ];
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${sheetName}!C:AD`,
+      range: `${sheetName}!A:AI`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [fullRowData]
