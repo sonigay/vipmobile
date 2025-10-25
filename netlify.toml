@@ -13,6 +13,7 @@
   to = "/index.html"
   status = 200
   force = true
+  conditions = {Path = ["!/api/*"]}
 
 [build.environment]
   CI = "false"
