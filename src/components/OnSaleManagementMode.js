@@ -691,6 +691,7 @@ const OnSaleManagementMode = ({
                         <TableCell>{activation.deviceSerial}</TableCell>
                         <TableCell>{activation.simModel}</TableCell>
                         <TableCell>{activation.simSerial}</TableCell>
+                        <TableCell>{activation.plan}</TableCell>
                         <TableCell>
                           {activation.isCompleted ? (
                             <Box>
