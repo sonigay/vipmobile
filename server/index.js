@@ -581,6 +581,15 @@ app.get('/api/test', (req, res) => {
   res.json({ success: true, message: '테스트 API 작동 중' });
 });
 
+console.log('🔧 [서버시작] API 라우트 등록 완료: /api/test');
+
+// 모든 등록된 라우트 확인
+app._router.stack.forEach((middleware) => {
+  if (middleware.route) {
+    console.log(`🔧 [서버시작] 등록된 라우트: ${middleware.route.methods} ${middleware.route.path}`);
+  }
+});
+
 // Google Sheets API configuration
 const SPREADSHEET_ID = process.env.SHEET_ID;
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
