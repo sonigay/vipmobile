@@ -90,6 +90,19 @@ const OnSaleManagementMode = ({
     fetchActivationList(); // 개통정보 목록도 함께 불러오기
   }, []);
 
+  // 수정 완료 메시지 리스너
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'ACTIVATION_UPDATED') {
+        console.log('🔄 수정 완료 알림 받음, 목록 새로고침');
+        fetchActivationList();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const fetchLinks = async () => {
     try {
       setLoading(true);

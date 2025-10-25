@@ -239,6 +239,12 @@ const ActivationInfoPage = () => {
         
         if (result.success) {
           setSuccess('개통정보가 수정되었습니다.');
+          
+          // 부모 컴포넌트에 수정 완료 알림 (새로고침을 위해)
+          if (window.opener) {
+            window.opener.postMessage({ type: 'ACTIVATION_UPDATED' }, '*');
+          }
+          
           setTimeout(() => {
             window.history.back();
           }, 2000);

@@ -88,6 +88,19 @@ const OnSaleReceptionMode = ({
     fetchActiveLinks();
   }, []);
 
+  // 수정 완료 메시지 리스너
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'ACTIVATION_UPDATED') {
+        console.log('🔄 수정 완료 알림 받음, 목록 새로고침');
+        fetchActivationList();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const fetchActiveLinks = async () => {
     try {
       setLoading(true);
