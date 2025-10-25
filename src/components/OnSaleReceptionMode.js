@@ -785,9 +785,6 @@ const OnSaleReceptionMode = ({
                               <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
                                 완료: {activation.completedBy}
                               </Box>
-                              <Box sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
-                                {activation.completedAt}
-                              </Box>
                             </Box>
                           ) : (
                             <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>

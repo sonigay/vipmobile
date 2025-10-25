@@ -622,6 +622,8 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/complete', async (req, 
       }
     });
     
+    // 개통시간은 별도로 저장하지 않음 (기존 데이터 구조 유지)
+    
     console.log(`✅ [개통완료] 완료 처리 완료`);
     res.json({ success: true, message: '개통정보가 완료 처리되었습니다.', completedAt });
   } catch (error) {
