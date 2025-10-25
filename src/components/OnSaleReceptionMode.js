@@ -751,25 +751,20 @@ const OnSaleReceptionMode = ({
                       >
                         <TableCell>{activation.submittedAt}</TableCell>
                         <TableCell>
-                          {activation.isCancelled ? (
-                            <Box>
-                              <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
-                                취소: {activation.cancelledBy}
-                              </Box>
-                              {activation.lastEditor && (
-                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                                  수정: {activation.lastEditor}
-                                </Box>
-                              )}
+                          {activation.completedBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                              개통: {activation.completedBy}
+                            </Box>
+                          ) : activation.cancelledBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
+                              취소: {activation.cancelledBy}
+                            </Box>
+                          ) : activation.lastEditor ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              수정: {activation.lastEditor}
                             </Box>
                           ) : (
-                            <Box>
-                              {activation.lastEditor && (
-                                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                                  수정: {activation.lastEditor}
-                                </Box>
-                              )}
-                            </Box>
+                            '-'
                           )}
                         </TableCell>
                         <TableCell>{activation.storeName}</TableCell>
