@@ -7092,7 +7092,7 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     
     // 25개 필드 데이터 업데이트 (I~AI열)
     const rowData = [
-      formData.submittedAt || '',
+      formData.submittedAt || new Date().toLocaleString('ko-KR'),
       formData.storeName || '',
       formData.pCode || '',
       formData.activationType || '',
@@ -7467,6 +7467,34 @@ app.post('/api/onsale/activation-info', async (req, res) => {
       minute: '2-digit',
       second: '2-digit'
     });
+    
+    // 매장명 추출
+    const storeName = data.storeName || '';
+    
+    // 모든 변수 정의
+    const pCode = data.pCode || '';
+    const activationType = data.activationType || '';
+    const previousCarrier = data.previousCarrier || '';
+    const customerName = data.customerName || '';
+    const birthDate = data.birthDate || '';
+    const phoneNumber = data.phoneNumber || '';
+    const modelName = data.modelName || '';
+    const deviceSerial = data.deviceSerial || '';
+    const color = data.color || '';
+    const simModel = data.simModel || '';
+    const simSerial = data.simSerial || '';
+    const contractType = data.contractType || '';
+    const conversionSupport = data.conversionSupport || '';
+    const distributionSupport = data.distributionSupport || '';
+    const installmentMonths = data.installmentMonths || '';
+    const installmentAmount = data.installmentAmount || '';
+    const isFree = data.isFree || '';
+    const plan = data.plan || '';
+    const mediaServices = Array.isArray(data.mediaServices) ? data.mediaServices.join(', ') : (data.mediaServices || '');
+    const additionalServices = data.additionalServices || '';
+    const premierContract = data.premierContract || '';
+    const reservationNumber = data.reservationNumber || '';
+    const otherRequests = data.otherRequests || '';
     
     // 데이터 추가 (A열부터 - 개통완료, 개통자, 개통시간, 취소여부, 취소자, 취소시간, 수정자, 수정시간, 제출일시, 매장명, ...)
     const fullRowData = [
