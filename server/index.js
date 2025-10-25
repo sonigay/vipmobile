@@ -573,6 +573,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// ==================== API 라우트들 ====================
+
+// 테스트 API
+app.get('/api/test', (req, res) => {
+  console.log('🧪 [테스트] API 호출됨');
+  res.json({ success: true, message: '테스트 API 작동 중' });
+});
+
 // Google Sheets API configuration
 const SPREADSHEET_ID = process.env.SHEET_ID;
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
@@ -6853,12 +6861,6 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/cancel', async (req, re
 });
 
 // ==================== 개통정보 관리 API ====================
-
-// 테스트 API
-app.get('/api/test', (req, res) => {
-  console.log('🧪 [테스트] API 호출됨');
-  res.json({ success: true, message: '테스트 API 작동 중' });
-});
 
 // 개통정보 단건 조회 (수정용)
 app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
