@@ -7458,6 +7458,16 @@ app.post('/api/onsale/activation-info', async (req, res) => {
       data.otherRequests || ''
     ];
     
+    // 제출일시 생성
+    const submittedAt = new Date().toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    
     // 데이터 추가 (A열부터 - 개통완료, 개통자, 개통시간, 취소여부, 취소자, 취소시간, 수정자, 수정시간, 제출일시, 매장명, ...)
     const fullRowData = [
       '', // A열: 개통완료 여부 (신규 입력 시 빈 값)
