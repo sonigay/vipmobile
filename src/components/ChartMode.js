@@ -3866,6 +3866,12 @@ function RechotanchoBondTab({ loggedInStore }) {
   const [history, setHistory] = useState([]);
   const [selectedTimestamp, setSelectedTimestamp] = useState('');
   
+  // 월별 필터링을 위한 상태 (기본값: 현재 월)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  
   // 전체 데이터 (그래프용)
   const [allData, setAllData] = useState([]);
   
@@ -3904,8 +3910,22 @@ function RechotanchoBondTab({ loggedInStore }) {
       const result = await response.json();
       
       if (result.success) {
-        setAllData(result.data || []);
-        setCurrentData(result.data || []);
+        const data = result.data || [];
+        setAllData(data);
+        setCurrentData(data);
+        
+        // 현재 선택된 월에 데이터가 없으면 가장 최근 데이터가 있는 월로 변경
+        if (data.length > 0) {
+          const availableMonths = [...new Set(data.map(item => {
+            if (!item.timestamp) return null;
+            return item.timestamp.substring(0, 7);
+          }).filter(Boolean))].sort().reverse();
+          
+          // 현재 선택된 월에 데이터가 없으면 가장 최근 월로 변경
+          if (!availableMonths.includes(selectedMonth) && availableMonths.length > 0) {
+            setSelectedMonth(availableMonths[0]);
+          }
+        }
       }
     } catch (error) {
       console.error('전체 데이터 로드 실패:', error);
@@ -4203,15 +4223,30 @@ function RechotanchoBondTab({ loggedInStore }) {
     };
   };
 
-  // 시계열 선 그래프 데이터 생성
+  // 월별로 필터링된 데이터 생성
+  const getFilteredDataByMonth = (month) => {
+    if (allData.length === 0) return [];
+    
+    return allData.filter(item => {
+      if (!item.timestamp) return false;
+      
+      // timestamp에서 년-월 추출 (예: "2024-01-15 10:30:25" -> "2024-01")
+      const itemMonth = item.timestamp.substring(0, 7);
+      return itemMonth === month;
+    });
+  };
+
+  // 시계열 선 그래프 데이터 생성 (월별 필터링 적용)
   const getLineChartData = () => {
-    if (allData.length === 0) {
+    const filteredData = getFilteredDataByMonth(selectedMonth);
+    
+    if (filteredData.length === 0) {
       return { labels: [], datasets: [] };
     }
 
     // 시점별로 그룹화
     const timestampMap = new Map();
-    allData.forEach(item => {
+    filteredData.forEach(item => {
       if (!timestampMap.has(item.timestamp)) {
         timestampMap.set(item.timestamp, []);
       }
@@ -4426,7 +4461,7 @@ function RechotanchoBondTab({ loggedInStore }) {
       },
       title: {
         display: true,
-        text: '시간별 채권 변화 추이 (기본: 관리대상채권만 표시, 범례 클릭으로 추가 선택)',
+        text: `${selectedMonth.replace('-', '년 ')}월 채권 변화 추이 (기본: 관리대상채권만 표시, 범례 클릭으로 추가 선택)`,
         font: { size: 14, weight: 'bold' }
       },
       tooltip: {
@@ -4488,6 +4523,33 @@ function RechotanchoBondTab({ loggedInStore }) {
       {/* 중단: 선 그래프 */}
       {allData.length > 0 && (
         <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+          {/* 월 선택 UI */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 2 }}>
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel>조회 월 선택</InputLabel>
+              <Select
+                value={selectedMonth}
+                label="조회 월 선택"
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                size="small"
+              >
+                {(() => {
+                  // 사용 가능한 월 목록 생성 (전체 데이터에서 추출)
+                  const availableMonths = [...new Set(allData.map(item => {
+                    if (!item.timestamp) return null;
+                    return item.timestamp.substring(0, 7);
+                  }).filter(Boolean))].sort().reverse();
+                  
+                  return availableMonths.map(month => (
+                    <MenuItem key={month} value={month}>
+                      {month.replace('-', '년 ')}월
+                    </MenuItem>
+                  ));
+                })()}
+              </Select>
+            </FormControl>
+          </Box>
+          
           <Box sx={{ height: 500 }}>
             <Line data={getLineChartData()} options={lineChartOptions} />
           </Box>

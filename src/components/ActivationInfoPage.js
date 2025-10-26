@@ -62,7 +62,7 @@ const ActivationInfoPage = () => {
     simSerial: '',
     
     // 요금/약정 정보
-    contractType: '공시지원금',
+    contractType: '이통사지원금',
     conversionSubsidy: '',
     additionalSubsidy: '',
     installmentMonths: '할부24개월',
@@ -392,7 +392,93 @@ const ActivationInfoPage = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5', position: 'relative' }}>
+    <>
+      {/* 인쇄 스타일 */}
+      <style>
+        {`
+          @media print {
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+            
+            .no-print {
+              display: none !important;
+            }
+            
+            .print-container {
+              width: 100% !important;
+              max-width: none !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+            }
+            
+            body {
+              font-size: 12px !important;
+              line-height: 1.4 !important;
+            }
+            
+            .MuiGrid-container {
+              margin: 0 !important;
+              width: 100% !important;
+            }
+            
+            .MuiTextField-root .MuiOutlinedInput-root {
+              border: none !important;
+              background: transparent !important;
+            }
+            
+            .MuiTextField-root .MuiOutlinedInput-notchedOutline {
+              border: none !important;
+            }
+            
+            .MuiTextField-root .MuiInputBase-input {
+              padding: 2px 0 !important;
+              border-bottom: 1px solid #ccc !important;
+              background: transparent !important;
+            }
+            
+            .MuiFormControl-root .MuiSelect-select {
+              border: none !important;
+              border-bottom: 1px solid #ccc !important;
+              padding: 2px 0 !important;
+              background: transparent !important;
+            }
+            
+            .MuiFormControl-root .MuiOutlinedInput-notchedOutline {
+              border: none !important;
+            }
+            
+            .MuiFormGroup-root {
+              flex-direction: row !important;
+              flex-wrap: wrap !important;
+            }
+            
+            .MuiCheckbox-root {
+              padding: 2px !important;
+            }
+            
+            .MuiInputLabel-root {
+              position: static !important;
+              transform: none !important;
+              font-size: 11px !important;
+              color: #333 !important;
+              margin-bottom: 2px !important;
+            }
+            
+            .MuiFormControlLabel-root {
+              margin-right: 16px !important;
+            }
+            
+            .MuiCheckbox-root:not(.Mui-checked) {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
+      
+      <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5', position: 'relative' }} className="print-container">
       {/* 워터마크 */}
       <Box
         sx={{
@@ -657,7 +743,8 @@ const ActivationInfoPage = () => {
                     💰 요금 및 약정 정보
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    {/* 한 줄 배치: 약정유형 + 할부개월 */}
+                    <Grid item xs={12} md={6}>
                       <FormControl component="fieldset">
                         <FormLabel component="legend">약정유형</FormLabel>
                         <RadioGroup
@@ -665,30 +752,12 @@ const ActivationInfoPage = () => {
                           onChange={(e) => updateFormData('contractType', e.target.value)}
                           row
                         >
-                          <FormControlLabel value="공시지원금" control={<Radio />} label="공시지원금" />
+                          <FormControlLabel value="이통사지원금" control={<Radio />} label="이통사지원금" />
                           <FormControlLabel value="선택약정(24)" control={<Radio />} label="선택약정(24)" />
                           <FormControlLabel value="선택약정(12)" control={<Radio />} label="선택약정(12)" />
                           <FormControlLabel value="선택약정(12+12)" control={<Radio />} label="선택약정(12+12)" />
                         </RadioGroup>
                       </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <TextField
-                          fullWidth
-                          label="전환지원금"
-                          value={formData.conversionSubsidy}
-                          onChange={(e) => updateFormData('conversionSubsidy', e.target.value)}
-                          type="number"
-                        />
-                        <TextField
-                          fullWidth
-                          label="유통망추가지원금"
-                          value={formData.additionalSubsidy}
-                          onChange={(e) => updateFormData('additionalSubsidy', e.target.value)}
-                          type="number"
-                        />
-                      </Box>
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <FormControl component="fieldset">
@@ -705,22 +774,42 @@ const ActivationInfoPage = () => {
                         </RadioGroup>
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={6}>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <TextField
-                          fullWidth
-                          label="할부원금"
-                          value={formData.installmentAmount}
-                          onChange={(e) => updateFormData('installmentAmount', e.target.value)}
-                          type="number"
-                        />
-                        <TextField
-                          fullWidth
-                          label="프리"
-                          value={formData.free}
-                          onChange={(e) => updateFormData('free', e.target.value)}
-                        />
-                      </Box>
+
+                    {/* 한 줄 배치: 이통사지원금 + 유통망추가지원금 + 할부원금 + 프리 */}
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        fullWidth
+                        label="이통사지원금"
+                        value={formData.conversionSubsidy}
+                        onChange={(e) => updateFormData('conversionSubsidy', e.target.value)}
+                        type="number"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        fullWidth
+                        label="유통망추가지원금"
+                        value={formData.additionalSubsidy}
+                        onChange={(e) => updateFormData('additionalSubsidy', e.target.value)}
+                        type="number"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        fullWidth
+                        label="할부원금"
+                        value={formData.installmentAmount}
+                        onChange={(e) => updateFormData('installmentAmount', e.target.value)}
+                        type="number"
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        fullWidth
+                        label="프리"
+                        value={formData.free}
+                        onChange={(e) => updateFormData('free', e.target.value)}
+                      />
                     </Grid>
                     <Grid item xs={12} md={8}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -821,15 +910,7 @@ const ActivationInfoPage = () => {
                         </FormGroup>
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="부가서비스"
-                        value={formData.additionalServices}
-                        onChange={(e) => updateFormData('additionalServices', e.target.value)}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
+                    <Grid item xs={12} md={4}>
                       <FormControl component="fieldset">
                         <FormLabel component="legend">프리미어약정(85이상)</FormLabel>
                         <RadioGroup
@@ -841,6 +922,14 @@ const ActivationInfoPage = () => {
                           <FormControlLabel value="미가입" control={<Radio />} label="미가입" />
                         </RadioGroup>
                       </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="부가서비스"
+                        value={formData.additionalServices}
+                        onChange={(e) => updateFormData('additionalServices', e.target.value)}
+                      />
                     </Grid>
                   </Grid>
                 </CardContent>
@@ -891,25 +980,31 @@ const ActivationInfoPage = () => {
 
             {/* 안내사항 */}
             <Grid item xs={12}>
-              <Alert severity="info" sx={{ mb: 3 }}>
-                <Typography variant="body2">
-                  <strong>안내사항:</strong><br/>
-                  • 보험 및 맘대로폰교체 가입은 서류 별도 접수 필요<br/>
-                  • 복지서류는 별도 접수 시 복지등록 가능
-                </Typography>
-              </Alert>
+              <Typography variant="body2" sx={{ mt: 1, mb: 1 }}>
+                <strong>안내사항:</strong><br/>
+                • 보험 및 맘대로폰교체 가입은 서류 별도 접수 필요<br/>
+                • 복지서류는 별도 접수 시 복지등록 가능
+              </Typography>
             </Grid>
           </Grid>
 
           {/* 제출 버튼 영역 */}
           <Box sx={{ mt: 4, textAlign: 'center' }}>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              <Typography variant="body2">
-                <strong>제출 후 다음 온세일 접수페이지로 이동합니다. 온세일 접수까지 완료되어야 최종 완료입니다.</strong>
-              </Typography>
-            </Alert>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mt: 1, 
+                mb: 3,
+                p: 2, 
+                backgroundColor: '#fff9c4', 
+                borderRadius: 1,
+                border: '1px solid #fdd835'
+              }}
+            >
+              <strong>제출 후 다음 온세일 접수페이지로 이동합니다. 온세일 접수까지 완료되어야 최종 완료입니다.</strong>
+            </Typography>
             
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }} className="no-print">
               {isEditMode ? (
                 // 수정 모드 버튼들
                 <>
@@ -1225,7 +1320,8 @@ const ActivationInfoPage = () => {
           }
         }
       `}</style>
-    </Box>
+      </Box>
+    </>
   );
 };
 

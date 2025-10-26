@@ -28,7 +28,10 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Tabs,
+  Tab,
+  Checkbox
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -40,6 +43,22 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
+
+// TabPanel 컴포넌트
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 const OnSaleManagementMode = ({ 
   loggedInStore, 
@@ -75,8 +94,50 @@ const OnSaleManagementMode = ({
   const [selectedLink, setSelectedLink] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // 탭 상태 관리
+  const [tabValue, setTabValue] = useState(0);
+  const [activationTabValue, setActivationTabValue] = useState(0);
+  
+  // 월별 필터링
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  // 보류함 관리
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [pendingList, setPendingList] = useState([]);
   
   const API_URL = process.env.REACT_APP_API_URL;
+
+  // 탭 핸들러 함수들
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  const handleActivationTabChange = (event, newValue) => {
+    setActivationTabValue(newValue);
+  };
+
+  const handleMonthChange = (event) => {
+    setSelectedMonth(event.target.value);
+  };
+
+  // 체크박스 핸들러
+  const handleRowSelect = (rowIndex) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(index => index !== rowIndex)
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleMoveToHold = () => {
+    const itemsToMove = activationList.filter((_, index) => selectedRows.includes(index));
+    setPendingList(prev => [...prev, ...itemsToMove]);
+    setSelectedRows([]);
+  };
 
   // 업데이트 팝업 자동 표시
   useEffect(() => {
@@ -89,6 +150,13 @@ const OnSaleManagementMode = ({
     fetchLinks();
     fetchActivationList(); // 개통정보 목록도 함께 불러오기
   }, []);
+
+  // 월별 필터링 변경 시 목록 새로고침
+  useEffect(() => {
+    if (selectedMonth) {
+      fetchActivationList();
+    }
+  }, [selectedMonth]);
 
   // 수정 완료 메시지 리스너
   useEffect(() => {
@@ -250,6 +318,11 @@ const OnSaleManagementMode = ({
         params.append('allSheets', 'true');
       }
       
+      // 월별 필터링 추가
+      if (selectedMonth) {
+        params.append('month', selectedMonth);
+      }
+      
       const response = await fetch(`${API_URL}/api/onsale/activation-list?${params.toString()}`);
       const result = await response.json();
       
@@ -407,22 +480,83 @@ const OnSaleManagementMode = ({
           </Alert>
         )}
 
-        {/* 상단 액션 바 */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <Typography 
-            variant="h5" 
-            sx={{ 
-              fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
-              mb: 3
-            }}
-          >
-            📱 온세일 링크 관리
-          </Typography>
+        {/* 메인 탭 */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={tabValue} onChange={handleTabChange}>
+            <Tab label="개통정보 목록" />
+            <Tab label="온세일 링크 관리" />
+          </Tabs>
+        </Box>
+
+        {/* 개통정보 목록 탭 */}
+        <TabPanel value={tabValue} index={0}>
+          {/* 개통정보 하위 탭 */}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+            <Tabs value={activationTabValue} onChange={handleActivationTabChange}>
+              <Tab label="수신함" />
+              <Tab label="보류함" />
+              <Tab label="취소함" />
+              <Tab label="완료함" />
+            </Tabs>
+          </Box>
+
+          {/* 월별 필터링 */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>월별 필터</InputLabel>
+              <Select
+                value={selectedMonth}
+                label="월별 필터"
+                onChange={handleMonthChange}
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const date = new Date();
+                  date.setMonth(date.getMonth() - i);
+                  const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  const label = `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+                  return (
+                    <MenuItem key={value} value={value}>
+                      {label}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+
+            {activationTabValue === 0 && selectedRows.length > 0 && (
+              <Button
+                variant="contained"
+                color="warning"
+                onClick={handleMoveToHold}
+                sx={{ ml: 2 }}
+              >
+                보류함으로 이동 ({selectedRows.length})
+              </Button>
+            )}
+          </Box>
+
+          {/* 개통정보 목록 내용은 여기에 추가 */}
+          {/* TODO: 개통정보 목록 컴포넌트 추가 */}
+        </TabPanel>
+
+        {/* 온세일 링크 관리 탭 */}
+        <TabPanel value={tabValue} index={1}>
+          {/* 상단 액션 바 */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
+                mb: 3
+              }}
+            >
+              📱 온세일 링크 관리
+            </Typography>
           <Box>
             <Button
               variant="outlined"

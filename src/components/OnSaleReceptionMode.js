@@ -26,7 +26,13 @@ import {
   TableRow,
   Chip,
   TablePagination,
-  InputAdornment
+  InputAdornment,
+  Tabs,
+  Tab,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Lock as LockIcon,
@@ -41,6 +47,22 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
+
+// TabPanel 컴포넌트
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
 
 const OnSaleReceptionMode = ({ 
   loggedInStore, 
@@ -72,8 +94,26 @@ const OnSaleReceptionMode = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // 탭 상태 관리
+  const [tabValue, setTabValue] = useState(0);
+  
+  // 월별 필터링
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   
   const API_URL = process.env.REACT_APP_API_URL;
+
+  // 탭 핸들러 함수들
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  const handleMonthChange = (event) => {
+    setSelectedMonth(event.target.value);
+  };
 
   // 업데이트 팝업 자동 표시 (인증 성공 시)
   useEffect(() => {
@@ -82,6 +122,13 @@ const OnSaleReceptionMode = ({
       fetchActivationList(); // 개통정보 목록도 함께 불러오기
     }
   }, [isAuthenticated]);
+
+  // 월별 필터링 변경 시 목록 새로고침
+  useEffect(() => {
+    if (selectedMonth && isAuthenticated) {
+      fetchActivationList();
+    }
+  }, [selectedMonth]);
 
   // 컴포넌트 마운트 시 활성화된 링크 불러오기
   useEffect(() => {
@@ -216,7 +263,16 @@ const OnSaleReceptionMode = ({
   const fetchActivationList = async () => {
     try {
       setActivationLoading(true);
-      const url = `${API_URL}/api/onsale/activation-list?storeName=${encodeURIComponent(loggedInStore.name)}&allSheets=true`;
+      const params = new URLSearchParams();
+      params.append('storeName', loggedInStore.name);
+      params.append('allSheets', 'true');
+      
+      // 월별 필터링 추가
+      if (selectedMonth) {
+        params.append('month', selectedMonth);
+      }
+      
+      const url = `${API_URL}/api/onsale/activation-list?${params.toString()}`;
       console.log('🔍 온세일접수 모드 - 개통정보 목록 요청:', url);
       console.log('🔍 매장명:', loggedInStore.name);
       
