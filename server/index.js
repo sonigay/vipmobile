@@ -6811,6 +6811,8 @@ app.get('/api/onsale/activation-list', async (req, res) => {
     const { storeName, sheetId, allSheets, month } = req.query;
     
     console.log('📋 [개통정보목록] 요청 파라미터:', { storeName, sheetId, allSheets, month });
+    console.log('📋 [개통정보목록] 요청 IP:', req.ip);
+    console.log('📋 [개통정보목록] User-Agent:', req.get('User-Agent'));
     
     let targetSheets = [];
     
@@ -6877,6 +6879,11 @@ app.get('/api/onsale/activation-list', async (req, res) => {
           const submittedAt = row[8] || ''; // I열
           const storeNameFromSheet = row[9] || ''; // J열
           const pCode = row[10] || ''; // K열
+          
+          // 완료 상태 로깅
+          if (isCompleted) {
+            console.log(`✅ [개통정보목록] 완료된 데이터 발견: ${storeNameFromSheet} - ${row[13] || ''} - ${completedBy}`);
+          }
           const activationType = row[11] || ''; // L열
           const previousCarrier = row[12] || ''; // M열
           const customerName = row[13] || ''; // N열

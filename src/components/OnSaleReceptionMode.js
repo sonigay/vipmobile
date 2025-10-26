@@ -279,9 +279,12 @@ const OnSaleReceptionMode = ({
       const result = await response.json();
       
       console.log('🔍 온세일접수 모드 - API 응답:', result);
+      console.log('🔍 온세일접수 모드 - 응답 상태:', response.status);
+      console.log('🔍 온세일접수 모드 - 응답 헤더:', response.headers);
       
       if (result.success) {
         console.log('🔍 온세일접수 모드 - 개통정보 개수:', result.data.length);
+        console.log('🔍 온세일접수 모드 - 첫 번째 데이터:', result.data[0]);
         setActivationList(result.data);
       } else {
         console.error('🔍 온세일접수 모드 - API 에러:', result.error);

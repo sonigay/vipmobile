@@ -990,7 +990,10 @@ const OnSaleManagementMode = ({
       {/* 업데이트 팝업 */}
       {showUpdatePopup && (
         <AppUpdatePopup
+          open={showUpdatePopup}
           onClose={() => setShowUpdatePopup(false)}
+          mode="onSaleManagement"
+          loggedInStore={loggedInStore}
           updateData={{
             version: "1.0.0",
             description: "온세일 관리 모드가 업데이트되었습니다.",
