@@ -45,3 +45,5 @@ context:
     url: https://github.com/sonigay/vipmobile.git
     branch: main
     path: server
+    username: sonigay
+    password: ghp_1234567890abcdef
