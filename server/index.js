@@ -578,6 +578,27 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control']
 }));
+// 모든 요청 로깅 미들웨어
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.url;
+  const userAgent = req.get('User-Agent') || 'Unknown';
+  const ip = req.ip || req.connection.remoteAddress;
+  
+  console.log(`📡 [${timestamp}] ${method} ${url} - IP: ${ip} - UA: ${userAgent.substring(0, 50)}...`);
+  
+  // 응답 완료 시 로깅
+  res.on('finish', () => {
+    const statusCode = res.statusCode;
+    const responseTime = Date.now() - req.startTime;
+    console.log(`✅ [${timestamp}] ${method} ${url} - ${statusCode} - ${responseTime}ms`);
+  });
+  
+  req.startTime = Date.now();
+  next();
+});
+
 app.use(express.json());
 
 // ==================== API 라우트들 ====================
@@ -8070,6 +8091,9 @@ const server = app.listen(port, '0.0.0.0', async () => {
   try {
     console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다`);
     console.log(`🔑 VAPID Public Key: ${vapidKeys.publicKey}`);
+    console.log(`📅 서버 시작 시간: ${new Date().toISOString()}`);
+    console.log(`🌍 서버 환경: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`💾 메모리 사용량: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
     
     // 환경변수 디버깅 (민감한 정보는 로깅하지 않음)
     console.log('🔧 [서버시작] 환경변수 상태 확인:');
@@ -8603,6 +8627,13 @@ const server = app.listen(port, '0.0.0.0', async () => {
         }
       
       console.log(`📈 [서버시작] 배정완료 재고 자동 저장 완료: ${updatedCount}개 저장, ${skippedCount}개 유지, ${cleanedCount}개 중복정리`);
+    
+    // 주기적 상태 로그 (5분마다)
+    setInterval(() => {
+      const memoryUsage = process.memoryUsage();
+      const uptime = Math.floor(process.uptime());
+      console.log(`📊 [상태체크] 서버 가동시간: ${uptime}초, 메모리: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`);
+    }, 5 * 60 * 1000); // 5분마다
       
       // 실제 시트 데이터와 비교 분석
       console.log('🔍 [서버시작] 실제 시트 데이터와 배정 상태 비교 분석 시작');
