@@ -1,0 +1,47 @@
+name: vipmobile
+app: node@20
+options:
+  ports: "4000"
+  install: npm ci --production
+  start: node index.js
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: PORT
+      value: "4000"
+    - name: GOOGLE_SERVICE_ACCOUNT_EMAIL
+      value: siljuk@siljuk.iam.gserviceaccount.com
+    - name: GOOGLE_APPLICATION_CREDENTIALS
+      value: ./siljuk-ba9eed4a893c.json
+    - name: SHEET_ID
+      value: 1scNwIN5ZgV_DGGQW7WKJW9mL33vMGnFfsASPHYxt-18
+    - name: SALES_SHEET_ID
+      value: 1-BrqXASrQ8YPPj6e0gAl9_lFYc18ci7K-LbofODVx6M
+    - name: INVENTORY_RECOVERY_SPREADSHEET_ID
+      value: 1soJE2C2svNCfLBSJsZBoXiBQIAglgefQpnehWqDUmuY
+    - name: INVENTORY_RECOVERY_SHEET_NAME
+      value: 회수목록
+    - name: DISCORD_CHANNEL_ID
+      value: "1366061518776701051"
+    - name: DISCORD_AGENT_CHANNEL_ID
+      value: "1366052490109386833"
+    - name: DISCORD_STORE_CHANNEL_ID
+      value: "1084567515419643985"
+    - name: DISCORD_LOGGING_ENABLED
+      value: "true"
+    - name: CHECK_INTERVAL
+      value: "60000"
+    - name: MAX_RETRIES
+      value: "3"
+    - name: PUSH_ADMIN_EMAIL
+      value: sonigay@naver.com
+    - name: CORS_ORIGIN
+      value: https://vipmobile.vercel.app,https://vipmobile.netlify.app
+    - name: NPM_FLAGS
+      value: --prefer-offline --no-audit
+  buildenv: []
+context:
+  git:
+    url: https://github.com/sonigay/vipmobile.git
+    branch: main
+    path: server
