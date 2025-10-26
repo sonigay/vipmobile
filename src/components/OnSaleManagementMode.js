@@ -882,6 +882,7 @@ const OnSaleManagementMode = ({
           )}
         </Paper>
         </TabPanel>
+        </Box>
       </Container>
 
       {/* 링크 추가/수정 다이얼로그 */}
