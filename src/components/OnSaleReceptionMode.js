@@ -38,7 +38,6 @@ import {
   Lock as LockIcon,
   Link as LinkIcon,
   OpenInNew as OpenInNewIcon,
-  Visibility as VisibilityIcon,
   Close as CloseIcon,
   Update as UpdateIcon,
   Refresh as RefreshIcon,
@@ -300,12 +299,6 @@ const OnSaleReceptionMode = ({
   const handleEditActivation = (activation) => {
     const editUrl = `/activation-info?editMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}&activationSheetId=${activation.sheetId}`;
     window.location.href = editUrl;
-  };
-
-  // 개통정보 상세보기
-  const handleViewActivation = (activation) => {
-    const viewUrl = `/activation-info?viewMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}&activationSheetId=${activation.sheetId}`;
-    window.location.href = viewUrl;
   };
 
   // 개통정보 취소
@@ -728,18 +721,12 @@ const OnSaleReceptionMode = ({
                     .map((activation, index) => (
                       <TableRow
                         key={index}
-                        onClick={() => handleViewActivation(activation)}
                         sx={{ 
                           backgroundColor: activation.isCompleted ? '#e3f2fd' : 
                                          activation.isCancelled ? '#fce4ec' : 
                                          activation.lastEditor ? '#f1f8e9' : 'inherit',
                           opacity: activation.isCancelled ? 0.7 : 1,
-                          cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: activation.isCompleted ? '#bbdefb' : 
-                                           activation.isCancelled ? '#f8bbd9' : 
-                                           activation.lastEditor ? '#dcedc8' : '#f8f9fa'
-                          }
+                          cursor: 'default' // 접수모드에서는 선택 불가
                         }}
                       >
                         <TableCell>{activation.submittedAt}</TableCell>
@@ -803,17 +790,6 @@ const OnSaleReceptionMode = ({
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<VisibilityIcon />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewActivation(activation);
-                              }}
-                            >
-                              보기
-                            </Button>
                             <Button
                               size="small"
                               variant="outlined"
@@ -920,7 +896,7 @@ const OnSaleReceptionMode = ({
                     <Button
                       fullWidth
                       variant="contained"
-                      endIcon={link.hideAgentInfo ? <VisibilityIcon /> : <OpenInNewIcon />}
+                      endIcon={<OpenInNewIcon />}
                       onClick={() => handleLinkClick(link)}
                       disabled={loading}
                       sx={{ 
