@@ -31522,8 +31522,3 @@ app.post('/api/sms/auto-reply/update-status', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// 서버 시작 (이미 위에서 처리됨)
-  console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다.`);
-  console.log(`📊 예산 관리 시스템이 준비되었습니다.`);
-  console.log(`🕐 자동 재계산 스케줄러가 임시 비활성화되었습니다. (클라우드타입 패키지 문제)`);
