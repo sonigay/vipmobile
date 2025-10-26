@@ -109,6 +109,11 @@ const OnSaleReceptionMode = ({
 
   const handleMonthChange = (event) => {
     const value = event.target.value;
+    console.log('📅 월별 필터 변경:', value);
+    
+    // 상태 초기화
+    setActivationList([]);
+    
     if (value === 'all') {
       setSelectedMonth(null); // 전체 선택 시 null로 설정
     } else {
@@ -676,6 +681,20 @@ const OnSaleReceptionMode = ({
                 })}
               </Select>
             </FormControl>
+            
+            {/* 강제 새로고침 버튼 */}
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                console.log('🔄 강제 새로고침 시작');
+                setActivationList([]); // 상태 초기화
+                fetchActivationList(); // 데이터 다시 가져오기
+              }}
+              disabled={activationLoading}
+            >
+              새로고침
+            </Button>
           </Box>
 
           {/* 개통정보 목록 테이블 */}

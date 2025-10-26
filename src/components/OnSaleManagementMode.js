@@ -101,11 +101,8 @@ const OnSaleManagementMode = ({
   const [tabValue, setTabValue] = useState(0);
   const [activationTabValue, setActivationTabValue] = useState(0);
   
-  // 월별 필터링
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  // 월별 필터링 (관리모드에서는 전체 데이터 표시)
+  const [selectedMonth, setSelectedMonth] = useState(null); // null = 전체
 
   // 보류함 관리
   const [selectedRows, setSelectedRows] = useState([]);
@@ -123,7 +120,17 @@ const OnSaleManagementMode = ({
   };
 
   const handleMonthChange = (event) => {
-    setSelectedMonth(event.target.value);
+    const value = event.target.value;
+    console.log('📅 온세일관리모드 월별 필터 변경:', value);
+    
+    // 상태 초기화
+    setActivationList([]);
+    
+    if (value === 'all') {
+      setSelectedMonth(null); // 전체 선택 시 null로 설정
+    } else {
+      setSelectedMonth(value);
+    }
   };
 
   // 체크박스 핸들러
@@ -524,10 +531,11 @@ const OnSaleManagementMode = ({
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <InputLabel>월별 필터</InputLabel>
               <Select
-                value={selectedMonth}
+                value={selectedMonth || 'all'}
                 label="월별 필터"
                 onChange={handleMonthChange}
               >
+                <MenuItem value="all">전체</MenuItem>
                 {Array.from({ length: 12 }, (_, i) => {
                   const date = new Date();
                   date.setMonth(date.getMonth() - i);
@@ -541,6 +549,21 @@ const OnSaleManagementMode = ({
                 })}
               </Select>
             </FormControl>
+            
+            {/* 강제 새로고침 버튼 */}
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                console.log('🔄 온세일관리모드 강제 새로고침 시작');
+                setActivationList([]); // 상태 초기화
+                fetchActivationList(); // 데이터 다시 가져오기
+              }}
+              disabled={loading}
+              sx={{ ml: 2 }}
+            >
+              새로고침
+            </Button>
 
             {activationTabValue === 0 && selectedRows.length > 0 && (
               <Button
