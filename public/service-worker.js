@@ -11,9 +11,10 @@ const CACHE_NAME = getCacheName();
 const BUILD_VERSION = '1752512625742'; // 새로운 빌드 버전 (업데이트 테스트)
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/static/js/main.js',
-  '/static/css/main.css'
+  '/index.html'
+  // 정적 파일들은 빌드 시점에 정확한 경로를 알 수 없으므로 제거
+  // '/static/js/main.js',
+  // '/static/css/main.css'
 ];
 
 // 설치 시 기존 캐시 모두 삭제
@@ -33,7 +34,15 @@ self.addEventListener('install', event => {
       return caches.open(CACHE_NAME);
     }).then(cache => {
       console.log(`새 캐시 생성: ${CACHE_NAME}`);
-      return cache.addAll(urlsToCache);
+      // 각 URL을 개별적으로 캐시하여 실패 시에도 계속 진행
+      return Promise.allSettled(
+        urlsToCache.map(url => 
+          cache.add(url).catch(error => {
+            console.warn(`캐시 실패 (무시): ${url}`, error);
+            return null; // 실패해도 계속 진행
+          })
+        )
+      );
     }).then(() => {
       // 강제로 새로운 서비스 워커 활성화
       return self.skipWaiting();
