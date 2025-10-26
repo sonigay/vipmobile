@@ -69,17 +69,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS 설정 - 더 안전하고 포괄적인 설정
+// CORS 설정 - 환경 변수 기반 동적 설정
 app.use(cors({
   origin: function (origin, callback) {
-    // 허용할 도메인 목록
-    const allowedOrigins = [
-      'https://vipmobile.netlify.app',
-      'https://vipmobile.netlify.app/',
+    // 환경 변수에서 허용할 도메인 목록 가져오기
+    const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+    
+    // 기본 허용 도메인 (개발용)
+    const defaultOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:4000'
     ];
+    
+    // 환경 변수 도메인과 기본 도메인 합치기
+    const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+    
+    console.log('CORS allowed origins:', allowedOrigins);
     
     // origin이 없거나 허용된 도메인에 포함되어 있으면 허용
     if (!origin || allowedOrigins.includes(origin)) {
