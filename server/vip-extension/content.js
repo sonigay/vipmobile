@@ -41,6 +41,7 @@
   // 개통정보 페이지 감지
   const isActivationInfoPage = 
     (window.location.hostname.includes('vipmobile.netlify.app') || 
+     window.location.hostname.includes('vipmobile.vercel.app') ||
      window.location.hostname.includes('localhost')) &&
     urlParams.get('activationSheetId');
   
@@ -69,6 +70,7 @@
 
   // VIP 앱에서 업체명 저장 (chrome.storage 사용 - 도메인 간 공유)
   if (window.location.href.includes('vipmobile.netlify.app') || 
+      window.location.href.includes('vipmobile.vercel.app') ||
       window.location.href.includes('localhost:3000')) {
     // VIP 앱에서 로그인 정보 감지 및 저장
     const checkAndSaveCompanyName = () => {
@@ -641,7 +643,7 @@
           
           // VIP 앱 API로 전송
           try {
-            const response = await fetch('https://vipmobile.netlify.app/api/onsale/uplus-submission', {
+            const response = await fetch('https://vipmobile.vercel.app/api/onsale/uplus-submission', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

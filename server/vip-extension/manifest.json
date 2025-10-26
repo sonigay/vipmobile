@@ -2,20 +2,22 @@
   "manifest_version": 3,
   "name": "VIP 필수 확장프로그램",
   "description": "VIP 앱 사용을 위한 필수 확장 프로그램",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "permissions": [
     "activeTab",
     "scripting",
     "storage"
   ],
   "host_permissions": [
-    "https://onsalemobile.uplus.co.kr/*"
+    "https://onsalemobile.uplus.co.kr/*",
+    "https://vipmobile.vercel.app/*"
   ],
   "content_scripts": [
     {
       "matches": [
         "https://onsalemobile.uplus.co.kr/*",
         "https://vipmobile.netlify.app/*",
+        "https://vipmobile.vercel.app/*",
         "http://localhost:3000/*"
       ],
       "js": [
