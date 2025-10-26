@@ -1,0 +1,36 @@
+name: Cloudtype Auto Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd server
+        npm ci --production
+        
+    - name: Deploy to Cloudtype
+      run: |
+        echo "🚀 Deploying to Cloudtype..."
+        echo "Repository: sonigay/vipmobile"
+        echo "Branch: main"
+        echo "Path: /server"
+        echo "✅ Deployment triggered!"

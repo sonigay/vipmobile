@@ -20,3 +20,7 @@ deploy:
   auto: true
   branch: main
   path: /server
+  webhook: true
+  github:
+    repository: sonigay/vipmobile
+    branch: main
