@@ -1,6 +1,0 @@
-pm2 start server/index.js --name "jegomap-server"
-pm2 start server/ecosystem.config.js --no-autorestart
-
-
-netstat -ano | findstr :4000 // 4000 포트 프로세스 찾기
-taskkill /F /PID 6084 // LISTENING 6084 종료료
