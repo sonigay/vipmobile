@@ -535,8 +535,210 @@ const OnSaleManagementMode = ({
             )}
           </Box>
 
-          {/* 개통정보 목록 내용은 여기에 추가 */}
-          {/* TODO: 개통정보 목록 컴포넌트 추가 */}
+          {/* 개통정보 목록 테이블 */}
+          <TableContainer 
+            component={Paper} 
+            sx={{ 
+              mb: 2, 
+              maxHeight: 600,
+              overflow: 'auto'
+            }}
+          >
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  {activationTabValue === 0 && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={selectedRows.length > 0 && selectedRows.length < filteredActivations.length}
+                        checked={filteredActivations.length > 0 && selectedRows.length === filteredActivations.length}
+                        onChange={(event) => {
+                          if (event.target.checked) {
+                            setSelectedRows(filteredActivations.map((_, index) => index));
+                          } else {
+                            setSelectedRows([]);
+                          }
+                        }}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell>제출일시</TableCell>
+                  <TableCell>작업자</TableCell>
+                  <TableCell>매장명</TableCell>
+                  <TableCell>개통유형</TableCell>
+                  <TableCell>고객명</TableCell>
+                  <TableCell>개통번호</TableCell>
+                  <TableCell>생년월일</TableCell>
+                  <TableCell>모델명</TableCell>
+                  <TableCell>일련번호</TableCell>
+                  <TableCell>유심모델명</TableCell>
+                  <TableCell>유심일련번호</TableCell>
+                  <TableCell>요금제</TableCell>
+                  <TableCell>개통완료</TableCell>
+                  <TableCell>개통시간</TableCell>
+                  <TableCell>상태</TableCell>
+                  <TableCell>작업</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {activationLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={activationTabValue === 0 ? 17 : 16} align="center">
+                      <CircularProgress />
+                    </TableCell>
+                  </TableRow>
+                ) : filteredActivations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={activationTabValue === 0 ? 17 : 16} align="center">
+                      데이터가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredActivations
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((activation, index) => (
+                      <TableRow
+                        key={index}
+                        onClick={() => handleViewActivation(activation)}
+                        sx={{ 
+                          backgroundColor: activation.isCompleted ? '#e3f2fd' : 
+                                         activation.isCancelled ? '#fce4ec' : 
+                                         activation.lastEditor ? '#f1f8e9' : 'inherit',
+                          opacity: activation.isCancelled ? 0.7 : 1,
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: activation.isCompleted ? '#bbdefb' : 
+                                           activation.isCancelled ? '#f8bbd9' : 
+                                           activation.lastEditor ? '#dcedc8' : '#f8f9fa'
+                          }
+                        }}
+                      >
+                        {activationTabValue === 0 && (
+                          <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedRows.includes(index)}
+                              onChange={() => handleRowSelect(index)}
+                            />
+                          </TableCell>
+                        )}
+                        <TableCell>{activation.submittedAt}</TableCell>
+                        <TableCell>
+                          {activation.completedBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                              개통: {activation.completedBy}
+                            </Box>
+                          ) : activation.cancelledBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
+                              취소: {activation.cancelledBy}
+                            </Box>
+                          ) : activation.lastEditor ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              수정: {activation.lastEditor}
+                            </Box>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>{activation.storeName}</TableCell>
+                        <TableCell>{activation.activationType}</TableCell>
+                        <TableCell>{activation.customerName}</TableCell>
+                        <TableCell>{activation.phoneNumber}</TableCell>
+                        <TableCell>{activation.birthDate}</TableCell>
+                        <TableCell>{activation.modelName}</TableCell>
+                        <TableCell>{activation.deviceSerial}</TableCell>
+                        <TableCell>{activation.simModel}</TableCell>
+                        <TableCell>{activation.simSerial}</TableCell>
+                        <TableCell>{activation.plan}</TableCell>
+                        <TableCell>
+                          {activation.isCompleted ? (
+                            <Box>
+                              <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                                완료: {activation.completedBy}
+                              </Box>
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              미완료
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {activation.completedAt ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
+                              {activation.completedAt}
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              -
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {activation.isCancelled ? (
+                            <Chip label="취소됨" color="error" size="small" />
+                          ) : (
+                            <Chip label="정상" color="success" size="small" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<VisibilityIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewActivation(activation);
+                              }}
+                            >
+                              보기
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<EditIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditActivation(activation);
+                              }}
+                            >
+                              수정
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<CancelIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelActivation(activation);
+                              }}
+                            >
+                              취소
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* 페이지네이션 */}
+          <TablePagination
+            component="div"
+            count={filteredActivations.length}
+            page={page}
+            onPageChange={(event, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            labelRowsPerPage="페이지당 행 수:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+          />
         </TabPanel>
 
         {/* 온세일 링크 관리 탭 */}
@@ -679,261 +881,31 @@ const OnSaleManagementMode = ({
             </TableContainer>
           )}
         </Paper>
-      </Box>
-
-      {/* 개통정보 목록 */}
-      <Box sx={{ mt: 4 }}>
-        <Paper sx={{ p: 3 }}>
-          <Typography 
-            variant="h5" 
-            sx={{ 
-              fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
-              mb: 3
-            }}
-          >
-            📋 개통정보 목록
-          </Typography>
-
-          {/* 필터 및 검색 */}
-          <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-            <FormControl sx={{ minWidth: 200 }}>
-              <InputLabel>링크 선택</InputLabel>
-              <Select
-                value={selectedLink}
-                onChange={(e) => setSelectedLink(e.target.value)}
-                label="링크 선택"
-              >
-                <MenuItem value="all">전체 리스트</MenuItem>
-                {links.filter(link => link.useActivationForm).map(link => (
-                  <MenuItem key={link.buttonName} value={link.buttonName}>
-                    {link.buttonName} ({link.activationSheetName})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              placeholder="고객명, 개통번호, 모델명, 요금제, 매장명으로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ flexGrow: 1, minWidth: 300 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchActivationList}
-              disabled={activationLoading}
-            >
-              새로고침
-            </Button>
-          </Box>
-
-          {/* 개통정보 테이블 */}
-          {activationLoading ? (
-            <Box sx={{ textAlign: 'center', p: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : paginatedActivations.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Typography color="textSecondary">
-                {searchTerm ? '검색 결과가 없습니다.' : '등록된 개통정보가 없습니다.'}
-              </Typography>
-            </Paper>
-          ) : (
-            <>
-              <TableContainer component={Paper} sx={{ mb: 2 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>제출일시</TableCell>
-                      <TableCell>작업자</TableCell>
-                      <TableCell>매장명</TableCell>
-                      <TableCell>개통유형</TableCell>
-                      <TableCell>고객명</TableCell>
-                      <TableCell>개통번호</TableCell>
-                      <TableCell>생년월일</TableCell>
-                      <TableCell>모델명</TableCell>
-                      <TableCell>일련번호</TableCell>
-                      <TableCell>유심모델명</TableCell>
-                      <TableCell>유심일련번호</TableCell>
-                      <TableCell>요금제</TableCell>
-                      <TableCell>개통완료</TableCell>
-                      <TableCell>개통시간</TableCell>
-                      <TableCell>상태</TableCell>
-                      <TableCell>작업</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedActivations.map((activation, index) => (
-                      <TableRow 
-                        key={index}
-                        onClick={() => handleViewActivation(activation)}
-                        sx={{ 
-                          backgroundColor: activation.isCompleted ? '#e3f2fd' : 
-                                         activation.isCancelled ? '#fce4ec' : 
-                                         activation.lastEditor ? '#f1f8e9' : 'inherit',
-                          opacity: activation.isCancelled ? 0.7 : 1,
-                          cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: activation.isCompleted ? '#bbdefb' : 
-                                           activation.isCancelled ? '#f8bbd9' : 
-                                           activation.lastEditor ? '#dcedc8' : '#f8f9fa'
-                          }
-                        }}
-                      >
-                        <TableCell>{activation.submittedAt}</TableCell>
-                        <TableCell>
-                          {activation.completedBy ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
-                              개통: {activation.completedBy}
-                            </Box>
-                          ) : activation.cancelledBy ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
-                              취소: {activation.cancelledBy}
-                            </Box>
-                          ) : activation.lastEditor ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                              수정: {activation.lastEditor}
-                            </Box>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell>{activation.storeName}</TableCell>
-                        <TableCell>{activation.activationType}</TableCell>
-                        <TableCell>{activation.customerName}</TableCell>
-                        <TableCell>{activation.phoneNumber}</TableCell>
-                        <TableCell>{activation.birthDate}</TableCell>
-                        <TableCell>{activation.modelName}</TableCell>
-                        <TableCell>{activation.deviceSerial}</TableCell>
-                        <TableCell>{activation.simModel}</TableCell>
-                        <TableCell>{activation.simSerial}</TableCell>
-                        <TableCell>{activation.plan}</TableCell>
-                        <TableCell>
-                          {activation.isCompleted ? (
-                            <Box>
-                              <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
-                                완료: {activation.completedBy}
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                              미완료
-                            </Box>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {activation.completedAt ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
-                              {activation.completedAt}
-                            </Box>
-                          ) : (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                              -
-                            </Box>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {activation.isCancelled ? (
-                            <Chip 
-                              label={`취소됨 (${activation.cancelledBy})`} 
-                              color="error" 
-                              size="small" 
-                            />
-                          ) : (
-                            <Chip label="정상" color="success" size="small" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEditActivation(activation)}
-                              disabled={activation.isCancelled}
-                              sx={{ color: '#5e35b1' }}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCancelActivation(activation)}
-                              disabled={activation.isCancelled || activationLoading}
-                              sx={{ color: '#d32f2f' }}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* 페이지네이션 */}
-              <TablePagination
-                component="div"
-                count={filteredActivations.length}
-                page={page}
-                onPageChange={(event, newPage) => setPage(newPage)}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(event) => {
-                  setRowsPerPage(parseInt(event.target.value, 10));
-                  setPage(0);
-                }}
-                rowsPerPageOptions={[5, 10, 25]}
-                labelRowsPerPage="페이지당 행 수:"
-                labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
-              />
-            </>
-          )}
-        </Paper>
-      </Box>
+      </Container>
 
       {/* 링크 추가/수정 다이얼로그 */}
-      <Dialog 
-        open={showLinkDialog} 
-        onClose={() => setShowLinkDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={showLinkDialog} onClose={() => setShowLinkDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingLink ? '링크 수정' : '링크 추가'}
+          {editingLink ? '링크 수정' : '새 링크 추가'}
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 1 }}>
+          <Box sx={{ pt: 2 }}>
             <TextField
               fullWidth
-              label="링크 URL"
+              label="URL"
               value={linkForm.url}
               onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
-              margin="normal"
-              placeholder="https://onsalemobile.uplus.co.kr/..."
-              required
+              sx={{ mb: 2 }}
+              placeholder="https://example.com"
             />
-            
             <TextField
               fullWidth
               label="버튼명"
               value={linkForm.buttonName}
               onChange={(e) => setLinkForm({ ...linkForm, buttonName: e.target.value })}
-              margin="normal"
-              placeholder="U+온라인가입"
-              required
+              sx={{ mb: 2 }}
+              placeholder="가입 신청하기"
             />
-            
             <FormControlLabel
               control={
                 <Switch
@@ -941,10 +913,9 @@ const OnSaleManagementMode = ({
                   onChange={(e) => setLinkForm({ ...linkForm, hideAgentInfo: e.target.checked })}
                 />
               }
-              label="대리점 정보 숨기기 (확장 프로그램 사용)"
-              sx={{ mt: 2, mb: 1 }}
+              label="대리점정보숨김"
+              sx={{ mb: 2 }}
             />
-            
             <FormControlLabel
               control={
                 <Switch
@@ -952,10 +923,9 @@ const OnSaleManagementMode = ({
                   onChange={(e) => setLinkForm({ ...linkForm, isActive: e.target.checked })}
                 />
               }
-              label="활성화 (일반모드에 표시)"
-              sx={{ mt: 2, mb: 2 }}
+              label="활성화"
+              sx={{ mb: 2 }}
             />
-            
             <FormControlLabel
               control={
                 <Switch
@@ -964,7 +934,7 @@ const OnSaleManagementMode = ({
                 />
               }
               label="개통양식 사용"
-              sx={{ mt: 2, mb: 1 }}
+              sx={{ mb: 2 }}
             />
             
             {linkForm.useActivationForm && (
@@ -974,55 +944,46 @@ const OnSaleManagementMode = ({
                   label="개통양식 시트 ID"
                   value={linkForm.activationSheetId}
                   onChange={(e) => setLinkForm({ ...linkForm, activationSheetId: e.target.value })}
-                  margin="normal"
-                  placeholder="1BxiM5m0e..."
-                  helperText="구글 스프레드시트의 ID (URL에서 확인 가능)"
+                  sx={{ mb: 2 }}
+                  placeholder="Google Sheets ID"
                 />
-                
                 <TextField
                   fullWidth
                   label="개통양식 시트 이름"
                   value={linkForm.activationSheetName}
                   onChange={(e) => setLinkForm({ ...linkForm, activationSheetName: e.target.value })}
-                  margin="normal"
-                  placeholder="개통정보_2024"
-                  helperText="개통정보가 저장될 시트의 이름"
+                  sx={{ mb: 2 }}
+                  placeholder="시트 탭 이름"
                 />
               </>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowLinkDialog(false)}>
-            취소
-          </Button>
-          <Button 
-            onClick={handleSaveLink} 
-            variant="contained"
-            disabled={loading}
-            sx={{ 
-              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-              '&:hover': { 
-                background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
-              },
-              boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
-            }}
-          >
-            {loading ? <CircularProgress size={24} /> : '저장'}
+          <Button onClick={() => setShowLinkDialog(false)}>취소</Button>
+          <Button onClick={handleSaveLink} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={20} /> : (editingLink ? '수정' : '추가')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 업데이트 팝업 */}
-      <AppUpdatePopup
-        open={showUpdatePopup}
-        onClose={() => setShowUpdatePopup(false)}
-        mode="onSaleManagement"
-        loggedInStore={loggedInStore}
-      />
+      {showUpdatePopup && (
+        <AppUpdatePopup
+          onClose={() => setShowUpdatePopup(false)}
+          updateData={{
+            version: "1.0.0",
+            description: "온세일 관리 모드가 업데이트되었습니다.",
+            features: [
+              "링크 관리 기능 개선",
+              "개통정보 목록 조회 기능 추가",
+              "UI/UX 개선"
+            ]
+          }}
+        />
+      )}
     </Box>
   );
 };
 
 export default OnSaleManagementMode;
-

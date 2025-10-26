@@ -639,22 +639,241 @@ const OnSaleReceptionMode = ({
           </Alert>
         )}
 
-        <Typography 
-          variant="h5" 
-          sx={{ 
-            fontWeight: 'bold',
-            background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
-            mb: 3
-          }}
-        >
-          🔗 가입 신청 링크
-        </Typography>
+        {/* 메인 탭 */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={tabValue} onChange={handleTabChange}>
+            <Tab label="개통정보 목록" />
+            <Tab label="가입 신청 링크" />
+          </Tabs>
+        </Box>
 
-        {loading && activeLinks.length === 0 ? (
+        {/* 개통정보 목록 탭 */}
+        <TabPanel value={tabValue} index={0}>
+          {/* 월별 필터링 */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>월별 필터</InputLabel>
+              <Select
+                value={selectedMonth}
+                label="월별 필터"
+                onChange={handleMonthChange}
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const date = new Date();
+                  date.setMonth(date.getMonth() - i);
+                  const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  const label = `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+                  return (
+                    <MenuItem key={value} value={value}>
+                      {label}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+          </Box>
+
+          {/* 개통정보 목록 테이블 */}
+          <TableContainer 
+            component={Paper} 
+            sx={{ 
+              mb: 2, 
+              maxHeight: 600,
+              overflow: 'auto'
+            }}
+          >
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>제출일시</TableCell>
+                  <TableCell>작업자</TableCell>
+                  <TableCell>매장명</TableCell>
+                  <TableCell>개통유형</TableCell>
+                  <TableCell>고객명</TableCell>
+                  <TableCell>개통번호</TableCell>
+                  <TableCell>생년월일</TableCell>
+                  <TableCell>모델명</TableCell>
+                  <TableCell>일련번호</TableCell>
+                  <TableCell>유심모델명</TableCell>
+                  <TableCell>유심일련번호</TableCell>
+                  <TableCell>요금제</TableCell>
+                  <TableCell>개통완료</TableCell>
+                  <TableCell>개통시간</TableCell>
+                  <TableCell>상태</TableCell>
+                  <TableCell>작업</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {activationLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={16} align="center">
+                      <CircularProgress />
+                    </TableCell>
+                  </TableRow>
+                ) : filteredActivations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={16} align="center">
+                      데이터가 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredActivations
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((activation, index) => (
+                      <TableRow
+                        key={index}
+                        onClick={() => handleViewActivation(activation)}
+                        sx={{ 
+                          backgroundColor: activation.isCompleted ? '#e3f2fd' : 
+                                         activation.isCancelled ? '#fce4ec' : 
+                                         activation.lastEditor ? '#f1f8e9' : 'inherit',
+                          opacity: activation.isCancelled ? 0.7 : 1,
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: activation.isCompleted ? '#bbdefb' : 
+                                           activation.isCancelled ? '#f8bbd9' : 
+                                           activation.lastEditor ? '#dcedc8' : '#f8f9fa'
+                          }
+                        }}
+                      >
+                        <TableCell>{activation.submittedAt}</TableCell>
+                        <TableCell>
+                          {activation.completedBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                              개통: {activation.completedBy}
+                            </Box>
+                          ) : activation.cancelledBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
+                              취소: {activation.cancelledBy}
+                            </Box>
+                          ) : activation.lastEditor ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              수정: {activation.lastEditor}
+                            </Box>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>{activation.storeName}</TableCell>
+                        <TableCell>{activation.activationType}</TableCell>
+                        <TableCell>{activation.customerName}</TableCell>
+                        <TableCell>{activation.phoneNumber}</TableCell>
+                        <TableCell>{activation.birthDate}</TableCell>
+                        <TableCell>{activation.modelName}</TableCell>
+                        <TableCell>{activation.deviceSerial}</TableCell>
+                        <TableCell>{activation.simModel}</TableCell>
+                        <TableCell>{activation.simSerial}</TableCell>
+                        <TableCell>{activation.plan}</TableCell>
+                        <TableCell>
+                          {activation.isCompleted ? (
+                            <Box>
+                              <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
+                                완료: {activation.completedBy}
+                              </Box>
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              미완료
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {activation.completedAt ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
+                              {activation.completedAt}
+                            </Box>
+                          ) : (
+                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                              -
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {activation.isCancelled ? (
+                            <Chip label="취소됨" color="error" size="small" />
+                          ) : (
+                            <Chip label="정상" color="success" size="small" />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<VisibilityIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewActivation(activation);
+                              }}
+                            >
+                              보기
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<EditIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditActivation(activation);
+                              }}
+                            >
+                              수정
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<CancelIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelActivation(activation);
+                              }}
+                            >
+                              취소
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* 페이지네이션 */}
+          <TablePagination
+            component="div"
+            count={filteredActivations.length}
+            page={page}
+            onPageChange={(event, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            labelRowsPerPage="페이지당 행 수:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+          />
+        </TabPanel>
+
+        {/* 가입 신청 링크 탭 */}
+        <TabPanel value={tabValue} index={1}>
+          <Typography 
+            variant="h5" 
+            sx={{ 
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
+              mb: 3
+            }}
+          >
+            🔗 가입 신청 링크
+          </Typography>
+
+          {loading && activeLinks.length === 0 ? (
           <Box sx={{ textAlign: 'center', p: 4 }}>
             <CircularProgress />
           </Box>
@@ -716,202 +935,7 @@ const OnSaleReceptionMode = ({
             ))}
           </Grid>
         )}
-
-        {/* 개통정보 목록 */}
-        <Box sx={{ mt: 4 }}>
-          <Typography 
-            variant="h5" 
-            sx={{ 
-              fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
-              mb: 3
-            }}
-          >
-            📋 개통정보 목록
-          </Typography>
-
-          {/* 검색 및 새로고침 */}
-          <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-            <TextField
-              placeholder="고객명, 개통번호, 모델명, 요금제로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ flexGrow: 1 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchActivationList}
-              disabled={activationLoading}
-            >
-              새로고침
-            </Button>
-          </Box>
-
-          {/* 개통정보 테이블 */}
-          {activationLoading ? (
-            <Box sx={{ textAlign: 'center', p: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : paginatedActivations.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Typography color="textSecondary">
-                {searchTerm ? '검색 결과가 없습니다.' : '등록된 개통정보가 없습니다.'}
-              </Typography>
-            </Paper>
-          ) : (
-            <>
-              <TableContainer component={Paper} sx={{ mb: 2 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>제출일시</TableCell>
-                      <TableCell>작업자</TableCell>
-                      <TableCell>매장명</TableCell>
-                      <TableCell>개통유형</TableCell>
-                      <TableCell>고객명</TableCell>
-                      <TableCell>개통번호</TableCell>
-                      <TableCell>생년월일</TableCell>
-                      <TableCell>모델명</TableCell>
-                      <TableCell>일련번호</TableCell>
-                      <TableCell>유심모델명</TableCell>
-                      <TableCell>유심일련번호</TableCell>
-                      <TableCell>요금제</TableCell>
-                      <TableCell>개통완료</TableCell>
-                      <TableCell>개통시간</TableCell>
-                      <TableCell>상태</TableCell>
-                      <TableCell>작업</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedActivations.map((activation, index) => (
-                      <TableRow 
-                        key={index}
-                        sx={{ 
-                          backgroundColor: activation.isCompleted ? '#e3f2fd' : 
-                                         activation.isCancelled ? '#fce4ec' : 
-                                         activation.lastEditor ? '#f1f8e9' : 'inherit',
-                          opacity: activation.isCancelled ? 0.7 : 1
-                        }}
-                      >
-                        <TableCell>{activation.submittedAt}</TableCell>
-                        <TableCell>
-                          {activation.completedBy ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
-                              개통: {activation.completedBy}
-                            </Box>
-                          ) : activation.cancelledBy ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
-                              취소: {activation.cancelledBy}
-                            </Box>
-                          ) : activation.lastEditor ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                              수정: {activation.lastEditor}
-                            </Box>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell>{activation.storeName}</TableCell>
-                        <TableCell>{activation.activationType}</TableCell>
-                        <TableCell>{activation.customerName}</TableCell>
-                        <TableCell>{activation.phoneNumber}</TableCell>
-                        <TableCell>{activation.birthDate}</TableCell>
-                        <TableCell>{activation.modelName}</TableCell>
-                        <TableCell>{activation.deviceSerial}</TableCell>
-                        <TableCell>{activation.simModel}</TableCell>
-                        <TableCell>{activation.simSerial}</TableCell>
-                        <TableCell>{activation.plan}</TableCell>
-                        <TableCell>
-                          {activation.isCompleted ? (
-                            <Box>
-                              <Box sx={{ fontSize: '0.8rem', color: 'success.main', fontWeight: 'bold' }}>
-                                완료: {activation.completedBy}
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                              미완료
-                            </Box>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {activation.completedAt ? (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
-                              {activation.completedAt}
-                            </Box>
-                          ) : (
-                            <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                              -
-                            </Box>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {activation.isCancelled ? (
-                            <Chip 
-                              label={`취소됨 (${activation.cancelledBy})`} 
-                              color="error" 
-                              size="small" 
-                            />
-                          ) : (
-                            <Chip label="정상" color="success" size="small" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEditActivation(activation)}
-                              disabled={activation.isCancelled}
-                              sx={{ color: '#5e35b1' }}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCancelActivation(activation)}
-                              disabled={activation.isCancelled || activationLoading}
-                              sx={{ color: '#d32f2f' }}
-                            >
-                              <CancelIcon />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* 페이지네이션 */}
-              <TablePagination
-                component="div"
-                count={filteredActivations.length}
-                page={page}
-                onPageChange={(event, newPage) => setPage(newPage)}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(event) => {
-                  setRowsPerPage(parseInt(event.target.value, 10));
-                  setPage(0);
-                }}
-                rowsPerPageOptions={[5, 10, 25]}
-                labelRowsPerPage="페이지당 행 수:"
-                labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
-              />
-            </>
-          )}
-        </Box>
+        </TabPanel>
       </Box>
 
       {/* 업데이트 팝업 */}
@@ -926,4 +950,3 @@ const OnSaleReceptionMode = ({
 };
 
 export default OnSaleReceptionMode;
-
