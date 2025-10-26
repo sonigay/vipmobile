@@ -40,7 +40,9 @@ import {
   Refresh as RefreshIcon,
   Link as LinkIcon,
   Update as UpdateIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Visibility as VisibilityIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
 

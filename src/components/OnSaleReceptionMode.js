@@ -302,6 +302,12 @@ const OnSaleReceptionMode = ({
     window.location.href = editUrl;
   };
 
+  // 개통정보 상세보기
+  const handleViewActivation = (activation) => {
+    const viewUrl = `/activation-info?viewMode=true&sheetId=${activation.sheetId}&rowIndex=${activation.rowIndex}&vipCompany=${encodeURIComponent(loggedInStore.name)}&activationSheetId=${activation.sheetId}`;
+    window.location.href = viewUrl;
+  };
+
   // 개통정보 취소
   const handleCancelActivation = async (activation) => {
     if (!window.confirm('이 개통정보를 취소 처리하시겠습니까?')) {
