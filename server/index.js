@@ -459,7 +459,8 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
     
     // 봇 준비 이벤트
     discordBot.once('ready', () => {
-      // console.log(`봇이 준비되었습니다: ${discordBot.user.tag}`);
+      // console.log('봇이 준비되었습니다: ${discordBot.user.tag}');
+      console.log('🤖 Discord 봇이 준비되었습니다:', discordBot.user.tag);
     });
     
     // console.log('디스코드 봇 모듈 로딩 성공');
@@ -8067,8 +8068,8 @@ app.get('/api/download-chrome-extension', (req, res) => {
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
-    // console.log(`서버가 포트 ${port}에서 실행 중입니다`);
-    // console.log(`VAPID Public Key: ${vapidKeys.publicKey}`);
+    console.log(`🚀 서버가 포트 ${port}에서 실행 중입니다`);
+    console.log(`🔑 VAPID Public Key: ${vapidKeys.publicKey}`);
     
     // 환경변수 디버깅 (민감한 정보는 로깅하지 않음)
     console.log('🔧 [서버시작] 환경변수 상태 확인:');
@@ -8087,12 +8088,12 @@ const server = app.listen(port, '0.0.0.0', async () => {
       console.log('- SALES_SHEET_ID 길이:', process.env.SALES_SHEET_ID.length);
       console.log('- SALES_SHEET_ID 시작:', process.env.SALES_SHEET_ID.substring(0, 10) + '...');
     }
-    // console.log('Discord 봇 환경변수 상태:');
-    // console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
-    // console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
-    // console.log('- DISCORD_AGENT_CHANNEL_ID 설정됨:', !!process.env.DISCORD_AGENT_CHANNEL_ID);
-    // console.log('- DISCORD_STORE_CHANNEL_ID 설정됨:', !!process.env.DISCORD_STORE_CHANNEL_ID);
-    // console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
+    console.log('🤖 Discord 봇 환경변수 상태:');
+    console.log('- DISCORD_BOT_TOKEN 설정됨:', !!process.env.DISCORD_BOT_TOKEN);
+    console.log('- DISCORD_CHANNEL_ID 설정됨:', !!process.env.DISCORD_CHANNEL_ID);
+    console.log('- DISCORD_AGENT_CHANNEL_ID 설정됨:', !!process.env.DISCORD_AGENT_CHANNEL_ID);
+    console.log('- DISCORD_STORE_CHANNEL_ID 설정됨:', !!process.env.DISCORD_STORE_CHANNEL_ID);
+    console.log('- DISCORD_LOGGING_ENABLED 설정됨:', process.env.DISCORD_LOGGING_ENABLED);
     
     // 무료 Geocoding 서비스 상태
           // console.log('무료 Geocoding 서비스 상태:');
