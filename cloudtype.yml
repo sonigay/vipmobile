@@ -1,0 +1,22 @@
+# Cloudtype 설정 파일
+# 자동 배포를 위한 설정
+
+# 빌드 설정
+build:
+  command: npm ci --production
+  path: /server
+
+# 시작 명령
+start:
+  command: node index.js
+
+# 환경 변수
+env:
+  NODE_ENV: production
+  PORT: 4000
+
+# 자동 배포 설정
+deploy:
+  auto: true
+  branch: main
+  path: /server
