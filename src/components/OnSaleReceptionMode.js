@@ -335,7 +335,7 @@ const OnSaleReceptionMode = ({
     }
   };
 
-  // 검색 필터링
+  // 검색 필터링 (접수모드에서는 모든 데이터 표시)
   const filteredActivations = activationList.filter(activation => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();

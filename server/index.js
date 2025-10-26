@@ -6808,7 +6808,9 @@ app.delete('/api/rechotancho-bond/delete/:timestamp', async (req, res) => {
 app.get('/api/onsale/activation-list', async (req, res) => {
   try {
     console.log('📋 [개통정보목록] 개통정보 목록 조회 시작');
-    const { storeName, sheetId, allSheets } = req.query;
+    const { storeName, sheetId, allSheets, month } = req.query;
+    
+    console.log('📋 [개통정보목록] 요청 파라미터:', { storeName, sheetId, allSheets, month });
     
     let targetSheets = [];
     
@@ -6923,11 +6925,35 @@ app.get('/api/onsale/activation-list', async (req, res) => {
       }
     }
     
-    // 제출일시 기준 최신순 정렬
-    allData.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+    // 월별 필터링 적용
+    let filteredData = allData;
+    if (month) {
+      console.log('📋 [개통정보목록] 월별 필터링 적용:', month);
+      filteredData = allData.filter(item => {
+        if (!item.submittedAt) return false;
+        
+        // submittedAt을 Date 객체로 변환
+        const submittedDate = new Date(item.submittedAt);
+        const submittedYear = submittedDate.getFullYear();
+        const submittedMonth = String(submittedDate.getMonth() + 1).padStart(2, '0');
+        const submittedYearMonth = `${submittedYear}-${submittedMonth}`;
+        
+        console.log('📋 [개통정보목록] 필터링 비교:', {
+          submittedYearMonth,
+          filterMonth: month,
+          match: submittedYearMonth === month
+        });
+        
+        return submittedYearMonth === month;
+      });
+      console.log(`📋 [개통정보목록] 월별 필터링 결과: ${filteredData.length}개 (전체: ${allData.length}개)`);
+    }
     
-    console.log(`✅ [개통정보목록] 조회 완료: ${allData.length}개`);
-    res.json({ success: true, data: allData });
+    // 제출일시 기준 최신순 정렬
+    filteredData.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+    
+    console.log(`✅ [개통정보목록] 조회 완료: ${filteredData.length}개`);
+    res.json({ success: true, data: filteredData });
     
   } catch (error) {
     console.error('❌ [개통정보목록] 조회 실패:', error);

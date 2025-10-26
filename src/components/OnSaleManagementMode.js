@@ -386,17 +386,34 @@ const OnSaleManagementMode = ({
     }
   };
 
-  // 검색 필터링
+  // 검색 및 함별 필터링
   const filteredActivations = activationList.filter(activation => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      activation.customerName?.toLowerCase().includes(searchLower) ||
-      activation.phoneNumber?.includes(searchTerm) ||
-      activation.modelName?.toLowerCase().includes(searchLower) ||
-      activation.plan?.toLowerCase().includes(searchLower) ||
-      activation.storeName?.toLowerCase().includes(searchLower)
-    );
+    // 검색 필터링
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = (
+        activation.customerName?.toLowerCase().includes(searchLower) ||
+        activation.phoneNumber?.includes(searchTerm) ||
+        activation.modelName?.toLowerCase().includes(searchLower) ||
+        activation.plan?.toLowerCase().includes(searchLower) ||
+        activation.storeName?.toLowerCase().includes(searchLower)
+      );
+      if (!matchesSearch) return false;
+    }
+    
+    // 함별 필터링
+    switch (activationTabValue) {
+      case 0: // 수신함: 완료/보류/취소되지 않은 데이터만
+        return !activation.isCompleted && !activation.isCancelled && !activation.isPending;
+      case 1: // 보류함: 보류된 데이터만
+        return activation.isPending;
+      case 2: // 취소함: 취소된 데이터만
+        return activation.isCancelled;
+      case 3: // 완료함: 개통 완료된 데이터만
+        return activation.isCompleted;
+      default:
+        return true;
+    }
   });
 
   // 페이지네이션
