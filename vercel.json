@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "installCommand": "npm ci --prefer-offline",
+  "framework": "create-react-app",
+  "functions": {
+    "app/api/**/*.js": {
+      "maxDuration": 10
+    }
+  }
+}
