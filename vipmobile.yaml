@@ -42,8 +42,6 @@ options:
   buildenv: []
 context:
   git:
-    url: https://github.com/sonigay/vipmobile.git
+    url: https://sonigay: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@github.com/sonigay/vipmobile.git
     branch: main
     path: server
-    username: sonigay
-    password: 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
