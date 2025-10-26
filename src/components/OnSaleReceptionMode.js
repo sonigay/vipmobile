@@ -97,11 +97,8 @@ const OnSaleReceptionMode = ({
   // 탭 상태 관리
   const [tabValue, setTabValue] = useState(0);
   
-  // 월별 필터링
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  // 월별 필터링 (접수모드에서는 전체 데이터 표시)
+  const [selectedMonth, setSelectedMonth] = useState(null); // null = 전체
   
   const API_URL = process.env.REACT_APP_API_URL;
 
@@ -111,7 +108,12 @@ const OnSaleReceptionMode = ({
   };
 
   const handleMonthChange = (event) => {
-    setSelectedMonth(event.target.value);
+    const value = event.target.value;
+    if (value === 'all') {
+      setSelectedMonth(null); // 전체 선택 시 null로 설정
+    } else {
+      setSelectedMonth(value);
+    }
   };
 
   // 업데이트 팝업 자동 표시 (인증 성공 시)
@@ -651,15 +653,16 @@ const OnSaleReceptionMode = ({
 
         {/* 개통정보 목록 탭 */}
         <TabPanel value={tabValue} index={0}>
-          {/* 월별 필터링 */}
+          {/* 월별 필터링 (접수모드에서는 전체 데이터 표시) */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <InputLabel>월별 필터</InputLabel>
               <Select
-                value={selectedMonth}
+                value={selectedMonth || 'all'}
                 label="월별 필터"
                 onChange={handleMonthChange}
               >
+                <MenuItem value="all">전체</MenuItem>
                 {Array.from({ length: 12 }, (_, i) => {
                   const date = new Date();
                   date.setMonth(date.getMonth() - i);

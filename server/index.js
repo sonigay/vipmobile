@@ -6818,19 +6818,34 @@ app.get('/api/onsale/activation-list', async (req, res) => {
     
     if (allSheets === 'true') {
       // 모든 개통양식 시트 조회
+      console.log('📋 [개통정보목록] 온세일링크관리 시트에서 개통양식 정보 조회');
+      
       const linksResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
         range: '온세일링크관리!A:G',
       });
       
       const links = linksResponse.data.values || [];
-      targetSheets = links.slice(1)
+      console.log('📋 [개통정보목록] 온세일링크관리 전체 데이터:', links);
+      console.log('📋 [개통정보목록] 온세일링크관리 데이터 개수:', links.length);
+      
+      if (links.length > 0) {
+        console.log('📋 [개통정보목록] 온세일링크관리 헤더:', links[0]);
+        console.log('📋 [개통정보목록] 온세일링크관리 데이터 (첫 5개):', links.slice(1, 6));
+      }
+      
+      const filteredLinks = links.slice(1)
         .filter(row => row[4] === 'O') // 개통양식 사용 여부가 'O'
         .map(row => ({
           sheetId: row[5] || '',
           sheetName: row[6] || ''
         }))
         .filter(sheet => sheet.sheetId && sheet.sheetName);
+      
+      console.log('📋 [개통정보목록] 개통양식 사용 설정된 링크들:', filteredLinks);
+      console.log('📋 [개통정보목록] 개통양식 링크 개수:', filteredLinks.length);
+      
+      targetSheets = filteredLinks;
     } else if (sheetId) {
       // 특정 시트만 조회
       const linksResponse = await sheets.spreadsheets.values.get({
@@ -6855,14 +6870,24 @@ app.get('/api/onsale/activation-list', async (req, res) => {
     
     const allData = [];
     
+    console.log('📋 [개통정보목록] 처리할 시트 개수:', targetSheets.length);
+    
     for (const sheet of targetSheets) {
       try {
+        console.log(`📋 [개통정보목록] 시트 처리 중: ${sheet.sheetName} (ID: ${sheet.sheetId})`);
+        
         const sheetData = await sheets.spreadsheets.values.get({
           spreadsheetId: sheet.sheetId,
           range: `${sheet.sheetName}!A:AI`,
         });
         
         const rows = sheetData.data.values || [];
+        console.log(`📋 [개통정보목록] ${sheet.sheetName} 시트 데이터 개수:`, rows.length);
+        
+        if (rows.length > 0) {
+          console.log(`📋 [개통정보목록] ${sheet.sheetName} 시트 헤더:`, rows[0]);
+          console.log(`📋 [개통정보목록] ${sheet.sheetName} 시트 첫 번째 데이터:`, rows[1]);
+        }
         
         for (let i = 1; i < rows.length; i++) { // 헤더 제외
           const row = rows[i];
