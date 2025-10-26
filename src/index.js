@@ -12,6 +12,6 @@ root.render(
 );
 
 // PWA 기능을 활성화하려면 register()를 호출하세요.
-// Service Worker 에러 방지를 위해 완전 비활성화
-// serviceWorker.register();
-console.log('Service Worker 비활성화 (에러 방지)'); 
+// Service Worker 안전한 버전으로 다시 활성화
+serviceWorker.register();
+console.log('Service Worker 안전한 버전 활성화'); 
