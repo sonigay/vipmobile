@@ -84,7 +84,7 @@ const ActivationInfoPage = () => {
     try {
       console.log('📝 [ActivationInfoPage] 수정 데이터 로드 시작:', sheetId, rowIndex);
       setLoading(true);
-      const API_URL = process.env.REACT_APP_API_URL || 'https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app';
+      const API_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
       const response = await fetch(`${API_URL}/api/onsale/activation-info/${sheetId}/${rowIndex}`);
       console.log('📝 [ActivationInfoPage] API 응답 상태:', response.status);
       const result = await response.json();

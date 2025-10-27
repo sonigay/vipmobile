@@ -1,5 +1,5 @@
 // API 기본 URL 설정
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
 
 // API 호출 함수들
 export const api = {

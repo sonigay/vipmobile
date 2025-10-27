@@ -582,7 +582,7 @@ function BudgetMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       console.log('🔄 [Frontend] 전체 재계산 시작');
       
       const currentUserId = loggedInStore?.id || loggedInStore?.agentInfo?.id || loggedInStore?.contactId;
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://jegomap2-server.onrender.com';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
       const response = await fetch(`${API_BASE_URL}/api/budget/recalculate-all`, {
         method: 'POST',
         headers: {

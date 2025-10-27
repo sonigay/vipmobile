@@ -441,7 +441,7 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       console.log('정책 삭제 시도:', policy.id);
       
       // API 기본 URL 설정
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
       
       // 먼저 테스트 API로 DELETE 메서드가 작동하는지 확인
       console.log('DELETE 테스트 API 호출 시도...');
