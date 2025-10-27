@@ -633,7 +633,7 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/complete', async (req, 
     // 기존 데이터를 읽어서 개통시간을 포함한 새로운 데이터로 업데이트
     const existingData = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${sheetName}!A${rowIndex}:AI${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:AL${rowIndex}`,
     });
     
     const existingRow = existingData.data.values?.[0] || [];
@@ -680,7 +680,7 @@ app.post('/api/onsale/activation-info/:sheetId/:rowIndex/complete', async (req, 
     // 전체 행을 새로운 데이터로 업데이트
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!A${rowIndex}:AI${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:AL${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [newRowData]
@@ -6998,7 +6998,7 @@ app.get('/api/onsale/activation-list', async (req, res) => {
         
         const sheetData = await sheets.spreadsheets.values.get({
           spreadsheetId: sheet.sheetId,
-          range: `${sheet.sheetName}!A:AI`,
+          range: `${sheet.sheetName}!A:AL`,
         });
         
         const rows = sheetData.data.values || [];
@@ -7641,13 +7641,13 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     if (existingHeaders.length === 0) {
       console.log('📋 [개통정보] 헤더 생성');
       const headers = [
-        '개통완료', '개통자', '개통시간', '취소여부', '취소자', '취소시간', '수정자', '수정시간', '제출일시', '매장명', 'P코드', '개통유형', '전통신사', '고객명', '생년월일', '개통번호', '모델명', '기기일련번호', '색상', '유심모델', '유심일련번호', '약정유형', '전환지원금', '유통망추가지원금', '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항', 'U+제출일시', 'U+제출데이터'
+        '개통완료', '완료처리자', '완료일시', '취소', '취소처리자', '취소일시', '보류', '보류처리자', '보류일시', '최종수정자', '최종수정일시', '제출일시', '매장명', 'P코드', '개통유형', '이전통신사', '고객명', '생년월일', '개통번호', '모델명', '기기일련번호', '색상', '유심모델', '유심일련번호', '약정유형', '전환지원금', '유통망추가지원금', '할부개월', '할부원금', '프리', '요금제', '미디어서비스', '부가서비스', '프리미어약정', '예약번호', '기타요청사항', 'U+제출일시', 'U+제출데이터'
       ];
       
-      // 전체 헤더 생성 (A1:AI1)
+      // 전체 헤더 생성 (A1:AL1)
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${sheetName}!A1:AI1`,
+        range: `${sheetName}!A1:AL1`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [headers]
@@ -7764,7 +7764,7 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${sheetName}!A:AI`,
+      range: `${sheetName}!A:AL`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [fullRowData]
