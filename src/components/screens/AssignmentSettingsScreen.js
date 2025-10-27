@@ -173,6 +173,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             const modelName = item.modelName;
             const color = item.color || '기본';
             
+            console.log('🔍 [재고배정] 개통 데이터 처리:', { modelName, color });
+            
             if (!modelGroups.has(modelName)) {
               modelGroups.set(modelName, {
                 modelName,
@@ -186,6 +188,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             // 개통된 단말기가 있으면 해당 색상을 목록에 포함 (재고가 없어도)
             if (!colorGroup.colors.has(color)) {
               colorGroup.colors.set(color, 0); // 재고는 0이지만 목록에는 표시
+              console.log('✅ [재고배정] 개통 데이터에서 색상 추가:', { modelName, color });
             }
             colorGroup.hasActivation = true;
           });
@@ -830,7 +833,75 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       bulkQuantities: newModel.bulkQuantities
     });
     
-    if (modelName && newModel.bulkQuantities && Object.keys(newModel.bulkQuantities || {}).length > 0) {
+    // 수동 입력이 우선되도록 조건 순서 변경
+    if (modelName && modelColor && newModel.quantity > 0) {
+      // 수기 입력 방식 (모델명, 색상, 수량을 직접 입력한 경우)
+      console.log('✅ [재고배정] 수동 입력 조건 만족:', {
+        modelName,
+        modelColor,
+        quantity: newModel.quantity
+      });
+      
+      setAssignmentSettings(prev => {
+        const existingModel = prev.models[modelName];
+        
+        if (existingModel) {
+          const existingColorIndex = existingModel.colors.findIndex(color => color.name === modelColor);
+          
+          if (existingColorIndex >= 0) {
+            const updatedColors = [...existingModel.colors];
+            const currentQuantity = updatedColors[existingColorIndex].quantity;
+            const newQuantity = isEditMode ? newModel.quantity : currentQuantity + newModel.quantity;
+            
+            updatedColors[existingColorIndex] = {
+              ...updatedColors[existingColorIndex],
+              quantity: newQuantity
+            };
+            
+            return {
+              ...prev,
+              models: {
+                ...prev.models,
+                [modelName]: {
+                  ...existingModel,
+                  colors: updatedColors
+                }
+              }
+            };
+          } else {
+            return {
+              ...prev,
+              models: {
+                ...prev.models,
+                [modelName]: {
+                  ...existingModel,
+                  colors: [
+                    ...existingModel.colors,
+                    { name: modelColor, quantity: newModel.quantity }
+                  ]
+                }
+              }
+            };
+          }
+        } else {
+          return {
+            ...prev,
+            models: {
+              ...prev.models,
+              [modelName]: {
+                colors: [{ name: modelColor, quantity: newModel.quantity }]
+              }
+            }
+          };
+        }
+      });
+      
+      setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
+      setSelectedModel('');
+      setSelectedColor('');
+      setIsEditMode(false);
+      setShowModelDialog(false);
+    } else if (modelName && newModel.bulkQuantities && Object.keys(newModel.bulkQuantities || {}).length > 0) {
       // 일괄 입력된 수량이 있는 경우
       const validColors = Object.entries(newModel.bulkQuantities || {})
         .filter(([color, quantity]) => quantity > 0)
@@ -895,73 +966,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     } else if (modelName && selectedColor && newModel.quantity > 0) {
       // 기존 방식 (단일 색상 입력)
       const modelColor = selectedColor;
-      
-      setAssignmentSettings(prev => {
-        const existingModel = prev.models[modelName];
-        
-        if (existingModel) {
-          const existingColorIndex = existingModel.colors.findIndex(color => color.name === modelColor);
-          
-          if (existingColorIndex >= 0) {
-            const updatedColors = [...existingModel.colors];
-            const currentQuantity = updatedColors[existingColorIndex].quantity;
-            const newQuantity = isEditMode ? newModel.quantity : currentQuantity + newModel.quantity;
-            
-            updatedColors[existingColorIndex] = {
-              ...updatedColors[existingColorIndex],
-              quantity: newQuantity
-            };
-            
-            return {
-              ...prev,
-              models: {
-                ...prev.models,
-                [modelName]: {
-                  ...existingModel,
-                  colors: updatedColors
-                }
-              }
-            };
-          } else {
-            return {
-              ...prev,
-              models: {
-                ...prev.models,
-                [modelName]: {
-                  ...existingModel,
-                  colors: [
-                    ...existingModel.colors,
-                    { name: modelColor, quantity: newModel.quantity }
-                  ]
-                }
-              }
-            };
-          }
-        } else {
-          return {
-            ...prev,
-            models: {
-              ...prev.models,
-              [modelName]: {
-                colors: [{ name: modelColor, quantity: newModel.quantity }]
-              }
-            }
-          };
-        }
-      });
-      
-      setNewModel({ name: '', color: '', quantity: 0, bulkQuantities: {} });
-      setSelectedModel('');
-      setSelectedColor('');
-      setIsEditMode(false);
-      setShowModelDialog(false);
-    } else if (modelName && modelColor && newModel.quantity > 0) {
-      // 수기 입력 방식 (모델명, 색상, 수량을 직접 입력한 경우)
-      console.log('✅ [재고배정] 수동 입력 조건 만족:', {
-        modelName,
-        modelColor,
-        quantity: newModel.quantity
-      });
       
       setAssignmentSettings(prev => {
         const existingModel = prev.models[modelName];
