@@ -6804,6 +6804,117 @@ app.delete('/api/rechotancho-bond/delete/:timestamp', async (req, res) => {
 
 // ==================== 개통정보 목록 관리 API ====================
 
+// 개통정보 보류 처리 API
+app.post('/api/onsale/activation-info/:sheetId/:rowIndex/pending', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    const { pendingBy } = req.body;
+    
+    console.log(`⏸️ [개통정보보류] 보류 처리 시작: 시트=${sheetId}, 행=${rowIndex}, 처리자=${pendingBy}`);
+    
+    if (!pendingBy) {
+      return res.status(400).json({
+        success: false,
+        error: '보류 처리자 정보가 필요합니다.'
+      });
+    }
+    
+    // 시트 정보 조회
+    const linksResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일링크관리!A:G',
+    });
+    
+    const links = linksResponse.data.values || [];
+    const link = links.slice(1).find(row => row[5] === sheetId);
+    
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        error: '개통양식을 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetName = link[6];
+    const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    
+    // G열(보류), H열(보류처리자), I열(보류일시) 업데이트
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!G${rowIndex}:I${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['보류', pendingBy, now]]
+      }
+    });
+    
+    console.log(`✅ [개통정보보류] 보류 처리 완료: ${sheetName} ${rowIndex}행`);
+    
+    res.json({
+      success: true,
+      message: '개통정보가 보류되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('❌ [개통정보보류] 보류 처리 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 개통정보 보류 해제 API
+app.post('/api/onsale/activation-info/:sheetId/:rowIndex/unpending', async (req, res) => {
+  try {
+    const { sheetId, rowIndex } = req.params;
+    
+    console.log(`▶️ [개통정보보류해제] 보류 해제 시작: 시트=${sheetId}, 행=${rowIndex}`);
+    
+    // 시트 정보 조회
+    const linksResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: '온세일링크관리!A:G',
+    });
+    
+    const links = linksResponse.data.values || [];
+    const link = links.slice(1).find(row => row[5] === sheetId);
+    
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        error: '개통양식을 찾을 수 없습니다.'
+      });
+    }
+    
+    const sheetName = link[6];
+    
+    // G열(보류), H열(보류처리자), I열(보류일시) 초기화
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!G${rowIndex}:I${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['', '', '']]
+      }
+    });
+    
+    console.log(`✅ [개통정보보류해제] 보류 해제 완료: ${sheetName} ${rowIndex}행`);
+    
+    res.json({
+      success: true,
+      message: '보류가 해제되었습니다.'
+    });
+    
+  } catch (error) {
+    console.error('❌ [개통정보보류해제] 보류 해제 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // 개통정보 목록 조회 API
 app.get('/api/onsale/activation-list', async (req, res) => {
   try {
@@ -6871,6 +6982,15 @@ app.get('/api/onsale/activation-list', async (req, res) => {
     const allData = [];
     
     console.log('📋 [개통정보목록] 처리할 시트 개수:', targetSheets.length);
+
+    if (targetSheets.length === 0) {
+      console.log('⚠️ [개통정보목록] 처리할 시트가 없습니다');
+      return res.json({ 
+        success: true, 
+        data: [],
+        message: '활성화된 개통양식이 없습니다. 온세일관리모드에서 개통양식 사용을 활성화해주세요.'
+      });
+    }
     
     for (const sheet of targetSheets) {
       try {
@@ -6893,33 +7013,51 @@ app.get('/api/onsale/activation-list', async (req, res) => {
           const row = rows[i];
           if (row.length === 0) continue;
           
-          const isCompleted = row[0] === '개통완료'; // A열
+          const isCompleted = row[0]?.trim() === '개통완료'; // A열
           const completedBy = row[1] || ''; // B열
           const completedAt = row[2] || ''; // C열
-          const isCancelled = row[3] === '취소'; // D열
+          const isCancelled = row[3]?.trim() === '취소'; // D열
           const cancelledBy = row[4] || ''; // E열
           const cancelledAt = row[5] || ''; // F열
-          const lastEditor = row[6] || ''; // G열
-          const editedAt = row[7] || ''; // H열
-          const submittedAt = row[8] || ''; // I열
-          const storeNameFromSheet = row[9] || ''; // J열
-          const pCode = row[10] || ''; // K열
+
+          // ===== 새로 추가 =====
+          const isPending = row[6]?.trim() === '보류'; // G열 (신규)
+          const pendingBy = row[7] || ''; // H열 (신규)
+          const pendingAt = row[8] || ''; // I열 (신규)
+          // ====================
+
+          const lastEditor = row[9] || ''; // J열 (기존 6 → 9)
+          const editedAt = row[10] || ''; // K열 (기존 7 → 10)
+          const submittedAt = row[11] || ''; // L열 (기존 8 → 11)
+          const storeNameFromSheet = row[12] || ''; // M열 (기존 9 → 12)
+          const pCode = row[13] || ''; // N열 (기존 10 → 13)
+          
+          // submittedAt 검증 로그
+          if (!submittedAt) {
+            console.log(`⚠️ [개통정보목록] submittedAt 없음: ${storeNameFromSheet} - ${row[16] || '이름없음'} (행: ${i+1})`);
+          }
           
           // 완료 상태 로깅
           if (isCompleted) {
-            console.log(`✅ [개통정보목록] 완료된 데이터 발견: ${storeNameFromSheet} - ${row[13] || ''} - ${completedBy}`);
+            console.log(`✅ [개통정보목록] 완료된 데이터 발견: ${storeNameFromSheet} - ${row[16] || ''} - ${completedBy}`);
           }
-          const activationType = row[11] || ''; // L열
-          const previousCarrier = row[12] || ''; // M열
-          const customerName = row[13] || ''; // N열
-          const birthDate = row[14] || ''; // O열
-          const phoneNumber = row[15] || ''; // P열
-          const modelName = row[16] || ''; // Q열
-          const deviceSerial = row[17] || ''; // R열
-          const color = row[18] || ''; // S열
-          const simModel = row[19] || ''; // T열
-          const simSerial = row[20] || ''; // U열
-          const plan = row[27] || ''; // AB열 (A열 기준 28번째, 0-based)
+
+          // 보류 상태 로깅
+          if (isPending) {
+            console.log(`⏸️ [개통정보목록] 보류된 데이터 발견: ${storeNameFromSheet} - ${row[16] || ''} - ${pendingBy}`);
+          }
+
+          const activationType = row[14] || ''; // O열 (기존 11 → 14)
+          const previousCarrier = row[15] || ''; // P열 (기존 12 → 15)
+          const customerName = row[16] || ''; // Q열 (기존 13 → 16)
+          const birthDate = row[17] || ''; // R열 (기존 14 → 17)
+          const phoneNumber = row[18] || ''; // S열 (기존 15 → 18)
+          const modelName = row[19] || ''; // T열 (기존 16 → 19)
+          const deviceSerial = row[20] || ''; // U열 (기존 17 → 20)
+          const color = row[21] || ''; // V열 (기존 18 → 21)
+          const simModel = row[22] || ''; // W열 (기존 19 → 22)
+          const simSerial = row[23] || ''; // X열 (기존 20 → 23)
+          const plan = row[30] || ''; // AE열 (기존 27 → 30)
           
           // storeName 필터링
           if (storeName && storeNameFromSheet !== storeName) {
@@ -6948,6 +7086,9 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             isCancelled,
             cancelledBy,
             cancelledAt,
+            isPending,      // 신규 추가
+            pendingBy,      // 신규 추가
+            pendingAt,      // 신규 추가
             editedAt
           });
         }

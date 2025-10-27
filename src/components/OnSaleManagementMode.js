@@ -142,10 +142,68 @@ const OnSaleManagementMode = ({
     );
   };
 
-  const handleMoveToHold = () => {
-    const itemsToMove = activationList.filter((_, index) => selectedRows.includes(index));
-    setPendingList(prev => [...prev, ...itemsToMove]);
-    setSelectedRows([]);
+  const handleMoveToHold = async () => {
+    try {
+      setLoading(true);
+      const itemsToMove = activationList.filter((_, index) => selectedRows.includes(index));
+      
+      // 각 항목에 대해 보류 처리 API 호출
+      for (const item of itemsToMove) {
+        const response = await fetch(
+          `${API_URL}/api/onsale/activation-info/${item.sheetId}/${item.rowIndex}/pending`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pendingBy: loggedInStore.name })
+          }
+        );
+        
+        const result = await response.json();
+        if (!result.success) {
+          console.error('보류 처리 실패:', item.customerName, result.error);
+        }
+      }
+      
+      setSuccess(`${itemsToMove.length}건이 보류함으로 이동되었습니다.`);
+      setSelectedRows([]);
+      fetchActivationList(); // 목록 새로고침
+      
+    } catch (error) {
+      console.error('보류함 이동 실패:', error);
+      setError('보류함 이동에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 보류 해제 핸들러 추가
+  const handleRemoveFromHold = async (activation) => {
+    try {
+      setLoading(true);
+      
+      const response = await fetch(
+        `${API_URL}/api/onsale/activation-info/${activation.sheetId}/${activation.rowIndex}/unpending`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccess('보류가 해제되었습니다.');
+        fetchActivationList(); // 목록 새로고침
+      } else {
+        setError(result.error || '보류 해제에 실패했습니다.');
+      }
+      
+    } catch (error) {
+      console.error('보류 해제 실패:', error);
+      setError('보류 해제에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 업데이트 팝업 자동 표시
@@ -162,9 +220,7 @@ const OnSaleManagementMode = ({
 
   // 월별 필터링 변경 시 목록 새로고침
   useEffect(() => {
-    if (selectedMonth) {
-      fetchActivationList();
-    }
+    fetchActivationList();
   }, [selectedMonth]);
 
   // 수정 완료 메시지 리스너
@@ -413,10 +469,19 @@ const OnSaleManagementMode = ({
       case 0: // 수신함: 완료/보류/취소되지 않은 데이터만
         return !activation.isCompleted && !activation.isCancelled && !activation.isPending;
       case 1: // 보류함: 보류된 데이터만
+        if (activation.isPending) {
+          console.log('⏸️ 보류함:', activation.customerName, 'G열:', activation.isPending, '보류일:', activation.pendingAt);
+        }
         return activation.isPending;
       case 2: // 취소함: 취소된 데이터만
+        if (activation.isCancelled) {
+          console.log('❌ 취소함:', activation.customerName, 'D열:', activation.isCancelled, '취소일:', activation.cancelledAt);
+        }
         return activation.isCancelled;
       case 3: // 완료함: 개통 완료된 데이터만
+        if (activation.isCompleted) {
+          console.log('✅ 완료함:', activation.customerName, 'A열:', activation.isCompleted, '완료일:', activation.completedAt);
+        }
         return activation.isCompleted;
       default:
         return true;
@@ -528,7 +593,7 @@ const OnSaleManagementMode = ({
 
           {/* 월별 필터링 */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 120 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <InputLabel>월별 필터</InputLabel>
               <Select
                 value={selectedMonth || 'all'}
@@ -735,29 +800,48 @@ const OnSaleManagementMode = ({
                             >
                               보기
                             </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<EditIcon />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditActivation(activation);
-                              }}
-                            >
-                              수정
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              startIcon={<CancelIcon />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCancelActivation(activation);
-                              }}
-                            >
-                              취소
-                            </Button>
+                            {activationTabValue === 1 ? (
+                              // 보류함 탭: 보류 해제 버튼
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="success"
+                                startIcon={<RefreshIcon />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveFromHold(activation);
+                                }}
+                              >
+                                보류 해제
+                              </Button>
+                            ) : (
+                              // 다른 탭: 수정/취소 버튼
+                              <>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={<EditIcon />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditActivation(activation);
+                                  }}
+                                >
+                                  수정
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  startIcon={<CancelIcon />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelActivation(activation);
+                                  }}
+                                >
+                                  취소
+                                </Button>
+                              </>
+                            )}
                           </Box>
                         </TableCell>
                       </TableRow>

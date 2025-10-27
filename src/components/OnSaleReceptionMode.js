@@ -131,10 +131,10 @@ const OnSaleReceptionMode = ({
 
   // 월별 필터링 변경 시 목록 새로고침
   useEffect(() => {
-    if (selectedMonth && isAuthenticated) {
+    if (isAuthenticated) {
       fetchActivationList();
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, isAuthenticated]);
 
   // 컴포넌트 마운트 시 활성화된 링크 불러오기
   useEffect(() => {
@@ -660,7 +660,7 @@ const OnSaleReceptionMode = ({
         <TabPanel value={tabValue} index={0}>
           {/* 월별 필터링 (접수모드에서는 전체 데이터 표시) */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 120 }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
               <InputLabel>월별 필터</InputLabel>
               <Select
                 value={selectedMonth || 'all'}
