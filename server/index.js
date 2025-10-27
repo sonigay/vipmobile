@@ -19962,7 +19962,9 @@ app.post('/api/app-updates', async (req, res) => {
       'inventoryRecovery': 13, // N열: 재고회수모드
       'dataCollection': 14,    // O열: 정보수집모드
       'smsManagement': 15,     // P열: SMS 관리모드
-      'obManagement': 16       // Q열: OB 관리모드
+      'obManagement': 16,      // Q열: OB 관리모드
+      'onSaleManagement': 17,  // R열: 온세일관리모드
+      'onSaleReception': 18    // S열: 온세일접수모드
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -19974,7 +19976,7 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(17).fill(''); // A~Q열 (17개 컬럼)
+    const newRow = new Array(19).fill(''); // A~S열 (19개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
