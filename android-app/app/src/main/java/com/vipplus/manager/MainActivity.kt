@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         
         // 저장된 설정 불러오기
         val prefs = getSharedPreferences("VIP_MANAGER", Context.MODE_PRIVATE)
-        val defaultUrl = "https://port-0-jegomap2-md0ol3n075a69e78.sel5.cloudtype.app"
+        val defaultUrl = "https://vipmobile-backend.cloudtype.app"
         val savedUrl = prefs.getString("SERVER_URL", defaultUrl)
         val savedPhoneNumber = prefs.getString("PHONE_NUMBER", "")
         
