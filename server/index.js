@@ -1024,7 +1024,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:S 범위 필요 (S열까지), 나머지는 A:AA 범위
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:S 범위 필요 (S열까지), 대리점아이디관리는 A:Y 범위 필요 (Y열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
     let range;
     if (sheetName === 'raw데이터') {
       range = `${safeSheetName}!A:AB`;
@@ -1034,6 +1034,12 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '어플업데이트') {
       range = `${safeSheetName}!A:S`;
+    } else if (sheetName === '대리점아이디관리') {
+      range = `${safeSheetName}!A:Y`;
+    } else if (sheetName === '폰클출고처데이터') {
+      range = `${safeSheetName}!A:AM`;
+    } else if (sheetName === '마당접수') {
+      range = `${safeSheetName}!A:AI`;
     } else {
       range = `${safeSheetName}!A:AA`;
     }
