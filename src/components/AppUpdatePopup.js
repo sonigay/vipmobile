@@ -57,7 +57,8 @@ const MODE_COLORS = {
   'obManagement': '#5E35B1',   // 보라색 (OB 관리모드)
   'onSaleManagement': '#5e35b1',  // U+ 진한 보라색 (온세일관리모드)
   'onSaleReception': '#8e24aa',   // U+ 보라색 (온세일접수모드)
-  'basicMode': '#1976d2'   // 파란색 (기본모드)
+  'basic': '#1976d2',             // 파란색 (기본모드)
+  'basicMode': '#1976d2'          // 파란색 (기본모드)
 };
 
 // 모드별 제목
@@ -79,6 +80,7 @@ const MODE_TITLES = {
   'obManagement': 'OB 관리 모드',
   'onSaleManagement': '온세일관리 모드',
   'onSaleReception': '온세일접수 모드',
+  'basic': '기본 모드',
   'basicMode': '기본 모드'
 };
 
