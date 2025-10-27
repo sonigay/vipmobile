@@ -819,6 +819,17 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     const modelName = newModel.name || selectedModel;
     const modelColor = newModel.color || selectedColor;
     
+    console.log('🔍 [재고배정] 모델 추가 시도:', {
+      modelName,
+      modelColor,
+      selectedModel,
+      selectedColor,
+      newModelName: newModel.name,
+      newModelColor: newModel.color,
+      newModelQuantity: newModel.quantity,
+      bulkQuantities: newModel.bulkQuantities
+    });
+    
     if (modelName && newModel.bulkQuantities && Object.keys(newModel.bulkQuantities || {}).length > 0) {
       // 일괄 입력된 수량이 있는 경우
       const validColors = Object.entries(newModel.bulkQuantities || {})
@@ -946,6 +957,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       setShowModelDialog(false);
     } else if (modelName && modelColor && newModel.quantity > 0) {
       // 수기 입력 방식 (모델명, 색상, 수량을 직접 입력한 경우)
+      console.log('✅ [재고배정] 수동 입력 조건 만족:', {
+        modelName,
+        modelColor,
+        quantity: newModel.quantity
+      });
       
       setAssignmentSettings(prev => {
         const existingModel = prev.models[modelName];

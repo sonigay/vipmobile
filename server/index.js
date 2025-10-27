@@ -7085,6 +7085,7 @@ app.get('/api/onsale/activation-list', async (req, res) => {
             birthDate,
             modelName,
             deviceSerial,
+            color,          // 색상 필드 추가
             simModel,
             simSerial,
             plan,
