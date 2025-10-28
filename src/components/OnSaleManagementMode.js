@@ -160,13 +160,36 @@ const OnSaleManagementMode = ({
   const handleMoveToHold = async () => {
     try {
       setLoading(true);
-      const itemsToMove = activationList.filter((_, index) => selectedRows.includes(index));
+      
+      // 필터링된 데이터에서 선택된 항목들을 찾기
+      const itemsToMove = selectedRows.map(selectedIndex => {
+        const filteredIndex = selectedIndex;
+        const actualActivation = filteredActivations[filteredIndex];
+        
+        // 전체 activationList에서 해당 항목의 실제 인덱스 찾기
+        const actualIndex = activationList.findIndex(item => 
+          item.sheetId === actualActivation.sheetId && 
+          item.rowIndex === actualActivation.rowIndex
+        );
+        
+        return {
+          ...actualActivation,
+          actualIndex
+        };
+      });
       
       console.log('🔍 [보류처리] 선택된 행들:', selectedRows);
-      console.log('🔍 [보류처리] 이동할 항목들:', itemsToMove.map(item => ({
+      console.log('🔍 [보류처리] 필터링된 데이터:', filteredActivations.map((item, index) => ({
+        index,
         customerName: item.customerName,
         rowIndex: item.rowIndex,
         sheetId: item.sheetId
+      })));
+      console.log('🔍 [보류처리] 이동할 항목들:', itemsToMove.map(item => ({
+        customerName: item.customerName,
+        rowIndex: item.rowIndex,
+        sheetId: item.sheetId,
+        actualIndex: item.actualIndex
       })));
       
       // 각 항목에 대해 보류 처리 API 호출
