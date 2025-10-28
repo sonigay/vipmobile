@@ -147,8 +147,17 @@ const OnSaleManagementMode = ({
       setLoading(true);
       const itemsToMove = activationList.filter((_, index) => selectedRows.includes(index));
       
+      console.log('🔍 [보류처리] 선택된 행들:', selectedRows);
+      console.log('🔍 [보류처리] 이동할 항목들:', itemsToMove.map(item => ({
+        customerName: item.customerName,
+        rowIndex: item.rowIndex,
+        sheetId: item.sheetId
+      })));
+      
       // 각 항목에 대해 보류 처리 API 호출
       for (const item of itemsToMove) {
+        console.log(`⏸️ [보류처리] API 호출: ${item.customerName}, 시트=${item.sheetId}, 행=${item.rowIndex}`);
+        
         const response = await fetch(
           `${API_URL}/api/onsale/activation-info/${item.sheetId}/${item.rowIndex}/pending`,
           {
@@ -161,6 +170,8 @@ const OnSaleManagementMode = ({
         const result = await response.json();
         if (!result.success) {
           console.error('보류 처리 실패:', item.customerName, result.error);
+        } else {
+          console.log(`✅ [보류처리] 성공: ${item.customerName}`);
         }
       }
       
