@@ -7732,43 +7732,46 @@ app.post('/api/onsale/activation-info', async (req, res) => {
     const reservationNumber = data.reservationNumber || '';
     const otherRequests = data.otherRequests || '';
     
-    // 데이터 추가 (A열부터 - 개통완료, 개통자, 개통시간, 취소여부, 취소자, 취소시간, 수정자, 수정시간, 제출일시, 매장명, ...)
+    // 데이터 추가 (A열부터 - 개통완료, 완료처리자, 완료일시, 취소, 취소처리자, 취소일시, 보류, 보류처리자, 보류일시, 최종수정자, 최종수정일시, 제출일시, 매장명, ...)
     const fullRowData = [
       '', // A열: 개통완료 여부 (신규 입력 시 빈 값)
-      '', // B열: 개통자 (신규 입력 시 빈 값)
-      '', // C열: 개통시간 (신규 입력 시 빈 값)
+      '', // B열: 완료처리자 (신규 입력 시 빈 값)
+      '', // C열: 완료일시 (신규 입력 시 빈 값)
       '', // D열: 취소여부 (신규 입력 시 빈 값)
-      '', // E열: 취소자 (신규 입력 시 빈 값)
-      '', // F열: 취소시간 (신규 입력 시 빈 값)
-      '', // G열: 수정자 (신규 입력 시 빈 값)
-      '', // H열: 수정시간 (신규 입력 시 빈 값)
-      submittedAt, // I열: 제출일시
-      storeName, // J열: 매장명
-      pCode, // K열: P코드
-      activationType, // L열: 개통유형
-      previousCarrier, // M열: 전통신사
-      customerName, // N열: 고객명
-      birthDate, // O열: 생년월일
-      phoneNumber, // P열: 개통번호
-      modelName, // Q열: 모델명
-      deviceSerial, // R열: 기기일련번호
-      color, // S열: 색상
-      simModel, // T열: 유심모델
-      simSerial, // U열: 유심일련번호
-      contractType, // V열: 약정유형
-      conversionSupport, // W열: 전환지원금
-      distributionSupport, // X열: 유통망추가지원금
-      installmentMonths, // Y열: 할부개월
-      installmentAmount, // Z열: 할부원금
-      isFree, // AA열: 프리
-      plan, // AB열: 요금제
-      mediaServices, // AC열: 미디어서비스
-      additionalServices, // AD열: 부가서비스
-      premierContract, // AE열: 프리미어약정
-      reservationNumber, // AF열: 예약번호
-      otherRequests, // AG열: 기타요청사항
-      '', // AH열: U+제출일시 (빈 값)
-      '' // AI열: U+제출데이터 (빈 값)
+      '', // E열: 취소처리자 (신규 입력 시 빈 값)
+      '', // F열: 취소일시 (신규 입력 시 빈 값)
+      '', // G열: 보류여부 (신규 입력 시 빈 값)
+      '', // H열: 보류처리자 (신규 입력 시 빈 값)
+      '', // I열: 보류일시 (신규 입력 시 빈 값)
+      '', // J열: 최종수정자 (신규 입력 시 빈 값)
+      '', // K열: 최종수정일시 (신규 입력 시 빈 값)
+      submittedAt, // L열: 제출일시
+      storeName, // M열: 매장명
+      pCode, // N열: P코드
+      activationType, // O열: 개통유형
+      previousCarrier, // P열: 이전통신사
+      customerName, // Q열: 고객명
+      birthDate, // R열: 생년월일
+      phoneNumber, // S열: 개통번호
+      modelName, // T열: 모델명
+      deviceSerial, // U열: 기기일련번호
+      color, // V열: 색상
+      simModel, // W열: 유심모델
+      simSerial, // X열: 유심일련번호
+      contractType, // Y열: 약정유형
+      conversionSupport, // Z열: 전환지원금
+      distributionSupport, // AA열: 유통망추가지원금
+      installmentMonths, // AB열: 할부개월
+      installmentAmount, // AC열: 할부원금
+      isFree, // AD열: 프리
+      plan, // AE열: 요금제
+      mediaServices, // AF열: 미디어서비스
+      additionalServices, // AG열: 부가서비스
+      premierContract, // AH열: 프리미어약정
+      reservationNumber, // AI열: 예약번호
+      otherRequests, // AJ열: 기타요청사항
+      '', // AK열: U+제출일시 (빈 값)
+      '' // AL열: U+제출데이터 (빈 값)
     ];
     
     await sheets.spreadsheets.values.append({
