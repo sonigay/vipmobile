@@ -1,7 +1,7 @@
 {
-  "buildCommand": "npm run build:fast",
+  "buildCommand": "npm run build:ultra-fast",
   "outputDirectory": "build",
-  "installCommand": "npm ci --prefer-offline --no-audit --no-fund",
+  "installCommand": "npm ci --prefer-offline --no-audit --no-fund --silent",
   "framework": "create-react-app",
   "env": {
     "REACT_APP_API_URL": "https://vipmobile-backend.cloudtype.app",
@@ -11,6 +11,10 @@
     "INLINE_RUNTIME_CHUNK": "false",
     "CI": "false",
     "NODE_ENV": "production",
-    "SKIP_PREFLIGHT_CHECK": "true"
+    "SKIP_PREFLIGHT_CHECK": "true",
+    "FAST_REFRESH": "false",
+    "TSC_COMPILE_ON_ERROR": "false",
+    "ESLINT_NO_DEV_ERRORS": "true",
+    "DISABLE_ESLINT_PLUGIN": "true"
   }
 }

@@ -32,6 +32,7 @@
     "build": "CI=false GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=false react-scripts build",
     "build:analyze": "CI=false GENERATE_SOURCEMAP=true react-scripts build",
     "build:fast": "CI=false GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=false SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "build:ultra-fast": "CI=false GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=false SKIP_PREFLIGHT_CHECK=true FAST_REFRESH=false TSC_COMPILE_ON_ERROR=false ESLINT_NO_DEV_ERRORS=true DISABLE_ESLINT_PLUGIN=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -39,7 +40,11 @@
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "rules": {
+      "no-unused-vars": "warn",
+      "no-console": "warn"
+    }
   },
   "browserslist": {
     "production": [
