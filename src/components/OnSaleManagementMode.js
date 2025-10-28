@@ -680,6 +680,7 @@ const OnSaleManagementMode = ({
                       />
                     </TableCell>
                   )}
+                  <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
                   <TableCell>제출일시</TableCell>
                   <TableCell>작업자</TableCell>
                   <TableCell>매장명</TableCell>
@@ -701,13 +702,13 @@ const OnSaleManagementMode = ({
               <TableBody>
                 {activationLoading ? (
                   <TableRow>
-                    <TableCell colSpan={activationTabValue === 0 ? 17 : 16} align="center">
+                    <TableCell colSpan={activationTabValue === 0 ? 18 : 17} align="center">
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
                 ) : filteredActivations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={activationTabValue === 0 ? 17 : 16} align="center">
+                    <TableCell colSpan={activationTabValue === 0 ? 18 : 17} align="center">
                       데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -739,6 +740,9 @@ const OnSaleManagementMode = ({
                             />
                           </TableCell>
                         )}
+                        <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                          #{page * rowsPerPage + index + 1}
+                        </TableCell>
                         <TableCell>{activation.submittedAt}</TableCell>
                         <TableCell>
                           {activation.completedBy ? (
