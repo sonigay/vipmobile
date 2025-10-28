@@ -135,11 +135,26 @@ const OnSaleManagementMode = ({
 
   // 체크박스 핸들러
   const handleRowSelect = (rowIndex) => {
-    setSelectedRows(prev => 
-      prev.includes(rowIndex) 
+    console.log('🔍 [행선택] handleRowSelect 호출:', {
+      rowIndex,
+      page,
+      rowsPerPage,
+      actualIndex: rowIndex,
+      displayNumber: rowIndex + 1
+    });
+    
+    setSelectedRows(prev => {
+      const newSelection = prev.includes(rowIndex) 
         ? prev.filter(index => index !== rowIndex)
-        : [...prev, rowIndex]
-    );
+        : [...prev, rowIndex];
+      
+      console.log('🔍 [행선택] 선택된 행 업데이트:', {
+        previous: prev,
+        new: newSelection
+      });
+      
+      return newSelection;
+    });
   };
 
   const handleMoveToHold = async () => {
@@ -736,7 +751,18 @@ const OnSaleManagementMode = ({
                           <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={selectedRows.includes(page * rowsPerPage + index)}
-                              onChange={() => handleRowSelect(page * rowsPerPage + index)}
+                              onChange={() => {
+                                const actualIndex = page * rowsPerPage + index;
+                                console.log('🔍 [체크박스] 클릭:', {
+                                  index,
+                                  page,
+                                  rowsPerPage,
+                                  actualIndex,
+                                  customerName: activation.customerName,
+                                  displayNumber: actualIndex + 1
+                                });
+                                handleRowSelect(actualIndex);
+                              }}
                             />
                           </TableCell>
                         )}
