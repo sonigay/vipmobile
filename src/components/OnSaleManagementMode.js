@@ -735,8 +735,8 @@ const OnSaleManagementMode = ({
                         {activationTabValue === 0 && (
                           <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
-                              checked={selectedRows.includes(index)}
-                              onChange={() => handleRowSelect(index)}
+                              checked={selectedRows.includes(page * rowsPerPage + index)}
+                              onChange={() => handleRowSelect(page * rowsPerPage + index)}
                             />
                           </TableCell>
                         )}
