@@ -418,7 +418,21 @@ const OnSaleManagementMode = ({
       const result = await response.json();
       
       if (result.success) {
-        setActivationList(result.data);
+        // 데이터를 제출일시 기준으로 내림차순 정렬 (최신순)
+        const sortedData = result.data.sort((a, b) => {
+          const dateA = new Date(a.submittedAt || 0);
+          const dateB = new Date(b.submittedAt || 0);
+          return dateB - dateA; // 최신순
+        });
+        
+        console.log('🔍 [온세일관리] 정렬된 데이터:', sortedData.map((item, index) => ({
+          index,
+          customerName: item.customerName,
+          submittedAt: item.submittedAt,
+          rowIndex: item.rowIndex
+        })));
+        
+        setActivationList(sortedData);
       } else {
         setError('개통정보 목록을 불러오는데 실패했습니다.');
       }
