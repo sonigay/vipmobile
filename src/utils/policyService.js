@@ -1,5 +1,3 @@
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-
 const API_URL = process.env.REACT_APP_API_URL || 'https://vipmobile-backend.cloudtype.app';
 
 // 정책 관련 API 엔드포인트
