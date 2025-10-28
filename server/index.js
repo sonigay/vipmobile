@@ -7223,8 +7223,8 @@ app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     const sheetName = sheetResponse.data.sheets[0].properties.title;
     console.log(`📋 [개통정보조회] 시트명: ${sheetName}`);
     
-    // I~AI열 데이터 읽기 (25개 필드)
-    const range = `${sheetName}!I${rowIndex}:AI${rowIndex}`;
+    // L~AL열 데이터 읽기 (25개 필드) - 제출일시부터 시작
+    const range = `${sheetName}!L${rowIndex}:AL${rowIndex}`;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: range
@@ -7239,33 +7239,33 @@ app.get('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
       });
     }
     
-    // 25개 필드 매핑
+    // 25개 필드 매핑 (L열부터 시작)
     const data = {
-      submittedAt: row[0] || '', // F열: 제출일시
-      storeName: row[1] || '', // G열: 매장명
-      pCode: row[2] || '', // H열: P코드
-      activationType: row[3] || '', // I열: 개통유형
-      previousCarrier: row[4] || '', // J열: 전통신사
-      customerName: row[5] || '', // K열: 고객명
-      birthDate: row[6] || '', // L열: 생년월일
-      phoneNumber: row[7] || '', // M열: 개통번호
-      modelName: row[8] || '', // N열: 모델명
-      deviceSerial: row[9] || '', // O열: 기기일련번호
-      color: row[10] || '', // P열: 색상
-      simModel: row[11] || '', // Q열: 유심모델
-      simSerial: row[12] || '', // R열: 유심일련번호
-      contractType: row[13] || '', // S열: 약정유형
-      conversionSupport: row[14] || '', // T열: 전환지원금
-      distributionSupport: row[15] || '', // U열: 유통망추가지원금
-      installmentMonths: row[16] || '', // V열: 할부개월
-      installmentAmount: row[17] || '', // W열: 할부원금
-      isFree: row[18] || '', // X열: 프리
-      plan: row[19] || '', // Y열: 요금제
-      mediaService: row[20] || '', // Z열: 미디어서비스
-      additionalService: row[21] || '', // AA열: 부가서비스
-      premierContract: row[22] || '', // AB열: 프리미어약정
-      reservationNumber: row[23] || '', // AC열: 예약번호
-      otherRequests: row[24] || '' // AD열: 기타요청사항
+      submittedAt: row[0] || '', // L열: 제출일시
+      storeName: row[1] || '', // M열: 매장명
+      pCode: row[2] || '', // N열: P코드
+      activationType: row[3] || '', // O열: 개통유형
+      previousCarrier: row[4] || '', // P열: 이전통신사
+      customerName: row[5] || '', // Q열: 고객명
+      birthDate: row[6] || '', // R열: 생년월일
+      phoneNumber: row[7] || '', // S열: 개통번호
+      modelName: row[8] || '', // T열: 모델명
+      deviceSerial: row[9] || '', // U열: 기기일련번호
+      color: row[10] || '', // V열: 색상
+      simModel: row[11] || '', // W열: 유심모델
+      simSerial: row[12] || '', // X열: 유심일련번호
+      contractType: row[13] || '', // Y열: 약정유형
+      conversionSupport: row[14] || '', // Z열: 전환지원금
+      distributionSupport: row[15] || '', // AA열: 유통망추가지원금
+      installmentMonths: row[16] || '', // AB열: 할부개월
+      installmentAmount: row[17] || '', // AC열: 할부원금
+      isFree: row[18] || '', // AD열: 프리
+      plan: row[19] || '', // AE열: 요금제
+      mediaService: row[20] || '', // AF열: 미디어서비스
+      additionalService: row[21] || '', // AG열: 부가서비스
+      premierContract: row[22] || '', // AH열: 프리미어약정
+      reservationNumber: row[23] || '', // AI열: 예약번호
+      otherRequests: row[24] || '' // AJ열: 기타요청사항
     };
     
     console.log(`✅ [개통정보조회] 조회 완료`);
@@ -7297,17 +7297,17 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     const sheetName = sheetResponse.data.sheets[0].properties.title;
     console.log(`📝 [개통정보수정] 시트명: ${sheetName}`);
     
-    // 수정자 정보 업데이트 (G열)
+    // 수정자 정보 업데이트 (J열 - 최종수정자)
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!G${rowIndex}`,
+      range: `${sheetName}!J${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [[editor || '']]
       }
     });
     
-    // 수정시간 정보 업데이트 (H열)
+    // 수정시간 정보 업데이트 (K열 - 최종수정일시)
     const editedAt = new Date().toLocaleString('ko-KR', {
       year: 'numeric',
       month: '2-digit',
@@ -7319,14 +7319,14 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!H${rowIndex}`,
+      range: `${sheetName}!K${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [[editedAt]]
       }
     });
     
-    // 25개 필드 데이터 업데이트 (I~AI열)
+    // 25개 필드 데이터 업데이트 (L~AL열 - 제출일시부터 시작)
     const rowData = [
       formData.submittedAt || new Date().toLocaleString('ko-KR'),
       formData.storeName || '',
@@ -7357,7 +7357,7 @@ app.put('/api/onsale/activation-info/:sheetId/:rowIndex', async (req, res) => {
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${sheetName}!I${rowIndex}:AI${rowIndex}`,
+      range: `${sheetName}!L${rowIndex}:AL${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [rowData]
