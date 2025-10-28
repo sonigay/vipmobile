@@ -816,6 +816,10 @@ const OnSaleManagementMode = ({
                             <Box sx={{ fontSize: '0.8rem', color: 'error.main' }}>
                               취소: {activation.cancelledBy}
                             </Box>
+                          ) : activation.pendingBy ? (
+                            <Box sx={{ fontSize: '0.8rem', color: 'warning.main', fontWeight: 'bold' }}>
+                              보류: {activation.pendingBy}
+                            </Box>
                           ) : activation.lastEditor ? (
                             <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
                               수정: {activation.lastEditor}
