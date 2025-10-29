@@ -31,8 +31,10 @@ function Login({ onLogin }) {
   const [userConsent, setUserConsent] = useState(false);
   const [showConsentForm, setShowConsentForm] = useState(false);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [requirePassword, setRequirePassword] = useState(false);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [tempLoginData, setTempLoginData] = useState(null); // 임시 로그인 데이터 저장
   const [passwordAttempts, setPasswordAttempts] = useState(0);
   const MAX_PASSWORD_ATTEMPTS = 5;
@@ -215,8 +217,18 @@ function Login({ onLogin }) {
           console.log('🔍 [패스워드 디버깅] agentInfo:', agentInfo);
           console.log('🔍 [패스워드 디버깅] passwordNotUsed:', agentInfo.passwordNotUsed);
           console.log('🔍 [패스워드 디버깅] hasPassword:', agentInfo.hasPassword);
+          console.log('🔍 [패스워드 디버깅] isPasswordEmpty:', agentInfo.isPasswordEmpty);
           
-          // 패스워드 필요 여부 확인
+          // 패스워드 설정이 필요한 경우 (D열과 E열이 모두 비어있음)
+          if (agentInfo.isPasswordEmpty) {
+            console.log('🔐 패스워드 설정 필요');
+            setTempLoginData(data);
+            setShowPasswordSetup(true);
+            setLoading(false);
+            return;
+          }
+          
+          // 패스워드 검증이 필요한 경우
           const needPassword = !agentInfo.passwordNotUsed && agentInfo.hasPassword;
           console.log('🔍 [패스워드 디버깅] needPassword:', needPassword);
           
@@ -392,11 +404,76 @@ function Login({ onLogin }) {
     }
   };
 
-  // 패스워드 모달 닫을 때 카운터 초기화
-  const handleClosePasswordModal = () => {
-    setShowPasswordInput(false);
+  // 패스워드 설정 함수
+  const handlePasswordSetup = async (usePassword) => {
+    if (usePassword === true) {
+      if (!password.trim() || !confirmPassword.trim()) {
+        setError('패스워드와 확인 패스워드를 입력해주세요.');
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        setError('패스워드가 일치하지 않습니다.');
+        return;
+      }
+      
+      if (password.length < 4) {
+        setError('패스워드는 최소 4자 이상이어야 합니다.');
+        return;
+      }
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const API_URL = process.env.REACT_APP_API_URL;
+      
+      // 패스워드 설정 API 호출
+      const response = await fetch(`${API_URL}/api/set-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          storeId,
+          password: usePassword ? password : '',
+          confirmPassword: usePassword ? confirmPassword : '',
+          usePassword
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ 패스워드 설정 성공');
+        setShowPasswordSetup(false);
+        setPassword('');
+        setConfirmPassword('');
+        
+        if (usePassword) {
+          // 패스워드 설정 후 바로 패스워드 입력 모달 표시
+          setShowPasswordInput(true);
+        } else {
+          // 패스워드 미사용 설정 후 바로 로그인
+          proceedLogin(tempLoginData);
+        }
+      } else {
+        setError(result.error || '패스워드 설정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('패스워드 설정 오류:', error);
+      setError('패스워드 설정 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 패스워드 설정 모달 닫기
+  const handleClosePasswordSetup = () => {
+    setShowPasswordSetup(false);
     setPassword('');
-    setPasswordAttempts(0); // 카운터 초기화
+    setConfirmPassword('');
     setTempLoginData(null);
     setLoading(false);
   };
@@ -746,6 +823,87 @@ function Login({ onLogin }) {
           </Box>
         </Paper>
       </Box>
+      
+      {/* 패스워드 설정 모달 */}
+      {showPasswordSetup && (
+        <Dialog 
+          open={showPasswordSetup}
+          onClose={handleClosePasswordSetup}
+        >
+          <DialogTitle>패스워드 설정</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              <Typography variant="body1" sx={{ mb: 3 }}>
+                패스워드를 사용하시겠습니까?
+              </Typography>
+              
+              <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                <Button 
+                  variant="outlined" 
+                  onClick={() => handlePasswordSetup(false)}
+                  disabled={loading}
+                  sx={{ flex: 1 }}
+                >
+                  패스워드 미사용
+                </Button>
+                <Button 
+                  variant="contained" 
+                  onClick={() => setRequirePassword(true)}
+                  disabled={loading}
+                  sx={{ flex: 1 }}
+                >
+                  패스워드 사용
+                </Button>
+              </Box>
+              
+              {requirePassword && (
+                <Box>
+                  <TextField
+                    type="password"
+                    label="패스워드"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    fullWidth
+                    sx={{ mb: 2 }}
+                    error={!!error}
+                  />
+                  <TextField
+                    type="password"
+                    label="패스워드 확인"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    fullWidth
+                    sx={{ mb: 2 }}
+                    error={!!error}
+                    helperText={error}
+                  />
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button 
+                      variant="outlined" 
+                      onClick={() => {
+                        setRequirePassword(false);
+                        setPassword('');
+                        setConfirmPassword('');
+                        setError('');
+                      }}
+                      disabled={loading}
+                    >
+                      취소
+                    </Button>
+                    <Button 
+                      variant="contained" 
+                      onClick={() => handlePasswordSetup(true)}
+                      disabled={loading}
+                    >
+                      {loading ? <CircularProgress size={24} /> : '설정 완료'}
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </DialogContent>
+        </Dialog>
+      )}
       
       {/* 패스워드 입력 모달 */}
       {showPasswordInput && (

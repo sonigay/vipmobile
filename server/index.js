@@ -2963,6 +2963,7 @@ app.post('/api/login', async (req, res) => {
         // 신규 추가: 패스워드 관련 정보
         const passwordNotUsed = agent[3] === 'TRUE'; // D열: 패스워드 미사용
         const storedPassword = agent[4] || ''; // E열: 패스워드
+        const isPasswordEmpty = !agent[3] && !agent[4]; // D열과 E열이 모두 비어있음
         
         console.log('🔍 [백엔드 패스워드 디버깅] 사용자:', storeId);
         console.log('🔍 [백엔드 패스워드 디버깅] agent[3] (D열):', agent[3]);
@@ -2970,6 +2971,7 @@ app.post('/api/login', async (req, res) => {
         console.log('🔍 [백엔드 패스워드 디버깅] passwordNotUsed:', passwordNotUsed);
         console.log('🔍 [백엔드 패스워드 디버깅] storedPassword:', storedPassword);
         console.log('🔍 [백엔드 패스워드 디버깅] hasPassword:', storedPassword !== '');
+        console.log('🔍 [백엔드 패스워드 디버깅] isPasswordEmpty:', isPasswordEmpty);
         
         // H열: 재고모드 권한, I열: 정산모드 권한, J열: 검수모드 권한, K열: 채권장표 메뉴 권한, L열: 정책모드 권한, M열: 검수전체현황 권한, N열: 회의모드 권한, O열: 사전예약모드 권한, P열: 장표모드 권한, S열: 예산모드 권한, U열: 영업모드 권한, V열: 재고회수모드 권한 확인
         const hasInventoryPermission = agent[7] === 'O'; // H열 (기존 F열)
@@ -3063,8 +3065,9 @@ app.post('/api/login', async (req, res) => {
             target: agent[0] || '',       // A열: 대상
             qualification: agent[1] || '', // B열: 자격
             contactId: agent[2] || '',     // C열: 연락처(아이디)
-            passwordNotUsed: passwordNotUsed, // D열: 패스워드 미사용 (신규)
+            passwordNotUsed: passwordNotUsed, // D열: 패스워드 미사용
             hasPassword: storedPassword !== '', // 패스워드 존재 여부
+            isPasswordEmpty: isPasswordEmpty, // 패스워드 설정이 필요한지 여부
             office: agent[5] || '',        // F열: 사무실 (기존 D열)
             department: agent[6] || '',    // G열: 소속 (기존 E열)
             userRole: agent[17] || ''      // R열: 권한 (기존 P열)
@@ -3326,6 +3329,117 @@ app.post('/api/verify-password', async (req, res) => {
     return res.status(500).json({ 
       success: false, 
       error: '패스워드 검증 중 오류가 발생했습니다',
+      message: error.message 
+    });
+  }
+});
+
+// 패스워드 설정 API
+app.post('/api/set-password', async (req, res) => {
+  try {
+    const { storeId, password, confirmPassword, usePassword } = req.body;
+    
+    if (!storeId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '아이디를 입력해주세요' 
+      });
+    }
+    
+    // 패스워드 사용 여부 확인
+    if (usePassword === true) {
+      if (!password || !confirmPassword) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '패스워드와 확인 패스워드를 입력해주세요' 
+        });
+      }
+      
+      if (password !== confirmPassword) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '패스워드가 일치하지 않습니다' 
+        });
+      }
+      
+      if (password.length < 4) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '패스워드는 최소 4자 이상이어야 합니다' 
+        });
+      }
+    }
+    
+    // 대리점아이디관리 시트에서 사용자 정보 가져오기
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    if (!agentValues) {
+      return res.status(500).json({ 
+        success: false, 
+        error: '시트 데이터를 가져올 수 없습니다' 
+      });
+    }
+    
+    const agentRows = agentValues.slice(1);
+    const agentIndex = agentRows.findIndex(row => row[2] === storeId); // C열: 아이디
+    
+    if (agentIndex === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '사용자를 찾을 수 없습니다' 
+      });
+    }
+    
+    const actualRowIndex = agentIndex + 2; // 헤더 1행 + 배열 인덱스 0부터 시작
+    
+    console.log(`🔐 [패스워드 설정] 사용자: ${storeId}, 패스워드 사용: ${usePassword}`);
+    
+    // Google Sheets 업데이트
+    const updates = [];
+    
+    if (usePassword === true) {
+      // 패스워드 사용 - D열에 FALSE, E열에 패스워드 저장
+      updates.push({
+        range: `${AGENT_SHEET_NAME}!D${actualRowIndex}`,
+        values: [['FALSE']]
+      });
+      updates.push({
+        range: `${AGENT_SHEET_NAME}!E${actualRowIndex}`,
+        values: [[password]]
+      });
+    } else {
+      // 패스워드 미사용 - D열에 TRUE, E열은 비워둠
+      updates.push({
+        range: `${AGENT_SHEET_NAME}!D${actualRowIndex}`,
+        values: [['TRUE']]
+      });
+      updates.push({
+        range: `${AGENT_SHEET_NAME}!E${actualRowIndex}`,
+        values: [['']]
+      });
+    }
+    
+    // 배치 업데이트 실행
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      valueInputOption: 'RAW',
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: updates
+      }
+    });
+    
+    console.log(`✅ [패스워드 설정] 완료: ${storeId}, 패스워드 사용: ${usePassword}`);
+    
+    return res.json({ 
+      success: true, 
+      message: usePassword ? '패스워드가 설정되었습니다' : '패스워드 미사용으로 설정되었습니다'
+    });
+    
+  } catch (error) {
+    console.error('❌ [패스워드 설정] 오류:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: '패스워드 설정 중 오류가 발생했습니다',
       message: error.message 
     });
   }
