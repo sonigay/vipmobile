@@ -478,6 +478,15 @@ function Login({ onLogin }) {
     setLoading(false);
   };
 
+  // 패스워드 입력 모달 닫기
+  const handleClosePasswordModal = () => {
+    setShowPasswordInput(false);
+    setPassword('');
+    setPasswordAttempts(0); // 카운터 초기화
+    setTempLoginData(null);
+    setLoading(false);
+  };
+
   return (
     <Container maxWidth="sm">
       <Box sx={{ 
