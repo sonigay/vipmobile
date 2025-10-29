@@ -2963,7 +2963,7 @@ app.post('/api/login', async (req, res) => {
         // 신규 추가: 패스워드 관련 정보
         const passwordNotUsed = agent[3] === 'TRUE'; // D열: 패스워드 미사용
         const storedPassword = agent[4] || ''; // E열: 패스워드
-        const isPasswordEmpty = !agent[3] && !agent[4]; // D열과 E열이 모두 비어있음
+        const isPasswordEmpty = (!agent[3] || agent[3] === '') && (!agent[4] || agent[4] === ''); // D열과 E열이 모두 비어있음
         
         console.log('🔍 [백엔드 패스워드 디버깅] 사용자:', storeId);
         console.log('🔍 [백엔드 패스워드 디버깅] agent[3] (D열):', agent[3]);
@@ -3271,13 +3271,13 @@ app.post('/api/verify-password', async (req, res) => {
       });
     }
     
-    // 패스워드가 설정되지 않은 경우
+    // 패스워드가 설정되지 않은 경우 - 접속 거부
     if (!storedPassword) {
-      console.log(`⚠️ [패스워드 검증] 패스워드가 설정되지 않음 - 접속 허용`);
+      console.log(`❌ [패스워드 검증] 패스워드가 설정되지 않음 - 접속 거부`);
       return res.json({ 
-        success: true, 
-        verified: true,
-        message: '패스워드가 설정되지 않음 - 접속 허용'
+        success: false, 
+        verified: false, 
+        error: '패스워드가 설정되지 않았습니다. 관리자에게 문의하세요.' 
       });
     }
     
