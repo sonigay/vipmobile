@@ -12,7 +12,11 @@ import {
   Alert,
   Collapse,
   Divider,
-  Link
+  Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import axios from 'axios';
 
@@ -26,7 +30,12 @@ function Login({ onLogin }) {
   const [ipInfo, setIpInfo] = useState(null);
   const [userConsent, setUserConsent] = useState(false);
   const [showConsentForm, setShowConsentForm] = useState(false);
-  const [storedIpInfo, setStoredIpInfo] = useState(null);
+  const [password, setPassword] = useState('');
+  const [requirePassword, setRequirePassword] = useState(false);
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [tempLoginData, setTempLoginData] = useState(null); // 임시 로그인 데이터 저장
+  const [passwordAttempts, setPasswordAttempts] = useState(0);
+  const MAX_PASSWORD_ATTEMPTS = 5;
 
 
   // 사용자 기기 정보 수집
@@ -199,102 +208,190 @@ function Login({ onLogin }) {
       }
       
       if (data.success) {
-        // 정보 저장
-        if (showConsentForm && userConsent) {
-          // 사용자가 동의한 경우 동의 정보와 IP 정보 저장
-          localStorage.setItem('userConsent', 'true');
-          localStorage.setItem('userIpInfo', JSON.stringify({
-            ip: ipInfo?.ip || '알 수 없음',
-            timestamp: new Date().toISOString()
-          }));
-        }
-        
+        // 대리점 아이디인 경우 패스워드 검증 필요 여부 확인
         if (data.isAgent) {
-          // 대리점 관리자인 경우
-          onLogin({
-            id: data.agentInfo.contactId,
-            name: `${data.agentInfo.target} (${data.agentInfo.qualification})`,
-            isAgent: true,
-            target: data.agentInfo.target,
-            qualification: data.agentInfo.qualification,
-            contactId: data.agentInfo.contactId,
-            userRole: data.agentInfo.userRole,
-            modePermissions: data.modePermissions // 다중 권한 정보 추가
-          });
-        } else if (data.isInventory) {
-          // 재고 관리자인 경우
-          onLogin({
-            ...data.storeInfo,
-            isInventory: true,
-            isAgent: false,
-            isSettlement: false
-          });
-        } else if (data.isSettlement) {
-          // 정산 관리자인 경우
-          onLogin({
-            ...data.storeInfo,
-            isSettlement: true,
-            isAgent: false,
-            isInventory: false
-          });
-        } else {
-          // 일반 매장인 경우 - Chrome 브라우저 및 확장 프로그램 체크
+          const agentInfo = data.agentInfo;
           
-          // 1. Chrome/Edge 브라우저 체크
-          if (!isChrome()) {
-            setError('❌ Chrome 또는 Edge 브라우저만 사용 가능합니다.\n\nChrome 다운로드: https://www.google.com/chrome/\nEdge 다운로드: https://www.microsoft.com/edge');
+          // 패스워드 필요 여부 확인
+          const needPassword = !agentInfo.passwordNotUsed && agentInfo.hasPassword;
+          
+          if (needPassword) {
+            // 패스워드 입력 모달 표시
+            console.log('🔐 패스워드 입력 필요');
+            setTempLoginData(data); // 로그인 데이터 임시 저장
+            setShowPasswordInput(true);
             setLoading(false);
             return;
           }
+        }
+        
+        // 패스워드가 필요 없거나 일반 매장인 경우 바로 로그인 처리
+        proceedLogin(data);
+      }
+    } catch (error) {
+      console.error('로그인 오류:', error);
+      setError('로그인 중 오류가 발생했습니다.');
+    } finally {
+      if (!showPasswordInput) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // 로그인 처리 함수 분리
+  const proceedLogin = (data) => {
+    // 정보 저장
+    if (showConsentForm && userConsent) {
+      localStorage.setItem('userConsent', 'true');
+      localStorage.setItem('userIpInfo', JSON.stringify({
+        ip: ipInfo?.ip || '알 수 없음',
+        timestamp: new Date().toISOString()
+      }));
+    }
+    
+    if (data.isAgent) {
+      // 대리점 관리자 로그인
+      onLogin({
+        id: data.agentInfo.contactId,
+        name: `${data.agentInfo.target} (${data.agentInfo.qualification})`,
+        isAgent: true,
+        target: data.agentInfo.target,
+        qualification: data.agentInfo.qualification,
+        contactId: data.agentInfo.contactId,
+        userRole: data.agentInfo.userRole,
+        modePermissions: data.modePermissions
+      });
+    } else if (data.isInventory) {
+      // 재고 관리자 로그인
+      onLogin({
+        ...data.storeInfo,
+        isInventory: true,
+        isAgent: false,
+        isSettlement: false
+      });
+    } else if (data.isSettlement) {
+      // 정산 관리자 로그인
+      onLogin({
+        ...data.storeInfo,
+        isSettlement: true,
+        isAgent: false,
+        isInventory: false
+      });
+    } else {
+      // 일반 매장 로그인 (Chrome 체크 등 기존 로직)
+      // 1. Chrome/Edge 브라우저 체크
+      if (!isChrome()) {
+        setError('❌ Chrome 또는 Edge 브라우저만 사용 가능합니다.\n\nChrome 다운로드: https://www.google.com/chrome/\nEdge 다운로드: https://www.microsoft.com/edge');
+        setLoading(false);
+        return;
+      }
+      
+      // 2. 확장 프로그램 설치 및 버전 체크 (0.5초 대기 후 체크)
+      setTimeout(async () => {
+        if (!isExtensionInstalled()) {
+          setError('❌ VIP 확장프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n5. 개발자 모드 켜기 → 압축 해제한 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인\n\n💡 설치가이드.html 파일 참고');
+          setLoading(false);
+          return;
+        }
+        
+        // 3. 버전 체크
+        try {
+          const API_URL = process.env.REACT_APP_API_URL;
+          const versionResponse = await fetch(`${API_URL}/api/extension-version`);
+          const versionData = await versionResponse.json();
           
-          // 2. 확장 프로그램 설치 및 버전 체크 (0.5초 대기 후 체크)
-          setTimeout(async () => {
-            if (!isExtensionInstalled()) {
-              setError('❌ VIP 확장프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n5. 개발자 모드 켜기 → 압축 해제한 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인\n\n💡 설치가이드.html 파일 참고');
+          if (versionData.success) {
+            const currentVersion = getExtensionVersion();
+            const requiredVersion = versionData.requiredVersion;
+            
+            if (!isVersionValid(currentVersion, requiredVersion)) {
+              setError(`❌ 버전이 변경되었습니다. 재설치가 필요합니다.\n\n현재 버전: ${currentVersion || '알 수 없음'}\n최신 버전: ${requiredVersion}\n\n📥 재설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n5. 기존 확장 제거 → 개발자 모드 켜기 → 새 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인`);
               setLoading(false);
               return;
             }
-            
-            // 3. 버전 체크
-            try {
-              const versionResponse = await fetch(`${API_URL}/api/extension-version`);
-              const versionData = await versionResponse.json();
-              
-              if (versionData.success) {
-                const currentVersion = getExtensionVersion();
-                const requiredVersion = versionData.requiredVersion;
-                
-                if (!isVersionValid(currentVersion, requiredVersion)) {
-                  setError(`❌ 버전이 변경되었습니다. 재설치가 필요합니다.\n\n현재 버전: ${currentVersion || '알 수 없음'}\n최신 버전: ${requiredVersion}\n\n📥 재설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n5. 기존 확장 제거 → 개발자 모드 켜기 → 새 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인`);
-                  setLoading(false);
-                  return;
-                }
-              }
-            } catch (error) {
-              console.error('버전 체크 실패:', error);
-              // 버전 체크 실패 시 경고만 하고 진행 (서버 문제로 차단하지 않음)
-            }
-            
-            // 모든 체크 통과 - 로그인 처리
-            console.log('✅ Chrome 브라우저 및 확장 프로그램 확인 완료');
-            onLogin({
-              ...data.storeInfo,
-              isAgent: false,
-              isInventory: false,
-              isSettlement: false
-            });
-            setLoading(false);
-          }, 500);
+          }
+        } catch (versionError) {
+          console.error('버전 체크 오류:', versionError);
         }
+        
+        // 4. 모든 체크 통과 시 로그인 처리
+        onLogin({
+          ...data.storeInfo,
+          isAgent: false,
+          isInventory: false,
+          isSettlement: false
+        });
+      }, 500);
+    }
+  };
+
+  // 패스워드 검증 함수
+  const handlePasswordVerify = async () => {
+    if (!password.trim()) {
+      setError('패스워드를 입력해주세요.');
+      return;
+    }
+    
+    // 시도 횟수 확인
+    if (passwordAttempts >= MAX_PASSWORD_ATTEMPTS) {
+      setError('패스워드 입력 횟수를 초과했습니다. 관리자에게 문의하세요.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const API_URL = process.env.REACT_APP_API_URL;
+      
+      // 패스워드 검증 API 호출
+      const response = await fetch(`${API_URL}/api/verify-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          storeId,
+          password
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.verified) {
+        // 패스워드 검증 성공 - 로그인 처리
+        console.log('✅ 패스워드 검증 성공');
+        setShowPasswordInput(false);
+        setPasswordAttempts(0); // 성공 시 카운터 초기화
+        proceedLogin(tempLoginData);
       } else {
-        setError('존재하지 않는 ID입니다.');
+        // 패스워드 불일치 - 시도 횟수 증가
+        const newAttempts = passwordAttempts + 1;
+        setPasswordAttempts(newAttempts);
+        
+        if (newAttempts >= MAX_PASSWORD_ATTEMPTS) {
+          setError('패스워드 입력 횟수를 초과했습니다. 관리자에게 문의하세요.');
+        } else {
+          setError(`패스워드가 일치하지 않습니다. (${newAttempts}/${MAX_PASSWORD_ATTEMPTS})`);
+        }
+        
+        setPassword('');
       }
     } catch (error) {
-      setError('서버 연결에 실패했습니다.');
-      console.error('Login error:', error);
+      console.error('패스워드 검증 오류:', error);
+      setError('패스워드 검증 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 패스워드 모달 닫을 때 카운터 초기화
+  const handleClosePasswordModal = () => {
+    setShowPasswordInput(false);
+    setPassword('');
+    setPasswordAttempts(0); // 카운터 초기화
+    setTempLoginData(null);
+    setLoading(false);
   };
 
   return (
@@ -642,6 +739,49 @@ function Login({ onLogin }) {
           </Box>
         </Paper>
       </Box>
+      
+      {/* 패스워드 입력 모달 */}
+      {showPasswordInput && (
+        <Dialog 
+          open={showPasswordInput}
+          onClose={handleClosePasswordModal}
+        >
+          <DialogTitle>패스워드 입력</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              <TextField
+                type="password"
+                label="패스워드"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePasswordVerify();
+                  }
+                }}
+                fullWidth
+                autoFocus
+                error={!!error}
+                helperText={error}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={handleClosePasswordModal}
+            >
+              취소
+            </Button>
+            <Button 
+              onClick={handlePasswordVerify}
+              variant="contained"
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : '확인'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
       
       {/* 업데이트 진행 팝업 */}
       

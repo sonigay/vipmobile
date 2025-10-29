@@ -143,7 +143,7 @@ app.get('/api/teams', async (req, res) => {
     const sheetName = '대리점아이디관리';
     console.log('🔍 [팀목록] 시트 이름:', sheetName);
     
-    const range = 'A:P'; // A열(이름)과 P열(권한레벨) 포함
+    const range = 'A:R'; // A열(이름)과 R열(권한레벨) 포함 (기존 P열 → R열)
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheetName}!${range}`,
@@ -158,7 +158,7 @@ app.get('/api/teams', async (req, res) => {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const name = row[0]; // A열: 대상(이름)
-      const permissionLevel = row[15]; // P열: 정책모드권한레벨
+      const permissionLevel = row[17]; // R열: 정책모드권한레벨 (기존 P열 → R열)
       
       console.log(`🔍 [팀목록] 행 ${i}: 이름=${name}, 권한레벨=${permissionLevel}`);
       
@@ -1035,7 +1035,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     } else if (sheetName === '어플업데이트') {
       range = `${safeSheetName}!A:S`;
     } else if (sheetName === '대리점아이디관리') {
-      range = `${safeSheetName}!A:Y`;
+      range = `${safeSheetName}!A:AA`;
     } else if (sheetName === '폰클출고처데이터') {
       range = `${safeSheetName}!A:AM`;
     } else if (sheetName === '마당접수') {
@@ -2207,10 +2207,10 @@ app.get('/api/sales-mode-access', async (req, res) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   
   try {
-    // 대리점아이디관리 시트에서 S열 권한 확인
+    // 대리점아이디관리 시트에서 U열 권한 확인 (기존 S열 → U열)
     const agentResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${AGENT_SHEET_NAME}!A:S`
+      range: `${AGENT_SHEET_NAME}!A:U`
     });
 
     if (!agentResponse.data.values || agentResponse.data.values.length === 0) {
@@ -2220,13 +2220,13 @@ app.get('/api/sales-mode-access', async (req, res) => {
     // 헤더 제거
     const agentRows = agentResponse.data.values.slice(1);
     
-    // S열에서 "O" 권한이 있는 대리점 찾기
+    // U열에서 "O" 권한이 있는 대리점 찾기 (기존 S열 → U열)
     const authorizedAgents = agentRows
-      .filter(row => row && row.length > 18 && row[18] === 'O') // S열 (18번 인덱스)
+      .filter(row => row && row.length > 20 && row[20] === 'O') // U열 (20번 인덱스)
       .map(row => ({
         agentCode: row[0] || '', // A열: 대리점코드
         agentName: row[1] || '', // B열: 대리점명
-        accessLevel: row[18] || '' // S열: 접근권한
+        accessLevel: row[20] || '' // U열: 접근권한
       }));
 
     res.json({
@@ -2265,10 +2265,10 @@ app.get('/api/inventoryRecoveryAccess', async (req, res) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   
   try {
-    // 대리점아이디관리 시트에서 T열 권한 확인
+    // 대리점아이디관리 시트에서 V열 권한 확인 (기존 T열 → V열)
     const agentResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${AGENT_SHEET_NAME}!A:T`
+      range: `${AGENT_SHEET_NAME}!A:V`
     });
 
     if (!agentResponse.data.values || agentResponse.data.values.length === 0) {
@@ -2278,13 +2278,13 @@ app.get('/api/inventoryRecoveryAccess', async (req, res) => {
     // 헤더 제거
     const agentRows = agentResponse.data.values.slice(1);
     
-    // T열에서 재고회수모드 권한이 있는 대리점 찾기
+    // V열에서 재고회수모드 권한이 있는 대리점 찾기 (기존 T열 → V열)
     const authorizedAgents = agentRows
-      .filter(row => row && row.length > 19 && row[19] === 'O') // T열 (19번 인덱스)
+      .filter(row => row && row.length > 21 && row[21] === 'O') // V열 (21번 인덱스)
       .map(row => ({
         agentCode: row[0] || '', // A열: 대리점코드
         agentName: row[1] || '', // B열: 대리점명
-        accessLevel: row[19] || '' // T열: 재고회수모드 접근권한
+        accessLevel: row[21] || '' // V열: 재고회수모드 접근권한
       }));
 
     res.json({
@@ -2960,24 +2960,28 @@ app.post('/api/login', async (req, res) => {
         // console.log(`Found agent: ${agent[0]}, ${agent[1]}`);
         // console.log('Step 6: Processing agent login...');
         
-        // F열: 재고모드 권한, G열: 정산모드 권한, H열: 검수모드 권한, I열: 채권장표 메뉴 권한, J열: 정책모드 권한, K열: 검수전체현황 권한, L열: 회의모드 권한, M열: 사전예약모드 권한, N열: 장표모드 권한, Q열: 예산모드 권한, S열: 영업모드 권한, T열: 재고회수모드 권한 확인
-        const hasInventoryPermission = agent[5] === 'O'; // F열
-        const hasSettlementPermission = agent[6] === 'O'; // G열
-        const hasInspectionPermission = agent[7] === 'O'; // H열
-        const hasBondChartPermission = agent[8] === 'O'; // I열: 채권장표 메뉴 권한
-        const hasPolicyPermission = agent[9] === 'O'; // J열
-        const hasInspectionOverviewPermission = agent[10] === 'O'; // K열
-        const hasMeetingPermission = agent[11] === 'O'; // L열
-        const hasReservationPermission = agent[12] === 'O'; // M열
-        const hasChartPermission = agent[13] === 'O'; // N열: 장표모드 권한
-        const hasBudgetPermission = agent[16] === 'O'; // Q열: 예산모드 권한
-        const hasSalesPermission = agent[18] === 'O'; // S열: 영업모드 권한
-        const hasInventoryRecoveryPermission = agent[19] === 'O'; // T열: 재고회수모드 권한
-        const hasDataCollectionPermission = agent[20] === 'O'; // U열: 정보수집모드 권한
-        const hasSmsManagementPermission = agent[21] === 'O'; // V열: SMS 관리모드 권한
-        const hasObManagementPermission = agent[22] === 'O'; // W열: OB 관리모드 권한
-        const hasAgentModePermission = agent[23] === 'O'; // X열: 관리자모드 권한
-        const hasOnSaleManagementPermission = agent[24] === 'O'; // Y열: 온세일관리모드 권한
+        // 신규 추가: 패스워드 관련 정보
+        const passwordNotUsed = agent[3] === 'TRUE'; // D열: 패스워드 미사용
+        const storedPassword = agent[4] || ''; // E열: 패스워드
+        
+        // H열: 재고모드 권한, I열: 정산모드 권한, J열: 검수모드 권한, K열: 채권장표 메뉴 권한, L열: 정책모드 권한, M열: 검수전체현황 권한, N열: 회의모드 권한, O열: 사전예약모드 권한, P열: 장표모드 권한, S열: 예산모드 권한, U열: 영업모드 권한, V열: 재고회수모드 권한 확인
+        const hasInventoryPermission = agent[7] === 'O'; // H열 (기존 F열)
+        const hasSettlementPermission = agent[8] === 'O'; // I열 (기존 G열)
+        const hasInspectionPermission = agent[9] === 'O'; // J열 (기존 H열)
+        const hasBondChartPermission = agent[10] === 'O'; // K열: 채권장표 메뉴 권한 (기존 I열)
+        const hasPolicyPermission = agent[11] === 'O'; // L열 (기존 J열)
+        const hasInspectionOverviewPermission = agent[12] === 'O'; // M열 (기존 K열)
+        const hasMeetingPermission = agent[13] === 'O'; // N열 (기존 L열)
+        const hasReservationPermission = agent[14] === 'O'; // O열 (기존 M열)
+        const hasChartPermission = agent[15] === 'O'; // P열: 장표모드 권한 (기존 N열)
+        const hasBudgetPermission = agent[18] === 'O'; // S열: 예산모드 권한 (기존 Q열)
+        const hasSalesPermission = agent[20] === 'O'; // U열: 영업모드 권한 (기존 S열)
+        const hasInventoryRecoveryPermission = agent[21] === 'O'; // V열: 재고회수모드 권한 (기존 T열)
+        const hasDataCollectionPermission = agent[22] === 'O'; // W열: 정보수집모드 권한 (기존 U열)
+        const hasSmsManagementPermission = agent[23] === 'O'; // X열: SMS 관리모드 권한 (기존 V열)
+        const hasObManagementPermission = agent[24] === 'O'; // Y열: OB 관리모드 권한 (기존 W열)
+        const hasAgentModePermission = agent[25] === 'O'; // Z열: 관리자모드 권한 (기존 X열)
+        const hasOnSaleManagementPermission = agent[26] === 'O'; // AA열: 온세일관리모드 권한 (기존 Y열)
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -3052,9 +3056,11 @@ app.post('/api/login', async (req, res) => {
             target: agent[0] || '',       // A열: 대상
             qualification: agent[1] || '', // B열: 자격
             contactId: agent[2] || '',     // C열: 연락처(아이디)
-            office: agent[3] || '',        // D열: 사무실
-            department: agent[4] || '',    // E열: 소속
-            userRole: agent[15] || ''      // P열: 권한 (정책모드 권한)
+            passwordNotUsed: passwordNotUsed, // D열: 패스워드 미사용 (신규)
+            hasPassword: storedPassword !== '', // 패스워드 존재 여부
+            office: agent[5] || '',        // F열: 사무실 (기존 D열)
+            department: agent[6] || '',    // G열: 소속 (기존 E열)
+            userRole: agent[17] || ''      // R열: 권한 (기존 P열)
           }
         };
         
@@ -3204,6 +3210,115 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Login failed', 
+      message: error.message 
+    });
+  }
+});
+
+// 패스워드 검증 API
+app.post('/api/verify-password', async (req, res) => {
+  try {
+    const { storeId, password } = req.body;
+    
+    if (!storeId || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '아이디와 패스워드를 입력해주세요' 
+      });
+    }
+    
+    // 대리점아이디관리 시트에서 사용자 정보 가져오기
+    const agentValues = await getSheetValues(AGENT_SHEET_NAME);
+    if (!agentValues) {
+      return res.status(500).json({ 
+        success: false, 
+        error: '시트 데이터를 가져올 수 없습니다' 
+      });
+    }
+    
+    const agentRows = agentValues.slice(1);
+    const agent = agentRows.find(row => row[2] === storeId); // C열: 아이디
+    
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '사용자를 찾을 수 없습니다' 
+      });
+    }
+    
+    const passwordNotUsed = agent[3] === 'TRUE'; // D열: 패스워드 미사용
+    const storedPassword = agent[4] || ''; // E열: 패스워드
+    
+    console.log(`🔐 [패스워드 검증] 사용자: ${storeId}, 패스워드 미사용: ${passwordNotUsed}`);
+    
+    // 패스워드 미사용인 경우, 접속 허용
+    if (passwordNotUsed) {
+      console.log(`✅ [패스워드 검증] 패스워드 미사용 - 접속 허용`);
+      return res.json({ 
+        success: true, 
+        verified: true,
+        message: '패스워드 미사용 - 접속 허용'
+      });
+    }
+    
+    // 패스워드가 설정되지 않은 경우
+    if (!storedPassword) {
+      console.log(`⚠️ [패스워드 검증] 패스워드가 설정되지 않음 - 접속 허용`);
+      return res.json({ 
+        success: true, 
+        verified: true,
+        message: '패스워드가 설정되지 않음 - 접속 허용'
+      });
+    }
+    
+    // 패스워드 검증
+    if (storedPassword === password) {
+      console.log(`✅ [패스워드 검증] 패스워드 일치 - 접속 허용`);
+      return res.json({ 
+        success: true, 
+        verified: true,
+        message: '패스워드 일치'
+      });
+    } else {
+      console.log(`❌ [패스워드 검증] 패스워드 불일치`);
+      
+      // 디스코드 로그 전송
+      if (DISCORD_LOGGING_ENABLED) {
+        const embedData = {
+          title: '⚠️ 패스워드 검증 실패',
+          color: 15158332, // 빨간색
+          timestamp: new Date().toISOString(),
+          fields: [
+            {
+              name: '사용자 정보',
+              value: `ID: ${storeId}\n대상: ${agent[0]}\n자격: ${agent[1]}`
+            },
+            {
+              name: '접속 정보',
+              value: `시도 시간: ${new Date().toLocaleString('ko-KR')}`
+            }
+          ],
+          footer: {
+            text: '패스워드 검증 실패 알림'
+          }
+        };
+        
+        sendLogToDiscord(embedData).catch(logError => {
+          console.error('디스코드 로그 전송 실패:', logError.message);
+        });
+      }
+      
+      return res.json({ 
+        success: false, 
+        verified: false, 
+        error: '패스워드가 일치하지 않습니다' 
+      });
+    }
+  } catch (error) {
+    console.error('❌ [패스워드 검증] 오류:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: '패스워드 검증 중 오류가 발생했습니다',
       message: error.message 
     });
   }
@@ -3968,8 +4083,8 @@ app.get('/api/agent-office-department', async (req, res) => {
     agentValues.slice(1).forEach(row => {
       if (row.length >= 5) {
         const agentName = (row[0] || '').toString().trim(); // A열: 담당자명
-        const office = (row[3] || '').toString().trim(); // D열: 사무실
-        const department = (row[4] || '').toString().trim(); // E열: 소속
+        const office = (row[5] || '').toString().trim(); // F열: 사무실 (기존 D열)
+        const department = (row[6] || '').toString().trim(); // G열: 소속 (기존 E열)
         
         if (agentName && office) {
           offices.add(office);
@@ -5554,10 +5669,10 @@ app.get('/api/subscriber-increase/access', async (req, res) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   
   try {
-    // 대리점아이디관리 시트에서 I열 권한 확인 (채권장표 메뉴 권한)
+    // 대리점아이디관리 시트에서 K열 권한 확인 (채권장표 메뉴 권한) (기존 I열 → K열)
     const agentResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${AGENT_SHEET_NAME}!A:J`
+      range: `${AGENT_SHEET_NAME}!A:L`
     });
 
     if (!agentResponse.data.values || agentResponse.data.values.length === 0) {
@@ -5567,13 +5682,13 @@ app.get('/api/subscriber-increase/access', async (req, res) => {
     // 헤더 제거
     const agentRows = agentResponse.data.values.slice(1);
     
-    // I열에서 "O" 권한이 있는 대리점 찾기 (채권장표 메뉴 권한)
+    // K열에서 "O" 권한이 있는 대리점 찾기 (채권장표 메뉴 권한) (기존 I열 → K열)
     const authorizedAgents = agentRows
-      .filter(row => row && row.length > 8 && row[8] === 'O') // I열 (8번 인덱스)
+      .filter(row => row && row.length > 10 && row[10] === 'O') // K열 (10번 인덱스)
       .map(row => ({
         agentCode: row[0] || '', // A열: 대리점코드
         agentName: row[1] || '', // B열: 대리점명
-        accessLevel: row[8] || '' // I열: 채권장표 메뉴 접근권한
+        accessLevel: row[10] || '' // K열: 채권장표 메뉴 접근권한
       }));
 
     res.json({
