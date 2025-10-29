@@ -212,8 +212,13 @@ function Login({ onLogin }) {
         if (data.isAgent) {
           const agentInfo = data.agentInfo;
           
+          console.log('🔍 [패스워드 디버깅] agentInfo:', agentInfo);
+          console.log('🔍 [패스워드 디버깅] passwordNotUsed:', agentInfo.passwordNotUsed);
+          console.log('🔍 [패스워드 디버깅] hasPassword:', agentInfo.hasPassword);
+          
           // 패스워드 필요 여부 확인
           const needPassword = !agentInfo.passwordNotUsed && agentInfo.hasPassword;
+          console.log('🔍 [패스워드 디버깅] needPassword:', needPassword);
           
           if (needPassword) {
             // 패스워드 입력 모달 표시
@@ -222,6 +227,8 @@ function Login({ onLogin }) {
             setShowPasswordInput(true);
             setLoading(false);
             return;
+          } else {
+            console.log('✅ 패스워드 입력 불필요 - 바로 로그인');
           }
         }
         

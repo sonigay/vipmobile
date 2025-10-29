@@ -2964,6 +2964,13 @@ app.post('/api/login', async (req, res) => {
         const passwordNotUsed = agent[3] === 'TRUE'; // D열: 패스워드 미사용
         const storedPassword = agent[4] || ''; // E열: 패스워드
         
+        console.log('🔍 [백엔드 패스워드 디버깅] 사용자:', storeId);
+        console.log('🔍 [백엔드 패스워드 디버깅] agent[3] (D열):', agent[3]);
+        console.log('🔍 [백엔드 패스워드 디버깅] agent[4] (E열):', agent[4]);
+        console.log('🔍 [백엔드 패스워드 디버깅] passwordNotUsed:', passwordNotUsed);
+        console.log('🔍 [백엔드 패스워드 디버깅] storedPassword:', storedPassword);
+        console.log('🔍 [백엔드 패스워드 디버깅] hasPassword:', storedPassword !== '');
+        
         // H열: 재고모드 권한, I열: 정산모드 권한, J열: 검수모드 권한, K열: 채권장표 메뉴 권한, L열: 정책모드 권한, M열: 검수전체현황 권한, N열: 회의모드 권한, O열: 사전예약모드 권한, P열: 장표모드 권한, S열: 예산모드 권한, U열: 영업모드 권한, V열: 재고회수모드 권한 확인
         const hasInventoryPermission = agent[7] === 'O'; // H열 (기존 F열)
         const hasSettlementPermission = agent[8] === 'O'; // I열 (기존 G열)
