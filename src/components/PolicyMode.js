@@ -915,19 +915,49 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     try {
       for (const policy of selectedPolicies) {
         if (policy.policyStatus !== '취소됨') {
+          // 정책 적용일 처리 (문자열 범위를 시작/종료 ISO로 변환)
+          let policyStartDate = policy.policyStartDate;
+          let policyEndDate = policy.policyEndDate;
+          if (!policyStartDate || !policyEndDate) {
+            if (policy.policyDate) {
+              const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+              if (m) {
+                const [, sy, sm, sd, ey, em, ed] = m;
+                policyStartDate = new Date(parseInt(sy), parseInt(sm) - 1, parseInt(sd)).toISOString();
+                policyEndDate = new Date(parseInt(ey), parseInt(em) - 1, parseInt(ed)).toISOString();
+              }
+            }
+          }
+
+          // 금액 및 금액유형 처리 ("내용에 직접입력" 문구 처리 포함)
+          let amountType = policy.amountType || 'total';
+          let policyAmount = '';
+          if (policy.policyAmount) {
+            if (policy.policyAmount.includes('내용에 직접입력')) {
+              amountType = 'in_content';
+            } else {
+              const amt = policy.policyAmount.match(/(\d+)원/);
+              if (amt) {
+                policyAmount = amt[1];
+                if (policy.policyAmount.includes('건당금액')) amountType = 'per_case';
+              }
+            }
+          }
+
           const copyData = {
             policyName: policy.policyName,
-            policyStartDate: policy.policyStartDate,
-            policyEndDate: policy.policyEndDate,
+            policyStartDate: policyStartDate || new Date().toISOString(),
+            policyEndDate: policyEndDate || new Date().toISOString(),
             policyStore: policy.policyStore,
             policyContent: policy.policyContent,
-            policyAmount: policy.policyAmount,
-            amountType: policy.amountType,
+            policyAmount: policyAmount,
+            amountType: amountType,
             policyType: policy.policyType,
             category: policy.category,
             yearMonth: targetYearMonth,
-        team: policy.team,
-        policyTeam: policy.team || policy.teamName,
+            team: policy.team,
+            policyTeam: policy.team || policy.teamName,
+            manager: policy.manager,
             inputUserId: loggedInStore?.contactId || loggedInStore?.id,
             inputUserName: loggedInStore?.target || loggedInStore?.name,
             inputDateTime: new Date().toISOString(),
@@ -935,7 +965,29 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               total: '대기',
               settlement: '대기',
               team: '대기'
-            }
+            },
+            // 공통/카테고리별 추가 필드들
+            activationType: policy.activationType,
+            multipleStoreName: policy.multipleStoreName,
+            isMultiple: policy.isMultiple,
+            // 구두정책
+            amount95Above: policy.amount95Above,
+            amount95Below: policy.amount95Below,
+            // 부가차감지원정책
+            deductSupport: policy.deductSupport,
+            conditionalOptions: policy.conditionalOptions,
+            // 부가추가지원정책
+            addSupport: policy.addSupport,
+            supportConditionalOptions: policy.supportConditionalOptions,
+            // 요금제유형별정책
+            rateSupports: policy.rateSupports,
+            // 연합정책
+            unionSettlementStore: policy.unionSettlementStore,
+            unionTargetStores: policy.unionTargetStores,
+            unionConditions: policy.unionConditions,
+            // 개별소급정책
+            individualTarget: policy.individualTarget,
+            individualActivationType: policy.individualActivationType
           };
           await PolicyService.createPolicy(copyData);
         }

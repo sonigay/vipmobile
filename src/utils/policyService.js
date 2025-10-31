@@ -48,7 +48,14 @@ export class PolicyService {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let msg = `HTTP error! status: ${response.status}`;
+        try {
+          const err = await response.json();
+          if (err && (err.error || err.message)) {
+            msg = err.error || err.message;
+          }
+        } catch (_) {}
+        throw new Error(msg);
       }
       
       const data = await response.json();
