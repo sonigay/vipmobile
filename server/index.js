@@ -1009,6 +1009,28 @@ async function getSheetValuesWithoutCache(sheetName) {
 
 // 시트에서 직접 데이터를 가져오는 공통 함수
 async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_ID) {
+  // 시트 이름을 안전하게 처리
+  const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
+  
+  // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:S 범위 필요 (S열까지), 대리점아이디관리는 A:AA 범위 필요 (AA열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
+  let range;
+  if (sheetName === 'raw데이터') {
+    range = `${safeSheetName}!A:AB`;
+  } else if (sheetName === '폰클개통데이터') {
+    range = `${safeSheetName}!A:BZ`;
+  } else if (sheetName === '폰클홈데이터') {
+    range = `${safeSheetName}!A:CN`;
+  } else if (sheetName === '어플업데이트') {
+    range = `${safeSheetName}!A:S`;
+  } else if (sheetName === '대리점아이디관리') {
+    range = `${safeSheetName}!A:AA`;
+  } else if (sheetName === '폰클출고처데이터') {
+    range = `${safeSheetName}!A:AM`;
+  } else if (sheetName === '마당접수') {
+    range = `${safeSheetName}!A:AI`;
+  } else {
+    range = `${safeSheetName}!A:AA`;
+  }
   
   try {
     // API 호출 제한 확인
@@ -1021,29 +1043,6 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     // API 호출 기록
     rateLimitUtils.recordRequest();
     
-    // 시트 이름을 안전하게 처리
-    const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
-    
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:S 범위 필요 (S열까지), 대리점아이디관리는 A:Y 범위 필요 (Y열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
-    let range;
-    if (sheetName === 'raw데이터') {
-      range = `${safeSheetName}!A:AB`;
-    } else if (sheetName === '폰클개통데이터') {
-      range = `${safeSheetName}!A:BZ`;
-    } else if (sheetName === '폰클홈데이터') {
-      range = `${safeSheetName}!A:CN`;
-    } else if (sheetName === '어플업데이트') {
-      range = `${safeSheetName}!A:S`;
-    } else if (sheetName === '대리점아이디관리') {
-      range = `${safeSheetName}!A:AA`;
-    } else if (sheetName === '폰클출고처데이터') {
-      range = `${safeSheetName}!A:AM`;
-    } else if (sheetName === '마당접수') {
-      range = `${safeSheetName}!A:AI`;
-    } else {
-      range = `${safeSheetName}!A:AA`;
-    }
-    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
       range: range
@@ -1053,21 +1052,30 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
     
     return data;
   } catch (error) {
-    // 429 에러 (Rate Limit) 처리 - Exponential Backoff
-    if (error.code === 429 || error.message?.includes('rateLimitExceeded')) {
-      console.log(`⚠️ [API-LIMIT] Google API 할당량 초과 (429). 60초 대기 후 재시도...`);
-      await new Promise(resolve => setTimeout(resolve, 60000)); // 60초 대기
+    // 429 에러 (Rate Limit) 처리 - Exponential Backoff 재시도 (최대 3회)
+    if (error.code === 429 || error.message?.includes('rateLimitExceeded') || error.response?.status === 429) {
+      const maxRetries = 3;
+      let retryCount = 0;
       
-      // 재시도
-      try {
-        const retryResponse = await sheets.spreadsheets.values.get({
-          spreadsheetId: spreadsheetId,
-          range: range
-        });
-        return retryResponse.data.values || [];
-      } catch (retryError) {
-        console.error(`❌ [API-LIMIT] 재시도 실패:`, retryError);
-        throw retryError;
+      while (retryCount < maxRetries) {
+        const waitTime = Math.min(500 * Math.pow(2, retryCount), 60000); // 0.5s → 1s → 2s (최대 60초)
+        console.log(`⚠️ [API-LIMIT] Google API 할당량 초과 (429). ${waitTime/1000}초 대기 후 재시도 (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        
+        try {
+          const retryResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: spreadsheetId,
+            range: range
+          });
+          console.log(`✅ [API-LIMIT] 재시도 성공 (${retryCount + 1}/${maxRetries})`);
+          return retryResponse.data.values || [];
+        } catch (retryError) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error(`❌ [API-LIMIT] 재시도 모두 실패 (${maxRetries}회 시도)`);
+            throw retryError;
+          }
+        }
       }
     }
     
@@ -21134,8 +21142,8 @@ app.post('/api/policies', async (req, res) => {
       ? '내용에 직접입력' 
       : `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
     
-    // 먼저 시트에 데이터가 있는지 확인
-    const existingData = await getSheetValuesWithoutCache('정책_기본정보 ');
+    // 먼저 시트에 데이터가 있는지 확인 (캐시 사용하여 쿼터 절약)
+    const existingData = await getSheetValues('정책_기본정보 ');
     
     // 헤더 정의
     const headerRow = [
@@ -21191,10 +21199,10 @@ app.post('/api/policies', async (req, res) => {
       '담당자'                      // AX열
     ];
     
-    // 매장 데이터에서 업체명 조회
+    // 매장 데이터에서 업체명 조회 (캐시 사용하여 쿼터 절약)
     let storeName = '';
     try {
-      const storeValues = await getSheetValuesWithoutCache(STORE_SHEET_NAME);
+      const storeValues = await getSheetValues(STORE_SHEET_NAME);
       if (storeValues && storeValues.length > 1) {
         const storeRows = storeValues.slice(1);
         const store = storeRows.find(row => {
