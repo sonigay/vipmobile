@@ -267,8 +267,29 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                 // 비밀번호 관련 필드 제거 (보안)
                 const sanitizedAgents = agentData.map(agent => {
                   const { password, storedPassword, passwordNotUsed, hasPassword, isPasswordEmpty, ...safeAgent } = agent;
+                  
+                  // department가 비밀번호나 체크박스 값인지 확인 (추가 보안 필터링)
+                  if (safeAgent.department) {
+                    const deptTrimmed = safeAgent.department.trim();
+                    // 숫자만 있는 경우 (비밀번호일 가능성)
+                    if (/^\d+$/.test(deptTrimmed) && deptTrimmed.length >= 4) {
+                      console.warn(`⚠️ [보안] 비밀번호로 의심되는 department 값 발견: ${safeAgent.contactId}, 값: "${deptTrimmed}"`);
+                      safeAgent.department = ''; // 빈 문자열로 설정
+                    }
+                    // "FALSE", "TRUE"는 체크박스 값
+                    if (deptTrimmed === 'FALSE' || deptTrimmed === 'TRUE') {
+                      console.warn(`⚠️ [보안] 체크박스 값으로 의심되는 department 값 발견: ${safeAgent.contactId}, 값: "${deptTrimmed}"`);
+                      safeAgent.department = ''; // 빈 문자열로 설정
+                    }
+                  }
+                  
                   return safeAgent;
+                }).filter(agent => {
+                  // office와 department가 모두 유효한 담당자만 반환
+                  return agent.contactId && agent.office && agent.office.trim() !== '' && agent.department && agent.department.trim() !== '';
                 });
+                
+                console.log(`✅ [담당자] 데이터 로드 완료: ${agentData.length}개 → ${sanitizedAgents.length}개 (필터링 후)`);
                 setAgents(sanitizedAgents);
                 agentDataLoaded = true;
                 // console.log('✅ 실제 담당자 데이터 로드 성공');
@@ -1093,11 +1114,28 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       agents: {}
     };
 
-    // 유효한 담당자만 필터링
-    const validAgents = agents.filter(agent => 
-      agent.office && agent.office.trim() !== '' && 
-      agent.department && agent.department.trim() !== ''
-    );
+    // 유효한 담당자만 필터링 (추가 검증: 비밀번호 값 필터링)
+    const validAgents = agents.filter(agent => {
+      const office = agent.office?.trim() || '';
+      const department = agent.department?.trim() || '';
+      
+      // 기본 검증
+      if (!office || !department) return false;
+      
+      // 비밀번호로 의심되는 값 필터링 (숫자만 있는 경우)
+      if (/^\d+$/.test(department) && department.length >= 4) {
+        console.warn(`⚠️ [필터링] 비밀번호로 의심되는 department 필터링: ${agent.contactId}, 값: "${department}"`);
+        return false;
+      }
+      
+      // 체크박스 값 필터링
+      if (department === 'FALSE' || department === 'TRUE') {
+        console.warn(`⚠️ [필터링] 체크박스 값으로 의심되는 department 필터링: ${agent.contactId}, 값: "${department}"`);
+        return false;
+      }
+      
+      return true;
+    });
 
     validAgents.forEach(agent => {
       const office = agent.office.trim();

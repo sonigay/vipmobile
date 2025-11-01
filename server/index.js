@@ -2405,30 +2405,64 @@ app.get('/api/agents', async (req, res) => {
     
     // 대리점 데이터 구성 (D열, E열 추가로 인해 사무실/소속이 +2 이동)
     const agents = agentRows.map((row, index) => {
+      let office = (row[5] || '').toString().trim();        // F열: 사무실 (기존 D열 → F열로 이동)
+      let department = (row[6] || '').toString().trim();     // G열: 소속 (기존 E열 → G열로 이동)
+      
+      // 보안 검증: department가 비밀번호나 체크박스 값인지 확인
+      const passwordValue = (row[4] || '').toString().trim(); // E열: 패스워드
+      const passwordNotUsed = (row[3] || '').toString().trim(); // D열: 패스워드 미사용
+      
+      // 만약 department가 비밀번호 값과 같거나, 패스워드 미사용 체크박스 값이면 빈 문자열로 설정
+      if (department === passwordValue) {
+        console.warn(`⚠️ [보안] department가 비밀번호 값과 일치: ${row[2]}, department 초기화`);
+        department = '';
+      }
+      if (department === passwordNotUsed || department === 'FALSE' || department === 'TRUE') {
+        console.warn(`⚠️ [보안] department가 체크박스 값: ${row[2]}, department 초기화`);
+        department = '';
+      }
+      // 숫자만 있고 4자 이상인 경우 (비밀번호일 가능성)
+      if (/^\d+$/.test(department) && department.length >= 4) {
+        console.warn(`⚠️ [보안] department가 비밀번호 형식으로 의심됨: ${row[2]}, department 초기화`);
+        department = '';
+      }
+      
       const agent = {
         target: row[0] || '',       // A열: 대상
         qualification: row[1] || '', // B열: 자격
         contactId: row[2] || '',     // C열: 연락처(아이디)
-        office: row[5] || '',        // F열: 사무실 (기존 D열 → F열로 이동)
-        department: row[6] || ''     // G열: 소속 (기존 E열 → G열로 이동)
+        office: office,
+        department: department
       };
       
-      // 디버깅: 처음 5개 행만 로그 출력
-      if (index < 5) {
+      // 디버깅: 처음 10개 행 모두 상세 로그 출력
+      if (index < 10) {
         console.log(`📋 [담당자 ${index + 1}]`, {
           target: agent.target,
           contactId: agent.contactId,
           office: agent.office,
           department: agent.department,
+          '전체 row 길이': row.length,
+          'row[0] (A열-대상)': row[0],
+          'row[1] (B열-자격)': row[1],
+          'row[2] (C열-아이디)': row[2],
           'row[3] (D열-패스워드미사용)': row[3],
           'row[4] (E열-패스워드)': row[4] ? '***' : '',
           'row[5] (F열-사무실)': row[5],
-          'row[6] (G열-소속)': row[6]
+          'row[6] (G열-소속)': row[6],
+          '최종 office': office,
+          '최종 department': department,
+          '필터링 전 row 전체': row.slice(0, 10) // 처음 10개 컬럼만
         });
       }
       
       return agent;
-    }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
+    }).filter(agent => {
+      // 아이디가 있고, office와 department가 모두 유효한 항목만 반환
+      return agent.contactId && 
+             agent.office && agent.office.trim() !== '' && 
+             agent.department && agent.department.trim() !== '';
+    });
     
     const processingTime = Date.now() - startTime;
     console.log(`✅ [담당자] 데이터 처리 완료: ${agents.length}개 담당자, ${processingTime}ms 소요`);
@@ -2999,6 +3033,10 @@ app.post('/api/login', async (req, res) => {
         console.log('🔍 [백엔드 패스워드 디버깅] isPasswordEmpty:', isPasswordEmpty);
         
         // H열: 재고모드 권한, I열: 정산모드 권한, J열: 검수모드 권한, K열: 채권장표 메뉴 권한, L열: 정책모드 권한, M열: 검수전체현황 권한, N열: 회의모드 권한, O열: 사전예약모드 권한, P열: 장표모드 권한, S열: 예산모드 권한, U열: 영업모드 권한, V열: 재고회수모드 권한 확인
+        // 사무실과 소속 정보 (F열, G열)
+        const office = agent[5] || ''; // F열: 사무실
+        const department = agent[6] || ''; // G열: 소속
+        
         const hasInventoryPermission = agent[7] === 'O'; // H열 (기존 F열)
         const hasSettlementPermission = agent[8] === 'O'; // I열 (기존 G열)
         const hasInspectionPermission = agent[9] === 'O'; // J열 (기존 H열)
@@ -3008,6 +3046,8 @@ app.post('/api/login', async (req, res) => {
         const hasMeetingPermission = agent[13] === 'O'; // N열 (기존 L열)
         const hasReservationPermission = agent[14] === 'O'; // O열 (기존 M열)
         const hasChartPermission = agent[15] === 'O'; // P열: 장표모드 권한 (기존 N열)
+        const teamCode = agent[16] || ''; // Q열: 팀코드
+        const userRole = agent[17] || ''; // R열: 권한
         const hasBudgetPermission = agent[18] === 'O'; // S열: 예산모드 권한 (기존 Q열)
         const hasSalesPermission = agent[20] === 'O'; // U열: 영업모드 권한 (기존 S열)
         const hasInventoryRecoveryPermission = agent[21] === 'O'; // V열: 재고회수모드 권한 (기존 T열)
