@@ -264,7 +264,12 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               // console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
               
               if (agentData && Array.isArray(agentData) && agentData.length > 0) {
-                setAgents(agentData);
+                // 비밀번호 관련 필드 제거 (보안)
+                const sanitizedAgents = agentData.map(agent => {
+                  const { password, storedPassword, passwordNotUsed, hasPassword, isPasswordEmpty, ...safeAgent } = agent;
+                  return safeAgent;
+                });
+                setAgents(sanitizedAgents);
                 agentDataLoaded = true;
                 // console.log('✅ 실제 담당자 데이터 로드 성공');
               } else {
