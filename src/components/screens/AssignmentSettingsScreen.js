@@ -1185,6 +1185,7 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       return true;
     });
 
+    console.log('🔍 [계층 구조 생성] validAgents 개수:', validAgents.length);
     validAgents.forEach(agent => {
       const office = agent.office.trim();
       const department = agent.department.trim();
@@ -1192,12 +1193,23 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
       // 최종 검증: department가 비밀번호 형식인지 다시 확인 (방어적 코딩)
       if (/^\d+$/.test(department) && department.length >= 4) {
-        console.warn(`⚠️ [최종 필터링] 소속별 배정에서 비밀번호 형식 제외: ${agent.contactId}, department: "${department}"`);
+        console.error(`❌ [최종 필터링] 소속별 배정에서 비밀번호 형식 제외: ${agent.contactId}, department: "${department}"`);
         return; // 이 agent는 제외
       }
       if (department === 'FALSE' || department === 'TRUE') {
-        console.warn(`⚠️ [최종 필터링] 소속별 배정에서 체크박스 값 제외: ${agent.contactId}, department: "${department}"`);
+        console.error(`❌ [최종 필터링] 소속별 배정에서 체크박스 값 제외: ${agent.contactId}, department: "${department}"`);
         return; // 이 agent는 제외
+      }
+
+      // department에 7985456이 포함되어 있는지 확인
+      if (department.includes('7985456')) {
+        console.error(`❌ [치명적 발견] department에 7985456 발견!`, {
+          contactId: agentId,
+          target: agent.target,
+          office: office,
+          department: department,
+          전체agent: agent
+        });
       }
 
       // 사무실별 구조
@@ -1212,12 +1224,16 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
       // 소속별 구조
       if (!structure.departments[department]) {
+        console.log(`📝 [계층 구조] 새 department 추가: "${department}" (office: "${office}", agent: ${agentId})`);
         structure.departments[department] = {
           office: office,
           agents: new Set()
         };
       }
       structure.departments[department].agents.add(agentId);
+    });
+    
+    console.log('🔍 [계층 구조 완료] departments 목록:', Object.keys(structure.departments));
 
       // 영업사원별 구조
       structure.agents[agentId] = {
