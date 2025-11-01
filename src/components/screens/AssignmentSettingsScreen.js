@@ -1231,9 +1231,6 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         };
       }
       structure.departments[department].agents.add(agentId);
-    });
-    
-    console.log('🔍 [계층 구조 완료] departments 목록:', Object.keys(structure.departments));
 
       // 영업사원별 구조
       structure.agents[agentId] = {
@@ -1242,6 +1239,8 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         department: department
       };
     });
+    
+    console.log('🔍 [계층 구조 완료] departments 목록:', Object.keys(structure.departments));
 
     return structure;
   }, [agents]);
