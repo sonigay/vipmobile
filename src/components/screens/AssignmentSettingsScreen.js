@@ -265,8 +265,24 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               console.log('🔍 [백엔드 응답] 전체 데이터:', agentData);
               console.log('🔍 [백엔드 응답] 데이터 개수:', agentData?.length || 0);
               
-              // department에 숫자만 있는 값이 있는지 확인
+              // 각 agent의 department 값 상세 확인 (특히 7985456 찾기)
               if (agentData && Array.isArray(agentData)) {
+                console.log('🔍 [백엔드 응답 상세] 각 agent의 department 값:');
+                agentData.forEach((agent, idx) => {
+                  if (agent.department && agent.department.toString().includes('7985456')) {
+                    console.error(`❌ [문제 발견] agent[${idx}]:`, {
+                      contactId: agent.contactId,
+                      target: agent.target,
+                      office: agent.office,
+                      department: agent.department,
+                      전체데이터: agent
+                    });
+                  } else {
+                    console.log(`  [${idx}] ${agent.target || agent.contactId}: office="${agent.office}", department="${agent.department}"`);
+                  }
+                });
+                
+                // department에 숫자만 있는 값이 있는지 확인
                 const numericDepts = agentData.filter(agent => {
                   const dept = (agent.department || '').toString().trim();
                   return /^\d+$/.test(dept) && dept.length >= 4;
