@@ -608,6 +608,17 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           if (agent.department) departments.add(agent.department);
         });
         
+        // 기존 departments에서 유효하지 않은 키 제거 (비밀번호 값 등)
+        const validDepartmentKeys = new Set(departments);
+        Object.keys(newSettings.targets.departments).forEach(key => {
+          // 유효한 department 목록에 없거나, 숫자만 있는 경우(비밀번호일 가능성) 제거
+          if (!validDepartmentKeys.has(key) || (/^\d+$/.test(key) && key.length >= 4)) {
+            console.warn(`⚠️ [설정 정리] 유효하지 않은 department 키 제거: "${key}"`);
+            delete newSettings.targets.departments[key];
+          }
+        });
+        
+        // 유효한 department만 추가
         departments.forEach(department => {
           if (!newSettings.targets.departments.hasOwnProperty(department)) {
             newSettings.targets.departments[department] = false; // 기본값: 선택되지 않음
@@ -2754,7 +2765,16 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {Object.entries(assignmentSettings.targets.departments).map(([department, checked]) => {
+                        {Object.entries(assignmentSettings.targets.departments)
+                          .filter(([department]) => {
+                            // getHierarchicalStructure에 있는 유효한 department만 표시
+                            const isValid = getHierarchicalStructure.departments.hasOwnProperty(department);
+                            if (!isValid) {
+                              console.warn(`⚠️ [UI 필터링] 유효하지 않은 department 제외: "${department}"`);
+                            }
+                            return isValid;
+                          })
+                          .map(([department, checked]) => {
                           const deptData = getHierarchicalStructure.departments[department];
                           const agentCount = deptData ? deptData.agents.size : 0;
                           const office = deptData ? deptData.office : '';
