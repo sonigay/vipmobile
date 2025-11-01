@@ -264,6 +264,21 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
               // console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
               
               if (agentData && Array.isArray(agentData) && agentData.length > 0) {
+                // 백엔드 응답 확인용 로그 (비밀번호 값이 포함된 행 찾기)
+                console.log('🔍 [백엔드 응답 확인] 전체 agentData:', agentData.length, '개');
+                const suspiciousAgents = agentData.filter(agent => {
+                  const dept = (agent.department || '').toString().trim();
+                  return /^\d+$/.test(dept) && dept.length >= 4;
+                });
+                if (suspiciousAgents.length > 0) {
+                  console.error('❌ [치명적 문제 발견] 백엔드에서 비밀번호 형식의 department 값 반환:', suspiciousAgents.map(a => ({
+                    contactId: a.contactId,
+                    target: a.target,
+                    department: a.department,
+                    office: a.office
+                  })));
+                }
+                
                 // 비밀번호 관련 필드 제거 (보안)
                 const sanitizedAgents = agentData.map(agent => {
                   const { password, storedPassword, passwordNotUsed, hasPassword, isPasswordEmpty, ...safeAgent } = agent;
@@ -271,9 +286,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   // department가 비밀번호나 체크박스 값인지 확인 (추가 보안 필터링)
                   if (safeAgent.department) {
                     const deptTrimmed = safeAgent.department.trim();
-                    // 숫자만 있는 경우 (비밀번호일 가능성)
+                    // 숫자만 있는 경우 (비밀번호일 가능성) - 무조건 필터링
                     if (/^\d+$/.test(deptTrimmed) && deptTrimmed.length >= 4) {
-                      console.warn(`⚠️ [보안] 비밀번호로 의심되는 department 값 발견: ${safeAgent.contactId}, 값: "${deptTrimmed}"`);
+                      console.error(`❌ [치명적 문제] 비밀번호 형식 department 발견 및 제거: ${safeAgent.contactId}, 값: "${deptTrimmed}"`);
                       safeAgent.department = ''; // 빈 문자열로 설정
                     }
                     // "FALSE", "TRUE"는 체크박스 값
@@ -286,10 +301,22 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                   return safeAgent;
                 }).filter(agent => {
                   // office와 department가 모두 유효한 담당자만 반환
-                  return agent.contactId && agent.office && agent.office.trim() !== '' && agent.department && agent.department.trim() !== '';
+                  // 단, department가 빈 문자열이면 제외
+                  const hasValidDept = agent.department && agent.department.trim() !== '';
+                  if (!hasValidDept && agent.contactId) {
+                    console.warn(`⚠️ [필터링] department가 비어있어 제외: ${agent.contactId}`);
+                  }
+                  return agent.contactId && agent.office && agent.office.trim() !== '' && hasValidDept;
                 });
                 
                 console.log(`✅ [담당자] 데이터 로드 완료: ${agentData.length}개 → ${sanitizedAgents.length}개 (필터링 후)`);
+                
+                // 최종 확인: 비밀번호 형식 값이 남아있는지 체크
+                const finalCheck = sanitizedAgents.filter(a => /^\d+$/.test(a.department?.trim() || '') && a.department.trim().length >= 4);
+                if (finalCheck.length > 0) {
+                  console.error('❌ [치명적 오류] 필터링 후에도 비밀번호 형식 값이 남아있음:', finalCheck);
+                }
+                
                 setAgents(sanitizedAgents);
                 agentDataLoaded = true;
                 // console.log('✅ 실제 담당자 데이터 로드 성공');
