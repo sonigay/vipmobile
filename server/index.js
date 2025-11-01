@@ -2402,14 +2402,14 @@ app.get('/api/agents', async (req, res) => {
     // 헤더 제거 (3행까지가 헤더이므로 4행부터 시작)
     const agentRows = agentValues.slice(3);
     
-    // 대리점 데이터 구성
+    // 대리점 데이터 구성 (D열, E열 추가로 인해 사무실/소속이 +2 이동)
     const agents = agentRows.map(row => {
       return {
         target: row[0] || '',       // A열: 대상
         qualification: row[1] || '', // B열: 자격
         contactId: row[2] || '',     // C열: 연락처(아이디)
-        office: row[3] || '',        // D열: 사무실 (새로 추가)
-        department: row[4] || ''     // E열: 소속 (새로 추가)
+        office: row[5] || '',        // F열: 사무실 (기존 D열 → F열로 이동)
+        department: row[6] || ''     // G열: 소속 (기존 E열 → G열로 이동)
       };
     }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
     
@@ -9525,11 +9525,12 @@ async function sendNotificationToTargetAgents(notification, targetOffices, targe
       agents = agentData.slice(3).map((row, index) => {
         const agent = {
           target: row[0], // A열: 담당자명
-          qualification: row[15], // P열: 권한 (정책모드 권한)
+          qualification: row[1] || '', // B열: 자격 (수정)
           contactId: row[2], // C열: 연락처(아이디)
-          office: row[3], // D열: 사무실
-          department: row[4], // E열: 소속
-          pushSubscription: row[14] ? JSON.parse(row[14]) : null // O열: 푸시 구독 정보
+          office: row[5] || '', // F열: 사무실 (기존 D열 → F열로 이동)
+          department: row[6] || '', // G열: 소속 (기존 E열 → G열로 이동)
+          userRole: row[17] || '', // R열: 권한 (기존 P열 → R열로 이동)
+          pushSubscription: row[16] ? JSON.parse(row[16]) : null // Q열: 푸시 구독 정보 (기존 O열 → Q열로 이동)
         };
         
         console.log(`담당자 데이터 파싱 ${index + 1}:`, {
