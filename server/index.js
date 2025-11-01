@@ -9807,15 +9807,22 @@ async function loadPushSubscriptionsFromSheet() {
     
     agentRows.forEach((row, index) => {
       const userId = row[2]; // C열: 연락처(아이디)
-      const subscriptionJson = row[14]; // O열: 푸시 구독 정보
+      const subscriptionJson = row[16]; // Q열: 푸시 구독 정보 (기존 O열 → Q열로 이동)
       
       if (userId && subscriptionJson) {
         try {
-          const subscription = JSON.parse(subscriptionJson);
-          subscriptions.set(userId, subscription);
-          console.log(`푸시 구독 정보 로드: ${userId}`);
+          // 빈 문자열이나 "O" 같은 단일 문자는 JSON이 아니므로 스킵
+          if (subscriptionJson.trim().length > 1 && subscriptionJson.trim().startsWith('{')) {
+            const subscription = JSON.parse(subscriptionJson);
+            subscriptions.set(userId, subscription);
+            console.log(`푸시 구독 정보 로드: ${userId}`);
+          } else {
+            console.log(`푸시 구독 정보 없음 또는 유효하지 않음 (${userId}): "${subscriptionJson}"`);
+          }
         } catch (error) {
           console.error(`푸시 구독 정보 파싱 실패 (${userId}):`, error);
+          console.error(`  - 원본 값: "${subscriptionJson}"`);
+          console.error(`  - 값 타입: ${typeof subscriptionJson}`);
         }
       }
     });
@@ -11044,14 +11051,18 @@ app.get('/api/push/subscriptions', async (req, res) => {
         const agentRows = agentValues.slice(3);
         agentRows.forEach(row => {
           const userId = row[2]; // C열: 연락처(아이디)
-          const subscriptionJson = row[14]; // O열: 푸시 구독 정보
+          const subscriptionJson = row[16]; // Q열: 푸시 구독 정보 (기존 O열 → Q열로 이동)
           
           if (userId && subscriptionJson && !allSubscriptions.has(userId)) {
             try {
-              const subscription = JSON.parse(subscriptionJson);
-              allSubscriptions.set(userId, subscription);
+              // 빈 문자열이나 "O" 같은 단일 문자는 JSON이 아니므로 스킵
+              if (subscriptionJson.trim().length > 1 && subscriptionJson.trim().startsWith('{')) {
+                const subscription = JSON.parse(subscriptionJson);
+                allSubscriptions.set(userId, subscription);
+              }
             } catch (error) {
               console.error(`구독 정보 파싱 실패 (${userId}):`, error);
+              console.error(`  - 원본 값: "${subscriptionJson}"`);
             }
           }
         });
@@ -11118,14 +11129,18 @@ app.post('/api/push/send-all', async (req, res) => {
         const agentRows = agentValues.slice(3);
         agentRows.forEach(row => {
           const userId = row[2]; // C열: 연락처(아이디)
-          const subscriptionJson = row[14]; // O열: 푸시 구독 정보
+          const subscriptionJson = row[16]; // Q열: 푸시 구독 정보 (기존 O열 → Q열로 이동)
           
           if (userId && subscriptionJson && !allSubscriptions.has(userId)) {
             try {
-              const subscription = JSON.parse(subscriptionJson);
-              allSubscriptions.set(userId, subscription);
+              // 빈 문자열이나 "O" 같은 단일 문자는 JSON이 아니므로 스킵
+              if (subscriptionJson.trim().length > 1 && subscriptionJson.trim().startsWith('{')) {
+                const subscription = JSON.parse(subscriptionJson);
+                allSubscriptions.set(userId, subscription);
+              }
             } catch (error) {
               console.error(`구독 정보 파싱 실패 (${userId}):`, error);
+              console.error(`  - 원본 값: "${subscriptionJson}"`);
             }
           }
         });
