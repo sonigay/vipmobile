@@ -247,6 +247,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       try {
         // console.log('AssignmentSettingsScreen: 데이터 로드 시작');
         
+        // 기존 로컬 스토리지의 잘못된 agents 데이터 무효화 (선택사항)
+        // 로컬 스토리지에서 agents를 더 이상 사용하지 않으므로 무시됨
+        
         // 담당자 데이터 로드
         // console.log('담당자 데이터 로드 중...');
         let agentDataLoaded = false;
@@ -447,9 +450,10 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
     const currentUserId = loginState.inventoryUserName || 'unknown';
     
     // 모든 설정을 사용자별로 로컬 스토리지에 저장
+    // agents는 저장하지 않음 (항상 백엔드에서 최신 데이터 사용)
     const settingsToSave = {
       assignmentSettings,
-      agents,
+      // agents, // agents는 저장하지 않음
       selectedModel,
       selectedColor,
       newModel,
@@ -480,9 +484,11 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         if (parsedData.assignmentSettings) {
           setAssignmentSettings(parsedData.assignmentSettings);
         }
-        if (parsedData.agents) {
-          setAgents(parsedData.agents);
-        }
+        // agents는 항상 백엔드에서 최신 데이터를 가져오므로 로컬 스토리지에서 복원하지 않음
+        // (이전에 잘못된 데이터가 저장되어 있을 수 있음)
+        // if (parsedData.agents) {
+        //   setAgents(parsedData.agents);
+        // }
         if (parsedData.selectedModel) {
           setSelectedModel(parsedData.selectedModel);
         }
