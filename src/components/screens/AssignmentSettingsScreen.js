@@ -596,6 +596,17 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
           if (agent.office) offices.add(agent.office);
         });
         
+        // 기존 offices에서 유효하지 않은 키 제거
+        const validOfficeKeys = new Set(offices);
+        Object.keys(newSettings.targets.offices).forEach(key => {
+          // 유효한 office 목록에 없거나, 숫자만 있는 경우(비밀번호일 가능성) 제거
+          if (!validOfficeKeys.has(key) || (/^\d+$/.test(key) && key.length >= 4)) {
+            console.warn(`⚠️ [설정 정리] 유효하지 않은 office 키 제거: "${key}"`);
+            delete newSettings.targets.offices[key];
+          }
+        });
+        
+        // 유효한 office만 추가
         offices.forEach(office => {
           if (!newSettings.targets.offices.hasOwnProperty(office)) {
             newSettings.targets.offices[office] = false; // 기본값: 선택되지 않음
@@ -626,6 +637,17 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
         });
 
         // 영업사원별 배정 대상 초기화 (유효한 담당자만)
+        // 기존 agents에서 유효하지 않은 키 제거
+        const validAgentIds = new Set(validAgents.map(agent => agent.contactId));
+        Object.keys(newSettings.targets.agents).forEach(key => {
+          // 유효한 agent 목록에 없거나, 숫자만 있는 경우(비밀번호일 가능성) 제거
+          if (!validAgentIds.has(key) || (/^\d+$/.test(key) && key.length >= 4)) {
+            console.warn(`⚠️ [설정 정리] 유효하지 않은 agent 키 제거: "${key}"`);
+            delete newSettings.targets.agents[key];
+          }
+        });
+        
+        // 유효한 agent만 추가
         validAgents.forEach(agent => {
           if (!newSettings.targets.agents.hasOwnProperty(agent.contactId)) {
             newSettings.targets.agents[agent.contactId] = false; // 기본값: 선택되지 않음
@@ -2712,7 +2734,16 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {Object.entries(assignmentSettings.targets.offices).map(([office, checked]) => {
+                        {Object.entries(assignmentSettings.targets.offices)
+                          .filter(([office]) => {
+                            // getHierarchicalStructure에 있는 유효한 office만 표시
+                            const isValid = getHierarchicalStructure.offices.hasOwnProperty(office);
+                            if (!isValid) {
+                              console.warn(`⚠️ [UI 필터링] 유효하지 않은 office 제외: "${office}"`);
+                            }
+                            return isValid;
+                          })
+                          .map(([office, checked]) => {
                           const officeData = getHierarchicalStructure.offices[office];
                           const deptCount = officeData ? officeData.departments.size : 0;
                           const agentCount = officeData ? officeData.agents.size : 0;
@@ -2827,7 +2858,16 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                         </Box>
                       </Box>
                       <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                        {Object.entries(assignmentSettings.targets.agents).map(([agentId, checked]) => {
+                        {Object.entries(assignmentSettings.targets.agents)
+                          .filter(([agentId]) => {
+                            // getHierarchicalStructure에 있는 유효한 agent만 표시
+                            const isValid = getHierarchicalStructure.agents.hasOwnProperty(agentId);
+                            if (!isValid) {
+                              console.warn(`⚠️ [UI 필터링] 유효하지 않은 agent 제외: "${agentId}"`);
+                            }
+                            return isValid;
+                          })
+                          .map(([agentId, checked]) => {
                           const agent = agents.find(a => a.contactId === agentId);
                           const agentData = getHierarchicalStructure.agents[agentId];
                           
