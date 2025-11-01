@@ -1142,6 +1142,16 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       const department = agent.department.trim();
       const agentId = agent.contactId;
 
+      // 최종 검증: department가 비밀번호 형식인지 다시 확인 (방어적 코딩)
+      if (/^\d+$/.test(department) && department.length >= 4) {
+        console.warn(`⚠️ [최종 필터링] 소속별 배정에서 비밀번호 형식 제외: ${agent.contactId}, department: "${department}"`);
+        return; // 이 agent는 제외
+      }
+      if (department === 'FALSE' || department === 'TRUE') {
+        console.warn(`⚠️ [최종 필터링] 소속별 배정에서 체크박스 값 제외: ${agent.contactId}, department: "${department}"`);
+        return; // 이 agent는 제외
+      }
+
       // 사무실별 구조
       if (!structure.offices[office]) {
         structure.offices[office] = {

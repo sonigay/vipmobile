@@ -2404,27 +2404,44 @@ app.get('/api/agents', async (req, res) => {
     const agentRows = agentValues.slice(3);
     
     // 대리점 데이터 구성 (D열, E열 추가로 인해 사무실/소속이 +2 이동)
+    // F열(인덱스 5) = 사무실, G열(인덱스 6) = 소속
     const agents = agentRows.map((row, index) => {
-      let office = (row[5] || '').toString().trim();        // F열: 사무실 (기존 D열 → F열로 이동)
-      let department = (row[6] || '').toString().trim();     // G열: 소속 (기존 E열 → G열로 이동)
+      // 정확히 F열(row[5])에서 사무실, G열(row[6])에서 소속만 읽기
+      let office = (row[5] || '').toString().trim();        // F열: 사무실
+      let department = (row[6] || '').toString().trim();     // G열: 소속
       
-      // 보안 검증: department가 비밀번호나 체크박스 값인지 확인
+      // 보안 검증: E열(패스워드) 값 확인 (비교용)
       const passwordValue = (row[4] || '').toString().trim(); // E열: 패스워드
       const passwordNotUsed = (row[3] || '').toString().trim(); // D열: 패스워드 미사용
       
-      // 만약 department가 비밀번호 값과 같거나, 패스워드 미사용 체크박스 값이면 빈 문자열로 설정
-      if (department === passwordValue) {
-        console.warn(`⚠️ [보안] department가 비밀번호 값과 일치: ${row[2]}, department 초기화`);
+      // 중요: department가 E열(패스워드) 값과 같으면 안 됨 (절대 비밀번호가 소속으로 표시되면 안 됨)
+      if (department === passwordValue && passwordValue !== '') {
+        console.error(`❌ [치명적 오류] ${row[2]}: G열(소속) 값이 E열(패스워드) 값과 동일! G열="${department}", E열="${passwordValue ? '***' : ''}" - department 초기화`);
         department = '';
       }
+      
+      // department가 체크박스 값인 경우 필터링
       if (department === passwordNotUsed || department === 'FALSE' || department === 'TRUE') {
         console.warn(`⚠️ [보안] department가 체크박스 값: ${row[2]}, department 초기화`);
         department = '';
       }
-      // 숫자만 있고 4자 이상인 경우 (비밀번호일 가능성)
+      
+      // 숫자만 있고 4자 이상인 경우 (비밀번호일 가능성) 필터링
+      // 단, E열(패스워드)과 비교하여 동일한 값이면 확실히 필터링
       if (/^\d+$/.test(department) && department.length >= 4) {
-        console.warn(`⚠️ [보안] department가 비밀번호 형식으로 의심됨: ${row[2]}, department 초기화`);
-        department = '';
+        if (department === passwordValue) {
+          console.error(`❌ [치명적 오류] ${row[2]}: G열(소속)이 비밀번호 형식이고 E열(패스워드)과 동일! - department 초기화`);
+          department = '';
+        } else {
+          console.warn(`⚠️ [보안] department가 비밀번호 형식으로 의심됨: ${row[2]}, 값="${department}" - department 초기화`);
+          department = '';
+        }
+      }
+      
+      // office도 체크박스 값 필터링
+      if (office === 'FALSE' || office === 'TRUE') {
+        console.warn(`⚠️ [보안] office가 체크박스 값: ${row[2]}, office 초기화`);
+        office = '';
       }
       
       const agent = {
