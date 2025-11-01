@@ -260,24 +260,29 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
             const contentType = agentResponse.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
               const agentData = await agentResponse.json();
-              // console.log('담당자 데이터 로드 완료:', agentData.length, '명');
-              // console.log('담당자 데이터 샘플:', agentData.slice(0, 3));
               
-              if (agentData && Array.isArray(agentData) && agentData.length > 0) {
-                // 백엔드 응답 확인용 로그 (비밀번호 값이 포함된 행 찾기)
-                console.log('🔍 [백엔드 응답 확인] 전체 agentData:', agentData.length, '개');
-                const suspiciousAgents = agentData.filter(agent => {
+              // 백엔드 응답 전체 출력 (문제 진단용)
+              console.log('🔍 [백엔드 응답] 전체 데이터:', agentData);
+              console.log('🔍 [백엔드 응답] 데이터 개수:', agentData?.length || 0);
+              
+              // department에 숫자만 있는 값이 있는지 확인
+              if (agentData && Array.isArray(agentData)) {
+                const numericDepts = agentData.filter(agent => {
                   const dept = (agent.department || '').toString().trim();
                   return /^\d+$/.test(dept) && dept.length >= 4;
                 });
-                if (suspiciousAgents.length > 0) {
-                  console.error('❌ [치명적 문제 발견] 백엔드에서 비밀번호 형식의 department 값 반환:', suspiciousAgents.map(a => ({
+                if (numericDepts.length > 0) {
+                  console.error('❌ [백엔드 응답 문제] 숫자 형식 department 발견:', numericDepts);
+                  console.error('❌ 상세:', numericDepts.map(a => ({
                     contactId: a.contactId,
                     target: a.target,
-                    department: a.department,
-                    office: a.office
+                    office: a.office,
+                    department: a.department
                   })));
                 }
+              }
+              
+              if (agentData && Array.isArray(agentData) && agentData.length > 0) {
                 
                 // 비밀번호 관련 필드 제거 (보안)
                 const sanitizedAgents = agentData.map(agent => {
