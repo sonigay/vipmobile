@@ -2380,17 +2380,18 @@ app.get('/api/models', async (req, res) => {
 
 // 대리점 ID 정보 가져오기 (캐싱 적용)
 app.get('/api/agents', async (req, res) => {
-  const cacheKey = 'processed_agents_data';
+  // 캐시 키 변경 (v2) - 컬럼 인덱스 수정 후 캐시 무효화를 위해
+  const cacheKey = 'processed_agents_data_v2';
   
   // 캐시에서 먼저 확인
   const cachedAgents = cacheUtils.get(cacheKey);
   if (cachedAgents) {
-    // console.log('캐시된 대리점 데이터 반환');
+    console.log('✅ [캐시] 수정된 agent 데이터 반환');
     return res.json(cachedAgents);
   }
   
   try {
-    // console.log('대리점 데이터 처리 시작...');
+    console.log('🔄 [담당자] 데이터 처리 시작...');
     const startTime = Date.now();
     
     const agentValues = await getSheetValues(AGENT_SHEET_NAME);
@@ -2403,18 +2404,34 @@ app.get('/api/agents', async (req, res) => {
     const agentRows = agentValues.slice(3);
     
     // 대리점 데이터 구성 (D열, E열 추가로 인해 사무실/소속이 +2 이동)
-    const agents = agentRows.map(row => {
-      return {
+    const agents = agentRows.map((row, index) => {
+      const agent = {
         target: row[0] || '',       // A열: 대상
         qualification: row[1] || '', // B열: 자격
         contactId: row[2] || '',     // C열: 연락처(아이디)
         office: row[5] || '',        // F열: 사무실 (기존 D열 → F열로 이동)
         department: row[6] || ''     // G열: 소속 (기존 E열 → G열로 이동)
       };
+      
+      // 디버깅: 처음 5개 행만 로그 출력
+      if (index < 5) {
+        console.log(`📋 [담당자 ${index + 1}]`, {
+          target: agent.target,
+          contactId: agent.contactId,
+          office: agent.office,
+          department: agent.department,
+          'row[3] (D열-패스워드미사용)': row[3],
+          'row[4] (E열-패스워드)': row[4] ? '***' : '',
+          'row[5] (F열-사무실)': row[5],
+          'row[6] (G열-소속)': row[6]
+        });
+      }
+      
+      return agent;
     }).filter(agent => agent.contactId); // 아이디가 있는 항목만 필터링
     
     const processingTime = Date.now() - startTime;
-    // console.log(`대리점 데이터 처리 완료: ${agents.length}개 대리점, ${processingTime}ms 소요`);
+    console.log(`✅ [담당자] 데이터 처리 완료: ${agents.length}개 담당자, ${processingTime}ms 소요`);
     
     // 캐시에 저장 (5분 TTL)
     cacheUtils.set(cacheKey, agents);
