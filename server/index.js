@@ -3072,7 +3072,8 @@ app.post('/api/login', async (req, res) => {
         const hasSmsManagementPermission = agent[23] === 'O'; // X열: SMS 관리모드 권한 (기존 V열)
         const hasObManagementPermission = agent[24] === 'O'; // Y열: OB 관리모드 권한 (기존 W열)
         const hasAgentModePermission = agent[25] === 'O'; // Z열: 관리자모드 권한 (기존 X열)
-        const hasOnSaleManagementPermission = agent[26] === 'O'; // AA열: 온세일관리모드 권한 (기존 Y열)
+        // AA열: 온세일관리모드 접속 권한 (O, S, M 모두 접속 가능)
+        const hasOnSaleManagementPermission = agent[26] === 'O' || agent[26] === 'S' || agent[26] === 'M';
         const hasOnSaleLinkPermission = agent[26] === 'S'; // AA열: 온세일 링크관리 권한
         const hasOnSalePolicyPermission = agent[26] === 'M'; // AA열: 온세일 정책게시판 권한 (M 권한은 링크관리 + 정책게시판)
         
