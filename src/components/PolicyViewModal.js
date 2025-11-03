@@ -164,14 +164,14 @@ const PolicyViewModal = ({
               overflow: 'hidden'
             }}
           >
-            {Array.from({ length: 20 }, (_, i) => (
+            {Array.from({ length: 12 }, (_, i) => (
               <Typography
                 key={i}
                 sx={{
                   position: 'absolute',
                   top: `${Math.random() * 100}%`,
                   left: `${Math.random() * 100}%`,
-                  fontSize: `${40 + Math.random() * 80}px`,
+                  fontSize: `${20 + Math.random() * 30}px`,
                   fontWeight: 'bold',
                   color: '#000',
                   transform: `rotate(${(Math.random() - 0.5) * 60}deg)`,
