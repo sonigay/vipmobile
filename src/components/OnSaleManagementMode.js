@@ -124,11 +124,25 @@ const OnSaleManagementMode = ({
   
   const API_URL = process.env.REACT_APP_API_URL;
 
+  // 권한 체크 헬퍼 함수
+  const hasLinkPermission = () => {
+    return loggedInStore?.modePermissions?.onSaleLink || loggedInStore?.onSaleLink;
+  };
+
+  const hasPolicyPermission = () => {
+    return loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy;
+  };
+
   // 탭 핸들러 함수들
   const handleTabChange = (event, newValue) => {
+    // 링크관리 권한이 없는데 링크관리 탭을 선택하려고 하면 막기
+    if (newValue === 1 && !hasLinkPermission()) {
+      setTabValue(0); // 개통정보 목록 탭으로 이동
+      return;
+    }
     // 정책게시판 권한이 없는데 정책게시판 탭을 선택하려고 하면 막기
-    const hasPolicyPermission = loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy;
-    if (newValue === 2 && !hasPolicyPermission) {
+    const policyTabIndex = hasLinkPermission() ? 2 : 1; // 링크관리 탭이 있으면 정책게시판은 인덱스 2, 없으면 1
+    if (newValue === policyTabIndex && !hasPolicyPermission()) {
       setTabValue(0); // 개통정보 목록 탭으로 이동
       return;
     }
@@ -364,6 +378,12 @@ const OnSaleManagementMode = ({
   };
 
   const handleSaveLink = async () => {
+    // 링크관리 권한 체크
+    if (!hasLinkPermission()) {
+      setError('온세일 링크관리 권한이 없습니다.');
+      return;
+    }
+
     try {
       // 유효성 검사
       if (!linkForm.url || !linkForm.buttonName) {
@@ -415,6 +435,12 @@ const OnSaleManagementMode = ({
   };
 
   const handleDeleteLink = async (link) => {
+    // 링크관리 권한 체크
+    if (!hasLinkPermission()) {
+      setError('온세일 링크관리 권한이 없습니다.');
+      return;
+    }
+
     if (!window.confirm(`"${link.buttonName}" 링크를 삭제하시겠습니까?`)) {
       return;
     }
@@ -607,7 +633,7 @@ const OnSaleManagementMode = ({
   // 정책 등록/수정
   const handleSavePolicy = async (policyData, policyId) => {
     // M 권한 체크
-    if (!loggedInStore?.modePermissions?.onSalePolicy && !loggedInStore?.onSalePolicy) {
+    if (!hasPolicyPermission()) {
       setError('정책게시판 등록 권한이 없습니다.');
       return;
     }
@@ -645,7 +671,7 @@ const OnSaleManagementMode = ({
   // 정책 삭제
   const handleDeletePolicy = async (policy) => {
     // M 권한 체크
-    if (!loggedInStore?.modePermissions?.onSalePolicy && !loggedInStore?.onSalePolicy) {
+    if (!hasPolicyPermission()) {
       setError('정책게시판 삭제 권한이 없습니다.');
       return;
     }
@@ -780,19 +806,14 @@ const OnSaleManagementMode = ({
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={tabValue} onChange={handleTabChange}>
             <Tab label="개통정보 목록" />
-            <Tab label="온세일 링크 관리" />
-            {(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && (
+            {hasLinkPermission() && (
+              <Tab label="온세일 링크 관리" />
+            )}
+            {hasPolicyPermission() && (
               <Tab label="정책게시판" />
             )}
           </Tabs>
         </Box>
-
-        {/* 정책게시판 권한이 없을 때 탭 인덱스 조정 */}
-        {!(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && tabValue === 2 && (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
-            <Typography color="textSecondary">정책게시판 탭이 존재하지 않습니다.</Typography>
-          </Box>
-        )}
 
         {/* 개통정보 목록 탭 */}
         <TabPanel value={tabValue} index={0}>
@@ -1101,51 +1122,52 @@ const OnSaleManagementMode = ({
           />
         </TabPanel>
 
-        {/* 온세일 링크 관리 탭 */}
-        <TabPanel value={tabValue} index={1}>
-          {/* 상단 액션 바 */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Typography 
-              variant="h5" 
-              sx={{ 
-                fontWeight: 'bold',
-                background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
-                mb: 3
-              }}
-            >
-              📱 온세일 링크 관리
-            </Typography>
-          <Box>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={fetchLinks}
-              sx={{ mr: 1 }}
-              disabled={loading}
-            >
-              새로고침
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddLink}
-              disabled={loading}
-              sx={{ 
-                background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-                '&:hover': { 
-                  background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
-                },
-                boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
-              }}
-            >
-              링크 추가
-            </Button>
+        {/* 온세일 링크 관리 탭 - S 또는 M 권한이 있는 경우에만 표시 */}
+        {hasLinkPermission() && (
+          <TabPanel value={tabValue} index={1}>
+            {/* 상단 액션 바 */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+              <Typography 
+                variant="h5" 
+                sx={{ 
+                  fontWeight: 'bold',
+                  background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  textShadow: '0 2px 4px rgba(142, 36, 170, 0.2)',
+                  mb: 3
+                }}
+              >
+                📱 온세일 링크 관리
+              </Typography>
+            <Box>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={fetchLinks}
+                sx={{ mr: 1 }}
+                disabled={loading}
+              >
+                새로고침
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddLink}
+                disabled={loading}
+                sx={{ 
+                  background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                  '&:hover': { 
+                    background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+                  },
+                  boxShadow: '0 4px 15px rgba(142, 36, 170, 0.3)'
+                }}
+              >
+                링크 추가
+              </Button>
+            </Box>
           </Box>
-        </Box>
 
         {/* 링크 목록 테이블 */}
         <Paper sx={{ 
@@ -1219,20 +1241,24 @@ const OnSaleManagementMode = ({
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleEditLink(link)}
-                          color="primary"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleDeleteLink(link)}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        {hasLinkPermission() && (
+                          <>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleEditLink(link)}
+                              color="primary"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleDeleteLink(link)}
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1241,11 +1267,12 @@ const OnSaleManagementMode = ({
             </TableContainer>
           )}
         </Paper>
-        </TabPanel>
+          </TabPanel>
+        )}
 
         {/* 정책게시판 탭 - M 권한이 있는 경우에만 표시 */}
-        {(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && (
-          <TabPanel value={tabValue} index={2}>
+        {hasPolicyPermission() && (
+          <TabPanel value={tabValue} index={hasLinkPermission() ? 2 : 1}>
             {/* 상단 액션 바 */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>

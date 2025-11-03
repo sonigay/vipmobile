@@ -3073,7 +3073,8 @@ app.post('/api/login', async (req, res) => {
         const hasObManagementPermission = agent[24] === 'O'; // Y열: OB 관리모드 권한 (기존 W열)
         const hasAgentModePermission = agent[25] === 'O'; // Z열: 관리자모드 권한 (기존 X열)
         const hasOnSaleManagementPermission = agent[26] === 'O'; // AA열: 온세일관리모드 권한 (기존 Y열)
-        const hasOnSalePolicyPermission = agent[26] === 'M'; // AA열: 온세일 정책게시판 권한
+        const hasOnSaleLinkPermission = agent[26] === 'S'; // AA열: 온세일 링크관리 권한
+        const hasOnSalePolicyPermission = agent[26] === 'M'; // AA열: 온세일 정책게시판 권한 (M 권한은 링크관리 + 정책게시판)
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -3110,7 +3111,8 @@ app.post('/api/login', async (req, res) => {
           smsManagement: hasSmsManagementPermission, // SMS 관리모드 권한
           obManagement: hasObManagementPermission, // OB 관리모드 권한
           onSaleManagement: hasOnSaleManagementPermission, // 온세일관리모드 권한
-          onSalePolicy: hasOnSalePolicyPermission // 온세일 정책게시판 권한
+          onSaleLink: hasOnSaleLinkPermission || hasOnSalePolicyPermission, // 온세일 링크관리 권한 (S 또는 M)
+          onSalePolicy: hasOnSalePolicyPermission // 온세일 정책게시판 권한 (M 권한만)
         };
         
         // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
@@ -3155,7 +3157,8 @@ app.post('/api/login', async (req, res) => {
             office: agent[5] || '',        // F열: 사무실 (기존 D열)
             department: agent[6] || '',    // G열: 소속 (기존 E열)
             userRole: agent[17] || '',     // R열: 권한 (기존 P열)
-            onSalePolicy: hasOnSalePolicyPermission // AA열: 온세일 정책게시판 권한
+            onSaleLink: hasOnSaleLinkPermission || hasOnSalePolicyPermission, // AA열: 온세일 링크관리 권한 (S 또는 M)
+            onSalePolicy: hasOnSalePolicyPermission // AA열: 온세일 정책게시판 권한 (M 권한만)
           }
         };
         

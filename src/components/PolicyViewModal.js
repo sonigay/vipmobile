@@ -266,7 +266,7 @@ const PolicyViewModal = ({
             <Button onClick={handleClose} startIcon={<ArrowBackIcon />}>
               목록으로
             </Button>
-            {(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && (
+            {((loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy)) && (
               <>
                 <Button onClick={handleEdit} variant="outlined" startIcon={<EditIcon />}>
                   수정
