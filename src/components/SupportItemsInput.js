@@ -66,7 +66,7 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
             ? `${amountNum / 10000}만`
             : `${amountNum.toLocaleString()}원`;
           const prefix = item.acquisitionType === '유치' ? '+' : '-';
-          lines.push(`💰 ${item.additionalType} / ${item.acquisitionType} / ${prefix}${amountText}`);
+          lines.push(`💳 ${item.additionalType} / ${item.acquisitionType} / ${prefix}${amountText}`);
         }
       });
     }
@@ -79,14 +79,14 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
           const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
             ? `${amountNum / 10000}만`
             : `${amountNum.toLocaleString()}원`;
-          lines.push(`💰 ${item.policyName} / ${item.content} / ${amountText}`);
+          lines.push(`📌 ${item.policyName} / ${item.content} / ${amountText}`);
         }
       });
     }
 
     // 자유입력 추가
     if (supportItems.freeText && supportItems.freeText.trim()) {
-      lines.push(supportItems.freeText.trim());
+      lines.push(`📝 ${supportItems.freeText.trim()}`);
     }
 
     if (onChange) {
