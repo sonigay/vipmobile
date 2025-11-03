@@ -3234,10 +3234,13 @@ app.post('/api/login', async (req, res) => {
           }
         }
         
+        // 일반모드권한관리 시트 구조 확인 필요
+        // A열(0): 아이디, B열(1): 업체명, C열(2): 그룹 (사용자 요구사항 기준)
         const store = {
           id: foundGeneralUser[0],           // A열: 사용자ID(POS코드)
           name: foundGeneralUser[1] || '',   // B열: 업체명
-          manager: foundGeneralUser[2] || '', // C열: 영업담당
+          group: (foundGeneralUser[2] || '').trim(),  // C열: 그룹
+          manager: foundGeneralUser[2] || '', // C열: 영업담당 (기존 코드 호환성)
           ...storeDetails,
           modePermissions: {
             basicMode: hasBasicMode,         // D열: 기본 모드
@@ -8280,6 +8283,480 @@ app.post('/api/check-onsale-permission', async (req, res) => {
       success: false, 
       hasPermission: false,
       error: '권한 확인에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// ========== 온세일 정책게시판 API ==========
+
+// 그룹 목록 조회 (일반모드권한관리 시트에서)
+app.get('/api/onsale/policies/groups', async (req, res) => {
+  try {
+    console.log('📋 [정책게시판] 그룹 목록 조회 시작');
+    
+    const sheetName = '일반모드권한관리';
+    const range = 'A:C'; // A열: 아이디, B열: 업체명, C열: 그룹
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    // 헤더는 3행(인덱스 2), 데이터는 4행(인덱스 3)부터
+    if (rows.length <= 3) {
+      return res.json({ success: true, groups: [] });
+    }
+    
+    const dataRows = rows.slice(3);
+    
+    // 그룹별로 업체들을 그룹핑
+    const groupMap = new Map();
+    
+    dataRows.forEach(row => {
+      const groupName = (row[2] || '').trim(); // C열: 그룹
+      const companyName = (row[1] || '').trim(); // B열: 업체명
+      const companyId = (row[0] || '').trim(); // A열: 아이디
+      
+      if (!groupName || !companyName || !companyId) return;
+      
+      if (!groupMap.has(groupName)) {
+        groupMap.set(groupName, []);
+      }
+      
+      groupMap.get(groupName).push({
+        id: companyId,
+        name: companyName
+      });
+    });
+    
+    // 그룹 목록 생성 (중복 제거)
+    const groups = Array.from(groupMap.entries()).map(([groupName, companies]) => ({
+      name: groupName,
+      companies: companies
+    }));
+    
+    console.log(`✅ [정책게시판] 그룹 목록 조회 완료: ${groups.length}개 그룹`);
+    res.json({ success: true, groups });
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 그룹 목록 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '그룹 목록 조회에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 정책 목록 조회
+app.get('/api/onsale/policies', async (req, res) => {
+  try {
+    console.log('📋 [정책게시판] 정책 목록 조회 시작');
+    
+    const sheetName = '온세일정책게시판';
+    const range = 'A:K'; // 번호, 제목, 그룹(JSON), 업체ID(JSON), 내용, 상단고정여부, 등록자, 등록일, 수정일, 삭제여부, 확인이력(JSON)
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      return res.json({ success: true, policies: [] });
+    }
+    
+    const policies = rows.slice(1).map((row, index) => {
+      try {
+        const viewHistory = row[10] ? JSON.parse(row[10]) : []; // K열: 확인이력
+        
+        // 중복 제거하여 고유 업체 수 계산
+        const uniqueCompanies = new Set();
+        let firstViewDate = null;
+        
+        viewHistory.forEach(view => {
+          if (view.companyId && !uniqueCompanies.has(view.companyId)) {
+            uniqueCompanies.add(view.companyId);
+            if (!firstViewDate || (view.firstViewDate && view.firstViewDate < firstViewDate)) {
+              firstViewDate = view.firstViewDate || view.viewDate;
+            }
+          }
+        });
+        
+        return {
+          id: index + 2, // 구글 시트의 실제 행 번호 (헤더 제외, 1-based)
+          number: row[0] || '',
+          title: row[1] || '',
+          groups: row[2] ? JSON.parse(row[2]) : [],
+          companyIds: row[3] ? JSON.parse(row[3]) : [],
+          content: row[4] || '',
+          isPinned: row[5] === 'O',
+          createdBy: row[6] || '',
+          createdAt: row[7] || '',
+          updatedAt: row[8] || '',
+          isDeleted: row[9] === 'O',
+          viewCount: uniqueCompanies.size,
+          firstViewDate: firstViewDate
+        };
+      } catch (error) {
+        console.error(`⚠️ [정책게시판] 행 ${index + 2} 파싱 오류:`, error);
+        return null;
+      }
+    }).filter(policy => policy && !policy.isDeleted); // 삭제되지 않은 정책만
+    
+    // 상단고정 정책을 먼저, 그 다음 등록일 내림차순 정렬
+    policies.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    
+    console.log(`✅ [정책게시판] 정책 목록 조회 완료: ${policies.length}개`);
+    res.json({ success: true, policies });
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 정책 목록 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '정책 목록 조회에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 정책 상세 조회
+app.get('/api/onsale/policies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rowIndex = parseInt(id);
+    
+    console.log(`📋 [정책게시판] 정책 상세 조회 시작: 행 ${rowIndex}`);
+    
+    const sheetName = '온세일정책게시판';
+    const range = `A${rowIndex}:K${rowIndex}`;
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!${range}`,
+    });
+    
+    const rows = response.data.values || [];
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '정책을 찾을 수 없습니다.' 
+      });
+    }
+    
+    const row = rows[0];
+    
+    try {
+      const viewHistory = row[10] ? JSON.parse(row[10]) : [];
+      
+      const policy = {
+        id: rowIndex,
+        number: row[0] || '',
+        title: row[1] || '',
+        groups: row[2] ? JSON.parse(row[2]) : [],
+        companyIds: row[3] ? JSON.parse(row[3]) : [],
+        content: row[4] || '',
+        isPinned: row[5] === 'O',
+        createdBy: row[6] || '',
+        createdAt: row[7] || '',
+        updatedAt: row[8] || '',
+        isDeleted: row[9] === 'O',
+        viewHistory: viewHistory
+      };
+      
+      console.log(`✅ [정책게시판] 정책 상세 조회 완료: ${policy.title}`);
+      res.json({ success: true, policy });
+      
+    } catch (error) {
+      console.error('❌ [정책게시판] 정책 파싱 오류:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: '정책 데이터 파싱에 실패했습니다.',
+        message: error.message 
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 정책 상세 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '정책 상세 조회에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 정책 등록
+app.post('/api/onsale/policies', async (req, res) => {
+  try {
+    const { title, groups, companyIds, content, isPinned, createdBy } = req.body;
+    
+    console.log('➕ [정책게시판] 새 정책 등록 시작');
+    
+    if (!title || !content || !createdBy) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '제목, 내용, 등록자는 필수입니다.' 
+      });
+    }
+    
+    const sheetName = '온세일정책게시판';
+    
+    // 다음 번호 계산 (기존 데이터 확인)
+    const existingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A:A`,
+    });
+    
+    const existingRows = existingResponse.data.values || [];
+    const nextNumber = existingRows.length; // 헤더 포함하므로 다음 번호
+    
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    const newRow = [
+      nextNumber.toString(), // 번호
+      title, // 제목
+      JSON.stringify(groups || []), // 그룹
+      JSON.stringify(companyIds || []), // 업체ID
+      content, // 내용
+      isPinned ? 'O' : 'X', // 상단고정여부
+      createdBy, // 등록자
+      now, // 등록일
+      '', // 수정일
+      'X', // 삭제여부
+      JSON.stringify([]) // 확인이력
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A:K`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [newRow]
+      }
+    });
+    
+    console.log(`✅ [정책게시판] 정책 등록 완료: ${title}`);
+    res.json({ success: true, message: '정책이 등록되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 정책 등록 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '정책 등록에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 정책 수정
+app.put('/api/onsale/policies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, groups, companyIds, content, isPinned } = req.body;
+    const rowIndex = parseInt(id);
+    
+    console.log(`✏️ [정책게시판] 정책 수정 시작: 행 ${rowIndex}`);
+    
+    if (!title || !content) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '제목과 내용은 필수입니다.' 
+      });
+    }
+    
+    const sheetName = '온세일정책게시판';
+    
+    // 기존 데이터 읽기
+    const existingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:K${rowIndex}`,
+    });
+    
+    const existingRow = existingResponse.data.values?.[0];
+    if (!existingRow) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '정책을 찾을 수 없습니다.' 
+      });
+    }
+    
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    const updatedRow = [
+      existingRow[0], // 번호 (변경 없음)
+      title, // 제목
+      JSON.stringify(groups || []), // 그룹
+      JSON.stringify(companyIds || []), // 업체ID
+      content, // 내용
+      isPinned ? 'O' : 'X', // 상단고정여부
+      existingRow[6], // 등록자 (변경 없음)
+      existingRow[7], // 등록일 (변경 없음)
+      now, // 수정일
+      existingRow[9], // 삭제여부 (변경 없음)
+      existingRow[10] || JSON.stringify([]) // 확인이력 (변경 없음)
+    ];
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:K${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [updatedRow]
+      }
+    });
+    
+    console.log(`✅ [정책게시판] 정책 수정 완료: ${title}`);
+    res.json({ success: true, message: '정책이 수정되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 정책 수정 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '정책 수정에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 정책 삭제
+app.delete('/api/onsale/policies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rowIndex = parseInt(id);
+    
+    console.log(`🗑️ [정책게시판] 정책 삭제 시작: 행 ${rowIndex}`);
+    
+    const sheetName = '온세일정책게시판';
+    
+    // 기존 데이터 읽기
+    const existingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:K${rowIndex}`,
+    });
+    
+    const existingRow = existingResponse.data.values?.[0];
+    if (!existingRow) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '정책을 찾을 수 없습니다.' 
+      });
+    }
+    
+    // 삭제 플래그만 업데이트 (실제 행 삭제 안 함)
+    const updatedRow = [...existingRow];
+    updatedRow[9] = 'O'; // 삭제여부
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:K${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [updatedRow]
+      }
+    });
+    
+    console.log(`✅ [정책게시판] 정책 삭제 완료: 행 ${rowIndex}`);
+    res.json({ success: true, message: '정책이 삭제되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 정책 삭제 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '정책 삭제에 실패했습니다.',
+      message: error.message 
+    });
+  }
+});
+
+// 정책 확인 이력 기록
+app.post('/api/onsale/policies/:id/view', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { companyId, companyName } = req.body;
+    const rowIndex = parseInt(id);
+    
+    console.log(`👁️ [정책게시판] 정책 확인 이력 기록 시작: 행 ${rowIndex}, 업체 ${companyId}`);
+    
+    if (!companyId || !companyName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '업체 ID와 업체명은 필수입니다.' 
+      });
+    }
+    
+    const sheetName = '온세일정책게시판';
+    
+    // 기존 데이터 읽기
+    const existingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:K${rowIndex}`,
+    });
+    
+    const existingRow = existingResponse.data.values?.[0];
+    if (!existingRow) {
+      return res.status(404).json({ 
+        success: false, 
+        error: '정책을 찾을 수 없습니다.' 
+      });
+    }
+    
+    // 기존 확인 이력 파싱
+    let viewHistory = [];
+    try {
+      viewHistory = existingRow[10] ? JSON.parse(existingRow[10]) : [];
+    } catch (error) {
+      console.error('⚠️ [정책게시판] 확인 이력 파싱 오류, 빈 배열로 초기화:', error);
+      viewHistory = [];
+    }
+    
+    // 같은 업체의 기존 확인 이력 찾기
+    const existingView = viewHistory.find(v => v.companyId === companyId);
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    if (existingView) {
+      // 기존 확인 이력이 있으면 조회일시만 업데이트
+      existingView.viewDate = now;
+    } else {
+      // 새로운 확인 이력 추가
+      viewHistory.push({
+        companyId: companyId,
+        companyName: companyName,
+        viewDate: now,
+        firstViewDate: now
+      });
+    }
+    
+    // 확인 이력 업데이트
+    const updatedRow = [...existingRow];
+    updatedRow[10] = JSON.stringify(viewHistory);
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rowIndex}:K${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [updatedRow]
+      }
+    });
+    
+    console.log(`✅ [정책게시판] 정책 확인 이력 기록 완료: 업체 ${companyName}`);
+    res.json({ success: true, message: '확인 이력이 기록되었습니다.' });
+    
+  } catch (error) {
+    console.error('❌ [정책게시판] 정책 확인 이력 기록 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '확인 이력 기록에 실패했습니다.',
       message: error.message 
     });
   }

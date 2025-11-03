@@ -46,6 +46,7 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
 import AppUpdatePopup from './AppUpdatePopup';
+import PolicyViewModal from './PolicyViewModal';
 
 // TabPanel 컴포넌트
 function TabPanel(props) {
@@ -100,6 +101,14 @@ const OnSaleReceptionMode = ({
   // 월별 필터링 (접수모드에서는 전체 데이터 표시)
   const [selectedMonth, setSelectedMonth] = useState(null); // null = 전체
   
+  // 정책게시판 관련 상태
+  const [policies, setPolicies] = useState([]);
+  const [policiesLoading, setPoliciesLoading] = useState(false);
+  const [policyPage, setPolicyPage] = useState(0);
+  const [policyRowsPerPage, setPolicyRowsPerPage] = useState(10);
+  const [showPolicyViewModal, setShowPolicyViewModal] = useState(false);
+  const [selectedPolicy, setSelectedPolicy] = useState(null);
+  
   const API_URL = process.env.REACT_APP_API_URL;
 
   // 탭 핸들러 함수들
@@ -140,6 +149,13 @@ const OnSaleReceptionMode = ({
   useEffect(() => {
     fetchActiveLinks();
   }, []);
+
+  // 정책게시판 탭일 때 정책 목록 불러오기
+  useEffect(() => {
+    if (tabValue === 2 && isAuthenticated) {
+      fetchPolicies();
+    }
+  }, [tabValue, isAuthenticated]);
 
   // 수정 완료 메시지 리스너
   useEffect(() => {
@@ -361,6 +377,56 @@ const OnSaleReceptionMode = ({
   const paginatedActivations = filteredActivations.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
+  );
+
+  // 정책 목록 불러오기
+  const fetchPolicies = async () => {
+    try {
+      setPoliciesLoading(true);
+      const response = await fetch(`${API_URL}/api/onsale/policies`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setPolicies(data.policies || []);
+      } else {
+        setError('정책 목록을 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('정책 목록 조회 실패:', error);
+      setError('정책 목록을 불러오는데 실패했습니다.');
+    } finally {
+      setPoliciesLoading(false);
+    }
+  };
+
+  // 접수 모드: 로그인한 사용자의 그룹/업체에 해당하는 정책만 필터링
+  const filteredPoliciesForReception = policies.filter(policy => {
+    if (!loggedInStore?.id) return false;
+    
+    // 업체ID가 선택된 정책인지 확인
+    if (policy.companyIds && policy.companyIds.length > 0) {
+      return policy.companyIds.includes(loggedInStore.id);
+    }
+    
+    // 그룹이 선택된 정책인지 확인
+    // loggedInStore에 그룹 정보가 있다면 비교, 없다면 그룹이 있는 정책은 표시하지 않음
+    if (policy.groups && policy.groups.length > 0) {
+      // 사용자의 그룹 정보가 있으면 비교
+      if (loggedInStore.group) {
+        return policy.groups.includes(loggedInStore.group);
+      }
+      // 그룹 정보가 없으면 그룹이 선택된 정책은 표시하지 않음
+      return false;
+    }
+    
+    // 그룹과 업체ID가 모두 없으면 모든 사용자에게 표시
+    return true;
+  });
+
+  // 정책 페이지네이션
+  const paginatedPolicies = filteredPoliciesForReception.slice(
+    policyPage * policyRowsPerPage,
+    policyPage * policyRowsPerPage + policyRowsPerPage
   );
 
   // 인증되지 않은 경우
@@ -653,6 +719,7 @@ const OnSaleReceptionMode = ({
           <Tabs value={tabValue} onChange={handleTabChange}>
             <Tab label="개통정보 목록" />
             <Tab label="가입 신청 링크" />
+            <Tab label="정책게시판" />
           </Tabs>
         </Box>
 
@@ -943,7 +1010,98 @@ const OnSaleReceptionMode = ({
           </Grid>
         )}
         </TabPanel>
+
+        {/* 정책게시판 탭 */}
+        <TabPanel value={tabValue} index={2}>
+          {/* 정책 목록 테이블 */}
+          <TableContainer component={Paper} sx={{ mb: 2 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>번호</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>제목</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>그룹</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>등록자</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>등록일</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {policiesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <CircularProgress />
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedPolicies.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      등록된 정책이 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedPolicies.map((policy) => (
+                    <TableRow
+                      key={policy.id}
+                      onClick={() => {
+                        setSelectedPolicy(policy);
+                        setShowPolicyViewModal(true);
+                      }}
+                      sx={{ 
+                        cursor: 'pointer',
+                        backgroundColor: policy.isPinned ? '#fff3e0' : 'inherit',
+                        '&:hover': { backgroundColor: policy.isPinned ? '#ffe0b2' : '#f5f5f5' }
+                      }}
+                    >
+                      <TableCell>
+                        {policy.isPinned && (
+                          <Chip label="중요!" color="warning" size="small" sx={{ mr: 1 }} />
+                        )}
+                        {policy.number || policy.id}
+                      </TableCell>
+                      <TableCell>{policy.title}</TableCell>
+                      <TableCell>
+                        {policy.groups && policy.groups.length > 0 
+                          ? policy.groups.join(', ') 
+                          : '-'}
+                      </TableCell>
+                      <TableCell>{policy.createdBy}</TableCell>
+                      <TableCell>{policy.createdAt}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* 페이지네이션 */}
+          <TablePagination
+            component="div"
+            count={filteredPoliciesForReception.length}
+            page={policyPage}
+            onPageChange={(event, newPage) => setPolicyPage(newPage)}
+            rowsPerPage={policyRowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setPolicyRowsPerPage(parseInt(event.target.value, 10));
+              setPolicyPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50]}
+            labelRowsPerPage="페이지당 행 수:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+          />
+        </TabPanel>
       </Box>
+
+      {/* 정책 상세보기 모달 (접수 모드) */}
+      <PolicyViewModal
+        open={showPolicyViewModal}
+        onClose={() => {
+          setShowPolicyViewModal(false);
+          setSelectedPolicy(null);
+        }}
+        policy={selectedPolicy}
+        loggedInStore={loggedInStore}
+        isReceptionMode={true}
+      />
 
       {/* 업데이트 팝업 */}
       <AppUpdatePopup
