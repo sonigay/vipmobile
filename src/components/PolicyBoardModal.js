@@ -147,9 +147,20 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
 
             {/* 내용 입력 */}
             <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                내용 *
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  내용 *
+                </Typography>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isDirectInput}
+                      onChange={(e) => setIsDirectInput(e.target.checked)}
+                    />
+                  }
+                  label="직접입력"
+                />
+              </Box>
               {!isDirectInput && (
                 <SupportItemsInput
                   value={content}

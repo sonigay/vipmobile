@@ -22,7 +22,8 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
   const [supportItems, setSupportItems] = useState({
     basic: [], // 기본: 모델유형/요금제군/범위/유형/금액
     additional: [], // 부가: 부가유형/유치,차감/금액
-    other: [] // 기타: 정책명/내용/금액
+    other: [], // 기타: 정책명/내용/금액
+    freeText: '' // 자유입력
   });
 
   // 초기값 설정 (직접입력 모드가 아닐 때만)
@@ -61,9 +62,11 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
       supportItems.additional.forEach(item => {
         if (item.additionalType && item.acquisitionType && item.amount) {
           const amountNum = Number(item.amount);
-          const amountText = amountNum.toLocaleString();
+          const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
+            ? `${amountNum / 10000}만`
+            : `${amountNum.toLocaleString()}원`;
           const prefix = item.acquisitionType === '유치' ? '+' : '-';
-          lines.push(`💰 ${item.additionalType} / ${item.acquisitionType} / ${prefix}${amountText}원`);
+          lines.push(`💰 ${item.additionalType} / ${item.acquisitionType} / ${prefix}${amountText}`);
         }
       });
     }
@@ -73,10 +76,17 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
       supportItems.other.forEach(item => {
         if (item.policyName && item.content && item.amount) {
           const amountNum = Number(item.amount);
-          const amountText = amountNum.toLocaleString();
-          lines.push(`💰 ${item.policyName} / ${item.content} / ${amountText}원`);
+          const amountText = (amountNum >= 10000 && amountNum % 10000 === 0) 
+            ? `${amountNum / 10000}만`
+            : `${amountNum.toLocaleString()}원`;
+          lines.push(`💰 ${item.policyName} / ${item.content} / ${amountText}`);
         }
       });
+    }
+
+    // 자유입력 추가
+    if (supportItems.freeText && supportItems.freeText.trim()) {
+      lines.push(supportItems.freeText.trim());
     }
 
     if (onChange) {
@@ -171,18 +181,6 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
 
   return (
     <Box>
-      {/* 직접입력 체크박스 */}
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={isDirectInput}
-            onChange={(e) => onDirectInputChange && onDirectInputChange(e.target.checked)}
-          />
-        }
-        label="직접입력"
-        sx={{ mb: 2 }}
-      />
-
       {!isDirectInput && (
         <>
           {/* 기본 타입 */}
@@ -368,6 +366,22 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
                 </IconButton>
               </Box>
             ))}
+          </Box>
+
+          {/* 자유입력 필드 */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              자유입력
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              value={supportItems.freeText || ''}
+              onChange={(e) => setSupportItems(prev => ({ ...prev, freeText: e.target.value }))}
+              placeholder="자유롭게 내용을 입력하세요"
+              size="small"
+            />
           </Box>
         </>
       )}
