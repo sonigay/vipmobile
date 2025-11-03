@@ -266,12 +266,16 @@ const PolicyViewModal = ({
             <Button onClick={handleClose} startIcon={<ArrowBackIcon />}>
               목록으로
             </Button>
-            <Button onClick={handleEdit} variant="outlined" startIcon={<EditIcon />}>
-              수정
-            </Button>
-            <Button onClick={handleDelete} variant="outlined" color="error" startIcon={<DeleteIcon />}>
-              삭제
-            </Button>
+            {(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && (
+              <>
+                <Button onClick={handleEdit} variant="outlined" startIcon={<EditIcon />}>
+                  수정
+                </Button>
+                <Button onClick={handleDelete} variant="outlined" color="error" startIcon={<DeleteIcon />}>
+                  삭제
+                </Button>
+              </>
+            )}
           </>
         )}
         {isReceptionMode && (

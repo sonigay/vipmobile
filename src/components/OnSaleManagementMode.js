@@ -126,6 +126,12 @@ const OnSaleManagementMode = ({
 
   // 탭 핸들러 함수들
   const handleTabChange = (event, newValue) => {
+    // 정책게시판 권한이 없는데 정책게시판 탭을 선택하려고 하면 막기
+    const hasPolicyPermission = loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy;
+    if (newValue === 2 && !hasPolicyPermission) {
+      setTabValue(0); // 개통정보 목록 탭으로 이동
+      return;
+    }
     setTabValue(newValue);
   };
 
@@ -600,6 +606,12 @@ const OnSaleManagementMode = ({
 
   // 정책 등록/수정
   const handleSavePolicy = async (policyData, policyId) => {
+    // M 권한 체크
+    if (!loggedInStore?.modePermissions?.onSalePolicy && !loggedInStore?.onSalePolicy) {
+      setError('정책게시판 등록 권한이 없습니다.');
+      return;
+    }
+
     try {
       setLoading(true);
       const url = policyId 
@@ -632,6 +644,12 @@ const OnSaleManagementMode = ({
 
   // 정책 삭제
   const handleDeletePolicy = async (policy) => {
+    // M 권한 체크
+    if (!loggedInStore?.modePermissions?.onSalePolicy && !loggedInStore?.onSalePolicy) {
+      setError('정책게시판 삭제 권한이 없습니다.');
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/onsale/policies/${policy.id}`, {
@@ -763,9 +781,18 @@ const OnSaleManagementMode = ({
           <Tabs value={tabValue} onChange={handleTabChange}>
             <Tab label="개통정보 목록" />
             <Tab label="온세일 링크 관리" />
-            <Tab label="정책게시판" />
+            {(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && (
+              <Tab label="정책게시판" />
+            )}
           </Tabs>
         </Box>
+
+        {/* 정책게시판 권한이 없을 때 탭 인덱스 조정 */}
+        {!(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && tabValue === 2 && (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography color="textSecondary">정책게시판 탭이 존재하지 않습니다.</Typography>
+          </Box>
+        )}
 
         {/* 개통정보 목록 탭 */}
         <TabPanel value={tabValue} index={0}>
@@ -1216,69 +1243,70 @@ const OnSaleManagementMode = ({
         </Paper>
         </TabPanel>
 
-        {/* 정책게시판 탭 */}
-        <TabPanel value={tabValue} index={2}>
-          {/* 상단 액션 바 */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
-              {/* 검색 타입 선택 */}
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <Select
-                  value={policySearchType}
-                  onChange={(e) => setPolicySearchType(e.target.value)}
-                >
-                  <MenuItem value="title">제목</MenuItem>
-                  <MenuItem value="content">내용</MenuItem>
-                  <MenuItem value="all">제목+내용</MenuItem>
-                </Select>
-              </FormControl>
+        {/* 정책게시판 탭 - M 권한이 있는 경우에만 표시 */}
+        {(loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy) && (
+          <TabPanel value={tabValue} index={2}>
+            {/* 상단 액션 바 */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
+                {/* 검색 타입 선택 */}
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <Select
+                    value={policySearchType}
+                    onChange={(e) => setPolicySearchType(e.target.value)}
+                  >
+                    <MenuItem value="title">제목</MenuItem>
+                    <MenuItem value="content">내용</MenuItem>
+                    <MenuItem value="all">제목+내용</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                {/* 검색 필드 */}
+                <TextField
+                  size="small"
+                  placeholder="검색어를 입력하세요"
+                  value={policySearchTerm}
+                  onChange={(e) => setPolicySearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{ flex: 1, maxWidth: 400 }}
+                />
+              </Box>
               
-              {/* 검색 필드 */}
-              <TextField
-                size="small"
-                placeholder="검색어를 입력하세요"
-                value={policySearchTerm}
-                onChange={(e) => setPolicySearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }}
-                sx={{ flex: 1, maxWidth: 400 }}
-              />
+              <Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchPolicies}
+                  sx={{ mr: 1 }}
+                  disabled={policiesLoading}
+                >
+                  새로고침
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setEditingPolicy(null);
+                    setShowPolicyModal(true);
+                  }}
+                  disabled={policiesLoading}
+                  sx={{ 
+                    background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
+                    '&:hover': { 
+                      background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
+                    }
+                  }}
+                >
+                  정책등록
+                </Button>
+              </Box>
             </Box>
-            
-            <Box>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={fetchPolicies}
-                sx={{ mr: 1 }}
-                disabled={policiesLoading}
-              >
-                새로고침
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  setEditingPolicy(null);
-                  setShowPolicyModal(true);
-                }}
-                disabled={policiesLoading}
-                sx={{ 
-                  background: 'linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%)',
-                  '&:hover': { 
-                    background: 'linear-gradient(135deg, #7b1fa2 0%, #4a2c7a 100%)'
-                  }
-                }}
-              >
-                정책등록
-              </Button>
-            </Box>
-          </Box>
 
           {/* 정책 목록 테이블 */}
           <TableContainer component={Paper} sx={{ mb: 2 }}>
@@ -1364,7 +1392,8 @@ const OnSaleManagementMode = ({
             labelRowsPerPage="페이지당 행 수:"
             labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
           />
-        </TabPanel>
+          </TabPanel>
+        )}
       </Box>
 
       {/* 정책 등록/수정 모달 */}
