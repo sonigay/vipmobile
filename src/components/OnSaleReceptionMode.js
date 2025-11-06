@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -111,8 +111,28 @@ const OnSaleReceptionMode = ({
   
   const API_URL = process.env.REACT_APP_API_URL;
 
+  // 권한 체크 헬퍼 함수
+  // 정책게시판 권한: 'O' 또는 'M' 권한만 접근 가능
+  // 링크 확인 권한은 모두 필수 (모두 접근 가능)
+  const hasPolicyPermission = useCallback(() => {
+    const policyPermission = loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy;
+    const userRole = loggedInStore?.userRole;
+    
+    // modePermissions.onSalePolicy 또는 onSalePolicy가 있고, userRole이 'O' 또는 'M'인 경우
+    if (policyPermission && (userRole === 'O' || userRole === 'M')) {
+      return true;
+    }
+    
+    return false;
+  }, [loggedInStore]);
+
   // 탭 핸들러 함수들
   const handleTabChange = (event, newValue) => {
+    // 정책게시판 탭(인덱스 2) 권한이 없는데 정책게시판 탭을 선택하려고 하면 막기
+    if (newValue === 2 && !hasPolicyPermission()) {
+      setTabValue(0); // 개통정보 목록 탭으로 이동
+      return;
+    }
     setTabValue(newValue);
   };
 
@@ -150,12 +170,12 @@ const OnSaleReceptionMode = ({
     fetchActiveLinks();
   }, []);
 
-  // 정책게시판 탭일 때 정책 목록 불러오기
+  // 정책게시판 탭일 때 정책 목록 불러오기 (권한이 있을 때만)
   useEffect(() => {
-    if (tabValue === 2 && isAuthenticated) {
+    if (tabValue === 2 && isAuthenticated && hasPolicyPermission()) {
       fetchPolicies();
     }
-  }, [tabValue, isAuthenticated]);
+  }, [tabValue, isAuthenticated, hasPolicyPermission]);
 
   // 수정 완료 메시지 리스너
   useEffect(() => {
@@ -719,7 +739,9 @@ const OnSaleReceptionMode = ({
           <Tabs value={tabValue} onChange={handleTabChange}>
             <Tab label="개통정보 목록" />
             <Tab label="가입 신청 링크" />
-            <Tab label="정책게시판" />
+            {hasPolicyPermission() && (
+              <Tab label="정책게시판" />
+            )}
           </Tabs>
         </Box>
 
@@ -1011,8 +1033,9 @@ const OnSaleReceptionMode = ({
         )}
         </TabPanel>
 
-        {/* 정책게시판 탭 */}
-        <TabPanel value={tabValue} index={2}>
+        {/* 정책게시판 탭 - 권한이 있을 때만 표시 */}
+        {hasPolicyPermission() && (
+          <TabPanel value={tabValue} index={2}>
           {/* 정책 목록 테이블 */}
           <TableContainer component={Paper} sx={{ mb: 2 }}>
             <Table stickyHeader>
@@ -1088,7 +1111,8 @@ const OnSaleReceptionMode = ({
             labelRowsPerPage="페이지당 행 수:"
             labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
           />
-        </TabPanel>
+          </TabPanel>
+        )}
       </Box>
 
       {/* 정책 상세보기 모달 (접수 모드) */}
