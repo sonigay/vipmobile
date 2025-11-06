@@ -112,14 +112,16 @@ const OnSaleReceptionMode = ({
   const API_URL = process.env.REACT_APP_API_URL;
 
   // 권한 체크 헬퍼 함수
-  // 정책게시판 권한: 'O' 또는 'M' 권한만 접근 가능
+  // 정책게시판 권한: 'M' 권한만 접근 가능
+  // O 권한: 링크와 개통정보 목록만 접근 가능
+  // M 권한: 모든 탭 접근 가능 (개통정보 목록, 가입 신청 링크, 정책게시판)
   // 링크 확인 권한은 모두 필수 (모두 접근 가능)
   const hasPolicyPermission = useCallback(() => {
     const policyPermission = loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy;
     const userRole = loggedInStore?.userRole;
     
-    // modePermissions.onSalePolicy 또는 onSalePolicy가 있고, userRole이 'O' 또는 'M'인 경우
-    if (policyPermission && (userRole === 'O' || userRole === 'M')) {
+    // modePermissions.onSalePolicy 또는 onSalePolicy가 있고, userRole이 'M'인 경우만 정책게시판 접근 가능
+    if (policyPermission && userRole === 'M') {
       return true;
     }
     
