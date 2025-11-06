@@ -24,10 +24,27 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
   const [isDirectInput, setIsDirectInput] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // content 상태가 제대로 업데이트되었는지 확인
+  useEffect(() => {
+    if (open && content) {
+      console.log('🔍 [PolicyBoardModal] content 상태:', content);
+      console.log('🔍 [PolicyBoardModal] isDirectInput 상태:', isDirectInput);
+    }
+  }, [open, content, isDirectInput]);
+
   // 수정 모드일 때 초기값 설정
   useEffect(() => {
     if (open) {
+      console.log('🔍 [PolicyBoardModal] 정책 수정 모드 초기화:', policy);
       if (policy) {
+        console.log('🔍 [PolicyBoardModal] 정책 데이터:', {
+          title: policy.title,
+          content: policy.content,
+          isPinned: policy.isPinned,
+          groups: policy.groups,
+          companyIds: policy.companyIds,
+          전체policy객체: policy
+        });
         setTitle(policy.title || '');
         setContent(policy.content || '');
         setIsPinned(policy.isPinned || false);
@@ -35,9 +52,12 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
         setSelectedCompanyIds(policy.companyIds || []);
         // 수정 모드: 기존 content가 있으면 직접입력 모드로 설정하여 내용을 표시
         // (이미 저장된 content는 포맷팅된 문자열이므로 직접입력 모드에서만 편집 가능)
-        setIsDirectInput(!!policy.content);
+        const hasContent = !!(policy.content && policy.content.trim());
+        console.log('🔍 [PolicyBoardModal] 직접입력 모드 설정:', hasContent, 'content:', policy.content);
+        setIsDirectInput(hasContent);
       } else {
         // 새 정책 등록
+        console.log('🔍 [PolicyBoardModal] 새 정책 등록 모드');
         setTitle('');
         setContent('');
         setIsPinned(false);

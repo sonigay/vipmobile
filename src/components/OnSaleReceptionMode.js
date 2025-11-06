@@ -127,11 +127,16 @@ const OnSaleReceptionMode = ({
       onSalePolicyLegacy: loggedInStore?.onSalePolicy,
       userRole: userRole,
       policyPermission: policyPermission,
-      hasPermission: policyPermission && userRole === 'M'
+      hasPermission: userRole === 'M' // M 권한이면 정책게시판 접근 가능
     });
     
-    // modePermissions.onSalePolicy 또는 onSalePolicy가 있고, userRole이 'M'인 경우만 정책게시판 접근 가능
-    if (policyPermission && userRole === 'M') {
+    // M 권한이면 정책게시판 접근 가능 (onSalePolicy 권한이 있거나 없거나 상관없이)
+    if (userRole === 'M') {
+      return true;
+    }
+    
+    // M 권한이 아니면 onSalePolicy 권한이 있어야 접근 가능 (레거시 지원)
+    if (policyPermission) {
       return true;
     }
     
