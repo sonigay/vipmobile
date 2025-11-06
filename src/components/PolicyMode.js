@@ -28,7 +28,8 @@ import {
   TableRow,
   CircularProgress,
   Checkbox,
-  Alert
+  Alert,
+  Backdrop
 } from '@mui/material';
 import {
   Policy as PolicyIcon,
@@ -160,6 +161,8 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkAction, setBulkAction] = useState('');
   const [showBulkCopyModal, setShowBulkCopyModal] = useState(false);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProcessingMessage, setBulkProcessingMessage] = useState('');
   
   // 정책모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -800,9 +803,14 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         return;
       }
       
+      setBulkProcessing(true);
+      setBulkProcessingMessage('일괄 삭제 중...');
       try {
+        const totalCount = selectedPolicies.length;
         // 선택된 정책들을 순차적으로 삭제
-        for (const policy of selectedPolicies) {
+        for (let i = 0; i < selectedPolicies.length; i++) {
+          const policy = selectedPolicies[i];
+          setBulkProcessingMessage(`일괄 삭제 중... (${i + 1}/${totalCount})`);
           const response = await fetch(`${API_BASE_URL}/api/policies/${policy.id}`, {
             method: 'DELETE',
             headers: {
@@ -822,6 +830,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       } catch (error) {
         console.error('일괄 삭제 실패:', error);
         alert(`일괄 삭제 중 오류가 발생했습니다: ${error.message}`);
+      } finally {
+        setBulkProcessing(false);
+        setBulkProcessingMessage('');
       }
       return;
     }
@@ -831,13 +842,18 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       if (!confirmed) return;
 
       setApprovalProcessing(true);
+      setBulkProcessing(true);
+      setBulkProcessingMessage('일괄 승인 중...');
       try {
         const userRole = loggedInStore?.userRole;
         let successCount = 0;
         let skipCount = 0;
         const errors = [];
+        const totalCount = selectedPolicies.length;
 
-        for (const policy of selectedPolicies) {
+        for (let i = 0; i < selectedPolicies.length; i++) {
+          const policy = selectedPolicies[i];
+          setBulkProcessingMessage(`일괄 승인 중... (${i + 1}/${totalCount})`);
           // 정책이 취소된 경우 스킵
           if (policy.policyStatus === '취소됨') {
             skipCount++;
@@ -909,17 +925,25 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         alert('일괄 승인에 실패했습니다: ' + error.message);
       } finally {
         setApprovalProcessing(false);
+        setBulkProcessing(false);
+        setBulkProcessingMessage('');
       }
     } else if (action === 'settlement') {
       const confirmed = window.confirm('선택된 정책들을 일괄 정산 반영하시겠습니까?');
       if (!confirmed) return;
 
+      setBulkProcessing(true);
+      setBulkProcessingMessage('일괄 정산 반영 중...');
       try {
         let successCount = 0;
         let skipCount = 0;
         const errors = [];
+        const totalCount = selectedPolicies.length;
 
-        for (const policy of selectedPolicies) {
+        for (let i = 0; i < selectedPolicies.length; i++) {
+          const policy = selectedPolicies[i];
+          setBulkProcessingMessage(`일괄 정산 반영 중... (${i + 1}/${totalCount})`);
+          
           // 정책이 취소되었거나 이미 반영된 경우 스킵
           if (policy.policyStatus === '취소됨' || policy.settlementStatus === '반영됨') {
             skipCount++;
@@ -955,13 +979,21 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       } catch (error) {
         console.error('일괄 정산 반영 실패:', error);
         alert('일괄 정산 반영에 실패했습니다: ' + error.message);
+      } finally {
+        setBulkProcessing(false);
+        setBulkProcessingMessage('');
       }
     } else if (action === 'cancel') {
       const confirmed = window.confirm('선택된 정책들을 일괄 취소하시겠습니까?');
       if (!confirmed) return;
 
+      setBulkProcessing(true);
+      setBulkProcessingMessage('일괄 취소 중...');
       try {
-        for (const policy of selectedPolicies) {
+        const totalCount = selectedPolicies.length;
+        for (let i = 0; i < selectedPolicies.length; i++) {
+          const policy = selectedPolicies[i];
+          setBulkProcessingMessage(`일괄 취소 중... (${i + 1}/${totalCount})`);
           if (policy.policyStatus !== '취소됨') {
             await PolicyService.cancelPolicy(policy.id, {
               cancelReason: '일괄 취소',
@@ -976,14 +1008,22 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       } catch (error) {
         console.error('일괄 취소 실패:', error);
         alert('일괄 취소에 실패했습니다.');
+      } finally {
+        setBulkProcessing(false);
+        setBulkProcessingMessage('');
       }
     }
   };
 
   // 일괄 복사 저장 핸들러
   const handleBulkCopySubmit = async (targetYearMonth) => {
+    setBulkProcessing(true);
+    setBulkProcessingMessage('일괄 복사 중...');
     try {
-      for (const policy of selectedPolicies) {
+      const totalCount = selectedPolicies.length;
+      for (let i = 0; i < selectedPolicies.length; i++) {
+        const policy = selectedPolicies[i];
+        setBulkProcessingMessage(`일괄 복사 중... (${i + 1}/${totalCount})`);
         if (policy.policyStatus !== '취소됨') {
           // 정책 적용일 처리 (문자열 범위를 시작/종료 ISO로 변환)
           let policyStartDate = policy.policyStartDate;
@@ -1070,6 +1110,9 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
     } catch (error) {
       console.error('일괄 복사 실패:', error);
       alert('일괄 복사에 실패했습니다.');
+    } finally {
+      setBulkProcessing(false);
+      setBulkProcessingMessage('');
     }
   };
 
@@ -2114,6 +2157,22 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
               onCopySubmit={handleBulkCopySubmit}
               selectedPolicies={selectedPolicies}
             />
+
+            {/* 일괄 처리 로딩 오버레이 */}
+            <Backdrop
+              sx={{ 
+                color: '#fff', 
+                zIndex: (theme) => theme.zIndex.drawer + 1,
+                flexDirection: 'column',
+                gap: 2
+              }}
+              open={bulkProcessing}
+            >
+              <CircularProgress color="inherit" size={60} />
+              <Typography variant="h6" sx={{ mt: 2 }}>
+                {bulkProcessingMessage || '처리 중...'}
+              </Typography>
+            </Backdrop>
                     </Box>
   );
 }
