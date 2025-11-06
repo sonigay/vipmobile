@@ -1170,11 +1170,49 @@ function AppContent() {
     console.log('🔍 handleLogin 호출됨:', store);
     console.log('🔍 store.modePermissions:', store.modePermissions);
     console.log('🔍 store.userRole:', store.userRole);
+    console.log('🔍 store.isAgent:', store.isAgent);
     console.log('🔍 store 전체:', JSON.stringify(store, null, 2));
     
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
+    // 대리점 관리자인 경우 별도 처리
+    if (store.isAgent) {
+      // 대리점 관리자는 modePermissions에 다른 모드 권한이 있으면 모달 표시
+      if (store.modePermissions) {
+        // 서브 권한(onSalePolicy 등)을 제외한 실제 모드 권한 필터링
+        const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement', 'agent', 'inventory', 'settlement', 'inspection', 'chart', 'policy', 'meeting', 'reservation', 'budget', 'inventoryRecovery', 'dataCollection', 'smsManagement', 'obManagement'];
+        const availableModes = Object.entries(store.modePermissions)
+          .filter(([mode, hasPermission]) => hasPermission && actualModes.includes(mode))
+          .map(([mode]) => mode);
+        
+        console.log('🔍 대리점 관리자 - 사용 가능한 모드:', availableModes);
+        
+        // 단일 권한인 경우 (agent만 있거나, 하나만 있는 경우)
+        if (availableModes.length === 1) {
+          console.log(`🔍 대리점 관리자 단일 권한 (${availableModes[0]}): 바로 진입`);
+          processLogin(store);
+          return;
+        }
+        
+        // 다중 권한이 있는 경우 모드 선택 팝업 표시
+        if (availableModes.length > 1) {
+          console.log('🔍 대리점 관리자 다중 권한: 모달 표시');
+          setAvailableModes(availableModes);
+          setPendingLoginData(store);
+          setShowModeSelection(true);
+          setModeSelectionRequired(true);
+          return;
+        }
+      }
+      
+      // 권한이 없거나 agent만 있는 경우 바로 관리자 모드로 진입
+      console.log('🔍 대리점 관리자 - 권한 없음 또는 agent만: 바로 관리자 모드 진입');
+      processLogin(store);
+      return;
+    }
+    
+    // 일반 매장 로그인 처리
     // 권한이 있는 경우 모드 선택 팝업 표시 (다중 권한일 때만)
     if (store.modePermissions) {
       // 실제 모드 권한만 필터링 (onSalePolicy는 서브 권한이므로 제외)
