@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -21,7 +21,18 @@ const SettlementReflectModal = ({
   onReflectSubmit,
   userRole 
 }) => {
+  // 모달이 열릴 때 현재 정산 반영 상태를 초기값으로 설정
   const [isReflected, setIsReflected] = useState(false);
+
+  // 정책이 변경되거나 모달이 열릴 때 상태 업데이트
+  useEffect(() => {
+    if (policy && open) {
+      setIsReflected(policy.settlementStatus === '반영됨');
+    } else if (!open) {
+      // 모달이 닫힐 때 초기화
+      setIsReflected(false);
+    }
+  }, [policy, open]);
 
   const handleSubmit = () => {
     onReflectSubmit({

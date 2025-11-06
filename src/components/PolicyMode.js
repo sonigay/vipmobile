@@ -832,36 +832,81 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
 
       setApprovalProcessing(true);
       try {
-        for (const policy of selectedPolicies) {
-          if (canEditPolicy(policy)) {
-            const { policyId, approvalData: approval, userRole } = { policyId: policy.id, approvalData: { total: '승인', settlement: '대기', team: '대기' }, userRole: loggedInStore?.userRole };
-            let approvalType = '';
-            if (userRole === 'SS' || userRole === '이사') {
-              if (approval.total === '승인') approvalType = 'total';
-              else if (approval.settlement === '승인') approvalType = 'settlement';
-              else if (approval.team === '승인') approvalType = 'team';
-            } else if (userRole === 'S') {
-              if (approval.total === '승인') approvalType = 'total';
-              else if (approval.settlement === '승인') approvalType = 'settlement';
-            } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
-              if (approval.team === '승인') approvalType = 'team';
-            }
-            if (!approvalType) continue;
+        const userRole = loggedInStore?.userRole;
+        let successCount = 0;
+        let skipCount = 0;
+        const errors = [];
 
-            await PolicyService.approvePolicy(policyId, {
+        for (const policy of selectedPolicies) {
+          // 정책이 취소된 경우 스킵
+          if (policy.policyStatus === '취소됨') {
+            skipCount++;
+            continue;
+          }
+
+          // 권한에 따라 승인 가능한 타입 결정
+          let approvalType = '';
+          const approvalStatus = policy.approvalStatus || {};
+          
+          if (userRole === 'SS' || userRole === '이사') {
+            // 총괄: 총괄, 정산팀, 소속팀 승인 모두 가능
+            if (approvalStatus.total !== '승인') {
+              approvalType = 'total';
+            } else if (approvalStatus.settlement !== '승인') {
+              approvalType = 'settlement';
+            } else if (approvalStatus.team !== '승인') {
+              approvalType = 'team';
+            }
+          } else if (userRole === 'S') {
+            // 정산팀: 총괄, 정산팀 승인 가능
+            if (approvalStatus.total !== '승인') {
+              approvalType = 'total';
+            } else if (approvalStatus.settlement !== '승인') {
+              approvalType = 'settlement';
+            }
+          } else if (['AA', 'BB', 'CC', 'DD', 'EE', 'FF'].includes(userRole)) {
+            // 소속정책팀: 소속팀 승인만 가능
+            if (approvalStatus.team !== '승인') {
+              approvalType = 'team';
+            }
+          }
+
+          // 이미 승인된 경우 스킵
+          if (!approvalType) {
+            skipCount++;
+            continue;
+          }
+
+          try {
+            await PolicyService.approvePolicy(policy.id, {
               approvalType,
               comment: '일괄 승인',
               userId: loggedInStore?.contactId || loggedInStore?.id,
               userName: loggedInStore?.target || loggedInStore?.name
             });
+            successCount++;
+          } catch (error) {
+            console.error(`정책 ${policy.policyName} 승인 실패:`, error);
+            errors.push(`${policy.policyName}: ${error.message || '승인 실패'}`);
           }
         }
-        alert('선택된 정책들이 일괄 승인되었습니다.');
+
+        let message = `일괄 승인 완료: ${successCount}건`;
+        if (skipCount > 0) {
+          message += `, 스킵: ${skipCount}건 (이미 승인됨 또는 취소됨)`;
+        }
+        if (errors.length > 0) {
+          message += `\n실패: ${errors.length}건\n${errors.slice(0, 3).join('\n')}`;
+          if (errors.length > 3) {
+            message += `\n외 ${errors.length - 3}건...`;
+          }
+        }
+        alert(message);
         setSelectedPolicies([]);
         await loadPolicyData();
       } catch (error) {
         console.error('일괄 승인 실패:', error);
-        alert('일괄 승인에 실패했습니다.');
+        alert('일괄 승인에 실패했습니다: ' + error.message);
       } finally {
         setApprovalProcessing(false);
       }
@@ -870,21 +915,46 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
       if (!confirmed) return;
 
       try {
+        let successCount = 0;
+        let skipCount = 0;
+        const errors = [];
+
         for (const policy of selectedPolicies) {
-          if (policy.settlementStatus !== '반영됨') {
+          // 정책이 취소되었거나 이미 반영된 경우 스킵
+          if (policy.policyStatus === '취소됨' || policy.settlementStatus === '반영됨') {
+            skipCount++;
+            continue;
+          }
+
+          try {
             await PolicyService.reflectSettlement(policy.id, {
               isReflected: true,
               userId: loggedInStore?.contactId || loggedInStore?.id,
               userName: loggedInStore?.target || loggedInStore?.name
             });
+            successCount++;
+          } catch (error) {
+            console.error(`정책 ${policy.policyName} 정산 반영 실패:`, error);
+            errors.push(`${policy.policyName}: ${error.message || '정산 반영 실패'}`);
           }
         }
-        alert('선택된 정책들이 일괄 정산 반영되었습니다.');
+
+        let message = `일괄 정산 반영 완료: ${successCount}건`;
+        if (skipCount > 0) {
+          message += `, 스킵: ${skipCount}건 (이미 반영됨 또는 취소됨)`;
+        }
+        if (errors.length > 0) {
+          message += `\n실패: ${errors.length}건\n${errors.slice(0, 3).join('\n')}`;
+          if (errors.length > 3) {
+            message += `\n외 ${errors.length - 3}건...`;
+          }
+        }
+        alert(message);
         setSelectedPolicies([]);
         await loadPolicyData();
       } catch (error) {
         console.error('일괄 정산 반영 실패:', error);
-        alert('일괄 정산 반영에 실패했습니다.');
+        alert('일괄 정산 반영에 실패했습니다: ' + error.message);
       }
     } else if (action === 'cancel') {
       const confirmed = window.confirm('선택된 정책들을 일괄 취소하시겠습니까?');
