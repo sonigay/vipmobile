@@ -21339,6 +21339,15 @@ app.get('/api/policies', async (req, res) => {
             return '미지정';
           }
           
+          // JSON 문자열인지 확인 (잘못 저장된 데이터 처리)
+          if (teamValue && typeof teamValue === 'string') {
+            // JSON 객체 형태의 문자열인지 확인
+            if (teamValue.trim().startsWith('{') && teamValue.trim().endsWith('}')) {
+              console.warn('⚠️ [정책목록] AD열에 JSON 문자열이 저장되어 있음:', teamValue, '정책ID:', row[0]);
+              return '미지정'; // JSON 문자열이면 무시하고 '미지정' 반환
+            }
+          }
+          
           // 새 정책들 (36개 컬럼)은 AD열에서 소속팀 정보 읽기
           return teamValue || '미지정';
         })(),         // AD열: 소속팀 (기존 데이터는 미지정)
@@ -21348,6 +21357,15 @@ app.get('/api/policies', async (req, res) => {
           // 기존 정책들 (24개 컬럼)은 소속팀 정보가 없으므로 '미지정'
           if (row.length < 30) {
             return '미지정';
+          }
+          
+          // JSON 문자열인지 확인 (잘못 저장된 데이터 처리)
+          if (teamValue && typeof teamValue === 'string') {
+            // JSON 객체 형태의 문자열인지 확인
+            if (teamValue.trim().startsWith('{') && teamValue.trim().endsWith('}')) {
+              console.warn('⚠️ [정책목록] AD열에 JSON 문자열이 저장되어 있음:', teamValue, '정책ID:', row[0]);
+              return '미지정'; // JSON 문자열이면 무시하고 '미지정' 반환
+            }
           }
           
           // 팀 코드가 'AA'인 경우, 대리점아이디관리 시트에서 실제 팀장 이름을 찾아서 반환
@@ -22240,103 +22258,114 @@ app.put('/api/policies/:policyId', async (req, res) => {
       ? '내용에 직접입력' 
       : `${policyAmount}원 (${amountType === 'total' ? '총금액' : '건당금액'})`;
     
-    // 수정할 데이터 준비
-    const updateData = [
-      policyName,                  // B열: 정책명
-      policyDateRange,             // C열: 정책적용일 (시작일~종료일)
-      policyStore,                 // D열: 정책적용점
-      policyContent,               // E열: 정책내용
-      amountWithType,              // F열: 금액 (금액 + 유형)
-      policyType,                  // G열: 정책유형
-      (category && category.startsWith('wireless')) ? '무선' : '유선', // H열: 무선/유선
-      category || '',              // I열: 하위카테고리
-      inputUserId,                 // J열: 입력자ID
-      inputUserName,               // K열: 입력자명
-      new Date().toISOString(),    // L열: 입력일시 (수정일시로 업데이트)
-      yearMonth,                   // X열: 대상년월
-      req.body.amount95Above || '', // AB열: 95군이상금액
-      req.body.amount95Below || '', // AC열: 95군미만금액
-      // 부가차감지원정책 데이터
-      JSON.stringify(req.body.deductSupport || {}), // AD열
-      (req.body.conditionalOptions?.option1 ? 'Y' : 'N'), // AE열
-      (req.body.conditionalOptions?.option2 ? 'Y' : 'N'), // AF열
-      (req.body.conditionalOptions?.option3 ? 'Y' : 'N'), // AG열
-      // 부가추가지원정책 데이터
-      req.body.addSupport?.ktClubAmount || '', // AH열
-      req.body.addSupport?.musicBellAmount || '', // AI열
-      req.body.addSupport?.uplayBasicAmount || '', // AJ열
-      req.body.addSupport?.uplayPremiumAmount || '', // AK열
-      req.body.addSupport?.phoneExchangePassAmount || '', // AL열
-      req.body.addSupport?.musicAmount || '', // AM열
-      req.body.addSupport?.numberFilteringAmount || '', // AN열
-      (req.body.supportConditionalOptions?.vas2Both ? 'Y' : 'N'), // AO열
-      (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N'), // AP열
-      (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N'), // AQ열
-      // 요금제유형별정책 데이터
-      JSON.stringify(req.body.rateSupports || []), // AR열
-      // 연합정책 데이터
-      req.body.unionSettlementStore || '', // AS열
-      JSON.stringify(req.body.unionTargetStores || []), // AT열
-      JSON.stringify(req.body.unionConditions || {}), // AU열
-      // 개별소급정책 데이터
-      JSON.stringify(req.body.individualTarget || {}), // AV열
-      req.body.individualActivationType || '', // AW열
-      // 담당자
-      req.body.manager || '' // AX열
-    ];
+    // 매장명 조회
+    let storeName = '';
+    try {
+      const storeValues = await getSheetValues(STORE_SHEET_NAME);
+      if (storeValues && storeValues.length > 1) {
+        const storeRows = storeValues.slice(1);
+        const store = storeRows.find(row => {
+          const storeId = row[15]; // P열: 매장코드 (15인덱스)
+          return storeId && storeId.toString() === policyStore.toString();
+        });
+        if (store) {
+          storeName = store[14] ? store[14].toString().trim() : ''; // O열: 업체명 (14인덱스)
+        }
+      }
+    } catch (error) {
+      console.warn('매장 데이터 조회 실패:', error.message);
+    }
+
+    // 기존 행 데이터를 유지하면서 수정할 필드만 업데이트
+    // 기존 행이 24개 컬럼보다 적을 수 있으므로 최소 50개까지 확장
+    const updatedRow = [...policyRow];
+    while (updatedRow.length < 50) {
+      updatedRow.push('');
+    }
     
-    // 각 필드를 개별적으로 업데이트
-    const updateRanges = [
-      `'정책_기본정보 '!B${rowNumber}`,  // 정책명
-      `'정책_기본정보 '!C${rowNumber}`,  // 정책적용일
-      `'정책_기본정보 '!D${rowNumber}`,  // 정책적용점
-      `'정책_기본정보 '!E${rowNumber}`,  // 정책내용
-      `'정책_기본정보 '!F${rowNumber}`,  // 금액
-      `'정책_기본정보 '!G${rowNumber}`,  // 정책유형
-      `'정책_기본정보 '!H${rowNumber}`,  // 무선/유선
-      `'정책_기본정보 '!I${rowNumber}`,  // 하위카테고리
-      `'정책_기본정보 '!J${rowNumber}`,  // 입력자ID
-      `'정책_기본정보 '!K${rowNumber}`,  // 입력자명
-      `'정책_기본정보 '!L${rowNumber}`,  // 입력일시
-      `'정책_기본정보 '!X${rowNumber}`,  // 대상년월
-      `'정책_기본정보 '!AB${rowNumber}`, // 95군이상금액
-      `'정책_기본정보 '!AC${rowNumber}`, // 95군미만금액
-      `'정책_기본정보 '!AD${rowNumber}`, // 부가차감지원 데이터
-      `'정책_기본정보 '!AE${rowNumber}`, // 조건옵션1
-      `'정책_기본정보 '!AF${rowNumber}`, // 조건옵션2
-      `'정책_기본정보 '!AG${rowNumber}`, // 조건옵션3
-      `'정책_기본정보 '!AH${rowNumber}`, // KT클럽
-      `'정책_기본정보 '!AI${rowNumber}`, // 뮤직벨
-      `'정책_기본정보 '!AJ${rowNumber}`, // 유플레이(기본)
-      `'정책_기본정보 '!AK${rowNumber}`, // 유플레이(프리미엄)
-      `'정책_기본정보 '!AL${rowNumber}`, // 폰교체패스
-      `'정책_기본정보 '!AM${rowNumber}`, // 음악감상
-      `'정책_기본정보 '!AN${rowNumber}`, // 지정번호필터링
-      `'정책_기본정보 '!AO${rowNumber}`, // VAS 2종 동시유치
-      `'정책_기본정보 '!AP${rowNumber}`, // VAS 2종중 1개유치
-      `'정책_기본정보 '!AQ${rowNumber}`, // 부가3종 모두유치
-      `'정책_기본정보 '!AR${rowNumber}`, // 요금제유형별정책 데이터
-      `'정책_기본정보 '!AS${rowNumber}`, // 연합정책 정산 입금처
-      `'정책_기본정보 '!AT${rowNumber}`, // 연합정책 연합대상하부점
-      `'정책_기본정보 '!AU${rowNumber}`, // 연합정책 조건
-      `'정책_기본정보 '!AV${rowNumber}`, // 개별소급정책 적용대상
-      `'정책_기본정보 '!AW${rowNumber}`, // 개별소급정책 개통유형
-      `'정책_기본정보 '!AX${rowNumber}`  // 담당자명
-    ];
+    // B~L열 업데이트 (기본 정보)
+    updatedRow[1] = policyName;                  // B열: 정책명
+    updatedRow[2] = policyDateRange;             // C열: 정책적용일
+    updatedRow[3] = policyStore;                 // D열: 정책적용점
+    updatedRow[4] = policyContent;               // E열: 정책내용
+    updatedRow[5] = amountWithType;              // F열: 금액
+    updatedRow[6] = policyType;                  // G열: 정책유형
+    updatedRow[7] = (category && category.startsWith('wireless')) ? '무선' : '유선'; // H열: 무선/유선
+    updatedRow[8] = category || '';              // I열: 하위카테고리
+    updatedRow[9] = inputUserId;                 // J열: 입력자ID
+    updatedRow[10] = inputUserName;              // K열: 입력자명
+    updatedRow[11] = new Date().toISOString();   // L열: 입력일시 (수정일시로 업데이트)
+    // M~W열은 승인상태, 취소, 정산반영 정보이므로 유지 (기존 값 유지)
+    updatedRow[23] = yearMonth;                  // X열: 대상년월
+    updatedRow[24] = req.body.multipleStoreName || ''; // Y열: 복수점명
+    updatedRow[25] = storeName;                  // Z열: 업체명
+    updatedRow[26] = (() => {                    // AA열: 개통유형
+      if (category === 'wireless_add_deduct' || category === 'wired_add_deduct' || 
+          category === 'wireless_add_support' || category === 'wired_add_support' ||
+          category === 'wireless_rate' || category === 'wired_rate') {
+        return '전유형';
+      }
+      if (!req.body.activationType) return '';
+      const { new010, mnp, change } = req.body.activationType;
+      const types = [];
+      if (new010) types.push('010신규');
+      if (mnp) types.push('MNP');
+      if (change) types.push('기변');
+      if (types.length === 3) return '전유형';
+      return types.join(', ');
+    })();
+    updatedRow[27] = (category === 'wireless_shoe' || category === 'wired_shoe') ? (req.body.amount95Above || '') : ''; // AB열: 95군이상금액
+    updatedRow[28] = (category === 'wireless_shoe' || category === 'wired_shoe') ? (req.body.amount95Below || '') : ''; // AC열: 95군미만금액
+    updatedRow[29] = (policyTeam && policyTeam.trim()) || '미지정'; // AD열: 소속팀 (중요: JSON이 아닌 소속팀 값)
+    // AE~AG열: 부가차감지원정책 데이터 (개별 필드로 저장)
+    updatedRow[30] = (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.addServiceAmount || '') : ''; // AE열: 부가미유치금액
+    updatedRow[31] = (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.insuranceAmount || '') : ''; // AF열: 보험미유치금액
+    updatedRow[32] = (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.deductSupport?.connectionAmount || '') : ''; // AG열: 연결음미유치금액
+    // AH~AQ열: 부가추가지원정책 데이터
+    updatedRow[33] = (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.addServiceAcquired ? 'Y' : 'N') : ''; // AH열: 부가유치시조건
+    updatedRow[34] = (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.insuranceAcquired ? 'Y' : 'N') : ''; // AI열: 보험유치시조건
+    updatedRow[35] = (category === 'wireless_add_deduct' || category === 'wired_add_deduct') ? (req.body.conditionalOptions?.connectionAcquired ? 'Y' : 'N') : ''; // AJ열: 연결음유치시조건
+    updatedRow[36] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.uplayPremiumAmount || '') : ''; // AK열: 유플레이(프리미엄) 유치금액
+    updatedRow[37] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.phoneExchangePassAmount || '') : ''; // AL열: 폰교체패스 유치금액
+    updatedRow[38] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.musicAmount || '') : ''; // AM열: 음악감상 유치금액
+    updatedRow[39] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.addSupport?.numberFilteringAmount || '') : ''; // AN열: 지정번호필터링 유치금액
+    updatedRow[40] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.vas2Both ? 'Y' : 'N') : ''; // AO열: VAS 2종 동시유치 조건
+    updatedRow[41] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.vas2Either ? 'Y' : 'N') : ''; // AP열: VAS 2종중 1개유치 조건
+    updatedRow[42] = (category === 'wireless_add_support' || category === 'wired_add_support') ? (req.body.supportConditionalOptions?.addon3All ? 'Y' : 'N') : ''; // AQ열: 부가3종 모두유치 조건
+    // AR~AX열: 기타 정책 데이터
+    updatedRow[43] = (category === 'wireless_rate' || category === 'wired_rate') ? JSON.stringify(req.body.rateSupports || []) : ''; // AR열: 요금제유형별정책 지원사항
+    updatedRow[44] = (category === 'wireless_union' || category === 'wired_union') ? (req.body.unionSettlementStore || '') : ''; // AS열: 연합정책 정산 입금처
+    updatedRow[45] = (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionTargetStores || []) : ''; // AT열: 연합정책 연합대상하부점
+    updatedRow[46] = (category === 'wireless_union' || category === 'wired_union') ? JSON.stringify(req.body.unionConditions || {}) : ''; // AU열: 연합정책 조건
+    updatedRow[47] = (category === 'wireless_individual' || category === 'wired_individual') ? JSON.stringify(req.body.individualTarget || {}) : ''; // AV열: 개별소급정책 적용대상
+    updatedRow[48] = (category === 'wireless_individual' || category === 'wired_individual') ? (req.body.individualActivationType || '') : ''; // AW열: 개별소급정책 개통유형
+    updatedRow[49] = req.body.manager || ''; // AX열: 담당자명
     
-    // 배치 업데이트 실행
-    const batchUpdateRequests = updateRanges.map((range, index) => ({
-      range: range,
-      values: [[updateData[index]]]
-    }));
+    // 배열을 24개 컬럼으로 제한 (A:X 범위)
+    const updatedRowForSheet = updatedRow.slice(0, 24);
     
-    await sheets.spreadsheets.values.batchUpdate({
+    // 전체 행을 한 번에 업데이트
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
+      range: `정책_기본정보 !A${rowNumber}:X${rowNumber}`,
+      valueInputOption: 'RAW',
       resource: {
-        valueInputOption: 'RAW',
-        data: batchUpdateRequests
+        values: [updatedRowForSheet]
       }
     });
+    
+    // 추가 컬럼(Y~AX)이 있으면 별도로 업데이트
+    if (updatedRow.length > 24) {
+      const additionalColumns = updatedRow.slice(24);
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `정책_기본정보 !Y${rowNumber}:AX${rowNumber}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [additionalColumns]
+        }
+      });
+    }
     
     // 정책_기본정보 시트 캐시 무효화
     cacheUtils.delete('sheet_정책_기본정보 ');
