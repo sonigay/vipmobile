@@ -191,6 +191,7 @@ function AppContent() {
   const [showModeSelection, setShowModeSelection] = useState(false);
   const [availableModes, setAvailableModes] = useState([]);
   const [pendingLoginData, setPendingLoginData] = useState(null);
+  const [pendingAvailableModes, setPendingAvailableModes] = useState([]); // 초기 로그인 시 계산된 모드 목록
   const [modeSelectionRequired, setModeSelectionRequired] = useState(false);
   
   const [showAppUpdatePopup, setShowAppUpdatePopup] = useState(false);
@@ -213,7 +214,7 @@ function AppContent() {
     }, 100);
   };
   
-  // 현재 사용자의 사용 가능한 모드 목록 가져오기
+  // 현재 사용자의 사용 가능한 모드 목록 가져오기 (모드 변경 시 사용)
   const getCurrentUserAvailableModes = () => {
     if (!loggedInStore) {
       console.log('🔍 getCurrentUserAvailableModes: loggedInStore가 없음');
@@ -224,8 +225,13 @@ function AppContent() {
     console.log('🔍 getCurrentUserAvailableModes: modePermissions =', loggedInStore.modePermissions);
     
     if (loggedInStore.modePermissions) {
+      // 서브 권한 제외 목록 (모드 선택에 표시하지 않을 권한들)
+      const subPermissions = ['onSalePolicy', 'onSaleLink', 'bondChart', 'inspectionOverview'];
       const availableModes = Object.entries(loggedInStore.modePermissions)
-        .filter(([mode, hasPermission]) => hasPermission === true || hasPermission === 'O')
+        .filter(([mode, hasPermission]) => {
+          // 권한이 있고, 서브 권한이 아닌 경우만 포함
+          return (hasPermission === true || hasPermission === 'O') && !subPermissions.includes(mode);
+        })
         .map(([mode]) => mode);
       
       console.log('✅ getCurrentUserAvailableModes: 사용 가능한 모드 =', availableModes);
@@ -1180,10 +1186,14 @@ function AppContent() {
     if (store.isAgent) {
       // 대리점 관리자는 modePermissions에 다른 모드 권한이 있으면 모달 표시
       if (store.modePermissions) {
-        // 서브 권한(onSalePolicy 등)을 제외한 실제 모드 권한 필터링
-        const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement', 'agent', 'inventory', 'settlement', 'inspection', 'chart', 'policy', 'meeting', 'reservation', 'budget', 'inventoryRecovery', 'dataCollection', 'smsManagement', 'obManagement'];
+        // 서브 권한 제외 목록 (모드 선택에 표시하지 않을 권한들)
+        const subPermissions = ['onSalePolicy', 'onSaleLink', 'bondChart', 'inspectionOverview'];
+        // getCurrentUserAvailableModes와 동일한 방식으로 필터링 (서브 권한 제외)
         const availableModes = Object.entries(store.modePermissions)
-          .filter(([mode, hasPermission]) => hasPermission && actualModes.includes(mode))
+          .filter(([mode, hasPermission]) => {
+            // 권한이 있고, 서브 권한이 아닌 경우만 포함
+            return (hasPermission === true || hasPermission === 'O') && !subPermissions.includes(mode);
+          })
           .map(([mode]) => mode);
         
         console.log('🔍 대리점 관리자 - 사용 가능한 모드:', availableModes);
@@ -1198,7 +1208,9 @@ function AppContent() {
         // 다중 권한이 있는 경우 모드 선택 팝업 표시
         if (availableModes.length > 1) {
           console.log('🔍 대리점 관리자 다중 권한: 모달 표시');
+          console.log('🔍 대리점 관리자 - availableModes:', availableModes);
           setAvailableModes(availableModes);
+          setPendingAvailableModes(availableModes); // 초기 로그인 시 계산된 모드 목록 저장
           setPendingLoginData(store);
           setShowModeSelection(true);
           setModeSelectionRequired(true);
@@ -1252,7 +1264,10 @@ function AppContent() {
       
       if (availableModes.length > 1) {
         // 다중 권한이 있는 경우 모드 선택 팝업 표시
+        console.log('🔍 일반 매장 다중 권한: 모달 표시');
+        console.log('🔍 일반 매장 - availableModes:', availableModes);
         setAvailableModes(availableModes);
+        setPendingAvailableModes(availableModes); // 초기 로그인 시 계산된 모드 목록 저장
         setPendingLoginData(store);
         setShowModeSelection(true);
         setModeSelectionRequired(true);
@@ -3728,8 +3743,9 @@ ${requestList}
         onClose={() => {
           setShowModeSelection(false);
           setPendingLoginData(null);
+          setPendingAvailableModes([]);
         }}
-        availableModes={availableModes}
+        availableModes={pendingAvailableModes.length > 0 ? pendingAvailableModes : availableModes}
         onModeSelect={handleModeSelect}
         onModeSwitch={handleModeSwitch}
         isModeSwitch={false}

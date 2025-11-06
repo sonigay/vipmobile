@@ -294,10 +294,15 @@ const ModeSelectionPopup = ({
       </DialogTitle>
 
       <DialogContent sx={{ p: 3 }}>
+        {console.log('🔍 [ModeSelectionPopup] availableModes:', availableModes)}
         <Grid container spacing={3}>
           {availableModes.map((mode) => {
             const config = modeConfigs[mode];
-            if (!config) return null;
+            console.log(`🔍 [ModeSelectionPopup] 모드: ${mode}, config 존재:`, !!config);
+            if (!config) {
+              console.warn(`⚠️ [ModeSelectionPopup] 모드 ${mode}에 대한 config가 없습니다.`);
+              return null;
+            }
 
             return (
               <Grid item xs={12} md={4} key={mode}>
