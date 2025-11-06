@@ -1176,20 +1176,30 @@ function AppContent() {
     
     // 권한이 있는 경우 모드 선택 팝업 표시 (다중 권한일 때만)
     if (store.modePermissions) {
+      // 실제 모드 권한만 필터링 (onSalePolicy는 서브 권한이므로 제외)
+      const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement'];
       const availableModes = Object.entries(store.modePermissions)
-        .filter(([mode, hasPermission]) => hasPermission)
+        .filter(([mode, hasPermission]) => hasPermission && actualModes.includes(mode))
         .map(([mode]) => mode);
       
       console.log('다중 권한 확인:', availableModes);
       
-      // 단일 권한인 경우 바로 해당 모드로 진입
+      // 단일 권한인 경우 바로 해당 모드로 진입 (모달 없이)
       if (availableModes.length === 1) {
-        if (availableModes[0] === 'onSaleReception') {
-          console.log('온세일접수모드 단일 권한: 바로 진입');
-        } else if (availableModes[0] === 'basicMode') {
-          console.log('기본모드 단일 권한: 바로 진입');
+        const singleMode = availableModes[0];
+        console.log(`${singleMode} 단일 권한: 바로 진입`);
+        
+        // 단일 권한의 경우 자동으로 해당 모드로 설정
+        const modifiedStore = { ...store };
+        if (singleMode === 'onSaleReception') {
+          modifiedStore.isOnSaleReception = true;
+        } else if (singleMode === 'basicMode') {
+          modifiedStore.isBasicMode = true;
+        } else if (singleMode === 'onSaleManagement') {
+          modifiedStore.isOnSaleManagement = true;
         }
-        processLogin(store);
+        
+        processLogin(modifiedStore);
         return;
       }
       
