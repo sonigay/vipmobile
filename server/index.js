@@ -3203,7 +3203,9 @@ app.post('/api/login', async (req, res) => {
         
         // 권한 확인
         const hasBasicMode = foundGeneralUser[3] === 'O'; // D열: 기본 모드
-        const hasOnSaleMode = foundGeneralUser[4] === 'O'; // E열: 온세일접수 모드
+        // E열: 온세일접수 모드 - 'O' 또는 'M' 모두 허용
+        const eColumnValue = (foundGeneralUser[4] || '').toString().trim().toUpperCase();
+        const hasOnSaleMode = eColumnValue === 'O' || eColumnValue === 'M';
         
         console.log('권한 확인:', {
           basicMode: hasBasicMode,
@@ -3243,15 +3245,19 @@ app.post('/api/login', async (req, res) => {
         
         // 일반모드권한관리 시트 구조 확인 필요
         // A열(0): 아이디, B열(1): 업체명, C열(2): 그룹 (사용자 요구사항 기준)
+        // E열 값: 'O' 또는 'M' - 온세일접수모드 권한
+        // 'M'인 경우 정책게시판 접근 권한도 있음 (onSalePolicy: true)
         const store = {
           id: foundGeneralUser[0],           // A열: 사용자ID(POS코드)
           name: foundGeneralUser[1] || '',   // B열: 업체명
           group: (foundGeneralUser[2] || '').trim(),  // C열: 그룹
           manager: foundGeneralUser[2] || '', // C열: 영업담당 (기존 코드 호환성)
+          userRole: eColumnValue,              // E열 값: 'O' 또는 'M'을 userRole로 설정
           ...storeDetails,
           modePermissions: {
             basicMode: hasBasicMode,         // D열: 기본 모드
-            onSaleReception: hasOnSaleMode    // E열: 온세일접수 모드
+            onSaleReception: hasOnSaleMode,  // E열: 온세일접수 모드
+            onSalePolicy: eColumnValue === 'M' // E열이 'M'인 경우 정책게시판 권한
           }
         };
         
@@ -8264,7 +8270,9 @@ app.post('/api/check-onsale-permission', async (req, res) => {
     }
     
     const storeName = userRow[1] || '';
-    const hasPermission = userRow[4] === 'O'; // E열(4인덱스): 온세일접수 모드
+    // E열(4인덱스): 온세일접수 모드 - 'O' 또는 'M' 모두 허용
+    const eColumnValue = (userRow[4] || '').toString().trim().toUpperCase();
+    const hasPermission = eColumnValue === 'O' || eColumnValue === 'M';
     const storedPassword = userRow[5] || ''; // F열(5인덱스): 비밀번호
     
     if (!hasPermission) {

@@ -222,6 +222,12 @@ const OnSaleReceptionMode = ({
       setLoading(true);
       setError(null);
 
+      console.log('🔐 온세일접수모드 권한 확인 요청:', {
+        userId: loggedInStore.id,
+        userRole: loggedInStore?.userRole,
+        modePermissions: loggedInStore?.modePermissions
+      });
+
       const response = await fetch(`${API_URL}/api/check-onsale-permission`, {
         method: 'POST',
         headers: {
@@ -234,13 +240,17 @@ const OnSaleReceptionMode = ({
       });
 
       const data = await response.json();
+      console.log('🔐 온세일접수모드 권한 확인 응답:', data);
 
       if (data.success && data.hasPermission) {
         setIsAuthenticated(true);
         setShowPasswordDialog(false);
         setPassword('');
+        console.log('✅ 온세일접수모드 인증 성공');
       } else {
-        setError(data.error || '권한이 없거나 비밀번호가 일치하지 않습니다.');
+        const errorMessage = data.error || '권한이 없거나 비밀번호가 일치하지 않습니다.';
+        console.error('❌ 온세일접수모드 인증 실패:', errorMessage);
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('권한 확인 실패:', error);
