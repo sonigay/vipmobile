@@ -33,6 +33,9 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
         setIsPinned(policy.isPinned || false);
         setSelectedGroups(policy.groups || []);
         setSelectedCompanyIds(policy.companyIds || []);
+        // 수정 모드: 기존 content가 있으면 직접입력 모드로 설정하여 내용을 표시
+        // (이미 저장된 content는 포맷팅된 문자열이므로 직접입력 모드에서만 편집 가능)
+        setIsDirectInput(!!policy.content);
       } else {
         // 새 정책 등록
         setTitle('');
