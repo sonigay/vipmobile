@@ -1188,9 +1188,14 @@ function AppContent() {
       if (availableModes.length === 1) {
         const singleMode = availableModes[0];
         console.log(`${singleMode} 단일 권한: 바로 진입`);
+        console.log('🔍 단일 권한 진입 시 store.modePermissions:', store.modePermissions);
         
         // 단일 권한의 경우 자동으로 해당 모드로 설정
-        const modifiedStore = { ...store };
+        // modePermissions는 반드시 보존되어야 함 (onSalePolicy 같은 서브 권한 포함)
+        const modifiedStore = { 
+          ...store,
+          modePermissions: { ...store.modePermissions } // modePermissions 깊은 복사로 보존
+        };
         if (singleMode === 'onSaleReception') {
           modifiedStore.isOnSaleReception = true;
         } else if (singleMode === 'basicMode') {
@@ -1199,6 +1204,7 @@ function AppContent() {
           modifiedStore.isOnSaleManagement = true;
         }
         
+        console.log('🔍 modifiedStore.modePermissions:', modifiedStore.modePermissions);
         processLogin(modifiedStore);
         return;
       }

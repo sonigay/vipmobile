@@ -120,6 +120,16 @@ const OnSaleReceptionMode = ({
     const policyPermission = loggedInStore?.modePermissions?.onSalePolicy || loggedInStore?.onSalePolicy;
     const userRole = loggedInStore?.userRole;
     
+    console.log('🔍 [OnSaleReceptionMode] 정책게시판 권한 확인:', {
+      loggedInStore: loggedInStore,
+      modePermissions: loggedInStore?.modePermissions,
+      onSalePolicy: loggedInStore?.modePermissions?.onSalePolicy,
+      onSalePolicyLegacy: loggedInStore?.onSalePolicy,
+      userRole: userRole,
+      policyPermission: policyPermission,
+      hasPermission: policyPermission && userRole === 'M'
+    });
+    
     // modePermissions.onSalePolicy 또는 onSalePolicy가 있고, userRole이 'M'인 경우만 정책게시판 접근 가능
     if (policyPermission && userRole === 'M') {
       return true;
