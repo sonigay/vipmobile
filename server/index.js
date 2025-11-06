@@ -5857,8 +5857,22 @@ app.post('/api/budget/calculate-usage', async (req, res) => {
 app.use((error, req, res, next) => {
   console.error('🚨 [서버에러]', error);
   
-  // CORS 헤더 설정
-  res.header('Access-Control-Allow-Origin', 'https://vipmobile.netlify.app');
+  // CORS 헤더 동적 설정
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [];
+  const defaultOrigins = [
+    'https://vipmobile.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4000'
+  ];
+  const allowedOrigins = [...corsOrigins, ...defaultOrigins];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.length > 0) {
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -21070,7 +21084,8 @@ app.put('/api/policies/:policyId/settlement-reflect', async (req, res) => {
     const policyRow = dataRows[policyRowIndex];
     
     // 정산 반영 상태 업데이트
-    const updatedRow = [...policyRow];
+    // A:X 범위(24개 컬럼)에 맞춰 배열을 24개로 제한
+    const updatedRow = [...policyRow].slice(0, 24);
     updatedRow[19] = isReflected ? '반영됨' : '미반영'; // T열: 정산반영상태
     updatedRow[20] = isReflected ? userName : ''; // U열: 정산반영자명
     updatedRow[21] = isReflected ? new Date().toISOString() : ''; // V열: 정산반영일시
