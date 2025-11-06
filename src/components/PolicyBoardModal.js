@@ -45,16 +45,33 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
           companyIds: policy.companyIds,
           전체policy객체: policy
         });
-        setTitle(policy.title || '');
-        setContent(policy.content || '');
-        setIsPinned(policy.isPinned || false);
-        setSelectedGroups(policy.groups || []);
-        setSelectedCompanyIds(policy.companyIds || []);
-        // 수정 모드: 기존 content가 있으면 직접입력 모드로 설정하여 내용을 표시
-        // (이미 저장된 content는 포맷팅된 문자열이므로 직접입력 모드에서만 편집 가능)
-        const hasContent = !!(policy.content && policy.content.trim());
-        console.log('🔍 [PolicyBoardModal] 직접입력 모드 설정:', hasContent, 'content:', policy.content);
+        const policyTitle = policy.title || '';
+        const policyContent = policy.content || '';
+        const policyIsPinned = policy.isPinned || false;
+        const policyGroups = policy.groups || [];
+        const policyCompanyIds = policy.companyIds || [];
+        
+        console.log('🔍 [PolicyBoardModal] 상태 설정 전:', { policyTitle, policyContent: policyContent.substring(0, 50) + '...' });
+        
+        // 수정 모드: 기존 content가 있으면 직접입력 모드로 먼저 설정 (SupportItemsInput이 content를 변경하지 않도록)
+        const hasContent = !!(policyContent && policyContent.trim());
+        console.log('🔍 [PolicyBoardModal] 직접입력 모드 먼저 설정:', hasContent, 'content 길이:', policyContent.length);
         setIsDirectInput(hasContent);
+        
+        // 상태 설정 (isDirectInput이 설정된 후에 content 설정)
+        setTitle(policyTitle);
+        setIsPinned(policyIsPinned);
+        setSelectedGroups(policyGroups);
+        setSelectedCompanyIds(policyCompanyIds);
+        
+        // content는 isDirectInput 설정 후에 설정하여 SupportItemsInput의 자동 포맷팅이 방해하지 않도록
+        if (hasContent) {
+          // 직접입력 모드이므로 content를 그대로 설정
+          setContent(policyContent);
+        } else {
+          // 지원사항 모드이므로 content는 빈 문자열 (SupportItemsInput이 관리)
+          setContent('');
+        }
       } else {
         // 새 정책 등록
         console.log('🔍 [PolicyBoardModal] 새 정책 등록 모드');
@@ -100,13 +117,17 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
   };
 
   const handleClose = () => {
-    setTitle('');
-    setContent('');
-    setIsPinned(false);
-    setSelectedGroups([]);
-    setSelectedCompanyIds([]);
-    setIsDirectInput(false);
+    // 모달이 닫힐 때만 상태 초기화 (onClose 호출 후 초기화)
     onClose();
+    // 다음 렌더링 사이클에서 상태 초기화 (모달이 완전히 닫힌 후)
+    setTimeout(() => {
+      setTitle('');
+      setContent('');
+      setIsPinned(false);
+      setSelectedGroups([]);
+      setSelectedCompanyIds([]);
+      setIsDirectInput(false);
+    }, 100);
   };
 
   const handleGroupConfirm = (groups, companyIds) => {
