@@ -1039,6 +1039,26 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
             }
           }
 
+          // 대상월에 맞춰 적용일 변경
+          if (policyStartDate && policyEndDate && targetYearMonth) {
+            const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+            const startDate = new Date(policyStartDate);
+            const endDate = new Date(policyEndDate);
+            
+            // 시작일: 대상월의 같은 일로 변경
+            const startDay = startDate.getDate();
+            const newStartDate = new Date(targetYear, targetMonth - 1, startDay);
+            policyStartDate = newStartDate.toISOString();
+            
+            // 종료일: 대상월의 같은 일로 변경 (해당 월의 마지막 날을 초과하지 않도록)
+            const endDay = endDate.getDate();
+            // 대상월의 마지막 날 계산
+            const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+            const adjustedEndDay = Math.min(endDay, lastDayOfTargetMonth);
+            const newEndDate = new Date(targetYear, targetMonth - 1, adjustedEndDay);
+            policyEndDate = newEndDate.toISOString();
+          }
+
           // 금액 및 금액유형 처리 ("내용에 직접입력" 문구 처리 포함)
           let amountType = policy.amountType || 'total';
           let policyAmount = '';
