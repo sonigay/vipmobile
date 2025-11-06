@@ -334,8 +334,13 @@ function Login({ onLogin }) {
         }
         
         // 4. 모든 체크 통과 시 로그인 처리
+        console.log('🔍 [Login] 일반 매장 로그인 - data.storeInfo:', data.storeInfo);
+        console.log('🔍 [Login] 일반 매장 로그인 - data.storeInfo.userRole:', data.storeInfo?.userRole);
+        console.log('🔍 [Login] 일반 매장 로그인 - data.modePermissions:', data.modePermissions);
         onLogin({
           ...data.storeInfo,
+          userRole: data.storeInfo?.userRole, // userRole 명시적으로 전달
+          modePermissions: data.modePermissions || data.storeInfo?.modePermissions, // modePermissions 명시적으로 전달
           isAgent: false,
           isInventory: false,
           isSettlement: false

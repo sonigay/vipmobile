@@ -1169,6 +1169,7 @@ function AppContent() {
   const handleLogin = (store) => {
     console.log('🔍 handleLogin 호출됨:', store);
     console.log('🔍 store.modePermissions:', store.modePermissions);
+    console.log('🔍 store.userRole:', store.userRole);
     console.log('🔍 store 전체:', JSON.stringify(store, null, 2));
     
     setIsLoggedIn(true);
@@ -1191,10 +1192,11 @@ function AppContent() {
         console.log('🔍 단일 권한 진입 시 store.modePermissions:', store.modePermissions);
         
         // 단일 권한의 경우 자동으로 해당 모드로 설정
-        // modePermissions는 반드시 보존되어야 함 (onSalePolicy 같은 서브 권한 포함)
+        // modePermissions와 userRole은 반드시 보존되어야 함 (onSalePolicy 같은 서브 권한 포함)
         const modifiedStore = { 
           ...store,
-          modePermissions: { ...store.modePermissions } // modePermissions 깊은 복사로 보존
+          modePermissions: { ...store.modePermissions }, // modePermissions 깊은 복사로 보존
+          userRole: store.userRole // userRole도 보존
         };
         if (singleMode === 'onSaleReception') {
           modifiedStore.isOnSaleReception = true;
@@ -1205,6 +1207,7 @@ function AppContent() {
         }
         
         console.log('🔍 modifiedStore.modePermissions:', modifiedStore.modePermissions);
+        console.log('🔍 modifiedStore.userRole:', modifiedStore.userRole);
         processLogin(modifiedStore);
         return;
       }
