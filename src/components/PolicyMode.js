@@ -1025,38 +1025,46 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
         const policy = selectedPolicies[i];
         setBulkProcessingMessage(`일괄 복사 중... (${i + 1}/${totalCount})`);
         if (policy.policyStatus !== '취소됨') {
-          // 정책 적용일 처리 (문자열 범위를 시작/종료 ISO로 변환)
-          let policyStartDate = policy.policyStartDate;
-          let policyEndDate = policy.policyEndDate;
-          if (!policyStartDate || !policyEndDate) {
-            if (policy.policyDate) {
-              const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
-              if (m) {
-                const [, sy, sm, sd, ey, em, ed] = m;
-                policyStartDate = new Date(parseInt(sy), parseInt(sm) - 1, parseInt(sd)).toISOString();
-                policyEndDate = new Date(parseInt(ey), parseInt(em) - 1, parseInt(ed)).toISOString();
-              }
+          // 정책 적용일 처리 및 대상월에 맞춰 변경
+          let policyStartDate;
+          let policyEndDate;
+          
+          // policy.policyDate 문자열에서 날짜 정보 추출
+          if (policy.policyDate && targetYearMonth) {
+            const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+            if (m) {
+              const [, sy, sm, sd, ey, em, ed] = m.map(Number);
+              const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
+              
+              // 시작일: 대상월의 같은 일로 변경
+              const startDay = sd;
+              const newStartDate = new Date(targetYear, targetMonth - 1, startDay);
+              policyStartDate = newStartDate.toISOString();
+              
+              // 종료일: 대상월의 같은 일로 변경 (해당 월의 마지막 날을 초과하지 않도록)
+              const endDay = ed;
+              // 대상월의 마지막 날 계산
+              const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
+              const adjustedEndDay = Math.min(endDay, lastDayOfTargetMonth);
+              const newEndDate = new Date(targetYear, targetMonth - 1, adjustedEndDay);
+              policyEndDate = newEndDate.toISOString();
             }
           }
-
-          // 대상월에 맞춰 적용일 변경
-          if (policyStartDate && policyEndDate && targetYearMonth) {
-            const [targetYear, targetMonth] = targetYearMonth.split('-').map(Number);
-            const startDate = new Date(policyStartDate);
-            const endDate = new Date(policyEndDate);
-            
-            // 시작일: 대상월의 같은 일로 변경
-            const startDay = startDate.getDate();
-            const newStartDate = new Date(targetYear, targetMonth - 1, startDay);
-            policyStartDate = newStartDate.toISOString();
-            
-            // 종료일: 대상월의 같은 일로 변경 (해당 월의 마지막 날을 초과하지 않도록)
-            const endDay = endDate.getDate();
-            // 대상월의 마지막 날 계산
-            const lastDayOfTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
-            const adjustedEndDay = Math.min(endDay, lastDayOfTargetMonth);
-            const newEndDate = new Date(targetYear, targetMonth - 1, adjustedEndDay);
-            policyEndDate = newEndDate.toISOString();
+          
+          // policy.policyDate가 없거나 파싱 실패한 경우 기존 방식 사용
+          if (!policyStartDate || !policyEndDate) {
+            policyStartDate = policy.policyStartDate;
+            policyEndDate = policy.policyEndDate;
+            if (!policyStartDate || !policyEndDate) {
+              if (policy.policyDate) {
+                const m = policy.policyDate.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*~\s*(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./);
+                if (m) {
+                  const [, sy, sm, sd, ey, em, ed] = m.map(Number);
+                  policyStartDate = new Date(sy, sm - 1, sd).toISOString();
+                  policyEndDate = new Date(ey, em - 1, ed).toISOString();
+                }
+              }
+            }
           }
 
           // 금액 및 금액유형 처리 ("내용에 직접입력" 문구 처리 포함)
