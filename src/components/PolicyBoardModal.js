@@ -34,54 +34,54 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
 
   // 수정 모드일 때 초기값 설정
   useEffect(() => {
-    if (open) {
-      console.log('🔍 [PolicyBoardModal] 정책 수정 모드 초기화:', policy);
-      if (policy) {
-        console.log('🔍 [PolicyBoardModal] 정책 데이터:', {
-          title: policy.title,
-          content: policy.content,
-          isPinned: policy.isPinned,
-          groups: policy.groups,
-          companyIds: policy.companyIds,
-          전체policy객체: policy
-        });
-        const policyTitle = policy.title || '';
-        const policyContent = policy.content || '';
-        const policyIsPinned = policy.isPinned || false;
-        const policyGroups = policy.groups || [];
-        const policyCompanyIds = policy.companyIds || [];
-        
-        console.log('🔍 [PolicyBoardModal] 상태 설정 전:', { policyTitle, policyContent: policyContent.substring(0, 50) + '...' });
-        
-        // 수정 모드: 기존 content가 있으면 직접입력 모드로 먼저 설정 (SupportItemsInput이 content를 변경하지 않도록)
-        const hasContent = !!(policyContent && policyContent.trim());
-        console.log('🔍 [PolicyBoardModal] 직접입력 모드 먼저 설정:', hasContent, 'content 길이:', policyContent.length);
-        setIsDirectInput(hasContent);
-        
-        // 상태 설정 (isDirectInput이 설정된 후에 content 설정)
-        setTitle(policyTitle);
-        setIsPinned(policyIsPinned);
-        setSelectedGroups(policyGroups);
-        setSelectedCompanyIds(policyCompanyIds);
-        
-        // content는 isDirectInput 설정 후에 설정하여 SupportItemsInput의 자동 포맷팅이 방해하지 않도록
-        if (hasContent) {
-          // 직접입력 모드이므로 content를 그대로 설정
-          setContent(policyContent);
-        } else {
-          // 지원사항 모드이므로 content는 빈 문자열 (SupportItemsInput이 관리)
-          setContent('');
-        }
-      } else {
-        // 새 정책 등록
-        console.log('🔍 [PolicyBoardModal] 새 정책 등록 모드');
-        setTitle('');
-        setContent('');
-        setIsPinned(false);
-        setSelectedGroups([]);
-        setSelectedCompanyIds([]);
-        setIsDirectInput(false);
-      }
+    // 모달이 닫혔을 때는 초기화하지 않음 (handleClose에서 처리)
+    if (!open) return;
+    
+    console.log('🔍 [PolicyBoardModal] 정책 수정 모드 초기화:', policy);
+    
+    if (policy) {
+      console.log('🔍 [PolicyBoardModal] 정책 데이터:', {
+        title: policy.title,
+        content: policy.content,
+        isPinned: policy.isPinned,
+        groups: policy.groups,
+        companyIds: policy.companyIds,
+        전체policy객체: policy
+      });
+      
+      const policyTitle = policy.title || '';
+      const policyContent = policy.content || '';
+      const policyIsPinned = policy.isPinned || false;
+      const policyGroups = policy.groups || [];
+      const policyCompanyIds = policy.companyIds || [];
+      
+      const hasContent = !!(policyContent && policyContent.trim());
+      
+      console.log('🔍 [PolicyBoardModal] 상태 설정:', {
+        hasContent,
+        contentLength: policyContent.length,
+        contentPreview: policyContent.substring(0, 100)
+      });
+      
+      // 수정 모드: 모든 상태를 동시에 설정 (순서 문제 방지)
+      // isDirectInput을 먼저 true로 설정하여 SupportItemsInput이 렌더링되지 않도록 함
+      setIsDirectInput(hasContent);
+      
+      // 나머지 상태 설정
+      setTitle(policyTitle);
+      setContent(policyContent); // content를 항상 설정 (isDirectInput이 true면 SupportItemsInput이 렌더링되지 않음)
+      setIsPinned(policyIsPinned);
+      setSelectedGroups(policyGroups);
+      setSelectedCompanyIds(policyCompanyIds);
+    } else {
+      // 새 정책 등록
+      console.log('🔍 [PolicyBoardModal] 새 정책 등록 모드');
+      setTitle('');
+      setContent('');
+      setIsPinned(false);
+      setSelectedGroups([]);
+      setSelectedCompanyIds([]);
+      setIsDirectInput(false);
     }
   }, [open, policy]);
 
@@ -205,7 +205,7 @@ const PolicyBoardModal = ({ open, onClose, onSave, policy = null, loggedInStore 
                   label="직접입력"
                 />
               </Box>
-              {!isDirectInput && (
+              {!isDirectInput && !policy && (
                 <SupportItemsInput
                   value={content}
                   onChange={setContent}

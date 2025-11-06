@@ -38,6 +38,19 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
   // 지원사항 변경 시 자동 포맷팅
   useEffect(() => {
     if (isDirectInput) return; // 직접입력 모드면 자동 포맷팅 안 함
+    
+    // value가 이미 있고 비어있지 않으면 자동 포맷팅하지 않음 (정책 수정 시 기존 content 보존)
+    // supportItems가 모두 비어있는 상태에서 value가 있으면 자동 포맷팅하지 않음
+    const isEmpty = !supportItems.basic?.length && 
+                    !supportItems.additional?.length && 
+                    !supportItems.other?.length && 
+                    !supportItems.freeText?.trim();
+    
+    if (isEmpty && value && value.trim()) {
+      // supportItems가 비어있고 value가 이미 있으면 자동 포맷팅하지 않음
+      // (정책 수정 시 기존 content를 보존하기 위함)
+      return;
+    }
 
     const lines = [];
 
@@ -92,12 +105,13 @@ const SupportItemsInput = ({ value, onChange, isDirectInput, onDirectInputChange
     if (onChange) {
       if (lines.length > 0) {
         onChange(lines.join('\n'));
-      } else {
-        // 지원사항이 없으면 빈 문자열로 설정
+      } else if (!isEmpty) {
+        // supportItems가 비어있는 것이 아니고 lines가 비어있으면 빈 문자열로 설정
+        // 하지만 isEmpty이고 value가 있으면 기존 value를 유지
         onChange('');
       }
     }
-  }, [supportItems, isDirectInput, onChange]);
+  }, [supportItems, isDirectInput, onChange, value]);
 
   const handleAddBasic = () => {
     setSupportItems(prev => ({
