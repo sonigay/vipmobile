@@ -1174,13 +1174,24 @@ function AppContent() {
     setIsLoggedIn(true);
     setLoggedInStore(store);
     
-    // 다중 권한이 있는 경우 모드 선택 팝업 표시 (관리자 포함)
+    // 권한이 있는 경우 모드 선택 팝업 표시 (다중 권한일 때만)
     if (store.modePermissions) {
       const availableModes = Object.entries(store.modePermissions)
         .filter(([mode, hasPermission]) => hasPermission)
         .map(([mode]) => mode);
       
       console.log('다중 권한 확인:', availableModes);
+      
+      // 단일 권한인 경우 바로 해당 모드로 진입
+      if (availableModes.length === 1) {
+        if (availableModes[0] === 'onSaleReception') {
+          console.log('온세일접수모드 단일 권한: 바로 진입');
+        } else if (availableModes[0] === 'basicMode') {
+          console.log('기본모드 단일 권한: 바로 진입');
+        }
+        processLogin(store);
+        return;
+      }
       
       if (availableModes.length > 1) {
         // 다중 권한이 있는 경우 모드 선택 팝업 표시
@@ -1703,8 +1714,8 @@ function AppContent() {
         store: store
       }));
     }
-    // 온세일접수 모드인지 확인
-    else if (store.modePermissions && store.modePermissions.onSaleReception && store.isOnSaleReception) {
+    // 온세일접수 모드인지 확인 (modePermissions.onSaleReception이 있으면 바로 진입)
+    else if (store.modePermissions && store.modePermissions.onSaleReception) {
       console.log('로그인: 온세일접수 모드');
       
       // loggedInStore 업데이트 (modePermissions 유지)
@@ -1736,8 +1747,8 @@ function AppContent() {
         }
       }));
     }
-    // 기본 모드인지 확인
-    else if (store.modePermissions && store.modePermissions.basicMode && store.isBasicMode) {
+    // 기본 모드인지 확인 (modePermissions.basicMode가 있으면 바로 진입)
+    else if (store.modePermissions && store.modePermissions.basicMode) {
       console.log('로그인: 기본 모드 (일반 매장)');
       
       // loggedInStore 업데이트 (modePermissions 유지)
