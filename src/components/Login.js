@@ -114,6 +114,7 @@ function Login({ onLogin }) {
     if (userAgent.includes('Firefox')) return 'Firefox';
     if (userAgent.includes('SamsungBrowser')) return 'Samsung Browser';
     if (userAgent.includes('Opera') || userAgent.includes('OPR')) return 'Opera';
+    if (userAgent.includes('Whale')) return 'Whale';
     if (userAgent.includes('Edg')) return 'Edge';
     if (userAgent.includes('Chrome')) return 'Chrome';
     if (userAgent.includes('Safari')) return 'Safari';
@@ -135,10 +136,12 @@ function Login({ onLogin }) {
   // 업데이트 진행 팝업 닫기 핸들러
 
 
-  // Chrome/Edge 브라우저 감지 (Chromium 기반)
-  const isChrome = () => {
+  // Chrome/Edge/Whale 브라우저 감지 (Chromium 기반)
+  const isSupportedBrowser = () => {
     const userAgent = navigator.userAgent.toLowerCase();
-    return userAgent.includes('chrome') || userAgent.includes('edg'); // Chrome 또는 Edge
+    return userAgent.includes('chrome') || 
+           userAgent.includes('edg') || 
+           userAgent.includes('whale'); // Chrome, Edge 또는 Whale
   };
 
   // 확장 프로그램 설치 감지
@@ -298,9 +301,9 @@ function Login({ onLogin }) {
       });
     } else {
       // 일반 매장 로그인 (Chrome 체크 등 기존 로직)
-      // 1. Chrome/Edge 브라우저 체크
-      if (!isChrome()) {
-        setError('❌ Chrome 또는 Edge 브라우저만 사용 가능합니다.\n\nChrome 다운로드: https://www.google.com/chrome/\nEdge 다운로드: https://www.microsoft.com/edge');
+      // 1. Chrome/Edge/Whale 브라우저 체크
+      if (!isSupportedBrowser()) {
+        setError('❌ Chrome, Edge 또는 Whale 브라우저만 사용 가능합니다.\n\nChrome 다운로드: https://www.google.com/chrome/\nEdge 다운로드: https://www.microsoft.com/edge\nWhale 다운로드: https://whale.naver.com/');
         setLoading(false);
         return;
       }
@@ -308,7 +311,7 @@ function Login({ onLogin }) {
       // 2. 확장 프로그램 설치 및 버전 체크 (0.5초 대기 후 체크)
       setTimeout(async () => {
         if (!isExtensionInstalled()) {
-          setError('❌ VIP 확장프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n5. 개발자 모드 켜기 → 압축 해제한 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인\n\n💡 설치가이드.html 파일 참고');
+          setError('❌ VIP 확장프로그램이 설치되지 않았습니다!\n\n📥 설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n   • Whale: whale://extensions/\n5. 개발자 모드 켜기 → 압축 해제한 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인\n\n💡 설치가이드.html 파일 참고');
           setLoading(false);
           return;
         }
@@ -324,7 +327,7 @@ function Login({ onLogin }) {
             const requiredVersion = versionData.requiredVersion;
             
             if (!isVersionValid(currentVersion, requiredVersion)) {
-              setError(`❌ 버전이 변경되었습니다. 재설치가 필요합니다.\n\n현재 버전: ${currentVersion || '알 수 없음'}\n최신 버전: ${requiredVersion}\n\n📥 재설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n5. 기존 확장 제거 → 개발자 모드 켜기 → 새 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인`);
+              setError(`❌ 버전이 변경되었습니다. 재설치가 필요합니다.\n\n현재 버전: ${currentVersion || '알 수 없음'}\n최신 버전: ${requiredVersion}\n\n📥 재설치 방법:\n1. 페이지 Ctrl+F5 (새로고침)\n2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭\n3. ZIP 파일 압축 해제\n4. 브라우저 주소창에 입력:\n   • Chrome: chrome://extensions/\n   • Edge: edge://extensions/\n   • Whale: whale://extensions/\n5. 기존 확장 제거 → 개발자 모드 켜기 → 새 폴더 로드\n6. 페이지 Ctrl+F5 (새로고침) 후 로그인`);
               setLoading(false);
               return;
             }
@@ -573,7 +576,7 @@ function Login({ onLogin }) {
               1. 페이지 Ctrl+F5 (새로고침)<br/>
               2. "📥 VIP 확장 프로그램 다운로드" 버튼 클릭<br/>
               3. 압축 해제<br/>
-              4. 브라우저 주소창에 <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>chrome://extensions/</code> 또는 <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>edge://extensions/</code> 입력<br/>
+              4. 브라우저 주소창에 <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>chrome://extensions/</code>, <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>edge://extensions/</code> 또는 <code style={{ bgcolor: '#fff', padding: '2px 4px', borderRadius: '3px' }}>whale://extensions/</code> 입력<br/>
               5. 개발자 모드 켜기 → 압축 해제한 폴더 로드<br/>
               6. 페이지 Ctrl+F5 (새로고침) 후 로그인
             </Typography>
