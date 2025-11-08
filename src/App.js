@@ -40,9 +40,11 @@ import ReservationMode from './components/ReservationMode';
 import BudgetMode from './components/BudgetMode';
 import SalesMode from './components/SalesMode';
 import InventoryRecoveryMode from './components/InventoryRecoveryMode';
-
-
-
+import MealAllowanceMode from './components/MealAllowanceMode';
+import AttendanceMode from './components/AttendanceMode';
+import RiskManagementMode from './components/RiskManagementMode';
+import DirectStoreManagementMode from './components/DirectStoreManagementMode';
+import DirectStoreMode from './components/DirectStoreMode';
 import AppUpdatePopup from './components/AppUpdatePopup';
 import ErrorBoundary from './components/ErrorBoundary';
 // 알림 시스템 관련 import 제거 (재고 모드로 이동)
@@ -59,7 +61,8 @@ import {
   TableContainer, 
   TableHead, 
   TableRow, 
-  Paper 
+  Paper,
+  TextField 
 } from '@mui/material';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -67,6 +70,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 
 import { addNotification, addAssignmentCompletedNotification, addSettingsChangedNotification } from './utils/notificationUtils';
+import { resolveModeKey } from './config/modeConfig';
 
 // Logger 유틸리티
 const logActivity = async (activityData) => {
@@ -152,6 +156,11 @@ function AppContent() {
   const [isObManagementMode, setIsObManagementMode] = useState(false);
   const [isOnSaleManagementMode, setIsOnSaleManagementMode] = useState(false);
   const [isOnSaleReceptionMode, setIsOnSaleReceptionMode] = useState(false);
+  const [isMealAllowanceMode, setIsMealAllowanceMode] = useState(false);
+  const [isAttendanceMode, setIsAttendanceMode] = useState(false);
+  const [isRiskManagementMode, setIsRiskManagementMode] = useState(false);
+  const [isDirectStoreManagementMode, setIsDirectStoreManagementMode] = useState(false);
+  const [isDirectStoreMode, setIsDirectStoreMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
   // 배정 모드 관련 상태 제거 (재고 모드로 이동)
   // 실시간 대시보드 모드 관련 상태 제거 (재고 모드로 이동)
@@ -196,6 +205,18 @@ function AppContent() {
   
   const [showAppUpdatePopup, setShowAppUpdatePopup] = useState(false);
   const [currentMode, setCurrentMode] = useState('');
+  const [directStoreAuthenticated, setDirectStoreAuthenticated] = useState(false);
+  const [showDirectStorePasswordModal, setShowDirectStorePasswordModal] = useState(false);
+  const [directStorePassword, setDirectStorePassword] = useState('');
+  const [directStorePasswordError, setDirectStorePasswordError] = useState('');
+  const [pendingDirectStoreAction, setPendingDirectStoreAction] = useState(null);
+  const resetNewModeFlags = useCallback(() => {
+    setIsMealAllowanceMode(false);
+    setIsAttendanceMode(false);
+    setIsRiskManagementMode(false);
+    setIsDirectStoreManagementMode(false);
+    setIsDirectStoreMode(false);
+  }, []);
   
   // 맵 확대 토글 핸들러 (스크롤 자동 조정 포함)
   const handleMapExpandToggle = () => {
@@ -789,6 +810,9 @@ function AppContent() {
         const parsedState = JSON.parse(savedLoginState);
         setIsLoggedIn(true);
         setLoggedInStore(parsedState.store);
+        const requiresDirectStorePassword = parsedState.store?.directStoreSecurity?.requiresPassword;
+        const directStoreAuth = parsedState.store?.directStoreSecurity?.authenticated;
+        setDirectStoreAuthenticated(directStoreAuth || !requiresDirectStorePassword);
         
         // 관리자 모드 상태 복원
         if (parsedState.isAgent) {
@@ -833,6 +857,26 @@ function AppContent() {
           // 온세일접수모드 상태 복원
           console.log('💾 온세일접수 모드 복원');
           setIsOnSaleReceptionMode(true);
+        } else if (parsedState.isMealAllowance) {
+          console.log('💾 식대 모드 복원');
+          setIsMealAllowanceMode(true);
+          setCurrentMode('mealAllowance');
+        } else if (parsedState.isAttendance) {
+          console.log('💾 근퇴 모드 복원');
+          setIsAttendanceMode(true);
+          setCurrentMode('attendance');
+        } else if (parsedState.isRiskManagement) {
+          console.log('💾 리스크 관리 모드 복원');
+          setIsRiskManagementMode(true);
+          setCurrentMode('riskManagement');
+        } else if (parsedState.isDirectStoreManagement) {
+          console.log('💾 직영점 관리 모드 복원');
+          setIsDirectStoreManagementMode(true);
+          setCurrentMode('directStoreManagement');
+        } else if (parsedState.isDirectStore) {
+          console.log('💾 직영점 모드 복원');
+          setIsDirectStoreMode(true);
+          setCurrentMode('directStore');
         } else if (parsedState.isBasicMode) {
           // 기본모드 상태 복원
           console.log('💾 기본 모드 복원');
@@ -1081,7 +1125,8 @@ function AppContent() {
         setLoggedInStore({
           ...updatedStore,
           modePermissions: loggedInStore.modePermissions, // 기존 modePermissions 유지
-          manager: loggedInStore.manager // 관리자 정보도 유지
+          manager: loggedInStore.manager, // 관리자 정보도 유지
+          directStoreSecurity: loggedInStore.directStoreSecurity
         });
       }
     }
@@ -1181,6 +1226,9 @@ function AppContent() {
     
     setIsLoggedIn(true);
     setLoggedInStore(store);
+  setDirectStoreAuthenticated(
+    store?.directStoreSecurity?.authenticated || !store?.directStoreSecurity?.requiresPassword
+  );
     
     // 대리점 관리자인 경우 별도 처리
     if (store.isAgent) {
@@ -1228,7 +1276,7 @@ function AppContent() {
     // 권한이 있는 경우 모드 선택 팝업 표시 (다중 권한일 때만)
     if (store.modePermissions) {
       // 실제 모드 권한만 필터링 (onSalePolicy는 서브 권한이므로 제외)
-      const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement'];
+      const actualModes = ['basicMode', 'onSaleReception', 'onSaleManagement', 'directStore'];
       const availableModes = Object.entries(store.modePermissions)
         .filter(([mode, hasPermission]) => hasPermission && actualModes.includes(mode))
         .map(([mode]) => mode);
@@ -1241,6 +1289,16 @@ function AppContent() {
         console.log(`${singleMode} 단일 권한: 바로 진입`);
         console.log('🔍 단일 권한 진입 시 store.modePermissions:', store.modePermissions);
         
+        if (singleMode === 'directStore' && store.directStoreSecurity?.requiresPassword) {
+          console.log('직영점 모드 단일 권한이지만 비밀번호 검증 필요 - 모드 선택으로 전환');
+          setAvailableModes(availableModes);
+          setPendingAvailableModes(availableModes);
+          setPendingLoginData(store);
+          setShowModeSelection(true);
+          setModeSelectionRequired(true);
+          return;
+        }
+
         // 단일 권한의 경우 자동으로 해당 모드로 설정
         // modePermissions와 userRole은 반드시 보존되어야 함 (onSalePolicy 같은 서브 권한 포함)
         const modifiedStore = { 
@@ -1254,6 +1312,8 @@ function AppContent() {
           modifiedStore.isBasicMode = true;
         } else if (singleMode === 'onSaleManagement') {
           modifiedStore.isOnSaleManagement = true;
+        } else if (singleMode === 'directStore') {
+          modifiedStore.isDirectStore = true;
         }
         
         console.log('🔍 modifiedStore.modePermissions:', modifiedStore.modePermissions);
@@ -1281,6 +1341,7 @@ function AppContent() {
 
   // 실제 로그인 처리 함수
   const processLogin = (store) => {
+    resetNewModeFlags();
     // 회의모드인지 확인
     if (store.isMeeting) {
       // console.log('로그인: 회의모드');
@@ -1593,7 +1654,7 @@ function AppContent() {
       setIsReservationMode(false);
       setIsBudgetMode(false);
       setIsSalesMode(false);
-      setCurrentMode('inventory-recovery');
+      setCurrentMode('inventoryRecovery');
       
       // 로그인 상태 저장
       localStorage.setItem('loginState', JSON.stringify({
@@ -1662,7 +1723,7 @@ function AppContent() {
       setIsSalesMode(false);
       setIsDataCollectionMode(false);
       setIsObManagementMode(false);
-      setCurrentMode('sms-management');
+      setCurrentMode('smsManagement');
       
       localStorage.setItem('loginState', JSON.stringify({
         isSmsManagement: true,
@@ -1697,7 +1758,7 @@ function AppContent() {
       setIsSalesMode(false);
       setIsDataCollectionMode(false);
       setIsSmsManagementMode(false);
-      setCurrentMode('ob-management');
+      setCurrentMode('obManagement');
       
       localStorage.setItem('loginState', JSON.stringify({
         isObManagement: true,
@@ -1733,7 +1794,7 @@ function AppContent() {
       setIsDataCollectionMode(false);
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
-      setCurrentMode('onsale-management');
+      setCurrentMode('onSaleManagement');
       
       localStorage.setItem('loginState', JSON.stringify({
         isOnSaleManagement: true,
@@ -1749,6 +1810,118 @@ function AppContent() {
         isInventoryRecovery: false,
         isSales: false,
         store: store
+      }));
+    }
+    // 식대 모드인지 확인
+    else if (store.isMealAllowance) {
+      console.log('로그인: 식대 모드');
+      setIsMealAllowanceMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('mealAllowance');
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isMealAllowance: true,
+        isAgent: false,
+        store
+      }));
+    }
+    // 근퇴 모드인지 확인
+    else if (store.isAttendance) {
+      console.log('로그인: 근퇴 모드');
+      setIsAttendanceMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('attendance');
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isAttendance: true,
+        isAgent: false,
+        store
+      }));
+    }
+    // 리스크 관리 모드인지 확인
+    else if (store.isRiskManagement) {
+      console.log('로그인: 리스크 관리 모드');
+      setIsRiskManagementMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('riskManagement');
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isRiskManagement: true,
+        isAgent: false,
+        store
+      }));
+    }
+    // 직영점 관리 모드인지 확인
+    else if (store.isDirectStoreManagement) {
+      console.log('로그인: 직영점 관리 모드');
+      setIsDirectStoreManagementMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('directStoreManagement');
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isDirectStoreManagement: true,
+        isAgent: false,
+        store
       }));
     }
     // 정보수집 모드인지 확인
@@ -1768,7 +1941,7 @@ function AppContent() {
       setIsSalesMode(false);
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
-      setCurrentMode('data-collection');
+      setCurrentMode('dataCollection');
       
       localStorage.setItem('loginState', JSON.stringify({
         isDataCollection: true,
@@ -1784,6 +1957,49 @@ function AppContent() {
         isInventoryRecovery: false,
         isSales: false,
         store: store
+      }));
+    }
+    // 온세일접수 모드인지 확인 (modePermissions.onSaleReception이 있으면 바로 진입)
+    else if (store.isDirectStore) {
+      console.log('로그인: 직영점 모드');
+
+      const authenticatedStore = {
+        ...store,
+        directStoreSecurity: {
+          ...(store.directStoreSecurity || {}),
+          authenticated: true
+        }
+      };
+
+      setLoggedInStore(authenticatedStore);
+
+      setIsDirectStoreMode(true);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('directStore');
+      setDirectStoreAuthenticated(true);
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isDirectStore: true,
+        isAgent: false,
+        store: {
+          ...authenticatedStore,
+          modePermissions: store.modePermissions
+        }
       }));
     }
     // 온세일접수 모드인지 확인 (modePermissions.onSaleReception이 있으면 바로 진입)
@@ -1808,7 +2024,7 @@ function AppContent() {
       setIsSmsManagementMode(false);
       setIsObManagementMode(false);
       setIsOnSaleManagementMode(false);
-      setCurrentMode('onsale-reception');
+      setCurrentMode('onSaleReception');
       
       localStorage.setItem('loginState', JSON.stringify({
         isOnSaleReception: true,
@@ -1841,7 +2057,7 @@ function AppContent() {
       setIsObManagementMode(false);
       setIsOnSaleManagementMode(false);
       setIsOnSaleReceptionMode(false);
-      setCurrentMode('basic');
+      setCurrentMode('basicMode');
       
       // 기본 모드인 경우 위치 설정
       if (store.latitude && store.longitude) {
@@ -1883,7 +2099,7 @@ function AppContent() {
       setIsObManagementMode(false);
       setIsOnSaleManagementMode(false);
       setIsOnSaleReceptionMode(false);
-      setCurrentMode('basic');
+      setCurrentMode('basicMode');
       
       // 일반 매장인 경우 기존 로직 유지
       if (store.latitude && store.longitude) {
@@ -1905,10 +2121,11 @@ function AppContent() {
     }
   };
 
-  // 모드 선택 핸들러 (초기 로그인 시)
-  const handleModeSelect = (selectedMode) => {
+  const completeModeSelection = (selectedMode) => {
     if (!pendingLoginData) return;
-    
+
+    const normalizedMode = resolveModeKey(selectedMode);
+
     // 선택된 모드에 따라 store 객체 수정
     const modifiedStore = { ...pendingLoginData };
     
@@ -1925,9 +2142,17 @@ function AppContent() {
     modifiedStore.isInventoryRecovery = false;
     modifiedStore.isSmsManagement = false;
     modifiedStore.isObManagement = false;
+    modifiedStore.isOnSaleManagement = false;
+    modifiedStore.isOnSaleReception = false;
+    modifiedStore.isMealAllowance = false;
+    modifiedStore.isAttendance = false;
+    modifiedStore.isRiskManagement = false;
+    modifiedStore.isDirectStoreManagement = false;
+    modifiedStore.isDirectStore = false;
+    modifiedStore.isDataCollection = false;
     
     // 선택된 모드만 true로 설정
-    switch (selectedMode) {
+    switch (normalizedMode) {
       case 'agent':
         modifiedStore.isAgent = true;
         break;
@@ -1958,9 +2183,6 @@ function AppContent() {
       case 'inventoryRecovery':
         modifiedStore.isInventoryRecovery = true;
         break;
-      case 'dataCollection':
-        modifiedStore.isDataCollection = true;
-        break;
       case 'smsManagement':
         modifiedStore.isSmsManagement = true;
         break;
@@ -1976,6 +2198,29 @@ function AppContent() {
       case 'onSaleReception':
         modifiedStore.isOnSaleReception = true;
         break;
+      case 'mealAllowance':
+        modifiedStore.isMealAllowance = true;
+        break;
+      case 'attendance':
+        modifiedStore.isAttendance = true;
+        break;
+      case 'riskManagement':
+        modifiedStore.isRiskManagement = true;
+        break;
+      case 'directStoreManagement':
+        modifiedStore.isDirectStoreManagement = true;
+        break;
+      case 'directStore':
+        modifiedStore.isDirectStore = true;
+        modifiedStore.directStoreSecurity = {
+          ...(modifiedStore.directStoreSecurity || {}),
+          authenticated: true
+        };
+        setDirectStoreAuthenticated(true);
+        break;
+      case 'dataCollection':
+        modifiedStore.isDataCollection = true;
+        break;
       default:
         break;
     }
@@ -1988,8 +2233,7 @@ function AppContent() {
     
     // 모드 진입 시 업데이트 팝업 표시
     // 로그 최소화 (성능 최적화)
-    // console.log('🔍 [App] handleModeSelect - 모드 진입 시 팝업 표시:', selectedMode);
-    setCurrentMode(selectedMode);
+    setCurrentMode(normalizedMode);
     setShowAppUpdatePopup(true);
     // console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     // console.log('🔍 [App] 현재 모드:', selectedMode, '팝업 상태:', true);
@@ -1998,6 +2242,24 @@ function AppContent() {
     setPendingLoginData(null);
     setShowModeSelection(false);
     setModeSelectionRequired(false);
+  };
+
+  // 모드 선택 핸들러 (초기 로그인 시)
+  const handleModeSelect = (selectedMode) => {
+    if (!pendingLoginData) return;
+    const normalizedMode = resolveModeKey(selectedMode);
+
+    if (
+      normalizedMode === 'directStore' &&
+      pendingLoginData?.directStoreSecurity?.requiresPassword &&
+      !directStoreAuthenticated
+    ) {
+      setPendingDirectStoreAction({ type: 'select', mode: selectedMode });
+      setShowDirectStorePasswordModal(true);
+      return;
+    }
+
+    completeModeSelection(selectedMode);
   };
 
   // 모드 전환 핸들러 (이미 로그인된 상태에서)
@@ -2012,6 +2274,17 @@ function AppContent() {
     }
 
     console.log('✅ 모드 전환 시작:', selectedMode);
+    const normalizedMode = resolveModeKey(selectedMode);
+
+    if (
+      normalizedMode === 'directStore' &&
+      loggedInStore?.directStoreSecurity?.requiresPassword &&
+      !directStoreAuthenticated
+    ) {
+      setPendingDirectStoreAction({ type: 'switch', mode: selectedMode });
+      setShowDirectStorePasswordModal(true);
+      return;
+    }
     
     // 모든 모드 상태 초기화
     setIsAgentMode(false);
@@ -2030,9 +2303,10 @@ function AppContent() {
     setIsObManagementMode(false);
     setIsOnSaleManagementMode(false);
     setIsOnSaleReceptionMode(false);
+    resetNewModeFlags();
     
     // 선택된 모드만 true로 설정
-    switch (selectedMode) {
+    switch (normalizedMode) {
       case 'agent':
         // console.log('관리자 모드로 전환');
         setIsAgentMode(true);
@@ -2116,6 +2390,22 @@ function AppContent() {
         // console.log('온세일접수 모드로 전환');
         setIsOnSaleReceptionMode(true);
         break;
+      case 'mealAllowance':
+        setIsMealAllowanceMode(true);
+        break;
+      case 'attendance':
+        setIsAttendanceMode(true);
+        break;
+      case 'riskManagement':
+        setIsRiskManagementMode(true);
+        break;
+      case 'directStoreManagement':
+        setIsDirectStoreManagementMode(true);
+        break;
+      case 'directStore':
+        setIsDirectStoreMode(true);
+        setDirectStoreAuthenticated(true);
+        break;
       default:
         // console.log('알 수 없는 모드:', selectedMode);
         break;
@@ -2126,10 +2416,10 @@ function AppContent() {
     
     // 모드 진입 시 업데이트 팝업 표시 (검수모드 제외)
     console.log('🔍 [App] handleModeSwitch - 모드 전환 시 팝업 표시:', selectedMode);
-    setCurrentMode(selectedMode);
+    setCurrentMode(normalizedMode);
     
     // 검수모드는 자체 업데이트 팝업을 사용하므로 App.js에서 표시하지 않음
-    if (selectedMode !== 'inspection') {
+    if (normalizedMode !== 'inspection') {
       setShowAppUpdatePopup(true);
       //       console.log('✅ [App] showAppUpdatePopup을 true로 설정');
     }
@@ -2137,6 +2427,78 @@ function AppContent() {
     setModeSelectionRequired(false);
     
     // console.log('모드 전환 완료');
+  };
+
+  const handleDirectStorePasswordCancel = () => {
+    setShowDirectStorePasswordModal(false);
+    setDirectStorePassword('');
+    setDirectStorePasswordError('');
+    setPendingDirectStoreAction(null);
+  };
+
+  const handleDirectStorePasswordSubmit = async () => {
+    if (!directStorePassword.trim()) {
+      setDirectStorePasswordError('비밀번호를 입력해주세요.');
+      return;
+    }
+
+    setDirectStorePasswordError('');
+    const targetStoreId = pendingLoginData?.id || loggedInStore?.id;
+    if (!targetStoreId) {
+      setDirectStorePasswordError('인증 대상 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    try {
+      const API_URL = process.env.REACT_APP_API_URL;
+      const response = await fetch(`${API_URL}/api/verify-direct-store-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          storeId: targetStoreId,
+          password: directStorePassword
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success || !result.verified) {
+        setDirectStorePasswordError(result.error || '비밀번호가 일치하지 않습니다.');
+        return;
+      }
+
+      setDirectStoreAuthenticated(true);
+
+      if (loggedInStore?.directStoreSecurity) {
+        setLoggedInStore(prev => prev ? ({
+          ...prev,
+          directStoreSecurity: {
+            ...(prev.directStoreSecurity || {}),
+            authenticated: true
+          }
+        }) : prev);
+      }
+
+      const action = pendingDirectStoreAction;
+
+      setShowDirectStorePasswordModal(false);
+      setDirectStorePassword('');
+      setDirectStorePasswordError('');
+      setPendingDirectStoreAction(null);
+
+      if (action) {
+        if (action.type === 'select') {
+          completeModeSelection(action.mode);
+        } else if (action.type === 'switch') {
+          handleModeSwitch(action.mode);
+        }
+      }
+    } catch (error) {
+      console.error('직영점 비밀번호 검증 오류:', error);
+      setDirectStorePasswordError('비밀번호 확인 중 오류가 발생했습니다.');
+    }
   };
 
   const handleLogout = () => {
@@ -2183,6 +2545,12 @@ function AppContent() {
     setIsOnSaleManagementMode(false);
     // 온세일 접수모드 상태 초기화
     setIsOnSaleReceptionMode(false);
+    resetNewModeFlags();
+    setDirectStoreAuthenticated(false);
+    setShowDirectStorePasswordModal(false);
+    setDirectStorePassword('');
+    setDirectStorePasswordError('');
+    setPendingDirectStoreAction(null);
     // 재고 확인 뷰 상태 초기화
     setCurrentView('all');
     
@@ -3024,6 +3392,101 @@ ${requestList}
     );
   }
 
+  if (isMealAllowanceMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <MealAllowanceMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsMealAllowanceMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  if (isAttendanceMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AttendanceMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsAttendanceMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  if (isRiskManagementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <RiskManagementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsRiskManagementMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  if (isDirectStoreManagementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <DirectStoreManagementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsDirectStoreManagementMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  if (isDirectStoreMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <DirectStoreMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsDirectStoreMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
   // 온세일접수모드일 때는 별도 화면 렌더링
   if (isOnSaleReceptionMode) {
     return (
@@ -3736,6 +4199,51 @@ ${requestList}
 
       {/* 알림 시스템 */}
                     {/* 알림 시스템 제거 (재고 모드로 이동) */}
+
+      {/* 직영점 모드 비밀번호 확인 */}
+      <Dialog
+        open={showDirectStorePasswordModal}
+        onClose={handleDirectStorePasswordCancel}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>직영점 모드 인증</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            직영점 모드에 접속하기 위해 설정된 비밀번호를 입력해주세요.
+          </Typography>
+          <TextField
+            fullWidth
+            label="비밀번호"
+            type="password"
+            value={directStorePassword}
+            onChange={(e) => setDirectStorePassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleDirectStorePasswordSubmit();
+              }
+            }}
+            autoFocus
+          />
+          {directStorePasswordError && (
+            <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1.5 }}>
+              {directStorePasswordError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDirectStorePasswordCancel}>
+            취소
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleDirectStorePasswordSubmit}
+          >
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 모드 선택 팝업 */}
       <ModeSelectionPopup

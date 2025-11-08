@@ -1012,7 +1012,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
   // 시트 이름을 안전하게 처리
   const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
   
-  // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:S 범위 필요 (S열까지), 대리점아이디관리는 A:AA 범위 필요 (AA열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
+  // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:X 범위 필요 (X열까지), 대리점아이디관리는 A:AA 범위 필요 (AA열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
   let range;
   if (sheetName === 'raw데이터') {
     range = `${safeSheetName}!A:AB`;
@@ -1021,7 +1021,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
   } else if (sheetName === '폰클홈데이터') {
     range = `${safeSheetName}!A:CN`;
   } else if (sheetName === '어플업데이트') {
-    range = `${safeSheetName}!A:S`;
+    range = `${safeSheetName}!A:X`;
   } else if (sheetName === '대리점아이디관리') {
     range = `${safeSheetName}!A:AA`;
   } else if (sheetName === '폰클출고처데이터') {
@@ -3076,6 +3076,10 @@ app.post('/api/login', async (req, res) => {
         const hasOnSaleManagementPermission = agent[26] === 'O' || agent[26] === 'S' || agent[26] === 'M';
         const hasOnSaleLinkPermission = agent[26] === 'S'; // AA열: 온세일 링크관리 권한
         const hasOnSalePolicyPermission = agent[26] === 'M'; // AA열: 온세일 정책게시판 권한 (M 권한은 링크관리 + 정책게시판)
+        const hasMealAllowancePermission = agent[27] === 'O'; // AB열: 식대 모드 권한
+        const hasAttendancePermission = agent[28] === 'O'; // AC열: 근퇴 모드 권한
+        const hasRiskManagementPermission = agent[29] === 'O'; // AD열: 리스크 관리 모드 권한
+        const hasDirectStoreManagementPermission = agent[30] === 'O'; // AE열: 직영점 관리 모드 권한
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -3113,7 +3117,11 @@ app.post('/api/login', async (req, res) => {
           obManagement: hasObManagementPermission, // OB 관리모드 권한
           onSaleManagement: hasOnSaleManagementPermission, // 온세일관리모드 권한
           onSaleLink: hasOnSaleLinkPermission || hasOnSalePolicyPermission, // 온세일 링크관리 권한 (S 또는 M)
-          onSalePolicy: hasOnSalePolicyPermission // 온세일 정책게시판 권한 (M 권한만)
+          onSalePolicy: hasOnSalePolicyPermission, // 온세일 정책게시판 권한 (M 권한만)
+          mealAllowance: hasMealAllowancePermission, // 식대 모드 권한
+          attendance: hasAttendancePermission, // 근퇴 모드 권한
+          riskManagement: hasRiskManagementPermission, // 리스크 관리 모드 권한
+          directStoreManagement: hasDirectStoreManagementPermission // 직영점 관리 모드 권한
         };
         
         // 디스코드로 로그인 로그 전송 (비동기 처리로 성능 최적화)
@@ -3177,7 +3185,7 @@ app.post('/api/login', async (req, res) => {
     console.log('Step 3: 일반모드권한관리 시트에서 검색 시작');
     
     const generalModeSheetName = '일반모드권한관리';
-    const generalModeRange = 'A:F'; // A~F열
+    const generalModeRange = 'A:H'; // A~H열
     
     const generalModeResponse = await rateLimitedSheetsCall(() => 
       sheets.spreadsheets.values.get({
@@ -3206,14 +3214,19 @@ app.post('/api/login', async (req, res) => {
         // E열: 온세일접수 모드 - 'O' 또는 'M' 모두 허용
         const eColumnValue = (foundGeneralUser[4] || '').toString().trim().toUpperCase();
         const hasOnSaleMode = eColumnValue === 'O' || eColumnValue === 'M';
+        const directStoreColumnValue = (foundGeneralUser[6] || '').toString().trim().toUpperCase(); // G열: 직영점 모드 권한
+        const hasDirectStoreMode = directStoreColumnValue === 'O';
+        const directStorePassword = (foundGeneralUser[7] || '').toString().trim(); // H열: 직영점 모드 비밀번호
+        const requiresDirectStorePassword = hasDirectStoreMode && directStorePassword !== '';
         
         console.log('권한 확인:', {
           basicMode: hasBasicMode,
-          onSaleMode: hasOnSaleMode
+          onSaleMode: hasOnSaleMode,
+          directStoreMode: hasDirectStoreMode
         });
         
         // 권한이 하나도 없으면 로그인 거부
-        if (!hasBasicMode && !hasOnSaleMode) {
+        if (!hasBasicMode && !hasOnSaleMode && !hasDirectStoreMode) {
           console.log('권한 없음: 로그인 거부');
           return res.status(403).json({
             success: false,
@@ -3257,7 +3270,11 @@ app.post('/api/login', async (req, res) => {
           modePermissions: {
             basicMode: hasBasicMode,         // D열: 기본 모드
             onSaleReception: hasOnSaleMode,  // E열: 온세일접수 모드
-            onSalePolicy: eColumnValue === 'M' // E열이 'M'인 경우 정책게시판 권한
+            onSalePolicy: eColumnValue === 'M', // E열이 'M'인 경우 정책게시판 권한
+            directStore: hasDirectStoreMode     // G열: 직영점 모드
+          },
+          directStoreSecurity: {
+            requiresPassword: requiresDirectStorePassword
           }
         };
         
@@ -3428,6 +3445,75 @@ app.post('/api/verify-password', async (req, res) => {
       success: false, 
       error: '패스워드 검증 중 오류가 발생했습니다',
       message: error.message 
+    });
+  }
+});
+
+// 일반 모드 직영점 비밀번호 검증 API
+app.post('/api/verify-direct-store-password', async (req, res) => {
+  try {
+    const { storeId, password } = req.body;
+
+    if (!storeId || !password) {
+      return res.status(400).json({
+        success: false,
+        error: '아이디와 비밀번호를 입력해주세요'
+      });
+    }
+
+    const response = await rateLimitedSheetsCall(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `일반모드권한관리!A:H`
+      })
+    );
+
+    const values = response.data.values || [];
+
+    if (values.length <= 3) {
+      return res.status(404).json({
+        success: false,
+        error: '직영점 권한 정보를 찾을 수 없습니다.'
+      });
+    }
+
+    const generalRows = values.slice(3); // 4행부터 데이터
+    const targetRow = generalRows.find(row => row[0] === storeId);
+
+    if (!targetRow) {
+      return res.status(404).json({
+        success: false,
+        error: '사용자를 찾을 수 없습니다.'
+      });
+    }
+
+    const storedPassword = (targetRow[7] || '').toString().trim(); // H열
+
+    if (!storedPassword) {
+      return res.status(400).json({
+        success: false,
+        error: '이 모드는 비밀번호가 설정되지 않았습니다.'
+      });
+    }
+
+    if (storedPassword === password.toString().trim()) {
+      return res.json({
+        success: true,
+        verified: true,
+        message: '비밀번호 일치'
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      verified: false,
+      error: '비밀번호가 일치하지 않습니다.'
+    });
+  } catch (error) {
+    console.error('직영점 비밀번호 검증 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '비밀번호 검증 중 오류가 발생했습니다.'
     });
   }
 });
@@ -20792,23 +20878,36 @@ app.post('/api/app-updates', async (req, res) => {
     
     // 모드별 컬럼 매핑
     const modeColumnMap = {
-      'general': 2,    // C열: 일반모드
-      'agent': 3,      // D열: 관리자모드
-      'inventory': 4,  // E열: 재고관리모드
-      'settlement': 5, // F열: 정산모드
-      'inspection': 6, // G열: 검수모드
-      'policy': 7,     // H열: 정책모드
-      'meeting': 8,    // I열: 회의모드
-      'reservation': 9, // J열: 사전예약모드
-      'chart': 10,     // K열: 장표모드
-      'budget': 11,    // L열: 예산모드
-      'sales': 12,     // M열: 영업모드
-      'inventoryRecovery': 13, // N열: 재고회수모드
-      'dataCollection': 14,    // O열: 정보수집모드
-      'smsManagement': 15,     // P열: SMS 관리모드
-      'obManagement': 16,      // Q열: OB 관리모드
-      'onSaleManagement': 17,  // R열: 온세일관리모드
-      'onSaleReception': 18    // S열: 온세일접수모드
+      'general': 2,              // C열: 일반모드
+      'basicMode': 2,            // C열: 기본 모드 (별칭)
+      'basic': 2,                // C열: 기본 모드 (별칭)
+      'agent': 3,                // D열: 관리자모드
+      'inventory': 4,            // E열: 재고관리모드
+      'settlement': 5,           // F열: 정산모드
+      'inspection': 6,           // G열: 검수모드
+      'policy': 7,               // H열: 정책모드
+      'meeting': 8,              // I열: 회의모드
+      'reservation': 9,          // J열: 사전예약모드
+      'chart': 10,               // K열: 장표모드
+      'budget': 11,              // L열: 예산모드
+      'sales': 12,               // M열: 영업모드
+      'inventoryRecovery': 13,   // N열: 재고회수모드
+      'inventory-recovery': 13,  // 별칭
+      'dataCollection': 14,      // O열: 정보수집모드
+      'data-collection': 14,     // 별칭
+      'smsManagement': 15,       // P열: SMS 관리모드
+      'sms-management': 15,      // 별칭
+      'obManagement': 16,        // Q열: OB 관리모드
+      'ob-management': 16,       // 별칭
+      'onSaleManagement': 17,    // R열: 온세일관리모드
+      'onsale-management': 17,   // 별칭
+      'onSaleReception': 18,     // S열: 온세일접수모드
+      'onsale-reception': 18,    // 별칭
+      'mealAllowance': 19,       // T열: 식대 모드
+      'attendance': 20,          // U열: 근퇴 모드
+      'riskManagement': 21,      // V열: 리스크 관리 모드
+      'directStoreManagement': 22, // W열: 직영점 관리 모드
+      'directStore': 23          // X열: 직영점 모드 (일반)
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -20820,14 +20919,14 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(19).fill(''); // A~S열 (19개 컬럼)
+    const newRow = new Array(24).fill(''); // A~X열 (24개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:S`,
+      range: `${UPDATE_SHEET_NAME}!A:X`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {

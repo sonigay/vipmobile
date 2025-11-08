@@ -30,61 +30,16 @@ import {
   History as HistoryIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
-import { 
+import {
   getLatestUpdateForMode, 
   getUpdatesForMode, 
   getAvailableDates, 
   checkAdminPermission, 
   addNewUpdate 
 } from '../utils/appUpdateService';
+import { getModeColor, getModeTitle } from '../config/modeConfig';
 
-// 모드별 색상 설정 (온세일 관련 모드만 U+ 색상)
-const MODE_COLORS = {
-  'general': '#757575',    // 회색
-  'agent': '#1976d2',      // 파란색
-  'inventory': '#2e7d32',  // 초록색
-  'settlement': '#d32f2f', // 빨간색
-  'inspection': '#7b1fa2', // 보라색
-  'policy': '#00bcd4',     // 청록색
-  'meeting': '#667eea',    // 보라파란색
-  'reservation': '#ff9a9e', // 핑크색
-  'chart': '#ff9800',      // 주황색
-  'budget': '#795548',     // 갈색 (예산모드)
-  'sales': '#e91e63',      // 핑크색 (영업모드)
-  'inventoryRecovery': '#8bc34a',  // 초록색 (재고회수모드)
-  'dataCollection': '#9c27b0',  // 보라색 (정보수집모드)
-  'smsManagement': '#00897B',  // 틸색 (SMS 관리모드)
-  'obManagement': '#5E35B1',   // 보라색 (OB 관리모드)
-  'onSaleManagement': '#5e35b1',  // U+ 진한 보라색 (온세일관리모드)
-  'onSaleReception': '#8e24aa',   // U+ 보라색 (온세일접수모드)
-  'basic': '#1976d2',             // 파란색 (기본모드)
-  'basicMode': '#1976d2'          // 파란색 (기본모드)
-};
-
-// 모드별 제목
-const MODE_TITLES = {
-  'general': '일반 모드',
-  'agent': '관리자 모드',
-  'inventory': '재고 관리 모드',
-  'settlement': '정산 모드',
-  'inspection': '검수 모드',
-  'policy': '정책 모드',
-  'meeting': '회의 모드',
-  'reservation': '사전예약 모드',
-  'chart': '장표 모드',
-  'budget': '예산 모드',
-  'sales': '영업 모드',
-  'inventoryRecovery': '재고회수 모드',
-  'dataCollection': '정보수집 모드',
-  'smsManagement': 'SMS 관리 모드',
-  'obManagement': 'OB 관리 모드',
-  'onSaleManagement': '온세일관리 모드',
-  'onSaleReception': '온세일접수 모드',
-  'basic': '기본 모드',
-  'basicMode': '기본 모드'
-};
-
-function AppUpdatePopup({ 
+function AppUpdatePopup({
   open, 
   onClose, 
   mode, 
@@ -105,8 +60,8 @@ function AppUpdatePopup({
     content: ''
   });
 
-  const modeColor = MODE_COLORS[mode] || '#757575';
-  const modeTitle = MODE_TITLES[mode] || '알 수 없는 모드';
+  const modeColor = getModeColor(mode, '#757575');
+  const modeTitle = getModeTitle(mode, '알 수 없는 모드');
 
   // 업데이트 데이터 로드
   const loadUpdates = async (showAll = false) => {

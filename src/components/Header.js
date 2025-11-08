@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AppBar, Toolbar, Typography, Button, Box, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Switch, FormControlLabel, Alert, Menu, MenuItem } from '@mui/material';
 import { 
   Update as UpdateIcon, 
@@ -21,6 +21,7 @@ import {
   sendTestPushNotification,
   debugPushNotificationStatus
 } from '../utils/pushNotificationUtils';
+import { getModeColor, getModeTitle, resolveModeKey } from '../config/modeConfig';
 
 function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, loggedInStore, isAgentMode, currentView, onViewChange, activationData, agentTarget, data, onModeChange, availableModes, onCheckUpdate = null, currentMode }) {
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
@@ -80,40 +81,6 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
     });
     
     return agentStores;
-  };
-
-  // 모드별 헤더 색상 반환 함수
-  const getModeHeaderColor = () => {
-    switch (currentMode) {
-      case '재고회수':
-        return '#8bc34a'; // 초록색
-      case '예산':
-        return '#795548'; // 갈색
-      case '영업':
-        return '#e91e63'; // 핑크색
-      case '정책':
-        return '#00bcd4'; // 청록색
-      case '회의':
-        return '#667eea'; // 보라파란색
-      case '사전예약':
-        return '#ff9a9e'; // 핑크색
-      case '장표':
-        return '#ff9800'; // 주황색
-      case '검수':
-        return '#7b1fa2'; // 보라색
-      case '정산':
-        return '#d32f2f'; // 빨간색
-      case '재고 관리':
-        return '#2e7d32'; // 초록색
-      case '관리자':
-        return '#1976d2'; // 파란색
-      case 'SMS 관리':
-        return '#00897B'; // 틸색
-      case 'OB 관리':
-        return '#5E35B1'; // 보라색
-      default:
-        return '#1976d2'; // 기본 파란색
-    }
   };
 
   // 담당자의 거래처들의 카테고리별 재고 계산 함수
@@ -363,12 +330,16 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
     handleMenuClose();
   };
 
+  const resolvedModeKey = useMemo(() => resolveModeKey(currentMode), [currentMode]);
+  const headerColor = useMemo(() => getModeColor(resolvedModeKey), [resolvedModeKey]);
+  const headerTitle = useMemo(() => getModeTitle(resolvedModeKey, '재고 조회 시스템'), [resolvedModeKey]);
+
   return (
-    <AppBar position="static" sx={{ backgroundColor: getModeHeaderColor() }}>
+    <AppBar position="static" sx={{ backgroundColor: headerColor }}>
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          {currentMode || '재고 조회 시스템'}
-          {loggedInStore && !isInventoryMode && !isAgentMode && currentMode !== '재고회수' && (
+          {headerTitle}
+          {loggedInStore && !isInventoryMode && !isAgentMode && resolvedModeKey !== 'inventoryRecovery' && (
             <Chip
               icon={<PersonIcon />}
               label={`${loggedInStore.name} : ${getStoreInventory(loggedInStore)}대`}
@@ -381,7 +352,7 @@ function Header({ inventoryUserName, isInventoryMode, currentUserId, onLogout, l
               }}
             />
           )}
-          {(isInventoryMode || currentMode === '재고회수') && inventoryUserName && (
+          {(isInventoryMode || resolvedModeKey === 'inventoryRecovery') && inventoryUserName && (
             <Chip
               icon={<PersonIcon />}
               label={`접속자: ${inventoryUserName}`}

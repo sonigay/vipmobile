@@ -20,7 +20,12 @@ const UPDATE_SHEET_COLUMNS = {
   SMS_MANAGEMENT: 15,      // P열: SMS 관리모드 업데이트내용
   OB_MANAGEMENT: 16,       // Q열: OB 관리모드 업데이트내용
   ONSALE_MANAGEMENT: 17,   // R열: 온세일관리모드 업데이트내용
-  ONSALE_RECEPTION: 18     // S열: 온세일접수모드 업데이트내용
+  ONSALE_RECEPTION: 18,    // S열: 온세일접수모드 업데이트내용
+  MEAL_ALLOWANCE: 19,      // T열: 식대 모드 업데이트내용
+  ATTENDANCE: 20,          // U열: 근퇴 모드 업데이트내용
+  RISK_MANAGEMENT: 21,     // V열: 리스크 관리 모드 업데이트내용
+  DIRECT_STORE_MANAGEMENT: 22, // W열: 직영점 관리 모드 업데이트내용
+  DIRECT_STORE: 23         // X열: 직영점 모드 업데이트내용
 };
 
 // 모드별 컬럼 매핑
@@ -37,11 +42,22 @@ const MODE_COLUMN_MAP = {
   'budget': UPDATE_SHEET_COLUMNS.BUDGET,
   'sales': UPDATE_SHEET_COLUMNS.SALES,
   'inventoryRecovery': UPDATE_SHEET_COLUMNS.INVENTORY_RECOVERY,
+  'inventory-recovery': UPDATE_SHEET_COLUMNS.INVENTORY_RECOVERY, // 별칭
   'dataCollection': UPDATE_SHEET_COLUMNS.DATA_COLLECTION,
+  'data-collection': UPDATE_SHEET_COLUMNS.DATA_COLLECTION, // 별칭
   'smsManagement': UPDATE_SHEET_COLUMNS.SMS_MANAGEMENT,
+  'sms-management': UPDATE_SHEET_COLUMNS.SMS_MANAGEMENT, // 별칭
   'obManagement': UPDATE_SHEET_COLUMNS.OB_MANAGEMENT,
+  'ob-management': UPDATE_SHEET_COLUMNS.OB_MANAGEMENT, // 별칭
   'onSaleManagement': UPDATE_SHEET_COLUMNS.ONSALE_MANAGEMENT,
+  'onsale-management': UPDATE_SHEET_COLUMNS.ONSALE_MANAGEMENT, // 별칭
   'onSaleReception': UPDATE_SHEET_COLUMNS.ONSALE_RECEPTION,
+  'onsale-reception': UPDATE_SHEET_COLUMNS.ONSALE_RECEPTION, // 별칭
+  'mealAllowance': UPDATE_SHEET_COLUMNS.MEAL_ALLOWANCE,
+  'attendance': UPDATE_SHEET_COLUMNS.ATTENDANCE,
+  'riskManagement': UPDATE_SHEET_COLUMNS.RISK_MANAGEMENT,
+  'directStoreManagement': UPDATE_SHEET_COLUMNS.DIRECT_STORE_MANAGEMENT,
+  'directStore': UPDATE_SHEET_COLUMNS.DIRECT_STORE,
   'basic': UPDATE_SHEET_COLUMNS.GENERAL,  // 기본모드는 일반모드와 동일
   'basicMode': UPDATE_SHEET_COLUMNS.GENERAL  // 별칭
 };
