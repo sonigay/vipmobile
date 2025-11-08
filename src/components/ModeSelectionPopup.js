@@ -46,13 +46,17 @@ const ModeSelectionPopup = ({
     if (isModeSwitch && onModeSwitch) {
       console.log('모드 전환 핸들러 호출');
       onModeSwitch(mode);
+      // 모드 전환의 경우 핸들러에서 팝업을 닫음
+      onClose();
     } else if (onModeSelect) {
       console.log('초기 로그인 모드 선택 핸들러 호출');
+      // 초기 로그인의 경우 핸들러가 팝업을 닫도록 함 (비밀번호 모달 등 추가 처리가 필요할 수 있음)
+      // completeModeSelection에서 팝업을 닫으므로 여기서는 닫지 않음
       onModeSelect(mode);
     } else {
       console.log('적절한 핸들러가 없음');
+      onClose();
     }
-    onClose();
   };
 
   return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Container, Box, Typography, Button, CircularProgress, Chip, IconButton } from '@mui/material';
+import { Container, Box, Typography, Button, CircularProgress, Chip, IconButton, Alert } from '@mui/material';
 import Map from './components/Map';
 import FilterPanel from './components/FilterPanel';
 import AgentFilterPanel from './components/AgentFilterPanel';
@@ -210,6 +210,7 @@ function AppContent() {
   const [directStorePassword, setDirectStorePassword] = useState('');
   const [directStorePasswordError, setDirectStorePasswordError] = useState('');
   const [pendingDirectStoreAction, setPendingDirectStoreAction] = useState(null);
+  const [directStorePasswordLoading, setDirectStorePasswordLoading] = useState(false);
   const resetNewModeFlags = useCallback(() => {
     setIsMealAllowanceMode(false);
     setIsAttendanceMode(false);
@@ -2261,11 +2262,17 @@ function AppContent() {
       pendingLoginData?.directStoreSecurity?.requiresPassword &&
       !directStoreAuthenticated
     ) {
+      // 비밀번호 모달 표시 (모드 선택 팝업은 ModeSelectionPopup에서 닫히지 않으므로 여기서 닫음)
+      setShowModeSelection(false);
       setPendingDirectStoreAction({ type: 'select', mode: selectedMode });
-      setShowDirectStorePasswordModal(true);
+      // 모달이 닫히는 애니메이션을 위해 약간의 지연 후 비밀번호 모달 표시
+      setTimeout(() => {
+        setShowDirectStorePasswordModal(true);
+      }, 150);
       return;
     }
 
+    // 비밀번호가 필요 없는 모드는 바로 완료 (completeModeSelection에서 팝업 닫음)
     completeModeSelection(selectedMode);
   };
 
@@ -2288,8 +2295,13 @@ function AppContent() {
       loggedInStore?.directStoreSecurity?.requiresPassword &&
       !directStoreAuthenticated
     ) {
+      // 비밀번호 모달 표시 (모드 선택 팝업은 ModeSelectionPopup에서 닫히므로 여기서도 닫음)
+      setShowModeSelection(false);
       setPendingDirectStoreAction({ type: 'switch', mode: selectedMode });
-      setShowDirectStorePasswordModal(true);
+      // 모달이 닫히는 애니메이션을 위해 약간의 지연 후 비밀번호 모달 표시
+      setTimeout(() => {
+        setShowDirectStorePasswordModal(true);
+      }, 150);
       return;
     }
     
@@ -2441,6 +2453,13 @@ function AppContent() {
     setDirectStorePassword('');
     setDirectStorePasswordError('');
     setPendingDirectStoreAction(null);
+    setDirectStorePasswordLoading(false);
+    // 취소 시 모드 선택 팝업이 다시 나타나도록 (초기 로그인 시에만)
+    if (pendingLoginData && modeSelectionRequired) {
+      setTimeout(() => {
+        setShowModeSelection(true);
+      }, 100);
+    }
   };
 
   const handleDirectStorePasswordSubmit = async () => {
@@ -2450,9 +2469,11 @@ function AppContent() {
     }
 
     setDirectStorePasswordError('');
+    setDirectStorePasswordLoading(true);
     const targetStoreId = pendingLoginData?.id || loggedInStore?.id;
     if (!targetStoreId) {
       setDirectStorePasswordError('인증 대상 정보를 찾을 수 없습니다.');
+      setDirectStorePasswordLoading(false);
       return;
     }
 
@@ -2473,6 +2494,7 @@ function AppContent() {
 
       if (!response.ok || !result.success || !result.verified) {
         setDirectStorePasswordError(result.error || '비밀번호가 일치하지 않습니다.');
+        setDirectStorePasswordLoading(false);
         return;
       }
 
@@ -2494,6 +2516,7 @@ function AppContent() {
       setDirectStorePassword('');
       setDirectStorePasswordError('');
       setPendingDirectStoreAction(null);
+      setDirectStorePasswordLoading(false);
 
       if (action) {
         if (action.type === 'select') {
@@ -2505,6 +2528,7 @@ function AppContent() {
     } catch (error) {
       console.error('직영점 비밀번호 검증 오류:', error);
       setDirectStorePasswordError('비밀번호 확인 중 오류가 발생했습니다.');
+      setDirectStorePasswordLoading(false);
     }
   };
 
@@ -4213,41 +4237,70 @@ ${requestList}
         onClose={handleDirectStorePasswordCancel}
         maxWidth="xs"
         fullWidth
+        PaperProps={{
+          sx: {
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #e8edf1 100%)',
+            border: '1px solid #b0bec5',
+            boxShadow: '0 8px 32px rgba(69, 90, 100, 0.15)'
+          }
+        }}
       >
-        <DialogTitle>직영점 모드 인증</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            직영점 모드에 접속하기 위해 설정된 비밀번호를 입력해주세요.
-          </Typography>
-          <TextField
-            fullWidth
-            label="비밀번호"
-            type="password"
-            value={directStorePassword}
-            onChange={(e) => setDirectStorePassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleDirectStorePasswordSubmit();
-              }
-            }}
-            autoFocus
-          />
-          {directStorePasswordError && (
-            <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1.5 }}>
-              {directStorePasswordError}
-            </Typography>
-          )}
+        <DialogTitle sx={{ color: '#455A64', fontWeight: 'bold', textAlign: 'center' }}>
+          🔐 비밀번호 입력
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1, minWidth: 300 }}>
+            {directStorePasswordError && (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                {directStorePasswordError}
+              </Alert>
+            )}
+            <TextField
+              fullWidth
+              type="password"
+              label="비밀번호"
+              value={directStorePassword}
+              onChange={(e) => setDirectStorePassword(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleDirectStorePasswordSubmit();
+                }
+              }}
+              autoFocus
+              disabled={directStorePasswordLoading}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&:hover fieldset': { borderColor: '#455A64' },
+                  '&.Mui-focused fieldset': { borderColor: '#455A64' }
+                },
+                '& .MuiInputLabel-root.Mui-focused': { color: '#455A64' }
+              }}
+            />
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDirectStorePasswordCancel}>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button 
+            onClick={handleDirectStorePasswordCancel}
+            disabled={directStorePasswordLoading}
+            sx={{ color: '#455A64' }}
+          >
             취소
           </Button>
           <Button
-            variant="contained"
             onClick={handleDirectStorePasswordSubmit}
+            variant="contained"
+            disabled={directStorePasswordLoading}
+            sx={{ 
+              background: 'linear-gradient(135deg, #455A64 0%, #37474f 100%)',
+              '&:hover': { 
+                background: 'linear-gradient(135deg, #37474f 0%, #263238 100%)'
+              },
+              boxShadow: '0 4px 15px rgba(69, 90, 100, 0.3)',
+              px: 3
+            }}
           >
-            확인
+            {directStorePasswordLoading ? <CircularProgress size={24} /> : '확인'}
           </Button>
         </DialogActions>
       </Dialog>
