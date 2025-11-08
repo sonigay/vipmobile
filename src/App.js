@@ -1960,20 +1960,32 @@ function AppContent() {
         store: store
       }));
     }
-    // 온세일접수 모드인지 확인 (modePermissions.onSaleReception이 있으면 바로 진입)
+    // 직영점 모드인지 확인 (비밀번호가 필요 없는 경우에만 바로 진입)
     else if (store.isDirectStore) {
       console.log('로그인: 직영점 모드');
+      
+      // 비밀번호가 필요하고 아직 인증되지 않은 경우, 컴포넌트에서 비밀번호 입력 화면을 보여주도록 함
+      // (온세일 접수 모드와 동일한 방식)
+      const requiresPassword = store.directStoreSecurity?.requiresPassword;
+      const isAuthenticated = store.directStoreSecurity?.authenticated;
+      
+      if (requiresPassword && !isAuthenticated) {
+        // 비밀번호가 필요한 경우, 인증 없이 모드를 활성화하여 컴포넌트에서 비밀번호 입력 화면을 보여줌
+        console.log('직영점 모드: 비밀번호 필요 - 컴포넌트에서 처리');
+      } else {
+        // 비밀번호가 필요 없거나 이미 인증된 경우
+        const authenticatedStore = {
+          ...store,
+          directStoreSecurity: {
+            ...(store.directStoreSecurity || {}),
+            authenticated: true
+          }
+        };
+        setLoggedInStore(authenticatedStore);
+        setDirectStoreAuthenticated(true);
+      }
 
-      const authenticatedStore = {
-        ...store,
-        directStoreSecurity: {
-          ...(store.directStoreSecurity || {}),
-          authenticated: true
-        }
-      };
-
-      setLoggedInStore(authenticatedStore);
-
+      setLoggedInStore(store);
       setIsDirectStoreMode(true);
       setIsAgentMode(false);
       setIsInventoryMode(false);
@@ -1992,13 +2004,12 @@ function AppContent() {
       setIsOnSaleManagementMode(false);
       setIsOnSaleReceptionMode(false);
       setCurrentMode('directStore');
-      setDirectStoreAuthenticated(true);
 
       localStorage.setItem('loginState', JSON.stringify({
         isDirectStore: true,
         isAgent: false,
         store: {
-          ...authenticatedStore,
+          ...store,
           modePermissions: store.modePermissions
         }
       }));
@@ -2213,18 +2224,7 @@ function AppContent() {
         break;
       case 'directStore':
         modifiedStore.isDirectStore = true;
-        // 비밀번호 검증이 완료된 경우에만 authenticated 설정
-        // (handleModeSelect에서 이미 검증 완료 후 호출되므로 항상 true)
-        if (modifiedStore.directStoreSecurity?.requiresPassword) {
-          modifiedStore.directStoreSecurity = {
-            ...(modifiedStore.directStoreSecurity || {}),
-            authenticated: true
-          };
-          setDirectStoreAuthenticated(true);
-        } else {
-          // 비밀번호가 필요 없는 경우
-          setDirectStoreAuthenticated(true);
-        }
+        // 비밀번호는 DirectStoreMode 컴포넌트에서 처리하므로 여기서는 설정하지 않음
         break;
       case 'dataCollection':
         modifiedStore.isDataCollection = true;
@@ -2255,24 +2255,7 @@ function AppContent() {
   // 모드 선택 핸들러 (초기 로그인 시)
   const handleModeSelect = (selectedMode) => {
     if (!pendingLoginData) return;
-    const normalizedMode = resolveModeKey(selectedMode);
-
-    if (
-      normalizedMode === 'directStore' &&
-      pendingLoginData?.directStoreSecurity?.requiresPassword &&
-      !directStoreAuthenticated
-    ) {
-      // 비밀번호 모달 표시 (모드 선택 팝업은 ModeSelectionPopup에서 닫히지 않으므로 여기서 닫음)
-      setShowModeSelection(false);
-      setPendingDirectStoreAction({ type: 'select', mode: selectedMode });
-      // 모달이 닫히는 애니메이션을 위해 약간의 지연 후 비밀번호 모달 표시
-      setTimeout(() => {
-        setShowDirectStorePasswordModal(true);
-      }, 150);
-      return;
-    }
-
-    // 비밀번호가 필요 없는 모드는 바로 완료 (completeModeSelection에서 팝업 닫음)
+    // 모든 모드는 바로 완료 (비밀번호는 각 모드 컴포넌트에서 처리)
     completeModeSelection(selectedMode);
   };
 
@@ -2290,20 +2273,7 @@ function AppContent() {
     console.log('✅ 모드 전환 시작:', selectedMode);
     const normalizedMode = resolveModeKey(selectedMode);
 
-    if (
-      normalizedMode === 'directStore' &&
-      loggedInStore?.directStoreSecurity?.requiresPassword &&
-      !directStoreAuthenticated
-    ) {
-      // 비밀번호 모달 표시 (모드 선택 팝업은 ModeSelectionPopup에서 닫히므로 여기서도 닫음)
-      setShowModeSelection(false);
-      setPendingDirectStoreAction({ type: 'switch', mode: selectedMode });
-      // 모달이 닫히는 애니메이션을 위해 약간의 지연 후 비밀번호 모달 표시
-      setTimeout(() => {
-        setShowDirectStorePasswordModal(true);
-      }, 150);
-      return;
-    }
+    // 비밀번호는 각 모드 컴포넌트에서 처리하므로 여기서는 바로 전환
     
     // 모든 모드 상태 초기화
     setIsAgentMode(false);
