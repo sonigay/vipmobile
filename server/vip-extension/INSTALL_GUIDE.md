@@ -19,7 +19,7 @@ VIP 앱의 **매장 사용자**는 반드시 설치해야 합니다.
    - Mac: 더블 클릭
 5. 압축 해제된 폴더를 바탕화면으로 이동
 
-### 2️⃣ Chrome/Edge에 설치
+### 2️⃣ Chrome/Edge/Whale에 설치
 
 **Chrome 사용 시:**
 ```
@@ -34,6 +34,14 @@ VIP 앱의 **매장 사용자**는 반드시 설치해야 합니다.
 1. Edge 주소창에 edge://extensions/ 입력
 2. 좌측 하단 "개발자 모드" 켜기
 3. "압축을 푼 확장 로드" 클릭
+4. 압축 해제한 폴더 선택
+```
+
+**Whale 사용 시:**
+```
+1. Whale 주소창에 whale://extensions/ 입력
+2. 우측 상단 "개발자 모드" 켜기
+3. "압축 해제된 확장 프로그램 로드" 클릭
 4. 압축 해제한 폴더 선택
 ```
 
@@ -55,17 +63,18 @@ VIP 앱의 **매장 사용자**는 반드시 설치해야 합니다.
 ### ❌ "확장 프로그램이 필요합니다" 에러
 
 **해결:**
-1. `chrome://extensions/` 또는 `edge://extensions/` 접속
+1. `chrome://extensions/`, `edge://extensions/` 또는 `whale://extensions/` 접속
 2. 확장이 **켜짐** 상태인지 확인
 3. 꺼져 있으면 켜기
 4. VIP 앱 페이지 **새로고침 (F5)**
 5. 다시 로그인
 
-### ❌ "Chrome 또는 Edge 브라우저만 사용 가능" 에러
+### ❌ "Chrome, Edge 또는 Whale 브라우저를 사용하세요" 에러
 
 **해결:**
 - Chrome 다운로드: https://www.google.com/chrome/
 - Edge 다운로드: https://www.microsoft.com/edge
+- Whale 다운로드: https://whale.naver.com/
 
 ### ❌ 확장이 목록에 없음
 
@@ -79,7 +88,7 @@ VIP 앱의 **매장 사용자**는 반드시 설치해야 합니다.
 ## 🔄 업데이트
 
 새 버전 배포 시:
-1. 기존 확장 제거 (`chrome://extensions/`에서)
+1. 기존 확장 제거 (`chrome://extensions/`, `edge://extensions/` 또는 `whale://extensions/`에서)
 2. 새로 다운로드 및 설치
 3. 페이지 새로고침
 

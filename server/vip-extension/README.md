@@ -1,7 +1,7 @@
 # VIP 필수 확장프로그램
 
 ## 📌 개요
-VIP 앱 사용을 위한 필수 Chrome 확장 프로그램입니다.
+VIP 앱 사용을 위한 필수 Chromium 기반 확장 프로그램입니다. (Chrome/Edge/Whale 지원)
 
 ## ⚠️ 필수 설치
 매장 사용자는 반드시 이 확장 프로그램을 설치해야 합니다.
@@ -15,7 +15,7 @@ VIP 앱 사용을 위한 필수 Chrome 확장 프로그램입니다.
 2. 로그인 화면에서 "📥 VIP 확장 프로그램 다운로드" 버튼 클릭
 3. ZIP 파일 다운로드 및 압축 해제
 
-### 2단계: Chrome/Edge에 설치
+### 2단계: Chrome/Edge/Whale에 설치
 
 **Chrome:**
 1. 주소창에 `chrome://extensions/` 입력
@@ -29,6 +29,12 @@ VIP 앱 사용을 위한 필수 Chrome 확장 프로그램입니다.
 3. **"압축을 푼 확장 로드"** 클릭
 4. 압축 해제한 폴더 선택
 
+**Whale:**
+1. 주소창에 `whale://extensions/` 입력
+2. 우측 상단 **"개발자 모드"** 켜기
+3. **"압축 해제된 확장 프로그램 로드"** 클릭
+4. 압축 해제한 폴더 선택
+
 ## ✅ 작동 확인
 
 1. VIP 앱 페이지 새로고침 (F5)
@@ -38,12 +44,14 @@ VIP 앱 사용을 위한 필수 Chrome 확장 프로그램입니다.
 ## 🔧 문제 해결
 
 **"확장 프로그램이 필요합니다" 에러:**
-1. `chrome://extensions/` 또는 `edge://extensions/` 접속
+1. `chrome://extensions/`, `edge://extensions/` 또는 `whale://extensions/` 접속
 2. 확장이 "켜짐" 상태인지 확인
 3. 페이지 새로고침 후 다시 로그인
 
-**"Chrome 또는 Edge 브라우저만 사용 가능" 에러:**
-- Chrome 또는 Edge 브라우저 다운로드 후 사용
+**"Chrome, Edge 또는 Whale 브라우저를 사용하세요" 에러:**
+- Chrome 다운로드: https://www.google.com/chrome/
+- Edge 다운로드: https://www.microsoft.com/edge
+- Whale 다운로드: https://whale.naver.com/
 
 ## 📞 지원
 문제 발생 시 관리자에게 문의하세요.
@@ -55,7 +63,7 @@ VIP 앱 사용을 위한 필수 Chrome 확장 프로그램입니다.
 2. 변경 사항 적용 후 커밋
 
 ### 사용자 업데이트 방법:
-1. 기존 확장 제거 (`chrome://extensions/`)
+1. 기존 확장 제거 (`chrome://extensions/`, `edge://extensions/` 또는 `whale://extensions/`)
 2. VIP 앱에서 새 버전 다운로드
 3. 재설치 후 페이지 새로고침
 
