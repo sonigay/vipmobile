@@ -2212,11 +2212,18 @@ function AppContent() {
         break;
       case 'directStore':
         modifiedStore.isDirectStore = true;
-        modifiedStore.directStoreSecurity = {
-          ...(modifiedStore.directStoreSecurity || {}),
-          authenticated: true
-        };
-        setDirectStoreAuthenticated(true);
+        // 비밀번호 검증이 완료된 경우에만 authenticated 설정
+        // (handleModeSelect에서 이미 검증 완료 후 호출되므로 항상 true)
+        if (modifiedStore.directStoreSecurity?.requiresPassword) {
+          modifiedStore.directStoreSecurity = {
+            ...(modifiedStore.directStoreSecurity || {}),
+            authenticated: true
+          };
+          setDirectStoreAuthenticated(true);
+        } else {
+          // 비밀번호가 필요 없는 경우
+          setDirectStoreAuthenticated(true);
+        }
         break;
       case 'dataCollection':
         modifiedStore.isDataCollection = true;

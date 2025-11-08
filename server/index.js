@@ -973,7 +973,7 @@ async function getSheetValuesWithoutCache(sheetName) {
     // 시트 이름을 안전하게 처리
     const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
     
-    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 정책_기본정보는 A:AC 범위 필요 (AC열까지), 나머지는 A:AA 범위
+    // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 정책_기본정보는 A:AC 범위 필요 (AC열까지), 대리점아이디관리는 A:AE 범위 필요 (AE열까지), 나머지는 A:AA 범위
     let range;
     if (sheetName === 'raw데이터') {
       range = `${safeSheetName}!A:AB`;
@@ -983,6 +983,8 @@ async function getSheetValuesWithoutCache(sheetName) {
       range = `${safeSheetName}!A:CN`;
     } else if (sheetName === '정책_기본정보 ') {
       range = `${safeSheetName}!A:AX`;  // 담당자 AX열까지 확장
+    } else if (sheetName === '대리점아이디관리') {
+      range = `${safeSheetName}!A:AE`;
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -1012,7 +1014,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
   // 시트 이름을 안전하게 처리
   const safeSheetName = `'${sheetName}'`; // 작은따옴표로 감싸서 특수문자 처리
   
-  // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:X 범위 필요 (X열까지), 대리점아이디관리는 A:AA 범위 필요 (AA열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
+  // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 폰클개통데이터는 A:BZ 범위 필요 (BZ열까지), 어플업데이트는 A:X 범위 필요 (X열까지), 대리점아이디관리는 A:AE 범위 필요 (AE열까지), 폰클출고처데이터는 A:AM 범위 필요 (AM열까지), 마당접수는 A:AI 범위 필요 (AI열까지), 나머지는 A:AA 범위
   let range;
   if (sheetName === 'raw데이터') {
     range = `${safeSheetName}!A:AB`;
@@ -1023,7 +1025,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
   } else if (sheetName === '어플업데이트') {
     range = `${safeSheetName}!A:X`;
   } else if (sheetName === '대리점아이디관리') {
-    range = `${safeSheetName}!A:AA`;
+    range = `${safeSheetName}!A:AE`;
   } else if (sheetName === '폰클출고처데이터') {
     range = `${safeSheetName}!A:AM`;
   } else if (sheetName === '마당접수') {
@@ -1097,8 +1099,13 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
         console.log(`✅ [시트조회] 정확한 시트 이름 발견: '${exactSheetName}'`);
         const safeSheetName = `'${exactSheetName}'`;
         
-        // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 나머지는 A:AA 범위
-        const retryRange = sheetName === 'raw데이터' ? `${safeSheetName}!A:AB` : `${safeSheetName}!A:AA`;
+        // raw데이터 시트는 A:AB 범위 필요 (AB열까지), 대리점아이디관리는 A:AE 범위 필요, 나머지는 A:AA 범위
+        const retryRange =
+          sheetName === 'raw데이터'
+            ? `${safeSheetName}!A:AB`
+            : sheetName === '대리점아이디관리'
+              ? `${safeSheetName}!A:AE`
+              : `${safeSheetName}!A:AA`;
         
         const retryResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: spreadsheetId,
