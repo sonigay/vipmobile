@@ -555,6 +555,57 @@ function PolicyMode({ onLogout, loggedInStore, onModeChange, availableModes }) {
   };
 
   const handleSavePolicy = async (policyData) => {
+    // 복수 정책 저장 요청 처리
+    if (Array.isArray(policyData)) {
+      const totalCount = policyData.length;
+      let successCount = 0;
+      let lastErrorMessage = '정책 저장에 실패했습니다. 다시 시도해주세요.';
+
+      try {
+        setBulkProcessing(true);
+        setBulkProcessingMessage(`정책 저장 중... (0/${totalCount})`);
+
+        for (let i = 0; i < totalCount; i += 1) {
+          const currentPolicy = policyData[i];
+          try {
+            setBulkProcessingMessage(`정책 저장 중... (${i + 1}/${totalCount})`);
+            await PolicyService.createPolicy(currentPolicy);
+            successCount += 1;
+          } catch (error) {
+            console.error('복수 정책 저장 실패:', error);
+
+            if (error.response && error.response.data) {
+              const responseData = error.response.data;
+              if (responseData.error) {
+                lastErrorMessage = responseData.error;
+              } else if (responseData.missingFieldNames && responseData.missingFieldNames.length > 0) {
+                lastErrorMessage = `다음 필수 항목이 누락되었습니다: ${responseData.missingFieldNames.join(', ')}`;
+              }
+            } else if (error.message) {
+              lastErrorMessage = error.message;
+            }
+
+            throw error;
+          }
+        }
+
+        await loadPolicyData();
+        alert(`정책 ${successCount}건이 성공적으로 저장되었습니다.`);
+      } catch (error) {
+        const summaryMessage = successCount > 0
+          ? `정책 저장 중 오류가 발생했습니다. (${successCount}/${totalCount}건 성공)\n사유: ${lastErrorMessage}`
+          : `정책 저장에 실패했습니다.\n사유: ${lastErrorMessage}`;
+        alert(summaryMessage);
+        throw new Error(lastErrorMessage);
+      } finally {
+        setBulkProcessing(false);
+        setBulkProcessingMessage('');
+      }
+
+      return;
+    }
+
+    // 단일 정책 저장 처리
     try {
       console.log('정책 저장 시도:', policyData);
       await PolicyService.createPolicy(policyData);

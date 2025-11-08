@@ -755,9 +755,10 @@ function PolicyInputModal({
 
           await onSave(policyData);
         } else {
-          // 복수점 선택 - 각 매장별로 개별 정책 생성
+          // 복수점 선택 - 각 매장별로 개별 정책 생성 후 일괄 저장 요청
+          const timestamp = Date.now();
           const policies = formData.multipleStores.map((store, index) => ({
-            id: `POL_${Date.now()}_${index}`, // 임시 ID 생성
+            id: `POL_${timestamp}_${index}`, // 임시 ID 생성
             policyName: formData.policyName.trim(),
             policyStartDate: formData.policyStartDate,
             policyEndDate: formData.policyEndDate,
@@ -807,10 +808,7 @@ function PolicyInputModal({
             individualActivationType: formData.individualActivationType
           }));
 
-          // 각 정책을 순차적으로 저장
-          for (const policyData of policies) {
-            await onSave(policyData);
-          }
+          await onSave(policies);
         }
       }
       
