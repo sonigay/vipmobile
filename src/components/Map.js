@@ -199,7 +199,8 @@ function Map({
   isMapExpanded, // 맵 확대 상태
   onMapExpandToggle, // 맵 확대 토글 함수
   rememberedRequests, // 기억된 요청 목록
-  setRememberedRequests // 기억된 요청 목록 설정 함수
+  setRememberedRequests, // 기억된 요청 목록 설정 함수
+  onQuickCostClick // 퀵비용 등록 버튼 클릭 핸들러
 }) {
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -947,6 +948,18 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
                   {isAgentMode ? (
                     <div>
+                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
+                      {requestedStore && requestedStore.id && store.id && (
+                        <QuickCostPreview
+                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          fromStoreId={requestedStore.id}
+                          toStoreId={store.id}
+                          fromStoreName={requestedStore.name}
+                          toStoreName={store.name}
+                          onQuickCostClick={onQuickCostClick}
+                        />
+                      )}
+                      
                       {store.inventory && (
                         <div>
                           {Object.entries(store.inventory).map(([category, models]) => {
@@ -1012,18 +1025,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         </div>
                       )}
                       
-                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우) */}
-                      {requestedStore && requestedStore.id && store.id && (
-                        <QuickCostPreview
-                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
-                          fromStoreId={requestedStore.id}
-                          toStoreId={store.id}
-                          fromStoreName={requestedStore.name}
-                          toStoreName={store.name}
-                        />
-                      )}
-                      
-                      {/* 선택됨과 기억 버튼을 같은 줄에 배치 */}
+                      {/* 선택됨/기억/퀵비등록 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
                         {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
@@ -1045,15 +1047,38 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         >
                           기억
                         </button>
+                        
+                        {/* 퀵비등록 버튼 */}
+                        {requestedStore && requestedStore.id && store.id && onQuickCostClick && (
+                          <button 
+                            onClick={() => {
+                              const fromStore = requestedStore;
+                              const toStore = store;
+                              onQuickCostClick(fromStore, toStore);
+                            }}
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: '#2196f3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              minWidth: '60px'
+                            }}
+                          >
+                            퀵비등록
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
                     /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
                     <div>
                       {store.address && <p>주소: {store.address}</p>}
-                      <p>재고: {inventoryCount}개</p>
                       
-                      {/* 퀵비용 예상 정보 */}
+                      {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
                       {loggedInStore && loggedInStore.id && store.id && (
                         <QuickCostPreview
                           key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
@@ -1061,14 +1086,44 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           toStoreId={store.id}
                           fromStoreName={loggedInStore.name}
                           toStoreName={store.name}
+                          onQuickCostClick={onQuickCostClick}
                         />
                       )}
                       
-                      {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
+                      <p>재고: {inventoryCount}개</p>
+                      
+                      {/* 선택됨/퀵비등록 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
                         {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
                         
+                        {/* 퀵비등록 버튼 */}
+                        {loggedInStore && loggedInStore.id && store.id && onQuickCostClick && (
+                          <button 
+                            onClick={() => {
+                              const fromStore = loggedInStore;
+                              const toStore = store;
+                              onQuickCostClick(fromStore, toStore);
+                            }}
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: '#2196f3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              minWidth: '60px'
+                            }}
+                          >
+                            퀵비등록
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* 영업사원요청문구/기억 버튼을 아래로 이동 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         <button 
                           onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
                           disabled={!selectedModel || !selectedColor}
@@ -1148,6 +1203,18 @@ ${loggedInStore.name}으로 이동 예정입니다.
                   {/* 관리자모드일 때는 출고일 기준 재고 표시, 일반모드일 때는 영업사원요청문구 버튼 표시 */}
                   {isAgentMode ? (
                     <div>
+                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
+                      {requestedStore && requestedStore.id && store.id && (
+                        <QuickCostPreview
+                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          fromStoreId={requestedStore.id}
+                          toStoreId={store.id}
+                          fromStoreName={requestedStore.name}
+                          toStoreName={store.name}
+                          onQuickCostClick={onQuickCostClick}
+                        />
+                      )}
+                      
                       {store.inventory && (
                         <div>
                           {Object.entries(store.inventory).map(([category, models]) => {
@@ -1213,18 +1280,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         </div>
                       )}
                       
-                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우) */}
-                      {requestedStore && requestedStore.id && store.id && (
-                        <QuickCostPreview
-                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
-                          fromStoreId={requestedStore.id}
-                          toStoreId={store.id}
-                          fromStoreName={requestedStore.name}
-                          toStoreName={store.name}
-                        />
-                      )}
-                      
-                      {/* 선택됨과 기억 버튼을 같은 줄에 배치 */}
+                      {/* 선택됨/기억/퀵비등록 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
                         {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
@@ -1246,15 +1302,38 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         >
                           기억
                         </button>
+                        
+                        {/* 퀵비등록 버튼 */}
+                        {requestedStore && requestedStore.id && store.id && onQuickCostClick && (
+                          <button 
+                            onClick={() => {
+                              const fromStore = requestedStore;
+                              const toStore = store;
+                              onQuickCostClick(fromStore, toStore);
+                            }}
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: '#2196f3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              minWidth: '60px'
+                            }}
+                          >
+                            퀵비등록
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
                     /* 일반모드일 때는 영업사원요청문구 버튼 표시 */
                     <div>
                       {store.address && <p>주소: {store.address}</p>}
-                      <p>재고: {inventoryCount}개</p>
                       
-                      {/* 퀵비용 예상 정보 */}
+                      {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
                       {loggedInStore && loggedInStore.id && store.id && (
                         <QuickCostPreview
                           key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
@@ -1262,14 +1341,44 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           toStoreId={store.id}
                           fromStoreName={loggedInStore.name}
                           toStoreName={store.name}
+                          onQuickCostClick={onQuickCostClick}
                         />
                       )}
                       
-                      {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
+                      <p>재고: {inventoryCount}개</p>
+                      
+                      {/* 선택됨/퀵비등록 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
                         {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
                         
+                        {/* 퀵비등록 버튼 */}
+                        {loggedInStore && loggedInStore.id && store.id && onQuickCostClick && (
+                          <button 
+                            onClick={() => {
+                              const fromStore = loggedInStore;
+                              const toStore = store;
+                              onQuickCostClick(fromStore, toStore);
+                            }}
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: '#2196f3',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              minWidth: '60px'
+                            }}
+                          >
+                            퀵비등록
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* 영업사원요청문구/기억 버튼을 아래로 이동 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         <button 
                           onClick={() => handleKakaoTalk(store, selectedModel, selectedColor, loggedInStore)}
                           disabled={!selectedModel || !selectedColor}
@@ -1540,6 +1649,7 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                   toStoreId={store.id}
                                   fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
                                   toStoreName={store.name}
+                                  onQuickCostClick={onQuickCostClick}
                                 />
                               )}
                             </div>

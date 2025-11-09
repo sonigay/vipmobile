@@ -4,7 +4,7 @@ import { api } from '../api';
 /**
  * Popup에 표시할 간단한 퀵비용 미리보기 컴포넌트
  */
-const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName }) => {
+const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, onQuickCostClick }) => {
   const [quickCostData, setQuickCostData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +40,51 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName }
     );
   }
 
-  if (!quickCostData) return null;
+  // 데이터가 없을 때 안내 메시지 및 등록 버튼 표시
+  if (!quickCostData) {
+    return (
+      <div style={{ 
+        marginTop: '8px', 
+        padding: '8px', 
+        backgroundColor: '#fff3e0', 
+        borderRadius: '4px',
+        border: '1px solid #ffb74d',
+        textAlign: 'center'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+          <span style={{ fontSize: '16px', marginRight: '4px' }}>📝</span>
+          <span style={{ fontSize: '12px', color: '#e65100', fontWeight: 'bold' }}>
+            등록된 퀵비용이 없습니다
+          </span>
+        </div>
+        <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
+          퀵비등록 버튼을 눌러 등록해주세요
+        </div>
+        {onQuickCostClick && (
+          <button 
+            onClick={() => {
+              const fromStore = { id: fromStoreId, name: fromStoreName };
+              const toStore = { id: toStoreId, name: toStoreName };
+              onQuickCostClick(fromStore, toStore);
+            }}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#ff9800',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              minWidth: '80px'
+            }}
+          >
+            퀵비등록
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ 
