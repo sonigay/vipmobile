@@ -304,12 +304,19 @@ export const api = {
   },
 
   // 통계 데이터 조회 (관리자 전용)
-  getQuickCostStatistics: async (region) => {
+  getQuickCostStatistics: async (region, options = {}) => {
     try {
+      const { forceRefresh = false } = options;
       const cacheKey = `quick-cost-statistics-${region || 'all'}`;
-      const cached = clientCacheUtils.get(cacheKey);
-      if (cached) {
-        return cached;
+      if (forceRefresh && clientCacheUtils.delete) {
+        clientCacheUtils.delete(cacheKey);
+      }
+
+      if (!forceRefresh) {
+        const cached = clientCacheUtils.get(cacheKey);
+        if (cached) {
+          return { success: true, data: cached, cached: true };
+        }
       }
 
       const url = region 
@@ -340,12 +347,19 @@ export const api = {
   },
 
   // 데이터 품질 정보 조회 (관리자 전용)
-  getQuickCostQuality: async () => {
+  getQuickCostQuality: async (options = {}) => {
     try {
+      const { forceRefresh = false } = options;
       const cacheKey = 'quick-cost-quality';
-      const cached = clientCacheUtils.get(cacheKey);
-      if (cached) {
-        return cached;
+      if (forceRefresh && clientCacheUtils.delete) {
+        clientCacheUtils.delete(cacheKey);
+      }
+
+      if (!forceRefresh) {
+        const cached = clientCacheUtils.get(cacheKey);
+        if (cached) {
+          return { success: true, data: cached, cached: true };
+        }
       }
 
       const response = await fetch(`${API_BASE_URL}/api/quick-cost/quality`, {
