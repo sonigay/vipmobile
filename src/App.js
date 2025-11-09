@@ -46,6 +46,7 @@ import MealAllowanceMode from './components/MealAllowanceMode';
 import AttendanceMode from './components/AttendanceMode';
 import RiskManagementMode from './components/RiskManagementMode';
 import DirectStoreManagementMode from './components/DirectStoreManagementMode';
+import QuickServiceManagementMode from './components/QuickServiceManagementMode';
 import DirectStoreMode from './components/DirectStoreMode';
 import AppUpdatePopup from './components/AppUpdatePopup';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -161,6 +162,7 @@ function AppContent() {
   const [isMealAllowanceMode, setIsMealAllowanceMode] = useState(false);
   const [isAttendanceMode, setIsAttendanceMode] = useState(false);
   const [isRiskManagementMode, setIsRiskManagementMode] = useState(false);
+  const [isQuickServiceManagementMode, setIsQuickServiceManagementMode] = useState(false);
   const [isDirectStoreManagementMode, setIsDirectStoreManagementMode] = useState(false);
   const [isDirectStoreMode, setIsDirectStoreMode] = useState(false);
   // 재고배정 모드 관련 상태 추가
@@ -223,6 +225,7 @@ function AppContent() {
     setIsMealAllowanceMode(false);
     setIsAttendanceMode(false);
     setIsRiskManagementMode(false);
+    setIsQuickServiceManagementMode(false);
     setIsDirectStoreManagementMode(false);
     setIsDirectStoreMode(false);
   }, []);
@@ -878,6 +881,10 @@ function AppContent() {
           console.log('💾 리스크 관리 모드 복원');
           setIsRiskManagementMode(true);
           setCurrentMode('riskManagement');
+        } else if (parsedState.isQuickServiceManagement) {
+          console.log('[state] 퀵서비스 관리 모드 복원');
+          setIsQuickServiceManagementMode(true);
+          setCurrentMode('quickServiceManagement');
         } else if (parsedState.isDirectStoreManagement) {
           console.log('💾 직영점 관리 모드 복원');
           setIsDirectStoreManagementMode(true);
@@ -1905,6 +1912,39 @@ function AppContent() {
         store
       }));
     }
+    // 퀵서비스 관리 모드인지 확인
+    else if (store.modePermissions && store.modePermissions.quickServiceManagement) {
+      console.log('로그인: 퀵서비스 관리 모드');
+      setIsQuickServiceManagementMode(true);
+      setIsRiskManagementMode(false);
+      setIsDirectStoreManagementMode(false);
+      setIsDirectStoreMode(false);
+      setIsMealAllowanceMode(false);
+      setIsAttendanceMode(false);
+      setIsAgentMode(false);
+      setIsInventoryMode(false);
+      setIsSettlementMode(false);
+      setIsInspectionMode(false);
+      setIsChartMode(false);
+      setIsPolicyMode(false);
+      setIsMeetingMode(false);
+      setIsReservationMode(false);
+      setIsBudgetMode(false);
+      setIsInventoryRecoveryMode(false);
+      setIsSalesMode(false);
+      setIsDataCollectionMode(false);
+      setIsSmsManagementMode(false);
+      setIsObManagementMode(false);
+      setIsOnSaleManagementMode(false);
+      setIsOnSaleReceptionMode(false);
+      setCurrentMode('quickServiceManagement');
+
+      localStorage.setItem('loginState', JSON.stringify({
+        isQuickServiceManagement: true,
+        isAgent: false,
+        store
+      }));
+    }
     // 직영점 관리 모드인지 확인
     else if (store.isDirectStoreManagement) {
       console.log('로그인: 직영점 관리 모드');
@@ -2167,6 +2207,7 @@ function AppContent() {
     modifiedStore.isMealAllowance = false;
     modifiedStore.isAttendance = false;
     modifiedStore.isRiskManagement = false;
+    modifiedStore.isQuickServiceManagement = false;
     modifiedStore.isDirectStoreManagement = false;
     modifiedStore.isDirectStore = false;
     modifiedStore.isDataCollection = false;
@@ -2226,6 +2267,9 @@ function AppContent() {
         break;
       case 'riskManagement':
         modifiedStore.isRiskManagement = true;
+        break;
+      case 'quickServiceManagement':
+        modifiedStore.isQuickServiceManagement = true;
         break;
       case 'directStoreManagement':
         modifiedStore.isDirectStoreManagement = true;
@@ -2395,6 +2439,9 @@ function AppContent() {
         break;
       case 'riskManagement':
         setIsRiskManagementMode(true);
+        break;
+      case 'quickServiceManagement':
+        setIsQuickServiceManagementMode(true);
         break;
       case 'directStoreManagement':
         setIsDirectStoreManagementMode(true);
@@ -3450,6 +3497,25 @@ ${requestList}
             const currentModes = getCurrentUserAvailableModes();
             setAvailableModes(currentModes);
             setIsRiskManagementMode(false);
+            setShowModeSelection(true);
+          }}
+          availableModes={availableModes}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  if (isQuickServiceManagementMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <QuickServiceManagementMode
+          onLogout={handleLogout}
+          loggedInStore={loggedInStore}
+          onModeChange={() => {
+            const currentModes = getCurrentUserAvailableModes();
+            setAvailableModes(currentModes);
+            setIsQuickServiceManagementMode(false);
             setShowModeSelection(true);
           }}
           availableModes={availableModes}

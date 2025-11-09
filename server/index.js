@@ -3090,6 +3090,7 @@ app.post('/api/login', async (req, res) => {
         const hasAttendancePermission = agent[28] === 'O'; // AC열: 근퇴 모드 권한
         const hasRiskManagementPermission = agent[29] === 'O'; // AD열: 리스크 관리 모드 권한
         const hasDirectStoreManagementPermission = agent[30] === 'O'; // AE열: 직영점 관리 모드 권한
+        const hasQuickServiceManagementPermission = agent[31] === 'O'; // AF열: 퀵서비스 관리 모드 권한
         
         // 정보수집모드 권한 디버깅
         console.log('🔍 [권한체크] 정보수집모드 디버깅:');
@@ -3131,6 +3132,7 @@ app.post('/api/login', async (req, res) => {
           mealAllowance: hasMealAllowancePermission, // 식대 모드 권한
           attendance: hasAttendancePermission, // 근퇴 모드 권한
           riskManagement: hasRiskManagementPermission, // 리스크 관리 모드 권한
+          quickServiceManagement: hasQuickServiceManagementPermission, // 퀵서비스 관리 모드 권한
           directStoreManagement: hasDirectStoreManagementPermission // 직영점 관리 모드 권한
         };
         
