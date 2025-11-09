@@ -81,68 +81,97 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
   }, [quickCostList, favorites]);
 
   const topThree = sortedForPreview.slice(0, 3);
-  const bestCompany = topThree[0] || null;
 
   if (!fromStoreId || !toStoreId) return null;
 
+  const renderAddButton = (label = '다른 업체 등록') => (
+    onQuickCostClick ? (
+      <button
+        onClick={() => {
+          const fromStore = { id: fromStoreId, name: fromStoreName };
+          const toStore = { id: toStoreId, name: toStoreName };
+          onQuickCostClick(fromStore, toStore);
+        }}
+        style={{
+          padding: '4px 10px',
+          backgroundColor: '#1976d2',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '11px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          minWidth: '90px'
+        }}
+      >
+        {label}
+      </button>
+    ) : null
+  );
+
+  const renderHeader = () => (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '6px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ fontSize: '16px' }}>🚚</span>
+        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1976d2' }}>
+          예상 퀵비용
+        </span>
+      </div>
+      {renderAddButton()}
+    </div>
+  );
+
   if (loading) {
     return (
-      <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px', textAlign: 'center' }}>
-        <span style={{ fontSize: '12px', color: '#666' }}>퀵비용 조회 중...</span>
+      <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+        {renderHeader()}
+        <div style={{ textAlign: 'center', padding: '6px 0' }}>
+          <span style={{ fontSize: '12px', color: '#666' }}>퀵비용 조회 중...</span>
+        </div>
       </div>
     );
   }
 
-  const renderAddButton = (label = '다른 업체 등록') => (
-    onQuickCostClick ? (
-      <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center' }}>
-        <button
-          onClick={() => {
-            const fromStore = { id: fromStoreId, name: fromStoreName };
-            const toStore = { id: toStoreId, name: toStoreName };
-            onQuickCostClick(fromStore, toStore);
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: '#1976d2',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            minWidth: '100px'
-          }}
-        >
-          {label}
-        </button>
-      </div>
-    ) : null
-  );
-
-  if (!bestCompany) {
+  if (!topThree.length) {
     return (
       <div style={{
         marginTop: '8px',
         padding: '8px',
         backgroundColor: '#fff3e0',
         borderRadius: '4px',
-        border: '1px solid #ffb74d',
-        textAlign: 'center'
+        border: '1px solid #ffb74d'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-          <span style={{ fontSize: '16px', marginRight: '4px' }}>📝</span>
-          <span style={{ fontSize: '12px', color: '#e65100', fontWeight: 'bold' }}>
+        {renderHeader()}
+        <div style={{ textAlign: 'center', padding: '8px 0' }}>
+          <div style={{ fontSize: '12px', color: '#e65100', fontWeight: 'bold', marginBottom: '4px' }}>
             등록된 퀵비용이 없습니다
-          </span>
+          </div>
+          <div style={{ fontSize: '11px', color: '#666' }}>
+            새로운 업체 정보를 등록해주세요
+          </div>
         </div>
-        <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-          퀵비등록 버튼을 눌러 등록해주세요
-        </div>
-        {renderAddButton('퀵비등록')}
       </div>
     );
   }
+
+  const priceRow = topThree
+    .map(item => `${item.averageCost.toLocaleString()}원`)
+    .join(' / ');
+  const nameRow = topThree
+    .map(item => `${item.companyName} (${item.entryCount}건)`)
+    .join(' / ');
+  const rankRow = topThree
+    .map((item, index) => {
+      const rank = index + 1;
+      const isFavorite = favorites.includes(`${item.companyName}-${item.phoneNumber}`);
+      return `${rank}순위${isFavorite ? ' ⭐' : ''}`;
+    })
+    .join(' / ');
 
   return (
     <div style={{
@@ -152,58 +181,16 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
       borderRadius: '4px',
       border: '1px solid #90caf9'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-        <span style={{ fontSize: '16px', marginRight: '4px' }}>🚚</span>
-        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1976d2' }}>
-          예상 퀵비용
-        </span>
+      {renderHeader()}
+      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1976d2', marginBottom: '4px' }}>
+        {priceRow}
       </div>
-      <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1976d2', marginBottom: '2px' }}>
-        {bestCompany.averageCost.toLocaleString()}원
+      <div style={{ fontSize: '11px', color: '#424242', marginBottom: '4px' }}>
+        {nameRow}
       </div>
-      <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-        {bestCompany.companyName} ({bestCompany.entryCount}건)
+      <div style={{ fontSize: '10px', color: '#616161' }}>
+        {rankRow}
       </div>
-
-      {topThree.length > 0 && (
-        <div style={{
-          display: 'flex',
-          gap: '6px',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap'
-        }}>
-          {topThree.map((item, index) => {
-            const rank = index + 1;
-            const isFavorite = favorites.includes(`${item.companyName}-${item.phoneNumber}`);
-            return (
-              <div
-                key={`${item.companyName}-${item.phoneNumber}`}
-                style={{
-                  flex: '1 1 30%',
-                  minWidth: '80px',
-                  backgroundColor: rank === 1 ? '#fff' : '#f5f5f5',
-                  border: rank === 1 ? '1px solid #1976d2' : '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  padding: '6px',
-                  textAlign: 'center'
-                }}
-              >
-                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1976d2' }}>
-                  {item.averageCost.toLocaleString()}원
-                </div>
-                <div style={{ fontSize: '11px', color: '#424242', marginTop: '2px' }}>
-                  {item.companyName}
-                </div>
-                <div style={{ fontSize: '10px', color: '#9e9e9e', marginTop: '2px' }}>
-                  {rank}순위{isFavorite ? ' ⭐' : ''}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {renderAddButton()}
     </div>
   );
 };
