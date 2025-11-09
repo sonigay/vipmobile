@@ -11,15 +11,21 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
 
   const loadFavorites = () => {
     const savedFavorites = localStorage.getItem('quick-cost-favorites');
+    let parsed = [];
+
     if (savedFavorites) {
       try {
-        setFavorites(JSON.parse(savedFavorites));
+        const data = JSON.parse(savedFavorites);
+        if (Array.isArray(data)) {
+          parsed = data;
+        }
       } catch (err) {
         console.error('즐겨찾기 로드 실패:', err);
       }
-    } else {
-      setFavorites([]);
     }
+
+    setFavorites(parsed);
+    return parsed;
   };
 
   useEffect(() => {
@@ -29,6 +35,21 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
   useEffect(() => {
     loadFavorites();
   }, [refreshKey, fromStoreId, toStoreId]);
+
+  useEffect(() => {
+    const handleFavoritesChanged = (event) => {
+      if (event && Array.isArray(event.detail?.favorites)) {
+        setFavorites(event.detail.favorites);
+      } else {
+        loadFavorites();
+      }
+    };
+
+    window.addEventListener('quick-cost-favorites-changed', handleFavoritesChanged);
+    return () => {
+      window.removeEventListener('quick-cost-favorites-changed', handleFavoritesChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (!fromStoreId || !toStoreId) {
@@ -78,16 +99,17 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
   }, [fromStoreId, toStoreId, refreshKey]);
 
   const sortedForPreview = useMemo(() => {
-    const list = [...quickCostList];
-    return list.sort((a, b) => {
-      const aKey = `${a.companyName}-${a.phoneNumber}`;
-      const bKey = `${b.companyName}-${b.phoneNumber}`;
-      const aFav = favorites.includes(aKey);
-      const bFav = favorites.includes(bKey);
-      if (aFav && !bFav) return -1;
-      if (!aFav && bFav) return 1;
-      return a.averageCost - b.averageCost;
-    });
+    const favoritesSet = new Set(favorites);
+
+    const favoriteItems = quickCostList
+      .filter(item => favoritesSet.has(`${item.companyName}-${item.phoneNumber}`))
+      .sort((a, b) => a.averageCost - b.averageCost);
+
+    const nonFavoriteItems = quickCostList
+      .filter(item => !favoritesSet.has(`${item.companyName}-${item.phoneNumber}`))
+      .sort((a, b) => a.averageCost - b.averageCost);
+
+    return [...favoriteItems, ...nonFavoriteItems];
   }, [quickCostList, favorites]);
 
   const topThree = sortedForPreview.slice(0, 3);
@@ -172,20 +194,26 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
   const topThreeBoxes = topThree.map((item, index) => {
     const rank = index + 1;
     const isFavorite = favorites.includes(`${item.companyName}-${item.phoneNumber}`);
+    const isTop = rank === 1;
     return (
       <div
         key={`${item.companyName}-${item.phoneNumber}`}
         style={{
           flex: '1 1 30%',
           minWidth: '80px',
-          backgroundColor: '#ffffff',
-          border: '1px solid #bbdefb',
+          backgroundColor: isTop ? '#fff8e1' : '#ffffff',
+          border: isTop ? '1px solid #ffcc80' : '1px solid #bbdefb',
           borderRadius: '6px',
           padding: '6px',
           textAlign: 'center',
           boxShadow: '0 1px 2px rgba(25, 118, 210, 0.12)'
         }}
       >
+        {isTop && (
+          <div style={{ fontSize: '10px', color: '#d84315', fontWeight: 'bold', marginBottom: '4px' }}>
+            추천
+          </div>
+        )}
         <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1976d2', marginBottom: '2px' }}>
           {item.averageCost.toLocaleString()}원
         </div>
@@ -193,7 +221,7 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
           {item.companyName} ({item.entryCount}건)
         </div>
         <div style={{ fontSize: '10px', color: '#616161' }}>
-          {rank}순위{isFavorite ? ' ⭐' : ''}
+          {rank === 1 ? '추천' : `${rank}순위`}{isFavorite ? ' ⭐' : ''}
         </div>
       </div>
     );

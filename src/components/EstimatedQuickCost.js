@@ -97,6 +97,12 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
     
     setFavorites(newFavorites);
     localStorage.setItem('quick-cost-favorites', JSON.stringify(newFavorites));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('quick-cost-favorites-changed', {
+        detail: { favorites: newFavorites }
+      }));
+    }
   };
 
   // 속도 아이콘 및 색상
