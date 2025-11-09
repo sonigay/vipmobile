@@ -326,8 +326,42 @@ const QuickCostModal = ({
         });
         localStorage.setItem('quick-cost-recent', JSON.stringify(recentCompanies));
 
+        // 저장 후 관련 캐시 무효화하여 즉시 반영되도록 함
+        // 1. 예상퀵비용 캐시 삭제 (양방향 모두)
+        const cacheKey1 = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
+        const cacheKey2 = `quick-cost-estimate-${toStoreId}-${fromStoreId}`;
+        if (window.clientCacheUtils) {
+          window.clientCacheUtils.delete(cacheKey1);
+          window.clientCacheUtils.delete(cacheKey2);
+        }
+        
+        // 2. 업체명 목록 캐시 삭제 (새 업체가 목록에 나타나도록)
+        const companiesCacheKey = 'quick-cost-companies';
+        if (window.clientCacheUtils) {
+          window.clientCacheUtils.delete(companiesCacheKey);
+        }
+        
+        // 3. 저장한 업체의 전화번호/비용 캐시도 삭제
+        companiesData.forEach(company => {
+          const phoneCacheKey = `quick-cost-phone-${company.name}`;
+          const costCacheKey = `quick-cost-cost-${company.name}-${company.phone}`;
+          if (window.clientCacheUtils) {
+            window.clientCacheUtils.delete(phoneCacheKey);
+            window.clientCacheUtils.delete(costCacheKey);
+          }
+        });
+
         alert('퀵비용 정보가 성공적으로 저장되었습니다.');
-        onClose();
+        
+        // 저장 성공 후 부모 컴포넌트에 리프레시 신호 전달
+        if (onClose) {
+          // onClose에 refresh 플래그를 전달할 수 있도록 수정 필요
+          // 일단 모달을 닫고, 부모 컴포넌트에서 리프레시 처리하도록 함
+          onClose(true); // true = 저장 성공 플래그
+        } else {
+          onClose();
+        }
+        
         // 폼 초기화
         setCompanyList([{ ...initialCompany }]);
       } else {
@@ -353,7 +387,7 @@ const QuickCostModal = ({
   const handleClose = () => {
     setError(null);
     setCompanyList([{ ...initialCompany }]);
-    onClose();
+    onClose(false); // 저장하지 않고 닫은 경우
   };
 
   const fromStoreName = modeType === '관리자모드' && requestedStore 
@@ -415,7 +449,6 @@ const QuickCostModal = ({
                       value={company.name}
                       onChange={(e) => handleCompanyNameChange(index, e.target.value, 'input')}
                       inputProps={{ maxLength: 50 }}
-                      autoFocus
                     />
                     <Button
                       size="small"
@@ -552,7 +585,6 @@ const QuickCostModal = ({
                       placeholder="010-1234-5678"
                       value={company.phone}
                       onChange={(e) => handlePhoneChange(index, e.target.value, 'input')}
-                      autoFocus={company.phoneInputMode === 'input' && !company.phone}
                     />
                     {company.name && company.nameInputMode === 'select' && (
                       <Button
@@ -641,7 +673,6 @@ const QuickCostModal = ({
                         handleCostChange(index, value, 'input');
                       }}
                       inputProps={{ maxLength: 7 }}
-                      autoFocus={company.costInputMode === 'input' && !company.cost}
                     />
                     {company.name && company.phone && company.nameInputMode === 'select' && company.phoneInputMode === 'select' && (
                       <Button

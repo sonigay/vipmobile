@@ -218,6 +218,7 @@ function AppContent() {
   const [showQuickCostModal, setShowQuickCostModal] = useState(false);
   const [quickCostFromStore, setQuickCostFromStore] = useState(null);
   const [quickCostToStore, setQuickCostToStore] = useState(null);
+  const [quickCostRefreshKey, setQuickCostRefreshKey] = useState(0); // 퀵비용 데이터 리프레시용 키
   const resetNewModeFlags = useCallback(() => {
     setIsMealAllowanceMode(false);
     setIsAttendanceMode(false);
@@ -3762,6 +3763,7 @@ ${requestList}
                             setQuickCostToStore(toStore);
                             setShowQuickCostModal(true);
                           }}
+                          quickCostRefreshKey={quickCostRefreshKey}
                         />
                       </Box>
                       
@@ -4033,6 +4035,7 @@ ${requestList}
                       setQuickCostToStore(toStore);
                       setShowQuickCostModal(true);
                     }}
+                    quickCostRefreshKey={quickCostRefreshKey}
                   />
                   <AgentFilterPanel
                     models={data?.models}
@@ -4070,6 +4073,7 @@ ${requestList}
                       setQuickCostToStore(toStore);
                       setShowQuickCostModal(true);
                     }}
+                    quickCostRefreshKey={quickCostRefreshKey}
                   />
                   <FilterPanel
                     models={data?.models}
@@ -4354,10 +4358,14 @@ ${requestList}
       {/* 퀵비용 등록 모달 */}
       <QuickCostModal
         open={showQuickCostModal}
-        onClose={() => {
+        onClose={(saved) => {
           setShowQuickCostModal(false);
           setQuickCostFromStore(null);
           setQuickCostToStore(null);
+          // 저장 성공 시 refreshKey 업데이트하여 QuickCostPreview 리프레시
+          if (saved === true) {
+            setQuickCostRefreshKey(prev => prev + 1);
+          }
         }}
         fromStore={quickCostFromStore}
         toStore={quickCostToStore}

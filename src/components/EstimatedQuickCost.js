@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material';
 import { api } from '../api';
 
-const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName }) => {
+const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, refreshKey }) => {
   const [estimatedData, setEstimatedData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -58,7 +58,9 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
       setLoading(true);
       setError(null);
       try {
-        const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId);
+        // refreshKey이 변경되면 캐시를 무시하고 새로 조회
+        const skipCache = refreshKey !== undefined && refreshKey !== null;
+        const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
         if (result.success) {
           setEstimatedData(result.data || []);
         } else {
@@ -73,7 +75,7 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
     };
 
     fetchEstimatedCost();
-  }, [fromStoreId, toStoreId]);
+  }, [fromStoreId, toStoreId, refreshKey]);
 
   // 즐겨찾기 토글
   const toggleFavorite = (companyName, phoneNumber) => {

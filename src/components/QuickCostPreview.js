@@ -4,31 +4,37 @@ import { api } from '../api';
 /**
  * Popup에 표시할 간단한 퀵비용 미리보기 컴포넌트
  */
-const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, onQuickCostClick }) => {
+const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, onQuickCostClick, refreshKey }) => {
   const [quickCostData, setQuickCostData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!fromStoreId || !toStoreId) return;
 
-    const fetchQuickCost = async () => {
-      setLoading(true);
-      try {
-        const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId);
-        if (result.success && result.data && result.data.length > 0) {
-          // 1순위 업체만 표시
-          const sorted = [...result.data].sort((a, b) => a.averageCost - b.averageCost);
-          setQuickCostData(sorted[0]);
+      const fetchQuickCost = async () => {
+        setLoading(true);
+        try {
+          // refreshKey이 변경되면 캐시를 무시하고 새로 조회
+          const skipCache = refreshKey !== undefined && refreshKey !== null;
+          const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
+          if (result.success && result.data && result.data.length > 0) {
+            // 1순위 업체만 표시
+            const sorted = [...result.data].sort((a, b) => a.averageCost - b.averageCost);
+            setQuickCostData(sorted[0]);
+          } else {
+            // 데이터가 없으면 null로 설정
+            setQuickCostData(null);
+          }
+        } catch (err) {
+          console.error('퀵비용 조회 오류:', err);
+          setQuickCostData(null);
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        console.error('퀵비용 조회 오류:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
     fetchQuickCost();
-  }, [fromStoreId, toStoreId]);
+  }, [fromStoreId, toStoreId, refreshKey]);
 
   if (!fromStoreId || !toStoreId) return null;
 

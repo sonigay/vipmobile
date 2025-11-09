@@ -61,7 +61,8 @@ function StoreInfoTable({
   agentTotalInventory,
   loggedInStore,
   isAgentMode,
-  onQuickCostClick
+  onQuickCostClick,
+  quickCostRefreshKey // 퀵비용 데이터 리프레시용 키
 }) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -389,6 +390,7 @@ ${model} / ${color} 모델
                 toStoreId={selectedStore?.id || ''}
                 fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
                 toStoreName={selectedStore?.name || ''}
+                refreshKey={quickCostRefreshKey}
               />
             </Box>
           )}

@@ -991,12 +991,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
                       {requestedStore && requestedStore.id && store.id && (
                         <QuickCostPreview
-                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
                           fromStoreId={requestedStore.id}
                           toStoreId={store.id}
                           fromStoreName={requestedStore.name}
                           toStoreName={store.name}
                           onQuickCostClick={onQuickCostClick}
+                          refreshKey={quickCostRefreshKey}
                         />
                       )}
                       
@@ -1097,12 +1098,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
                       {loggedInStore && loggedInStore.id && store.id && (
                         <QuickCostPreview
-                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
                           fromStoreId={loggedInStore.id}
                           toStoreId={store.id}
                           fromStoreName={loggedInStore.name}
                           toStoreName={store.name}
                           onQuickCostClick={onQuickCostClick}
+                          refreshKey={quickCostRefreshKey}
                         />
                       )}
                       
@@ -1198,12 +1200,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우 - 매장명 아래, 모델명/색상 정보 위) */}
                       {requestedStore && requestedStore.id && store.id && (
                         <QuickCostPreview
-                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
                           fromStoreId={requestedStore.id}
                           toStoreId={store.id}
                           fromStoreName={requestedStore.name}
                           toStoreName={store.name}
                           onQuickCostClick={onQuickCostClick}
+                          refreshKey={quickCostRefreshKey}
                         />
                       )}
                       
@@ -1304,12 +1307,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                       {/* 퀵비용 예상 정보 (주소 아래, 재고 위) */}
                       {loggedInStore && loggedInStore.id && store.id && (
                         <QuickCostPreview
-                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
                           fromStoreId={loggedInStore.id}
                           toStoreId={store.id}
                           fromStoreName={loggedInStore.name}
                           toStoreName={store.name}
                           onQuickCostClick={onQuickCostClick}
+                          refreshKey={quickCostRefreshKey}
                         />
                       )}
                       
@@ -1588,12 +1592,13 @@ ${loggedInStore.name}으로 이동 예정입니다.
                               {/* 퀵비용 예상 정보 */}
                               {((isAgentMode && requestedStore && requestedStore.id) || (!isAgentMode && loggedInStore && loggedInStore.id)) && store.id && (
                                 <QuickCostPreview
-                                  key={`quickcost-${isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                                  key={`quickcost-${isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}-${quickCostRefreshKey || 0}`}
                                   fromStoreId={isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}
                                   toStoreId={store.id}
                                   fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
                                   toStoreName={store.name}
                                   onQuickCostClick={onQuickCostClick}
+                                  refreshKey={quickCostRefreshKey}
                                 />
                               )}
                             </div>

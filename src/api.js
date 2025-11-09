@@ -118,12 +118,16 @@ export const api = {
   },
 
   // 예상퀵비 조회
-  getEstimatedQuickCost: async (fromStoreId, toStoreId) => {
+  getEstimatedQuickCost: async (fromStoreId, toStoreId, skipCache = false) => {
     try {
       const cacheKey = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
-      const cached = clientCacheUtils.get(cacheKey);
-      if (cached) {
-        return cached;
+      
+      // skipCache가 false일 때만 캐시 확인
+      if (!skipCache) {
+        const cached = clientCacheUtils.get(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const response = await fetch(`${API_BASE_URL}/api/quick-cost/estimate?fromStoreId=${fromStoreId}&toStoreId=${toStoreId}`, {
