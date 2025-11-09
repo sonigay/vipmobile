@@ -4144,6 +4144,7 @@ ${requestList}
                       setQuickCostToStore(toStore);
                       setShowQuickCostModal(true);
                     }}
+                    quickCostRefreshKey={quickCostRefreshKey}
                   />
                 </Box>
               )}

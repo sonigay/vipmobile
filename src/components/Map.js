@@ -205,43 +205,21 @@ function Map({
 }) {
   // 디버깅: onQuickCostClick prop 확인
   useEffect(() => {
-    console.log('🔍 Map 컴포넌트: onQuickCostClick prop 상세 확인', {
-      onQuickCostClick: onQuickCostClick,
-      type: typeof onQuickCostClick,
-      isUndefined: typeof onQuickCostClick === 'undefined',
-      isNull: onQuickCostClick === null,
-      isFunction: typeof onQuickCostClick === 'function',
-      isAgentMode,
-      currentView,
-      loggedInStore: !!loggedInStore,
-      requestedStore: !!requestedStore
+    console.log('🔍 Map 컴포넌트: quickCostRefreshKey prop 확인', {
+      quickCostRefreshKey,
+      type: typeof quickCostRefreshKey,
+      isUndefined: typeof quickCostRefreshKey === 'undefined',
+      isNull: quickCostRefreshKey === null,
+      isNumber: typeof quickCostRefreshKey === 'number',
+      value: quickCostRefreshKey
     });
     
-    if (typeof onQuickCostClick === 'undefined') {
-      console.warn('⚠️ Map 컴포넌트: onQuickCostClick prop이 전달되지 않았습니다.', {
-        isAgentMode,
-        currentView,
-        loggedInStore: !!loggedInStore,
-        requestedStore: !!requestedStore
-      });
-    } else if (typeof onQuickCostClick === 'function') {
-      console.log('✅ Map 컴포넌트: onQuickCostClick prop 전달 확인됨 (함수)', {
-        isAgentMode,
-        currentView,
-        loggedInStore: !!loggedInStore,
-        requestedStore: !!requestedStore
-      });
+    if (typeof quickCostRefreshKey === 'undefined') {
+      console.warn('⚠️ Map 컴포넌트: quickCostRefreshKey prop이 전달되지 않았습니다.');
     } else {
-      console.warn('⚠️ Map 컴포넌트: onQuickCostClick prop이 함수가 아닙니다.', {
-        value: onQuickCostClick,
-        type: typeof onQuickCostClick,
-        isAgentMode,
-        currentView,
-        loggedInStore: !!loggedInStore,
-        requestedStore: !!requestedStore
-      });
+      console.log('✅ Map 컴포넌트: quickCostRefreshKey prop 전달 확인됨:', quickCostRefreshKey);
     }
-  }, [onQuickCostClick, isAgentMode, currentView, loggedInStore, requestedStore]);
+  }, [quickCostRefreshKey]);
   
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
