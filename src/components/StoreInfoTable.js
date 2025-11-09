@@ -9,7 +9,8 @@ import {
   TableContainer,
   TableRow,
   Button,
-  Chip
+  Chip,
+  Divider
 } from '@mui/material';
 import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
@@ -18,7 +19,10 @@ import CallIcon from '@mui/icons-material/Call';
 import ChatIcon from '@mui/icons-material/Chat';
 import SearchIcon from '@mui/icons-material/Search';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import AddIcon from '@mui/icons-material/Add';
 import { fetchAgentData } from '../api';
+import EstimatedQuickCost from './EstimatedQuickCost';
 
 /**
  * 문자열에서 앞 N글자 추출하는 함수
@@ -44,7 +48,21 @@ const handleCall = (phoneNumber) => {
 /**
  * 선택된 매장 정보를 표시하는 테이블 컴포넌트
  */
-function StoreInfoTable({ selectedStore, requestedStore, agentTarget, agentContactId, onCallButtonClick, onKakaoTalkButtonClick, selectedModel, selectedColor, currentView, agentTotalInventory }) {
+function StoreInfoTable({ 
+  selectedStore, 
+  requestedStore, 
+  agentTarget, 
+  agentContactId, 
+  onCallButtonClick, 
+  onKakaoTalkButtonClick, 
+  selectedModel, 
+  selectedColor, 
+  currentView, 
+  agentTotalInventory,
+  loggedInStore,
+  isAgentMode,
+  onQuickCostClick
+}) {
   const [matchedContact, setMatchedContact] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -338,6 +356,41 @@ ${model} / ${color} 모델
             </TableBody>
           </Table>
         </TableContainer>
+        
+        {/* 퀵비용 예상 섹션 */}
+        {(selectedStore && (requestedStore || loggedInStore)) && (
+          <Box sx={{ mt: 3 }}>
+            <Divider sx={{ mb: 2 }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalShippingIcon color="primary" />
+                매장간 퀵비용 예상
+              </Typography>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  if (onQuickCostClick) {
+                    const fromStore = isAgentMode && requestedStore ? requestedStore : loggedInStore;
+                    const toStore = selectedStore;
+                    onQuickCostClick(fromStore, toStore);
+                  }
+                }}
+                sx={{ borderRadius: '20px', textTransform: 'none' }}
+              >
+                퀵비용 등록
+              </Button>
+            </Box>
+            <EstimatedQuickCost
+              fromStoreId={isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}
+              toStoreId={selectedStore?.id || ''}
+              fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
+              toStoreName={selectedStore?.name || ''}
+            />
+          </Box>
+        )}
       ) : (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
           지도에서 업체를 선택하세요

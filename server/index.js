@@ -741,6 +741,7 @@ const SMS_HISTORY_SHEET_NAME = 'SMS전달이력';  // SMS 전달 이력
 const SMS_AUTO_REPLY_RULES_SHEET_NAME = 'SMS자동응답규칙';  // SMS 자동응답 규칙
 const SMS_AUTO_REPLY_CONTACTS_SHEET_NAME = 'SMS자동응답거래처';  // SMS 자동응답 거래처
 const SMS_AUTO_REPLY_HISTORY_SHEET_NAME = 'SMS자동응답이력';  // SMS 자동응답 이력
+const QUICK_COST_SHEET_NAME = '퀵비용관리';  // 퀵비용 관리 시트
 
 // 단가표 시트 ID (Phase 2에서 사용)
 const PRICE_SHEET_IDS = {
@@ -32709,5 +32710,951 @@ app.post('/api/sms/auto-reply/update-status', async (req, res) => {
   } catch (error) {
     console.error('자동응답 발송 상태 업데이트 실패:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===== 퀵비용 관리 API =====
+
+// 데이터 정규화 유틸리티 함수
+const normalizeCompanyName = (name) => {
+  if (!name) return '';
+  return name.replace(/\s+/g, '').toLowerCase().trim();
+};
+
+const normalizePhoneNumber = (phone) => {
+  if (!phone) return '';
+  return phone.replace(/[-\s]/g, '').replace(/\D/g, '');
+};
+
+// 퀵비용 데이터 저장 API
+app.post('/api/quick-cost/save', async (req, res) => {
+  try {
+    const {
+      registrantStoreName,
+      registrantStoreId,
+      fromStoreName,
+      fromStoreId,
+      toStoreName,
+      toStoreId,
+      modeType,
+      companies // 배열: [{name, phone, cost, dispatchSpeed, pickupSpeed, arrivalSpeed}, ...]
+    } = req.body;
+
+    // 입력값 검증
+    if (!registrantStoreName || !registrantStoreId || !fromStoreName || !fromStoreId || 
+        !toStoreName || !toStoreId || !modeType || !companies || companies.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '필수 필드가 누락되었습니다.' 
+      });
+    }
+
+    // 최대 5개 업체까지만 허용
+    if (companies.length > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '최대 5개 업체까지만 등록 가능합니다.' 
+      });
+    }
+
+    // 각 업체 정보 검증 및 정규화
+    const normalizedCompanies = companies.map((company, index) => {
+      // 비용 검증
+      const cost = parseInt(company.cost);
+      if (isNaN(cost) || cost <= 0 || cost > 1000000) {
+        throw new Error(`업체${index + 1}의 비용이 유효하지 않습니다. (1원 ~ 1,000,000원)`);
+      }
+
+      // 전화번호 검증
+      const normalizedPhone = normalizePhoneNumber(company.phone);
+      if (!normalizedPhone || normalizedPhone.length < 8) {
+        throw new Error(`업체${index + 1}의 전화번호가 유효하지 않습니다.`);
+      }
+
+      // 업체명 검증
+      const normalizedName = normalizeCompanyName(company.name);
+      if (!normalizedName || normalizedName.length === 0 || normalizedName.length > 50) {
+        throw new Error(`업체${index + 1}의 업체명이 유효하지 않습니다. (1~50자)`);
+      }
+
+      // 속도 검증
+      const validSpeeds = ['빠름', '중간', '느림'];
+      if (!validSpeeds.includes(company.dispatchSpeed) || 
+          !validSpeeds.includes(company.pickupSpeed) || 
+          !validSpeeds.includes(company.arrivalSpeed)) {
+        throw new Error(`업체${index + 1}의 속도 정보가 유효하지 않습니다. (빠름/중간/느림)`);
+      }
+
+      return {
+        name: normalizedName,
+        originalName: company.name.trim(), // 원본 업체명도 저장
+        phone: normalizedPhone,
+        originalPhone: company.phone.trim(), // 원본 전화번호도 저장
+        cost: cost,
+        dispatchSpeed: company.dispatchSpeed,
+        pickupSpeed: company.pickupSpeed,
+        arrivalSpeed: company.arrivalSpeed
+      };
+    });
+
+    // 구글시트에 저장할 데이터 준비
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const row = [
+      now, // 등록일시
+      registrantStoreName, // 등록자매장명
+      registrantStoreId, // 등록자매장ID
+      fromStoreName, // 출발매장명
+      fromStoreId, // 출발매장ID
+      toStoreName, // 도착매장명
+      toStoreId, // 도착매장ID
+      modeType // 모드타입
+    ];
+
+    // 업체 정보 추가 (최대 5개)
+    for (let i = 0; i < 5; i++) {
+      if (i < normalizedCompanies.length) {
+        const company = normalizedCompanies[i];
+        row.push(
+          company.originalName, // 퀵서비스업체명 (원본)
+          company.originalPhone, // 퀵서비스업체전화번호 (원본)
+          company.cost, // 퀵서비스업체비용
+          company.dispatchSpeed, // 퀵서비스업체배차속도
+          company.pickupSpeed, // 퀵서비스업체픽업속도
+          company.arrivalSpeed // 퀵서비스업체도착속도
+        );
+      } else {
+        // 빈 업체 슬롯
+        row.push('', '', '', '', '', '');
+      }
+    }
+
+    // 구글시트에 추가
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [row]
+      }
+    });
+
+    // 캐시 무효화 (관련 캐시 삭제)
+    const cacheKeys = [
+      `quick-cost-companies`,
+      `quick-cost-estimate-${fromStoreId}-${toStoreId}`,
+      `quick-cost-phone-*`,
+      `quick-cost-cost-*`
+    ];
+    cacheKeys.forEach(key => {
+      if (key.includes('*')) {
+        // 와일드카드가 있는 경우 모든 관련 캐시 삭제
+        for (const [cacheKey] of cache.entries()) {
+          if (cacheKey.startsWith(key.replace('*', ''))) {
+            cache.delete(cacheKey);
+          }
+        }
+      } else {
+        cache.delete(key);
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: '퀵비용 데이터가 성공적으로 저장되었습니다.' 
+    });
+
+  } catch (error) {
+    console.error('퀵비용 데이터 저장 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '퀵비용 데이터 저장에 실패했습니다.' 
+    });
+  }
+});
+
+// 예상퀵비 조회 API
+app.get('/api/quick-cost/estimate', async (req, res) => {
+  try {
+    const { fromStoreId, toStoreId } = req.query;
+
+    if (!fromStoreId || !toStoreId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '출발매장ID와 도착매장ID가 필요합니다.' 
+      });
+    }
+
+    // 캐시 확인
+    const cacheKey = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
+    const cached = cacheUtils.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      // 헤더만 있는 경우
+      return res.json({ success: true, data: [] });
+    }
+
+    // 헤더 제외하고 데이터 처리
+    const dataRows = rows.slice(1);
+    
+    // 해당 매장간 데이터 필터링
+    const filteredData = dataRows.filter(row => {
+      const rowFromStoreId = row[4]?.toString().trim(); // 출발매장ID (E열, 인덱스 4)
+      const rowToStoreId = row[6]?.toString().trim(); // 도착매장ID (G열, 인덱스 6)
+      return rowFromStoreId === fromStoreId.toString() && rowToStoreId === toStoreId.toString();
+    });
+
+    if (filteredData.length === 0) {
+      const emptyResult = [];
+      cacheUtils.set(cacheKey, emptyResult, 5 * 60 * 1000); // 5분 캐싱
+      return res.json({ success: true, data: emptyResult });
+    }
+
+    // 업체별 데이터 수집 (업체1~5)
+    const companyDataMap = new Map(); // key: normalizedCompanyName-normalizedPhone
+
+    filteredData.forEach(row => {
+      // 각 업체 슬롯 처리 (업체1~5)
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6); // I열부터 시작, 각 업체당 6열
+        const companyName = row[baseIndex]?.toString().trim();
+        const phoneNumber = row[baseIndex + 1]?.toString().trim();
+        const cost = row[baseIndex + 2]?.toString().trim();
+        const dispatchSpeed = row[baseIndex + 3]?.toString().trim();
+        const pickupSpeed = row[baseIndex + 4]?.toString().trim();
+        const arrivalSpeed = row[baseIndex + 5]?.toString().trim();
+
+        if (!companyName || !phoneNumber || !cost) continue;
+
+        const normalizedName = normalizeCompanyName(companyName);
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        const costNum = parseInt(cost);
+
+        if (!normalizedName || !normalizedPhone || isNaN(costNum)) continue;
+
+        const key = `${normalizedName}-${normalizedPhone}`;
+
+        if (!companyDataMap.has(key)) {
+          companyDataMap.set(key, {
+            companyName: companyName, // 원본 업체명
+            phoneNumber: phoneNumber, // 원본 전화번호
+            normalizedName: normalizedName,
+            normalizedPhone: normalizedPhone,
+            costs: [],
+            dispatchSpeeds: [],
+            pickupSpeeds: [],
+            arrivalSpeeds: []
+          });
+        }
+
+        const companyData = companyDataMap.get(key);
+        companyData.costs.push(costNum);
+        if (dispatchSpeed) companyData.dispatchSpeeds.push(dispatchSpeed);
+        if (pickupSpeed) companyData.pickupSpeeds.push(pickupSpeed);
+        if (arrivalSpeed) companyData.arrivalSpeeds.push(arrivalSpeed);
+      }
+    });
+
+    // 업체별 통계 계산
+    const results = Array.from(companyDataMap.values()).map(companyData => {
+      const costs = companyData.costs;
+      const avgCost = costs.reduce((sum, cost) => sum + cost, 0) / costs.length;
+
+      // 이상치 탐지 (평균 대비 20% 이상 차이)
+      const threshold = avgCost * 0.2;
+      const outliers = costs.filter(cost => Math.abs(cost - avgCost) > threshold);
+      const hasOutliers = outliers.length > 0;
+
+      // 이상치 제외한 평균 재계산
+      const validCosts = costs.filter(cost => Math.abs(cost - avgCost) <= threshold);
+      const finalAvgCost = validCosts.length > 0 
+        ? validCosts.reduce((sum, cost) => sum + cost, 0) / validCosts.length 
+        : avgCost;
+
+      // 서비스 품질 정보 계산 (최빈값)
+      const getMostFrequent = (arr) => {
+        if (arr.length === 0) return null;
+        const counts = {};
+        arr.forEach(item => {
+          counts[item] = (counts[item] || 0) + 1;
+        });
+        return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+      };
+
+      const dispatchSpeed = getMostFrequent(companyData.dispatchSpeeds) || '중간';
+      const pickupSpeed = getMostFrequent(companyData.pickupSpeeds) || '중간';
+      const arrivalSpeed = getMostFrequent(companyData.arrivalSpeeds) || '중간';
+
+      return {
+        companyName: companyData.companyName,
+        phoneNumber: companyData.phoneNumber,
+        averageCost: Math.round(finalAvgCost),
+        entryCount: costs.length,
+        hasOutliers: hasOutliers,
+        outlierCount: outliers.length,
+        dispatchSpeed: dispatchSpeed,
+        pickupSpeed: pickupSpeed,
+        arrivalSpeed: arrivalSpeed
+      };
+    });
+
+    // 가격 순으로 정렬
+    results.sort((a, b) => a.averageCost - b.averageCost);
+
+    // 캐싱 (5분)
+    cacheUtils.set(cacheKey, results, 5 * 60 * 1000);
+
+    res.json({ success: true, data: results });
+
+  } catch (error) {
+    console.error('예상퀵비 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '예상퀵비 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 업체명 목록 조회 API
+app.get('/api/quick-cost/companies', async (req, res) => {
+  try {
+    // 캐시 확인
+    const cacheKey = 'quick-cost-companies';
+    const cached = cacheUtils.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      const emptyResult = [];
+      cacheUtils.set(cacheKey, emptyResult, 10 * 60 * 1000); // 10분 캐싱
+      return res.json({ success: true, data: emptyResult });
+    }
+
+    const dataRows = rows.slice(1);
+    const companySet = new Set();
+
+    // 모든 업체명 수집 (업체1~5)
+    dataRows.forEach(row => {
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6); // I열부터 시작
+        const companyName = row[baseIndex]?.toString().trim();
+        if (companyName) {
+          const normalizedName = normalizeCompanyName(companyName);
+          if (normalizedName) {
+            companySet.add(companyName); // 원본 업체명 저장
+          }
+        }
+      }
+    });
+
+    const companies = Array.from(companySet).sort();
+    cacheUtils.set(cacheKey, companies, 10 * 60 * 1000); // 10분 캐싱
+
+    res.json({ success: true, data: companies });
+
+  } catch (error) {
+    console.error('업체명 목록 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '업체명 목록 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 전화번호 목록 조회 API
+app.get('/api/quick-cost/phone-numbers', async (req, res) => {
+  try {
+    const { companyName } = req.query;
+
+    if (!companyName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '업체명이 필요합니다.' 
+      });
+    }
+
+    const normalizedCompanyName = normalizeCompanyName(companyName);
+    const cacheKey = `quick-cost-phone-${normalizedCompanyName}`;
+    
+    // 캐시 확인
+    const cached = cacheUtils.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      const emptyResult = [];
+      cacheUtils.set(cacheKey, emptyResult, 10 * 60 * 1000);
+      return res.json({ success: true, data: emptyResult });
+    }
+
+    const dataRows = rows.slice(1);
+    const phoneSet = new Set();
+
+    // 해당 업체명의 전화번호 수집
+    dataRows.forEach(row => {
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6);
+        const rowCompanyName = row[baseIndex]?.toString().trim();
+        const phoneNumber = row[baseIndex + 1]?.toString().trim();
+
+        if (rowCompanyName && phoneNumber) {
+          const rowNormalizedName = normalizeCompanyName(rowCompanyName);
+          if (rowNormalizedName === normalizedCompanyName) {
+            phoneSet.add(phoneNumber); // 원본 전화번호 저장
+          }
+        }
+      }
+    });
+
+    const phones = Array.from(phoneSet).sort();
+    cacheUtils.set(cacheKey, phones, 10 * 60 * 1000); // 10분 캐싱
+
+    res.json({ success: true, data: phones });
+
+  } catch (error) {
+    console.error('전화번호 목록 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '전화번호 목록 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 비용 목록 조회 API
+app.get('/api/quick-cost/costs', async (req, res) => {
+  try {
+    const { companyName, phoneNumber } = req.query;
+
+    if (!companyName || !phoneNumber) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '업체명과 전화번호가 필요합니다.' 
+      });
+    }
+
+    const normalizedCompanyName = normalizeCompanyName(companyName);
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    const cacheKey = `quick-cost-cost-${normalizedCompanyName}-${normalizedPhone}`;
+    
+    // 캐시 확인
+    const cached = cacheUtils.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      const emptyResult = [];
+      cacheUtils.set(cacheKey, emptyResult, 10 * 60 * 1000);
+      return res.json({ success: true, data: emptyResult });
+    }
+
+    const dataRows = rows.slice(1);
+    const costSet = new Set();
+
+    // 해당 업체명+전화번호 조합의 비용 수집
+    dataRows.forEach(row => {
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6);
+        const rowCompanyName = row[baseIndex]?.toString().trim();
+        const rowPhoneNumber = row[baseIndex + 1]?.toString().trim();
+        const cost = row[baseIndex + 2]?.toString().trim();
+
+        if (rowCompanyName && rowPhoneNumber && cost) {
+          const rowNormalizedName = normalizeCompanyName(rowCompanyName);
+          const rowNormalizedPhone = normalizePhoneNumber(rowPhoneNumber);
+          
+          if (rowNormalizedName === normalizedCompanyName && 
+              rowNormalizedPhone === normalizedPhone) {
+            const costNum = parseInt(cost);
+            if (!isNaN(costNum)) {
+              costSet.add(costNum);
+            }
+          }
+        }
+      }
+    });
+
+    const costs = Array.from(costSet).sort((a, b) => a - b);
+    cacheUtils.set(cacheKey, costs, 10 * 60 * 1000); // 10분 캐싱
+
+    res.json({ success: true, data: costs });
+
+  } catch (error) {
+    console.error('비용 목록 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '비용 목록 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 사용자 등록 이력 조회 API
+app.get('/api/quick-cost/history', async (req, res) => {
+  try {
+    const { userId, storeId } = req.query;
+
+    if (!userId && !storeId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'userId 또는 storeId가 필요합니다.' 
+      });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const dataRows = rows.slice(1);
+    
+    // 필터링
+    const filteredData = dataRows
+      .map((row, index) => {
+        const registrantStoreId = row[2]?.toString().trim(); // 등록자매장ID (C열)
+        const match = userId 
+          ? row[1]?.toString().trim() === userId.toString() // 등록자매장명으로 매칭 (임시)
+          : registrantStoreId === storeId.toString();
+        
+        if (!match) return null;
+
+        return {
+          rowIndex: index + 2, // 실제 행 번호 (헤더 포함)
+          registeredAt: row[0] || '', // 등록일시
+          registrantStoreName: row[1] || '', // 등록자매장명
+          registrantStoreId: registrantStoreId, // 등록자매장ID
+          fromStoreName: row[3] || '', // 출발매장명
+          fromStoreId: row[4] || '', // 출발매장ID
+          toStoreName: row[5] || '', // 도착매장명
+          toStoreId: row[6] || '', // 도착매장ID
+          modeType: row[7] || '', // 모드타입
+          companies: []
+        };
+      })
+      .filter(item => item !== null);
+
+    // 각 행의 업체 정보 추출
+    filteredData.forEach(item => {
+      const row = dataRows[item.rowIndex - 2];
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6);
+        const companyName = row[baseIndex]?.toString().trim();
+        const phoneNumber = row[baseIndex + 1]?.toString().trim();
+        const cost = row[baseIndex + 2]?.toString().trim();
+        
+        if (companyName && phoneNumber && cost) {
+          item.companies.push({
+            name: companyName,
+            phone: phoneNumber,
+            cost: parseInt(cost) || 0,
+            dispatchSpeed: row[baseIndex + 3] || '',
+            pickupSpeed: row[baseIndex + 4] || '',
+            arrivalSpeed: row[baseIndex + 5] || ''
+          });
+        }
+      }
+    });
+
+    // 등록일시 역순 정렬
+    filteredData.sort((a, b) => {
+      const dateA = new Date(a.registeredAt);
+      const dateB = new Date(b.registeredAt);
+      return dateB - dateA;
+    });
+
+    res.json({ success: true, data: filteredData });
+
+  } catch (error) {
+    console.error('등록 이력 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '등록 이력 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 통계 데이터 조회 API (관리자 전용)
+app.get('/api/quick-cost/statistics', async (req, res) => {
+  try {
+    const { region } = req.query;
+
+    // 캐시 확인
+    const cacheKey = `quick-cost-statistics-${region || 'all'}`;
+    const cached = cacheUtils.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      const emptyResult = {
+        companyStats: [],
+        popularCompanies: [],
+        excellentCompanies: [],
+        distanceCostAnalysis: [],
+        timeTrends: []
+      };
+      cacheUtils.set(cacheKey, emptyResult, 30 * 60 * 1000);
+      return res.json({ success: true, data: emptyResult });
+    }
+
+    const dataRows = rows.slice(1);
+    
+    // 매장 데이터 조회 (지역 정보 필요)
+    const storeResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${STORE_SHEET_NAME}!A:F`,
+    });
+
+    const storeRows = storeResponse.data.values || [];
+    const storeMap = new Map();
+    if (storeRows.length > 1) {
+      storeRows.slice(1).forEach(row => {
+        const storeId = row[0]?.toString().trim();
+        const address = row[2]?.toString().trim() || '';
+        // 주소에서 지역 추출 (시/도 단위)
+        const regionMatch = address.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/);
+        const storeRegion = regionMatch ? regionMatch[1] : '기타';
+        storeMap.set(storeId, { address, region: storeRegion });
+      });
+    }
+
+    // 업체별 통계 수집
+    const companyStatsMap = new Map();
+    const regionCompanyMap = new Map(); // 지역별 업체 통계
+
+    dataRows.forEach(row => {
+      const fromStoreId = row[4]?.toString().trim();
+      const toStoreId = row[6]?.toString().trim();
+      const fromStoreInfo = storeMap.get(fromStoreId);
+      const toStoreInfo = storeMap.get(toStoreId);
+      const storeRegion = fromStoreInfo?.region || '기타';
+
+      // 지역 필터링
+      if (region && storeRegion !== region) return;
+
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6);
+        const companyName = row[baseIndex]?.toString().trim();
+        const phoneNumber = row[baseIndex + 1]?.toString().trim();
+        const cost = row[baseIndex + 2]?.toString().trim();
+        const dispatchSpeed = row[baseIndex + 3]?.toString().trim();
+        const pickupSpeed = row[baseIndex + 4]?.toString().trim();
+        const arrivalSpeed = row[baseIndex + 5]?.toString().trim();
+
+        if (!companyName || !phoneNumber || !cost) continue;
+
+        const normalizedName = normalizeCompanyName(companyName);
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        const key = `${normalizedName}-${normalizedPhone}`;
+        const costNum = parseInt(cost);
+
+        if (!companyStatsMap.has(key)) {
+          companyStatsMap.set(key, {
+            companyName: companyName,
+            phoneNumber: phoneNumber,
+            costs: [],
+            speeds: { dispatch: [], pickup: [], arrival: [] },
+            entryCount: 0
+          });
+        }
+
+        const stats = companyStatsMap.get(key);
+        stats.costs.push(costNum);
+        if (dispatchSpeed) stats.speeds.dispatch.push(dispatchSpeed);
+        if (pickupSpeed) stats.speeds.pickup.push(pickupSpeed);
+        if (arrivalSpeed) stats.speeds.arrival.push(arrivalSpeed);
+        stats.entryCount++;
+
+        // 지역별 통계
+        const regionKey = `${storeRegion}-${key}`;
+        if (!regionCompanyMap.has(regionKey)) {
+          regionCompanyMap.set(regionKey, {
+            region: storeRegion,
+            companyName: companyName,
+            phoneNumber: phoneNumber,
+            entryCount: 0,
+            speeds: { dispatch: [], pickup: [], arrival: [] }
+          });
+        }
+        const regionStats = regionCompanyMap.get(regionKey);
+        regionStats.entryCount++;
+        if (dispatchSpeed) regionStats.speeds.dispatch.push(dispatchSpeed);
+        if (pickupSpeed) regionStats.speeds.pickup.push(pickupSpeed);
+        if (arrivalSpeed) regionStats.speeds.arrival.push(arrivalSpeed);
+      }
+    });
+
+    // 업체별 통계 계산
+    const companyStats = Array.from(companyStatsMap.values()).map(stats => {
+      const avgCost = stats.costs.reduce((sum, cost) => sum + cost, 0) / stats.costs.length;
+      const variance = stats.costs.reduce((sum, cost) => sum + Math.pow(cost - avgCost, 2), 0) / stats.costs.length;
+      const stdDev = Math.sqrt(variance);
+
+      // 속도 점수 계산 (빠름=3, 중간=2, 느림=1)
+      const getSpeedScore = (speed) => {
+        if (speed === '빠름') return 3;
+        if (speed === '중간') return 2;
+        return 1;
+      };
+
+      const getMostFrequent = (arr) => {
+        if (arr.length === 0) return '중간';
+        const counts = {};
+        arr.forEach(item => { counts[item] = (counts[item] || 0) + 1; });
+        return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+      };
+
+      const avgDispatchSpeed = getMostFrequent(stats.speeds.dispatch);
+      const avgPickupSpeed = getMostFrequent(stats.speeds.pickup);
+      const avgArrivalSpeed = getMostFrequent(stats.speeds.arrival);
+
+      const avgSpeedScore = (
+        getSpeedScore(avgDispatchSpeed) +
+        getSpeedScore(avgPickupSpeed) +
+        getSpeedScore(avgArrivalSpeed)
+      ) / 3;
+
+      // 신뢰도 점수 계산 (0~100)
+      const entryScore = Math.min(stats.entryCount * 10, 50); // 최대 50점
+      const consistencyScore = Math.max(0, 50 - (stdDev / avgCost) * 100); // 최대 50점
+      const reliabilityScore = Math.round(entryScore + consistencyScore);
+
+      return {
+        companyName: stats.companyName,
+        phoneNumber: stats.phoneNumber,
+        averageCost: Math.round(avgCost),
+        averageSpeedScore: Math.round(avgSpeedScore * 100) / 100,
+        entryCount: stats.entryCount,
+        reliabilityScore: reliabilityScore,
+        dispatchSpeed: avgDispatchSpeed,
+        pickupSpeed: avgPickupSpeed,
+        arrivalSpeed: avgArrivalSpeed
+      };
+    });
+
+    // 지역별 인기 업체 순위 (등록 건수 기준)
+    const popularCompanies = Array.from(regionCompanyMap.values())
+      .sort((a, b) => b.entryCount - a.entryCount)
+      .slice(0, 20)
+      .map(stats => ({
+        region: stats.region,
+        companyName: stats.companyName,
+        phoneNumber: stats.phoneNumber,
+        entryCount: stats.entryCount
+      }));
+
+    // 지역별 우수 업체 순위 (평균 속도 점수 기준)
+    const excellentCompanies = Array.from(regionCompanyMap.values())
+      .map(stats => {
+        const getSpeedScore = (speed) => {
+          if (speed === '빠름') return 3;
+          if (speed === '중간') return 2;
+          return 1;
+        };
+        const getMostFrequent = (arr) => {
+          if (arr.length === 0) return '중간';
+          const counts = {};
+          arr.forEach(item => { counts[item] = (counts[item] || 0) + 1; });
+          return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        };
+        const avgSpeedScore = (
+          getSpeedScore(getMostFrequent(stats.speeds.dispatch)) +
+          getSpeedScore(getMostFrequent(stats.speeds.pickup)) +
+          getSpeedScore(getMostFrequent(stats.speeds.arrival))
+        ) / 3;
+        return {
+          region: stats.region,
+          companyName: stats.companyName,
+          phoneNumber: stats.phoneNumber,
+          averageSpeedScore: Math.round(avgSpeedScore * 100) / 100,
+          entryCount: stats.entryCount
+        };
+      })
+      .sort((a, b) => b.averageSpeedScore - a.averageSpeedScore)
+      .slice(0, 20);
+
+    const result = {
+      companyStats: companyStats,
+      popularCompanies: popularCompanies,
+      excellentCompanies: excellentCompanies,
+      distanceCostAnalysis: [], // 거리별 분석은 나중에 구현
+      timeTrends: [] // 시간대별 추이는 나중에 구현
+    };
+
+    cacheUtils.set(cacheKey, result, 30 * 60 * 1000); // 30분 캐싱
+
+    res.json({ success: true, data: result });
+
+  } catch (error) {
+    console.error('통계 데이터 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '통계 데이터 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 데이터 품질 정보 조회 API (관리자 전용)
+app.get('/api/quick-cost/quality', async (req, res) => {
+  try {
+    // 캐시 확인
+    const cacheKey = 'quick-cost-quality';
+    const cached = cacheUtils.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    // 구글시트에서 데이터 조회
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length <= 1) {
+      const emptyResult = {
+        outliers: [],
+        normalizationStatus: { total: 0, normalized: 0 },
+        duplicateRate: 0,
+        reliabilityScores: []
+      };
+      cacheUtils.set(cacheKey, emptyResult, 30 * 60 * 1000);
+      return res.json({ success: true, data: emptyResult });
+    }
+
+    const dataRows = rows.slice(1);
+    
+    // 이상치 데이터 수집
+    const outliers = [];
+    const companyNameSet = new Set();
+    const normalizedNameSet = new Set();
+    let totalEntries = 0;
+
+    dataRows.forEach((row, rowIndex) => {
+      for (let i = 0; i < 5; i++) {
+        const baseIndex = 8 + (i * 6);
+        const companyName = row[baseIndex]?.toString().trim();
+        const cost = row[baseIndex + 2]?.toString().trim();
+
+        if (!companyName || !cost) continue;
+
+        totalEntries++;
+        const normalizedName = normalizeCompanyName(companyName);
+        companyNameSet.add(companyName);
+        normalizedNameSet.add(normalizedName);
+
+        // 같은 업체의 다른 행들과 비교하여 이상치 탐지
+        // (간단한 구현, 실제로는 더 정교한 분석 필요)
+      }
+    });
+
+    const duplicateRate = totalEntries > 0 
+      ? ((totalEntries - normalizedNameSet.size) / totalEntries * 100).toFixed(2)
+      : 0;
+
+    const result = {
+      outliers: outliers,
+      normalizationStatus: {
+        total: totalEntries,
+        normalized: normalizedNameSet.size,
+        rate: totalEntries > 0 ? ((normalizedNameSet.size / totalEntries) * 100).toFixed(2) : 0
+      },
+      duplicateRate: parseFloat(duplicateRate),
+      reliabilityScores: [] // 신뢰도 점수는 통계 API에서 가져올 수 있음
+    };
+
+    cacheUtils.set(cacheKey, result, 30 * 60 * 1000); // 30분 캐싱
+
+    res.json({ success: true, data: result });
+
+  } catch (error) {
+    console.error('데이터 품질 정보 조회 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '데이터 품질 정보 조회에 실패했습니다.' 
+    });
+  }
+});
+
+// 업체명 정규화 제안 API (관리자 전용)
+app.post('/api/quick-cost/normalize', async (req, res) => {
+  try {
+    const { companyName1, companyName2 } = req.body;
+
+    if (!companyName1 || !companyName2) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '두 개의 업체명이 필요합니다.' 
+      });
+    }
+
+    const normalized1 = normalizeCompanyName(companyName1);
+    const normalized2 = normalizeCompanyName(companyName2);
+
+    // 유사도 계산 (간단한 구현)
+    const similarity = normalized1 === normalized2 ? 100 : 0;
+
+    res.json({ 
+      success: true, 
+      data: {
+        companyName1: companyName1,
+        companyName2: companyName2,
+        normalized1: normalized1,
+        normalized2: normalized2,
+        similarity: similarity,
+        shouldMerge: similarity >= 80 // 80% 이상 유사하면 병합 제안
+      }
+    });
+
+  } catch (error) {
+    console.error('정규화 제안 실패:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || '정규화 제안에 실패했습니다.' 
+    });
   }
 });

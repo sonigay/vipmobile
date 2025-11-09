@@ -91,6 +91,275 @@ export const api = {
       console.error('월간시상 셋팅 저장 오류:', error);
       throw error;
     }
+  },
+
+  // 퀵비용 데이터 저장
+  saveQuickCost: async (data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('퀵비용 데이터 저장 오류:', error);
+      throw error;
+    }
+  },
+
+  // 예상퀵비 조회
+  getEstimatedQuickCost: async (fromStoreId, toStoreId) => {
+    try {
+      const cacheKey = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/estimate?fromStoreId=${fromStoreId}&toStoreId=${toStoreId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        clientCacheUtils.set(cacheKey, result.data, 5 * 60 * 1000); // 5분 캐싱
+      }
+      return result;
+    } catch (error) {
+      console.error('예상퀵비 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 업체명 목록 조회
+  getQuickServiceCompanies: async () => {
+    try {
+      const cacheKey = 'quick-cost-companies';
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/companies`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        clientCacheUtils.set(cacheKey, result.data, 10 * 60 * 1000); // 10분 캐싱
+      }
+      return result;
+    } catch (error) {
+      console.error('업체명 목록 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 전화번호 목록 조회
+  getQuickServicePhoneNumbers: async (companyName) => {
+    try {
+      const cacheKey = `quick-cost-phone-${companyName}`;
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/phone-numbers?companyName=${encodeURIComponent(companyName)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        clientCacheUtils.set(cacheKey, result.data, 10 * 60 * 1000); // 10분 캐싱
+      }
+      return result;
+    } catch (error) {
+      console.error('전화번호 목록 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 비용 목록 조회
+  getQuickServiceCosts: async (companyName, phoneNumber) => {
+    try {
+      const cacheKey = `quick-cost-cost-${companyName}-${phoneNumber}`;
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/costs?companyName=${encodeURIComponent(companyName)}&phoneNumber=${encodeURIComponent(phoneNumber)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        clientCacheUtils.set(cacheKey, result.data, 10 * 60 * 1000); // 10분 캐싱
+      }
+      return result;
+    } catch (error) {
+      console.error('비용 목록 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 등록 이력 조회
+  getQuickServiceHistory: async (userId, storeId) => {
+    try {
+      const params = new URLSearchParams();
+      if (userId) params.append('userId', userId);
+      if (storeId) params.append('storeId', storeId);
+
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/history?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('등록 이력 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 통계 데이터 조회 (관리자 전용)
+  getQuickCostStatistics: async (region) => {
+    try {
+      const cacheKey = `quick-cost-statistics-${region || 'all'}`;
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const url = region 
+        ? `${API_BASE_URL}/api/quick-cost/statistics?region=${encodeURIComponent(region)}`
+        : `${API_BASE_URL}/api/quick-cost/statistics`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        clientCacheUtils.set(cacheKey, result.data, 30 * 60 * 1000); // 30분 캐싱
+      }
+      return result;
+    } catch (error) {
+      console.error('통계 데이터 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 데이터 품질 정보 조회 (관리자 전용)
+  getQuickCostQuality: async () => {
+    try {
+      const cacheKey = 'quick-cost-quality';
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/quality`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.success && result.data) {
+        clientCacheUtils.set(cacheKey, result.data, 30 * 60 * 1000); // 30분 캐싱
+      }
+      return result;
+    } catch (error) {
+      console.error('데이터 품질 정보 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 업체명 정규화 제안 (관리자 전용)
+  suggestNormalize: async (companyName1, companyName2) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/normalize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({ companyName1, companyName2 })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('정규화 제안 오류:', error);
+      throw error;
+    }
   }
 };
 

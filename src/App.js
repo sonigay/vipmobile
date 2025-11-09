@@ -30,6 +30,8 @@ import './App.css';
 import StoreInfoTable from './components/StoreInfoTable';
 import RememberedRequestsTable from './components/RememberedRequestsTable';
 import AgentRememberedRequestsTable from './components/AgentRememberedRequestsTable';
+import EstimatedQuickCost from './components/EstimatedQuickCost';
+import QuickCostModal from './components/QuickCostModal';
 
 import ModeSelectionPopup from './components/ModeSelectionPopup';
 import InspectionMode from './components/InspectionMode';
@@ -211,6 +213,11 @@ function AppContent() {
   const [directStorePasswordError, setDirectStorePasswordError] = useState('');
   const [pendingDirectStoreAction, setPendingDirectStoreAction] = useState(null);
   const [directStorePasswordLoading, setDirectStorePasswordLoading] = useState(false);
+  
+  // 퀵비용 관련 상태
+  const [showQuickCostModal, setShowQuickCostModal] = useState(false);
+  const [quickCostFromStore, setQuickCostFromStore] = useState(null);
+  const [quickCostToStore, setQuickCostToStore] = useState(null);
   const resetNewModeFlags = useCallback(() => {
     setIsMealAllowanceMode(false);
     setIsAttendanceMode(false);
@@ -4012,7 +4019,14 @@ ${requestList}
                     selectedModel={selectedModel}
                     selectedColor={selectedColor}
                     currentView={currentView}
-                        agentTotalInventory={getAgentTotalInventory()}
+                    agentTotalInventory={getAgentTotalInventory()}
+                    loggedInStore={loggedInStore}
+                    isAgentMode={isAgentMode}
+                    onQuickCostClick={(fromStore, toStore) => {
+                      setQuickCostFromStore(fromStore);
+                      setQuickCostToStore(toStore);
+                      setShowQuickCostModal(true);
+                    }}
                   />
                   <AgentFilterPanel
                     models={data?.models}
@@ -4303,6 +4317,21 @@ ${requestList}
           // 로그 최소화 (성능 최적화)
           // console.log('새 업데이트가 추가되었습니다.');
         }}
+      />
+      
+      {/* 퀵비용 등록 모달 */}
+      <QuickCostModal
+        open={showQuickCostModal}
+        onClose={() => {
+          setShowQuickCostModal(false);
+          setQuickCostFromStore(null);
+          setQuickCostToStore(null);
+        }}
+        fromStore={quickCostFromStore}
+        toStore={quickCostToStore}
+        loggedInStore={loggedInStore}
+        modeType={isAgentMode ? '관리자모드' : '일반모드'}
+        requestedStore={requestedStore}
       />
       {/* 디버깅용 로그 제거 (성능 최적화) */}
       {/* {console.log('🔍 [App] AppUpdatePopup props:', { 

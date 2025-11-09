@@ -18,7 +18,8 @@ import {
   RestaurantMenu as RestaurantMenuIcon,
   AccessTime as AccessTimeIcon,
   Security as SecurityIcon,
-  HomeWork as HomeWorkIcon
+  HomeWork as HomeWorkIcon,
+  LocalShipping as LocalShippingIcon
 } from '@mui/icons-material';
 
 /**
@@ -438,6 +439,24 @@ export const MODE_CONFIG = {
       general: '일반모드권한관리!G열',
       updates: '어플업데이트!X열'
     }
+  },
+  quickServiceManagement: {
+    key: 'quickServiceManagement',
+    title: '퀵서비스 관리 모드',
+    description: '퀵서비스 업체 데이터를 관리하고 통계를 분석합니다.',
+    features: [
+      '업체별 통계 및 분석',
+      '지역별 인기/우수 업체 순위',
+      '데이터 품질 관리',
+      '이상치 데이터 검토'
+    ],
+    color: '#9C27B0',
+    icon: LocalShippingIcon,
+    category: 'admin',
+    sheetRefs: {
+      admin: '대리점아이디관리!AF열',
+      updates: '어플업데이트!Y열'
+    }
   }
 };
 
@@ -461,6 +480,7 @@ export const MODE_ORDER = [
   'attendance',
   'riskManagement',
   'directStoreManagement',
+  'quickServiceManagement',
   'basicMode',
   'directStore',
   'onSaleReception'
