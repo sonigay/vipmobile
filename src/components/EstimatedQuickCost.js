@@ -37,7 +37,6 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [priceFilter, setPriceFilter] = useState('all');
   const [speedFilter, setSpeedFilter] = useState('all');
   const [favorites, setFavorites] = useState([]);
 
@@ -130,18 +129,11 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
       }
     }
 
-    // 가격 필터
-    if (priceFilter !== 'all') {
-      const maxPrice = priceFilter === '5000' ? 5000 : priceFilter === '10000' ? 10000 : Infinity;
-      if (item.averageCost > maxPrice) return false;
-    }
-
     // 속도 필터
     if (speedFilter !== 'all') {
       if (speedFilter === 'fast') {
-        if (item.dispatchSpeed !== '빠름' || item.pickupSpeed !== '빠름' || item.arrivalSpeed !== '빠름') {
-          return false;
-        }
+        const isFast = [item.dispatchSpeed, item.pickupSpeed, item.arrivalSpeed].some(speed => speed === '빠름');
+        if (!isFast) return false;
       }
     }
 
@@ -196,21 +188,7 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
                 }}
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
-              <FormControl fullWidth size="small">
-                <InputLabel>가격대</InputLabel>
-                <Select
-                  value={priceFilter}
-                  label="가격대"
-                  onChange={(e) => setPriceFilter(e.target.value)}
-                >
-                  <MenuItem value="all">전체</MenuItem>
-                  <MenuItem value="5000">5천원 이하</MenuItem>
-                  <MenuItem value="10000">1만원 이하</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={12} sm={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>속도</InputLabel>
                 <Select
