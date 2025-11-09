@@ -363,7 +363,7 @@ const QuickCostModal = ({
 
         {/* 업체 정보 입력 폼 */}
         {companyList.map((company, index) => (
-          <Box key={index} sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+          <Box key={`company-${index}-${company.nameInputMode}-${company.phoneInputMode}-${company.costInputMode}`} sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                 업체 {index + 1}
@@ -391,31 +391,36 @@ const QuickCostModal = ({
                     value={company.name}
                     onChange={(e) => handleCompanyNameChange(index, e.target.value, 'input')}
                     inputProps={{ maxLength: 50 }}
+                    autoFocus
                   />
                 ) : (
                   <FormControl fullWidth size="small">
                     <InputLabel>업체명</InputLabel>
                     <Select
-                      value={company.nameInputMode === 'input' ? '' : (company.name || '')}
+                      value={company.name || ''}
                       label="업체명"
                       onChange={(e) => {
-                        console.log('🔍 Select onChange 호출:', { value: e.target.value, index, currentMode: company.nameInputMode });
                         const selectedValue = e.target.value;
+                        console.log('🔍 [업체명] Select onChange:', { selectedValue, index, currentMode: company.nameInputMode });
+                        
                         if (selectedValue === '직접 입력') {
-                          console.log('🔍 직접 입력 선택됨, input 모드로 전환');
-                          // 직접 입력 모드로 전환 - 즉시 상태 업데이트
+                          console.log('🔍 [업체명] 직접 입력 선택 - 즉시 전환');
+                          // 즉시 상태 업데이트 - 함수형 업데이트 사용
                           setCompanyList(prevList => {
-                            const newList = [...prevList];
-                            newList[index] = {
-                              ...newList[index],
-                              name: '',
-                              nameInputMode: 'input'
-                            };
-                            console.log('🔍 상태 업데이트 완료:', newList[index]);
-                            return newList;
+                            const updated = prevList.map((item, idx) => {
+                              if (idx === index) {
+                                return {
+                                  ...item,
+                                  name: '',
+                                  nameInputMode: 'input'
+                                };
+                              }
+                              return item;
+                            });
+                            console.log('🔍 [업체명] 업데이트된 상태:', updated[index]);
+                            return updated;
                           });
-                        } else {
-                          console.log('🔍 업체명 선택됨:', selectedValue);
+                        } else if (selectedValue && selectedValue !== '') {
                           handleCompanyNameChange(index, selectedValue, 'select');
                         }
                       }}
@@ -425,7 +430,7 @@ const QuickCostModal = ({
                         <MenuItem disabled>로딩 중...</MenuItem>
                       ) : (
                         <>
-                          <MenuItem value="직접 입력">
+                          <MenuItem value="직접 입력" key="direct-input">
                             <em>직접 입력</em>
                           </MenuItem>
                           {companyOptions.map((opt) => (
@@ -446,26 +451,30 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>대표번호</InputLabel>
                     <Select
-                      value={company.phoneInputMode === 'input' ? '' : (company.phone || '')}
+                      value={company.phone || ''}
                       label="대표번호"
                       onChange={async (e) => {
-                        if (e.target.value === '직접 입력') {
-                          // 직접 입력 모드로 전환 - 즉시 상태 업데이트
+                        const selectedValue = e.target.value;
+                        if (selectedValue === '직접 입력') {
+                          console.log('🔍 [전화번호] 직접 입력 선택 - 즉시 전환');
                           setCompanyList(prevList => {
-                            const newList = [...prevList];
-                            newList[index] = {
-                              ...newList[index],
-                              phone: '',
-                              phoneInputMode: 'input'
-                            };
-                            return newList;
+                            return prevList.map((item, idx) => {
+                              if (idx === index) {
+                                return {
+                                  ...item,
+                                  phone: '',
+                                  phoneInputMode: 'input'
+                                };
+                              }
+                              return item;
+                            });
                           });
-                        } else {
-                          handlePhoneChange(index, e.target.value, 'select');
+                        } else if (selectedValue && selectedValue !== '') {
+                          handlePhoneChange(index, selectedValue, 'select');
                         }
                       }}
                     >
-                      <MenuItem value="직접 입력">직접 입력</MenuItem>
+                      <MenuItem value="직접 입력" key="direct-input-phone">직접 입력</MenuItem>
                       {/* 전화번호 목록은 동적으로 로드 */}
                     </Select>
                   </FormControl>
@@ -477,6 +486,7 @@ const QuickCostModal = ({
                     placeholder="010-1234-5678"
                     value={company.phone}
                     onChange={(e) => handlePhoneChange(index, e.target.value, 'input')}
+                    autoFocus={company.phoneInputMode === 'input' && !company.phone}
                   />
                 )}
               </Grid>
@@ -487,26 +497,30 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>비용</InputLabel>
                     <Select
-                      value={company.costInputMode === 'input' ? '' : (company.cost || '')}
+                      value={company.cost || ''}
                       label="비용"
                       onChange={(e) => {
-                        if (e.target.value === '직접 입력') {
-                          // 직접 입력 모드로 전환 - 즉시 상태 업데이트
+                        const selectedValue = e.target.value;
+                        if (selectedValue === '직접 입력') {
+                          console.log('🔍 [비용] 직접 입력 선택 - 즉시 전환');
                           setCompanyList(prevList => {
-                            const newList = [...prevList];
-                            newList[index] = {
-                              ...newList[index],
-                              cost: '',
-                              costInputMode: 'input'
-                            };
-                            return newList;
+                            return prevList.map((item, idx) => {
+                              if (idx === index) {
+                                return {
+                                  ...item,
+                                  cost: '',
+                                  costInputMode: 'input'
+                                };
+                              }
+                              return item;
+                            });
                           });
-                        } else {
-                          handleCostChange(index, e.target.value, 'select');
+                        } else if (selectedValue && selectedValue !== '') {
+                          handleCostChange(index, selectedValue, 'select');
                         }
                       }}
                     >
-                      <MenuItem value="직접 입력">직접 입력</MenuItem>
+                      <MenuItem value="직접 입력" key="direct-input-cost">직접 입력</MenuItem>
                       {/* 비용 목록은 동적으로 로드 */}
                     </Select>
                   </FormControl>
@@ -522,6 +536,7 @@ const QuickCostModal = ({
                       handleCostChange(index, value, 'input');
                     }}
                     inputProps={{ maxLength: 7 }}
+                    autoFocus={company.costInputMode === 'input' && !company.cost}
                   />
                 )}
               </Grid>
