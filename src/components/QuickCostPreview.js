@@ -23,17 +23,34 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
         // refreshKey가 0보다 클 때만 캐시를 무시하고 새로 조회 (초기값 0은 캐시 사용)
         // fromStoreId나 toStoreId가 변경되면 캐시 키가 달라지므로 자동으로 새로 조회됨
         const skipCache = refreshKey !== undefined && refreshKey !== null && refreshKey > 0;
+        console.log('🔍 QuickCostPreview 조회 시작:', {
+          fromStoreId,
+          toStoreId,
+          refreshKey,
+          skipCache
+        });
+        
         const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
+        
+        console.log('🔍 QuickCostPreview 조회 결과:', {
+          success: result.success,
+          dataLength: result.data?.length || 0,
+          data: result.data,
+          error: result.error
+        });
+        
         if (result.success && result.data && result.data.length > 0) {
           // 1순위 업체만 표시
           const sorted = [...result.data].sort((a, b) => a.averageCost - b.averageCost);
           setQuickCostData(sorted[0]);
+          console.log('✅ QuickCostPreview 데이터 설정 완료:', sorted[0]);
         } else {
           // 데이터가 없으면 null로 설정
           setQuickCostData(null);
+          console.log('⚠️ QuickCostPreview 데이터 없음');
         }
       } catch (err) {
-        console.error('퀵비용 조회 오류:', err);
+        console.error('❌ QuickCostPreview 조회 오류:', err);
         setQuickCostData(null);
       } finally {
         setLoading(false);

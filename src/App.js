@@ -4364,7 +4364,15 @@ ${requestList}
           setQuickCostToStore(null);
           // 저장 성공 시 refreshKey 업데이트하여 QuickCostPreview 리프레시
           if (saved === true) {
-            setQuickCostRefreshKey(prev => prev + 1);
+            console.log('🔍 저장 성공 - refreshKey 업데이트:', {
+              이전값: quickCostRefreshKey,
+              새값: quickCostRefreshKey + 1
+            });
+            setQuickCostRefreshKey(prev => {
+              const newValue = prev + 1;
+              console.log('✅ refreshKey 업데이트 완료:', newValue);
+              return newValue;
+            });
           }
         }}
         fromStore={quickCostFromStore}

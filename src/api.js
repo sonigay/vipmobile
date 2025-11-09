@@ -122,11 +122,26 @@ export const api = {
     try {
       const cacheKey = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
       
+      console.log('🔍 API getEstimatedQuickCost 호출:', {
+        fromStoreId,
+        toStoreId,
+        skipCache,
+        cacheKey
+      });
+      
       // skipCache가 false일 때만 캐시 확인
       if (!skipCache) {
         const cached = clientCacheUtils.get(cacheKey);
         if (cached) {
+          console.log('✅ 캐시 사용:', cached);
           return cached;
+        }
+        console.log('⚠️ 캐시 없음 - API 호출');
+      } else {
+        console.log('🔄 캐시 무시 - API 호출');
+        // 캐시 무시 시 기존 캐시 삭제
+        if (clientCacheUtils && clientCacheUtils.delete) {
+          clientCacheUtils.delete(cacheKey);
         }
       }
 
@@ -139,16 +154,29 @@ export const api = {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const result = await response.json();
+      console.log('✅ API 응답 성공:', {
+        success: result.success,
+        dataLength: result.data?.length || 0,
+        error: result.error
+      });
+      
       if (result.success && result.data) {
         clientCacheUtils.set(cacheKey, result.data, 5 * 60 * 1000); // 5분 캐싱
+        console.log('✅ 캐시 저장 완료');
       }
       return result;
     } catch (error) {
-      console.error('예상퀵비 조회 오류:', error);
+      console.error('❌ 예상퀵비 조회 오류:', error);
       throw error;
     }
   },
