@@ -52,13 +52,21 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
 
   // 예상퀵비 조회
   useEffect(() => {
-    if (!fromStoreId || !toStoreId) return;
+    if (!fromStoreId || !toStoreId) {
+      setEstimatedData([]);
+      setError(null);
+      return;
+    }
+
+    // 매장이 변경되면 이전 데이터 초기화
+    setEstimatedData([]);
+    setError(null);
+    setLoading(true);
 
     const fetchEstimatedCost = async () => {
-      setLoading(true);
-      setError(null);
       try {
         // refreshKey가 0보다 클 때만 캐시를 무시하고 새로 조회 (초기값 0은 캐시 사용)
+        // fromStoreId나 toStoreId가 변경되면 캐시 키가 달라지므로 자동으로 새로 조회됨
         const skipCache = refreshKey !== undefined && refreshKey !== null && refreshKey > 0;
         const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
         if (result.success) {

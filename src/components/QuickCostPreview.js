@@ -9,29 +9,36 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!fromStoreId || !toStoreId) return;
+    if (!fromStoreId || !toStoreId) {
+      setQuickCostData(null);
+      return;
+    }
 
-      const fetchQuickCost = async () => {
-        setLoading(true);
-        try {
-          // refreshKey가 0보다 클 때만 캐시를 무시하고 새로 조회 (초기값 0은 캐시 사용)
-          const skipCache = refreshKey !== undefined && refreshKey !== null && refreshKey > 0;
-          const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
-          if (result.success && result.data && result.data.length > 0) {
-            // 1순위 업체만 표시
-            const sorted = [...result.data].sort((a, b) => a.averageCost - b.averageCost);
-            setQuickCostData(sorted[0]);
-          } else {
-            // 데이터가 없으면 null로 설정
-            setQuickCostData(null);
-          }
-        } catch (err) {
-          console.error('퀵비용 조회 오류:', err);
+    // 매장이 변경되면 이전 데이터 초기화
+    setQuickCostData(null);
+    setLoading(true);
+
+    const fetchQuickCost = async () => {
+      try {
+        // refreshKey가 0보다 클 때만 캐시를 무시하고 새로 조회 (초기값 0은 캐시 사용)
+        // fromStoreId나 toStoreId가 변경되면 캐시 키가 달라지므로 자동으로 새로 조회됨
+        const skipCache = refreshKey !== undefined && refreshKey !== null && refreshKey > 0;
+        const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
+        if (result.success && result.data && result.data.length > 0) {
+          // 1순위 업체만 표시
+          const sorted = [...result.data].sort((a, b) => a.averageCost - b.averageCost);
+          setQuickCostData(sorted[0]);
+        } else {
+          // 데이터가 없으면 null로 설정
           setQuickCostData(null);
-        } finally {
-          setLoading(false);
         }
-      };
+      } catch (err) {
+        console.error('퀵비용 조회 오류:', err);
+        setQuickCostData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchQuickCost();
   }, [fromStoreId, toStoreId, refreshKey]);
