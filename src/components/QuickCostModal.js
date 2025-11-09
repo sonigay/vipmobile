@@ -52,8 +52,10 @@ const QuickCostModal = ({
     nameInputMode: 'select', // 'select' or 'input'
     phone: '',
     phoneInputMode: 'select',
+    phoneOptions: [], // 해당 업체의 전화번호 목록
     cost: '',
     costInputMode: 'select',
+    costOptions: [], // 해당 업체+전화번호의 비용 목록
     dispatchSpeed: '중간',
     pickupSpeed: '중간',
     arrivalSpeed: '중간'
@@ -132,16 +134,28 @@ const QuickCostModal = ({
     if (inputMode === 'select' && value && value !== '직접 입력') {
       try {
         const result = await api.getQuickServicePhoneNumbers(value);
-        if (result.success) {
-          // 전화번호 필드 초기화
+        if (result.success && result.data) {
+          // 전화번호 목록 저장 및 필드 초기화
+          newList[index].phoneOptions = result.data || [];
           newList[index].phone = '';
           newList[index].phoneInputMode = 'select';
+          newList[index].costOptions = [];
           newList[index].cost = '';
           newList[index].costInputMode = 'select';
+          console.log('🔍 전화번호 목록 로드 완료:', newList[index].phoneOptions);
+        } else {
+          newList[index].phoneOptions = [];
         }
       } catch (err) {
         console.error('전화번호 목록 로드 오류:', err);
+        newList[index].phoneOptions = [];
       }
+    } else {
+      // 직접 입력 모드이거나 업체명이 없으면 전화번호 목록 초기화
+      newList[index].phoneOptions = [];
+      newList[index].phone = '';
+      newList[index].costOptions = [];
+      newList[index].cost = '';
     }
 
     setCompanyList(newList);
@@ -157,14 +171,23 @@ const QuickCostModal = ({
     if (inputMode === 'select' && value && value !== '직접 입력' && newList[index].name) {
       try {
         const result = await api.getQuickServiceCosts(newList[index].name, value);
-        if (result.success) {
-          // 비용 필드 초기화
+        if (result.success && result.data) {
+          // 비용 목록 저장 및 필드 초기화
+          newList[index].costOptions = result.data || [];
           newList[index].cost = '';
           newList[index].costInputMode = 'select';
+          console.log('🔍 비용 목록 로드 완료:', newList[index].costOptions);
+        } else {
+          newList[index].costOptions = [];
         }
       } catch (err) {
         console.error('비용 목록 로드 오류:', err);
+        newList[index].costOptions = [];
       }
+    } else {
+      // 직접 입력 모드이거나 전화번호가 없으면 비용 목록 초기화
+      newList[index].costOptions = [];
+      newList[index].cost = '';
     }
 
     setCompanyList(newList);
@@ -383,161 +406,262 @@ const QuickCostModal = ({
               {/* 업체명 */}
               <Grid item xs={12} sm={6}>
                 {company.nameInputMode === 'input' ? (
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="업체명"
-                    placeholder="업체명을 입력하세요"
-                    value={company.name}
-                    onChange={(e) => handleCompanyNameChange(index, e.target.value, 'input')}
-                    inputProps={{ maxLength: 50 }}
-                    autoFocus
-                  />
-                ) : (
-                  <FormControl fullWidth size="small">
-                    <InputLabel>업체명</InputLabel>
-                    <Select
-                      value={company.name || ''}
+                  <Box>
+                    <TextField
+                      fullWidth
+                      size="small"
                       label="업체명"
-                      onChange={(e) => {
-                        const selectedValue = e.target.value;
-                        console.log('🔍 [업체명] Select onChange:', { selectedValue, index, currentMode: company.nameInputMode });
-                        
-                        if (selectedValue === '직접 입력') {
-                          console.log('🔍 [업체명] 직접 입력 선택 - 즉시 전환');
-                          // 즉시 상태 업데이트 - 함수형 업데이트 사용
-                          setCompanyList(prevList => {
-                            const updated = prevList.map((item, idx) => {
-                              if (idx === index) {
-                                return {
-                                  ...item,
-                                  name: '',
-                                  nameInputMode: 'input'
-                                };
-                              }
-                              return item;
-                            });
-                            console.log('🔍 [업체명] 업데이트된 상태:', updated[index]);
-                            return updated;
+                      placeholder="업체명을 입력하세요"
+                      value={company.name}
+                      onChange={(e) => handleCompanyNameChange(index, e.target.value, 'input')}
+                      inputProps={{ maxLength: 50 }}
+                      autoFocus
+                    />
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setCompanyList(prevList => {
+                          return prevList.map((item, idx) => {
+                            if (idx === index) {
+                              return { ...item, nameInputMode: 'select', name: '' };
+                            }
+                            return item;
                           });
-                        } else if (selectedValue && selectedValue !== '') {
-                          handleCompanyNameChange(index, selectedValue, 'select');
-                        }
+                        });
                       }}
-                      displayEmpty
+                      sx={{ mt: 0.5, fontSize: '0.75rem' }}
                     >
-                      {loading ? (
-                        <MenuItem disabled>로딩 중...</MenuItem>
-                      ) : (
-                        <>
-                          <MenuItem value="직접 입력" key="direct-input">
-                            <em>직접 입력</em>
-                          </MenuItem>
-                          {companyOptions.map((opt) => (
+                      목록에서 선택
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>업체명</InputLabel>
+                      <Select
+                        value={company.name || ''}
+                        label="업체명"
+                        onChange={(e) => {
+                          const selectedValue = e.target.value;
+                          if (selectedValue && selectedValue !== '') {
+                            handleCompanyNameChange(index, selectedValue, 'select');
+                          }
+                        }}
+                        displayEmpty
+                      >
+                        {loading ? (
+                          <MenuItem disabled>로딩 중...</MenuItem>
+                        ) : companyOptions.length === 0 ? (
+                          <MenuItem disabled>등록된 업체가 없습니다</MenuItem>
+                        ) : (
+                          companyOptions.map((opt) => (
                             <MenuItem key={opt} value={opt}>
                               {opt}
                             </MenuItem>
-                          ))}
-                        </>
-                      )}
-                    </Select>
-                  </FormControl>
+                          ))
+                        )}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        console.log('🔍 [업체명] 직접 입력 버튼 클릭');
+                        setCompanyList(prevList => {
+                          const updated = prevList.map((item, idx) => {
+                            if (idx === index) {
+                              return {
+                                ...item,
+                                name: '',
+                                nameInputMode: 'input'
+                              };
+                            }
+                            return item;
+                          });
+                          console.log('🔍 [업체명] 상태 업데이트 완료:', updated[index]);
+                          return updated;
+                        });
+                      }}
+                      sx={{ mt: 0.5, fontSize: '0.75rem' }}
+                      variant="outlined"
+                      color="primary"
+                    >
+                      직접 입력
+                    </Button>
+                  </Box>
                 )}
               </Grid>
 
               {/* 전화번호 */}
               <Grid item xs={12} sm={6}>
-                {company.name && company.nameInputMode === 'select' && company.name !== '직접 입력' && company.phoneInputMode === 'select' ? (
-                  <FormControl fullWidth size="small">
-                    <InputLabel>대표번호</InputLabel>
-                    <Select
-                      value={company.phone || ''}
+                {company.name && company.nameInputMode === 'select' && company.phoneInputMode === 'select' ? (
+                  <Box>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>대표번호</InputLabel>
+                      <Select
+                        value={company.phone || ''}
+                        label="대표번호"
+                        onChange={async (e) => {
+                          const selectedValue = e.target.value;
+                          if (selectedValue && selectedValue !== '') {
+                            handlePhoneChange(index, selectedValue, 'select');
+                          }
+                        }}
+                        displayEmpty
+                      >
+                        {company.phoneOptions && company.phoneOptions.length > 0 ? (
+                          company.phoneOptions.map((phone) => (
+                            <MenuItem key={phone} value={phone}>
+                              {phone}
+                            </MenuItem>
+                          ))
+                        ) : (
+                          <MenuItem disabled>등록된 전화번호가 없습니다</MenuItem>
+                        )}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        console.log('🔍 [전화번호] 직접 입력 버튼 클릭');
+                        setCompanyList(prevList => {
+                          return prevList.map((item, idx) => {
+                            if (idx === index) {
+                              return {
+                                ...item,
+                                phone: '',
+                                phoneInputMode: 'input'
+                              };
+                            }
+                            return item;
+                          });
+                        });
+                      }}
+                      sx={{ mt: 0.5, fontSize: '0.75rem' }}
+                      variant="outlined"
+                      color="primary"
+                    >
+                      직접 입력
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box>
+                    <TextField
+                      fullWidth
+                      size="small"
                       label="대표번호"
-                      onChange={async (e) => {
-                        const selectedValue = e.target.value;
-                        if (selectedValue === '직접 입력') {
-                          console.log('🔍 [전화번호] 직접 입력 선택 - 즉시 전환');
+                      placeholder="010-1234-5678"
+                      value={company.phone}
+                      onChange={(e) => handlePhoneChange(index, e.target.value, 'input')}
+                      autoFocus={company.phoneInputMode === 'input' && !company.phone}
+                    />
+                    {company.name && company.nameInputMode === 'select' && (
+                      <Button
+                        size="small"
+                        onClick={() => {
                           setCompanyList(prevList => {
                             return prevList.map((item, idx) => {
                               if (idx === index) {
-                                return {
-                                  ...item,
-                                  phone: '',
-                                  phoneInputMode: 'input'
-                                };
+                                return { ...item, phoneInputMode: 'select', phone: '' };
                               }
                               return item;
                             });
                           });
-                        } else if (selectedValue && selectedValue !== '') {
-                          handlePhoneChange(index, selectedValue, 'select');
-                        }
-                      }}
-                    >
-                      <MenuItem value="직접 입력" key="direct-input-phone">직접 입력</MenuItem>
-                      {/* 전화번호 목록은 동적으로 로드 */}
-                    </Select>
-                  </FormControl>
-                ) : (
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="대표번호"
-                    placeholder="010-1234-5678"
-                    value={company.phone}
-                    onChange={(e) => handlePhoneChange(index, e.target.value, 'input')}
-                    autoFocus={company.phoneInputMode === 'input' && !company.phone}
-                  />
+                        }}
+                        sx={{ mt: 0.5, fontSize: '0.75rem' }}
+                      >
+                        목록에서 선택
+                      </Button>
+                    )}
+                  </Box>
                 )}
               </Grid>
 
               {/* 비용 */}
               <Grid item xs={12} sm={6}>
-                {company.name && company.phone && company.nameInputMode === 'select' && company.phoneInputMode === 'select' && company.name !== '직접 입력' && company.phone !== '직접 입력' && company.costInputMode === 'select' ? (
-                  <FormControl fullWidth size="small">
-                    <InputLabel>비용</InputLabel>
-                    <Select
-                      value={company.cost || ''}
-                      label="비용"
+                {company.name && company.phone && company.nameInputMode === 'select' && company.phoneInputMode === 'select' && company.costInputMode === 'select' ? (
+                  <Box>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>비용</InputLabel>
+                      <Select
+                        value={company.cost || ''}
+                        label="비용"
+                        onChange={(e) => {
+                          const selectedValue = e.target.value;
+                          if (selectedValue && selectedValue !== '') {
+                            handleCostChange(index, selectedValue, 'select');
+                          }
+                        }}
+                        displayEmpty
+                      >
+                        {company.costOptions && company.costOptions.length > 0 ? (
+                          company.costOptions.map((cost) => (
+                            <MenuItem key={cost} value={cost}>
+                              {cost.toLocaleString()}원
+                            </MenuItem>
+                          ))
+                        ) : (
+                          <MenuItem disabled>등록된 비용이 없습니다</MenuItem>
+                        )}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        console.log('🔍 [비용] 직접 입력 버튼 클릭');
+                        setCompanyList(prevList => {
+                          return prevList.map((item, idx) => {
+                            if (idx === index) {
+                              return {
+                                ...item,
+                                cost: '',
+                                costInputMode: 'input'
+                              };
+                            }
+                            return item;
+                          });
+                        });
+                      }}
+                      sx={{ mt: 0.5, fontSize: '0.75rem' }}
+                      variant="outlined"
+                      color="primary"
+                    >
+                      직접 입력
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="비용 (원)"
+                      placeholder="7000"
+                      value={company.cost}
                       onChange={(e) => {
-                        const selectedValue = e.target.value;
-                        if (selectedValue === '직접 입력') {
-                          console.log('🔍 [비용] 직접 입력 선택 - 즉시 전환');
+                        const value = e.target.value.replace(/\D/g, '');
+                        handleCostChange(index, value, 'input');
+                      }}
+                      inputProps={{ maxLength: 7 }}
+                      autoFocus={company.costInputMode === 'input' && !company.cost}
+                    />
+                    {company.name && company.phone && company.nameInputMode === 'select' && company.phoneInputMode === 'select' && (
+                      <Button
+                        size="small"
+                        onClick={() => {
                           setCompanyList(prevList => {
                             return prevList.map((item, idx) => {
                               if (idx === index) {
-                                return {
-                                  ...item,
-                                  cost: '',
-                                  costInputMode: 'input'
-                                };
+                                return { ...item, costInputMode: 'select', cost: '' };
                               }
                               return item;
                             });
                           });
-                        } else if (selectedValue && selectedValue !== '') {
-                          handleCostChange(index, selectedValue, 'select');
-                        }
-                      }}
-                    >
-                      <MenuItem value="직접 입력" key="direct-input-cost">직접 입력</MenuItem>
-                      {/* 비용 목록은 동적으로 로드 */}
-                    </Select>
-                  </FormControl>
-                ) : (
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="비용 (원)"
-                    placeholder="7000"
-                    value={company.cost}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      handleCostChange(index, value, 'input');
-                    }}
-                    inputProps={{ maxLength: 7 }}
-                    autoFocus={company.costInputMode === 'input' && !company.cost}
-                  />
+                        }}
+                        sx={{ mt: 0.5, fontSize: '0.75rem' }}
+                      >
+                        목록에서 선택
+                      </Button>
+                    )}
+                  </Box>
                 )}
               </Grid>
 
