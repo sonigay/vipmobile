@@ -40,7 +40,6 @@ const QuickCostModal = ({
   modeType, // '일반모드' or '관리자모드'
   requestedStore // 관리자모드에서 재고요청점
 }) => {
-  const [companies, setCompanies] = useState([]);
   const [companyOptions, setCompanyOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,6 +68,63 @@ const QuickCostModal = ({
     dispatchSpeed: '',
     pickupSpeed: '',
     arrivalSpeed: ''
+  };
+
+  const cloneCompany = (company = initialCompany) => ({
+    ...company,
+    phoneOptions: [...(company.phoneOptions || [])],
+    costOptions: [...(company.costOptions || [])]
+  });
+
+  const cloneCompanyList = (list) => list.map(cloneCompany);
+
+  const convertDraftToCompany = (company) => ({
+    ...initialCompany,
+    name: company?.name || '',
+    nameInputMode: 'input',
+    phone: company?.phone || '',
+    phoneInputMode: 'input',
+    cost: company?.cost !== undefined && company?.cost !== null ? String(company.cost) : '',
+    costInputMode: 'input',
+    dispatchSpeed: company?.dispatchSpeed || '중간',
+    pickupSpeed: company?.pickupSpeed || '중간',
+    arrivalSpeed: company?.arrivalSpeed || '중간'
+  });
+
+  const resolvedFromStore = modeType === '관리자모드' && requestedStore
+    ? requestedStore
+    : (fromStore || loggedInStore || null);
+  const resolvedToStore = toStore || null;
+  const resolvedFromStoreId = resolvedFromStore?.id || '';
+  const resolvedToStoreId = resolvedToStore?.id || '';
+
+  const getDraftKey = () => {
+    if (!resolvedFromStoreId || !resolvedToStoreId) return null;
+    return `quick-cost-draft-${resolvedFromStoreId}-${resolvedToStoreId}`;
+  };
+
+  const saveDraft = (companiesData) => {
+    const key = getDraftKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(companiesData));
+    } catch (err) {
+      console.error('퀵비용 드래프트 저장 실패:', err);
+    }
+  };
+
+  const loadDraft = () => {
+    const key = getDraftKey();
+    if (!key) return null;
+    try {
+      const saved = localStorage.getItem(key);
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch (err) {
+      console.error('퀵비용 드래프트 로드 실패:', err);
+      return null;
+    }
   };
 
   const [companyList, setCompanyList] = useState([{ ...initialCompany }]);
@@ -129,20 +185,20 @@ const QuickCostModal = ({
   // 업체 추가
   const handleAddCompany = () => {
     if (companyList.length >= 5) return;
-    setCompanyList(prev => [...prev, { ...initialCompany }]);
+    setCompanyList(prev => [...cloneCompanyList(prev), { ...initialCompany }]);
     setCompanyErrors(prev => [...prev, { ...initialCompanyError }]);
   };
 
   // 업체 삭제
   const handleRemoveCompany = (index) => {
-    setCompanyList(companyList.filter((_, i) => i !== index));
-    setCompanyErrors(companyErrors.filter((_, i) => i !== index));
+    setCompanyList(prev => cloneCompanyList(prev).filter((_, i) => i !== index));
+    setCompanyErrors(prev => prev.filter((_, i) => i !== index));
   };
 
   // 업체명 변경
   const handleCompanyNameChange = async (index, value, inputMode) => {
     console.log('🔍 handleCompanyNameChange 호출:', { index, value, inputMode });
-    const newList = [...companyList];
+    const newList = cloneCompanyList(companyList);
     newList[index].name = value;
     newList[index].nameInputMode = inputMode;
     console.log('🔍 업데이트된 companyList:', newList[index]);
@@ -183,7 +239,7 @@ const QuickCostModal = ({
   // 전화번호 변경
   const handlePhoneChange = async (index, value, inputMode) => {
     const normalizedValue = value !== undefined && value !== null ? value.toString() : '';
-    const newList = [...companyList];
+    const newList = cloneCompanyList(companyList);
     newList[index].phone = normalizedValue;
     newList[index].phoneInputMode = inputMode;
 
@@ -218,7 +274,7 @@ const QuickCostModal = ({
   // 비용 변경
   const handleCostChange = (index, value, inputMode) => {
     const normalizedValue = value !== undefined && value !== null ? value.toString() : '';
-    const newList = [...companyList];
+    const newList = cloneCompanyList(companyList);
     newList[index].cost = normalizedValue;
     newList[index].costInputMode = inputMode;
     setCompanyList(newList);
@@ -227,7 +283,7 @@ const QuickCostModal = ({
 
   // 속도 변경
   const handleSpeedChange = (index, type, value) => {
-    const newList = [...companyList];
+    const newList = cloneCompanyList(companyList);
     newList[index][type] = value;
     setCompanyList(newList);
     setCompanyErrors(prev => prev.map((err, idx) => {
@@ -388,6 +444,7 @@ const QuickCostModal = ({
       });
       
       if (result1.success && result2.success) {
+        saveDraft(companiesData);
         // 최근 사용 업체 저장
         companiesData.forEach(company => {
           const key = `${company.name}-${company.phone}`;
@@ -461,12 +518,19 @@ const QuickCostModal = ({
 
   // 모달 열릴 때 초기화
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+
+    const draft = loadDraft();
+    if (draft && draft.length) {
+      const restored = draft.map(convertDraftToCompany);
+      setCompanyList(restored);
+      setCompanyErrors(restored.map(() => ({ ...initialCompanyError })));
+    } else {
       setCompanyList([{ ...initialCompany }]);
       setCompanyErrors([{ ...initialCompanyError }]);
-      setError(null);
     }
-  }, [open]);
+    setError(null);
+  }, [open, resolvedFromStoreId, resolvedToStoreId]);
 
   // 모달 닫기
   const handleClose = () => {
