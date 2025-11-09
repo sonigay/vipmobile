@@ -58,8 +58,8 @@ const EstimatedQuickCost = ({ fromStoreId, toStoreId, fromStoreName, toStoreName
       setLoading(true);
       setError(null);
       try {
-        // refreshKey이 변경되면 캐시를 무시하고 새로 조회
-        const skipCache = refreshKey !== undefined && refreshKey !== null;
+        // refreshKey가 0보다 클 때만 캐시를 무시하고 새로 조회 (초기값 0은 캐시 사용)
+        const skipCache = refreshKey !== undefined && refreshKey !== null && refreshKey > 0;
         const result = await api.getEstimatedQuickCost(fromStoreId, toStoreId, skipCache);
         if (result.success) {
           setEstimatedData(result.data || []);
