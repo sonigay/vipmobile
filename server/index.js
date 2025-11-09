@@ -1257,7 +1257,8 @@ async function saveInspectionMemoData(completionStatus, notes) {
       spreadsheetId: SPREADSHEET_ID,
         range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
-        resource: {
+      insertDataOption: 'INSERT_ROWS',
+      resource: {
           values: [headerRow, ...finalDataRows]
         }
       });
@@ -1268,7 +1269,8 @@ async function saveInspectionMemoData(completionStatus, notes) {
         spreadsheetId: SPREADSHEET_ID,
         range: `${INSPECTION_MEMO_SHEET_NAME}!A:G`,
         valueInputOption: 'USER_ENTERED',
-        resource: {
+insertDataOption: 'INSERT_ROWS',
+resource: {
           values: [headerRow]
         }
       });
@@ -32833,6 +32835,7 @@ app.post('/api/quick-cost/save', async (req, res) => {
       spreadsheetId: SPREADSHEET_ID,
       range: `${QUICK_COST_SHEET_NAME}!A:AL`,
       valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
       resource: {
         values: [row]
       }
