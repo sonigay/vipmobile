@@ -132,9 +132,9 @@ export const api = {
       // skipCache가 false일 때만 캐시 확인
       if (!skipCache) {
         const cached = clientCacheUtils.get(cacheKey);
-        if (cached) {
+        if (cached !== undefined && cached !== null) {
           console.log('✅ 캐시 사용:', cached);
-          return cached;
+          return { success: true, data: cached };
         }
         console.log('⚠️ 캐시 없음 - API 호출');
       } else {
