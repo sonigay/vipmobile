@@ -396,14 +396,18 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>업체명</InputLabel>
                     <Select
-                      value={company.nameInputMode === 'input' ? '' : (company.name || '')}
+                      value={company.name || ''}
                       label="업체명"
                       onChange={(e) => {
                         console.log('🔍 Select onChange 호출:', { value: e.target.value, index, currentMode: company.nameInputMode });
                         const selectedValue = e.target.value;
-                        if (selectedValue === '직접 입력' || selectedValue === '') {
+                        if (selectedValue === '직접 입력') {
                           console.log('🔍 직접 입력 선택됨, input 모드로 전환');
-                          handleCompanyNameChange(index, '', 'input');
+                          // 직접 입력 모드로 전환
+                          const newList = [...companyList];
+                          newList[index].name = '';
+                          newList[index].nameInputMode = 'input';
+                          setCompanyList(newList);
                         } else {
                           console.log('🔍 업체명 선택됨:', selectedValue);
                           handleCompanyNameChange(index, selectedValue, 'select');
@@ -440,7 +444,11 @@ const QuickCostModal = ({
                       label="대표번호"
                       onChange={async (e) => {
                         if (e.target.value === '직접 입력') {
-                          handlePhoneChange(index, '', 'input');
+                          // 직접 입력 모드로 전환
+                          const newList = [...companyList];
+                          newList[index].phone = '';
+                          newList[index].phoneInputMode = 'input';
+                          setCompanyList(newList);
                         } else {
                           handlePhoneChange(index, e.target.value, 'select');
                         }
@@ -472,7 +480,11 @@ const QuickCostModal = ({
                       label="비용"
                       onChange={(e) => {
                         if (e.target.value === '직접 입력') {
-                          handleCostChange(index, '', 'input');
+                          // 직접 입력 모드로 전환
+                          const newList = [...companyList];
+                          newList[index].cost = '';
+                          newList[index].costInputMode = 'input';
+                          setCompanyList(newList);
                         } else {
                           handleCostChange(index, e.target.value, 'select');
                         }
