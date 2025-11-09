@@ -234,163 +234,165 @@ ${model} / ${color} 모델
       </Typography>
 
       {selectedStore ? (
-        <TableContainer component={Paper} variant="outlined">
-          <Table>
-            <TableBody>
-              <TableRow>
-                <TableCell variant="head" width="30%">업체명</TableCell>
-                <TableCell>{selectedStore.name}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell variant="head">담당자</TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
-                      <span style={{ fontWeight: 'medium' }}>
-                        {selectedStore.manager || '미지정'}
-                      </span>
-                    </Box>
-                    {loading ? (
-                      <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                        연락처 조회 중...
-                      </Typography>
-                    ) : matchedContact ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
-                        <Button 
-                          variant="contained" 
-                          color="primary" 
-                          startIcon={<CallIcon />}
-                          onClick={() => handleCall(matchedContact)}
-                          size="small"
-                          sx={{ borderRadius: '20px', minWidth: '100px' }}
-                        >
-                          전화걸기
-                        </Button>
-                        <Button 
-                          variant="contained" 
-                          sx={{ 
-                            borderRadius: '20px', 
-                            minWidth: '100px',
-                            backgroundColor: '#FEE500',
-                            color: '#3C1E1E',
-                            fontWeight: 'bold',
-                            fontSize: '0.7rem',
-                            textTransform: 'none',
-                            boxShadow: '0 2px 8px rgba(254, 229, 0, 0.3)',
-                            '&:hover': {
-                              backgroundColor: '#FDD835',
-                              boxShadow: '0 4px 12px rgba(254, 229, 0, 0.4)'
-                            },
-                            '&:disabled': {
-                              backgroundColor: '#F5F5F5',
-                              color: '#999'
-                            }
-                          }}
-                          startIcon={
-                            <img 
-                              src="/kakao-logo.png" 
-                              alt="KakaoTalk" 
-                              style={{ 
-                                width: '18px', 
-                                height: '18px',
-                                marginRight: '4px'
-                              }}
-                            />
-                          }
-                          onClick={() => handleKakaoTalk(selectedStore, selectedModel, selectedColor)}
-                          size="small"
-                          disabled={!selectedModel || !selectedColor}
-                          title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡 문구 생성'}
-                        >
-                          카톡문구생성
-                        </Button>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" sx={{ mt: 1, color: 'error.main' }}>
-                        연락처를 찾을 수 없습니다
-                      </Typography>
-                    )}
-                  </Box>
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell variant="head">주소</TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <span>{selectedStore.address || '주소 정보 없음'}</span>
-                    </Box>
-                    <Button 
-                      variant="outlined" 
-                      color="secondary"
-                      startIcon={<ContentCopyIcon />}
-                      onClick={() => handlePickupInfoCopy(selectedStore)}
-                      size="small"
-                      sx={{ 
-                        borderRadius: '20px', 
-                        minWidth: '120px',
-                        alignSelf: 'flex-start',
-                        fontSize: '0.7rem',
-                        textTransform: 'none'
-                      }}
-                    >
-                      픽업지복사
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
-              {requestedStore && (
+        <>
+          <TableContainer component={Paper} variant="outlined">
+            <Table>
+              <TableBody>
                 <TableRow>
-                  <TableCell variant="head">요청점</TableCell>
+                  <TableCell variant="head" width="30%">업체명</TableCell>
+                  <TableCell>{selectedStore.name}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell variant="head">담당자</TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <SearchIcon sx={{ mr: 1, fontSize: '1.2rem', color: 'primary.main' }} />
-                      <span style={{ fontWeight: 'medium', color: 'primary.main' }}>
-                        {requestedStore.name}
-                      </span>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <PersonIcon sx={{ mr: 1, fontSize: '1.2rem' }} />
+                        <span style={{ fontWeight: 'medium' }}>
+                          {selectedStore.manager || '미지정'}
+                        </span>
+                      </Box>
+                      {loading ? (
+                        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                          연락처 조회 중...
+                        </Typography>
+                      ) : matchedContact ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
+                          <Button 
+                            variant="contained" 
+                            color="primary" 
+                            startIcon={<CallIcon />}
+                            onClick={() => handleCall(matchedContact)}
+                            size="small"
+                            sx={{ borderRadius: '20px', minWidth: '100px' }}
+                          >
+                            전화걸기
+                          </Button>
+                          <Button 
+                            variant="contained" 
+                            sx={{ 
+                              borderRadius: '20px', 
+                              minWidth: '100px',
+                              backgroundColor: '#FEE500',
+                              color: '#3C1E1E',
+                              fontWeight: 'bold',
+                              fontSize: '0.7rem',
+                              textTransform: 'none',
+                              boxShadow: '0 2px 8px rgba(254, 229, 0, 0.3)',
+                              '&:hover': {
+                                backgroundColor: '#FDD835',
+                                boxShadow: '0 4px 12px rgba(254, 229, 0, 0.4)'
+                              },
+                              '&:disabled': {
+                                backgroundColor: '#F5F5F5',
+                                color: '#999'
+                              }
+                            }}
+                            startIcon={
+                              <img 
+                                src="/kakao-logo.png" 
+                                alt="KakaoTalk" 
+                                style={{ 
+                                  width: '18px', 
+                                  height: '18px',
+                                  marginRight: '4px'
+                                }}
+                              />
+                            }
+                            onClick={() => handleKakaoTalk(selectedStore, selectedModel, selectedColor)}
+                            size="small"
+                            disabled={!selectedModel || !selectedColor}
+                            title={!selectedModel || !selectedColor ? '모델과 색상을 모두 선택해주세요' : '카카오톡 문구 생성'}
+                          >
+                            카톡문구생성
+                          </Button>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" sx={{ mt: 1, color: 'error.main' }}>
+                          연락처를 찾을 수 없습니다
+                        </Typography>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        {/* 퀵비용 예상 섹션 */}
-        {(selectedStore && (requestedStore || loggedInStore)) && (
-          <Box sx={{ mt: 3 }}>
-            <Divider sx={{ mb: 2 }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocalShippingIcon color="primary" />
-                매장간 퀵비용 예상
-              </Typography>
-              <Button
-                variant="outlined"
-                color="primary"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  if (onQuickCostClick) {
-                    const fromStore = isAgentMode && requestedStore ? requestedStore : loggedInStore;
-                    const toStore = selectedStore;
-                    onQuickCostClick(fromStore, toStore);
-                  }
-                }}
-                sx={{ borderRadius: '20px', textTransform: 'none' }}
-              >
-                퀵비용 등록
-              </Button>
+                <TableRow>
+                  <TableCell variant="head">주소</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <span>{selectedStore.address || '주소 정보 없음'}</span>
+                      </Box>
+                      <Button 
+                        variant="outlined" 
+                        color="secondary"
+                        startIcon={<ContentCopyIcon />}
+                        onClick={() => handlePickupInfoCopy(selectedStore)}
+                        size="small"
+                        sx={{ 
+                          borderRadius: '20px', 
+                          minWidth: '120px',
+                          alignSelf: 'flex-start',
+                          fontSize: '0.7rem',
+                          textTransform: 'none'
+                        }}
+                      >
+                        픽업지복사
+                      </Button>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+                {requestedStore && (
+                  <TableRow>
+                    <TableCell variant="head">요청점</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <SearchIcon sx={{ mr: 1, fontSize: '1.2rem', color: 'primary.main' }} />
+                        <span style={{ fontWeight: 'medium', color: 'primary.main' }}>
+                          {requestedStore.name}
+                        </span>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          {/* 퀵비용 예상 섹션 */}
+          {(selectedStore && (requestedStore || loggedInStore)) && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <LocalShippingIcon color="primary" />
+                  매장간 퀵비용 예상
+                </Typography>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    if (onQuickCostClick) {
+                      const fromStore = isAgentMode && requestedStore ? requestedStore : loggedInStore;
+                      const toStore = selectedStore;
+                      onQuickCostClick(fromStore, toStore);
+                    }
+                  }}
+                  sx={{ borderRadius: '20px', textTransform: 'none' }}
+                >
+                  퀵비용 등록
+                </Button>
+              </Box>
+              <EstimatedQuickCost
+                fromStoreId={isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}
+                toStoreId={selectedStore?.id || ''}
+                fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
+                toStoreName={selectedStore?.name || ''}
+              />
             </Box>
-            <EstimatedQuickCost
-              fromStoreId={isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}
-              toStoreId={selectedStore?.id || ''}
-              fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
-              toStoreName={selectedStore?.name || ''}
-            />
-          </Box>
-        )}
+          )}
+        </>
       ) : (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
           지도에서 업체를 선택하세요
