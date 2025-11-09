@@ -1048,27 +1048,27 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           기억
                         </button>
                         
-                        {/* 퀵비등록 버튼 - 관리자모드: 항상 표시 */}
+                        {/* 퀵비등록 버튼 - 관리자모드: requestedStore와 store만 있으면 활성화 */}
                         <button 
                           onClick={() => {
-                            if (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) {
+                            if (onQuickCostClick && requestedStore && store) {
                               const fromStore = requestedStore;
                               const toStore = store;
                               onQuickCostClick(fromStore, toStore);
                             }
                           }}
-                          disabled={!onQuickCostClick || !requestedStore || !requestedStore.id || !store || !store.id}
+                          disabled={!onQuickCostClick || !requestedStore || !store}
                           style={{
                             padding: '6px 8px',
-                            backgroundColor: (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) ? '#2196f3' : '#ccc',
+                            backgroundColor: (onQuickCostClick && requestedStore && store) ? '#2196f3' : '#ccc',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: 'bold',
-                            cursor: (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) ? 'pointer' : 'not-allowed',
+                            cursor: (onQuickCostClick && requestedStore && store) ? 'pointer' : 'not-allowed',
                             minWidth: '60px',
-                            opacity: (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) ? 1 : 0.6
+                            opacity: (onQuickCostClick && requestedStore && store) ? 1 : 0.6
                           }}
                         >
                           퀵비등록
@@ -1099,27 +1099,27 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
                         {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
                         
-                        {/* 퀵비등록 버튼 - 일반모드: 항상 표시 */}
+                        {/* 퀵비등록 버튼 - 일반모드: loggedInStore와 store만 있으면 활성화 */}
                         <button 
                           onClick={() => {
-                            if (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) {
+                            if (onQuickCostClick && loggedInStore && store) {
                               const fromStore = loggedInStore;
                               const toStore = store;
                               onQuickCostClick(fromStore, toStore);
                             }
                           }}
-                          disabled={!onQuickCostClick || !loggedInStore || !loggedInStore.id || !store || !store.id}
+                          disabled={!onQuickCostClick || !loggedInStore || !store}
                           style={{
                             padding: '6px 8px',
-                            backgroundColor: (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) ? '#2196f3' : '#ccc',
+                            backgroundColor: (onQuickCostClick && loggedInStore && store) ? '#2196f3' : '#ccc',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: 'bold',
-                            cursor: (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) ? 'pointer' : 'not-allowed',
+                            cursor: (onQuickCostClick && loggedInStore && store) ? 'pointer' : 'not-allowed',
                             minWidth: '60px',
-                            opacity: (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) ? 1 : 0.6
+                            opacity: (onQuickCostClick && loggedInStore && store) ? 1 : 0.6
                           }}
                         >
                           퀵비등록
@@ -1307,27 +1307,27 @@ ${loggedInStore.name}으로 이동 예정입니다.
                           기억
                         </button>
                         
-                        {/* 퀵비등록 버튼 - 관리자모드: 항상 표시 */}
+                        {/* 퀵비등록 버튼 - 관리자모드: requestedStore와 store만 있으면 활성화 */}
                         <button 
                           onClick={() => {
-                            if (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) {
+                            if (onQuickCostClick && requestedStore && store) {
                               const fromStore = requestedStore;
                               const toStore = store;
                               onQuickCostClick(fromStore, toStore);
                             }
                           }}
-                          disabled={!onQuickCostClick || !requestedStore || !requestedStore.id || !store || !store.id}
+                          disabled={!onQuickCostClick || !requestedStore || !store}
                           style={{
                             padding: '6px 8px',
-                            backgroundColor: (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) ? '#2196f3' : '#ccc',
+                            backgroundColor: (onQuickCostClick && requestedStore && store) ? '#2196f3' : '#ccc',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: 'bold',
-                            cursor: (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) ? 'pointer' : 'not-allowed',
+                            cursor: (onQuickCostClick && requestedStore && store) ? 'pointer' : 'not-allowed',
                             minWidth: '60px',
-                            opacity: (onQuickCostClick && requestedStore && requestedStore.id && store && store.id) ? 1 : 0.6
+                            opacity: (onQuickCostClick && requestedStore && store) ? 1 : 0.6
                           }}
                         >
                           퀵비등록
@@ -1358,27 +1358,27 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
                         {isLoggedInStore && <span style={{color: '#9c27b0', fontWeight: 'bold', fontSize: '12px'}}>내 매장</span>}
                         
-                        {/* 퀵비등록 버튼 - 일반모드: 항상 표시 */}
+                        {/* 퀵비등록 버튼 - 일반모드: loggedInStore와 store만 있으면 활성화 */}
                         <button 
                           onClick={() => {
-                            if (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) {
+                            if (onQuickCostClick && loggedInStore && store) {
                               const fromStore = loggedInStore;
                               const toStore = store;
                               onQuickCostClick(fromStore, toStore);
                             }
                           }}
-                          disabled={!onQuickCostClick || !loggedInStore || !loggedInStore.id || !store || !store.id}
+                          disabled={!onQuickCostClick || !loggedInStore || !store}
                           style={{
                             padding: '6px 8px',
-                            backgroundColor: (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) ? '#2196f3' : '#ccc',
+                            backgroundColor: (onQuickCostClick && loggedInStore && store) ? '#2196f3' : '#ccc',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: 'bold',
-                            cursor: (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) ? 'pointer' : 'not-allowed',
+                            cursor: (onQuickCostClick && loggedInStore && store) ? 'pointer' : 'not-allowed',
                             minWidth: '60px',
-                            opacity: (onQuickCostClick && loggedInStore && loggedInStore.id && store && store.id) ? 1 : 0.6
+                            opacity: (onQuickCostClick && loggedInStore && store) ? 1 : 0.6
                           }}
                         >
                           퀵비등록
