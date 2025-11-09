@@ -561,14 +561,20 @@ const QuickCostModal = ({
                         displayEmpty
                       >
                         {company.phoneOptions && company.phoneOptions.length > 0 ? (
-                          company.phoneOptions.map((phone) => {
-                            const phoneLabel = company.name ? `${phone} (${company.name})` : phone;
-                            return (
-                              <MenuItem key={phone} value={phone}>
-                                {phoneLabel}
-                              </MenuItem>
-                            );
-                          })
+                          company.phoneOptions.map((phone) => (
+                            <MenuItem key={phone} value={phone}>
+                              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {phone}
+                                </Typography>
+                                {company.name && (
+                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    {company.name}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </MenuItem>
+                          ))
                         ) : (
                           <MenuItem disabled>등록된 전화번호가 없습니다</MenuItem>
                         )}
