@@ -200,7 +200,8 @@ function Map({
   onMapExpandToggle, // 맵 확대 토글 함수
   rememberedRequests, // 기억된 요청 목록
   setRememberedRequests, // 기억된 요청 목록 설정 함수
-  onQuickCostClick // 퀵비용 등록 버튼 클릭 핸들러
+  onQuickCostClick, // 퀵비용 등록 버튼 클릭 핸들러
+  quickCostRefreshKey // 퀵비용 데이터 리프레시용 키
 }) {
   // 디버깅: onQuickCostClick prop 확인
   useEffect(() => {
