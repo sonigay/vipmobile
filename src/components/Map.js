@@ -202,6 +202,25 @@ function Map({
   setRememberedRequests, // 기억된 요청 목록 설정 함수
   onQuickCostClick // 퀵비용 등록 버튼 클릭 핸들러
 }) {
+  // 디버깅: onQuickCostClick prop 확인
+  useEffect(() => {
+    if (typeof onQuickCostClick === 'undefined') {
+      console.warn('⚠️ Map 컴포넌트: onQuickCostClick prop이 전달되지 않았습니다.', {
+        isAgentMode,
+        currentView,
+        loggedInStore: !!loggedInStore,
+        requestedStore: !!requestedStore
+      });
+    } else {
+      console.log('✅ Map 컴포넌트: onQuickCostClick prop 전달 확인됨', {
+        isAgentMode,
+        currentView,
+        loggedInStore: !!loggedInStore,
+        requestedStore: !!requestedStore
+      });
+    }
+  }, [onQuickCostClick, isAgentMode, currentView, loggedInStore, requestedStore]);
+  
   const [map, setMap] = useState(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
