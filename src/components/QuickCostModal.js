@@ -271,9 +271,22 @@ const QuickCostModal = ({
         companies: companiesData
       };
 
-      const result = await api.saveQuickCost(saveData);
+      // 양방향 저장: A↔B와 B↔A 모두 저장
+      const saveDataReverse = {
+        ...saveData,
+        fromStoreName: toStoreName,
+        fromStoreId: toStoreId,
+        toStoreName: fromStoreName,
+        toStoreId: fromStoreId
+      };
+
+      // 양방향 모두 저장
+      const [result1, result2] = await Promise.all([
+        api.saveQuickCost(saveData),
+        api.saveQuickCost(saveDataReverse)
+      ]);
       
-      if (result.success) {
+      if (result1.success && result2.success) {
         // 최근 사용 업체 저장
         companiesData.forEach(company => {
           const key = `${company.name}-${company.phone}`;
