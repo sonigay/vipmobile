@@ -159,19 +159,35 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
     );
   }
 
-  const priceRow = topThree
-    .map(item => `${item.averageCost.toLocaleString()}원`)
-    .join(' / ');
-  const nameRow = topThree
-    .map(item => `${item.companyName} (${item.entryCount}건)`)
-    .join(' / ');
-  const rankRow = topThree
-    .map((item, index) => {
-      const rank = index + 1;
-      const isFavorite = favorites.includes(`${item.companyName}-${item.phoneNumber}`);
-      return `${rank}순위${isFavorite ? ' ⭐' : ''}`;
-    })
-    .join(' / ');
+  const topThreeBoxes = topThree.map((item, index) => {
+    const rank = index + 1;
+    const isFavorite = favorites.includes(`${item.companyName}-${item.phoneNumber}`);
+    return (
+      <div
+        key={`${item.companyName}-${item.phoneNumber}`}
+        style={{
+          flex: '1 1 30%',
+          minWidth: '80px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #bbdefb',
+          borderRadius: '6px',
+          padding: '6px',
+          textAlign: 'center',
+          boxShadow: '0 1px 2px rgba(25, 118, 210, 0.12)'
+        }}
+      >
+        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1976d2', marginBottom: '2px' }}>
+          {item.averageCost.toLocaleString()}원
+        </div>
+        <div style={{ fontSize: '10px', color: '#424242', marginBottom: '2px' }}>
+          {item.companyName} ({item.entryCount}건)
+        </div>
+        <div style={{ fontSize: '10px', color: '#616161' }}>
+          {rank}순위{isFavorite ? ' ⭐' : ''}
+        </div>
+      </div>
+    );
+  });
 
   return (
     <div style={{
@@ -182,14 +198,8 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
       border: '1px solid #90caf9'
     }}>
       {renderHeader()}
-      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1976d2', marginBottom: '4px' }}>
-        {priceRow}
-      </div>
-      <div style={{ fontSize: '11px', color: '#424242', marginBottom: '4px' }}>
-        {nameRow}
-      </div>
-      <div style={{ fontSize: '10px', color: '#616161' }}>
-        {rankRow}
+      <div style={{ display: 'flex', gap: '6px', justifyContent: 'space-between' }}>
+        {topThreeBoxes}
       </div>
     </div>
   );
