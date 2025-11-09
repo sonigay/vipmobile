@@ -430,11 +430,11 @@ const QuickCostModal = ({
 
               {/* 비용 */}
               <Grid item xs={12} sm={6}>
-                {company.name && company.phone && company.nameInputMode === 'select' && company.phoneInputMode === 'select' && company.name !== '직접 입력' && company.phone !== '직접 입력' ? (
+                {company.name && company.phone && company.nameInputMode === 'select' && company.phoneInputMode === 'select' && company.name !== '직접 입력' && company.phone !== '직접 입력' && company.costInputMode === 'select' ? (
                   <FormControl fullWidth size="small">
                     <InputLabel>비용</InputLabel>
                     <Select
-                      value={company.costInputMode === 'select' ? company.cost : '직접 입력'}
+                      value={company.cost || ''}
                       label="비용"
                       onChange={(e) => {
                         if (e.target.value === '직접 입력') {
