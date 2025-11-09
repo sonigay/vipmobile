@@ -20939,7 +20939,7 @@ app.post('/api/app-updates', async (req, res) => {
     // Google Sheets에 새 행 추가
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${UPDATE_SHEET_NAME}!A:X`,
+      range: `${UPDATE_SHEET_NAME}!A:Y`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
