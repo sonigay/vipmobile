@@ -396,18 +396,24 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>업체명</InputLabel>
                     <Select
-                      value={company.name || ''}
+                      value={company.nameInputMode === 'input' ? '' : (company.name || '')}
                       label="업체명"
                       onChange={(e) => {
                         console.log('🔍 Select onChange 호출:', { value: e.target.value, index, currentMode: company.nameInputMode });
                         const selectedValue = e.target.value;
                         if (selectedValue === '직접 입력') {
                           console.log('🔍 직접 입력 선택됨, input 모드로 전환');
-                          // 직접 입력 모드로 전환
-                          const newList = [...companyList];
-                          newList[index].name = '';
-                          newList[index].nameInputMode = 'input';
-                          setCompanyList(newList);
+                          // 직접 입력 모드로 전환 - 즉시 상태 업데이트
+                          setCompanyList(prevList => {
+                            const newList = [...prevList];
+                            newList[index] = {
+                              ...newList[index],
+                              name: '',
+                              nameInputMode: 'input'
+                            };
+                            console.log('🔍 상태 업데이트 완료:', newList[index]);
+                            return newList;
+                          });
                         } else {
                           console.log('🔍 업체명 선택됨:', selectedValue);
                           handleCompanyNameChange(index, selectedValue, 'select');
@@ -440,15 +446,20 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>대표번호</InputLabel>
                     <Select
-                      value={company.phone || ''}
+                      value={company.phoneInputMode === 'input' ? '' : (company.phone || '')}
                       label="대표번호"
                       onChange={async (e) => {
                         if (e.target.value === '직접 입력') {
-                          // 직접 입력 모드로 전환
-                          const newList = [...companyList];
-                          newList[index].phone = '';
-                          newList[index].phoneInputMode = 'input';
-                          setCompanyList(newList);
+                          // 직접 입력 모드로 전환 - 즉시 상태 업데이트
+                          setCompanyList(prevList => {
+                            const newList = [...prevList];
+                            newList[index] = {
+                              ...newList[index],
+                              phone: '',
+                              phoneInputMode: 'input'
+                            };
+                            return newList;
+                          });
                         } else {
                           handlePhoneChange(index, e.target.value, 'select');
                         }
@@ -476,15 +487,20 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>비용</InputLabel>
                     <Select
-                      value={company.cost || ''}
+                      value={company.costInputMode === 'input' ? '' : (company.cost || '')}
                       label="비용"
                       onChange={(e) => {
                         if (e.target.value === '직접 입력') {
-                          // 직접 입력 모드로 전환
-                          const newList = [...companyList];
-                          newList[index].cost = '';
-                          newList[index].costInputMode = 'input';
-                          setCompanyList(newList);
+                          // 직접 입력 모드로 전환 - 즉시 상태 업데이트
+                          setCompanyList(prevList => {
+                            const newList = [...prevList];
+                            newList[index] = {
+                              ...newList[index],
+                              cost: '',
+                              costInputMode: 'input'
+                            };
+                            return newList;
+                          });
                         } else {
                           handleCostChange(index, e.target.value, 'select');
                         }
