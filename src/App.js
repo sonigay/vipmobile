@@ -3744,6 +3744,7 @@ ${requestList}
                           selectedModel={selectedModel}
                           selectedColor={selectedColor}
                           loggedInStoreId={loggedInStore?.id}
+                          loggedInStore={loggedInStore}
                           isAgentMode={isAgentMode}
                           currentView={currentView}
                           forceZoomToStore={forceZoomToStore}
@@ -3756,6 +3757,11 @@ ${requestList}
                           onMapExpandToggle={handleMapExpandToggle}
                           rememberedRequests={rememberedRequests}
                           setRememberedRequests={setRememberedRequests}
+                          onQuickCostClick={(fromStore, toStore) => {
+                            setQuickCostFromStore(fromStore);
+                            setQuickCostToStore(toStore);
+                            setShowQuickCostModal(true);
+                          }}
                         />
                       </Box>
                       
@@ -4129,6 +4135,11 @@ ${requestList}
                     onMapExpandToggle={handleMapExpandToggle}
                     rememberedRequests={rememberedRequests}
                     setRememberedRequests={setRememberedRequests}
+                    onQuickCostClick={(fromStore, toStore) => {
+                      setQuickCostFromStore(fromStore);
+                      setQuickCostToStore(toStore);
+                      setShowQuickCostModal(true);
+                    }}
                   />
                 </Box>
               )}
