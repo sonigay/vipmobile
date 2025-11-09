@@ -53,9 +53,6 @@ const ModeSelectionPopup = ({
   // 검색어 상태
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 카테고리 필터 상태 (기본값: 'all')
-  const [selectedCategory, setSelectedCategory] = useState('all');
-
   // 즐겨찾기 상태
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -66,18 +63,36 @@ const ModeSelectionPopup = ({
     }
   });
 
+  // 사용자 타입 자동 감지 (availableModes의 모드 카테고리 기반)
+  const userCategory = useMemo(() => {
+    if (!Array.isArray(availableModes) || availableModes.length === 0) return null;
+    
+    // availableModes의 모드들의 category 확인
+    const categories = availableModes.map(mode => {
+      const config = getModeConfig(mode);
+      return config?.category;
+    }).filter(Boolean);
+    
+    // 모든 모드가 같은 category인지 확인
+    const uniqueCategories = [...new Set(categories)];
+    
+    // 대부분이 admin이면 admin, 대부분이 general이면 general
+    if (uniqueCategories.length === 1) {
+      return uniqueCategories[0];
+    }
+    
+    // 혼합된 경우, admin이 더 많으면 admin, 아니면 general
+    const adminCount = categories.filter(c => c === 'admin').length;
+    const generalCount = categories.filter(c => c === 'general').length;
+    
+    return adminCount >= generalCount ? 'admin' : 'general';
+  }, [availableModes]);
+
   // 뷰 모드 변경 핸들러
   const handleViewModeChange = (event, newViewMode) => {
     if (newViewMode !== null) {
       setViewMode(newViewMode);
       localStorage.setItem('mode-selection-view-mode', newViewMode);
-    }
-  };
-
-  // 카테고리 필터 변경 핸들러
-  const handleCategoryChange = (event, newCategory) => {
-    if (newCategory !== null) {
-      setSelectedCategory(newCategory);
     }
   };
 
@@ -100,11 +115,11 @@ const ModeSelectionPopup = ({
     const remaining = availableModes.filter(mode => !sorted.includes(mode));
     let modes = [...sorted, ...remaining];
 
-    // 카테고리 필터 적용
-    if (selectedCategory !== 'all') {
+    // 사용자 카테고리 기반 자동 필터링
+    if (userCategory) {
       modes = modes.filter(mode => {
         const config = getModeConfig(mode);
-        return config?.category === selectedCategory;
+        return config?.category === userCategory;
       });
     }
 
@@ -130,7 +145,7 @@ const ModeSelectionPopup = ({
     });
 
     return modes;
-  }, [availableModes, selectedCategory, searchQuery, favorites]);
+  }, [availableModes, userCategory, searchQuery, favorites]);
 
   const handleModeSelect = (mode) => {
     console.log('ModeSelectionPopup handleModeSelect 호출됨:', mode);
@@ -201,9 +216,8 @@ const ModeSelectionPopup = ({
           sx={{ mb: 2 }}
         />
 
-        {/* 뷰 모드 선택 및 카테고리 필터 */}
+        {/* 뷰 모드 선택 */}
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* 뷰 모드 선택 */}
           <ToggleButtonGroup
             value={viewMode}
             exclusive
@@ -219,25 +233,6 @@ const ModeSelectionPopup = ({
             </ToggleButton>
             <ToggleButton value="compact" aria-label="간략히">
               간략히
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          {/* 카테고리 필터 */}
-          <ToggleButtonGroup
-            value={selectedCategory}
-            exclusive
-            onChange={handleCategoryChange}
-            size="small"
-            aria-label="카테고리 필터"
-          >
-            <ToggleButton value="all" aria-label="전체">
-              전체
-            </ToggleButton>
-            <ToggleButton value="admin" aria-label="관리자 모드">
-              관리자 모드
-            </ToggleButton>
-            <ToggleButton value="general" aria-label="일반 모드">
-              일반 모드
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>
