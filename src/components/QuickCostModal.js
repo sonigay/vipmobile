@@ -271,16 +271,20 @@ const QuickCostModal = ({
         companies: companiesData
       };
 
-      // 양방향 저장: A↔B와 B↔A 모두 저장
+      // 양방향 저장: 같은 퀵서비스 업체일 경우 A↔B와 B↔A 모두 저장
+      // 조건: 입력한 업체 정보(업체명, 전화번호, 비용)가 동일한 경우
+      // 현재 구현: 입력한 모든 업체 정보를 양방향으로 저장
       const saveDataReverse = {
         ...saveData,
         fromStoreName: toStoreName,
         fromStoreId: toStoreId,
         toStoreName: fromStoreName,
-        toStoreId: fromStoreId
+        toStoreId: fromStoreId,
+        // 같은 업체 정보(companies)를 그대로 사용
+        companies: companiesData
       };
 
-      // 양방향 모두 저장
+      // 양방향 모두 저장 (같은 업체 정보로)
       const [result1, result2] = await Promise.all([
         api.saveQuickCost(saveData),
         api.saveQuickCost(saveDataReverse)
@@ -313,6 +317,14 @@ const QuickCostModal = ({
       setSaving(false);
     }
   };
+
+  // 모달 열릴 때 초기화
+  useEffect(() => {
+    if (open) {
+      setCompanyList([{ ...initialCompany }]);
+      setError(null);
+    }
+  }, [open]);
 
   // 모달 닫기
   const handleClose = () => {
@@ -384,24 +396,28 @@ const QuickCostModal = ({
                   <FormControl fullWidth size="small">
                     <InputLabel>업체명</InputLabel>
                     <Select
-                      value={company.name || ''}
+                      value={company.nameInputMode === 'input' ? '' : (company.name || '')}
                       label="업체명"
                       onChange={(e) => {
-                        console.log('🔍 Select onChange 호출:', { value: e.target.value, index });
-                        if (e.target.value === '직접 입력') {
+                        console.log('🔍 Select onChange 호출:', { value: e.target.value, index, currentMode: company.nameInputMode });
+                        const selectedValue = e.target.value;
+                        if (selectedValue === '직접 입력' || selectedValue === '') {
                           console.log('🔍 직접 입력 선택됨, input 모드로 전환');
                           handleCompanyNameChange(index, '', 'input');
                         } else {
-                          console.log('🔍 업체명 선택됨:', e.target.value);
-                          handleCompanyNameChange(index, e.target.value, 'select');
+                          console.log('🔍 업체명 선택됨:', selectedValue);
+                          handleCompanyNameChange(index, selectedValue, 'select');
                         }
                       }}
+                      displayEmpty
                     >
                       {loading ? (
                         <MenuItem disabled>로딩 중...</MenuItem>
                       ) : (
                         <>
-                          <MenuItem value="직접 입력">직접 입력</MenuItem>
+                          <MenuItem value="직접 입력">
+                            <em>직접 입력</em>
+                          </MenuItem>
                           {companyOptions.map((opt) => (
                             <MenuItem key={opt} value={opt}>
                               {opt}
