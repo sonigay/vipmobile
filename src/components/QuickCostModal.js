@@ -122,9 +122,11 @@ const QuickCostModal = ({
 
   // 업체명 변경
   const handleCompanyNameChange = async (index, value, inputMode) => {
+    console.log('🔍 handleCompanyNameChange 호출:', { index, value, inputMode });
     const newList = [...companyList];
     newList[index].name = value;
     newList[index].nameInputMode = inputMode;
+    console.log('🔍 업데이트된 companyList:', newList[index]);
 
     // 선택 모드이고 업체명이 변경되면 전화번호 목록 로드
     if (inputMode === 'select' && value && value !== '직접 입력') {
@@ -372,9 +374,12 @@ const QuickCostModal = ({
                       value={company.name || ''}
                       label="업체명"
                       onChange={(e) => {
+                        console.log('🔍 Select onChange 호출:', { value: e.target.value, index });
                         if (e.target.value === '직접 입력') {
+                          console.log('🔍 직접 입력 선택됨, input 모드로 전환');
                           handleCompanyNameChange(index, '', 'input');
                         } else {
+                          console.log('🔍 업체명 선택됨:', e.target.value);
                           handleCompanyNameChange(index, e.target.value, 'select');
                         }
                       }}
