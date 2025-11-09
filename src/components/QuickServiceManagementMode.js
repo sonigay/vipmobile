@@ -22,8 +22,17 @@ import {
   Paper,
   TextField,
   MenuItem,
-  Tooltip
+  Tooltip,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Tooltip as LeafletTooltip
+} from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import UpdateIcon from '@mui/icons-material/Update';
@@ -54,6 +63,27 @@ const defaultQuality = {
   reliabilityScores: []
 };
 
+const REGION_COORDINATES = {
+  서울: { lat: 37.5665, lng: 126.978 },
+  부산: { lat: 35.1796, lng: 129.0756 },
+  대구: { lat: 35.8714, lng: 128.6014 },
+  인천: { lat: 37.4563, lng: 126.7052 },
+  광주: { lat: 35.1595, lng: 126.8526 },
+  대전: { lat: 36.3504, lng: 127.3845 },
+  울산: { lat: 35.5384, lng: 129.3114 },
+  세종: { lat: 36.4875, lng: 127.2817 },
+  경기: { lat: 37.4138, lng: 127.5183 },
+  강원: { lat: 37.8228, lng: 128.1555 },
+  충북: { lat: 36.6357, lng: 127.4917 },
+  충남: { lat: 36.5184, lng: 126.8 },
+  전북: { lat: 35.7175, lng: 127.153 },
+  전남: { lat: 34.8679, lng: 126.991 },
+  경북: { lat: 36.4919, lng: 128.8889 },
+  경남: { lat: 35.4606, lng: 128.2132 },
+  제주: { lat: 33.4996, lng: 126.5312 },
+  기타: { lat: 36.5, lng: 127.8 }
+};
+
 const QuickServiceManagementMode = ({
   onLogout,
   onModeChange,
@@ -66,6 +96,7 @@ const QuickServiceManagementMode = ({
   const [error, setError] = useState(null);
   const [region, setRegion] = useState('all');
   const [regionOptions, setRegionOptions] = useState(['all']);
+  const [mapMetric, setMapMetric] = useState('popular');
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const modeColor = useMemo(() => getModeColor(MODE_KEY), []);
   const modeTitle = useMemo(
@@ -180,6 +211,12 @@ const QuickServiceManagementMode = ({
     setRegion(event.target.value);
   };
 
+  const handleMapMetricChange = (_event, next) => {
+    if (next !== null) {
+      setMapMetric(next);
+    }
+  };
+
   const handleRefresh = () => {
     fetchData(region, true);
   };
@@ -267,6 +304,121 @@ const QuickServiceManagementMode = ({
       )}
     </Paper>
   );
+
+  const aggregatedRegionMetrics = useMemo(() => {
+    const metrics = {};
+
+    (statistics.popularCompanies || []).forEach((item) => {
+      const regionKey = item.region || '기타';
+      if (!metrics[regionKey]) {
+        metrics[regionKey] = {
+          region: regionKey,
+          popularEntries: 0,
+          excellentEntries: 0,
+          averageSpeedScoreSum: 0,
+          averageSpeedScoreAvg: 0,
+          popularTopCompany: null,
+          excellentTopCompany: null
+        };
+      }
+      metrics[regionKey].popularEntries += item.entryCount || 0;
+      if (!metrics[regionKey].popularTopCompany) {
+        metrics[regionKey].popularTopCompany = {
+          companyName: item.companyName,
+          phoneNumber: item.phoneNumber
+        };
+      }
+    });
+
+    (statistics.excellentCompanies || []).forEach((item) => {
+      const regionKey = item.region || '기타';
+      if (!metrics[regionKey]) {
+        metrics[regionKey] = {
+          region: regionKey,
+          popularEntries: 0,
+          excellentEntries: 0,
+          averageSpeedScoreSum: 0,
+          averageSpeedScoreAvg: 0,
+          popularTopCompany: null,
+          excellentTopCompany: null
+        };
+      }
+      metrics[regionKey].excellentEntries += 1;
+      metrics[regionKey].averageSpeedScoreSum += item.averageSpeedScore || 0;
+      if (!metrics[regionKey].excellentTopCompany) {
+        metrics[regionKey].excellentTopCompany = {
+          companyName: item.companyName,
+          phoneNumber: item.phoneNumber
+        };
+      }
+    });
+
+    Object.values(metrics).forEach((metric) => {
+      if (metric.excellentEntries > 0) {
+        metric.averageSpeedScoreAvg =
+          Math.round(
+            (metric.averageSpeedScoreSum / metric.excellentEntries) * 100
+          ) / 100;
+      }
+    });
+
+    return metrics;
+  }, [statistics]);
+
+  const mapData = useMemo(() => {
+    const list = [];
+
+    Object.values(aggregatedRegionMetrics).forEach((metric) => {
+      const coords =
+        REGION_COORDINATES[metric.region] || REGION_COORDINATES.기타;
+
+      if (mapMetric === 'popular' && metric.popularEntries > 0) {
+        const top = metric.popularTopCompany;
+        list.push({
+          key: `${metric.region}-popular`,
+          region: metric.region,
+          lat: coords.lat,
+          lng: coords.lng,
+          intensity: metric.popularEntries,
+          label: `${metric.popularEntries.toLocaleString()}건`,
+          description: top
+            ? `${top.companyName} (${top.phoneNumber || '-'})`
+            : '상위 업체 정보 없음'
+        });
+      }
+
+      if (mapMetric === 'excellent' && metric.excellentEntries > 0) {
+        const top = metric.excellentTopCompany;
+        list.push({
+          key: `${metric.region}-excellent`,
+          region: metric.region,
+          lat: coords.lat,
+          lng: coords.lng,
+          intensity: metric.averageSpeedScoreAvg,
+          label: `${metric.averageSpeedScoreAvg?.toFixed(2)}점`,
+          description: top
+            ? `${top.companyName} (${top.phoneNumber || '-'})`
+            : '상위 업체 정보 없음'
+        });
+      }
+    });
+
+    return list;
+  }, [aggregatedRegionMetrics, mapMetric]);
+
+  const mapIntensityRange = useMemo(() => {
+    if (mapData.length === 0) return { min: 0, max: 0 };
+    let min = Infinity;
+    let max = -Infinity;
+    mapData.forEach((item) => {
+      if (item.intensity < min) min = item.intensity;
+      if (item.intensity > max) max = item.intensity;
+    });
+    if (!isFinite(min) || !isFinite(max)) {
+      return { min: 0, max: 1 };
+    }
+    return { min, max };
+  }, [mapData]);
 
   return (
     <>
@@ -436,6 +588,117 @@ const QuickServiceManagementMode = ({
             </Paper>
           ) : (
             <>
+              <Paper
+                elevation={2}
+                sx={{
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 3,
+                    py: 2,
+                    borderBottom: '1px solid rgba(0,0,0,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 1.5
+                  }}
+                >
+                  <Stack spacing={0.5}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      지역 분포 시각화 (1차 버전)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      인기/우수 업체 데이터를 지도에 표시합니다. 이후 단계에서 폴리곤 기반 열지도 등으로 확장할 예정입니다.
+                    </Typography>
+                  </Stack>
+                  <ToggleButtonGroup
+                    size="small"
+                    value={mapMetric}
+                    exclusive
+                    onChange={handleMapMetricChange}
+                  >
+                    <ToggleButton value="popular">인기 업체</ToggleButton>
+                    <ToggleButton value="excellent">우수 업체</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+                <Box sx={{ height: 420 }}>
+                  {mapData.length === 0 ? (
+                    <Box
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'text.secondary',
+                        gap: 1.5
+                      }}
+                    >
+                      <MapOutlinedIcon fontSize="large" />
+                      <Typography variant="body2">
+                        표시할 데이터가 없습니다.
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <MapContainer
+                      center={[36.5, 127.8]}
+                      zoom={6.7}
+                      style={{ height: '100%', width: '100%' }}
+                      zoomControl={false}
+                      attributionControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      {mapData.map((item) => {
+                        const range =
+                          mapIntensityRange.max - mapIntensityRange.min || 1;
+                        const normalized =
+                          (item.intensity - mapIntensityRange.min) / range;
+                        const radius =
+                          mapMetric === 'popular'
+                            ? 10000 + normalized * 25000
+                            : 8000 + normalized * 20000;
+                        const color =
+                          mapMetric === 'popular' ? '#ff7043' : '#4caf50';
+                        return (
+                          <CircleMarker
+                            key={item.key}
+                            center={[item.lat, item.lng]}
+                            radius={Math.max(radius / 4000, 8)}
+                            pathOptions={{
+                              color,
+                              fillColor: color,
+                              fillOpacity: 0.4,
+                              weight: 2
+                            }}
+                          >
+                            <LeafletTooltip direction="top" offset={[0, -2]}>
+                              <div style={{ minWidth: 160 }}>
+                                <strong>{item.region}</strong>
+                                <br />
+                                {mapMetric === 'popular'
+                                  ? `등록 건수: ${item.label}`
+                                  : `평균 속도 점수: ${item.label}`}
+                                <br />
+                                {item.description}
+                              </div>
+                            </LeafletTooltip>
+                          </CircleMarker>
+                        );
+                      })}
+                    </MapContainer>
+                  )}
+                </Box>
+              </Paper>
+
               <Grid container spacing={2}>
                 <Grid item xs={12} md={3}>
                   {renderSummaryCard(
