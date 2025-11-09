@@ -355,53 +355,54 @@ const QuickCostModal = ({
             <Grid container spacing={2}>
               {/* 업체명 */}
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>업체명</InputLabel>
-                  <Select
-                    value={company.nameInputMode === 'select' ? company.name : '직접 입력'}
-                    label="업체명"
-                    onChange={(e) => {
-                      if (e.target.value === '직접 입력') {
-                        handleCompanyNameChange(index, '', 'input');
-                      } else {
-                        handleCompanyNameChange(index, e.target.value, 'select');
-                      }
-                    }}
-                  >
-                    {loading ? (
-                      <MenuItem disabled>로딩 중...</MenuItem>
-                    ) : (
-                      <>
-                        <MenuItem value="직접 입력">직접 입력</MenuItem>
-                        {companyOptions.map((opt) => (
-                          <MenuItem key={opt} value={opt}>
-                            {opt}
-                          </MenuItem>
-                        ))}
-                      </>
-                    )}
-                  </Select>
-                </FormControl>
-                {company.nameInputMode === 'input' && (
+                {company.nameInputMode === 'input' ? (
                   <TextField
                     fullWidth
                     size="small"
-                    sx={{ mt: 1 }}
+                    label="업체명"
                     placeholder="업체명을 입력하세요"
                     value={company.name}
                     onChange={(e) => handleCompanyNameChange(index, e.target.value, 'input')}
                     inputProps={{ maxLength: 50 }}
                   />
+                ) : (
+                  <FormControl fullWidth size="small">
+                    <InputLabel>업체명</InputLabel>
+                    <Select
+                      value={company.name || ''}
+                      label="업체명"
+                      onChange={(e) => {
+                        if (e.target.value === '직접 입력') {
+                          handleCompanyNameChange(index, '', 'input');
+                        } else {
+                          handleCompanyNameChange(index, e.target.value, 'select');
+                        }
+                      }}
+                    >
+                      {loading ? (
+                        <MenuItem disabled>로딩 중...</MenuItem>
+                      ) : (
+                        <>
+                          <MenuItem value="직접 입력">직접 입력</MenuItem>
+                          {companyOptions.map((opt) => (
+                            <MenuItem key={opt} value={opt}>
+                              {opt}
+                            </MenuItem>
+                          ))}
+                        </>
+                      )}
+                    </Select>
+                  </FormControl>
                 )}
               </Grid>
 
               {/* 전화번호 */}
               <Grid item xs={12} sm={6}>
-                {company.name && company.nameInputMode === 'select' && company.name !== '직접 입력' ? (
+                {company.name && company.nameInputMode === 'select' && company.name !== '직접 입력' && company.phoneInputMode === 'select' ? (
                   <FormControl fullWidth size="small">
                     <InputLabel>대표번호</InputLabel>
                     <Select
-                      value={company.phoneInputMode === 'select' ? company.phone : '직접 입력'}
+                      value={company.phone || ''}
                       label="대표번호"
                       onChange={async (e) => {
                         if (e.target.value === '직접 입력') {
