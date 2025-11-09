@@ -4044,18 +4044,39 @@ ${requestList}
                   )}
                 </>
               ) : (
-                // 일반 매장 모드일 때 FilterPanel만 표시
-                <FilterPanel
-                  models={data?.models}
-                  colorsByModel={data?.colorsByModel}
-                  selectedModel={selectedModel}
-                  selectedColor={selectedColor}
-                  selectedRadius={selectedRadius}
-                  onModelSelect={handleModelSelect}
-                  onColorSelect={handleColorSelect}
-                  onRadiusSelect={handleRadiusSelect}
-                  isAgentMode={isAgentMode}
-                />
+                // 일반 매장 모드일 때 StoreInfoTable과 FilterPanel 표시
+                <>
+                  <StoreInfoTable 
+                    selectedStore={selectedStore}
+                    requestedStore={requestedStore}
+                    agentTarget={agentTarget}
+                    agentContactId={agentContactId}
+                    onCallButtonClick={handleCallButtonClick}
+                    onKakaoTalkButtonClick={handleKakaoTalkButtonClick}
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    currentView={currentView}
+                    agentTotalInventory={getAgentTotalInventory()}
+                    loggedInStore={loggedInStore}
+                    isAgentMode={isAgentMode}
+                    onQuickCostClick={(fromStore, toStore) => {
+                      setQuickCostFromStore(fromStore);
+                      setQuickCostToStore(toStore);
+                      setShowQuickCostModal(true);
+                    }}
+                  />
+                  <FilterPanel
+                    models={data?.models}
+                    colorsByModel={data?.colorsByModel}
+                    selectedModel={selectedModel}
+                    selectedColor={selectedColor}
+                    selectedRadius={selectedRadius}
+                    onModelSelect={handleModelSelect}
+                    onColorSelect={handleColorSelect}
+                    onRadiusSelect={handleRadiusSelect}
+                    isAgentMode={isAgentMode}
+                  />
+                </>
               )}
               
               {/* 기억된 요청 목록 테이블 */}
