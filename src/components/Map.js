@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import { Paper, Box, Button } from '@mui/material';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import QuickCostPreview from './QuickCostPreview';
 
 // Leaflet 마커 아이콘 설정 (기본 아이콘 경로 문제 해결)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -659,9 +660,9 @@ ${loggedInStore.name}으로 이동 예정입니다.
     }
   }, [map, isMapReady]);
 
-  // 선택된 매장으로 지도 이동 (개선된 버전)
+  // 선택된 매장으로 지도 이동 및 Popup 자동 열기 (개선된 버전)
   useEffect(() => {
-    if (!selectedStore || !selectedStore.latitude || !selectedStore.longitude) return;
+    if (!selectedStore || !selectedStore.latitude || !selectedStore.longitude || !map) return;
     
     // 이전에 선택된 매장과 다른 경우에만 처리
     if (previousSelectedStoreRef.current !== selectedStore.id) {
@@ -685,14 +686,41 @@ ${loggedInStore.name}으로 이동 예정입니다.
         // 거리가 가까우면 (500m 이내) 이동하지 않음
         if (isVisible && distance < 500) {
           console.log('매장이 화면에 보이므로 지도 이동하지 않음');
-          return;
+        } else {
+          // 현재 줌 레벨 유지 (강제 변경하지 않음)
+          map.setView([position.lat, position.lng], currentZoom, {
+            animate: true,
+            duration: 0.8 // 애니메이션 시간 단축
+          });
         }
         
-        // 현재 줌 레벨 유지 (강제 변경하지 않음)
-        map.setView([position.lat, position.lng], currentZoom, {
-          animate: true,
-          duration: 0.8 // 애니메이션 시간 단축
-        });
+        // 선택된 매장의 마커 Popup 자동으로 열기
+        setTimeout(() => {
+          try {
+            // 지도에서 모든 레이어를 순회하며 해당 위치의 마커 찾기
+            let foundMarker = null;
+            map.eachLayer((layer) => {
+              if (layer instanceof L.Marker) {
+                const markerLat = layer.getLatLng().lat;
+                const markerLng = layer.getLatLng().lng;
+                // 좌표가 거의 일치하는지 확인 (0.0001도 이내, 약 11m)
+                if (Math.abs(markerLat - position.lat) < 0.0001 && 
+                    Math.abs(markerLng - position.lng) < 0.0001) {
+                  foundMarker = layer;
+                }
+              }
+            });
+            
+            if (foundMarker && foundMarker.getPopup) {
+              const popup = foundMarker.getPopup();
+              if (popup) {
+                foundMarker.openPopup();
+              }
+            }
+          } catch (error) {
+            console.warn('Popup 열기 실패:', error);
+          }
+        }, 300); // 지도 이동 후 약간의 지연을 두고 Popup 열기
       });
       
       // 선택한 매장 ID 저장
@@ -984,6 +1012,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         </div>
                       )}
                       
+                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우) */}
+                      {requestedStore && requestedStore.id && store.id && (
+                        <QuickCostPreview
+                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          fromStoreId={requestedStore.id}
+                          toStoreId={store.id}
+                          fromStoreName={requestedStore.name}
+                          toStoreName={store.name}
+                        />
+                      )}
+                      
                       {/* 선택됨과 기억 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
@@ -1013,6 +1052,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
                     <div>
                       {store.address && <p>주소: {store.address}</p>}
                       <p>재고: {inventoryCount}개</p>
+                      
+                      {/* 퀵비용 예상 정보 */}
+                      {loggedInStore && loggedInStore.id && store.id && (
+                        <QuickCostPreview
+                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          fromStoreId={loggedInStore.id}
+                          toStoreId={store.id}
+                          fromStoreName={loggedInStore.name}
+                          toStoreName={store.name}
+                        />
+                      )}
                       
                       {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
@@ -1163,6 +1213,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
                         </div>
                       )}
                       
+                      {/* 퀵비용 예상 정보 (관리자 모드에서 요청점이 있는 경우) */}
+                      {requestedStore && requestedStore.id && store.id && (
+                        <QuickCostPreview
+                          key={`quickcost-${requestedStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          fromStoreId={requestedStore.id}
+                          toStoreId={store.id}
+                          fromStoreName={requestedStore.name}
+                          toStoreName={store.name}
+                        />
+                      )}
+                      
                       {/* 선택됨과 기억 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                         {isSelected && <span style={{color: '#2196f3', fontWeight: 'bold', fontSize: '12px'}}>✓ 선택됨</span>}
@@ -1192,6 +1253,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
                     <div>
                       {store.address && <p>주소: {store.address}</p>}
                       <p>재고: {inventoryCount}개</p>
+                      
+                      {/* 퀵비용 예상 정보 */}
+                      {loggedInStore && loggedInStore.id && store.id && (
+                        <QuickCostPreview
+                          key={`quickcost-${loggedInStore.id}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                          fromStoreId={loggedInStore.id}
+                          toStoreId={store.id}
+                          fromStoreName={loggedInStore.name}
+                          toStoreName={store.name}
+                        />
+                      )}
                       
                       {/* 선택됨과 카톡문구생성 버튼을 같은 줄에 배치 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
@@ -1458,6 +1530,17 @@ ${loggedInStore.name}으로 이동 예정입니다.
                                     <span style={{ color: '#4caf50', marginRight: '8px' }}>✅ {inventoryByAge.within30}</span>
                                   )}
                                 </div>
+                              )}
+                              
+                              {/* 퀵비용 예상 정보 */}
+                              {((isAgentMode && requestedStore && requestedStore.id) || (!isAgentMode && loggedInStore && loggedInStore.id)) && store.id && (
+                                <QuickCostPreview
+                                  key={`quickcost-${isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}-${store.id}-${selectedStore?.id === store.id ? 'selected' : 'normal'}`}
+                                  fromStoreId={isAgentMode && requestedStore ? requestedStore.id : (loggedInStore?.id || '')}
+                                  toStoreId={store.id}
+                                  fromStoreName={isAgentMode && requestedStore ? requestedStore.name : (loggedInStore?.name || '')}
+                                  toStoreName={store.name}
+                                />
                               )}
                             </div>
                           );
