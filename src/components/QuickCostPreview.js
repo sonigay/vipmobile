@@ -9,7 +9,7 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
   const [loading, setLoading] = useState(false);
   const [favorites, setFavorites] = useState([]);
 
-  useEffect(() => {
+  const loadFavorites = () => {
     const savedFavorites = localStorage.getItem('quick-cost-favorites');
     if (savedFavorites) {
       try {
@@ -17,8 +17,18 @@ const QuickCostPreview = ({ fromStoreId, toStoreId, fromStoreName, toStoreName, 
       } catch (err) {
         console.error('즐겨찾기 로드 실패:', err);
       }
+    } else {
+      setFavorites([]);
     }
+  };
+
+  useEffect(() => {
+    loadFavorites();
   }, []);
+
+  useEffect(() => {
+    loadFavorites();
+  }, [refreshKey, fromStoreId, toStoreId]);
 
   useEffect(() => {
     if (!fromStoreId || !toStoreId) {
