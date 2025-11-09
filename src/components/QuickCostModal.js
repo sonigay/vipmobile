@@ -308,10 +308,20 @@ const QuickCostModal = ({
       };
 
       // 양방향 모두 저장 (같은 업체 정보로)
+      console.log('🔍 양방향 저장 시작:', {
+        방향1: `${fromStoreName}(${fromStoreId}) ↔ ${toStoreName}(${toStoreId})`,
+        방향2: `${toStoreName}(${toStoreId}) ↔ ${fromStoreName}(${fromStoreId})`
+      });
+      
       const [result1, result2] = await Promise.all([
         api.saveQuickCost(saveData),
         api.saveQuickCost(saveDataReverse)
       ]);
+      
+      console.log('🔍 양방향 저장 결과:', {
+        방향1: result1.success ? '성공' : `실패: ${result1.error || '알 수 없는 오류'}`,
+        방향2: result2.success ? '성공' : `실패: ${result2.error || '알 수 없는 오류'}`
+      });
       
       if (result1.success && result2.success) {
         // 최근 사용 업체 저장
@@ -365,7 +375,16 @@ const QuickCostModal = ({
         // 폼 초기화
         setCompanyList([{ ...initialCompany }]);
       } else {
-        setError(result.error || '저장에 실패했습니다.');
+        // 양방향 저장 중 하나라도 실패한 경우
+        const errorMessages = [];
+        if (!result1.success) {
+          errorMessages.push(`방향1 저장 실패: ${result1.error || '알 수 없는 오류'}`);
+        }
+        if (!result2.success) {
+          errorMessages.push(`방향2 저장 실패: ${result2.error || '알 수 없는 오류'}`);
+        }
+        setError(`저장에 실패했습니다. ${errorMessages.join(', ')}`);
+        console.error('❌ 양방향 저장 실패:', { result1, result2 });
       }
     } catch (err) {
       console.error('저장 오류:', err);
