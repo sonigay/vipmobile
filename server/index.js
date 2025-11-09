@@ -20919,7 +20919,8 @@ app.post('/api/app-updates', async (req, res) => {
       'attendance': 20,          // U열: 근퇴 모드
       'riskManagement': 21,      // V열: 리스크 관리 모드
       'directStoreManagement': 22, // W열: 직영점 관리 모드
-      'directStore': 23          // X열: 직영점 모드 (일반)
+      'directStore': 23,         // X열: 직영점 모드 (일반)
+      'quickServiceManagement': 24 // Y열: 퀵서비스 관리 모드
     };
     
     const columnIndex = modeColumnMap[mode];
@@ -20931,7 +20932,7 @@ app.post('/api/app-updates', async (req, res) => {
     }
     
     // 새 행 데이터 생성
-    const newRow = new Array(24).fill(''); // A~X열 (24개 컬럼)
+    const newRow = new Array(25).fill(''); // A~Y열 (25개 컬럼)
     newRow[0] = date;  // A열: 날짜
     newRow[columnIndex] = content;  // 해당 모드 컬럼에 내용
     
