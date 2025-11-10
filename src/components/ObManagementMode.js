@@ -28,7 +28,7 @@ import AppUpdatePopup from './AppUpdatePopup';
 import Snackbar from '@mui/material/Snackbar';
 import ObSheetConfigModal from './ob/ObSheetConfigModal';
 import ObSettlementManagementPanel from './ob/ObSettlementManagementPanel';
-import ObSettlementOverviewPlaceholder from './ob/ObSettlementOverviewPlaceholder';
+import ObSettlementOverview from './ob/ObSettlementOverview';
 
 const OB_LINK_SHEET_ID =
   process.env.REACT_APP_OB_LINK_SHEET_ID ||
@@ -855,7 +855,7 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
         {activeTab === TAB_KEYS.CALCULATOR && renderCalculatorSection()}
         {activeTab === TAB_KEYS.OVERVIEW && (
-          <ObSettlementOverviewPlaceholder month={sheetConfigs[0]?.month} />
+          <ObSettlementOverview sheetConfigs={sheetConfigs} />
         )}
         {activeTab === TAB_KEYS.MANAGEMENT && (
           <ObSettlementManagementPanel

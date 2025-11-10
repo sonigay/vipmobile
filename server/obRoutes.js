@@ -28,6 +28,69 @@ const HEADERS_SETTLEMENT_LINKS = [
   '등록일시'
 ];
 
+const CUSTOM_PROPOSAL_EXCLUDED_IDS = new Set([
+  'a306891291',
+  'a306891341',
+  'rlatjddk901',
+  'chldmswls520',
+  'a315835213',
+  'a315835905',
+  'rlgpwls611',
+  'a306891917',
+  'a306891345',
+  'wkdalgus521'
+]);
+
+const CUSTOM_PROPOSAL_EXCLUDED_NAMES = new Set([
+  '정다운',
+  '김보라',
+  '김성아',
+  '최은진',
+  '주혜지',
+  '남혜원',
+  '기혜진',
+  '김태희',
+  '주선영',
+  '장미현'
+]);
+
+const RECONTRACT_EXCLUDED_IDS = new Set([
+  'VIP│김보라',
+  'VIP│정다운',
+  'VIP│김태희',
+  'VIP│남예원',
+  'VIP│주혜지',
+  '이은영 대리',
+  'VIP│신유나',
+  'MIN│최은진',
+  'MIN│장미현',
+  'MIN│기혜진',
+  'MIN│김성아'
+]);
+
+const OB_RECONTRACT_OFFER_PATTERNS = {
+  giftCard: /상품권/i,
+  deposit: /입금/i
+};
+
+const LABOR_SUPPORT_TABLE = [
+  { sales: 500, payout: 700 },
+  { sales: 400, payout: 600 },
+  { sales: 300, payout: 500 },
+  { sales: 250, payout: 400 },
+  { sales: 200, payout: 325 },
+  { sales: 150, payout: 250 },
+  { sales: 100, payout: 175 }
+];
+
+const PER_CASE_PAYOUT_TABLE = [
+  { count: 500, unitAmount: 23100 },
+  { count: 400, unitAmount: 19800 },
+  { count: 300, unitAmount: 16500 },
+  { count: 200, unitAmount: 13200 },
+  { count: 100, unitAmount: 9900 }
+];
+
 function createSheetsClient() {
   const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY;
@@ -145,6 +208,293 @@ function buildSettlementRow({
   ];
 }
 
+function parseNumber(value, defaultValue = 0) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : defaultValue;
+  }
+  if (!value) return defaultValue;
+  const cleaned = value.toString().replace(/[^0-9.+-]/g, '');
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function parseString(value) {
+  if (typeof value === 'string') return value.trim();
+  if (value == null) return '';
+  return String(value).trim();
+}
+
+function extractOfferAmounts(value) {
+  const text = parseString(value);
+  if (!text) return { giftCard: 0, deposit: 0 };
+
+  const parts = text.split('/');
+  const lastPart = parts[parts.length - 1];
+  const amount = parseNumber(lastPart);
+
+  const isGiftCard = OB_RECONTRACT_OFFER_PATTERNS.giftCard.test(text);
+  const isDeposit = OB_RECONTRACT_OFFER_PATTERNS.deposit.test(text);
+
+  return {
+    giftCard: isGiftCard ? amount : 0,
+    deposit: isDeposit ? amount : 0
+  };
+}
+
+async function loadSheetRows(sheets, spreadsheetId, sheetName) {
+  if (!sheetName) return [];
+  const range = `'${sheetName}'`;
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range
+  });
+  return response.data.values || [];
+}
+
+function normalizeCustomRows(values, sourceSheet) {
+  if (!values || values.length <= 2) return [];
+  return values.slice(2).map((row, index) => ({
+    sourceSheet,
+    rowNumber: index + 3,
+    row
+  }));
+}
+
+function normalizeRecontractRows(values, sourceSheet) {
+  if (!values || values.length <= 2) return [];
+  return values.slice(2).map((row, index) => ({
+    sourceSheet,
+    rowNumber: index + 3,
+    row
+  }));
+}
+
+function filterCustomRow(rowObject) {
+  const { row } = rowObject;
+  const proposerId = parseString(row[37]);
+  const proposerName = parseString(row[38]);
+
+  if (CUSTOM_PROPOSAL_EXCLUDED_IDS.has(proposerId)) {
+    return { include: false, reason: 'excludedId' };
+  }
+
+  if (CUSTOM_PROPOSAL_EXCLUDED_NAMES.has(proposerName)) {
+    return { include: false, reason: 'excludedName' };
+  }
+
+  return { include: true };
+}
+
+function filterRecontractRow(rowObject) {
+  const { row } = rowObject;
+  const promoterId = parseString(row[90]);
+  if (RECONTRACT_EXCLUDED_IDS.has(promoterId)) {
+    return { include: false, reason: 'excludedId' };
+  }
+  return { include: true };
+}
+
+function calculatePolicy3Payout(totalSales) {
+  const totalSalesInTenThousands = totalSales / 10000;
+  const entry = LABOR_SUPPORT_TABLE.find((item) => totalSalesInTenThousands >= item.sales);
+  if (!entry) {
+    return {
+      tier: null,
+      payout: 0
+    };
+  }
+  return {
+    tier: entry,
+    payout: entry.payout * 10000
+  };
+}
+
+function calculatePerCasePayout(caseCount) {
+  const entry = PER_CASE_PAYOUT_TABLE.find((item) => caseCount >= item.count);
+  if (!entry) {
+    return {
+      threshold: null,
+      unitAmount: 0,
+      payout: 0
+    };
+  }
+  return {
+    threshold: entry,
+    unitAmount: entry.unitAmount,
+    payout: caseCount * entry.unitAmount
+  };
+}
+
+function buildCustomProposalSummary(rows) {
+  const included = [];
+  const excluded = {
+    count: 0,
+    reasons: {
+      excludedId: 0,
+      excludedName: 0
+    }
+  };
+
+  rows.forEach((rowObj) => {
+    const decision = filterCustomRow(rowObj);
+    if (decision.include) {
+      included.push(rowObj);
+    } else {
+      excluded.count += 1;
+      if (decision.reason && excluded.reasons[decision.reason] != null) {
+        excluded.reasons[decision.reason] += 1;
+      }
+    }
+  });
+
+  const resultRows = included.map(({ sourceSheet, rowNumber, row }) => {
+    const proposerId = parseString(row[37]);
+    const proposerName = parseString(row[38]);
+    const sales = parseNumber(row[10]);
+    const themeFlag = parseString(row[22]);
+    const approvalFlag = parseString(row[9]);
+    return {
+      sourceSheet,
+      rowNumber,
+      proposerId,
+      proposerName,
+      salesAmount: sales,
+      themeFlag,
+      approvalFlag
+    };
+  });
+
+  const totalSales = resultRows.reduce((sum, item) => sum + item.salesAmount, 0);
+  const policy1Payout = totalSales * 2;
+  const policy2Sales = resultRows
+    .filter((item) => item.themeFlag === '1')
+    .reduce((sum, item) => sum + item.salesAmount, 0);
+
+  const policy3Result = calculatePolicy3Payout(totalSales);
+  const perCaseCount = resultRows.filter((item) => item.approvalFlag === '1').length;
+  const perCaseResult = calculatePerCasePayout(perCaseCount);
+
+  const totalPayout =
+    policy1Payout +
+    policy2Sales +
+    policy3Result.payout +
+    perCaseResult.payout;
+
+  return {
+    includedCount: resultRows.length,
+    excluded,
+    policy1: {
+      totalSales,
+      payout: policy1Payout
+    },
+    policy2: {
+      qualifyingSales: policy2Sales
+    },
+    policy3: {
+      totalSales,
+      payout: policy3Result.payout,
+      tier: policy3Result.tier
+    },
+    perCase: {
+      count: perCaseCount,
+      unitAmount: perCaseResult.unitAmount,
+      payout: perCaseResult.payout,
+      threshold: perCaseResult.threshold
+    },
+    totalPayout,
+    rows: resultRows
+  };
+}
+
+function buildRecontractSummary(rows) {
+  const included = [];
+  let excludedCount = 0;
+
+  rows.forEach((rowObj) => {
+    const decision = filterRecontractRow(rowObj);
+    if (decision.include) {
+      included.push(rowObj);
+    } else {
+      excludedCount += 1;
+    }
+  });
+
+  const filteredRows = included
+    .map(({ sourceSheet, rowNumber, row }) => {
+      const outlet = parseString(row[9]);
+      const status = parseString(row[10]);
+      const isObOutlet = outlet.includes('OB');
+      const isCompleted = status === '완료';
+      const settlementAmount = parseNumber(row[19]);
+      const remarkPlate = parseString(row[58]);
+      const remarkRecontract = parseString(row[73]);
+
+      const remarkPlateAmounts = extractOfferAmounts(remarkPlate);
+      const remarkRecontractAmounts = extractOfferAmounts(remarkRecontract);
+
+      const offerGiftCard = remarkPlateAmounts.giftCard + remarkRecontractAmounts.giftCard;
+      const offerDeposit = remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit;
+
+      const promoterId = parseString(row[90]);
+      const promoterName = parseString(row[91]);
+
+      return {
+        sourceSheet,
+        rowNumber,
+        outlet,
+        status,
+        isObOutlet,
+        isCompleted,
+        settlementAmount,
+        remarkPlate,
+        remarkRecontract,
+        offerGiftCard,
+        offerDeposit,
+        promoterId,
+        promoterName
+      };
+    })
+    .filter((row) => row.isObOutlet && row.isCompleted);
+
+  const feeTotal = filteredRows.reduce((sum, row) => sum + row.settlementAmount, 0);
+  const giftCardTotal = filteredRows.reduce((sum, row) => sum + row.offerGiftCard, 0);
+  const depositTotal = filteredRows.reduce((sum, row) => sum + row.offerDeposit, 0);
+  const offerTotal = giftCardTotal + depositTotal;
+
+  return {
+    includedCount: filteredRows.length,
+    excludedCount,
+    feeTotal,
+    offer: {
+      giftCard: giftCardTotal,
+      deposit: depositTotal,
+      total: offerTotal
+    },
+    totalPayout: feeTotal + offerTotal,
+    rows: filteredRows
+  };
+}
+
+function buildTotals(customSummary, recontractSummary) {
+  const customTotal = customSummary.totalPayout || 0;
+  const recontractTotal = recontractSummary.totalPayout || 0;
+  const laborTotal = 0;
+  const costTotal = 0;
+  const grandTotal = customTotal + recontractTotal + laborTotal + costTotal;
+
+  return {
+    customTotal,
+    recontractTotal,
+    laborTotal,
+    costTotal,
+    grandTotal,
+    split: {
+      vip: Math.round(grandTotal * 0.3),
+      yai: Math.round(grandTotal * 0.7)
+    }
+  };
+}
+
 function setupObRoutes(app) {
   const router = express.Router();
 
@@ -260,6 +610,74 @@ function setupObRoutes(app) {
     } catch (error) {
       console.error('[OB] settlement-links GET error:', error);
       res.status(500).json({ success: false, error: 'Failed to load settlement links', message: error.message });
+    }
+  });
+
+  router.get('/settlement-summary', async (req, res) => {
+    const month = (req.query.month || '').trim();
+    if (!month) {
+      return res.status(400).json({ success: false, error: 'month query parameter is required' });
+    }
+
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTLEMENT_LINKS, HEADERS_SETTLEMENT_LINKS);
+
+      const configResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: SHEET_SETTLEMENT_LINKS
+      });
+      const configRows = configResponse.data.values || [];
+      const configEntry = configRows
+        .slice(1)
+        .map((row) => mapSettlementRow(row))
+        .find((config) => config.month === month);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const sheetNames = configEntry.sheetNames || {};
+      const extraSheetNames = configEntry.extraSheetNames || {};
+
+      const customMainValues = await loadSheetRows(sheets, targetSheetId, sheetNames.customProposal);
+      const customExtraValues = extraSheetNames.customProposal
+        ? await loadSheetRows(sheets, targetSheetId, extraSheetNames.customProposal)
+        : [];
+
+      const recontractMainValues = await loadSheetRows(sheets, targetSheetId, sheetNames.recontract);
+      const recontractExtraValues = extraSheetNames.recontract
+        ? await loadSheetRows(sheets, targetSheetId, extraSheetNames.recontract)
+        : [];
+
+      const customRows = [
+        ...normalizeCustomRows(customMainValues, sheetNames.customProposal || '맞춤제안'),
+        ...normalizeCustomRows(customExtraValues, extraSheetNames.customProposal || '기타맞춤제안')
+      ];
+
+      const recontractRows = [
+        ...normalizeRecontractRows(recontractMainValues, sheetNames.recontract || '재약정'),
+        ...normalizeRecontractRows(recontractExtraValues, extraSheetNames.recontract || '기타재약정')
+      ];
+
+      const customSummary = buildCustomProposalSummary(customRows);
+      const recontractSummary = buildRecontractSummary(recontractRows);
+      const totals = buildTotals(customSummary, recontractSummary);
+
+      res.json({
+        success: true,
+        data: {
+          month,
+          config: configEntry,
+          customProposal: customSummary,
+          recontract: recontractSummary,
+          totals
+        }
+      });
+    } catch (error) {
+      console.error('[OB] settlement-summary GET error:', error);
+      res.status(500).json({ success: false, error: '정산 데이터를 불러오지 못했습니다.', message: error.message });
     }
   });
 

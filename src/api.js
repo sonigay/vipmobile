@@ -434,6 +434,32 @@ export const api = {
     }
   },
 
+  // OB 정산 요약 데이터 조회
+  getObSettlementSummary: async (month) => {
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/settlement-summary?month=${encodeURIComponent(month)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 정산 요약 조회 오류:', error);
+      throw error;
+    }
+  },
+
   // 매장 목록 조회
   getStores: async (options = {}) => {
     try {
@@ -575,6 +601,8 @@ export const api = {
     }
   }
 };
+
+export default api;
 
 // 프론트엔드 캐싱 시스템
 const clientCache = new Map();
