@@ -296,6 +296,7 @@ function normalizeRecontractRows(values, sourceSheet) {
 
 function filterCustomRow(rowObject) {
   const { row } = rowObject;
+  // 플랜 문서 기준: 38번(유치자마당ID), 39번(유치자명) -> 배열 인덱스는 37, 38
   const proposerId = parseString(row[37]);
   const proposerName = parseString(row[38]);
 
@@ -373,6 +374,9 @@ function buildCustomProposalSummary(rows) {
   });
 
   const resultRows = included.map(({ sourceSheet, rowNumber, row }) => {
+    // 플랜 문서 기준 컬럼 번호 -> 배열 인덱스 (0-based)
+    // 10번(맞춤제안인정여부) -> row[9], 11번(당월 맞춤제안 매출) -> row[10]
+    // 23번(테마 업셀) -> row[22], 38번(유치자마당ID) -> row[37], 39번(유치자명) -> row[38]
     const proposerId = parseString(row[37]);
     const proposerName = parseString(row[38]);
     const sales = parseNumber(row[10]);
@@ -446,6 +450,10 @@ function buildRecontractSummary(rows) {
 
   const filteredRows = included
     .map(({ sourceSheet, rowNumber, row }) => {
+      // 플랜 문서 기준 컬럼 번호 -> 배열 인덱스 (0-based)
+      // 10번(출고처) -> row[9], 11번(상태) -> row[10], 20번(정산금액) -> row[19]
+      // 59번(동판-비고) -> row[58], 74번(재약정-비고) -> row[73]
+      // 91번(유치자마당ID) -> row[90], 92번(유치자명) -> row[91] (플랜 문서에 91번만 명시되어 있지만 92번도 확인 필요)
       const outlet = parseString(row[9]);
       const status = parseString(row[10]);
       const isObOutlet = outlet.includes('OB');
@@ -461,7 +469,7 @@ function buildRecontractSummary(rows) {
       const offerDeposit = remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit;
 
       const promoterId = parseString(row[90]);
-      const promoterName = parseString(row[91]);
+      const promoterName = parseString(row[91] || '');
 
       return {
         sourceSheet,
