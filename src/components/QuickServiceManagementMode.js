@@ -84,6 +84,82 @@ const REGION_COORDINATES = {
   기타: { lat: 36.5, lng: 127.8 }
 };
 
+const CITY_COORDINATES = {
+  수원시: { lat: 37.2636, lng: 127.0286 },
+  용인시: { lat: 37.2411, lng: 127.1775 },
+  성남시: { lat: 37.4200, lng: 127.1267 },
+  의정부시: { lat: 37.7380, lng: 127.0337 },
+  안양시: { lat: 37.3943, lng: 126.9568 },
+  부천시: { lat: 37.5036, lng: 126.7660 },
+  고양시: { lat: 37.6584, lng: 126.8320 },
+  과천시: { lat: 37.4292, lng: 126.9879 },
+  광명시: { lat: 37.4755, lng: 126.8666 },
+  구리시: { lat: 37.5943, lng: 127.1295 },
+  남양주시: { lat: 37.6368, lng: 127.2148 },
+  동두천시: { lat: 37.9035, lng: 127.0606 },
+  시흥시: { lat: 37.3799, lng: 126.8031 },
+  파주시: { lat: 37.7599, lng: 126.7800 },
+  평택시: { lat: 36.9925, lng: 127.1129 },
+  포천시: { lat: 37.8945, lng: 127.2001 },
+  하남시: { lat: 37.5393, lng: 127.2146 },
+  군포시: { lat: 37.3614, lng: 126.9350 },
+  의왕시: { lat: 37.3446, lng: 126.9683 },
+  오산시: { lat: 37.1498, lng: 127.0771 },
+  이천시: { lat: 37.2720, lng: 127.4350 },
+  안산시: { lat: 37.3219, lng: 126.8309 },
+  양주시: { lat: 37.7853, lng: 127.0450 },
+  여주시: { lat: 37.2980, lng: 127.6374 },
+  김포시: { lat: 37.6152, lng: 126.7158 },
+  화성시: { lat: 37.1995, lng: 126.8314 },
+  천안시: { lat: 36.8151, lng: 127.1139 },
+  아산시: { lat: 36.7898, lng: 127.0019 },
+  공주시: { lat: 36.4460, lng: 127.1190 },
+  보령시: { lat: 36.3333, lng: 126.6125 },
+  서산시: { lat: 36.7845, lng: 126.4500 },
+  논산시: { lat: 36.1872, lng: 127.0980 },
+  계룡시: { lat: 36.2748, lng: 127.2487 },
+  당진시: { lat: 36.8890, lng: 126.6468 },
+  춘천시: { lat: 37.8813, lng: 127.7298 },
+  원주시: { lat: 37.3422, lng: 127.9198 },
+  강릉시: { lat: 37.7519, lng: 128.8761 },
+  동해시: { lat: 37.5245, lng: 129.1140 },
+  태백시: { lat: 37.1641, lng: 128.9856 },
+  속초시: { lat: 38.2043, lng: 128.5911 },
+  삼척시: { lat: 37.4479, lng: 129.1657 },
+  충주시: { lat: 36.9910, lng: 127.9250 },
+  제천시: { lat: 37.1326, lng: 128.1995 },
+  청주시: { lat: 36.6424, lng: 127.4890 },
+  전주시: { lat: 35.8242, lng: 127.1479 },
+  군산시: { lat: 35.9676, lng: 126.7363 },
+  익산시: { lat: 35.9483, lng: 126.9574 },
+  남원시: { lat: 35.4164, lng: 127.3900 },
+  김제시: { lat: 35.8039, lng: 126.8800 },
+  목포시: { lat: 34.8118, lng: 126.3922 },
+  여수시: { lat: 34.7604, lng: 127.6622 },
+  순천시: { lat: 34.9507, lng: 127.4872 },
+  나주시: { lat: 35.0155, lng: 126.7109 },
+  광양시: { lat: 34.9400, lng: 127.6957 },
+  포항시: { lat: 36.0190, lng: 129.3435 },
+  경주시: { lat: 35.8562, lng: 129.2247 },
+  안동시: { lat: 36.5683, lng: 128.7294 },
+  김천시: { lat: 36.1397, lng: 128.1136 },
+  구미시: { lat: 36.1195, lng: 128.3446 },
+  영주시: { lat: 36.8057, lng: 128.6242 },
+  영천시: { lat: 35.9733, lng: 128.9382 },
+  상주시: { lat: 36.4105, lng: 128.1596 },
+  문경시: { lat: 36.5860, lng: 128.1868 },
+  경산시: { lat: 35.8251, lng: 128.7415 },
+  창원시: { lat: 35.2283, lng: 128.6818 },
+  김해시: { lat: 35.2285, lng: 128.8890 },
+  진주시: { lat: 35.1796, lng: 128.1070 },
+  통영시: { lat: 34.8554, lng: 128.4330 },
+  사천시: { lat: 35.0038, lng: 128.0640 },
+  밀양시: { lat: 35.5038, lng: 128.7468 },
+  거제시: { lat: 34.8806, lng: 128.6216 },
+  양산시: { lat: 35.3350, lng: 129.0372 },
+  제주시: { lat: 33.4996, lng: 126.5312 },
+  서귀포시: { lat: 33.2539, lng: 126.5590 }
+};
 const QuickServiceManagementMode = ({
   onLogout,
   onModeChange,
@@ -391,7 +467,9 @@ const QuickServiceManagementMode = ({
 
     Object.values(aggregatedRegionMetrics).forEach((metric) => {
       const coords =
-        REGION_COORDINATES[metric.region] || REGION_COORDINATES.기타;
+        CITY_COORDINATES[metric.region] ||
+        REGION_COORDINATES[metric.region] ||
+        REGION_COORDINATES.기타;
 
       if (mapMetric === 'popular' && metric.popularEntries > 0) {
         const top = metric.popularTopCompany;
@@ -523,75 +601,77 @@ const QuickServiceManagementMode = ({
 
       <Container sx={{ py: 4 }}>
         <Stack spacing={3}>
-          <Paper
-            elevation={1}
-            sx={{
-              p: { xs: 2, md: 2.5 },
-              borderRadius: 2
-            }}
-          >
-            <Grid
-              container
-              spacing={2}
-              alignItems="center"
-              justifyContent="space-between"
+          <Paper elevation={1} sx={{ borderRadius: 2 }}>
+            <Box
+              sx={{
+                px: { xs: 2, md: 3 },
+                py: { xs: 2, md: 2.5 }
+              }}
             >
-              <Grid item xs={12} md={8} lg={9}>
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={{ xs: 1.5, sm: 2 }}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  sx={{ width: '100%', flexWrap: 'wrap' }}
-                >
-                  <Typography
-                    variant="subtitle1"
-                    sx={{ fontWeight: 600, flexShrink: 0 }}
-                  >
-                    지역 선택
-                  </Typography>
-                  <TextField
-                    select
-                    size="small"
-                    value={region}
-                    onChange={handleRegionChange}
-                    sx={{
-                      minWidth: { xs: '100%', sm: 200 },
-                      width: { xs: '100%', sm: 'auto' }
-                    }}
-                  >
-                    {regionOptions.map((option) => (
-                      <MenuItem key={option} value={option}>
-                        {option === 'all' ? '전체 지역' : option}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Stack>
-              </Grid>
               <Grid
-                item
-                xs={12}
-                md={4}
-                lg={3}
-                sx={{
-                  display: 'flex',
-                  justifyContent: { xs: 'flex-start', md: 'flex-end' }
-                }}
+                container
+                spacing={2}
+                alignItems="center"
+                justifyContent="space-between"
               >
-                <Stack direction="row" spacing={1}>
-                  <Tooltip title="데이터 새로고침">
-                    <span>
-                      <IconButton
-                        color="primary"
-                        onClick={handleRefresh}
-                        disabled={loading}
-                      >
-                        <RefreshIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Stack>
+                <Grid item xs={12} md={8} lg={9}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={{ xs: 1.5, sm: 2 }}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                    sx={{ width: '100%', flexWrap: 'wrap' }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ fontWeight: 600, flexShrink: 0 }}
+                    >
+                      지역 선택
+                    </Typography>
+                    <TextField
+                      select
+                      size="small"
+                      value={region}
+                      onChange={handleRegionChange}
+                      sx={{
+                        minWidth: { xs: '100%', sm: 220 },
+                        maxWidth: { sm: 260 },
+                        width: { xs: '100%', sm: 'auto' }
+                      }}
+                    >
+                      {regionOptions.map((option) => (
+                        <MenuItem key={option} value={option}>
+                          {option === 'all' ? '전체 지역' : option}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Stack>
+                </Grid>
+                <Grid
+                  item
+                  xs={12}
+                  md={4}
+                  lg={3}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: { xs: 'flex-start', md: 'flex-end' }
+                  }}
+                >
+                  <Stack direction="row" spacing={1}>
+                    <Tooltip title="데이터 새로고침">
+                      <span>
+                        <IconButton
+                          color="primary"
+                          onClick={handleRefresh}
+                          disabled={loading}
+                        >
+                          <RefreshIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                </Grid>
               </Grid>
-            </Grid>
+            </Box>
           </Paper>
 
           {loading ? (
