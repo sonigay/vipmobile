@@ -68,6 +68,18 @@ const RECONTRACT_EXCLUDED_IDS = new Set([
   'MIN│김성아'
 ]);
 
+const PLACEHOLDER_SHEET_TOKENS = [
+  '시트이름(맞춤제안)',
+  '시트이름(재약정)',
+  '시트이름(후정산)',
+  '기타맞춤제안 시트',
+  '기타재약정 시트',
+  '기타후정산 시트',
+  'sheet name (custom)',
+  'sheet name (recontract)',
+  'sheet name (post)'
+];
+
 const OB_RECONTRACT_OFFER_PATTERNS = {
   giftCard: /상품권/i,
   deposit: /입금/i
@@ -222,6 +234,19 @@ function parseString(value) {
   if (typeof value === 'string') return value.trim();
   if (value == null) return '';
   return String(value).trim();
+}
+
+function normalizeConfiguredSheetName(value) {
+  const name = parseString(value);
+  if (!name) return '';
+  const compact = name.replace(/\s+/g, '').toLowerCase();
+  const isPlaceholder = PLACEHOLDER_SHEET_TOKENS.some(
+    (token) => compact === token.replace(/\s+/g, '').toLowerCase()
+  );
+  if (isPlaceholder) {
+    return '';
+  }
+  return name;
 }
 
 function extractOfferAmounts(value) {
@@ -641,24 +666,66 @@ function setupObRoutes(app) {
       const sheetNames = configEntry.sheetNames || {};
       const extraSheetNames = configEntry.extraSheetNames || {};
 
-      const customMainValues = await loadSheetRows(sheets, targetSheetId, sheetNames.customProposal);
-      const customExtraValues = extraSheetNames.customProposal
-        ? await loadSheetRows(sheets, targetSheetId, extraSheetNames.customProposal)
+      const resolvedSheetNames = {
+        customProposal: normalizeConfiguredSheetName(sheetNames.customProposal),
+        recontract: normalizeConfiguredSheetName(sheetNames.recontract),
+        postSettlement: normalizeConfiguredSheetName(sheetNames.postSettlement)
+      };
+      const resolvedExtraSheetNames = {
+        customProposal: normalizeConfiguredSheetName(extraSheetNames.customProposal),
+        recontract: normalizeConfiguredSheetName(extraSheetNames.recontract),
+        postSettlement: normalizeConfiguredSheetName(extraSheetNames.postSettlement)
+      };
+
+      const missingNames = [];
+      if (!resolvedSheetNames.customProposal) missingNames.push('맞춤제안');
+      if (!resolvedSheetNames.recontract) missingNames.push('재약정');
+
+      if (missingNames.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `정산 관리 탭에서 ${missingNames.join(', ')} 시트 이름을 먼저 입력해주세요.`
+        });
+      }
+
+      const customMainValues = await loadSheetRows(
+        sheets,
+        targetSheetId,
+        resolvedSheetNames.customProposal
+      );
+      const customExtraValues = resolvedExtraSheetNames.customProposal
+        ? await loadSheetRows(sheets, targetSheetId, resolvedExtraSheetNames.customProposal)
         : [];
 
-      const recontractMainValues = await loadSheetRows(sheets, targetSheetId, sheetNames.recontract);
-      const recontractExtraValues = extraSheetNames.recontract
-        ? await loadSheetRows(sheets, targetSheetId, extraSheetNames.recontract)
+      const recontractMainValues = await loadSheetRows(
+        sheets,
+        targetSheetId,
+        resolvedSheetNames.recontract
+      );
+      const recontractExtraValues = resolvedExtraSheetNames.recontract
+        ? await loadSheetRows(sheets, targetSheetId, resolvedExtraSheetNames.recontract)
         : [];
 
       const customRows = [
-        ...normalizeCustomRows(customMainValues, sheetNames.customProposal || '맞춤제안'),
-        ...normalizeCustomRows(customExtraValues, extraSheetNames.customProposal || '기타맞춤제안')
+        ...normalizeCustomRows(
+          customMainValues,
+          resolvedSheetNames.customProposal || '맞춤제안'
+        ),
+        ...normalizeCustomRows(
+          customExtraValues,
+          resolvedExtraSheetNames.customProposal || '기타맞춤제안'
+        )
       ];
 
       const recontractRows = [
-        ...normalizeRecontractRows(recontractMainValues, sheetNames.recontract || '재약정'),
-        ...normalizeRecontractRows(recontractExtraValues, extraSheetNames.recontract || '기타재약정')
+        ...normalizeRecontractRows(
+          recontractMainValues,
+          resolvedSheetNames.recontract || '재약정'
+        ),
+        ...normalizeRecontractRows(
+          recontractExtraValues,
+          resolvedExtraSheetNames.recontract || '기타재약정'
+        )
       ];
 
       const customSummary = buildCustomProposalSummary(customRows);
@@ -669,7 +736,11 @@ function setupObRoutes(app) {
         success: true,
         data: {
           month,
-          config: configEntry,
+          config: {
+            ...configEntry,
+            sheetNames: resolvedSheetNames,
+            extraSheetNames: resolvedExtraSheetNames
+          },
           customProposal: customSummary,
           recontract: recontractSummary,
           totals
