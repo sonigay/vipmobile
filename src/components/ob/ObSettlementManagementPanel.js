@@ -14,7 +14,9 @@ import {
   TableRow,
   Tooltip,
   Typography,
-  IconButton
+  IconButton,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -48,6 +50,8 @@ const resolveSheetUrl = (config) => {
 const ObSettlementManagementPanel = ({
   sheetConfigs,
   storageSheetUrl,
+  loading,
+  error,
   onCreate,
   onEdit,
   onDelete,
@@ -94,6 +98,17 @@ const ObSettlementManagementPanel = ({
         </Stack>
       </Stack>
 
+      {error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      ) : null}
+
+      {loading ? (
+        <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress />
+        </Box>
+      ) : (
       <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0' }}>
         <Table size="small">
           <TableHead sx={{ bgcolor: '#fafafa' }}>
@@ -212,6 +227,7 @@ const ObSettlementManagementPanel = ({
           </TableBody>
         </Table>
       </TableContainer>
+      )}
     </Box>
   );
 };
@@ -239,6 +255,8 @@ ObSettlementManagementPanel.propTypes = {
     })
   ),
   storageSheetUrl: PropTypes.string,
+  loading: PropTypes.bool,
+  error: PropTypes.string,
   onCreate: PropTypes.func,
   onEdit: PropTypes.func,
   onDelete: PropTypes.func,
@@ -248,6 +266,8 @@ ObSettlementManagementPanel.propTypes = {
 ObSettlementManagementPanel.defaultProps = {
   sheetConfigs: [],
   storageSheetUrl: '',
+  loading: false,
+  error: '',
   onCreate: undefined,
   onEdit: undefined,
   onDelete: undefined,

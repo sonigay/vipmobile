@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ExistingCalculatorPanel from './ob/ExistingCalculatorPanel';
 import TogetherCalculatorPanel from './ob/TogetherCalculatorPanel';
 import { api } from '../api';
@@ -30,7 +30,6 @@ import ObSheetConfigModal from './ob/ObSheetConfigModal';
 import ObSettlementManagementPanel from './ob/ObSettlementManagementPanel';
 import ObSettlementOverviewPlaceholder from './ob/ObSettlementOverviewPlaceholder';
 
-const SHEET_CONFIG_STORAGE_KEY = 'obSheetConfigs';
 const OB_LINK_SHEET_ID =
   process.env.REACT_APP_OB_LINK_SHEET_ID ||
   process.env.REACT_APP_SHEET_ID ||
@@ -67,21 +66,9 @@ const ObManagementMode = ({
   });
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [activeTab, setActiveTab] = useState(TAB_KEYS.CALCULATOR);
-  const [sheetConfigs, setSheetConfigs] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const storedValue = window.localStorage.getItem(SHEET_CONFIG_STORAGE_KEY);
-      if (storedValue) {
-        const parsed = JSON.parse(storedValue);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      }
-    } catch (storageError) {
-      console.warn('[OB] Failed to parse sheet configs from storage', storageError);
-    }
-    return [];
-  });
+const [sheetConfigs, setSheetConfigs] = useState([]);
+  const [sheetConfigsLoading, setSheetConfigsLoading] = useState(false);
+  const [sheetConfigsError, setSheetConfigsError] = useState('');
   const [sheetConfigModalOpen, setSheetConfigModalOpen] = useState(false);
   const [editingSheetConfig, setEditingSheetConfig] = useState(null);
   const [sheetConfigMessage, setSheetConfigMessage] = useState({
@@ -144,14 +131,35 @@ const ObManagementMode = ({
     }
   }, [loggedInStore]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  const fetchSheetConfigs = useCallback(async () => {
+    setSheetConfigsLoading(true);
+    setSheetConfigsError('');
     try {
-      window.localStorage.setItem(SHEET_CONFIG_STORAGE_KEY, JSON.stringify(sheetConfigs));
-    } catch (storageError) {
-      console.warn('[OB] Failed to persist sheet configs', storageError);
+      const response = await api.getObSettlementLinks();
+      if (response?.success) {
+        setSheetConfigs(Array.isArray(response.data) ? response.data : []);
+      } else {
+        setSheetConfigs([]);
+        setSheetConfigsError(response?.error || '정산 링크 정보를 불러오지 못했습니다.');
+      }
+    } catch (error) {
+      console.error('[OB] Failed to fetch settlement links:', error);
+      setSheetConfigs([]);
+      setSheetConfigsError(error.message || '정산 링크 정보를 불러오지 못했습니다.');
+    } finally {
+      setSheetConfigsLoading(false);
     }
-  }, [sheetConfigs]);
+  }, []);
+
+  useEffect(() => {
+    fetchSheetConfigs();
+  }, [fetchSheetConfigs]);
+
+  useEffect(() => {
+    if (activeTab === TAB_KEYS.MANAGEMENT) {
+      fetchSheetConfigs();
+    }
+  }, [activeTab, fetchSheetConfigs]);
 
   const { existing, together, diff } = useObCalculation(inputs, planData, discountData, segDiscountData);
 
@@ -193,13 +201,6 @@ const ObManagementMode = ({
     });
   };
 
-  const createSheetConfigId = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return `cfg_${Date.now()}`;
-  };
-
   const showSheetConfigMessage = (message, severity = 'success') => {
     setSheetConfigMessage({
       open: true,
@@ -228,57 +229,22 @@ const ObManagementMode = ({
   };
 
   const handleSheetConfigSubmit = (payload) => {
-    let feedbackMessage = '월별 링크를 저장했습니다.';
-    let feedbackSeverity = 'success';
+    const normalizedPayload = {
+      ...payload,
+      originalMonth: editingSheetConfig?.month,
+      registrant: loggedInStore?.name || loggedInStore?.userId || ''
+    };
 
-    setSheetConfigs((prev) => {
-      const next = [...prev];
-      const normalized = {
-        ...payload,
-        id: payload.id || createSheetConfigId(),
-        month: payload.month,
-        createdAt: payload.createdAt || new Date().toISOString(),
-        updatedAt: payload.updatedAt || new Date().toISOString()
-      };
-
-      if (payload.id) {
-        const targetIndex = next.findIndex((item) => item.id === payload.id);
-        if (targetIndex >= 0) {
-          const originalCreatedAt = next[targetIndex].createdAt;
-          next[targetIndex] = {
-            ...next[targetIndex],
-            ...normalized,
-            createdAt: originalCreatedAt || normalized.createdAt
-          };
-          feedbackMessage = '월별 링크를 수정했습니다.';
-        } else {
-          next.push(normalized);
-          feedbackMessage = '월별 링크를 등록했습니다.';
-        }
-      } else {
-        const existingIndex = next.findIndex((item) => item.month === normalized.month);
-        if (existingIndex >= 0) {
-          const original = next[existingIndex];
-          next[existingIndex] = {
-            ...original,
-            ...normalized,
-            id: original.id || normalized.id,
-            createdAt: original.createdAt || normalized.createdAt
-          };
-          feedbackMessage = '같은 연월 데이터가 업데이트되었습니다.';
-          feedbackSeverity = 'info';
-        } else {
-          next.push(normalized);
-          feedbackMessage = '월별 링크를 등록했습니다.';
-        }
-      }
-
-      next.sort((a, b) => (b.month || '').localeCompare(a.month || ''));
-      return next;
-    });
-
-    handleCloseSheetConfigModal();
-    showSheetConfigMessage(feedbackMessage, feedbackSeverity);
+    const isUpdate = Boolean(editingSheetConfig);
+    try {
+      await api.saveObSettlementLink(normalizedPayload);
+      await fetchSheetConfigs();
+      handleCloseSheetConfigModal();
+      showSheetConfigMessage(isUpdate ? '월별 링크를 수정했습니다.' : '월별 링크를 저장했습니다.', isUpdate ? 'info' : 'success');
+    } catch (error) {
+      console.error('[OB] Failed to save settlement link:', error);
+      showSheetConfigMessage(error.message || '월별 링크 저장 중 오류가 발생했습니다.', 'error');
+    }
   };
 
   const handleDeleteSheetConfig = (config) => {
@@ -289,8 +255,15 @@ const ObManagementMode = ({
       );
       if (!confirmed) return;
     }
-    setSheetConfigs((prev) => prev.filter((item) => item.id !== config.id));
-    showSheetConfigMessage('월별 링크를 삭제했습니다.', 'info');
+    api.deleteObSettlementLink(config.month)
+      .then(() => {
+        fetchSheetConfigs();
+        showSheetConfigMessage('월별 링크를 삭제했습니다.', 'info');
+      })
+      .catch((error) => {
+        console.error('[OB] Failed to delete settlement link:', error);
+        showSheetConfigMessage(error.message || '월별 링크 삭제 중 오류가 발생했습니다.', 'error');
+      });
   };
 
   const handleDownloadTemplate = () => {
@@ -885,6 +858,8 @@ const ObManagementMode = ({
           <ObSettlementManagementPanel
             sheetConfigs={sheetConfigs}
             storageSheetUrl={SHEET_CONFIG_DRIVE_URL}
+            loading={sheetConfigsLoading}
+            error={sheetConfigsError}
             onCreate={handleOpenSheetConfigModal}
             onEdit={handleEditSheetConfig}
             onDelete={handleDeleteSheetConfig}

@@ -364,6 +364,76 @@ export const api = {
     }
   },
 
+  // OB 정산 링크 조회
+  getObSettlementLinks: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/settlement-links`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 정산 링크 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 정산 링크 저장 (등록/수정)
+  saveObSettlementLink: async (payload) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/settlement-links`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 정산 링크 저장 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 정산 링크 삭제
+  deleteObSettlementLink: async (month) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/settlement-links/${encodeURIComponent(month)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 정산 링크 삭제 오류:', error);
+      throw error;
+    }
+  },
+
   // 매장 목록 조회
   getStores: async (options = {}) => {
     try {
