@@ -43,6 +43,9 @@ import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import LeaderboardIcon from '@mui/icons-material/Leaderboard';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../api';
@@ -341,6 +344,75 @@ const QuickServiceManagementMode = ({
     }
     return { color: 'error', label: '검토' };
   };
+
+  const companyStatsAll = useMemo(
+    () => Array.isArray(statistics.companyStats) ? statistics.companyStats : [],
+    [statistics.companyStats]
+  );
+
+  const companyOverview = useMemo(() => {
+    if (!companyStatsAll.length) {
+      return {
+        totalCompanies: 0,
+        totalEntries: 0,
+        averageCost: 0,
+        averageReliability: 0
+      };
+    }
+
+    const totalCompanies = companyStatsAll.length;
+    const totalEntries = companyStatsAll.reduce(
+      (sum, item) => sum + (item.entryCount || 0),
+      0
+    );
+    const averageCost =
+      totalCompanies > 0
+        ? Math.round(
+            companyStatsAll.reduce(
+              (sum, item) => sum + (item.averageCost || 0),
+              0
+            ) / totalCompanies
+          )
+        : 0;
+    const averageReliability =
+      totalCompanies > 0
+        ? Math.round(
+            companyStatsAll.reduce(
+              (sum, item) => sum + (item.reliabilityScore || 0),
+              0
+            ) / totalCompanies
+          )
+        : 0;
+
+    return {
+      totalCompanies,
+      totalEntries,
+      averageCost,
+      averageReliability
+    };
+  }, [companyStatsAll]);
+
+  const topReliableCompanies = useMemo(() => {
+    const sorted = [...companyStatsAll].sort(
+      (a, b) => (b.reliabilityScore || 0) - (a.reliabilityScore || 0)
+    );
+    return sorted.slice(0, 10);
+  }, [companyStatsAll]);
+
+  const topVolumeCompanies = useMemo(() => {
+    const sorted = [...companyStatsAll].sort(
+      (a, b) => (b.entryCount || 0) - (a.entryCount || 0)
+    );
+    return sorted.slice(0, 10);
+  }, [companyStatsAll]);
+
+  const topAffordableCompanies = useMemo(() => {
+    const filtered = companyStatsAll.filter((item) => (item.entryCount || 0) >= 3);
+    const sorted = filtered.sort(
+      (a, b) => (a.averageCost || 0) - (b.averageCost || 0)
+    );
+    return sorted.slice(0, 10);
+  }, [companyStatsAll]);
 
   const handleRegionChange = (event) => {
     const nextRegion = event.target.value;
@@ -1162,6 +1234,262 @@ const QuickServiceManagementMode = ({
                     </Grid>
                   </Grid>
                 </Grid>
+
+              {/* 업체별 통계 */}
+              {companyStatsAll.length > 0 && (
+                <Grid item xs={12}>
+                  <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                    <Box
+                      sx={{
+                        px: 3,
+                        py: 2,
+                        borderBottom: '1px solid rgba(0,0,0,0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 1.5
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        업체별 통계 개요
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        평균 비용·등록 건수·신뢰도 등을 기반으로 상위 업체를 확인할 수 있습니다.
+                      </Typography>
+                    </Box>
+                    <Box sx={{ px: 3, py: 3 }}>
+                      <Grid container spacing={2} sx={{ mb: 2 }}>
+                        <Grid item xs={12} md={3}>
+                          {renderSummaryCard(
+                            '총 업체 수',
+                            `${companyOverview.totalCompanies.toLocaleString()} 곳`,
+                            <LeaderboardIcon />,
+                            '통계에 포함된 업체 (업체+전화 조합)',
+                            '#1976d2'
+                          )}
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          {renderSummaryCard(
+                            '총 등록 건수',
+                            `${companyOverview.totalEntries.toLocaleString()} 건`,
+                            <TrendingUpIcon />,
+                            '전체 업체의 누적 입력 수',
+                            '#5c6bc0'
+                          )}
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          {renderSummaryCard(
+                            '평균 비용',
+                            companyOverview.averageCost
+                              ? `${companyOverview.averageCost.toLocaleString()} 원`
+                              : '-',
+                            <AttachMoneyIcon />,
+                            '전체 업체 평균 예상 비용',
+                            '#ff7043'
+                          )}
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          {renderSummaryCard(
+                            '평균 신뢰도',
+                            `${companyOverview.averageReliability} 점`,
+                            <InsightsIcon />,
+                            '업체별 신뢰도 점수 평균',
+                            '#009688'
+                          )}
+                        </Grid>
+                      </Grid>
+
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                              신뢰도 상위 업체
+                            </Typography>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    신뢰도
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    등록수
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    평균 비용
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {topReliableCompanies.map((company, index) => {
+                                  const status = getReliabilityStatus(
+                                    company.reliabilityScore || 0
+                                  );
+                                  return (
+                                    <TableRow key={`${company.companyName}-${company.phoneNumber}-${index}`}>
+                                      <TableCell>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {company.companyName}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {company.phoneNumber}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        <Chip
+                                          size="small"
+                                          color={status.color}
+                                          label={`${company.reliabilityScore || 0}점`}
+                                          sx={{ fontWeight: 600 }}
+                                        />
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        {company.entryCount?.toLocaleString()}건
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        {company.averageCost?.toLocaleString()}원
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                              등록 건수 상위 업체
+                            </Typography>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    등록수
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    평균 비용
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    신뢰도
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {topVolumeCompanies.map((company, index) => {
+                                  const status = getReliabilityStatus(
+                                    company.reliabilityScore || 0
+                                  );
+                                  return (
+                                    <TableRow key={`${company.companyName}-${company.phoneNumber}-volume-${index}`}>
+                                      <TableCell>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {company.companyName}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {company.phoneNumber}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        {company.entryCount?.toLocaleString()}건
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        {company.averageCost?.toLocaleString()}원
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        <Chip
+                                          size="small"
+                                          color={status.color}
+                                          label={`${company.reliabilityScore || 0}점`}
+                                          sx={{ fontWeight: 600 }}
+                                        />
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                              평균 비용이 낮은 우수 업체 (등록 3건 이상)
+                            </Typography>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    평균 비용
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    등록수
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    신뢰도
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }} align="right">
+                                    속도 점수
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {topAffordableCompanies.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={5} align="center">
+                                      <Typography variant="body2" color="text.secondary">
+                                        조건을 충족하는 업체가 없습니다.
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  topAffordableCompanies.map((company, index) => {
+                                    const status = getReliabilityStatus(
+                                      company.reliabilityScore || 0
+                                    );
+                                    return (
+                                      <TableRow key={`${company.companyName}-${company.phoneNumber}-affordable-${index}`}>
+                                        <TableCell>
+                                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {company.companyName}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            {company.phoneNumber}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {company.averageCost?.toLocaleString()}원
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {company.entryCount?.toLocaleString()}건
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          <Chip
+                                            size="small"
+                                            color={status.color}
+                                            label={`${company.reliabilityScore || 0}점`}
+                                            sx={{ fontWeight: 600 }}
+                                          />
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {company.averageSpeedScore}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })
+                                )}
+                              </TableBody>
+                            </Table>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  </Paper>
+                </Grid>
+              )}
 
                 {/* 데이터 품질 */}
                 <Grid item xs={12}>
