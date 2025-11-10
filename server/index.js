@@ -33679,31 +33679,140 @@ app.get('/api/quick-cost/quality', async (req, res) => {
     
     // 이상치 데이터 수집
     const outliers = [];
-    const companyNameSet = new Set();
-    const normalizedNameSet = new Set();
+    const companyStatsMap = new Map();
     let totalEntries = 0;
 
+    const parseCost = (value) => {
+      if (!value) return null;
+      const cleaned = value.toString().replace(/[^0-9.-]/g, '');
+      const parsed = parseInt(cleaned, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const addVariant = (map, key) => {
+      map.set(key, (map.get(key) || 0) + 1);
+    };
+
     dataRows.forEach((row, rowIndex) => {
+      const fromStoreName = row[3]?.toString().trim() || '';
+      const toStoreName = row[5]?.toString().trim() || '';
+      const modeType = row[7]?.toString().trim() || '';
+
       for (let i = 0; i < 5; i++) {
-        const baseIndex = 8 + (i * 6);
+        const baseIndex = 8 + i * 6;
         const companyName = row[baseIndex]?.toString().trim();
-        const cost = row[baseIndex + 2]?.toString().trim();
+        const phoneNumber = row[baseIndex + 1]?.toString().trim();
+        const costValue = parseCost(row[baseIndex + 2]);
+        const dispatchSpeed = row[baseIndex + 3]?.toString().trim();
+        const pickupSpeed = row[baseIndex + 4]?.toString().trim();
+        const arrivalSpeed = row[baseIndex + 5]?.toString().trim();
 
-        if (!companyName || !cost) continue;
+        if (!companyName || costValue === null) continue;
 
-        totalEntries++;
+        totalEntries += 1;
         const normalizedName = normalizeCompanyName(companyName);
-        companyNameSet.add(companyName);
-        normalizedNameSet.add(normalizedName);
 
-        // 같은 업체의 다른 행들과 비교하여 이상치 탐지
-        // (간단한 구현, 실제로는 더 정교한 분석 필요)
+        if (!companyStatsMap.has(normalizedName)) {
+          companyStatsMap.set(normalizedName, {
+            normalizedName,
+            variants: new Map(),
+            phoneNumbers: new Map(),
+            costs: [],
+            entries: []
+          });
+        }
+
+        const companyStats = companyStatsMap.get(normalizedName);
+        addVariant(companyStats.variants, companyName);
+        if (phoneNumber) {
+          addVariant(companyStats.phoneNumbers, phoneNumber);
+        }
+
+        companyStats.costs.push(costValue);
+        companyStats.entries.push({
+          rowNumber: rowIndex + 2,
+          companyName,
+          normalizedName,
+          phoneNumber,
+          cost: costValue,
+          dispatchSpeed,
+          pickupSpeed,
+          arrivalSpeed,
+          fromStoreName,
+          toStoreName,
+          modeType
+        });
       }
     });
+
+    const normalizedNameSet = new Set(companyStatsMap.keys());
 
     const duplicateRate = totalEntries > 0 
       ? ((totalEntries - normalizedNameSet.size) / totalEntries * 100).toFixed(2)
       : 0;
+
+    const duplicateGroups = [];
+    const mergeSuggestions = [];
+
+    companyStatsMap.forEach((stats) => {
+      if (stats.variants.size > 1) {
+        const variants = Array.from(stats.variants.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count);
+        duplicateGroups.push({
+          normalizedName: stats.normalizedName,
+          totalCount: variants.reduce((sum, item) => sum + item.count, 0),
+          variants
+        });
+
+        mergeSuggestions.push({
+          normalizedName: stats.normalizedName,
+          candidates: variants.slice(0, 5)
+        });
+      }
+
+      if (stats.costs.length >= 3) {
+        const mean =
+          stats.costs.reduce((sum, value) => sum + value, 0) / stats.costs.length;
+        const variance =
+          stats.costs.reduce(
+            (sum, value) => sum + Math.pow(value - mean, 2),
+            0
+          ) / stats.costs.length;
+        const stdDev = Math.sqrt(variance);
+
+        stats.entries.forEach((entry) => {
+          const deviation = Math.abs(entry.cost - mean);
+          const deviationRatio = mean === 0 ? 0 : deviation / mean;
+
+          if (
+            (stdDev > 0 && deviation > stdDev * 2) ||
+            deviationRatio >= 0.3
+          ) {
+            outliers.push({
+              companyName: entry.companyName,
+              normalizedName: entry.normalizedName,
+              phoneNumber: entry.phoneNumber,
+              cost: entry.cost,
+              meanCost: Math.round(mean),
+              deviation: Math.round(deviation),
+              deviationRatio: Math.round(deviationRatio * 100),
+              rowNumber: entry.rowNumber,
+              fromStoreName: entry.fromStoreName,
+              toStoreName: entry.toStoreName,
+              modeType: entry.modeType,
+              speeds: {
+                dispatch: entry.dispatchSpeed,
+                pickup: entry.pickupSpeed,
+                arrival: entry.arrivalSpeed
+              }
+            });
+          }
+        });
+      }
+    });
+
+    duplicateGroups.sort((a, b) => b.totalCount - a.totalCount);
 
     const result = {
       outliers: outliers,
@@ -33713,6 +33822,8 @@ app.get('/api/quick-cost/quality', async (req, res) => {
         rate: totalEntries > 0 ? ((normalizedNameSet.size / totalEntries) * 100).toFixed(2) : 0
       },
       duplicateRate: parseFloat(duplicateRate),
+      duplicateGroups: duplicateGroups.slice(0, 25),
+      mergeSuggestions: mergeSuggestions.slice(0, 25),
       reliabilityScores: [] // 신뢰도 점수는 통계 API에서 가져올 수 있음
     };
 

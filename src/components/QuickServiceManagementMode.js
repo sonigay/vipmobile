@@ -301,6 +301,18 @@ const QuickServiceManagementMode = ({
   }, [statistics]);
 
   const normalizationRate = quality.normalizationStatus?.rate || 0;
+  const duplicateGroups = useMemo(
+    () => (quality.duplicateGroups || []).slice(0, 10),
+    [quality.duplicateGroups]
+  );
+  const mergeSuggestions = useMemo(
+    () => (quality.mergeSuggestions || []).slice(0, 6),
+    [quality.mergeSuggestions]
+  );
+  const topOutliers = useMemo(
+    () => (quality.outliers || []).slice(0, 10),
+    [quality.outliers]
+  );
 
   const handleRegionChange = (event) => {
     const nextRegion = event.target.value;
@@ -1044,6 +1056,201 @@ const QuickServiceManagementMode = ({
                             )}
                           </Stack>
                         </Grid>
+                      </Grid>
+                      <Divider sx={{ my: 3 }} />
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                          <Paper
+                            variant="outlined"
+                            sx={{ p: 2, borderRadius: 2, height: '100%' }}
+                          >
+                            <Stack spacing={1.5} sx={{ height: '100%' }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                  중복 업체명 그룹
+                                </Typography>
+                                <Tooltip title="정규화 키에 여러 변형이 존재하는 상위 그룹">
+                                  <IconButton size="small">
+                                    <InfoOutlinedIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                              {duplicateGroups.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  중복 관리가 필요한 업체명이 없습니다.
+                                </Typography>
+                              ) : (
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell sx={{ fontWeight: 600 }}>
+                                        정규화 이름
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        등록 건수
+                                      </TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {duplicateGroups.map((group) => (
+                                      <TableRow key={group.normalizedName}>
+                                        <TableCell>
+                                          <Typography
+                                            variant="body2"
+                                            sx={{ fontWeight: 600 }}
+                                          >
+                                            {group.normalizedName || '(미정규화)'}
+                                          </Typography>
+                                          <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                            {group.variants.slice(0, 3).map((variant) => (
+                                              <Typography
+                                                key={`${variant.name}-${variant.count}`}
+                                                variant="caption"
+                                                color="text.secondary"
+                                              >
+                                                {variant.name || '(빈 문자열)'} ·{' '}
+                                                {variant.count.toLocaleString()}건
+                                              </Typography>
+                                            ))}
+                                            {group.variants.length > 3 && (
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                              >
+                                                + {group.variants.length - 3}개 변형
+                                              </Typography>
+                                            )}
+                                          </Stack>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {group.totalCount.toLocaleString()}건
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </Stack>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <Paper
+                            variant="outlined"
+                            sx={{ p: 2, borderRadius: 2, height: '100%' }}
+                          >
+                            <Stack spacing={1.5} sx={{ height: '100%' }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                  이상치 감지
+                                </Typography>
+                                <Tooltip title="평균 대비 편차가 큰 비용 입력 항목">
+                                  <IconButton size="small">
+                                    <InfoOutlinedIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                              {topOutliers.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  확인이 필요한 이상치 데이터가 없습니다.
+                                </Typography>
+                              ) : (
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        비용
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        편차
+                                      </TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {topOutliers.map((item, index) => (
+                                      <TableRow key={`${item.normalizedName}-${index}`}>
+                                        <TableCell>
+                                          <Typography
+                                            variant="body2"
+                                            sx={{ fontWeight: 600 }}
+                                          >
+                                            {item.companyName}
+                                          </Typography>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            {item.fromStoreName || '-'} →{' '}
+                                            {item.toStoreName || '-'}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {item.cost?.toLocaleString()}원
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          +{item.deviationRatio}%
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </Stack>
+                          </Paper>
+                        </Grid>
+                        {mergeSuggestions.length > 0 && (
+                          <Grid item xs={12}>
+                            <Paper
+                              variant="outlined"
+                              sx={{ p: 2, borderRadius: 2 }}
+                            >
+                              <Stack spacing={1.5}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{ fontWeight: 600 }}
+                                  >
+                                    병합 제안
+                                  </Typography>
+                                  <Tooltip title="동일 정규화 키로 매칭되는 주요 변형 목록입니다. 유사 업체명 병합을 검토하세요.">
+                                    <IconButton size="small">
+                                      <InfoOutlinedIcon fontSize="inherit" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Stack>
+                                <Grid container spacing={1.5}>
+                                  {mergeSuggestions.map((suggestion) => (
+                                    <Grid key={suggestion.normalizedName} item xs={12} md={6}>
+                                      <Paper
+                                        variant="outlined"
+                                        sx={{ p: 1.5, borderRadius: 2 }}
+                                      >
+                                        <Typography
+                                          variant="body2"
+                                          sx={{ fontWeight: 600 }}
+                                        >
+                                          {suggestion.normalizedName || '(미정규화)'}
+                                        </Typography>
+                                        <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                                          {suggestion.candidates.map((candidate) => (
+                                            <Typography
+                                              key={`${candidate.name}-${candidate.count}`}
+                                              variant="caption"
+                                              color="text.secondary"
+                                            >
+                                              {candidate.name || '(빈 문자열)'} ·{' '}
+                                              {candidate.count.toLocaleString()}건
+                                            </Typography>
+                                          ))}
+                                        </Stack>
+                                      </Paper>
+                                    </Grid>
+                                  ))}
+                                </Grid>
+                              </Stack>
+                            </Paper>
+                          </Grid>
+                        )}
                       </Grid>
                       <Divider sx={{ my: 3 }} />
                       <Typography variant="body2" color="text.secondary">
