@@ -32765,6 +32765,108 @@ const QUICK_COST_TOTAL_COLUMN_COUNT =
   QUICK_COST_BASE_COLUMN_COUNT + QUICK_COST_MAX_COMPANIES * QUICK_COST_COMPANY_FIELD_COUNT;
 const QUICK_COST_VALID_SPEEDS = new Set(['빠름', '중간', '느림']);
 
+const formatDateTimeForSheet = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const pad = (value) => String(value).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = pad(date.getUTCMonth() + 1);
+  const day = pad(date.getUTCDate());
+  const hours = pad(date.getUTCHours());
+  const minutes = pad(date.getUTCMinutes());
+  const seconds = pad(date.getUTCSeconds());
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+const parseSheetDate = (value) => {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === 'number' && !Number.isNaN(value)) {
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    const milliseconds = Math.round(value * 24 * 60 * 60 * 1000);
+    const computed = new Date(excelEpoch + milliseconds);
+    return Number.isNaN(computed.getTime()) ? null : computed;
+  }
+
+  const stringValue = value.toString().trim();
+  if (!stringValue) return null;
+
+  const normalized = stringValue
+    .replace(/년|\.|\/|월/g, '-')
+    .replace(/일/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  const compactMatch = normalized.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (compactMatch) {
+    const [, yyyy, mm, dd] = compactMatch;
+    const compactDate = new Date(`${yyyy}-${mm}-${dd}`);
+    return Number.isNaN(compactDate.getTime()) ? null : compactDate;
+  }
+
+  return null;
+};
+
+const createRegisteredAtResolver = () => {
+  let lastKnownDate = null;
+
+  return (rawValue, options = {}) => {
+    const {
+      rowIndex,
+      missingRows,
+      recordMissing = false,
+      updateOnFallback = false
+    } = options;
+
+    const trimmed =
+      rawValue === null || rawValue === undefined
+        ? ''
+        : rawValue.toString().trim();
+
+    const parsed = parseSheetDate(trimmed);
+    if (parsed) {
+      lastKnownDate = parsed;
+      return {
+        date: parsed,
+        label: formatDateTimeForSheet(parsed),
+        wasFallback: false
+      };
+    }
+
+    const fallbackDate = lastKnownDate
+      ? new Date(lastKnownDate.getTime())
+      : new Date();
+    lastKnownDate = fallbackDate;
+    const fallbackLabel = formatDateTimeForSheet(fallbackDate);
+
+    if (
+      missingRows &&
+      typeof rowIndex === 'number' &&
+      ((recordMissing && !trimmed) || updateOnFallback)
+    ) {
+      missingRows.push({
+        rowIndex,
+        value: fallbackLabel
+      });
+    }
+
+    return {
+      date: fallbackDate,
+      label: fallbackLabel,
+      wasFallback: true
+    };
+  };
+};
+
 const normalizeQuickCostCompanies = (companies = []) => {
   if (!Array.isArray(companies) || companies.length === 0) {
     throw new Error('저장할 업체 정보가 필요합니다.');
@@ -33567,8 +33669,17 @@ app.get('/api/quick-cost/history', async (req, res) => {
 
     const dataRows = rows.slice(1);
 
+    const missingRegisteredAtRows = [];
+    const resolveRegisteredAt = createRegisteredAtResolver();
+
     const entries = dataRows.map((row, index) => {
-      const registeredAt = (row[0] || '').toString().trim();
+      const registeredAtInfo = resolveRegisteredAt(row[0], {
+        rowIndex: index + 2,
+        missingRows: missingRegisteredAtRows,
+        recordMissing: true,
+        updateOnFallback: true
+      });
+      const registeredAt = registeredAtInfo.label;
       const registrantStoreName = (row[1] || '').toString().trim();
       const registrantStoreId = (row[2] || '').toString().trim();
       const fromName = (row[3] || '').toString().trim();
@@ -33617,6 +33728,26 @@ app.get('/api/quick-cost/history', async (req, res) => {
         entry.toStoreId &&
         entry.companies.length > 0
     );
+
+    if (missingRegisteredAtRows.length > 0) {
+      try {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            valueInputOption: 'USER_ENTERED',
+            data: missingRegisteredAtRows.map(({ rowIndex, value }) => ({
+              range: `${QUICK_COST_SHEET_NAME}!A${rowIndex}`,
+              values: [[value]]
+            }))
+          }
+        });
+      } catch (timestampError) {
+        console.warn(
+          '[QuickCost] history registeredAt backfill failed:',
+          timestampError?.message || timestampError
+        );
+      }
+    }
 
     const entryMap = new Map();
     validEntries.forEach((entry) => {
@@ -33851,47 +33982,12 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
     const regionMetricsMap = new Map();
     const routeMetrics = [];
     const timeTrendMap = new Map();
-
-    const parseRegisteredAt = (value) => {
-      if (!value && value !== 0) return null;
-      if (value instanceof Date && !Number.isNaN(value.getTime?.())) {
-        return value;
-      }
-
-      if (typeof value === 'number' && !Number.isNaN(value)) {
-        const excelEpoch = Date.UTC(1899, 11, 30);
-        const milliseconds = Math.round(value * 24 * 60 * 60 * 1000);
-        const computed = new Date(excelEpoch + milliseconds);
-        return Number.isNaN(computed.getTime()) ? null : computed;
-      }
-
-      const stringValue = value.toString().trim();
-      if (!stringValue) return null;
-
-      // 구글시트 날짜 포맷 다양성 대응
-      const normalized = stringValue
-        .replace(/년|\.|\/|월/g, '-')
-        .replace(/일/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      const parsed = new Date(normalized);
-      if (!Number.isNaN(parsed.getTime())) {
-        return parsed;
-      }
-
-      const compactMatch = normalized.match(/^(\d{4})(\d{2})(\d{2})/);
-      if (compactMatch) {
-        const [_, yyyy, mm, dd] = compactMatch;
-        const compactDate = new Date(`${yyyy}-${mm}-${dd}`);
-        return Number.isNaN(compactDate.getTime()) ? null : compactDate;
-      }
-
-      return null;
-    };
+    const missingRegisteredAtRows = [];
+    const resolveRegisteredAt = createRegisteredAtResolver();
 
     const resolveTimeBucket = (value) => {
-      const parsedDate = parseRegisteredAt(value);
+      const parsedDate =
+        value instanceof Date ? value : parseSheetDate(value);
       if (!parsedDate) return null;
 
       const year = parsedDate.getUTCFullYear();
@@ -33903,10 +33999,18 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       return { label: bucketLabel, timestamp };
     };
 
-    dataRows.forEach(row => {
+    dataRows.forEach((row, index) => {
+      const registeredAtInfo = resolveRegisteredAt(row[0], {
+        rowIndex: index + 2,
+        missingRows: missingRegisteredAtRows,
+        recordMissing: true,
+        updateOnFallback: true
+      });
+      const timeBucketInfo = resolveTimeBucket(registeredAtInfo.date);
+      row[0] = registeredAtInfo.label;
+
       const fromStoreId = row[4]?.toString().trim();
       const toStoreId = row[6]?.toString().trim();
-      const timeBucketInfo = resolveTimeBucket(row[0]);
 
       const fromStoreInfo = storeMap.get(fromStoreId);
       const toStoreInfo = storeMap.get(toStoreId);
@@ -34230,6 +34334,26 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
         };
       }
     );
+
+    if (missingRegisteredAtRows.length > 0) {
+      try {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          resource: {
+            valueInputOption: 'USER_ENTERED',
+            data: missingRegisteredAtRows.map(({ rowIndex, value }) => ({
+              range: `${QUICK_COST_SHEET_NAME}!A${rowIndex}`,
+              values: [[value]]
+            }))
+          }
+        });
+      } catch (timestampError) {
+        console.warn(
+          '[QuickCost] registeredAt backfill failed:',
+          timestampError?.message || timestampError
+        );
+      }
+    }
 
     const result = {
       companyStats: companyStats,
