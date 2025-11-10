@@ -33,6 +33,7 @@ import {
   MapContainer,
   TileLayer,
   CircleMarker,
+  Circle,
   Tooltip as LeafletTooltip
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -50,6 +51,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { api } from '../api';
 import AppUpdatePopup from './AppUpdatePopup';
 import QuickCostModal from './QuickCostModal';
@@ -61,6 +63,7 @@ const defaultStatistics = {
   companyStats: [],
   popularCompanies: [],
   excellentCompanies: [],
+  regionAggregates: [],
   distanceCostAnalysis: [],
   timeTrends: []
 };
@@ -169,6 +172,68 @@ const CITY_COORDINATES = {
   제주시: { lat: 33.4996, lng: 126.5312 },
   서귀포시: { lat: 33.2539, lng: 126.5590 }
 };
+
+const REGION_METRIC_KEYS = new Set(['volume', 'avgCost', 'avgDistance', 'costPerKm']);
+
+const MAP_METRIC_PALETTES = {
+  volume: ['#ffe0b2', '#ffb74d', '#f57c00'],
+  avgCost: ['#2e7d32', '#fff59d', '#ef5350'],
+  avgDistance: ['#bbdefb', '#64b5f6', '#1e88e5'],
+  costPerKm: ['#c5e1a5', '#ffeb3b', '#e65100']
+};
+
+const interpolateColor = (colors, t) => {
+  if (!Array.isArray(colors) || colors.length === 0) {
+    return '#1976d2';
+  }
+  const clampT = Math.max(0, Math.min(1, t));
+  if (colors.length === 1) return colors[0];
+  const segment = (colors.length - 1) * clampT;
+  const index = Math.floor(segment);
+  const ratio = segment - index;
+  const startColor = colors[index];
+  const endColor = colors[Math.min(index + 1, colors.length - 1)];
+
+  const hexToRgb = (hex) => {
+    const clean = hex.replace('#', '');
+    const bigint = parseInt(clean, 16);
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255
+    };
+  };
+
+  const rgbToHex = (r, g, b) => {
+    const toHex = (value) => {
+      const hex = value.toString(16);
+      return hex.length === 1 ? `0${hex}` : hex;
+    };
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  };
+
+  const start = hexToRgb(startColor);
+  const end = hexToRgb(endColor);
+
+  const r = Math.round(start.r + (end.r - start.r) * ratio);
+  const g = Math.round(start.g + (end.g - start.g) * ratio);
+  const b = Math.round(start.b + (end.b - start.b) * ratio);
+
+  return rgbToHex(r, g, b);
+};
+
+const getGradientColor = (paletteKey, value, min, max) => {
+  const palette = MAP_METRIC_PALETTES[paletteKey];
+  if (!palette || typeof value !== 'number') {
+    return '#1976d2';
+  }
+  const safeMin = typeof min === 'number' ? min : 0;
+  const safeMax = typeof max === 'number' ? max : safeMin + 1;
+  const range = safeMax - safeMin;
+  const normalized =
+    range === 0 ? 0.5 : Math.max(0, Math.min(1, (value - safeMin) / range));
+  return interpolateColor(palette, normalized);
+};
 const QuickServiceManagementMode = ({
   onLogout,
   onModeChange,
@@ -201,6 +266,11 @@ const QuickServiceManagementMode = ({
     to: 'id'
   });
   const [historySelection, setHistorySelection] = useState({
+    from: null,
+    to: null
+  });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalStores, setCreateModalStores] = useState({
     from: null,
     to: null
   });
@@ -661,10 +731,77 @@ const QuickServiceManagementMode = ({
     setHistorySuccessMessage('');
     setHistorySelection({ from: null, to: null });
     setHistorySearchMode({ from: 'id', to: 'id' });
+    setShowCreateModal(false);
+    setCreateModalStores({ from: null, to: null });
   };
 
   const handleFetchHistoryClick = () => {
     performFetchHistory();
+  };
+
+  const buildStoreInfo = useCallback(
+    (id, fallbackName = '') => {
+      if (!id) return null;
+      const matched =
+        historySelection.from?.id === id
+          ? historySelection.from
+          : historySelection.to?.id === id
+          ? historySelection.to
+          : storeOptions.find((store) => store.id === id);
+      if (matched) {
+        return { id: matched.id, name: matched.name };
+      }
+      return { id, name: fallbackName || id };
+    },
+    [historySelection.from, historySelection.to, storeOptions]
+  );
+
+  const handleOpenCreateModal = () => {
+    const fromId = resolveStoreIdForFetch(
+      historySearchMode.from,
+      historySelection.from,
+      historyFilters.fromInput
+    );
+    const toId = resolveStoreIdForFetch(
+      historySearchMode.to,
+      historySelection.to,
+      historyFilters.toInput
+    );
+
+    const fromInputTrim = historyFilters.fromInput.trim();
+    const toInputTrim = historyFilters.toInput.trim();
+
+    if (!fromId || !toId) {
+      let message = '신규 등록을 위해 출발/도착 매장을 모두 지정해주세요.';
+      if (!fromId && historySearchMode.from === 'name' && fromInputTrim) {
+        message = '출발 매장명을 목록에서 선택하거나 정확히 입력해주세요.';
+      } else if (!toId && historySearchMode.to === 'name' && toInputTrim) {
+        message = '도착 매장명을 목록에서 선택하거나 정확히 입력해주세요.';
+      }
+      setHistoryError(message);
+      setHistorySuccessMessage('');
+      return;
+    }
+
+    const fromStoreInfo = buildStoreInfo(
+      fromId,
+      historySearchMode.from === 'name' ? fromInputTrim : ''
+    );
+    const toStoreInfo = buildStoreInfo(
+      toId,
+      historySearchMode.to === 'name' ? toInputTrim : ''
+    );
+
+    if (!fromStoreInfo || !toStoreInfo) {
+      setHistoryError('선택한 매장 정보를 찾을 수 없습니다.');
+      setHistorySuccessMessage('');
+      return;
+    }
+
+    setCreateModalStores({ from: fromStoreInfo, to: toStoreInfo });
+    setHistoryError(null);
+    setHistorySuccessMessage('');
+    setShowCreateModal(true);
   };
 
   const handleEditEntry = (entry) => {
@@ -929,59 +1066,158 @@ const QuickServiceManagementMode = ({
     return metrics;
   }, [statistics]);
 
+  const regionAggregates = useMemo(
+    () =>
+      Array.isArray(statistics.regionAggregates)
+        ? statistics.regionAggregates
+        : [],
+    [statistics.regionAggregates]
+  );
+
+  const distanceCostAnalysis = useMemo(
+    () =>
+      Array.isArray(statistics.distanceCostAnalysis)
+        ? statistics.distanceCostAnalysis
+        : [],
+    [statistics.distanceCostAnalysis]
+  );
+
+  const hasDistanceAnalysis = useMemo(
+    () => distanceCostAnalysis.some((bucket) => (bucket?.count || 0) > 0),
+    [distanceCostAnalysis]
+  );
+
   const mapData = useMemo(() => {
     const list = [];
 
-    Object.values(aggregatedRegionMetrics).forEach((metric) => {
+    if (mapMetric === 'popular' || mapMetric === 'excellent') {
+      Object.values(aggregatedRegionMetrics).forEach((metric) => {
+        const coords =
+          CITY_COORDINATES[metric.region] ||
+          REGION_COORDINATES[metric.region] ||
+          REGION_COORDINATES.기타;
+
+        if (mapMetric === 'popular' && metric.popularEntries > 0) {
+          const top = metric.popularTopCompany;
+          list.push({
+            key: `${metric.region}-popular`,
+            type: 'company',
+            region: metric.region,
+            coords,
+            value: metric.popularEntries,
+            label: `${metric.popularEntries.toLocaleString()}건`,
+            topCompany: top
+              ? {
+                  name: top.companyName,
+                  phone: top.phoneNumber
+                }
+              : null
+          });
+        }
+
+        if (mapMetric === 'excellent' && metric.excellentEntries > 0) {
+          const top = metric.excellentTopCompany;
+          list.push({
+            key: `${metric.region}-excellent`,
+            type: 'company',
+            region: metric.region,
+            coords,
+            value: metric.averageSpeedScoreAvg,
+            label: `${metric.averageSpeedScoreAvg?.toFixed(2)}점`,
+            entryCount: metric.excellentEntries,
+            topCompany: top
+              ? {
+                  name: top.companyName,
+                  phone: top.phoneNumber
+                }
+              : null
+          });
+        }
+      });
+
+      return list;
+    }
+
+    regionAggregates.forEach((regionMetric) => {
       const coords =
-        CITY_COORDINATES[metric.region] ||
-        REGION_COORDINATES[metric.region] ||
+        REGION_COORDINATES[regionMetric.region] ||
+        CITY_COORDINATES[regionMetric.region] ||
         REGION_COORDINATES.기타;
+      const baseData = {
+        key: `${regionMetric.region}-${mapMetric}`,
+        type: 'region',
+        region: regionMetric.region,
+        coords,
+        totalEntries: regionMetric.totalEntries,
+        companyCount: regionMetric.companyCount,
+        averageCost: regionMetric.averageCost,
+        averageDistance: regionMetric.averageDistance,
+        averageCostPerKm: regionMetric.averageCostPerKm,
+        distanceCoverage: regionMetric.distanceCoverage
+      };
 
-      if (mapMetric === 'popular' && metric.popularEntries > 0) {
-        const top = metric.popularTopCompany;
-        list.push({
-          key: `${metric.region}-popular`,
-          region: metric.region,
-          lat: coords.lat,
-          lng: coords.lng,
-          intensity: metric.popularEntries,
-          label: `${metric.popularEntries.toLocaleString()}건`,
-          description: top
-            ? `${top.companyName} (${top.phoneNumber || '-'})`
-            : '상위 업체 정보 없음'
-        });
+      let value = null;
+      let label = '';
+
+      switch (mapMetric) {
+        case 'volume': {
+          value = regionMetric.totalEntries;
+          label = value ? `${value.toLocaleString()}건` : '-';
+          break;
+        }
+        case 'avgCost': {
+          value = regionMetric.averageCost;
+          label = value ? `${value.toLocaleString()}원` : '-';
+          break;
+        }
+        case 'avgDistance': {
+          value = regionMetric.averageDistance;
+          label = value ? `${value.toLocaleString()}km` : '-';
+          break;
+        }
+        case 'costPerKm': {
+          value = regionMetric.averageCostPerKm;
+          label = value ? `${value.toLocaleString()}원/km` : '-';
+          break;
+        }
+        default:
+          break;
       }
 
-      if (mapMetric === 'excellent' && metric.excellentEntries > 0) {
-        const top = metric.excellentTopCompany;
-        list.push({
-          key: `${metric.region}-excellent`,
-          region: metric.region,
-          lat: coords.lat,
-          lng: coords.lng,
-          intensity: metric.averageSpeedScoreAvg,
-          label: `${metric.averageSpeedScoreAvg?.toFixed(2)}점`,
-          description: top
-            ? `${top.companyName} (${top.phoneNumber || '-'})`
-            : '상위 업체 정보 없음'
-        });
+      if (
+        value === null ||
+        value === undefined ||
+        Number.isNaN(value) ||
+        (mapMetric === 'volume' && value <= 0)
+      ) {
+        return;
       }
+
+      list.push({
+        ...baseData,
+        value,
+        label
+      });
     });
 
     return list;
-  }, [aggregatedRegionMetrics, mapMetric]);
+  }, [aggregatedRegionMetrics, mapMetric, regionAggregates]);
+
+  const isRegionMetric = useMemo(
+    () => REGION_METRIC_KEYS.has(mapMetric),
+    [mapMetric]
+  );
 
   const mapIntensityRange = useMemo(() => {
     if (mapData.length === 0) return { min: 0, max: 0 };
-    let min = Infinity;
-    let max = -Infinity;
-    mapData.forEach((item) => {
-      if (item.intensity < min) min = item.intensity;
-      if (item.intensity > max) max = item.intensity;
-    });
-    if (!isFinite(min) || !isFinite(max)) {
-      return { min: 0, max: 1 };
+    const values = mapData
+      .map((item) => item.value)
+      .filter((value) => typeof value === 'number' && !Number.isNaN(value));
+    if (values.length === 0) return { min: 0, max: 0 };
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return { min: 0, max: 0 };
     }
     return { min, max };
   }, [mapData]);
@@ -1212,10 +1448,12 @@ const QuickServiceManagementMode = ({
                     >
                       <Stack spacing={0.5}>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          지역 분포 시각화 (1차 버전)
+                          지역 분포 시각화 (2차 버전)
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          인기/우수 업체 데이터를 지도에 표시합니다. 이후 단계에서 폴리곤 기반 열지도 등으로 확장할 예정입니다.
+                          {isRegionMetric
+                            ? '등록 건수·평균 비용·평균 거리 등 핵심 지표를 열지도 스타일로 확인할 수 있습니다.'
+                            : '지역별 인기/우수 업체 TOP 데이터를 지도에서 확인할 수 있습니다.'}
                         </Typography>
                       </Stack>
                       <ToggleButtonGroup
@@ -1223,9 +1461,20 @@ const QuickServiceManagementMode = ({
                         value={mapMetric}
                         exclusive
                         onChange={handleMapMetricChange}
+                        sx={{
+                          flexWrap: 'wrap',
+                          gap: 0.5,
+                          '& .MuiToggleButton-root': {
+                            flex: '0 0 auto'
+                          }
+                        }}
                       >
                         <ToggleButton value="popular">인기 업체</ToggleButton>
                         <ToggleButton value="excellent">우수 업체</ToggleButton>
+                        <ToggleButton value="volume">등록 건수</ToggleButton>
+                        <ToggleButton value="avgCost">평균 비용</ToggleButton>
+                        <ToggleButton value="avgDistance">평균 거리</ToggleButton>
+                        <ToggleButton value="costPerKm">km당 비용</ToggleButton>
                       </ToggleButtonGroup>
                     </Box>
                     <Box sx={{ height: 420 }}>
@@ -1259,40 +1508,142 @@ const QuickServiceManagementMode = ({
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           />
                           {mapData.map((item) => {
-                            const range =
+                            const valueRange =
                               mapIntensityRange.max - mapIntensityRange.min || 1;
                             const normalized =
-                              (item.intensity - mapIntensityRange.min) / range;
-                            const radius =
-                              mapMetric === 'popular'
-                                ? 10000 + normalized * 25000
-                                : 8000 + normalized * 20000;
-                            const color =
-                              mapMetric === 'popular' ? '#ff7043' : '#4caf50';
+                              valueRange === 0
+                                ? 0.5
+                                : (item.value - mapIntensityRange.min) /
+                                  valueRange;
+
+                            if (item.type === 'company') {
+                              const color =
+                                mapMetric === 'popular' ? '#ff7043' : '#4caf50';
+                              const radius =
+                                mapMetric === 'popular'
+                                  ? 10000 + normalized * 25000
+                                  : 8000 + normalized * 20000;
+                              return (
+                                <CircleMarker
+                                  key={item.key}
+                                  center={[item.coords.lat, item.coords.lng]}
+                                  radius={Math.max(radius / 4000, 8)}
+                                  pathOptions={{
+                                    color,
+                                    fillColor: color,
+                                    fillOpacity: 0.4,
+                                    weight: 2
+                                  }}
+                                >
+                                  <LeafletTooltip direction="top" offset={[0, -2]}>
+                                    <div style={{ minWidth: 180 }}>
+                                      <strong>{item.region}</strong>
+                                      <br />
+                                      {mapMetric === 'popular'
+                                        ? `등록 건수: ${item.label}`
+                                        : `평균 속도 점수: ${item.label}`}
+                                      <br />
+                                      {item.topCompany
+                                        ? `${item.topCompany.name} (${item.topCompany.phone || '-'})`
+                                        : '상위 업체 정보 없음'}
+                                      {mapMetric === 'excellent' && item.entryCount && (
+                                        <>
+                                          <br />
+                                          등록 건수: {item.entryCount.toLocaleString()}건
+                                        </>
+                                      )}
+                                    </div>
+                                  </LeafletTooltip>
+                                </CircleMarker>
+                              );
+                            }
+
+                            const color = getGradientColor(
+                              mapMetric,
+                              item.value,
+                              mapIntensityRange.min,
+                              mapIntensityRange.max
+                            );
+                            const radiusMeters = 25000 + normalized * 80000;
+
                             return (
-                              <CircleMarker
+                              <Circle
                                 key={item.key}
-                                center={[item.lat, item.lng]}
-                                radius={Math.max(radius / 4000, 8)}
+                                center={[item.coords.lat, item.coords.lng]}
+                                radius={Math.max(radiusMeters, 15000)}
                                 pathOptions={{
                                   color,
                                   fillColor: color,
-                                  fillOpacity: 0.4,
-                                  weight: 2
+                                  fillOpacity: 0.35,
+                                  weight: 1.5
                                 }}
                               >
-                                <LeafletTooltip direction="top" offset={[0, -2]}>
-                                  <div style={{ minWidth: 160 }}>
+                                <LeafletTooltip direction="top" offset={[0, -4]}>
+                                  <div style={{ minWidth: 190 }}>
                                     <strong>{item.region}</strong>
                                     <br />
-                                    {mapMetric === 'popular'
-                                      ? `등록 건수: ${item.label}`
-                                      : `평균 속도 점수: ${item.label}`}
-                                    <br />
-                                    {item.description}
+                                    {mapMetric === 'volume' && (
+                                      <>
+                                        등록 건수: {item.totalEntries?.toLocaleString()}건
+                                        <br />
+                                        업체 수: {item.companyCount?.toLocaleString()}곳
+                                        <br />
+                                        평균 비용:{' '}
+                                        {item.averageCost
+                                          ? `${item.averageCost.toLocaleString()}원`
+                                          : '-'}
+                                        <br />
+                                        평균 거리:{' '}
+                                        {item.averageDistance
+                                          ? `${item.averageDistance.toLocaleString()}km`
+                                          : '-'}
+                                        <br />
+                                        거리 데이터 커버리지:{' '}
+                                        {item.distanceCoverage ?? 0}%
+                                      </>
+                                    )}
+                                    {mapMetric === 'avgCost' && (
+                                      <>
+                                        평균 비용: {item.label}
+                                        <br />
+                                        등록 건수:{' '}
+                                        {item.totalEntries?.toLocaleString()}건
+                                        <br />
+                                        업체 수:{' '}
+                                        {item.companyCount?.toLocaleString()}곳
+                                      </>
+                                    )}
+                                    {mapMetric === 'avgDistance' && (
+                                      <>
+                                        평균 거리: {item.label}
+                                        <br />
+                                        km당 비용:{' '}
+                                        {item.averageCostPerKm
+                                          ? `${item.averageCostPerKm.toLocaleString()}원/km`
+                                          : '-'}
+                                        <br />
+                                        거리 데이터 커버리지:{' '}
+                                        {item.distanceCoverage ?? 0}%
+                                      </>
+                                    )}
+                                    {mapMetric === 'costPerKm' && (
+                                      <>
+                                        평균 km당 비용: {item.label}
+                                        <br />
+                                        평균 비용:{' '}
+                                        {item.averageCost
+                                          ? `${item.averageCost.toLocaleString()}원`
+                                          : '-'}
+                                        <br />
+                                        평균 거리:{' '}
+                                        {item.averageDistance
+                                          ? `${item.averageDistance.toLocaleString()}km`
+                                          : '-'}
+                                      </>
+                                    )}
                                   </div>
                                 </LeafletTooltip>
-                              </CircleMarker>
+                              </Circle>
                             );
                           })}
                         </MapContainer>
@@ -1300,6 +1651,73 @@ const QuickServiceManagementMode = ({
                     </Box>
                   </Paper>
                 </Grid>
+
+                {hasDistanceAnalysis && (
+                  <Grid item xs={12}>
+                    <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                      <Box
+                        sx={{
+                          px: 3,
+                          py: 2,
+                          borderBottom: '1px solid rgba(0,0,0,0.08)'
+                        }}
+                      >
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={1}
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          justifyContent="space-between"
+                        >
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            거리대별 비용 분석
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            위경도 좌표가 있는 구간만 집계되며, 각 구간의 평균 비용과 km당 비용을
+                            제공합니다.
+                          </Typography>
+                        </Stack>
+                      </Box>
+                      <Box sx={{ px: 3, py: 2 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>거리 구간</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }} align="right">
+                                등록 건수
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }} align="right">
+                                평균 비용
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }} align="right">
+                                평균 km당 비용
+                              </TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {distanceCostAnalysis.map((bucket) => (
+                              <TableRow key={bucket.label}>
+                                <TableCell>{bucket.label}</TableCell>
+                                <TableCell align="right">
+                                  {bucket.count?.toLocaleString() || 0}
+                                </TableCell>
+                                <TableCell align="right">
+                                  {bucket.averageCost
+                                    ? `${bucket.averageCost.toLocaleString()}원`
+                                    : '-'}
+                                </TableCell>
+                                <TableCell align="right">
+                                  {bucket.averageCostPerKm
+                                    ? `${bucket.averageCostPerKm.toLocaleString()}원/km`
+                                    : '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                )}
 
                 {/* 요약 카드 */}
                 <Grid item xs={12}>

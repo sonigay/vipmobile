@@ -1784,6 +1784,31 @@ function createHash(str) {
   return hash.toString();
 }
 
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  if (
+    typeof lat1 !== 'number' ||
+    typeof lon1 !== 'number' ||
+    typeof lat2 !== 'number' ||
+    typeof lon2 !== 'number'
+  ) {
+    return null;
+  }
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371; // km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  if (!Number.isFinite(distance)) return null;
+  return Math.round(distance * 10) / 10; // one decimal
+}
+
 // 스토어 데이터 가져오기 (캐싱 적용)
 app.get('/api/stores', async (req, res) => {
   const { includeShipped = 'true' } = req.query; // 쿼리 파라미터로 출고 제외 여부 제어
@@ -33787,29 +33812,44 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
         const storeId = row[15]?.toString().trim(); // P열: POS코드
         if (!storeId) return;
 
-        const storeName = row[14]?.toString().trim() || ''; // O열: 매장명
-        const addressCandidates = [
-          row[32], // AG열: 상세 주소
-          row[11]  // L열: 예비 주소
-        ];
+              const storeName = row[14]?.toString().trim() || ''; // O열: 매장명
+              const addressCandidates = [
+                row[32], // AG열: 상세 주소
+                row[11]  // L열: 예비 주소
+              ];
 
-        const address =
-          addressCandidates
-            .map((value) => value?.toString().trim())
-            .find((value) => value && value !== '주소확인필요') || '';
+              const address =
+                addressCandidates
+                  .map((value) => value?.toString().trim())
+                  .find((value) => value && value !== '주소확인필요') || '';
 
-        let storeRegion = extractRegionFromAddress(address);
-        if (storeRegion === '기타' && storeName) {
-          storeRegion = extractRegionFromAddress(storeName);
-        }
+              let storeRegion = extractRegionFromAddress(address);
+              if (storeRegion === '기타' && storeName) {
+                storeRegion = extractRegionFromAddress(storeName);
+              }
 
-        storeMap.set(storeId, { address, region: storeRegion, name: storeName });
+              const lat = parseFloat(row[8]?.toString() || '');
+              const lng = parseFloat(row[9]?.toString() || '');
+              const hasValidCoords =
+                !Number.isNaN(lat) &&
+                !Number.isNaN(lng) &&
+                Math.abs(lat) <= 90 &&
+                Math.abs(lng) <= 180;
+
+              storeMap.set(storeId, {
+                address,
+                region: storeRegion,
+                name: storeName,
+                coordinates: hasValidCoords ? { lat, lng } : null
+              });
       });
     }
 
     // 업체별 통계 수집
     const companyStatsMap = new Map();
     const regionCompanyMap = new Map(); // 지역별 업체 통계
+    const regionMetricsMap = new Map();
+    const routeMetrics = [];
 
     dataRows.forEach(row => {
       const fromStoreId = row[4]?.toString().trim();
@@ -33832,8 +33872,15 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       // 지역 필터링
       if (region && storeRegion !== region) return;
 
+      const fromCoords = fromStoreInfo?.coordinates;
+      const toCoords = toStoreInfo?.coordinates;
+      let distanceKm = null;
+      if (fromCoords && toCoords) {
+        distanceKm = calculateDistance(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng);
+      }
+
       for (let i = 0; i < 5; i++) {
-        const baseIndex = 8 + (i * 6);
+        const baseIndex = 8 + i * 6;
         const companyName = row[baseIndex]?.toString().trim();
         const phoneNumber = row[baseIndex + 1]?.toString().trim();
         const cost = row[baseIndex + 2]?.toString().trim();
@@ -33864,6 +33911,39 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
         if (pickupSpeed) stats.speeds.pickup.push(pickupSpeed);
         if (arrivalSpeed) stats.speeds.arrival.push(arrivalSpeed);
         stats.entryCount++;
+
+        if (typeof distanceKm === 'number') {
+          stats.routeDistances = stats.routeDistances || [];
+          stats.routeDistances.push(distanceKm);
+          stats.routeCosts = stats.routeCosts || [];
+          stats.routeCosts.push(costNum);
+          routeMetrics.push({
+            region: storeRegion,
+            distance: distanceKm,
+            cost: costNum
+          });
+        }
+
+        if (!regionMetricsMap.has(storeRegion)) {
+          regionMetricsMap.set(storeRegion, {
+            region: storeRegion,
+            totalEntries: 0,
+            totalCost: 0,
+            companyKeys: new Set(),
+            totalDistance: 0,
+            totalCostWithDistance: 0,
+            distanceCount: 0
+          });
+        }
+        const regionMetric = regionMetricsMap.get(storeRegion);
+        regionMetric.totalEntries += 1;
+        regionMetric.totalCost += costNum;
+        regionMetric.companyKeys.add(key);
+        if (typeof distanceKm === 'number') {
+          regionMetric.totalDistance += distanceKm;
+          regionMetric.totalCostWithDistance += costNum;
+          regionMetric.distanceCount += 1;
+        }
 
         // 지역별 통계
         const regionKey = `${storeRegion}-${key}`;
@@ -33919,6 +33999,17 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       const consistencyScore = Math.max(0, 50 - (stdDev / avgCost) * 100); // 최대 50점
       const reliabilityScore = Math.round(entryScore + consistencyScore);
 
+      let averageDistance = null;
+      let averageCostPerKm = null;
+      if (stats.routeDistances?.length) {
+        const totalDistance = stats.routeDistances.reduce((sum, value) => sum + value, 0);
+        averageDistance = Math.round((totalDistance / stats.routeDistances.length) * 10) / 10;
+        const totalCost = stats.routeCosts?.reduce((sum, value) => sum + value, 0) || 0;
+        if (averageDistance > 0 && totalCost > 0) {
+          averageCostPerKm = Math.round((totalCost / stats.routeDistances.length) / (averageDistance || 1));
+        }
+      }
+
       return {
         companyName: stats.companyName,
         phoneNumber: stats.phoneNumber,
@@ -33928,7 +34019,9 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
         reliabilityScore: reliabilityScore,
         dispatchSpeed: avgDispatchSpeed,
         pickupSpeed: avgPickupSpeed,
-        arrivalSpeed: avgArrivalSpeed
+        arrivalSpeed: avgArrivalSpeed,
+        averageDistance,
+        averageCostPerKm
       };
     });
 
@@ -33973,11 +34066,99 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       .sort((a, b) => b.averageSpeedScore - a.averageSpeedScore)
       .slice(0, 20);
 
+    const regionAggregates = Array.from(regionMetricsMap.values()).map(
+      (metrics) => {
+        const averageCost =
+          metrics.totalEntries > 0
+            ? Math.round(metrics.totalCost / metrics.totalEntries)
+            : null;
+        const averageDistance =
+          metrics.distanceCount > 0
+            ? Math.round(
+                (metrics.totalDistance / metrics.distanceCount) * 10
+              ) / 10
+            : null;
+        const averageCostPerKm =
+          metrics.totalDistance > 0
+            ? Math.round(
+                (metrics.totalCostWithDistance / metrics.totalDistance) * 10
+              ) / 10
+            : null;
+        const distanceCoverage =
+          metrics.totalEntries > 0
+            ? Math.round((metrics.distanceCount / metrics.totalEntries) * 100)
+            : 0;
+
+        return {
+          region: metrics.region,
+          totalEntries: metrics.totalEntries,
+          companyCount: metrics.companyKeys.size,
+          averageCost,
+          averageDistance,
+          averageCostPerKm,
+          distanceCoverage
+        };
+      }
+    );
+
+    const distanceBucketDefinitions = [
+      { label: '0~5km', min: 0, max: 5 },
+      { label: '5~10km', min: 5, max: 10 },
+      { label: '10~20km', min: 10, max: 20 },
+      { label: '20~50km', min: 20, max: 50 },
+      { label: '50~100km', min: 50, max: 100 },
+      { label: '100km 이상', min: 100, max: Infinity }
+    ];
+
+    const distanceBucketStats = distanceBucketDefinitions.map(() => ({
+      count: 0,
+      totalCost: 0,
+      totalDistance: 0
+    }));
+
+    routeMetrics.forEach((route) => {
+      const { distance, cost } = route;
+      const bucketIndex = distanceBucketDefinitions.findIndex(
+        (bucket) => distance >= bucket.min && distance < bucket.max
+      );
+      if (bucketIndex === -1) return;
+      const bucket = distanceBucketStats[bucketIndex];
+      bucket.count += 1;
+      bucket.totalCost += cost;
+      bucket.totalDistance += distance;
+    });
+
+    const distanceCostAnalysis = distanceBucketDefinitions.map(
+      (bucket, index) => {
+        const stats = distanceBucketStats[index];
+        if (stats.count === 0) {
+          return {
+            label: bucket.label,
+            count: 0,
+            averageCost: null,
+            averageCostPerKm: null
+          };
+        }
+        const averageCost = Math.round(stats.totalCost / stats.count);
+        const averageCostPerKm =
+          stats.totalDistance > 0
+            ? Math.round((stats.totalCost / stats.totalDistance) * 10) / 10
+            : null;
+        return {
+          label: bucket.label,
+          count: stats.count,
+          averageCost,
+          averageCostPerKm
+        };
+      }
+    );
+
     const result = {
       companyStats: companyStats,
       popularCompanies: popularCompanies,
       excellentCompanies: excellentCompanies,
-      distanceCostAnalysis: [], // 거리별 분석은 나중에 구현
+      regionAggregates,
+      distanceCostAnalysis,
       timeTrends: [] // 시간대별 추이는 나중에 구현
     };
 
