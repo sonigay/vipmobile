@@ -25,8 +25,10 @@ import {
   Tooltip,
   ToggleButton,
   ToggleButtonGroup,
-  Alert
+  Alert,
+  Autocomplete
 } from '@mui/material';
+import { createFilterOptions } from '@mui/material/Autocomplete';
 import {
   MapContainer,
   TileLayer,
@@ -182,8 +184,8 @@ const QuickServiceManagementMode = ({
   const [mapMetric, setMapMetric] = useState('popular');
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [historyFilters, setHistoryFilters] = useState({
-    fromStoreId: '',
-    toStoreId: ''
+    fromInput: '',
+    toInput: ''
   });
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -191,10 +193,53 @@ const QuickServiceManagementMode = ({
   const [historyFetched, setHistoryFetched] = useState(false);
   const [historySuccessMessage, setHistorySuccessMessage] = useState('');
   const [editEntry, setEditEntry] = useState(null);
+  const [storeOptions, setStoreOptions] = useState([]);
+  const [storeOptionsLoading, setStoreOptionsLoading] = useState(false);
+  const [storeOptionsError, setStoreOptionsError] = useState(null);
+  const [historySearchMode, setHistorySearchMode] = useState({
+    from: 'id',
+    to: 'id'
+  });
+  const [historySelection, setHistorySelection] = useState({
+    from: null,
+    to: null
+  });
   const modeColor = useMemo(() => getModeColor(MODE_KEY), []);
   const modeTitle = useMemo(
     () => getModeTitle(MODE_KEY, '퀵서비스 관리 모드'),
     []
+  );
+  const storeFilterOptions = useMemo(
+    () =>
+      createFilterOptions({
+        matchFrom: 'any',
+        stringify: (option) => `${option?.id || ''} ${option?.name || ''}`
+      }),
+    []
+  );
+
+  const resolveStoreIdForFetch = useCallback(
+    (mode, selection, input) => {
+      if (selection?.id) {
+        return selection.id;
+      }
+
+      const trimmed = (input || '').toString().trim();
+      if (!trimmed) return '';
+
+      if (mode === 'id') {
+        return trimmed;
+      }
+
+      const lower = trimmed.toLowerCase();
+      const found = storeOptions.find(
+        (store) =>
+          store.name.toLowerCase().includes(lower) ||
+          store.id.toLowerCase() === lower
+      );
+      return found?.id || '';
+    },
+    [storeOptions]
   );
 
   const collectRegions = useCallback((stats) => {
@@ -282,6 +327,46 @@ const QuickServiceManagementMode = ({
     if (!hideUntil || new Date() >= new Date(hideUntil)) {
       setShowUpdatePopup(true);
     }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchStores = async () => {
+      setStoreOptionsLoading(true);
+      setStoreOptionsError(null);
+      try {
+        const stores = await api.getStores({ includeShipped: true });
+        if (!mounted) return;
+        if (Array.isArray(stores)) {
+          const processed = stores
+            .map((store) => ({
+              id: store?.id?.toString().trim() || '',
+              name: store?.name?.toString().trim() || '',
+              address: store?.address?.toString().trim() || '',
+              uniqueId: store?.uniqueId || `${store?.id || ''}_${store?.name || ''}`
+            }))
+            .filter((store) => store.id && store.name);
+          processed.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+          setStoreOptions(processed);
+        } else {
+          setStoreOptions([]);
+        }
+      } catch (err) {
+        if (!mounted) return;
+        console.error('[QuickServiceManagementMode] store fetch failed:', err);
+        setStoreOptionsError(err.message || '매장 목록을 불러오지 못했습니다.');
+        setStoreOptions([]);
+      } finally {
+        if (mounted) {
+          setStoreOptionsLoading(false);
+        }
+      }
+    };
+
+    fetchStores();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const summaryStats = useMemo(() => {
@@ -429,11 +514,29 @@ const QuickServiceManagementMode = ({
   const performFetchHistory = useCallback(
     async (options = {}) => {
       const { silent = false } = options;
-      const fromId = historyFilters.fromStoreId.trim();
-      const toId = historyFilters.toStoreId.trim();
+      const fromInputTrim = (historyFilters.fromInput || '').trim();
+      const toInputTrim = (historyFilters.toInput || '').trim();
+      const fromId = resolveStoreIdForFetch(
+        historySearchMode.from,
+        historySelection.from,
+        historyFilters.fromInput
+      );
+      const toId = resolveStoreIdForFetch(
+        historySearchMode.to,
+        historySelection.to,
+        historyFilters.toInput
+      );
 
       if (!fromId || !toId) {
-        setHistoryError('출발 매장 ID와 도착 매장 ID를 모두 입력해주세요.');
+        let message = '출발/도착 매장 정보를 모두 선택하거나 입력해주세요.';
+        if (!fromId && historySearchMode.from === 'name' && fromInputTrim) {
+          message =
+            '입력한 출발 매장명을 찾을 수 없습니다. 목록에서 선택해주세요.';
+        } else if (!toId && historySearchMode.to === 'name' && toInputTrim) {
+          message =
+            '입력한 도착 매장명을 찾을 수 없습니다. 목록에서 선택해주세요.';
+        }
+        setHistoryError(message);
         setHistoryData([]);
         setHistoryFetched(false);
         return;
@@ -468,25 +571,96 @@ const QuickServiceManagementMode = ({
         }
       }
     },
-    [historyFilters]
+    [
+      historyFilters.fromInput,
+      historyFilters.toInput,
+      historySearchMode,
+      historySelection,
+      resolveStoreIdForFetch
+    ]
   );
 
-  const handleHistoryInputChange = (field) => (event) => {
-    const value = event.target.value;
-    setHistoryFilters((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-    setHistoryError(null);
-    setHistorySuccessMessage('');
-  };
+  const getHistoryInputKey = useCallback(
+    (field) => (field === 'from' ? 'fromInput' : 'toInput'),
+    []
+  );
+
+  const handleHistoryModeChange = useCallback(
+    (field) => (_event, newMode) => {
+      if (!newMode) return;
+      setHistorySearchMode((prev) => ({
+        ...prev,
+        [field]: newMode
+      }));
+      const inputKey = getHistoryInputKey(field);
+      setHistoryFilters((prev) => ({
+        ...prev,
+        [inputKey]: ''
+      }));
+      setHistorySelection((prev) => ({
+        ...prev,
+        [field]: null
+      }));
+      setHistoryError(null);
+      setHistorySuccessMessage('');
+    },
+    [getHistoryInputKey]
+  );
+
+  const handleHistorySelectionChange = useCallback(
+    (field) => (_event, newValue) => {
+      const inputKey = getHistoryInputKey(field);
+      setHistorySelection((prev) => ({
+        ...prev,
+        [field]: newValue
+      }));
+      if (newValue) {
+        setHistoryFilters((prev) => ({
+          ...prev,
+          [inputKey]:
+            historySearchMode[field] === 'id'
+              ? newValue.id || ''
+              : newValue.name || ''
+        }));
+      } else {
+        setHistoryFilters((prev) => ({
+          ...prev,
+          [inputKey]: ''
+        }));
+      }
+      setHistoryError(null);
+      setHistorySuccessMessage('');
+    },
+    [getHistoryInputKey, historySearchMode]
+  );
+
+  const handleHistoryInputChange = useCallback(
+    (field) => (_event, newValue, reason) => {
+      const inputKey = getHistoryInputKey(field);
+      setHistoryFilters((prev) => ({
+        ...prev,
+        [inputKey]: newValue || ''
+      }));
+      if (reason === 'input' || reason === 'clear') {
+        setHistorySelection((prev) => ({
+          ...prev,
+          [field]: null
+        }));
+      }
+      setHistoryError(null);
+      setHistorySuccessMessage('');
+    },
+    [getHistoryInputKey]
+  );
 
   const handleHistoryReset = () => {
-    setHistoryFilters({ fromStoreId: '', toStoreId: '' });
+    setHistoryFilters({ fromInput: '', toInput: '' });
     setHistoryData([]);
     setHistoryFetched(false);
     setHistoryError(null);
     setHistorySuccessMessage('');
+    setHistorySelection({ from: null, to: null });
+    setHistorySearchMode({ from: 'id', to: 'id' });
   };
 
   const handleFetchHistoryClick = () => {
@@ -497,6 +671,34 @@ const QuickServiceManagementMode = ({
     if (!entry) return;
     setHistoryError(null);
     setHistorySuccessMessage('');
+    const fromStore = entry.fromStoreId
+      ? {
+          id: entry.fromStoreId,
+          name: entry.fromStoreName || entry.fromStoreId
+        }
+      : null;
+    const toStore = entry.toStoreId
+      ? {
+          id: entry.toStoreId,
+          name: entry.toStoreName || entry.toStoreId
+        }
+      : null;
+    setHistorySelection((prev) => ({
+      ...prev,
+      from: fromStore,
+      to: toStore
+    }));
+    setHistoryFilters((prev) => ({
+      ...prev,
+      fromInput:
+        historySearchMode.from === 'name'
+          ? fromStore?.name || ''
+          : fromStore?.id || '',
+      toInput:
+        historySearchMode.to === 'name'
+          ? toStore?.name || ''
+          : toStore?.id || ''
+    }));
     setEditEntry({
       rowIndex: entry.rowIndex,
       reverseRowIndex: entry.reverseRowIndex,
@@ -1893,33 +2095,169 @@ const QuickServiceManagementMode = ({
                       </Stack>
                     </Box>
                     <Box sx={{ px: 3, py: 3 }}>
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} md={4} lg={3}>
-                          <TextField
-                            label="출발 매장 ID"
-                            size="small"
-                            fullWidth
-                            value={historyFilters.fromStoreId}
-                            onChange={handleHistoryInputChange('fromStoreId')}
-                            placeholder="예: P123456"
-                          />
+                      <Grid container spacing={2} alignItems="flex-start">
+                        <Grid item xs={12} md={6} lg={4}>
+                          <Stack spacing={1.5}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                              justifyContent="space-between"
+                            >
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                출발 매장 찾기
+                              </Typography>
+                              <ToggleButtonGroup
+                                size="small"
+                                value={historySearchMode.from}
+                                exclusive
+                                onChange={handleHistoryModeChange('from')}
+                              >
+                                <ToggleButton value="id">ID</ToggleButton>
+                                <ToggleButton value="name">매장명</ToggleButton>
+                              </ToggleButtonGroup>
+                            </Stack>
+                            <Autocomplete
+                              freeSolo
+                              options={storeOptions}
+                              loading={storeOptionsLoading}
+                              filterOptions={storeFilterOptions}
+                              loadingText="매장 목록을 불러오는 중입니다..."
+                              noOptionsText="일치하는 매장을 찾을 수 없습니다."
+                              value={historySelection.from}
+                              onChange={handleHistorySelectionChange('from')}
+                              inputValue={historyFilters.fromInput}
+                              onInputChange={handleHistoryInputChange('from')}
+                              getOptionLabel={(option) => {
+                                if (typeof option === 'string') return option;
+                                if (!option) return '';
+                                return historySearchMode.from === 'id'
+                                  ? option.id || ''
+                                  : option.name || '';
+                              }}
+                              renderOption={(props, option) => (
+                                <li {...props} key={option.uniqueId || option.id}>
+                                  <Stack spacing={0.25}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {option.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {option.id}
+                                    </Typography>
+                                  </Stack>
+                                </li>
+                              )}
+                              isOptionEqualToValue={(option, value) =>
+                                option?.id === (value?.id || value)
+                              }
+                              ListboxProps={{ style: { maxHeight: 320 } }}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label={
+                                    historySearchMode.from === 'id'
+                                      ? '출발 매장 ID'
+                                      : '출발 매장명'
+                                  }
+                                  size="small"
+                                  placeholder={
+                                    historySearchMode.from === 'id'
+                                      ? '예: P123456'
+                                      : '예: 정직폰강서점'
+                                  }
+                                />
+                              )}
+                            />
+                          </Stack>
                         </Grid>
-                        <Grid item xs={12} md={4} lg={3}>
-                          <TextField
-                            label="도착 매장 ID"
-                            size="small"
-                            fullWidth
-                            value={historyFilters.toStoreId}
-                            onChange={handleHistoryInputChange('toStoreId')}
-                            placeholder="예: P654321"
-                          />
+                        <Grid item xs={12} md={6} lg={4}>
+                          <Stack spacing={1.5}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                              justifyContent="space-between"
+                            >
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                도착 매장 찾기
+                              </Typography>
+                              <ToggleButtonGroup
+                                size="small"
+                                value={historySearchMode.to}
+                                exclusive
+                                onChange={handleHistoryModeChange('to')}
+                              >
+                                <ToggleButton value="id">ID</ToggleButton>
+                                <ToggleButton value="name">매장명</ToggleButton>
+                              </ToggleButtonGroup>
+                            </Stack>
+                            <Autocomplete
+                              freeSolo
+                              options={storeOptions}
+                              loading={storeOptionsLoading}
+                              filterOptions={storeFilterOptions}
+                              loadingText="매장 목록을 불러오는 중입니다..."
+                              noOptionsText="일치하는 매장을 찾을 수 없습니다."
+                              value={historySelection.to}
+                              onChange={handleHistorySelectionChange('to')}
+                              inputValue={historyFilters.toInput}
+                              onInputChange={handleHistoryInputChange('to')}
+                              getOptionLabel={(option) => {
+                                if (typeof option === 'string') return option;
+                                if (!option) return '';
+                                return historySearchMode.to === 'id'
+                                  ? option.id || ''
+                                  : option.name || '';
+                              }}
+                              renderOption={(props, option) => (
+                                <li {...props} key={option.uniqueId || option.id}>
+                                  <Stack spacing={0.25}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {option.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {option.id}
+                                    </Typography>
+                                  </Stack>
+                                </li>
+                              )}
+                              isOptionEqualToValue={(option, value) =>
+                                option?.id === (value?.id || value)
+                              }
+                              ListboxProps={{ style: { maxHeight: 320 } }}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label={
+                                    historySearchMode.to === 'id'
+                                      ? '도착 매장 ID'
+                                      : '도착 매장명'
+                                  }
+                                  size="small"
+                                  placeholder={
+                                    historySearchMode.to === 'id'
+                                      ? '예: P654321'
+                                      : '예: 신윤티엔에스'
+                                  }
+                                />
+                              )}
+                            />
+                          </Stack>
                         </Grid>
-                        <Grid item xs={12} md={4} lg={6}>
+                        <Grid item xs={12} lg={4}>
                           <Typography variant="body2" color="text.secondary">
-                            출발/도착 매장 ID를 입력하고 조회를 눌러 등록된 퀵비용 데이터를 수정하거나 삭제할 수 있습니다.
+                            매장 ID 또는 매장명을 선택해 출발/도착 매장을 지정한 뒤 조회를 눌러 등록된
+                            퀵비용 데이터를 수정하거나 삭제할 수 있습니다. 한 글자만 입력해도 목록에서
+                            빠르게 검색할 수 있습니다.
                           </Typography>
                         </Grid>
                       </Grid>
+
+                      {storeOptionsError && (
+                        <Box sx={{ mt: 2 }}>
+                          <Alert severity="warning">{storeOptionsError}</Alert>
+                        </Box>
+                      )}
 
                       {historyError && (
                         <Box sx={{ mt: 2 }}>
@@ -1954,7 +2292,7 @@ const QuickServiceManagementMode = ({
                           <Typography variant="body2" color="text.secondary">
                             {historyFetched
                               ? '조회된 데이터가 없습니다.'
-                              : '출발/도착 매장 ID를 입력한 뒤 조회를 눌러주세요.'}
+                              : '출발/도착 매장을 선택하거나 입력한 뒤 조회를 눌러주세요.'}
                           </Typography>
                         ) : (
                           <Table size="small">

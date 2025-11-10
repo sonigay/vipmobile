@@ -364,6 +364,42 @@ export const api = {
     }
   },
 
+  // 매장 목록 조회
+  getStores: async (options = {}) => {
+    try {
+      const { includeShipped = true } = options;
+      const cacheKey = `stores-${includeShipped}`;
+      const cached = clientCacheUtils.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/stores?includeShipped=${includeShipped}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (Array.isArray(result)) {
+        clientCacheUtils.set(cacheKey, result, 5 * 60 * 1000);
+      }
+      return result;
+    } catch (error) {
+      console.error('매장 목록 조회 오류:', error);
+      throw error;
+    }
+  },
+
   // 통계 데이터 조회 (관리자 전용)
   getQuickCostStatistics: async (region, options = {}) => {
     try {
