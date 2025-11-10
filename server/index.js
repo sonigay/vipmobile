@@ -34540,6 +34540,7 @@ app.get('/api/quick-cost/quality', async (req, res) => {
     const outliers = [];
     const outlierCountMap = new Map();
     const companyStatsMap = new Map();
+    const routeStatsMap = new Map();
     let totalEntries = 0;
 
     const parseCost = (value) => {
@@ -34588,8 +34589,7 @@ app.get('/api/quick-cost/quality', async (req, res) => {
           addVariant(companyStats.phoneNumbers, phoneNumber);
         }
 
-        companyStats.costs.push(costValue);
-        companyStats.entries.push({
+        const entry = {
           rowNumber: rowIndex + 2,
           companyName,
           normalizedName,
@@ -34600,26 +34600,146 @@ app.get('/api/quick-cost/quality', async (req, res) => {
           arrivalSpeed,
           fromStoreName,
           toStoreName,
+          fromStoreId: row[4]?.toString().trim() || '',
+          toStoreId: row[6]?.toString().trim() || '',
           modeType
-        });
+        };
+
+        companyStats.costs.push(costValue);
+        companyStats.entries.push(entry);
+
+        const routeKey = `${entry.fromStoreId || entry.fromStoreName}__${entry.toStoreId || entry.toStoreName}`;
+        if (!routeStatsMap.has(routeKey)) {
+          routeStatsMap.set(routeKey, {
+            routeKey,
+            fromStoreName: entry.fromStoreName,
+            toStoreName: entry.toStoreName,
+            fromStoreId: entry.fromStoreId,
+            toStoreId: entry.toStoreId,
+            costs: [],
+            entries: []
+          });
+        }
+
+        const routeStats = routeStatsMap.get(routeKey);
+        routeStats.costs.push(costValue);
+        routeStats.entries.push(entry);
       }
     });
 
     const normalizedNameSet = new Set(companyStatsMap.keys());
 
-    const duplicateRate = totalEntries > 0 
-      ? ((totalEntries - normalizedNameSet.size) / totalEntries * 100).toFixed(2)
-      : 0;
-
     const duplicateGroups = [];
     const mergeSuggestions = [];
     const reliabilityScores = [];
+    let mergeCandidateCount = 0;
+
+    const detectOutliersForSet = (entries, label) => {
+      const entryCount = entries.length;
+      if (entryCount < 3) return;
+
+      const costs = entries.map((entry) => entry.cost);
+      const mean = costs.reduce((sum, value) => sum + value, 0) / entryCount;
+      const variance =
+        entryCount > 1
+          ? costs.reduce(
+              (sum, value) => sum + Math.pow(value - mean, 2),
+              0
+            ) / entryCount
+          : 0;
+      const stdDev = Math.sqrt(variance);
+
+      entries.forEach((entry) => {
+        const deviation = Math.abs(entry.cost - mean);
+        const deviationRatio = mean === 0 ? 0 : deviation / mean;
+
+        if (
+          (stdDev > 0 && deviation > stdDev * 2) ||
+          deviationRatio >= 0.3
+        ) {
+          outliers.push({
+            companyName: entry.companyName,
+            normalizedName: entry.normalizedName,
+            phoneNumber: entry.phoneNumber,
+            cost: entry.cost,
+            meanCost: Math.round(mean),
+            deviation: Math.round(deviation),
+            deviationRatio: Math.round(deviationRatio * 100),
+            rowNumber: entry.rowNumber,
+            fromStoreName: entry.fromStoreName,
+            toStoreName: entry.toStoreName,
+            fromStoreId: entry.fromStoreId,
+            toStoreId: entry.toStoreId,
+            routeKey: label.key || label.routeKey || '',
+            routeLabel: label.display || label.routeLabel || '',
+            modeType: entry.modeType,
+            speeds: {
+              dispatch: entry.dispatchSpeed,
+              pickup: entry.pickupSpeed,
+              arrival: entry.arrivalSpeed
+            }
+          });
+
+          outlierCountMap.set(
+            entry.normalizedName,
+            (outlierCountMap.get(entry.normalizedName) || 0) + 1
+          );
+        }
+      });
+    };
+
+    routeStatsMap.forEach((routeStats) => {
+      detectOutliersForSet(routeStats.entries, {
+        key: routeStats.routeKey,
+        display: `${routeStats.fromStoreName} → ${routeStats.toStoreName}`,
+        routeLabel: `${routeStats.fromStoreName} → ${routeStats.toStoreName}`
+      });
+    });
+
+    const companyRouteMap = new Map();
+    routeStatsMap.forEach((routeStats) => {
+      routeStats.entries.forEach((entry) => {
+        const companyRouteKey = `${entry.normalizedName}__${routeStats.routeKey}`;
+        if (!companyRouteMap.has(companyRouteKey)) {
+          companyRouteMap.set(companyRouteKey, {
+            companyRouteKey,
+            normalizedName: entry.normalizedName,
+            displayName: entry.companyName,
+            routeKey: routeStats.routeKey,
+            fromStoreName: routeStats.fromStoreName,
+            toStoreName: routeStats.toStoreName,
+            entries: []
+          });
+        }
+        companyRouteMap.get(companyRouteKey).entries.push(entry);
+      });
+    });
+
+    companyRouteMap.forEach((companyRoute) => {
+      detectOutliersForSet(companyRoute.entries, {
+        key: companyRoute.companyRouteKey,
+        display: `${companyRoute.displayName} (${companyRoute.fromStoreName} → ${companyRoute.toStoreName})`,
+        routeLabel: `${companyRoute.fromStoreName} → ${companyRoute.toStoreName}`
+      });
+    });
 
     companyStatsMap.forEach((stats) => {
-      if (stats.variants.size > 1) {
-        const variants = Array.from(stats.variants.entries())
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count);
+      const variants = Array.from(stats.variants.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+
+      const canonicalName = variants[0]?.name || stats.normalizedName;
+      const mergeCandidates = variants.filter(
+        (variant) =>
+          variant.name !== canonicalName &&
+          variant.count < variants[0].count
+      );
+
+      if (mergeCandidates.length > 0) {
+        mergeCandidateCount += mergeCandidates.reduce(
+          (sum, item) => sum + item.count,
+          0
+        );
         duplicateGroups.push({
           normalizedName: stats.normalizedName,
           totalCount: variants.reduce((sum, item) => sum + item.count, 0),
@@ -34628,7 +34748,13 @@ app.get('/api/quick-cost/quality', async (req, res) => {
 
         mergeSuggestions.push({
           normalizedName: stats.normalizedName,
-          candidates: variants.slice(0, 5)
+          canonicalName,
+          candidates: mergeCandidates
+            .slice(0, 5)
+            .map((candidate) => ({
+              name: candidate.name,
+              count: candidate.count
+            }))
         });
       }
 
@@ -34645,42 +34771,6 @@ app.get('/api/quick-cost/quality', async (req, res) => {
             ) / entryCount
           : 0;
       const stdDev = Math.sqrt(variance);
-
-      if (entryCount >= 3) {
-        stats.entries.forEach((entry) => {
-          const deviation = Math.abs(entry.cost - mean);
-          const deviationRatio = mean === 0 ? 0 : deviation / mean;
-
-          if (
-            (stdDev > 0 && deviation > stdDev * 2) ||
-            deviationRatio >= 0.3
-          ) {
-            outliers.push({
-              companyName: entry.companyName,
-              normalizedName: entry.normalizedName,
-              phoneNumber: entry.phoneNumber,
-              cost: entry.cost,
-              meanCost: Math.round(mean),
-              deviation: Math.round(deviation),
-              deviationRatio: Math.round(deviationRatio * 100),
-              rowNumber: entry.rowNumber,
-              fromStoreName: entry.fromStoreName,
-              toStoreName: entry.toStoreName,
-              modeType: entry.modeType,
-              speeds: {
-                dispatch: entry.dispatchSpeed,
-                pickup: entry.pickupSpeed,
-                arrival: entry.arrivalSpeed
-              }
-            });
-
-            outlierCountMap.set(
-              stats.normalizedName,
-              (outlierCountMap.get(stats.normalizedName) || 0) + 1
-            );
-          }
-        });
-      }
 
       if (entryCount > 0) {
         const entryScore =
@@ -34728,10 +34818,12 @@ app.get('/api/quick-cost/quality', async (req, res) => {
       outliers: outliers,
       normalizationStatus: {
         total: totalEntries,
-        normalized: normalizedNameSet.size,
-        rate: totalEntries > 0 ? ((normalizedNameSet.size / totalEntries) * 100).toFixed(2) : 0
+        normalized: totalEntries - mergeCandidateCount,
+        rate:
+          totalEntries > 0
+            ? (((totalEntries - mergeCandidateCount) / totalEntries) * 100).toFixed(2)
+            : 0
       },
-      duplicateRate: parseFloat(duplicateRate),
       duplicateGroups: duplicateGroups.slice(0, 25),
       mergeSuggestions: mergeSuggestions.slice(0, 25),
       reliabilityScores: reliabilityScores.slice(0, 100)
