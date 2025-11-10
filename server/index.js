@@ -33359,13 +33359,78 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
 
     const storeRows = storeResponse.data.values || [];
     const storeMap = new Map();
+
+    const extractRegionFromAddress = (address = '') => {
+      const trimmed = address.trim();
+      if (!trimmed) return '기타';
+
+      const normalized = trimmed.replace(/\s+/g, '');
+
+      const regionPatterns = {
+        '서울': ['서울특별시', '서울시', '서울'],
+        '부산': ['부산광역시', '부산시', '부산'],
+        '대구': ['대구광역시', '대구시', '대구'],
+        '인천': ['인천광역시', '인천시', '인천'],
+        '광주': ['광주광역시', '광주시', '광주'],
+        '대전': ['대전광역시', '대전시', '대전'],
+        '울산': ['울산광역시', '울산시', '울산'],
+        '세종': ['세종특별자치시', '세종시', '세종'],
+        '경기': ['경기도', '경기'],
+        '강원': ['강원특별자치도', '강원도', '강원'],
+        '충북': ['충청북도', '충북'],
+        '충남': ['충청남도', '충남'],
+        '전북': ['전라북도', '전북특별자치도', '전북'],
+        '전남': ['전라남도', '전남'],
+        '경북': ['경상북도', '경북'],
+        '경남': ['경상남도', '경남'],
+        '제주': ['제주특별자치도', '제주시', '제주']
+      };
+
+      for (const [regionName, patterns] of Object.entries(regionPatterns)) {
+        if (patterns.some(pattern => normalized.includes(pattern))) {
+          return regionName;
+        }
+      }
+
+      const cityToProvince = {
+        '수원시': '경기', '용인시': '경기', '성남시': '경기', '의정부시': '경기',
+        '안양시': '경기', '부천시': '경기', '고양시': '경기', '과천시': '경기',
+        '광명시': '경기', '구리시': '경기', '남양주시': '경기', '동두천시': '경기',
+        '시흥시': '경기', '파주시': '경기', '평택시': '경기', '포천시': '경기',
+        '하남시': '경기', '군포시': '경기', '의왕시': '경기', '오산시': '경기',
+        '이천시': '경기', '안산시': '경기', '양주시': '경기', '여주시': '경기',
+        '김포시': '경기', '화성시': '경기',
+        '천안시': '충남', '아산시': '충남', '공주시': '충남', '보령시': '충남',
+        '서산시': '충남', '논산시': '충남', '계룡시': '충남', '당진시': '충남',
+        '춘천시': '강원', '원주시': '강원', '강릉시': '강원', '동해시': '강원',
+        '태백시': '강원', '속초시': '강원', '삼척시': '강원',
+        '충주시': '충북', '제천시': '충북', '청주시': '충북',
+        '전주시': '전북', '군산시': '전북', '익산시': '전북', '남원시': '전북', '김제시': '전북',
+        '목포시': '전남', '여수시': '전남', '순천시': '전남', '나주시': '전남', '광양시': '전남',
+        '포항시': '경북', '경주시': '경북', '안동시': '경북', '김천시': '경북',
+        '구미시': '경북', '영주시': '경북', '영천시': '경북', '상주시': '경북',
+        '문경시': '경북', '경산시': '경북',
+        '창원시': '경남', '김해시': '경남', '진주시': '경남', '통영시': '경남',
+        '사천시': '경남', '밀양시': '경남', '거제시': '경남', '양산시': '경남',
+        '제주시': '제주', '서귀포시': '제주'
+      };
+
+      const token = trimmed.split(/\s+/)[0];
+      if (token) {
+        if (cityToProvince[token]) return cityToProvince[token];
+        if (token.length >= 2) {
+          const twoChar = token.slice(0, 2);
+          if (regionPatterns[twoChar]) return twoChar;
+        }
+      }
+      return '기타';
+    };
+
     if (storeRows.length > 1) {
       storeRows.slice(1).forEach(row => {
         const storeId = row[0]?.toString().trim();
         const address = row[2]?.toString().trim() || '';
-        // 주소에서 지역 추출 (시/도 단위)
-        const regionMatch = address.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/);
-        const storeRegion = regionMatch ? regionMatch[1] : '기타';
+        const storeRegion = extractRegionFromAddress(address);
         storeMap.set(storeId, { address, region: storeRegion });
       });
     }
@@ -33379,7 +33444,7 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       const toStoreId = row[6]?.toString().trim();
       const fromStoreInfo = storeMap.get(fromStoreId);
       const toStoreInfo = storeMap.get(toStoreId);
-      const storeRegion = fromStoreInfo?.region || '기타';
+      const storeRegion = fromStoreInfo?.region || toStoreInfo?.region || '기타';
 
       // 지역 필터링
       if (region && storeRegion !== region) return;

@@ -588,327 +588,341 @@ const QuickServiceManagementMode = ({
             </Paper>
           ) : (
             <>
-              <Paper
-                elevation={2}
-                sx={{
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}
-              >
-                <Box
-                  sx={{
-                    px: 3,
-                    py: 2,
-                    borderBottom: '1px solid rgba(0,0,0,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: 1.5
-                  }}
-                >
-                  <Stack spacing={0.5}>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      지역 분포 시각화 (1차 버전)
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      인기/우수 업체 데이터를 지도에 표시합니다. 이후 단계에서 폴리곤 기반 열지도 등으로 확장할 예정입니다.
-                    </Typography>
-                  </Stack>
-                  <ToggleButtonGroup
-                    size="small"
-                    value={mapMetric}
-                    exclusive
-                    onChange={handleMapMetricChange}
+              <Grid container spacing={3}>
+                {/* 지도 영역 */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={2}
+                    sx={{
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
                   >
-                    <ToggleButton value="popular">인기 업체</ToggleButton>
-                    <ToggleButton value="excellent">우수 업체</ToggleButton>
-                  </ToggleButtonGroup>
-                </Box>
-                <Box sx={{ height: 420 }}>
-                  {mapData.length === 0 ? (
                     <Box
                       sx={{
-                        height: '100%',
+                        px: 3,
+                        py: 2,
+                        borderBottom: '1px solid rgba(0,0,0,0.08)',
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'text.secondary',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
                         gap: 1.5
                       }}
                     >
-                      <MapOutlinedIcon fontSize="large" />
-                      <Typography variant="body2">
-                        표시할 데이터가 없습니다.
-                      </Typography>
+                      <Stack spacing={0.5}>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          지역 분포 시각화 (1차 버전)
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          인기/우수 업체 데이터를 지도에 표시합니다. 이후 단계에서 폴리곤 기반 열지도 등으로 확장할 예정입니다.
+                        </Typography>
+                      </Stack>
+                      <ToggleButtonGroup
+                        size="small"
+                        value={mapMetric}
+                        exclusive
+                        onChange={handleMapMetricChange}
+                      >
+                        <ToggleButton value="popular">인기 업체</ToggleButton>
+                        <ToggleButton value="excellent">우수 업체</ToggleButton>
+                      </ToggleButtonGroup>
                     </Box>
-                  ) : (
-                    <MapContainer
-                      center={[36.5, 127.8]}
-                      zoom={6.7}
-                      style={{ height: '100%', width: '100%' }}
-                      zoomControl={false}
-                      attributionControl={false}
-                    >
-                      <TileLayer
-                        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      {mapData.map((item) => {
-                        const range =
-                          mapIntensityRange.max - mapIntensityRange.min || 1;
-                        const normalized =
-                          (item.intensity - mapIntensityRange.min) / range;
-                        const radius =
-                          mapMetric === 'popular'
-                            ? 10000 + normalized * 25000
-                            : 8000 + normalized * 20000;
-                        const color =
-                          mapMetric === 'popular' ? '#ff7043' : '#4caf50';
-                        return (
-                          <CircleMarker
-                            key={item.key}
-                            center={[item.lat, item.lng]}
-                            radius={Math.max(radius / 4000, 8)}
-                            pathOptions={{
-                              color,
-                              fillColor: color,
-                              fillOpacity: 0.4,
-                              weight: 2
-                            }}
-                          >
-                            <LeafletTooltip direction="top" offset={[0, -2]}>
-                              <div style={{ minWidth: 160 }}>
-                                <strong>{item.region}</strong>
-                                <br />
-                                {mapMetric === 'popular'
-                                  ? `등록 건수: ${item.label}`
-                                  : `평균 속도 점수: ${item.label}`}
-                                <br />
-                                {item.description}
-                              </div>
-                            </LeafletTooltip>
-                          </CircleMarker>
-                        );
-                      })}
-                    </MapContainer>
-                  )}
-                </Box>
-              </Paper>
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={3}>
-                  {renderSummaryCard(
-                    '총 업체 수',
-                    `${summaryStats.totalCompanies.toLocaleString()} 곳`,
-                    <InsightsIcon />,
-                    '등록된 퀵서비스 업체 수',
-                    modeColor
-                  )}
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  {renderSummaryCard(
-                    '총 입력 건수',
-                    `${summaryStats.totalEntries.toLocaleString()} 건`,
-                    <CheckCircleIcon />,
-                    '누적 입력 기록',
-                    '#1976d2'
-                  )}
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  {renderSummaryCard(
-                    '평균 비용',
-                    summaryStats.averageCost
-                      ? `${summaryStats.averageCost.toLocaleString()} 원`
-                      : '-',
-                    <MapOutlinedIcon />,
-                    '전체 평균 예상 비용',
-                    '#ff9800'
-                  )}
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  {renderSummaryCard(
-                    '평균 신뢰도',
-                    `${summaryStats.averageReliability}`,
-                    <InsightsIcon />,
-                    '입력량/일관성 기반 지표',
-                    '#009688'
-                  )}
-                </Grid>
-              </Grid>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12} lg={6}>
-                  {renderTable(
-                    '지역별 인기 업체 TOP 20',
-                    statistics.popularCompanies || [],
-                    [
-                      {
-                        key: 'rank',
-                        label: '순위',
-                        align: 'center',
-                        render: (_row, index) => index + 1
-                      },
-                      { key: 'region', label: '지역', nowrap: true },
-                      {
-                        key: 'companyName',
-                        label: '업체명',
-                        render: (row) => (
-                          <Stack spacing={0.5}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {row.companyName}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {row.phoneNumber}
-                            </Typography>
-                          </Stack>
-                        )
-                      },
-                      {
-                        key: 'entryCount',
-                        label: '등록 건수',
-                        align: 'right',
-                        render: (row) =>
-                          `${(row.entryCount || 0).toLocaleString()} 건`
-                      }
-                    ],
-                    '해당 지역의 인기 업체 데이터가 없습니다.'
-                  )}
-                </Grid>
-                <Grid item xs={12} lg={6}>
-                  {renderTable(
-                    '지역별 우수 업체 TOP 20',
-                    statistics.excellentCompanies || [],
-                    [
-                      {
-                        key: 'rank',
-                        label: '순위',
-                        align: 'center',
-                        render: (_row, index) => index + 1
-                      },
-                      { key: 'region', label: '지역', nowrap: true },
-                      {
-                        key: 'companyName',
-                        label: '업체명',
-                        render: (row) => (
-                          <Stack spacing={0.5}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {row.companyName}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {row.phoneNumber}
-                            </Typography>
-                          </Stack>
-                        )
-                      },
-                      {
-                        key: 'averageSpeedScore',
-                        label: '평균 속도 점수',
-                        align: 'right',
-                        render: (row) => (
-                          <Chip
-                            size="small"
-                            color={
-                              row.averageSpeedScore >= 2.5
-                                ? 'success'
-                                : row.averageSpeedScore >= 2
-                                ? 'warning'
-                                : 'default'
-                            }
-                            label={row.averageSpeedScore?.toFixed(2) || '-'}
-                            sx={{ fontWeight: 600 }}
-                          />
-                        )
-                      }
-                    ],
-                    '해당 지역의 우수 업체 데이터가 없습니다.'
-                  )}
-                </Grid>
-              </Grid>
-
-              <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                <Box sx={{ px: 3, py: 2, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    데이터 품질 현황
-                  </Typography>
-                </Box>
-                <Box sx={{ px: 3, py: 3 }}>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
-                      <Stack spacing={1.5}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          업체명 정규화 진행률
-                        </Typography>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip
-                            color="primary"
-                            variant="outlined"
-                            label={`${normalizationRate}%`}
-                            sx={{ fontWeight: 600 }}
-                          />
-                          <Typography variant="body2" color="text.secondary">
-                            총 {quality.normalizationStatus.total.toLocaleString()}건 중{' '}
-                            {quality.normalizationStatus.normalized.toLocaleString()}건 정규화
+                    <Box sx={{ height: 420 }}>
+                      {mapData.length === 0 ? (
+                        <Box
+                          sx={{
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'text.secondary',
+                            gap: 1.5
+                          }}
+                        >
+                          <MapOutlinedIcon fontSize="large" />
+                          <Typography variant="body2">
+                            표시할 데이터가 없습니다.
                           </Typography>
-                        </Stack>
-                      </Stack>
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                      <Stack spacing={1.5}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          업체명 중복률
-                        </Typography>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip
-                            color={
-                              quality.duplicateRate < 20
-                                ? 'success'
-                                : quality.duplicateRate < 40
-                                ? 'warning'
-                                : 'error'
-                            }
-                            label={`${quality.duplicateRate?.toFixed(2)}%`}
-                            sx={{ fontWeight: 600 }}
+                        </Box>
+                      ) : (
+                        <MapContainer
+                          center={[36.5, 127.8]}
+                          zoom={6.7}
+                          style={{ height: '100%', width: '100%' }}
+                          zoomControl={false}
+                          attributionControl={false}
+                        >
+                          <TileLayer
+                            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           />
-                          <Typography variant="body2" color="text.secondary">
-                            중복률이 높을수록 정규화 필요성이 큽니다.
-                          </Typography>
-                        </Stack>
-                      </Stack>
+                          {mapData.map((item) => {
+                            const range =
+                              mapIntensityRange.max - mapIntensityRange.min || 1;
+                            const normalized =
+                              (item.intensity - mapIntensityRange.min) / range;
+                            const radius =
+                              mapMetric === 'popular'
+                                ? 10000 + normalized * 25000
+                                : 8000 + normalized * 20000;
+                            const color =
+                              mapMetric === 'popular' ? '#ff7043' : '#4caf50';
+                            return (
+                              <CircleMarker
+                                key={item.key}
+                                center={[item.lat, item.lng]}
+                                radius={Math.max(radius / 4000, 8)}
+                                pathOptions={{
+                                  color,
+                                  fillColor: color,
+                                  fillOpacity: 0.4,
+                                  weight: 2
+                                }}
+                              >
+                                <LeafletTooltip direction="top" offset={[0, -2]}>
+                                  <div style={{ minWidth: 160 }}>
+                                    <strong>{item.region}</strong>
+                                    <br />
+                                    {mapMetric === 'popular'
+                                      ? `등록 건수: ${item.label}`
+                                      : `평균 속도 점수: ${item.label}`}
+                                    <br />
+                                    {item.description}
+                                  </div>
+                                </LeafletTooltip>
+                              </CircleMarker>
+                            );
+                          })}
+                        </MapContainer>
+                      )}
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                {/* 요약 카드 */}
+                <Grid item xs={12}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={3}>
+                      {renderSummaryCard(
+                        '총 업체 수',
+                        `${summaryStats.totalCompanies.toLocaleString()} 곳`,
+                        <InsightsIcon />,
+                        '등록된 퀵서비스 업체 수',
+                        modeColor
+                      )}
                     </Grid>
-                    <Grid item xs={12} md={4}>
-                      <Stack spacing={1.5}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          이상치 데이터
-                        </Typography>
-                        {quality.outliers?.length > 0 ? (
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <WarningAmberIcon color="warning" />
-                            <Typography variant="body2">
-                              {quality.outliers.length.toLocaleString()}건의 이상치 검토 필요
-                            </Typography>
-                          </Stack>
-                        ) : (
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <CheckCircleIcon color="success" />
-                            <Typography variant="body2" color="text.secondary">
-                              검토가 필요한 이상치 데이터가 없습니다.
-                            </Typography>
-                          </Stack>
-                        )}
-                      </Stack>
+                    <Grid item xs={12} md={3}>
+                      {renderSummaryCard(
+                        '총 입력 건수',
+                        `${summaryStats.totalEntries.toLocaleString()} 건`,
+                        <CheckCircleIcon />,
+                        '누적 입력 기록',
+                        '#1976d2'
+                      )}
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      {renderSummaryCard(
+                        '평균 비용',
+                        summaryStats.averageCost
+                          ? `${summaryStats.averageCost.toLocaleString()} 원`
+                          : '-',
+                        <MapOutlinedIcon />,
+                        '전체 평균 예상 비용',
+                        '#ff9800'
+                      )}
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      {renderSummaryCard(
+                        '평균 신뢰도',
+                        `${summaryStats.averageReliability}`,
+                        <InsightsIcon />,
+                        '입력량/일관성 기반 지표',
+                        '#009688'
+                      )}
                     </Grid>
                   </Grid>
-                  <Divider sx={{ my: 3 }} />
-                  <Typography variant="body2" color="text.secondary">
-                    * 지도 기반 시각화 및 추가 품질 지표는 향후 단계에서 구현 예정입니다.
-                    인기/우수 업체 분포를 지도에서 직관적으로 확인할 수 있도록 확장할 계획입니다.
-                  </Typography>
-                </Box>
-              </Paper>
+                </Grid>
+
+                {/* 인기/우수 테이블 */}
+                <Grid item xs={12}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} lg={6}>
+                      {renderTable(
+                        '지역별 인기 업체 TOP 20',
+                        statistics.popularCompanies || [],
+                        [
+                          {
+                            key: 'rank',
+                            label: '순위',
+                            align: 'center',
+                            render: (_row, index) => index + 1
+                          },
+                          { key: 'region', label: '지역', nowrap: true },
+                          {
+                            key: 'companyName',
+                            label: '업체명',
+                            render: (row) => (
+                              <Stack spacing={0.5}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {row.companyName}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {row.phoneNumber}
+                                </Typography>
+                              </Stack>
+                            )
+                          },
+                          {
+                            key: 'entryCount',
+                            label: '등록 건수',
+                            align: 'right',
+                            render: (row) =>
+                              `${(row.entryCount || 0).toLocaleString()} 건`
+                          }
+                        ],
+                        '해당 지역의 인기 업체 데이터가 없습니다.'
+                      )}
+                    </Grid>
+                    <Grid item xs={12} lg={6}>
+                      {renderTable(
+                        '지역별 우수 업체 TOP 20',
+                        statistics.excellentCompanies || [],
+                        [
+                          {
+                            key: 'rank',
+                            label: '순위',
+                            align: 'center',
+                            render: (_row, index) => index + 1
+                          },
+                          { key: 'region', label: '지역', nowrap: true },
+                          {
+                            key: 'companyName',
+                            label: '업체명',
+                            render: (row) => (
+                              <Stack spacing={0.5}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {row.companyName}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {row.phoneNumber}
+                                </Typography>
+                              </Stack>
+                            )
+                          },
+                          {
+                            key: 'averageSpeedScore',
+                            label: '평균 속도 점수',
+                            align: 'right',
+                            render: (row) => (
+                              <Chip
+                                size="small"
+                                color={
+                                  row.averageSpeedScore >= 2.5
+                                    ? 'success'
+                                    : row.averageSpeedScore >= 2
+                                    ? 'warning'
+                                    : 'default'
+                                }
+                                label={row.averageSpeedScore?.toFixed(2) || '-'}
+                                sx={{ fontWeight: 600 }}
+                              />
+                            )
+                          }
+                        ],
+                        '해당 지역의 우수 업체 데이터가 없습니다.'
+                      )}
+                    </Grid>
+                  </Grid>
+                </Grid>
+
+                {/* 데이터 품질 */}
+                <Grid item xs={12}>
+                  <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                    <Box sx={{ px: 3, py: 2, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        데이터 품질 현황
+                      </Typography>
+                    </Box>
+                    <Box sx={{ px: 3, py: 3 }}>
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={4}>
+                          <Stack spacing={1.5}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                              업체명 정규화 진행률
+                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Chip
+                                color="primary"
+                                variant="outlined"
+                                label={`${normalizationRate}%`}
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Typography variant="body2" color="text.secondary">
+                                총 {quality.normalizationStatus.total.toLocaleString()}건 중{' '}
+                                {quality.normalizationStatus.normalized.toLocaleString()}건 정규화
+                              </Typography>
+                            </Stack>
+                          </Stack>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Stack spacing={1.5}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                              업체명 중복률
+                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Chip
+                                color={
+                                  quality.duplicateRate < 20
+                                    ? 'success'
+                                    : quality.duplicateRate < 40
+                                    ? 'warning'
+                                    : 'error'
+                                }
+                                label={`${quality.duplicateRate?.toFixed(2)}%`}
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Typography variant="body2" color="text.secondary">
+                                중복률이 높을수록 정규화 필요성이 큽니다.
+                              </Typography>
+                            </Stack>
+                          </Stack>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Stack spacing={1.5}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                              이상치 데이터
+                            </Typography>
+                            {quality.outliers?.length > 0 ? (
+                              <Stack direction="row" spacing={1} align-items="center">
+                                <WarningAmberIcon color="warning" />
+                                <Typography variant="body2">
+                                  {quality.outliers.length.toLocaleString()}건의 이상치 검토 필요
+                                </Typography>
+                              </Stack>
+                            ) : (
+                              <Stack direction="row" spacing={1} align-items="center">
+                                <CheckCircleIcon color="success" />
+                                <Typography variant="body2" color="text.secondary">
+                                  검토가 필요한 이상치 데이터가 없습니다.
+                                </Typography>
+                              </Stack>
+                            )}
+                          </Stack>
+                        </Grid>
+                      </Grid>
+                      <Divider sx={{ my: 3 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        * 지도 기반 시각화 및 추가 품질 지표는 향후 단계에서 구현 예정입니다.
+                        인기/우수 업체 분포를 지도에서 직관적으로 확인할 수 있도록 확장할 계획입니다.
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
             </>
           )}
         </Stack>
