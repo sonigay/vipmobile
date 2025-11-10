@@ -505,46 +505,65 @@ const QuickServiceManagementMode = ({
           <Paper
             elevation={1}
             sx={{
-              p: 2.5,
-              borderRadius: 2,
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2
+              p: { xs: 2, md: 2.5 },
+              borderRadius: 2
             }}
           >
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                지역 선택
-              </Typography>
-              <TextField
-                select
-                size="small"
-                value={region}
-                onChange={handleRegionChange}
-                sx={{ minWidth: 160 }}
-              >
-                {regionOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option === 'all' ? '전체 지역' : option}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Stack>
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="데이터 새로고침">
-                <span>
-                  <IconButton
-                    color="primary"
-                    onClick={handleRefresh}
-                    disabled={loading}
+            <Grid
+              container
+              spacing={2}
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Grid item xs={12} md>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={{ xs: 1.5, sm: 2 }}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                >
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    지역 선택
+                  </Typography>
+                  <TextField
+                    select
+                    size="small"
+                    value={region}
+                    onChange={handleRegionChange}
+                    fullWidth
+                    sx={{
+                      minWidth: { xs: '100%', sm: 180 },
+                      maxWidth: { sm: 240 }
+                    }}
                   >
-                    <RefreshIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Stack>
+                    {regionOptions.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option === 'all' ? '전체 지역' : option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
+              </Grid>
+              <Grid
+                item
+                xs={12}
+                md="auto"
+                sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}
+              >
+                <Stack direction="row" spacing={1}>
+                  <Tooltip title="데이터 새로고침">
+                    <span>
+                      <IconButton
+                        color="primary"
+                        onClick={handleRefresh}
+                        disabled={loading}
+                      >
+                        <RefreshIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Stack>
+              </Grid>
+            </Grid>
           </Paper>
 
           {loading ? (
