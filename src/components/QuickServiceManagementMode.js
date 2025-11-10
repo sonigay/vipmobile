@@ -600,121 +600,125 @@ const QuickServiceManagementMode = ({
       </AppBar>
 
       <Container sx={{ py: 4 }}>
-        <Stack spacing={3}>
-          <Paper elevation={1} sx={{ borderRadius: 2 }}>
-            <Box
-              sx={{
-                px: { xs: 2, md: 3 },
-                py: { xs: 2, md: 2.5 }
-              }}
-            >
-              <Grid
-                container
-                spacing={2}
-                alignItems="center"
-                justifyContent="space-between"
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Paper elevation={1} sx={{ borderRadius: 2 }}>
+              <Box
+                sx={{
+                  px: { xs: 2, md: 3 },
+                  py: { xs: 2, md: 2.5 }
+                }}
               >
-                <Grid item xs={12} md={8} lg={9}>
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={{ xs: 1.5, sm: 2 }}
-                    alignItems={{ xs: 'flex-start', sm: 'center' }}
-                    sx={{ width: '100%', flexWrap: 'wrap' }}
-                  >
-                    <Typography
-                      variant="subtitle1"
-                      sx={{ fontWeight: 600, flexShrink: 0 }}
-                    >
-                      지역 선택
-                    </Typography>
-                    <TextField
-                      select
-                      size="small"
-                      value={region}
-                      onChange={handleRegionChange}
-                      sx={{
-                        minWidth: { xs: '100%', sm: 220 },
-                        maxWidth: { sm: 260 },
-                        width: { xs: '100%', sm: 'auto' }
-                      }}
-                    >
-                      {regionOptions.map((option) => (
-                        <MenuItem key={option} value={option}>
-                          {option === 'all' ? '전체 지역' : option}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Stack>
-                </Grid>
                 <Grid
-                  item
-                  xs={12}
-                  md={4}
-                  lg={3}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: { xs: 'flex-start', md: 'flex-end' }
-                  }}
+                  container
+                  spacing={2}
+                  alignItems="center"
+                  justifyContent="space-between"
                 >
-                  <Stack direction="row" spacing={1}>
-                    <Tooltip title="데이터 새로고침">
-                      <span>
-                        <IconButton
-                          color="primary"
-                          onClick={handleRefresh}
-                          disabled={loading}
-                        >
-                          <RefreshIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Stack>
+                  <Grid item xs={12} md={8} lg={9}>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={{ xs: 1.5, sm: 2 }}
+                      alignItems={{ xs: 'flex-start', sm: 'center' }}
+                      sx={{ width: '100%', flexWrap: 'wrap' }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{ fontWeight: 600, flexShrink: 0 }}
+                      >
+                        지역 선택
+                      </Typography>
+                      <TextField
+                        select
+                        size="small"
+                        value={region}
+                        onChange={handleRegionChange}
+                        sx={{
+                          minWidth: { xs: '100%', sm: 220 },
+                          maxWidth: { sm: 260 },
+                          width: { xs: '100%', sm: 'auto' }
+                        }}
+                      >
+                        {regionOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {option === 'all' ? '전체 지역' : option}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Stack>
+                  </Grid>
+                  <Grid
+                    item
+                    xs={12}
+                    md={4}
+                    lg={3}
+                    sx={{
+                      display: 'flex',
+                      justifyContent: { xs: 'flex-start', md: 'flex-end' }
+                    }}
+                  >
+                    <Stack direction="row" spacing={1}>
+                      <Tooltip title="데이터 새로고침">
+                        <span>
+                          <IconButton
+                            color="primary"
+                            onClick={handleRefresh}
+                            disabled={loading}
+                          >
+                            <RefreshIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Stack>
+                  </Grid>
                 </Grid>
-              </Grid>
-            </Box>
-          </Paper>
-
-          {loading ? (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                py: 12,
-                gap: 2,
-                color: 'text.secondary'
-              }}
-            >
-              <CircularProgress color="secondary" />
-              <Typography variant="body2">데이터를 불러오는 중입니다...</Typography>
-            </Box>
-          ) : error ? (
-            <Paper
-              elevation={1}
-              sx={{
-                p: 4,
-                borderRadius: 2,
-                textAlign: 'center',
-                color: 'error.main'
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                데이터를 불러오지 못했습니다.
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {error}
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => fetchData(region, true)}
-              >
-                다시 시도
-              </Button>
+              </Box>
             </Paper>
-          ) : (
-            <>
+          </Grid>
+
+          <Grid item xs={12}>
+            {loading ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  py: 12,
+                  gap: 2,
+                  color: 'text.secondary'
+                }}
+              >
+                <CircularProgress color="secondary" />
+                <Typography variant="body2">
+                  데이터를 불러오는 중입니다...
+                </Typography>
+              </Box>
+            ) : error ? (
+              <Paper
+                elevation={1}
+                sx={{
+                  p: 4,
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  color: 'error.main'
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  데이터를 불러오지 못했습니다.
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  {error}
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => fetchData(region, true)}
+                >
+                  다시 시도
+                </Button>
+              </Paper>
+            ) : (
               <Grid container spacing={3}>
                 {/* 지도 영역 */}
                 <Grid item xs={12}>
@@ -1050,9 +1054,9 @@ const QuickServiceManagementMode = ({
                   </Paper>
                 </Grid>
               </Grid>
-            </>
-          )}
-        </Stack>
+            )}
+          </Grid>
+        </Grid>
       </Container>
 
       <AppUpdatePopup
