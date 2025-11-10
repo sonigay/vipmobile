@@ -33850,10 +33850,64 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
     const regionCompanyMap = new Map(); // 지역별 업체 통계
     const regionMetricsMap = new Map();
     const routeMetrics = [];
+    const timeTrendMap = new Map();
+
+    const parseRegisteredAt = (value) => {
+      if (!value && value !== 0) return null;
+      if (value instanceof Date && !Number.isNaN(value.getTime?.())) {
+        return value;
+      }
+
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        const excelEpoch = Date.UTC(1899, 11, 30);
+        const milliseconds = Math.round(value * 24 * 60 * 60 * 1000);
+        const computed = new Date(excelEpoch + milliseconds);
+        return Number.isNaN(computed.getTime()) ? null : computed;
+      }
+
+      const stringValue = value.toString().trim();
+      if (!stringValue) return null;
+
+      // 구글시트 날짜 포맷 다양성 대응
+      const normalized = stringValue
+        .replace(/년|\.|\/|월/g, '-')
+        .replace(/일/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const parsed = new Date(normalized);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+
+      const compactMatch = normalized.match(/^(\d{4})(\d{2})(\d{2})/);
+      if (compactMatch) {
+        const [_, yyyy, mm, dd] = compactMatch;
+        const compactDate = new Date(`${yyyy}-${mm}-${dd}`);
+        return Number.isNaN(compactDate.getTime()) ? null : compactDate;
+      }
+
+      return null;
+    };
+
+    const resolveTimeBucket = (value) => {
+      const parsedDate = parseRegisteredAt(value);
+      if (!parsedDate) return null;
+
+      const year = parsedDate.getUTCFullYear();
+      const month = parsedDate.getUTCMonth(); // 0-based
+      if (Number.isNaN(year) || Number.isNaN(month)) return null;
+
+      const bucketLabel = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const timestamp = Date.UTC(year, month, 1);
+      return { label: bucketLabel, timestamp };
+    };
 
     dataRows.forEach(row => {
       const fromStoreId = row[4]?.toString().trim();
       const toStoreId = row[6]?.toString().trim();
+      const timeBucketInfo = resolveTimeBucket(row[0]);
+
       const fromStoreInfo = storeMap.get(fromStoreId);
       const toStoreInfo = storeMap.get(toStoreId);
       let storeRegion = fromStoreInfo?.region || toStoreInfo?.region || '기타';
@@ -33943,6 +33997,30 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
           regionMetric.totalDistance += distanceKm;
           regionMetric.totalCostWithDistance += costNum;
           regionMetric.distanceCount += 1;
+        }
+
+        if (timeBucketInfo) {
+          if (!timeTrendMap.has(timeBucketInfo.label)) {
+            timeTrendMap.set(timeBucketInfo.label, {
+              label: timeBucketInfo.label,
+              timestamp: timeBucketInfo.timestamp,
+              entryCount: 0,
+              totalCost: 0,
+              companyKeys: new Set(),
+              totalDistance: 0,
+              totalCostWithDistance: 0,
+              distanceCount: 0
+            });
+          }
+          const trendBucket = timeTrendMap.get(timeBucketInfo.label);
+          trendBucket.entryCount += 1;
+          trendBucket.totalCost += costNum;
+          trendBucket.companyKeys.add(key);
+          if (typeof distanceKm === 'number') {
+            trendBucket.totalDistance += distanceKm;
+            trendBucket.totalCostWithDistance += costNum;
+            trendBucket.distanceCount += 1;
+          }
         }
 
         // 지역별 통계
@@ -34159,7 +34237,34 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       excellentCompanies: excellentCompanies,
       regionAggregates,
       distanceCostAnalysis,
-      timeTrends: [] // 시간대별 추이는 나중에 구현
+      timeTrends: Array.from(timeTrendMap.values())
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+        .map((bucket) => {
+          const averageCost =
+            bucket.entryCount > 0
+              ? Math.round(bucket.totalCost / bucket.entryCount)
+              : null;
+          const averageCostPerKm =
+            bucket.totalDistance > 0
+              ? Math.round(
+                  (bucket.totalCostWithDistance / bucket.totalDistance) * 10
+                ) / 10
+              : null;
+          const distanceCoverage =
+            bucket.entryCount > 0
+              ? Math.round((bucket.distanceCount / bucket.entryCount) * 100)
+              : 0;
+
+          return {
+            label: bucket.label,
+            timestamp: bucket.timestamp,
+            entryCount: bucket.entryCount,
+            averageCost,
+            averageCostPerKm,
+            companyCount: bucket.companyKeys.size,
+            distanceCoverage
+          };
+        })
     };
 
     cacheUtils.set(cacheKey, result, 30 * 60 * 1000); // 30분 캐싱

@@ -36,6 +36,17 @@ import {
   Circle,
   Tooltip as LeafletTooltip
 } from 'react-leaflet';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend
+} from 'recharts';
 import 'leaflet/dist/leaflet.css';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -233,6 +244,44 @@ const getGradientColor = (paletteKey, value, min, max) => {
   const normalized =
     range === 0 ? 0.5 : Math.max(0, Math.min(1, (value - safeMin) / range));
   return interpolateColor(palette, normalized);
+};
+
+const formatMonthLabel = (label) => {
+  if (typeof label !== 'string') return label || '';
+  const trimmed = label.trim();
+  if (/^\d{4}-\d{2}$/.test(trimmed)) {
+    const [year, month] = trimmed.split('-');
+    return `${year}.${month}`;
+  }
+  return trimmed || '';
+};
+
+const getTimestampFromLabel = (label) => {
+  if (typeof label !== 'string') return null;
+  const trimmed = label.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    const [, year, month] = match;
+    const y = Number(year);
+    const m = Number(month);
+    if (!Number.isNaN(y) && !Number.isNaN(m)) {
+      return Date.UTC(y, Math.max(0, m - 1), 1);
+    }
+  }
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+};
+
+const formatTrendDelta = (value, suffix) => {
+  if (typeof value !== 'number') return '변화 데이터 없음';
+  if (value === 0) return '변화 없음';
+  const direction = value > 0 ? '▲' : '▼';
+  return `${direction} ${Math.abs(value).toLocaleString()}${suffix}`;
+};
+
+const formatNumberWithUnit = (value, unit) => {
+  if (value === null || value === undefined) return '-';
+  return `${value.toLocaleString()}${unit}`;
 };
 const QuickServiceManagementMode = ({
   onLogout,
@@ -477,6 +526,85 @@ const QuickServiceManagementMode = ({
     () => (quality.duplicateGroups || []).slice(0, 10),
     [quality.duplicateGroups]
   );
+
+  const timeTrendSeries = useMemo(() => {
+    if (!Array.isArray(statistics.timeTrends)) return [];
+    return statistics.timeTrends
+      .map((item) => {
+        const label = item?.label || '';
+        const timestamp =
+          typeof item?.timestamp === 'number'
+            ? item.timestamp
+            : getTimestampFromLabel(label);
+        return {
+          label,
+          displayLabel: formatMonthLabel(label),
+          entryCount: item?.entryCount ?? item?.count ?? 0,
+          averageCost:
+            item?.averageCost !== undefined ? item.averageCost : item?.avgCost ?? null,
+          companyCount: item?.companyCount ?? 0,
+          averageCostPerKm:
+            item?.averageCostPerKm !== undefined
+              ? item.averageCostPerKm
+              : item?.avgCostPerKm ?? null,
+          distanceCoverage: item?.distanceCoverage ?? null,
+          timestamp
+        };
+      })
+      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  }, [statistics.timeTrends]);
+
+  const timeTrendMetrics = useMemo(() => {
+    if (timeTrendSeries.length === 0) {
+      return {
+        latest: null,
+        previous: null,
+        maxEntryCount: 0,
+        maxAverageCost: 0
+      };
+    }
+    const maxEntryCount = Math.max(
+      ...timeTrendSeries.map((item) => item.entryCount || 0)
+    );
+    const maxAverageCost = Math.max(
+      ...timeTrendSeries.map((item) => item.averageCost || 0)
+    );
+    const latest = timeTrendSeries[timeTrendSeries.length - 1];
+    const previous =
+      timeTrendSeries.length > 1
+        ? timeTrendSeries[timeTrendSeries.length - 2]
+        : null;
+
+    return {
+      latest,
+      previous,
+      maxEntryCount,
+      maxAverageCost
+    };
+  }, [timeTrendSeries]);
+
+  const trendCostAxisMax =
+    timeTrendMetrics.maxAverageCost > 0
+      ? Math.ceil(timeTrendMetrics.maxAverageCost * 1.2)
+      : null;
+  const trendEntryAxisMax =
+    timeTrendMetrics.maxEntryCount > 0
+      ? Math.ceil(timeTrendMetrics.maxEntryCount * 1.2)
+      : null;
+
+  const latestTrend = timeTrendMetrics.latest;
+  const previousTrend = timeTrendMetrics.previous;
+  const entryDelta =
+    latestTrend && previousTrend
+      ? (latestTrend.entryCount || 0) - (previousTrend.entryCount || 0)
+      : null;
+  const costDelta =
+    latestTrend &&
+    previousTrend &&
+    latestTrend.averageCost !== null &&
+    previousTrend.averageCost !== null
+      ? latestTrend.averageCost - previousTrend.averageCost
+      : null;
   const mergeSuggestions = useMemo(
     () => (quality.mergeSuggestions || []).slice(0, 6),
     [quality.mergeSuggestions]
@@ -1770,6 +1898,149 @@ const QuickServiceManagementMode = ({
                       )}
                     </Grid>
                   </Grid>
+                </Grid>
+
+                {/* 최근 등록 추이 */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={2}
+                    sx={{ borderRadius: 2, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+                  >
+                    <Box
+                      sx={{
+                        px: 3,
+                        py: 2,
+                        borderBottom: '1px solid rgba(0,0,0,0.08)',
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        gap: 1.5,
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <Stack spacing={0.5}>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          최근 등록 추이
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          월별 등록 건수와 평균 비용 변화를 한눈에 확인하세요.
+                        </Typography>
+                      </Stack>
+                      {latestTrend && (
+                        <Stack spacing={0.5}>
+                          <Stack
+                            direction={{ xs: 'column', sm: 'row' }}
+                            spacing={1.5}
+                            alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          >
+                            <Chip
+                              size="small"
+                              color="primary"
+                              label={`최근 월 ${latestTrend.displayLabel}`}
+                              sx={{ fontWeight: 600 }}
+                            />
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              등록 {formatNumberWithUnit(latestTrend.entryCount, '건')} · 평균 비용{' '}
+                              {latestTrend.averageCost !== null
+                                ? `${latestTrend.averageCost.toLocaleString()}원`
+                                : '-'}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            전월 대비 등록{' '}
+                            {entryDelta !== null
+                              ? formatTrendDelta(entryDelta, '건')
+                              : '비교 데이터 없음'}{' '}
+                            · 평균 비용{' '}
+                            {costDelta !== null
+                              ? formatTrendDelta(costDelta, '원')
+                              : '비교 데이터 없음'}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </Box>
+                    <Box sx={{ px: 2.5, py: 3, height: 340 }}>
+                      {timeTrendSeries.length === 0 ? (
+                        <Stack
+                          sx={{ height: '100%' }}
+                          alignItems="center"
+                          justifyContent="center"
+                          spacing={1.5}
+                          color="text.secondary"
+                        >
+                          <MapOutlinedIcon fontSize="large" />
+                          <Typography variant="body2">
+                            추이를 분석할 데이터가 부족합니다.
+                          </Typography>
+                        </Stack>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart
+                            data={timeTrendSeries}
+                            margin={{ top: 8, right: 24, bottom: 12, left: 8 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="displayLabel" />
+                            <YAxis
+                              yAxisId="left"
+                              orientation="left"
+                              tickFormatter={(value) =>
+                                value ? `${value.toLocaleString()}원` : '0원'
+                              }
+                              domain={[0, trendCostAxisMax || 'auto']}
+                            />
+                            <YAxis
+                              yAxisId="right"
+                              orientation="right"
+                              tickFormatter={(value) =>
+                                value ? `${value.toLocaleString()}건` : '0건'
+                              }
+                              domain={[0, trendEntryAxisMax || 'auto']}
+                            />
+                            <RechartsTooltip
+                              formatter={(value, name) => {
+                                if (name === '평균 비용') {
+                                  return [
+                                    typeof value === 'number'
+                                      ? `${value.toLocaleString()}원`
+                                      : '-',
+                                    name
+                                  ];
+                                }
+                                if (name === '등록 건수') {
+                                  return [
+                                    typeof value === 'number'
+                                      ? `${value.toLocaleString()}건`
+                                      : '-',
+                                    name
+                                  ];
+                                }
+                                return [value, name];
+                              }}
+                              labelFormatter={(label) => `월: ${label}`}
+                            />
+                            <Legend />
+                            <Bar
+                              yAxisId="right"
+                              dataKey="entryCount"
+                              name="등록 건수"
+                              fill="#90caf9"
+                              radius={[6, 6, 0, 0]}
+                            />
+                            <Line
+                              yAxisId="left"
+                              type="monotone"
+                              dataKey="averageCost"
+                              name="평균 비용"
+                              stroke="#ff7043"
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                              activeDot={{ r: 5 }}
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      )}
+                    </Box>
+                  </Paper>
                 </Grid>
 
                 {/* 인기/우수 테이블 */}
