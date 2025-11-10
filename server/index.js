@@ -33354,7 +33354,7 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
     // 매장 데이터 조회 (지역 정보 필요)
     const storeResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${STORE_SHEET_NAME}!A:F`,
+      range: `${STORE_SHEET_NAME}!A:AM`,
     });
 
     const storeRows = storeResponse.data.values || [];
@@ -33429,9 +33429,29 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
     if (storeRows.length > 1) {
       storeRows.slice(1).forEach(row => {
         const storeId = row[0]?.toString().trim();
-        const address = row[2]?.toString().trim() || '';
-        const storeRegion = extractRegionFromAddress(address);
-        storeMap.set(storeId, { address, region: storeRegion });
+        if (!storeId) return;
+
+        const storeName = row[1]?.toString().trim() || '';
+        const addressCandidates = [
+          row[11], // L열: 기본 주소
+          row[7],  // H열: 주소 (다른 시트와 정렬 시)
+          row[3],  // D열: 주소 (일부 경우)
+          row[2],  // C열: 지역/주소 축약본
+          row[12], // M열: 상세주소
+          row[13]  // N열: 상세주소 보조
+        ];
+
+        const address =
+          addressCandidates
+            .map((value) => value?.toString().trim())
+            .find((value) => value && value !== '주소확인필요') || '';
+
+        let storeRegion = extractRegionFromAddress(address);
+        if (storeRegion === '기타' && storeName) {
+          storeRegion = extractRegionFromAddress(storeName);
+        }
+
+        storeMap.set(storeId, { address, region: storeRegion, name: storeName });
       });
     }
 
@@ -33444,7 +33464,18 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       const toStoreId = row[6]?.toString().trim();
       const fromStoreInfo = storeMap.get(fromStoreId);
       const toStoreInfo = storeMap.get(toStoreId);
-      const storeRegion = fromStoreInfo?.region || toStoreInfo?.region || '기타';
+      let storeRegion = fromStoreInfo?.region || toStoreInfo?.region || '기타';
+      if (storeRegion === '기타') {
+        const regionCandidates = [
+          extractRegionFromAddress(row[3]?.toString() || ''), // fromStoreName
+          extractRegionFromAddress(row[5]?.toString() || ''), // toStoreName
+          extractRegionFromAddress(fromStoreInfo?.address || ''),
+          extractRegionFromAddress(toStoreInfo?.address || '')
+        ].filter((value) => value && value !== '기타');
+        if (regionCandidates.length > 0) {
+          storeRegion = regionCandidates[0];
+        }
+      }
 
       // 지역 필터링
       if (region && storeRegion !== region) return;

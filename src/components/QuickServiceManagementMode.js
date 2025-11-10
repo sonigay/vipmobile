@@ -149,7 +149,15 @@ const QuickServiceManagementMode = ({
         setRegionOptions((prev) => {
           const merged = new Set(prev);
           regions.forEach((item) => merged.add(item));
-          return ['all', ...Array.from(merged).filter((item) => item !== 'all')];
+          const regionList = Array.from(merged).filter(
+            (item) => item !== 'all'
+          );
+          regionList.sort((a, b) => {
+            if (a === '기타') return 1;
+            if (b === '기타') return -1;
+            return a.localeCompare(b, 'ko');
+          });
+          return ['all', ...regionList];
         });
       } catch (err) {
         console.error('[QuickServiceManagementMode] 데이터 로드 실패:', err);
@@ -515,13 +523,17 @@ const QuickServiceManagementMode = ({
               alignItems="center"
               justifyContent="space-between"
             >
-              <Grid item xs={12} md>
+              <Grid item xs={12} md={8} lg={9}>
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
                   spacing={{ xs: 1.5, sm: 2 }}
                   alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  sx={{ width: '100%', flexWrap: 'wrap' }}
                 >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ fontWeight: 600, flexShrink: 0 }}
+                  >
                     지역 선택
                   </Typography>
                   <TextField
@@ -529,10 +541,9 @@ const QuickServiceManagementMode = ({
                     size="small"
                     value={region}
                     onChange={handleRegionChange}
-                    fullWidth
                     sx={{
-                      minWidth: { xs: '100%', sm: 180 },
-                      maxWidth: { sm: 240 }
+                      minWidth: { xs: '100%', sm: 200 },
+                      width: { xs: '100%', sm: 'auto' }
                     }}
                   >
                     {regionOptions.map((option) => (
@@ -546,8 +557,12 @@ const QuickServiceManagementMode = ({
               <Grid
                 item
                 xs={12}
-                md="auto"
-                sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}
+                md={4}
+                lg={3}
+                sx={{
+                  display: 'flex',
+                  justifyContent: { xs: 'flex-start', md: 'flex-end' }
+                }}
               >
                 <Stack direction="row" spacing={1}>
                   <Tooltip title="데이터 새로고침">
