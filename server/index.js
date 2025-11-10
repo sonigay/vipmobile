@@ -33354,7 +33354,7 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
     // 매장 데이터 조회 (지역 정보 필요)
     const storeResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${STORE_SHEET_NAME}!A:AM`,
+      range: `${STORE_SHEET_NAME}!A:AG`,
     });
 
     const storeRows = storeResponse.data.values || [];
@@ -33428,17 +33428,13 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
 
     if (storeRows.length > 1) {
       storeRows.slice(1).forEach(row => {
-        const storeId = row[0]?.toString().trim();
+        const storeId = row[15]?.toString().trim(); // P열: POS코드
         if (!storeId) return;
 
-        const storeName = row[1]?.toString().trim() || '';
+        const storeName = row[14]?.toString().trim() || ''; // O열: 매장명
         const addressCandidates = [
-          row[11], // L열: 기본 주소
-          row[7],  // H열: 주소 (다른 시트와 정렬 시)
-          row[3],  // D열: 주소 (일부 경우)
-          row[2],  // C열: 지역/주소 축약본
-          row[12], // M열: 상세주소
-          row[13]  // N열: 상세주소 보조
+          row[32], // AG열: 상세 주소
+          row[11]  // L열: 예비 주소
         ];
 
         const address =

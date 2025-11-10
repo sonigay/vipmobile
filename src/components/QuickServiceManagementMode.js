@@ -106,27 +106,38 @@ const QuickServiceManagementMode = ({
 
   const collectRegions = useCallback((stats) => {
     if (!stats) return [];
-    const regions = new Set();
+    const regionSet = new Set();
+
+    (stats.regionStats || []).forEach((item) => {
+      if (item?.region) regionSet.add(item.region);
+    });
+
     (stats.popularCompanies || []).forEach((item) => {
-      if (item.region) regions.add(item.region);
+      if (item?.region) regionSet.add(item.region);
     });
+
     (stats.excellentCompanies || []).forEach((item) => {
-      if (item.region) regions.add(item.region);
+      if (item?.region) regionSet.add(item.region);
     });
-    return Array.from(regions);
+
+    return Array.from(regionSet);
   }, []);
 
   const fetchData = useCallback(
     async (targetRegion, forceRefresh = false) => {
+      const fetchRegion =
+        targetRegion === 'all' || !targetRegion ? undefined : targetRegion;
+
+      if (fetchRegion !== region) {
+        setRegion(targetRegion);
+      }
+
       setLoading(true);
       setError(null);
 
       try {
         const [statsRes, qualityRes] = await Promise.all([
-          api.getQuickCostStatistics(
-            targetRegion === 'all' ? undefined : targetRegion,
-            { forceRefresh }
-          ),
+          api.getQuickCostStatistics(fetchRegion, { forceRefresh }),
           api.getQuickCostQuality({ forceRefresh })
         ]);
 
@@ -171,7 +182,7 @@ const QuickServiceManagementMode = ({
 
   useEffect(() => {
     fetchData(region, false);
-  }, [fetchData, region]);
+  }, []); // 초기 로딩 한 번만 실행
 
   useEffect(() => {
     const hideUntil = localStorage.getItem(`hideUpdate_${MODE_KEY}`);
@@ -216,7 +227,9 @@ const QuickServiceManagementMode = ({
   const normalizationRate = quality.normalizationStatus?.rate || 0;
 
   const handleRegionChange = (event) => {
-    setRegion(event.target.value);
+    const nextRegion = event.target.value;
+    setRegion(nextRegion);
+    fetchData(nextRegion, false);
   };
 
   const handleMapMetricChange = (_event, next) => {
