@@ -3107,7 +3107,8 @@ app.post('/api/login', async (req, res) => {
         const hasInventoryRecoveryPermission = agent[21] === 'O'; // V열: 재고회수모드 권한 (기존 T열)
         const hasDataCollectionPermission = agent[22] === 'O'; // W열: 정보수집모드 권한 (기존 U열)
         const hasSmsManagementPermission = agent[23] === 'O'; // X열: SMS 관리모드 권한 (기존 V열)
-        const hasObManagementPermission = agent[24] === 'O'; // Y열: OB 관리모드 권한 (기존 W열)
+        const obManagementPermissionRaw = (agent[24] || '').toString().trim().toUpperCase();
+        const hasObManagementPermission = ['O', 'M', 'S'].includes(obManagementPermissionRaw); // Y열: OB 관리모드 권한 (기존 W열)
         const hasAgentModePermission = agent[25] === 'O'; // Z열: 관리자모드 권한 (기존 X열)
         // AA열: 온세일관리모드 접속 권한 (O, S, M 모두 접속 가능)
         const hasOnSaleManagementPermission = agent[26] === 'O' || agent[26] === 'S' || agent[26] === 'M';
