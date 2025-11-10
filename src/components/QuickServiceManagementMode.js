@@ -24,7 +24,8 @@ import {
   MenuItem,
   Tooltip,
   ToggleButton,
-  ToggleButtonGroup
+  ToggleButtonGroup,
+  Alert
 } from '@mui/material';
 import {
   MapContainer,
@@ -42,8 +43,11 @@ import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../api';
 import AppUpdatePopup from './AppUpdatePopup';
+import QuickCostModal from './QuickCostModal';
 import { getModeColor, getModeTitle } from '../config/modeConfig';
 
 const MODE_KEY = 'quickServiceManagement';
@@ -174,6 +178,16 @@ const QuickServiceManagementMode = ({
   const [regionOptions, setRegionOptions] = useState(['all']);
   const [mapMetric, setMapMetric] = useState('popular');
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [historyFilters, setHistoryFilters] = useState({
+    fromStoreId: '',
+    toStoreId: ''
+  });
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
+  const [historyFetched, setHistoryFetched] = useState(false);
+  const [historySuccessMessage, setHistorySuccessMessage] = useState('');
+  const [editEntry, setEditEntry] = useState(null);
   const modeColor = useMemo(() => getModeColor(MODE_KEY), []);
   const modeTitle = useMemo(
     () => getModeTitle(MODE_KEY, '퀵서비스 관리 모드'),
@@ -325,6 +339,159 @@ const QuickServiceManagementMode = ({
       setMapMetric(next);
     }
   };
+
+  const performFetchHistory = useCallback(
+    async (options = {}) => {
+      const { silent = false } = options;
+      const fromId = historyFilters.fromStoreId.trim();
+      const toId = historyFilters.toStoreId.trim();
+
+      if (!fromId || !toId) {
+        setHistoryError('출발 매장 ID와 도착 매장 ID를 모두 입력해주세요.');
+        setHistoryData([]);
+        setHistoryFetched(false);
+        return;
+      }
+
+      if (!silent) {
+        setHistoryLoading(true);
+        setHistorySuccessMessage('');
+      }
+      setHistoryError(null);
+
+      try {
+        const result = await api.getQuickServiceHistory({
+          fromStoreId: fromId,
+          toStoreId: toId
+        });
+
+        if (!result?.success) {
+          throw new Error(result?.error || '데이터를 불러오지 못했습니다.');
+        }
+
+        setHistoryData(result.data || []);
+        setHistoryFetched(true);
+      } catch (err) {
+        console.error('[QuickServiceManagementMode] history fetch failed:', err);
+        setHistoryError(err.message || '데이터를 불러오지 못했습니다.');
+        setHistoryData([]);
+        setHistoryFetched(false);
+      } finally {
+        if (!silent) {
+          setHistoryLoading(false);
+        }
+      }
+    },
+    [historyFilters]
+  );
+
+  const handleHistoryInputChange = (field) => (event) => {
+    const value = event.target.value;
+    setHistoryFilters((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+    setHistoryError(null);
+    setHistorySuccessMessage('');
+  };
+
+  const handleHistoryReset = () => {
+    setHistoryFilters({ fromStoreId: '', toStoreId: '' });
+    setHistoryData([]);
+    setHistoryFetched(false);
+    setHistoryError(null);
+    setHistorySuccessMessage('');
+  };
+
+  const handleFetchHistoryClick = () => {
+    performFetchHistory();
+  };
+
+  const handleEditEntry = (entry) => {
+    if (!entry) return;
+    setHistoryError(null);
+    setHistorySuccessMessage('');
+    setEditEntry({
+      rowIndex: entry.rowIndex,
+      reverseRowIndex: entry.reverseRowIndex,
+      registrantStoreName: entry.registrantStoreName,
+      registrantStoreId: entry.registrantStoreId,
+      fromStoreName: entry.fromStoreName,
+      fromStoreId: entry.fromStoreId,
+      toStoreName: entry.toStoreName,
+      toStoreId: entry.toStoreId,
+      modeType: entry.modeType,
+      companies: entry.companies
+    });
+  };
+
+  const clearClientRouteCache = (fromId, toId, companies = []) => {
+    if (typeof window === 'undefined' || !window.clientCacheUtils) return;
+    const cacheUtils = window.clientCacheUtils;
+    if (fromId && toId) {
+      cacheUtils.delete(`quick-cost-estimate-${fromId}-${toId}`);
+      cacheUtils.delete(`quick-cost-estimate-${toId}-${fromId}`);
+    }
+    cacheUtils.delete('quick-cost-companies');
+    companies.forEach((company) => {
+      if (!company) return;
+      const nameKey = (company.name || '').trim();
+      if (nameKey) {
+        cacheUtils.delete(`quick-cost-phone-${nameKey}`);
+      }
+      const phoneKey = (company.phone || '').toString().trim();
+      if (nameKey && phoneKey) {
+        cacheUtils.delete(`quick-cost-cost-${nameKey}-${phoneKey}`);
+      }
+    });
+  };
+
+  const handleDeleteEntry = async (entry) => {
+    if (!entry) return;
+    const confirmDelete = window.confirm(
+      `${entry.fromStoreName || entry.fromStoreId} → ${entry.toStoreName || entry.toStoreId} 등록 데이터를 삭제하시겠습니까?`
+    );
+    if (!confirmDelete) {
+      return;
+    }
+
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistorySuccessMessage('');
+
+    try {
+      const payload = {
+        rowIndex: entry.rowIndex,
+        reverseRowIndex: entry.reverseRowIndex,
+        fromStoreId: entry.fromStoreId,
+        toStoreId: entry.toStoreId
+      };
+      const result = await api.deleteQuickCost(payload);
+      if (!result?.success) {
+        throw new Error(result?.error || '삭제에 실패했습니다.');
+      }
+
+      clearClientRouteCache(entry.fromStoreId, entry.toStoreId, entry.companies);
+      setHistorySuccessMessage('선택한 데이터가 삭제되었습니다.');
+      await performFetchHistory({ silent: true });
+      fetchData(region, true);
+    } catch (err) {
+      console.error('[QuickServiceManagementMode] delete failed:', err);
+      setHistoryError(err.message || '삭제에 실패했습니다.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleEditModalClose = (result) => {
+    setEditEntry(null);
+    if (result === 'updated') {
+      setHistorySuccessMessage('퀵비용 데이터가 수정되었습니다.');
+      performFetchHistory({ silent: false });
+      fetchData(region, true);
+    }
+  };
+
 
   const handleRefresh = () => {
     fetchData(region, true);
@@ -1260,11 +1427,232 @@ const QuickServiceManagementMode = ({
                     </Box>
                   </Paper>
                 </Grid>
+
+                {/* 데이터 수정/삭제 */}
+                <Grid item xs={12}>
+                  <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                    <Box
+                      sx={{
+                        px: 3,
+                        py: 2,
+                        borderBottom: '1px solid rgba(0,0,0,0.08)'
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: 'column', md: 'row' }}
+                        spacing={1.5}
+                        justifyContent="space-between"
+                        alignItems={{ xs: 'flex-start', md: 'center' }}
+                      >
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          등록 데이터 수정/삭제
+                        </Typography>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            onClick={handleHistoryReset}
+                            disabled={historyLoading}
+                          >
+                            초기화
+                          </Button>
+                          <Button
+                            variant="contained"
+                            onClick={handleFetchHistoryClick}
+                            disabled={historyLoading}
+                          >
+                            {historyLoading ? '조회 중...' : '조회'}
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Box>
+                    <Box sx={{ px: 3, py: 3 }}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} md={4} lg={3}>
+                          <TextField
+                            label="출발 매장 ID"
+                            size="small"
+                            fullWidth
+                            value={historyFilters.fromStoreId}
+                            onChange={handleHistoryInputChange('fromStoreId')}
+                            placeholder="예: P123456"
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4} lg={3}>
+                          <TextField
+                            label="도착 매장 ID"
+                            size="small"
+                            fullWidth
+                            value={historyFilters.toStoreId}
+                            onChange={handleHistoryInputChange('toStoreId')}
+                            placeholder="예: P654321"
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4} lg={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            출발/도착 매장 ID를 입력하고 조회를 눌러 등록된 퀵비용 데이터를 수정하거나 삭제할 수 있습니다.
+                          </Typography>
+                        </Grid>
+                      </Grid>
+
+                      {historyError && (
+                        <Box sx={{ mt: 2 }}>
+                          <Alert severity="error">{historyError}</Alert>
+                        </Box>
+                      )}
+
+                      {historySuccessMessage && (
+                        <Box sx={{ mt: 2 }}>
+                          <Alert severity="success">{historySuccessMessage}</Alert>
+                        </Box>
+                      )}
+
+                      <Box sx={{ mt: 3 }}>
+                        {historyLoading ? (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              py: 6,
+                              color: 'text.secondary',
+                              gap: 2
+                            }}
+                          >
+                            <CircularProgress size={28} />
+                            <Typography variant="body2">
+                              데이터를 불러오는 중입니다...
+                            </Typography>
+                          </Box>
+                        ) : historyData.length === 0 ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {historyFetched
+                              ? '조회된 데이터가 없습니다.'
+                              : '출발/도착 매장 ID를 입력한 뒤 조회를 눌러주세요.'}
+                          </Typography>
+                        ) : (
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 600 }}>등록일시</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>등록자</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>구간</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>업체 정보</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }} align="right">
+                                  동작
+                                </TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {historyData.map((item) => (
+                                <TableRow key={item.rowIndex}>
+                                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {item.registeredAt || '-'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      행 번호: {item.rowIndex}
+                                      {item.reverseRowIndex
+                                        ? ` / 반대 방향: ${item.reverseRowIndex}`
+                                        : ''}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {item.registrantStoreName || '-'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {item.registrantStoreId || '-'}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {item.fromStoreName || '-'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {item.fromStoreId || '-'}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                      ↘ {item.toStoreName || '-'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {item.toStoreId || '-'}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Stack spacing={0.5}>
+                                      {item.companies.slice(0, 3).map((company, idx) => (
+                                        <Typography
+                                          key={`${company.name}-${company.phone}-${idx}`}
+                                          variant="caption"
+                                          color="text.secondary"
+                                        >
+                                          {company.name} / {company.phone} /{' '}
+                                          {company.cost?.toLocaleString()}원
+                                        </Typography>
+                                      ))}
+                                      {item.companies.length > 3 && (
+                                        <Typography variant="caption" color="text.secondary">
+                                          + {item.companies.length - 3}건
+                                        </Typography>
+                                      )}
+                                    </Stack>
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <Tooltip title="수정">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => handleEditEntry(item)}
+                                          disabled={historyLoading}
+                                        >
+                                          <EditIcon fontSize="inherit" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                    <Tooltip title="삭제">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={() => handleDeleteEntry(item)}
+                                          disabled={historyLoading}
+                                        >
+                                          <DeleteOutlineIcon fontSize="inherit" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
               </Grid>
             )}
           </Grid>
         </Grid>
       </Container>
+
+      <QuickCostModal
+        open={Boolean(editEntry)}
+        onClose={handleEditModalClose}
+        loggedInStore={loggedInStore}
+        fromStore={
+          editEntry
+            ? { id: editEntry.fromStoreId, name: editEntry.fromStoreName }
+            : null
+        }
+        toStore={
+          editEntry
+            ? { id: editEntry.toStoreId, name: editEntry.toStoreName }
+            : null
+        }
+        modeType="관리자모드"
+        editData={editEntry}
+      />
 
       <AppUpdatePopup
         open={showUpdatePopup}

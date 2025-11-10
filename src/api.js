@@ -278,11 +278,24 @@ export const api = {
   },
 
   // 등록 이력 조회
-  getQuickServiceHistory: async (userId, storeId) => {
+  getQuickServiceHistory: async (userOrOptions, storeId) => {
     try {
       const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-      if (storeId) params.append('storeId', storeId);
+
+      if (
+        userOrOptions &&
+        typeof userOrOptions === 'object' &&
+        !Array.isArray(userOrOptions)
+      ) {
+        Object.entries(userOrOptions).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, value);
+          }
+        });
+      } else {
+        if (userOrOptions) params.append('userId', userOrOptions);
+        if (storeId) params.append('storeId', storeId);
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/quick-cost/history?${params.toString()}`, {
         method: 'GET',
@@ -299,6 +312,54 @@ export const api = {
       return await response.json();
     } catch (error) {
       console.error('등록 이력 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 퀵비용 데이터 수정
+  updateQuickCost: async (data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('퀵비용 데이터 수정 오류:', error);
+      throw error;
+    }
+  },
+
+  // 퀵비용 데이터 삭제
+  deleteQuickCost: async (data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/quick-cost/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('퀵비용 데이터 삭제 오류:', error);
       throw error;
     }
   },

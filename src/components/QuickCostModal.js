@@ -38,7 +38,8 @@ const QuickCostModal = ({
   toStore,
   loggedInStore,
   modeType, // '일반모드' or '관리자모드'
-  requestedStore // 관리자모드에서 재고요청점
+  requestedStore, // 관리자모드에서 재고요청점
+  editData = null
 }) => {
   const [companyOptions, setCompanyOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -91,17 +92,34 @@ const QuickCostModal = ({
     arrivalSpeed: company?.arrivalSpeed || '중간'
   });
 
-  const resolvedFromStore = modeType === '관리자모드' && requestedStore
+  const isEditMode = Boolean(editData);
+
+  const resolvedFromStore = isEditMode
+    ? {
+        id: editData?.fromStoreId || '',
+        name: editData?.fromStoreName || ''
+      }
+    : modeType === '관리자모드' && requestedStore
     ? requestedStore
     : (fromStore || loggedInStore || null);
-  const resolvedToStore = toStore || null;
-  const resolvedFromStoreId = resolvedFromStore?.id || '';
-  const resolvedToStoreId = resolvedToStore?.id || '';
+  const resolvedToStore = isEditMode
+    ? {
+        id: editData?.toStoreId || '',
+        name: editData?.toStoreName || ''
+      }
+    : (toStore || null);
+  const resolvedFromStoreId = (resolvedFromStore?.id || '').toString().trim();
+  const resolvedToStoreId = (resolvedToStore?.id || '').toString().trim();
 
   const getDraftKey = () => {
+    if (isEditMode) return null;
     if (!resolvedFromStoreId || !resolvedToStoreId) return null;
     return `quick-cost-draft-${resolvedFromStoreId}-${resolvedToStoreId}`;
   };
+
+  const effectiveModeType = isEditMode
+    ? (editData?.modeType || modeType || '일반모드')
+    : (modeType || '일반모드');
 
   const saveDraft = (companiesData) => {
     const key = getDraftKey();
@@ -124,6 +142,35 @@ const QuickCostModal = ({
     } catch (err) {
       console.error('퀵비용 드래프트 로드 실패:', err);
       return null;
+    }
+  };
+
+  const clearClientCacheForRoute = (fromId, toId, companiesData = []) => {
+    if (typeof window === 'undefined' || !window.clientCacheUtils) return;
+    const cacheUtils = window.clientCacheUtils;
+    const fromKey = (fromId || '').toString().trim();
+    const toKey = (toId || '').toString().trim();
+
+    if (fromKey && toKey) {
+      cacheUtils.delete(`quick-cost-estimate-${fromKey}-${toKey}`);
+      cacheUtils.delete(`quick-cost-estimate-${toKey}-${fromKey}`);
+    }
+
+    cacheUtils.delete('quick-cost-companies');
+
+    if (Array.isArray(companiesData)) {
+      companiesData.forEach((company) => {
+        if (!company) return;
+        const nameKey = (company.name || company.originalName || '').toString().trim();
+        const phoneKey = (company.phone || company.originalPhone || '').toString().trim();
+
+        if (nameKey) {
+          cacheUtils.delete(`quick-cost-phone-${nameKey}`);
+        }
+        if (nameKey && phoneKey) {
+          cacheUtils.delete(`quick-cost-cost-${nameKey}-${phoneKey}`);
+        }
+      });
     }
   };
 
@@ -378,15 +425,18 @@ const QuickCostModal = ({
 
     setSaving(true);
     try {
-      const fromStoreName = modeType === '관리자모드' && requestedStore 
-        ? requestedStore.name 
-        : (loggedInStore?.name || fromStore?.name || '');
-      const fromStoreId = modeType === '관리자모드' && requestedStore 
-        ? requestedStore.id 
-        : (loggedInStore?.id || fromStore?.id || '');
+      const fromStoreName = resolvedFromStore?.name || '';
+      const fromStoreId = resolvedFromStoreId;
 
-      const toStoreName = toStore?.name || '';
-      const toStoreId = toStore?.id || '';
+      const toStoreName = resolvedToStore?.name || '';
+      const toStoreId = resolvedToStoreId;
+
+      const registrantName = isEditMode
+        ? (editData?.registrantStoreName || loggedInStore?.name || '')
+        : (loggedInStore?.name || '');
+      const registrantId = isEditMode
+        ? (editData?.registrantStoreId || loggedInStore?.id || '')
+        : (loggedInStore?.id || '');
 
       const companiesData = companyList.map(company => {
         const normalizedName = company.name ? company.name.trim() : '';
@@ -403,110 +453,104 @@ const QuickCostModal = ({
         };
       });
 
-      const saveData = {
-        registrantStoreName: loggedInStore?.name || '',
-        registrantStoreId: loggedInStore?.id || '',
-        fromStoreName,
-        fromStoreId,
-        toStoreName,
-        toStoreId,
-        modeType: modeType || '일반모드',
-        companies: companiesData
-      };
+      if (isEditMode) {
+        const updatePayload = {
+          rowIndex: editData?.rowIndex,
+          reverseRowIndex: editData?.reverseRowIndex,
+          registrantStoreName: registrantName,
+          registrantStoreId: registrantId,
+          fromStoreName,
+          fromStoreId,
+          toStoreName,
+          toStoreId,
+          modeType: effectiveModeType,
+          companies: companiesData
+        };
 
-      // 양방향 저장: 같은 퀵서비스 업체일 경우 A↔B와 B↔A 모두 저장
-      // 조건: 입력한 업체 정보(업체명, 전화번호, 비용)가 동일한 경우
-      // 현재 구현: 입력한 모든 업체 정보를 양방향으로 저장
-      const saveDataReverse = {
-        ...saveData,
-        fromStoreName: toStoreName,
-        fromStoreId: toStoreId,
-        toStoreName: fromStoreName,
-        toStoreId: fromStoreId,
-        // 같은 업체 정보(companies)를 그대로 사용
-        companies: companiesData
-      };
-
-      // 양방향 모두 저장 (같은 업체 정보로)
-      console.log('🔍 양방향 저장 시작:', {
-        방향1: `${fromStoreName}(${fromStoreId}) ↔ ${toStoreName}(${toStoreId})`,
-        방향2: `${toStoreName}(${toStoreId}) ↔ ${fromStoreName}(${fromStoreId})`
-      });
-      
-      const [result1, result2] = await Promise.all([
-        api.saveQuickCost(saveData),
-        api.saveQuickCost(saveDataReverse)
-      ]);
-      
-      console.log('🔍 양방향 저장 결과:', {
-        방향1: result1.success ? '성공' : `실패: ${result1.error || '알 수 없는 오류'}`,
-        방향2: result2.success ? '성공' : `실패: ${result2.error || '알 수 없는 오류'}`
-      });
-      
-      if (result1.success && result2.success) {
-        saveDraft(companiesData);
-        // 최근 사용 업체 저장
-        companiesData.forEach(company => {
-          const key = `${company.name}-${company.phone}`;
-          if (!recentCompanies.some(r => `${r.name}-${r.phone}` === key)) {
-            recentCompanies.unshift({ name: company.name, phone: company.phone });
-            if (recentCompanies.length > 10) {
-              recentCompanies.pop();
-            }
-          }
-        });
-        localStorage.setItem('quick-cost-recent', JSON.stringify(recentCompanies));
-
-        // 저장 후 관련 캐시 무효화하여 즉시 반영되도록 함
-        // 1. 예상퀵비용 캐시 삭제 (양방향 모두)
-        const cacheKey1 = `quick-cost-estimate-${fromStoreId}-${toStoreId}`;
-        const cacheKey2 = `quick-cost-estimate-${toStoreId}-${fromStoreId}`;
-        if (window.clientCacheUtils) {
-          window.clientCacheUtils.delete(cacheKey1);
-          window.clientCacheUtils.delete(cacheKey2);
+        const result = await api.updateQuickCost(updatePayload);
+        if (!result?.success) {
+          throw new Error(result?.error || '퀵비용 데이터 수정에 실패했습니다.');
         }
-        
-        // 2. 업체명 목록 캐시 삭제 (새 업체가 목록에 나타나도록)
-        const companiesCacheKey = 'quick-cost-companies';
-        if (window.clientCacheUtils) {
-          window.clientCacheUtils.delete(companiesCacheKey);
-        }
-        
-        // 3. 저장한 업체의 전화번호/비용 캐시도 삭제
-        companiesData.forEach(company => {
-          const phoneCacheKey = `quick-cost-phone-${company.name}`;
-          const costCacheKey = `quick-cost-cost-${company.name}-${company.phone}`;
-          if (window.clientCacheUtils) {
-            window.clientCacheUtils.delete(phoneCacheKey);
-            window.clientCacheUtils.delete(costCacheKey);
-          }
-        });
 
-        alert('퀵비용 정보가 성공적으로 저장되었습니다.');
-        
-        // 저장 성공 후 부모 컴포넌트에 리프레시 신호 전달
+        clearClientCacheForRoute(fromStoreId, toStoreId, companiesData);
+        alert('퀵비용 정보가 수정되었습니다.');
+
         if (onClose) {
-          // onClose에 refresh 플래그를 전달할 수 있도록 수정 필요
-          // 일단 모달을 닫고, 부모 컴포넌트에서 리프레시 처리하도록 함
-          onClose(true); // true = 저장 성공 플래그
-        } else {
-          onClose();
+          onClose('updated');
         }
-        
-        // 폼 초기화
+
         setCompanyList([{ ...initialCompany }]);
         setCompanyErrors([{ ...initialCompanyError }]);
       } else {
-        // 양방향 저장 중 하나라도 실패한 경우
-        const errorMessages = [];
-        if (!result1.success) {
-          errorMessages.push(`방향1 저장 실패: ${result1.error || '알 수 없는 오류'}`);
+        const saveData = {
+          registrantStoreName: registrantName,
+          registrantStoreId: registrantId,
+          fromStoreName,
+          fromStoreId,
+          toStoreName,
+          toStoreId,
+          modeType: effectiveModeType,
+          companies: companiesData
+        };
+
+        const saveDataReverse = {
+          ...saveData,
+          fromStoreName: toStoreName,
+          fromStoreId: toStoreId,
+          toStoreName: fromStoreName,
+          toStoreId: fromStoreId,
+          companies: companiesData
+        };
+
+        console.log('🔍 양방향 저장 시작:', {
+          방향1: `${fromStoreName}(${fromStoreId}) ↔ ${toStoreName}(${toStoreId})`,
+          방향2: `${toStoreName}(${toStoreId}) ↔ ${fromStoreName}(${fromStoreId})`
+        });
+
+        const [result1, result2] = await Promise.all([
+          api.saveQuickCost(saveData),
+          api.saveQuickCost(saveDataReverse)
+        ]);
+
+        console.log('🔍 양방향 저장 결과:', {
+          방향1: result1.success ? '성공' : `실패: ${result1.error || '알 수 없는 오류'}`,
+          방향2: result2.success ? '성공' : `실패: ${result2.error || '알 수 없는 오류'}`
+        });
+
+        if (result1.success && result2.success) {
+          saveDraft(companiesData);
+          companiesData.forEach(company => {
+            const key = `${company.name}-${company.phone}`;
+            if (!recentCompanies.some(r => `${r.name}-${r.phone}` === key)) {
+              recentCompanies.unshift({ name: company.name, phone: company.phone });
+              if (recentCompanies.length > 10) {
+                recentCompanies.pop();
+              }
+            }
+          });
+          localStorage.setItem('quick-cost-recent', JSON.stringify(recentCompanies));
+
+          clearClientCacheForRoute(fromStoreId, toStoreId, companiesData);
+
+          alert('퀵비용 정보가 성공적으로 저장되었습니다.');
+
+          if (onClose) {
+            onClose(true);
+          }
+
+          setCompanyList([{ ...initialCompany }]);
+          setCompanyErrors([{ ...initialCompanyError }]);
+        } else {
+          const errorMessages = [];
+          if (!result1.success) {
+            errorMessages.push(`방향1 저장 실패: ${result1.error || '알 수 없는 오류'}`);
+          }
+          if (!result2.success) {
+            errorMessages.push(`방향2 저장 실패: ${result2.error || '알 수 없는 오류'}`);
+          }
+          setError(`저장에 실패했습니다. ${errorMessages.join(', ')}`);
+          console.error('❌ 양방향 저장 실패:', { result1, result2 });
         }
-        if (!result2.success) {
-          errorMessages.push(`방향2 저장 실패: ${result2.error || '알 수 없는 오류'}`);
-        }
-        setError(`저장에 실패했습니다. ${errorMessages.join(', ')}`);
-        console.error('❌ 양방향 저장 실패:', { result1, result2 });
       }
     } catch (err) {
       console.error('저장 오류:', err);
@@ -520,17 +564,39 @@ const QuickCostModal = ({
   useEffect(() => {
     if (!open) return;
 
-    const draft = loadDraft();
-    if (draft && draft.length) {
-      const restored = draft.map(convertDraftToCompany);
-      setCompanyList(restored);
-      setCompanyErrors(restored.map(() => ({ ...initialCompanyError })));
+    if (isEditMode) {
+      const companiesFromEdit = (editData?.companies || []).map((company) =>
+        convertDraftToCompany({
+          name: company.name,
+          phone: company.phone,
+          cost: company.cost,
+          dispatchSpeed: company.dispatchSpeed,
+          pickupSpeed: company.pickupSpeed,
+          arrivalSpeed: company.arrivalSpeed
+        })
+      );
+
+      const preparedList =
+        companiesFromEdit.length > 0 ? companiesFromEdit : [{ ...initialCompany }];
+
+      setCompanyList(preparedList);
+      setCompanyErrors(
+        preparedList.map(() => ({ ...initialCompanyError }))
+      );
     } else {
-      setCompanyList([{ ...initialCompany }]);
-      setCompanyErrors([{ ...initialCompanyError }]);
+      const draft = loadDraft();
+      if (draft && draft.length) {
+        const restored = draft.map(convertDraftToCompany);
+        setCompanyList(restored);
+        setCompanyErrors(restored.map(() => ({ ...initialCompanyError })));
+      } else {
+        setCompanyList([{ ...initialCompany }]);
+        setCompanyErrors([{ ...initialCompanyError }]);
+      }
     }
+
     setError(null);
-  }, [open, resolvedFromStoreId, resolvedToStoreId]);
+  }, [open, isEditMode, editData, resolvedFromStoreId, resolvedToStoreId]);
 
   // 모달 닫기
   const handleClose = () => {
@@ -542,15 +608,15 @@ const QuickCostModal = ({
     }
   };
 
-  const fromStoreName = modeType === '관리자모드' && requestedStore 
-    ? requestedStore.name 
-    : (loggedInStore?.name || fromStore?.name || '');
-  const toStoreName = toStore?.name || '';
+  const fromStoreName = resolvedFromStore?.name || '';
+  const toStoreName = resolvedToStore?.name || '';
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">퀵비용 등록</Typography>
+        <Typography variant="h6">
+          {isEditMode ? '퀵비용 수정' : '퀵비용 등록'}
+        </Typography>
         <IconButton onClick={handleClose} size="small">
           <CloseIcon />
         </IconButton>

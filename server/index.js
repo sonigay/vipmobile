@@ -32733,6 +32733,164 @@ const normalizePhoneNumber = (phone) => {
   return phone.replace(/[-\s]/g, '').replace(/\D/g, '');
 };
 
+const QUICK_COST_MAX_COMPANIES = 5;
+const QUICK_COST_COMPANY_FIELD_COUNT = 6;
+const QUICK_COST_BASE_COLUMN_COUNT = 8;
+const QUICK_COST_TOTAL_COLUMN_COUNT =
+  QUICK_COST_BASE_COLUMN_COUNT + QUICK_COST_MAX_COMPANIES * QUICK_COST_COMPANY_FIELD_COUNT;
+const QUICK_COST_VALID_SPEEDS = new Set(['빠름', '중간', '느림']);
+
+const normalizeQuickCostCompanies = (companies = []) => {
+  if (!Array.isArray(companies) || companies.length === 0) {
+    throw new Error('저장할 업체 정보가 필요합니다.');
+  }
+
+  if (companies.length > QUICK_COST_MAX_COMPANIES) {
+    throw new Error(`최대 ${QUICK_COST_MAX_COMPANIES}개 업체까지만 등록 가능합니다.`);
+  }
+
+  return companies.map((company, index) => {
+    const companyNumber = index + 1;
+    const originalName = (company?.name || '').toString().trim();
+    if (!originalName) {
+      throw new Error(`업체${companyNumber}의 업체명을 입력해주세요.`);
+    }
+    if (originalName.length > 50) {
+      throw new Error(`업체${companyNumber}의 업체명이 너무 깁니다. (최대 50자)`);
+    }
+
+    const normalizedName = normalizeCompanyName(originalName);
+    if (!normalizedName) {
+      throw new Error(`업체${companyNumber}의 업체명이 유효하지 않습니다.`);
+    }
+
+    const originalPhone = (company?.phone || '').toString().trim();
+    if (!originalPhone) {
+      throw new Error(`업체${companyNumber}의 전화번호를 입력해주세요.`);
+    }
+    const normalizedPhone = normalizePhoneNumber(originalPhone);
+    if (!normalizedPhone || normalizedPhone.length < 8) {
+      throw new Error(`업체${companyNumber}의 전화번호가 유효하지 않습니다.`);
+    }
+
+    const rawCost = (company?.cost !== undefined && company?.cost !== null)
+      ? company.cost.toString().replace(/,/g, '').trim()
+      : '';
+    if (!rawCost) {
+      throw new Error(`업체${companyNumber}의 비용을 입력해주세요.`);
+    }
+    const cost = parseInt(rawCost, 10);
+    if (!Number.isInteger(cost) || cost <= 0 || cost > 1_000_000) {
+      throw new Error(`업체${companyNumber}의 비용이 유효하지 않습니다. (1원 ~ 1,000,000원)`);
+    }
+
+    const dispatchSpeed = (company?.dispatchSpeed || '').toString().trim();
+    const pickupSpeed = (company?.pickupSpeed || '').toString().trim();
+    const arrivalSpeed = (company?.arrivalSpeed || '').toString().trim();
+
+    if (!QUICK_COST_VALID_SPEEDS.has(dispatchSpeed)) {
+      throw new Error(`업체${companyNumber}의 배차속도가 유효하지 않습니다. (빠름/중간/느림)`);
+    }
+    if (!QUICK_COST_VALID_SPEEDS.has(pickupSpeed)) {
+      throw new Error(`업체${companyNumber}의 픽업속도가 유효하지 않습니다. (빠름/중간/느림)`);
+    }
+    if (!QUICK_COST_VALID_SPEEDS.has(arrivalSpeed)) {
+      throw new Error(`업체${companyNumber}의 도착속도가 유효하지 않습니다. (빠름/중간/느림)`);
+    }
+
+    return {
+      originalName,
+      normalizedName,
+      originalPhone,
+      normalizedPhone,
+      cost,
+      dispatchSpeed,
+      pickupSpeed,
+      arrivalSpeed
+    };
+  });
+};
+
+const buildQuickCostRow = ({
+  timestamp,
+  registrantStoreName,
+  registrantStoreId,
+  fromStoreName,
+  fromStoreId,
+  toStoreName,
+  toStoreId,
+  modeType,
+  companies = []
+}) => {
+  const row = [
+    timestamp || '',
+    registrantStoreName || '',
+    registrantStoreId || '',
+    fromStoreName || '',
+    fromStoreId || '',
+    toStoreName || '',
+    toStoreId || '',
+    modeType || ''
+  ];
+
+  for (let i = 0; i < QUICK_COST_MAX_COMPANIES; i++) {
+    if (i < companies.length) {
+      const company = companies[i];
+      row.push(
+        company.originalName || '',
+        company.originalPhone || '',
+        company.cost ?? '',
+        company.dispatchSpeed || '',
+        company.pickupSpeed || '',
+        company.arrivalSpeed || ''
+      );
+    } else {
+      row.push('', '', '', '', '', '');
+    }
+  }
+
+  return row;
+};
+
+const buildEmptyQuickCostRow = () =>
+  Array.from({ length: QUICK_COST_TOTAL_COLUMN_COUNT }, () => '');
+
+const invalidateQuickCostCache = (fromStoreId, toStoreId, companies = []) => {
+  if (fromStoreId && toStoreId) {
+    cache.delete(`quick-cost-estimate-${fromStoreId}-${toStoreId}`);
+    cache.delete(`quick-cost-estimate-${toStoreId}-${fromStoreId}`);
+  }
+
+  cache.delete('quick-cost-companies');
+  cache.delete('quick-cost-quality');
+
+  for (const [key] of cache.entries()) {
+    if (key.startsWith('quick-cost-statistics-')) {
+      cache.delete(key);
+    }
+  }
+
+  companies.forEach((company) => {
+    if (!company) return;
+    const nameVariants = new Set();
+    if (company.originalName) nameVariants.add(company.originalName);
+    if (company.normalizedName) nameVariants.add(company.normalizedName);
+
+    nameVariants.forEach((variant) => {
+      cache.delete(`quick-cost-phone-${variant}`);
+    });
+
+    nameVariants.forEach((nameVariant) => {
+      if (company.originalPhone) {
+        cache.delete(`quick-cost-cost-${nameVariant}-${company.originalPhone}`);
+      }
+      if (company.normalizedPhone) {
+        cache.delete(`quick-cost-cost-${nameVariant}-${company.normalizedPhone}`);
+      }
+    });
+  });
+};
+
 // 퀵비용 데이터 저장 API
 app.post('/api/quick-cost/save', async (req, res) => {
   try {
@@ -32764,76 +32922,21 @@ app.post('/api/quick-cost/save', async (req, res) => {
       });
     }
 
-    // 각 업체 정보 검증 및 정규화
-    const normalizedCompanies = companies.map((company, index) => {
-      // 비용 검증
-      const cost = parseInt(company.cost);
-      if (isNaN(cost) || cost <= 0 || cost > 1000000) {
-        throw new Error(`업체${index + 1}의 비용이 유효하지 않습니다. (1원 ~ 1,000,000원)`);
-      }
-
-      // 전화번호 검증
-      const normalizedPhone = normalizePhoneNumber(company.phone);
-      if (!normalizedPhone || normalizedPhone.length < 8) {
-        throw new Error(`업체${index + 1}의 전화번호가 유효하지 않습니다.`);
-      }
-
-      // 업체명 검증
-      const normalizedName = normalizeCompanyName(company.name);
-      if (!normalizedName || normalizedName.length === 0 || normalizedName.length > 50) {
-        throw new Error(`업체${index + 1}의 업체명이 유효하지 않습니다. (1~50자)`);
-      }
-
-      // 속도 검증
-      const validSpeeds = ['빠름', '중간', '느림'];
-      if (!validSpeeds.includes(company.dispatchSpeed) || 
-          !validSpeeds.includes(company.pickupSpeed) || 
-          !validSpeeds.includes(company.arrivalSpeed)) {
-        throw new Error(`업체${index + 1}의 속도 정보가 유효하지 않습니다. (빠름/중간/느림)`);
-      }
-
-      return {
-        name: normalizedName,
-        originalName: company.name.trim(), // 원본 업체명도 저장
-        phone: normalizedPhone,
-        originalPhone: company.phone.trim(), // 원본 전화번호도 저장
-        cost: cost,
-        dispatchSpeed: company.dispatchSpeed,
-        pickupSpeed: company.pickupSpeed,
-        arrivalSpeed: company.arrivalSpeed
-      };
-    });
+    const normalizedCompanies = normalizeQuickCostCompanies(companies);
 
     // 구글시트에 저장할 데이터 준비
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const row = [
-      now, // 등록일시
-      registrantStoreName, // 등록자매장명
-      registrantStoreId, // 등록자매장ID
-      fromStoreName, // 출발매장명
-      fromStoreId, // 출발매장ID
-      toStoreName, // 도착매장명
-      toStoreId, // 도착매장ID
-      modeType // 모드타입
-    ];
-
-    // 업체 정보 추가 (최대 5개)
-    for (let i = 0; i < 5; i++) {
-      if (i < normalizedCompanies.length) {
-        const company = normalizedCompanies[i];
-        row.push(
-          company.originalName, // 퀵서비스업체명 (원본)
-          company.originalPhone, // 퀵서비스업체전화번호 (원본)
-          company.cost, // 퀵서비스업체비용
-          company.dispatchSpeed, // 퀵서비스업체배차속도
-          company.pickupSpeed, // 퀵서비스업체픽업속도
-          company.arrivalSpeed // 퀵서비스업체도착속도
-        );
-      } else {
-        // 빈 업체 슬롯
-        row.push('', '', '', '', '', '');
-      }
-    }
+    const row = buildQuickCostRow({
+      timestamp: now,
+      registrantStoreName,
+      registrantStoreId,
+      fromStoreName,
+      fromStoreId,
+      toStoreName,
+      toStoreId,
+      modeType,
+      companies: normalizedCompanies
+    });
 
     // 구글시트에 추가
     await sheets.spreadsheets.values.append({
@@ -32846,25 +32949,7 @@ app.post('/api/quick-cost/save', async (req, res) => {
       }
     });
 
-    // 캐시 무효화 (관련 캐시 삭제)
-    const cacheKeys = [
-      `quick-cost-companies`,
-      `quick-cost-estimate-${fromStoreId}-${toStoreId}`,
-      `quick-cost-phone-*`,
-      `quick-cost-cost-*`
-    ];
-    cacheKeys.forEach(key => {
-      if (key.includes('*')) {
-        // 와일드카드가 있는 경우 모든 관련 캐시 삭제
-        for (const [cacheKey] of cache.entries()) {
-          if (cacheKey.startsWith(key.replace('*', ''))) {
-            cache.delete(cacheKey);
-          }
-        }
-      } else {
-        cache.delete(key);
-      }
-    });
+    invalidateQuickCostCache(fromStoreId, toStoreId, normalizedCompanies);
 
     res.json({ 
       success: true, 
@@ -32876,6 +32961,211 @@ app.post('/api/quick-cost/save', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: error.message || '퀵비용 데이터 저장에 실패했습니다.' 
+    });
+  }
+});
+
+// 퀵비용 데이터 수정 API
+app.put('/api/quick-cost/update', async (req, res) => {
+  try {
+    let {
+      rowIndex,
+      reverseRowIndex,
+      registrantStoreName,
+      registrantStoreId,
+      fromStoreName,
+      fromStoreId,
+      toStoreName,
+      toStoreId,
+      modeType,
+      companies
+    } = req.body || {};
+
+    const parsedRowIndex = parseInt(rowIndex, 10);
+    if (!parsedRowIndex || Number.isNaN(parsedRowIndex) || parsedRowIndex < 2) {
+      return res.status(400).json({
+        success: false,
+        error: '유효한 rowIndex가 필요합니다.'
+      });
+    }
+
+    const getRowByIndex = async (index) => {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${QUICK_COST_SHEET_NAME}!A${index}:AL${index}`
+      });
+      return response.data.values?.[0] || null;
+    };
+
+    const existingRow = await getRowByIndex(parsedRowIndex);
+    if (!existingRow) {
+      return res.status(404).json({
+        success: false,
+        error: '수정할 데이터를 찾을 수 없습니다.'
+      });
+    }
+
+    registrantStoreName = (registrantStoreName || existingRow[1] || '').toString().trim();
+    registrantStoreId = (registrantStoreId || existingRow[2] || '').toString().trim();
+    fromStoreName = (fromStoreName || existingRow[3] || '').toString().trim();
+    fromStoreId = (fromStoreId || existingRow[4] || '').toString().trim();
+    toStoreName = (toStoreName || existingRow[5] || '').toString().trim();
+    toStoreId = (toStoreId || existingRow[6] || '').toString().trim();
+    modeType = (modeType || existingRow[7] || '일반모드').toString().trim() || '일반모드';
+
+    const normalizedCompanies = normalizeQuickCostCompanies(companies || []);
+
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const updatedRow = buildQuickCostRow({
+      timestamp: now,
+      registrantStoreName,
+      registrantStoreId,
+      fromStoreName,
+      fromStoreId,
+      toStoreName,
+      toStoreId,
+      modeType,
+      companies: normalizedCompanies
+    });
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A${parsedRowIndex}:AL${parsedRowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [updatedRow]
+      }
+    });
+
+    const updatedRows = [parsedRowIndex];
+
+    const parsedReverseRowIndex = reverseRowIndex
+      ? parseInt(reverseRowIndex, 10)
+      : null;
+
+    if (parsedReverseRowIndex && !Number.isNaN(parsedReverseRowIndex) && parsedReverseRowIndex >= 2) {
+      const reverseRow = await getRowByIndex(parsedReverseRowIndex);
+
+      const reverseFromStoreName = (reverseRow?.[3] || toStoreName).toString().trim();
+      const reverseFromStoreId = (reverseRow?.[4] || toStoreId).toString().trim();
+      const reverseToStoreName = (reverseRow?.[5] || fromStoreName).toString().trim();
+      const reverseToStoreId = (reverseRow?.[6] || fromStoreId).toString().trim();
+      const reverseModeType = (reverseRow?.[7] || modeType).toString().trim() || modeType;
+
+      const reverseRowValues = buildQuickCostRow({
+        timestamp: now,
+        registrantStoreName,
+        registrantStoreId,
+        fromStoreName: reverseFromStoreName,
+        fromStoreId: reverseFromStoreId,
+        toStoreName: reverseToStoreName,
+        toStoreId: reverseToStoreId,
+        modeType: reverseModeType,
+        companies: normalizedCompanies
+      });
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${QUICK_COST_SHEET_NAME}!A${parsedReverseRowIndex}:AL${parsedReverseRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [reverseRowValues]
+        }
+      });
+
+      updatedRows.push(parsedReverseRowIndex);
+    }
+
+    invalidateQuickCostCache(fromStoreId, toStoreId, normalizedCompanies);
+
+    res.json({
+      success: true,
+      message: '퀵비용 데이터가 성공적으로 수정되었습니다.',
+      updatedRows
+    });
+
+  } catch (error) {
+    console.error('퀵비용 데이터 수정 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '퀵비용 데이터 수정에 실패했습니다.'
+    });
+  }
+});
+
+// 퀵비용 데이터 삭제 API
+app.delete('/api/quick-cost/delete', async (req, res) => {
+  try {
+    const { rowIndex, reverseRowIndex } = req.body || {};
+
+    const parsedRowIndex = parseInt(rowIndex, 10);
+    if (!parsedRowIndex || Number.isNaN(parsedRowIndex) || parsedRowIndex < 2) {
+      return res.status(400).json({
+        success: false,
+        error: '유효한 rowIndex가 필요합니다.'
+      });
+    }
+
+    const getRowByIndex = async (index) => {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${QUICK_COST_SHEET_NAME}!A${index}:AL${index}`
+      });
+      return response.data.values?.[0] || null;
+    };
+
+    const existingRow = await getRowByIndex(parsedRowIndex);
+    if (!existingRow) {
+      return res.status(404).json({
+        success: false,
+        error: '삭제할 데이터를 찾을 수 없습니다.'
+      });
+    }
+
+    const fromStoreId = (existingRow[4] || '').toString().trim();
+    const toStoreId = (existingRow[6] || '').toString().trim();
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${QUICK_COST_SHEET_NAME}!A${parsedRowIndex}:AL${parsedRowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [buildEmptyQuickCostRow()]
+      }
+    });
+
+    const deletedRows = [parsedRowIndex];
+
+    const parsedReverseRowIndex = reverseRowIndex
+      ? parseInt(reverseRowIndex, 10)
+      : null;
+
+    if (parsedReverseRowIndex && !Number.isNaN(parsedReverseRowIndex) && parsedReverseRowIndex >= 2) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${QUICK_COST_SHEET_NAME}!A${parsedReverseRowIndex}:AL${parsedReverseRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [buildEmptyQuickCostRow()]
+        }
+      });
+
+      deletedRows.push(parsedReverseRowIndex);
+    }
+
+    invalidateQuickCostCache(fromStoreId, toStoreId, []);
+
+    res.json({
+      success: true,
+      message: '퀵비용 데이터가 성공적으로 삭제되었습니다.',
+      deletedRows
+    });
+
+  } catch (error) {
+    console.error('퀵비용 데이터 삭제 실패:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '퀵비용 데이터 삭제에 실패했습니다.'
     });
   }
 });
@@ -33231,19 +33521,18 @@ app.get('/api/quick-cost/costs', async (req, res) => {
 // 사용자 등록 이력 조회 API
 app.get('/api/quick-cost/history', async (req, res) => {
   try {
-    const { userId, storeId } = req.query;
+    const { userId, storeId, fromStoreId, toStoreId, limit } = req.query;
 
-    if (!userId && !storeId) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'userId 또는 storeId가 필요합니다.' 
+    if (!userId && !storeId && !fromStoreId && !toStoreId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId, storeId, fromStoreId, toStoreId 중 최소 하나는 필요합니다.'
       });
     }
 
-    // 구글시트에서 데이터 조회
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${QUICK_COST_SHEET_NAME}!A:AL`,
+      range: `${QUICK_COST_SHEET_NAME}!A:AL`
     });
 
     const rows = response.data.values || [];
@@ -33252,68 +33541,126 @@ app.get('/api/quick-cost/history', async (req, res) => {
     }
 
     const dataRows = rows.slice(1);
-    
-    // 필터링
-    const filteredData = dataRows
-      .map((row, index) => {
-        const registrantStoreId = row[2]?.toString().trim(); // 등록자매장ID (C열)
-        const match = userId 
-          ? row[1]?.toString().trim() === userId.toString() // 등록자매장명으로 매칭 (임시)
-          : registrantStoreId === storeId.toString();
-        
-        if (!match) return null;
 
-        return {
-          rowIndex: index + 2, // 실제 행 번호 (헤더 포함)
-          registeredAt: row[0] || '', // 등록일시
-          registrantStoreName: row[1] || '', // 등록자매장명
-          registrantStoreId: registrantStoreId, // 등록자매장ID
-          fromStoreName: row[3] || '', // 출발매장명
-          fromStoreId: row[4] || '', // 출발매장ID
-          toStoreName: row[5] || '', // 도착매장명
-          toStoreId: row[6] || '', // 도착매장ID
-          modeType: row[7] || '', // 모드타입
-          companies: []
-        };
-      })
-      .filter(item => item !== null);
+    const entries = dataRows.map((row, index) => {
+      const registeredAt = (row[0] || '').toString().trim();
+      const registrantStoreName = (row[1] || '').toString().trim();
+      const registrantStoreId = (row[2] || '').toString().trim();
+      const fromName = (row[3] || '').toString().trim();
+      const fromId = (row[4] || '').toString().trim();
+      const toName = (row[5] || '').toString().trim();
+      const toId = (row[6] || '').toString().trim();
+      const mode = (row[7] || '').toString().trim();
 
-    // 각 행의 업체 정보 추출
-    filteredData.forEach(item => {
-      const row = dataRows[item.rowIndex - 2];
-      for (let i = 0; i < 5; i++) {
-        const baseIndex = 8 + (i * 6);
-        const companyName = row[baseIndex]?.toString().trim();
-        const phoneNumber = row[baseIndex + 1]?.toString().trim();
-        const cost = row[baseIndex + 2]?.toString().trim();
-        
-        if (companyName && phoneNumber && cost) {
-          item.companies.push({
-            name: companyName,
-            phone: phoneNumber,
-            cost: parseInt(cost) || 0,
-            dispatchSpeed: row[baseIndex + 3] || '',
-            pickupSpeed: row[baseIndex + 4] || '',
-            arrivalSpeed: row[baseIndex + 5] || ''
-          });
+      const companies = [];
+      for (let i = 0; i < QUICK_COST_MAX_COMPANIES; i++) {
+        const baseIndex = QUICK_COST_BASE_COLUMN_COUNT + i * QUICK_COST_COMPANY_FIELD_COUNT;
+        const companyName = (row[baseIndex] || '').toString().trim();
+        const phone = (row[baseIndex + 1] || '').toString().trim();
+        const costRaw = (row[baseIndex + 2] || '').toString().trim();
+        if (!companyName || !phone || !costRaw) continue;
+
+        companies.push({
+          name: companyName,
+          phone,
+          cost: parseInt(costRaw, 10) || 0,
+          dispatchSpeed: (row[baseIndex + 3] || '').toString().trim(),
+          pickupSpeed: (row[baseIndex + 4] || '').toString().trim(),
+          arrivalSpeed: (row[baseIndex + 5] || '').toString().trim()
+        });
+      }
+
+      return {
+        rowIndex: index + 2,
+        registeredAt,
+        registrantStoreName,
+        registrantStoreId,
+        fromStoreName: fromName,
+        fromStoreId: fromId,
+        toStoreName: toName,
+        toStoreId: toId,
+        modeType: mode,
+        companies,
+        reverseRowIndex: null
+      };
+    });
+
+    const validEntries = entries.filter(
+      (entry) =>
+        entry &&
+        entry.fromStoreId &&
+        entry.toStoreId &&
+        entry.companies.length > 0
+    );
+
+    const entryMap = new Map();
+    validEntries.forEach((entry) => {
+      const key = `${entry.fromStoreId}__${entry.toStoreId}__${entry.registeredAt}__${entry.registrantStoreId}`;
+      if (!entryMap.has(key)) {
+        entryMap.set(key, []);
+      }
+      entryMap.get(key).push(entry);
+    });
+
+    validEntries.forEach((entry) => {
+      const reverseKey = `${entry.toStoreId}__${entry.fromStoreId}__${entry.registeredAt}__${entry.registrantStoreId}`;
+      const candidates = entryMap.get(reverseKey);
+      if (candidates && candidates.length > 0) {
+        const reverse = candidates.find((candidate) => candidate.rowIndex !== entry.rowIndex);
+        if (reverse) {
+          entry.reverseRowIndex = reverse.rowIndex;
         }
       }
     });
 
-    // 등록일시 역순 정렬
-    filteredData.sort((a, b) => {
+    let filtered = validEntries;
+
+    if (userId) {
+      const userIdStr = userId.toString().trim();
+      filtered = filtered.filter(
+        (entry) =>
+          entry.registrantStoreName === userIdStr ||
+          entry.registrantStoreId === userIdStr
+      );
+    }
+
+    if (storeId) {
+      const storeIdStr = storeId.toString().trim();
+      filtered = filtered.filter(
+        (entry) => entry.registrantStoreId === storeIdStr
+      );
+    }
+
+    if (fromStoreId) {
+      const fromIdStr = fromStoreId.toString().trim();
+      filtered = filtered.filter((entry) => entry.fromStoreId === fromIdStr);
+    }
+
+    if (toStoreId) {
+      const toIdStr = toStoreId.toString().trim();
+      filtered = filtered.filter((entry) => entry.toStoreId === toIdStr);
+    }
+
+    filtered.sort((a, b) => {
       const dateA = new Date(a.registeredAt);
       const dateB = new Date(b.registeredAt);
+      if (!Number.isFinite(dateA.getTime()) || !Number.isFinite(dateB.getTime())) {
+        return (b.rowIndex || 0) - (a.rowIndex || 0);
+      }
       return dateB - dateA;
     });
 
-    res.json({ success: true, data: filteredData });
+    const parsedLimit = limit ? parseInt(limit, 10) : null;
+    if (parsedLimit && !Number.isNaN(parsedLimit) && parsedLimit > 0) {
+      filtered = filtered.slice(0, parsedLimit);
+    }
 
+    res.json({ success: true, data: filtered });
   } catch (error) {
     console.error('등록 이력 조회 실패:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || '등록 이력 조회에 실패했습니다.' 
+    res.status(500).json({
+      success: false,
+      error: error.message || '등록 이력 조회에 실패했습니다.'
     });
   }
 });
