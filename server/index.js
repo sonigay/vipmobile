@@ -34026,6 +34026,7 @@ app.get('/api/quick-cost/quality', async (req, res) => {
     
     // 이상치 데이터 수집
     const outliers = [];
+    const outlierCountMap = new Map();
     const companyStatsMap = new Map();
     let totalEntries = 0;
 
@@ -34100,6 +34101,7 @@ app.get('/api/quick-cost/quality', async (req, res) => {
 
     const duplicateGroups = [];
     const mergeSuggestions = [];
+    const reliabilityScores = [];
 
     companyStatsMap.forEach((stats) => {
       if (stats.variants.size > 1) {
@@ -34118,16 +34120,21 @@ app.get('/api/quick-cost/quality', async (req, res) => {
         });
       }
 
-      if (stats.costs.length >= 3) {
-        const mean =
-          stats.costs.reduce((sum, value) => sum + value, 0) / stats.costs.length;
-        const variance =
-          stats.costs.reduce(
-            (sum, value) => sum + Math.pow(value - mean, 2),
-            0
-          ) / stats.costs.length;
-        const stdDev = Math.sqrt(variance);
+      const entryCount = stats.costs.length;
+      const mean =
+        entryCount > 0
+          ? stats.costs.reduce((sum, value) => sum + value, 0) / entryCount
+          : 0;
+      const variance =
+        entryCount > 1
+          ? stats.costs.reduce(
+              (sum, value) => sum + Math.pow(value - mean, 2),
+              0
+            ) / entryCount
+          : 0;
+      const stdDev = Math.sqrt(variance);
 
+      if (entryCount >= 3) {
         stats.entries.forEach((entry) => {
           const deviation = Math.abs(entry.cost - mean);
           const deviationRatio = mean === 0 ? 0 : deviation / mean;
@@ -34154,12 +34161,56 @@ app.get('/api/quick-cost/quality', async (req, res) => {
                 arrival: entry.arrivalSpeed
               }
             });
+
+            outlierCountMap.set(
+              stats.normalizedName,
+              (outlierCountMap.get(stats.normalizedName) || 0) + 1
+            );
           }
+        });
+      }
+
+      if (entryCount > 0) {
+        const entryScore =
+          entryCount >= 10
+            ? 50
+            : Math.round((Math.min(entryCount, 10) / 10) * 50);
+
+        const dispersion =
+          mean > 0 && Number.isFinite(stdDev) ? Math.min(stdDev / mean, 1) : 0;
+        const varianceScore = Math.round(30 * Math.max(0, 1 - dispersion));
+
+        const outlierCount = outlierCountMap.get(stats.normalizedName) || 0;
+        const outlierRatio =
+          entryCount > 0 ? Math.min(outlierCount / entryCount, 1) : 0;
+        const outlierScore = Math.round(
+          20 * Math.max(0, 1 - Math.min(outlierRatio * 2, 1))
+        );
+
+        const totalScore = Math.max(
+          0,
+          Math.min(100, entryScore + varianceScore + outlierScore)
+        );
+
+        const variants = Array.from(stats.variants.entries()).sort(
+          (a, b) => b[1] - a[1]
+        );
+        const displayName = variants[0]?.[0] || stats.normalizedName;
+
+        reliabilityScores.push({
+          normalizedName: stats.normalizedName,
+          displayName,
+          score: totalScore,
+          entryCount,
+          meanCost: Math.round(mean),
+          stdDev: Math.round(stdDev),
+          outlierRatio: parseFloat((outlierRatio * 100).toFixed(2))
         });
       }
     });
 
     duplicateGroups.sort((a, b) => b.totalCount - a.totalCount);
+    reliabilityScores.sort((a, b) => b.score - a.score);
 
     const result = {
       outliers: outliers,
@@ -34171,7 +34222,7 @@ app.get('/api/quick-cost/quality', async (req, res) => {
       duplicateRate: parseFloat(duplicateRate),
       duplicateGroups: duplicateGroups.slice(0, 25),
       mergeSuggestions: mergeSuggestions.slice(0, 25),
-      reliabilityScores: [] // 신뢰도 점수는 통계 API에서 가져올 수 있음
+      reliabilityScores: reliabilityScores.slice(0, 100)
     };
 
     cacheUtils.set(cacheKey, result, 30 * 60 * 1000); // 30분 캐싱

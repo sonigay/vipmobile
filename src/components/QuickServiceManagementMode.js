@@ -327,6 +327,20 @@ const QuickServiceManagementMode = ({
     () => (quality.outliers || []).slice(0, 10),
     [quality.outliers]
   );
+  const reliabilityScores = useMemo(
+    () => (quality.reliabilityScores || []).slice(0, 15),
+    [quality.reliabilityScores]
+  );
+
+  const getReliabilityStatus = (score) => {
+    if (score >= 75) {
+      return { color: 'success', label: '안정' };
+    }
+    if (score >= 50) {
+      return { color: 'warning', label: '주의' };
+    }
+    return { color: 'error', label: '검토' };
+  };
 
   const handleRegionChange = (event) => {
     const nextRegion = event.target.value;
@@ -1226,6 +1240,92 @@ const QuickServiceManagementMode = ({
                       </Grid>
                       <Divider sx={{ my: 3 }} />
                       <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                          <Paper
+                            variant="outlined"
+                            sx={{ p: 2, borderRadius: 2 }}
+                          >
+                            <Stack spacing={1.5}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                  신뢰도 평가
+                                </Typography>
+                                <Tooltip title="등록 건수, 비용 분산, 이상치 비율을 기반으로 산출된 신뢰도 점수입니다.">
+                                  <IconButton size="small">
+                                    <InfoOutlinedIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                              {reliabilityScores.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  계산 가능한 신뢰도 데이터가 없습니다.
+                                </Typography>
+                              ) : (
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell sx={{ fontWeight: 600 }}>업체명</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        신뢰도
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        등록수
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        평균 비용
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        표준편차
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }} align="right">
+                                        이상치 비율
+                                      </TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {reliabilityScores.map((item) => {
+                                      const status = getReliabilityStatus(item.score);
+                                      return (
+                                        <TableRow key={item.normalizedName}>
+                                          <TableCell>
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                              {item.displayName || item.normalizedName}
+                                            </Typography>
+                                            {item.displayName !== item.normalizedName && (
+                                              <Typography variant="caption" color="text.secondary">
+                                                ({item.normalizedName})
+                                              </Typography>
+                                            )}
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            <Chip
+                                              size="small"
+                                              color={status.color}
+                                              label={`${item.score}점 · ${status.label}`}
+                                              sx={{ fontWeight: 600 }}
+                                            />
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            {item.entryCount?.toLocaleString()}건
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            {item.meanCost?.toLocaleString()}원
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            {item.stdDev?.toLocaleString()}원
+                                          </TableCell>
+                                          <TableCell align="right">
+                                            {item.outlierRatio?.toFixed(2)}%
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </Stack>
+                          </Paper>
+                        </Grid>
                         <Grid item xs={12} md={6}>
                           <Paper
                             variant="outlined"
