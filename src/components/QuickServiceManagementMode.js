@@ -1708,7 +1708,7 @@ const QuickServiceManagementMode = ({
                     >
                       <Stack spacing={0.5}>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          지역 분포 시각화 (2차 버전)
+                          지역 분포 시각화
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {isRegionMetric
@@ -2599,7 +2599,12 @@ const QuickServiceManagementMode = ({
                                     ? 'warning'
                                     : 'error'
                                 }
-                                label={`${quality.duplicateRate?.toFixed(2)}%`}
+                                label={
+                                  quality.duplicateRate === null ||
+                                  quality.duplicateRate === undefined
+                                    ? '-'
+                                    : `${quality.duplicateRate.toFixed(2)}%`
+                                }
                                 sx={{ fontWeight: 600 }}
                               />
                               <Typography variant="body2" color="text.secondary">

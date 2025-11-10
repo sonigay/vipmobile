@@ -34633,6 +34633,7 @@ app.get('/api/quick-cost/quality', async (req, res) => {
     const mergeSuggestions = [];
     const reliabilityScores = [];
     let mergeCandidateCount = 0;
+    let totalDuplicateEntries = 0;
 
     const detectOutliersForSet = (entries, label) => {
       const entryCount = entries.length;
@@ -34740,6 +34741,10 @@ app.get('/api/quick-cost/quality', async (req, res) => {
           (sum, item) => sum + item.count,
           0
         );
+        totalDuplicateEntries += mergeCandidates.reduce(
+          (sum, item) => sum + item.count,
+          0
+        );
         duplicateGroups.push({
           normalizedName: stats.normalizedName,
           totalCount: variants.reduce((sum, item) => sum + item.count, 0),
@@ -34824,6 +34829,10 @@ app.get('/api/quick-cost/quality', async (req, res) => {
             ? (((totalEntries - mergeCandidateCount) / totalEntries) * 100).toFixed(2)
             : 0
       },
+      duplicateRate:
+        totalEntries > 0
+          ? parseFloat(((totalDuplicateEntries / totalEntries) * 100).toFixed(2))
+          : 0,
       duplicateGroups: duplicateGroups.slice(0, 25),
       mergeSuggestions: mergeSuggestions.slice(0, 25),
       reliabilityScores: reliabilityScores.slice(0, 100)
