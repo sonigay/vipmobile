@@ -32764,6 +32764,8 @@ const QUICK_COST_BASE_COLUMN_COUNT = 8;
 const QUICK_COST_TOTAL_COLUMN_COUNT =
   QUICK_COST_BASE_COLUMN_COUNT + QUICK_COST_MAX_COMPANIES * QUICK_COST_COMPANY_FIELD_COUNT;
 const QUICK_COST_VALID_SPEEDS = new Set(['빠름', '중간', '느림']);
+const SECONDS_IN_DAY = 24 * 60 * 60;
+const MILLIS_IN_DAY = SECONDS_IN_DAY * 1000;
 
 const formatDateTimeForSheet = (date) => {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
@@ -32818,6 +32820,7 @@ const parseSheetDate = (value) => {
 
 const createRegisteredAtResolver = () => {
   let lastKnownDate = null;
+  let currentFallback = null;
 
   return (rawValue, options = {}) => {
     const {
@@ -32835,6 +32838,7 @@ const createRegisteredAtResolver = () => {
     const parsed = parseSheetDate(trimmed);
     if (parsed) {
       lastKnownDate = parsed;
+      currentFallback = parsed;
       return {
         date: parsed,
         label: formatDateTimeForSheet(parsed),
@@ -32842,10 +32846,13 @@ const createRegisteredAtResolver = () => {
       };
     }
 
-    const fallbackDate = lastKnownDate
-      ? new Date(lastKnownDate.getTime())
+    const fallbackBase = lastKnownDate || currentFallback;
+    const fallbackDate = fallbackBase
+      ? new Date(fallbackBase.getTime())
       : new Date();
+    fallbackDate.setUTCHours(0, 0, 0, 0);
     lastKnownDate = fallbackDate;
+    currentFallback = fallbackDate;
     const fallbackLabel = formatDateTimeForSheet(fallbackDate);
 
     if (
@@ -32865,6 +32872,146 @@ const createRegisteredAtResolver = () => {
       wasFallback: true
     };
   };
+};
+
+const getMonthlyTrendInfo = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const label = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const startTimestamp = Date.UTC(year, month, 1);
+  const endTimestamp = Date.UTC(year, month + 1, 1) - 1;
+  return {
+    key: label,
+    label,
+    displayLabel: `${year}.${String(month + 1).padStart(2, '0')}`,
+    startTimestamp,
+    endTimestamp
+  };
+};
+
+const getISOWeekInfo = (date) => {
+  const target = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+  let day = target.getUTCDay();
+  if (day === 0) day = 7;
+  target.setUTCDate(target.getUTCDate() + (4 - day));
+  const isoYear = target.getUTCFullYear();
+
+  const isoYearStart = new Date(Date.UTC(isoYear, 0, 1));
+  let isoYearStartDay = isoYearStart.getUTCDay();
+  if (isoYearStartDay === 0) isoYearStartDay = 7;
+  if (isoYearStartDay > 4) {
+    isoYearStart.setUTCDate(isoYearStart.getUTCDate() + (8 - isoYearStartDay));
+  } else {
+    isoYearStart.setUTCDate(isoYearStart.getUTCDate() - (isoYearStartDay - 1));
+  }
+
+  const weekNumber =
+    Math.floor((target - isoYearStart) / (7 * MILLIS_IN_DAY)) + 1;
+
+  const weekStart = new Date(target);
+  weekStart.setUTCDate(target.getUTCDate() - 3);
+  weekStart.setUTCHours(0, 0, 0, 0);
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  weekEnd.setUTCHours(23, 59, 59, 999);
+
+  return { isoYear, weekNumber, weekStart, weekEnd };
+};
+
+const getWeeklyTrendInfo = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const { isoYear, weekNumber, weekStart, weekEnd } = getISOWeekInfo(date);
+  const label = `${isoYear}-W${String(weekNumber).padStart(2, '0')}`;
+  return {
+    key: label,
+    label,
+    displayLabel: `${isoYear}.W${String(weekNumber).padStart(2, '0')}`,
+    startTimestamp: weekStart.getTime(),
+    endTimestamp: weekEnd.getTime(),
+    isoYear,
+    weekNumber
+  };
+};
+
+const ensureTrendBucket = (map, info) => {
+  if (!info) return null;
+  if (!map.has(info.key)) {
+    map.set(info.key, {
+      key: info.key,
+      label: info.label,
+      displayLabel: info.displayLabel,
+      startTimestamp: info.startTimestamp,
+      endTimestamp: info.endTimestamp,
+      isoYear: info.isoYear,
+      weekNumber: info.weekNumber,
+      entryCount: 0,
+      totalCost: 0,
+      companyKeys: new Set(),
+      totalDistance: 0,
+      totalCostWithDistance: 0,
+      distanceCount: 0
+    });
+  }
+  return map.get(info.key);
+};
+
+const updateTrendBucket = (bucket, costNum, distanceKm, companyKey) => {
+  if (!bucket) return;
+  bucket.entryCount += 1;
+  bucket.totalCost += costNum;
+  if (companyKey) {
+    bucket.companyKeys.add(companyKey);
+  }
+  if (typeof distanceKm === 'number') {
+    bucket.totalDistance += distanceKm;
+    bucket.totalCostWithDistance += costNum;
+    bucket.distanceCount += 1;
+  }
+};
+
+const buildTrendResult = (map, type) => {
+  const buckets = Array.from(map.values()).sort(
+    (a, b) => (a.startTimestamp || 0) - (b.startTimestamp || 0)
+  );
+
+  return buckets.map((bucket) => {
+    const averageCost =
+      bucket.entryCount > 0
+        ? Math.round(bucket.totalCost / bucket.entryCount)
+        : null;
+    const averageCostPerKm =
+      bucket.totalDistance > 0
+        ? Math.round(
+            (bucket.totalCostWithDistance / bucket.totalDistance) * 10
+          ) / 10
+        : null;
+    const distanceCoverage =
+      bucket.entryCount > 0
+        ? Math.round((bucket.distanceCount / bucket.entryCount) * 100)
+        : 0;
+
+    return {
+      type,
+      label: bucket.label,
+      displayLabel: bucket.displayLabel,
+      timestamp: bucket.startTimestamp,
+      startTimestamp: bucket.startTimestamp,
+      endTimestamp: bucket.endTimestamp,
+      entryCount: bucket.entryCount,
+      averageCost,
+      averageCostPerKm,
+      companyCount: bucket.companyKeys.size,
+      distanceCoverage
+    };
+  });
 };
 
 const normalizeQuickCostCompanies = (companies = []) => {
@@ -33846,7 +33993,7 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
         popularCompanies: [],
         excellentCompanies: [],
         distanceCostAnalysis: [],
-        timeTrends: []
+        timeTrends: { monthly: [], weekly: [] }
       };
       cacheUtils.set(cacheKey, emptyResult, 30 * 60 * 1000);
       return res.json({ success: true, data: emptyResult });
@@ -33981,23 +34128,10 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
     const regionCompanyMap = new Map(); // 지역별 업체 통계
     const regionMetricsMap = new Map();
     const routeMetrics = [];
-    const timeTrendMap = new Map();
+    const monthlyTrendMap = new Map();
+    const weeklyTrendMap = new Map();
     const missingRegisteredAtRows = [];
     const resolveRegisteredAt = createRegisteredAtResolver();
-
-    const resolveTimeBucket = (value) => {
-      const parsedDate =
-        value instanceof Date ? value : parseSheetDate(value);
-      if (!parsedDate) return null;
-
-      const year = parsedDate.getUTCFullYear();
-      const month = parsedDate.getUTCMonth(); // 0-based
-      if (Number.isNaN(year) || Number.isNaN(month)) return null;
-
-      const bucketLabel = `${year}-${String(month + 1).padStart(2, '0')}`;
-      const timestamp = Date.UTC(year, month, 1);
-      return { label: bucketLabel, timestamp };
-    };
 
     dataRows.forEach((row, index) => {
       const registeredAtInfo = resolveRegisteredAt(row[0], {
@@ -34006,7 +34140,8 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
         recordMissing: true,
         updateOnFallback: true
       });
-      const timeBucketInfo = resolveTimeBucket(registeredAtInfo.date);
+      const monthlyBucketInfo = getMonthlyTrendInfo(registeredAtInfo.date);
+      const weeklyBucketInfo = getWeeklyTrendInfo(registeredAtInfo.date);
       row[0] = registeredAtInfo.label;
 
       const fromStoreId = row[4]?.toString().trim();
@@ -34103,29 +34238,18 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
           regionMetric.distanceCount += 1;
         }
 
-        if (timeBucketInfo) {
-          if (!timeTrendMap.has(timeBucketInfo.label)) {
-            timeTrendMap.set(timeBucketInfo.label, {
-              label: timeBucketInfo.label,
-              timestamp: timeBucketInfo.timestamp,
-              entryCount: 0,
-              totalCost: 0,
-              companyKeys: new Set(),
-              totalDistance: 0,
-              totalCostWithDistance: 0,
-              distanceCount: 0
-            });
-          }
-          const trendBucket = timeTrendMap.get(timeBucketInfo.label);
-          trendBucket.entryCount += 1;
-          trendBucket.totalCost += costNum;
-          trendBucket.companyKeys.add(key);
-          if (typeof distanceKm === 'number') {
-            trendBucket.totalDistance += distanceKm;
-            trendBucket.totalCostWithDistance += costNum;
-            trendBucket.distanceCount += 1;
-          }
-        }
+        updateTrendBucket(
+          ensureTrendBucket(monthlyTrendMap, monthlyBucketInfo),
+          costNum,
+          distanceKm,
+          key
+        );
+        updateTrendBucket(
+          ensureTrendBucket(weeklyTrendMap, weeklyBucketInfo),
+          costNum,
+          distanceKm,
+          key
+        );
 
         // 지역별 통계
         const regionKey = `${storeRegion}-${key}`;
@@ -34355,40 +34479,18 @@ app.get('/api/quick-cost/statistics', async (req, res) => {
       }
     }
 
+    const timeTrends = {
+      monthly: buildTrendResult(monthlyTrendMap, 'monthly'),
+      weekly: buildTrendResult(weeklyTrendMap, 'weekly')
+    };
+
     const result = {
       companyStats: companyStats,
       popularCompanies: popularCompanies,
       excellentCompanies: excellentCompanies,
       regionAggregates,
       distanceCostAnalysis,
-      timeTrends: Array.from(timeTrendMap.values())
-        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-        .map((bucket) => {
-          const averageCost =
-            bucket.entryCount > 0
-              ? Math.round(bucket.totalCost / bucket.entryCount)
-              : null;
-          const averageCostPerKm =
-            bucket.totalDistance > 0
-              ? Math.round(
-                  (bucket.totalCostWithDistance / bucket.totalDistance) * 10
-                ) / 10
-              : null;
-          const distanceCoverage =
-            bucket.entryCount > 0
-              ? Math.round((bucket.distanceCount / bucket.entryCount) * 100)
-              : 0;
-
-          return {
-            label: bucket.label,
-            timestamp: bucket.timestamp,
-            entryCount: bucket.entryCount,
-            averageCost,
-            averageCostPerKm,
-            companyCount: bucket.companyKeys.size,
-            distanceCoverage
-          };
-        })
+      timeTrends
     };
 
     cacheUtils.set(cacheKey, result, 30 * 60 * 1000); // 30분 캐싱

@@ -76,7 +76,10 @@ const defaultStatistics = {
   excellentCompanies: [],
   regionAggregates: [],
   distanceCostAnalysis: [],
-  timeTrends: []
+  timeTrends: {
+    monthly: [],
+    weekly: []
+  }
 };
 
 const defaultQuality = {
@@ -85,6 +88,11 @@ const defaultQuality = {
   duplicateRate: 0,
   reliabilityScores: []
 };
+
+const TREND_OPTIONS = [
+  { key: 'monthly', label: '월별' },
+  { key: 'weekly', label: '주별' }
+];
 
 const REGION_COORDINATES = {
   서울: { lat: 37.5665, lng: 126.978 },
@@ -256,6 +264,25 @@ const formatMonthLabel = (label) => {
   return trimmed || '';
 };
 
+const formatWeekLabel = (label) => {
+  if (typeof label !== 'string') return label || '';
+  const trimmed = label.trim();
+  const match = trimmed.match(/^(\d{4})-W(\d{2})$/);
+  if (match) {
+    const [, year, week] = match;
+    return `${year}.${week}주`;
+  }
+  return trimmed || '';
+};
+
+const getIsoWeekStartTimestamp = (year, week) => {
+  const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+  const dayOfWeek = simple.getUTCDay();
+  const isoDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+  simple.setUTCDate(simple.getUTCDate() + (1 - isoDay));
+  return simple.getTime();
+};
+
 const getTimestampFromLabel = (label) => {
   if (typeof label !== 'string') return null;
   const trimmed = label.trim();
@@ -266,6 +293,15 @@ const getTimestampFromLabel = (label) => {
     const m = Number(month);
     if (!Number.isNaN(y) && !Number.isNaN(m)) {
       return Date.UTC(y, Math.max(0, m - 1), 1);
+    }
+  }
+  const weekMatch = trimmed.match(/^(\d{4})-W(\d{2})$/);
+  if (weekMatch) {
+    const [, year, week] = weekMatch;
+    const y = Number(year);
+    const w = Number(week);
+    if (!Number.isNaN(y) && !Number.isNaN(w)) {
+      return getIsoWeekStartTimestamp(y, w);
     }
   }
   const parsed = new Date(trimmed);
@@ -282,6 +318,25 @@ const formatTrendDelta = (value, suffix) => {
 const formatNumberWithUnit = (value, unit) => {
   if (value === null || value === undefined) return '-';
   return `${value.toLocaleString()}${unit}`;
+};
+
+const formatDateWithSeparator = (timestamp) => {
+  if (!timestamp && timestamp !== 0) return '';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}.${month}.${day}`;
+};
+
+const formatDateRange = (startTimestamp, endTimestamp) => {
+  const start = formatDateWithSeparator(startTimestamp);
+  const end = formatDateWithSeparator(endTimestamp);
+  if (!start && !end) return '';
+  if (!start) return `~ ${end}`;
+  if (!end) return `${start} ~`;
+  return `${start} ~ ${end}`;
 };
 const QuickServiceManagementMode = ({
   onLogout,
@@ -323,6 +378,7 @@ const QuickServiceManagementMode = ({
     from: null,
     to: null
   });
+  const [trendGranularity, setTrendGranularity] = useState('monthly');
   const modeColor = useMemo(() => getModeColor(MODE_KEY), []);
   const modeTitle = useMemo(
     () => getModeTitle(MODE_KEY, '퀵서비스 관리 모드'),
@@ -527,32 +583,87 @@ const QuickServiceManagementMode = ({
     [quality.duplicateGroups]
   );
 
+  const trendDataMap = useMemo(() => {
+    const raw = statistics.timeTrends;
+    if (!raw) return {};
+    if (Array.isArray(raw)) {
+      return { monthly: raw };
+    }
+    return raw;
+  }, [statistics.timeTrends]);
+
+  const availableTrendKeys = useMemo(() => {
+    const keys = Object.keys(trendDataMap);
+    if (keys.length === 0) return [];
+    const nonEmpty = keys.filter((key) => {
+      const list = trendDataMap[key];
+      return Array.isArray(list) && list.length > 0;
+    });
+    return nonEmpty.length > 0 ? nonEmpty : keys;
+  }, [trendDataMap]);
+
+  useEffect(() => {
+    if (availableTrendKeys.length === 0) return;
+    if (!availableTrendKeys.includes(trendGranularity)) {
+      setTrendGranularity(availableTrendKeys[0]);
+    }
+  }, [availableTrendKeys, trendGranularity]);
+
   const timeTrendSeries = useMemo(() => {
-    if (!Array.isArray(statistics.timeTrends)) return [];
-    return statistics.timeTrends
+    const source = trendDataMap[trendGranularity];
+    if (!Array.isArray(source)) return [];
+    return source
       .map((item) => {
         const label = item?.label || '';
-        const timestamp =
+        const rawTimestamp =
           typeof item?.timestamp === 'number'
             ? item.timestamp
             : getTimestampFromLabel(label);
+        const startTimestamp =
+          typeof item?.startTimestamp === 'number'
+            ? item.startTimestamp
+            : rawTimestamp;
+        const endTimestamp =
+          typeof item?.endTimestamp === 'number'
+            ? item.endTimestamp
+            : startTimestamp;
+        const timestamp = Number.isFinite(startTimestamp)
+          ? startTimestamp
+          : Number.isFinite(rawTimestamp)
+          ? rawTimestamp
+          : Date.now();
+        const type = item?.type || trendGranularity;
+        const displayLabel =
+          item?.displayLabel ||
+          (type === 'weekly'
+            ? formatWeekLabel(label)
+            : formatMonthLabel(label));
         return {
           label,
-          displayLabel: formatMonthLabel(label),
+          displayLabel,
           entryCount: item?.entryCount ?? item?.count ?? 0,
           averageCost:
-            item?.averageCost !== undefined ? item.averageCost : item?.avgCost ?? null,
+            item?.averageCost !== undefined
+              ? item.averageCost
+              : item?.avgCost ?? null,
           companyCount: item?.companyCount ?? 0,
           averageCostPerKm:
             item?.averageCostPerKm !== undefined
               ? item.averageCostPerKm
               : item?.avgCostPerKm ?? null,
           distanceCoverage: item?.distanceCoverage ?? null,
-          timestamp
+          timestamp,
+          type,
+          startTimestamp: Number.isFinite(startTimestamp)
+            ? startTimestamp
+            : timestamp,
+          endTimestamp: Number.isFinite(endTimestamp)
+            ? endTimestamp
+            : timestamp
         };
       })
       .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  }, [statistics.timeTrends]);
+  }, [trendDataMap, trendGranularity]);
 
   const timeTrendMetrics = useMemo(() => {
     if (timeTrendSeries.length === 0) {
@@ -605,6 +716,12 @@ const QuickServiceManagementMode = ({
     previousTrend.averageCost !== null
       ? latestTrend.averageCost - previousTrend.averageCost
       : null;
+  const trendDescription =
+    trendGranularity === 'weekly'
+      ? '주별 등록 건수와 평균 비용 변화를 한눈에 확인하세요.'
+      : '월별 등록 건수와 평균 비용 변화를 한눈에 확인하세요.';
+  const comparisonLabel = trendGranularity === 'weekly' ? '전주' : '전월';
+  const latestLabelPrefix = trendGranularity === 'weekly' ? '최근 주' : '최근 월';
   const mergeSuggestions = useMemo(
     () => (quality.mergeSuggestions || []).slice(0, 6),
     [quality.mergeSuggestions]
@@ -706,6 +823,12 @@ const QuickServiceManagementMode = ({
   const handleMapMetricChange = (_event, next) => {
     if (next !== null) {
       setMapMetric(next);
+    }
+  };
+
+  const handleTrendGranularityChange = (_event, next) => {
+    if (next && next !== trendGranularity) {
+      setTrendGranularity(next);
     }
   };
 
@@ -1922,41 +2045,68 @@ const QuickServiceManagementMode = ({
                           최근 등록 추이
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          월별 등록 건수와 평균 비용 변화를 한눈에 확인하세요.
+                          {trendDescription}
                         </Typography>
                       </Stack>
-                      {latestTrend && (
-                        <Stack spacing={0.5}>
-                          <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1.5}
-                            alignItems={{ xs: 'flex-start', sm: 'center' }}
-                          >
-                            <Chip
-                              size="small"
-                              color="primary"
-                              label={`최근 월 ${latestTrend.displayLabel}`}
-                              sx={{ fontWeight: 600 }}
-                            />
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              등록 {formatNumberWithUnit(latestTrend.entryCount, '건')} · 평균 비용{' '}
-                              {latestTrend.averageCost !== null
-                                ? `${latestTrend.averageCost.toLocaleString()}원`
-                                : '-'}
+                      <Stack
+                        spacing={1}
+                        alignItems={{ xs: 'flex-start', sm: 'flex-end' }}
+                      >
+                        <ToggleButtonGroup
+                          size="small"
+                          value={trendGranularity}
+                          exclusive
+                          onChange={handleTrendGranularityChange}
+                          sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
+                        >
+                          {TREND_OPTIONS.map((option) => {
+                            const disabled =
+                              !Array.isArray(trendDataMap[option.key]) ||
+                              trendDataMap[option.key].length === 0;
+                            return (
+                              <ToggleButton
+                                key={option.key}
+                                value={option.key}
+                                disabled={disabled}
+                              >
+                                {option.label}
+                              </ToggleButton>
+                            );
+                          })}
+                        </ToggleButtonGroup>
+                        {latestTrend && (
+                          <Stack spacing={0.5}>
+                            <Stack
+                              direction={{ xs: 'column', sm: 'row' }}
+                              spacing={1.5}
+                              alignItems={{ xs: 'flex-start', sm: 'center' }}
+                            >
+                              <Chip
+                                size="small"
+                                color="primary"
+                                label={`${latestLabelPrefix} ${latestTrend.displayLabel}`}
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                등록 {formatNumberWithUnit(latestTrend.entryCount, '건')} · 평균 비용{' '}
+                                {latestTrend.averageCost !== null
+                                  ? `${latestTrend.averageCost.toLocaleString()}원`
+                                  : '-'}
+                              </Typography>
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {comparisonLabel} 대비 등록{' '}
+                              {entryDelta !== null
+                                ? formatTrendDelta(entryDelta, '건')
+                                : '비교 데이터 없음'}{' '}
+                              · 평균 비용{' '}
+                              {costDelta !== null
+                                ? formatTrendDelta(costDelta, '원')
+                                : '비교 데이터 없음'}
                             </Typography>
                           </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            전월 대비 등록{' '}
-                            {entryDelta !== null
-                              ? formatTrendDelta(entryDelta, '건')
-                              : '비교 데이터 없음'}{' '}
-                            · 평균 비용{' '}
-                            {costDelta !== null
-                              ? formatTrendDelta(costDelta, '원')
-                              : '비교 데이터 없음'}
-                          </Typography>
-                        </Stack>
-                      )}
+                        )}
+                      </Stack>
                     </Box>
                     <Box sx={{ px: 2.5, py: 3, height: 340 }}>
                       {timeTrendSeries.length === 0 ? (
@@ -2016,7 +2166,22 @@ const QuickServiceManagementMode = ({
                                 }
                                 return [value, name];
                               }}
-                              labelFormatter={(label) => `월: ${label}`}
+                              labelFormatter={(label, payload) => {
+                                const item = payload?.[0]?.payload;
+                                if (item) {
+                                  const range = formatDateRange(
+                                    item.startTimestamp,
+                                    item.endTimestamp
+                                  );
+                                  if (range) {
+                                    return `기간: ${range}`;
+                                  }
+                                  if (item.displayLabel) {
+                                    return `기간: ${item.displayLabel}`;
+                                  }
+                                }
+                                return `기간: ${label}`;
+                              }}
                             />
                             <Legend />
                             <Bar
