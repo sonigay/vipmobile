@@ -917,6 +917,15 @@ const QuickServiceManagementMode = ({
     }
   };
 
+  const handleCreateModalClose = (result) => {
+    setShowCreateModal(false);
+    if (result === true) {
+      setHistorySuccessMessage('새 퀵비용 데이터가 등록되었습니다.');
+      performFetchHistory({ silent: false });
+      fetchData(region, true);
+    }
+  };
+
 
   const handleRefresh = () => {
     fetchData(region, true);
@@ -2497,6 +2506,14 @@ const QuickServiceManagementMode = ({
                         </Typography>
                         <Stack direction="row" spacing={1}>
                           <Button
+                            variant="outlined"
+                            startIcon={<AddCircleOutlineIcon />}
+                            onClick={handleOpenCreateModal}
+                            disabled={historyLoading || storeOptionsLoading}
+                          >
+                            신규 등록
+                          </Button>
+                          <Button
                             onClick={handleHistoryReset}
                             disabled={historyLoading}
                           >
@@ -2819,6 +2836,15 @@ const QuickServiceManagementMode = ({
           </Grid>
         </Grid>
       </Container>
+
+      <QuickCostModal
+        open={showCreateModal}
+        onClose={handleCreateModalClose}
+        loggedInStore={loggedInStore}
+        fromStore={createModalStores.from}
+        toStore={createModalStores.to}
+        modeType="관리자모드"
+      />
 
       <QuickCostModal
         open={Boolean(editEntry)}
