@@ -228,7 +228,7 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
     setEditingSheetConfig(null);
   };
 
-  const handleSheetConfigSubmit = (payload) => {
+  const handleSheetConfigSubmit = async (payload) => {
     const normalizedPayload = {
       ...payload,
       originalMonth: editingSheetConfig?.month,
@@ -240,7 +240,10 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
       await api.saveObSettlementLink(normalizedPayload);
       await fetchSheetConfigs();
       handleCloseSheetConfigModal();
-      showSheetConfigMessage(isUpdate ? '월별 링크를 수정했습니다.' : '월별 링크를 저장했습니다.', isUpdate ? 'info' : 'success');
+      showSheetConfigMessage(
+        isUpdate ? '월별 링크를 수정했습니다.' : '월별 링크를 저장했습니다.',
+        isUpdate ? 'info' : 'success'
+      );
     } catch (error) {
       console.error('[OB] Failed to save settlement link:', error);
       showSheetConfigMessage(error.message || '월별 링크 저장 중 오류가 발생했습니다.', 'error');
