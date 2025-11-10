@@ -986,6 +986,8 @@ async function getSheetValuesWithoutCache(sheetName) {
       range = `${safeSheetName}!A:AX`;  // 담당자 AX열까지 확장
     } else if (sheetName === '대리점아이디관리') {
       range = `${safeSheetName}!A:AF`;
+    } else if (sheetName === '어플업데이트') {
+      range = `${safeSheetName}!A:Y`;
     } else {
       range = `${safeSheetName}!A:AA`;
     }
@@ -1024,7 +1026,7 @@ async function fetchSheetValuesDirectly(sheetName, spreadsheetId = SPREADSHEET_I
   } else if (sheetName === '폰클홈데이터') {
     range = `${safeSheetName}!A:CN`;
   } else if (sheetName === '어플업데이트') {
-    range = `${safeSheetName}!A:X`;
+    range = `${safeSheetName}!A:Y`;
   } else if (sheetName === '대리점아이디관리') {
     range = `${safeSheetName}!A:AF`;
   } else if (sheetName === '폰클출고처데이터') {
