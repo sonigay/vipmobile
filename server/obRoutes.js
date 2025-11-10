@@ -296,9 +296,9 @@ function normalizeRecontractRows(values, sourceSheet) {
 
 function filterCustomRow(rowObject) {
   const { row } = rowObject;
-  // 플랜 문서 기준: 38번(유치자마당ID), 39번(유치자명) -> 배열 인덱스는 37, 38
-  const proposerId = parseString(row[37]);
-  const proposerName = parseString(row[38]);
+  // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 38인덱스(유치자마당ID), 39인덱스(유치자명)
+  const proposerId = parseString(row[38]);
+  const proposerName = parseString(row[39]);
 
   if (CUSTOM_PROPOSAL_EXCLUDED_IDS.has(proposerId)) {
     return { include: false, reason: 'excludedId' };
@@ -313,7 +313,8 @@ function filterCustomRow(rowObject) {
 
 function filterRecontractRow(rowObject) {
   const { row } = rowObject;
-  const promoterId = parseString(row[90]);
+  // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 91인덱스(유치자마당ID)
+  const promoterId = parseString(row[91]);
   if (RECONTRACT_EXCLUDED_IDS.has(promoterId)) {
     return { include: false, reason: 'excludedId' };
   }
@@ -374,14 +375,14 @@ function buildCustomProposalSummary(rows) {
   });
 
   const resultRows = included.map(({ sourceSheet, rowNumber, row }) => {
-    // 플랜 문서 기준 컬럼 번호 -> 배열 인덱스 (0-based)
-    // 10번(맞춤제안인정여부) -> row[9], 11번(당월 맞춤제안 매출) -> row[10]
-    // 23번(테마 업셀) -> row[22], 38번(유치자마당ID) -> row[37], 39번(유치자명) -> row[38]
-    const proposerId = parseString(row[37]);
-    const proposerName = parseString(row[38]);
-    const sales = parseNumber(row[10]);
-    const themeFlag = parseString(row[22]);
-    const approvalFlag = parseString(row[9]);
+    // 사용자가 이미 -1을 해서 알려준 인덱스 기준 (K열=10인덱스=row[10])
+    // 10인덱스(맞춤제안인정여부) -> row[10], 11인덱스(당월 맞춤제안 매출) -> row[11]
+    // 23인덱스(테마 업셀) -> row[23], 38인덱스(유치자마당ID) -> row[38], 39인덱스(유치자명) -> row[39]
+    const proposerId = parseString(row[38]);
+    const proposerName = parseString(row[39]);
+    const sales = parseNumber(row[11]);
+    const themeFlag = parseString(row[23]);
+    const approvalFlag = parseString(row[10]);
     return {
       sourceSheet,
       rowNumber,
@@ -450,17 +451,17 @@ function buildRecontractSummary(rows) {
 
   const filteredRows = included
     .map(({ sourceSheet, rowNumber, row }) => {
-      // 플랜 문서 기준 컬럼 번호 -> 배열 인덱스 (0-based)
-      // 10번(출고처) -> row[9], 11번(상태) -> row[10], 20번(정산금액) -> row[19]
-      // 59번(동판-비고) -> row[58], 74번(재약정-비고) -> row[73]
-      // 91번(유치자마당ID) -> row[90], 92번(유치자명) -> row[91] (플랜 문서에 91번만 명시되어 있지만 92번도 확인 필요)
-      const outlet = parseString(row[9]);
-      const status = parseString(row[10]);
+      // 사용자가 이미 -1을 해서 알려준 인덱스 기준
+      // 10인덱스(출고처) -> row[10], 11인덱스(상태) -> row[11], 20인덱스(정산금액) -> row[20]
+      // 59인덱스(동판-비고) -> row[59], 74인덱스(재약정-비고) -> row[74]
+      // 91인덱스(유치자마당ID) -> row[91], 92인덱스(유치자명) -> row[92]
+      const outlet = parseString(row[10]);
+      const status = parseString(row[11]);
       const isObOutlet = outlet.includes('OB');
       const isCompleted = status === '완료';
-      const settlementAmount = parseNumber(row[19]);
-      const remarkPlate = parseString(row[58]);
-      const remarkRecontract = parseString(row[73]);
+      const settlementAmount = parseNumber(row[20]);
+      const remarkPlate = parseString(row[59]);
+      const remarkRecontract = parseString(row[74]);
 
       const remarkPlateAmounts = extractOfferAmounts(remarkPlate);
       const remarkRecontractAmounts = extractOfferAmounts(remarkRecontract);
@@ -468,8 +469,8 @@ function buildRecontractSummary(rows) {
       const offerGiftCard = remarkPlateAmounts.giftCard + remarkRecontractAmounts.giftCard;
       const offerDeposit = remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit;
 
-      const promoterId = parseString(row[90]);
-      const promoterName = parseString(row[91] || '');
+      const promoterId = parseString(row[91]);
+      const promoterName = parseString(row[92] || '');
 
       return {
         sourceSheet,
