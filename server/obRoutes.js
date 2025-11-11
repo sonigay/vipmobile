@@ -253,16 +253,88 @@ function extractOfferAmounts(value) {
   const text = parseString(value);
   if (!text) return { giftCard: 0, deposit: 0 };
 
-  const parts = text.split('/');
-  const lastPart = parts[parts.length - 1];
-  const amount = parseNumber(lastPart);
+  let giftCardTotal = 0;
+  let depositTotal = 0;
 
-  const isGiftCard = OB_RECONTRACT_OFFER_PATTERNS.giftCard.test(text);
-  const isDeposit = OB_RECONTRACT_OFFER_PATTERNS.deposit.test(text);
+  // 상품권 패턴 찾기 (더 포괄적으로)
+  // 1. "상품권" 단어가 포함된 경우, 그 뒤 "/" 또는 공백 뒤의 숫자
+  // 2. "/" 뒤의 숫자 (앞에 "상품권"이 포함된 경우)
+  // 3. 숫자 뒤의 "상품권" (공백 있거나 없거나)
+  const giftCardPatterns = [
+    /상품권[\/\s]+(\d{1,3}(?:,\d{3})*)/g,           // "상품권/140000" 또는 "상품권 140,000"
+    /(\d{1,3}(?:,\d{3})*)\s*상품권/g,               // "190,000상품권" 또는 "190000 상품권"
+    /\/\s*(\d{1,3}(?:,\d{3})*)\s*\/[^\/]*상품권/g,  // "/140000/권은숙" 형태에서 "상품권"이 뒤에 있는 경우
+    /상품권[^\/]*\/\s*(\d{1,3}(?:,\d{3})*)/g        // "신세계상품권/140000" 형태
+  ];
+
+  // 입금 패턴 찾기 (더 포괄적으로)
+  // 1. "입금" 단어 뒤의 숫자
+  // 2. 숫자 뒤의 "입금" (공백 있거나 없거나)
+  // 3. "/" 뒤의 숫자 (앞에 "입금" 관련 텍스트가 있는 경우)
+  const depositPatterns = [
+    /입금[\/\s]+(\d{1,3}(?:,\d{3})*)/g,             // "입금/190000" 또는 "입금 190,000"
+    /(\d{1,3}(?:,\d{3})*)\s*입금/g,                 // "190,000입금" 또는 "190000 입금" (공백 없이도)
+    /\/\s*(\d{1,3}(?:,\d{3})*)\s*\/[^\/]*입금/g,    // "/190000/..." 형태에서 "입금"이 뒤에 있는 경우
+    /[^\/]*입금[^\/]*\/\s*(\d{1,3}(?:,\d{3})*)/g    // "...입금.../190000" 형태
+  ];
+
+  // 상품권 금액 추출
+  giftCardPatterns.forEach((pattern) => {
+    // 패턴을 재사용하기 위해 lastIndex 초기화
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const amountStr = match[1].replace(/,/g, '');
+      const amount = parseNumber(amountStr);
+      if (amount > 0) {
+        giftCardTotal += amount;
+      }
+    }
+  });
+
+  // 입금 금액 추출
+  depositPatterns.forEach((pattern) => {
+    // 패턴을 재사용하기 위해 lastIndex 초기화
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const amountStr = match[1].replace(/,/g, '');
+      const amount = parseNumber(amountStr);
+      if (amount > 0) {
+        depositTotal += amount;
+      }
+    }
+  });
+
+  // 추가: "/"로 구분된 부분에서 "상품권" 또는 "입금"이 포함된 경우 숫자 추출
+  if (text.includes('상품권') || text.includes('입금')) {
+    const parts = text.split('/');
+    parts.forEach((part, index) => {
+      // 숫자만 포함된 부분 찾기 (쉼표 포함 가능)
+      const numberMatch = part.match(/(\d{1,3}(?:,\d{3})*)/);
+      if (numberMatch) {
+        const amountStr = numberMatch[1].replace(/,/g, '');
+        const amount = parseNumber(amountStr);
+        
+        // 이전 또는 다음 부분에 "상품권" 또는 "입금"이 있는지 확인
+        const prevPart = index > 0 ? parts[index - 1] : '';
+        const nextPart = index < parts.length - 1 ? parts[index + 1] : '';
+        const context = prevPart + ' ' + part + ' ' + nextPart;
+        
+        if (amount > 0) {
+          if (context.includes('상품권') && !context.includes('입금')) {
+            giftCardTotal += amount;
+          } else if (context.includes('입금') && !context.includes('상품권')) {
+            depositTotal += amount;
+          }
+        }
+      }
+    });
+  }
 
   return {
-    giftCard: isGiftCard ? amount : 0,
-    deposit: isDeposit ? amount : 0
+    giftCard: giftCardTotal,
+    deposit: depositTotal
   };
 }
 
@@ -453,9 +525,13 @@ function buildRecontractSummary(rows) {
     .map(({ sourceSheet, rowNumber, row }) => {
       // 사용자가 이미 -1을 해서 알려준 인덱스 기준
       // 10인덱스(출고처) -> row[10], 11인덱스(상태) -> row[11], 20인덱스(정산금액) -> row[20]
+      // 14인덱스(고객명) -> row[14], 26인덱스(인터넷-고유번호) -> row[26]
       // 59인덱스(동판-비고) -> row[59], 74인덱스(재약정-비고) -> row[74]
-      // 91인덱스(유치자마당ID) -> row[91], 92인덱스(유치자명) -> row[92]
-      const outlet = parseString(row[10]);
+      // 91인덱스(유치자마당ID) -> row[91], 92인덱스(등록일/유치자명) -> row[92]
+      const registrationDate = parseString(row[92]); // 등록일
+      const outlet = parseString(row[10]); // 출고처
+      const customerName = parseString(row[14]); // 고객명
+      const internetUniqueNumber = parseString(row[26]); // 인터넷-고유번호
       const status = parseString(row[11]);
       const isObOutlet = outlet.includes('OB');
       const isCompleted = status === '완료';
@@ -473,12 +549,15 @@ function buildRecontractSummary(rows) {
         (remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit) * -1;
 
       const promoterId = parseString(row[91]);
-      const promoterName = parseString(row[92] || '');
+      const promoterName = parseString(row[92] || ''); // 유치자명 (92인덱스가 등록일과 동일한 경우 다른 컬럼 확인 필요)
 
       return {
         sourceSheet,
         rowNumber,
+        registrationDate,
         outlet,
+        customerName,
+        internetUniqueNumber,
         status,
         isObOutlet,
         isCompleted,

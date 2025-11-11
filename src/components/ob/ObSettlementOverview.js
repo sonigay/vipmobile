@@ -42,7 +42,10 @@ const CUSTOM_COLUMNS = [
 const RECONTRACT_COLUMNS = [
   { key: 'sourceSheet', label: '시트' },
   { key: 'rowNumber', label: '행번호' },
+  { key: 'registrationDate', label: '등록일' },
   { key: 'outlet', label: '출고처' },
+  { key: 'customerName', label: '고객명' },
+  { key: 'internetUniqueNumber', label: '인터넷-고유번호' },
   { key: 'status', label: '상태' },
   { key: 'settlementAmount', label: '정산금액' },
   { key: 'remarkPlate', label: '동판-비고' },
