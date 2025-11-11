@@ -81,7 +81,18 @@ const PLACEHOLDER_SHEET_TOKENS = [
 ];
 
 const DEFAULT_POST_SETTLEMENT_SHEET_NAME = '기타후정산';
-const HEADERS_POST_SETTLEMENT = ['연월', '유형', '항목', '금액', 'ID', '비고', '등록일시', '수정일시'];
+const HEADERS_POST_SETTLEMENT = [
+  '연월',
+  '구분(인건비/비용)',
+  '항목명',
+  '직원명',
+  '고정급여',
+  '인센티브/추가비용',
+  '총합(자동계산용)',
+  '비고',
+  '작성자',
+  '작성일시'
+];
 
 const OB_RECONTRACT_OFFER_PATTERNS = {
   giftCard: /상품권/i,
@@ -233,22 +244,32 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
 function mapManualPostSettlementRow(row = [], index = 0) {
   const month = parseString(row[0]);
   const rawType = parseString(row[1]).toLowerCase();
-  const type = rawType === 'labor' || rawType === 'cost' ? rawType : 'labor';
-  const label = parseString(row[2]);
-  const amount = parseNumber(row[3]);
-  const id = parseString(row[4]) || `manual-${index + 3}`;
-  const note = parseString(row[5]);
-  const createdAt = parseString(row[6]);
-  const updatedAt = parseString(row[7]);
+  const type = rawType === 'labor' || rawType === 'cost' || rawType === '인건비' || rawType === '비용' 
+    ? (rawType === '인건비' ? 'labor' : rawType === '비용' ? 'cost' : rawType)
+    : 'labor';
+  const label = parseString(row[2]); // 항목명
+  const employeeName = parseString(row[3]); // 직원명
+  const fixedSalary = parseNumber(row[4]); // 고정급여
+  const incentive = parseNumber(row[5]); // 인센티브/추가비용
+  const total = parseNumber(row[6]); // 총합(자동계산용)
+  const amount = Number.isFinite(total) && total !== 0 ? total : (fixedSalary + incentive);
+  const note = parseString(row[7]); // 비고
+  const registrant = parseString(row[8]); // 작성자
+  const createdAt = parseString(row[9]); // 작성일시
+  const id = `${month}-${type}-${index + 3}-${Date.now()}`; // ID는 자동 생성
   return {
     id,
     month,
     type,
     label,
+    employeeName,
+    fixedSalary,
+    incentive,
     amount,
     note,
+    registrant,
     createdAt,
-    updatedAt,
+    updatedAt: createdAt,
     rowNumber: index + 3
   };
 }
@@ -896,9 +917,9 @@ function setupObRoutes(app) {
         )
       ];
 
+      // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
       const manualSheetName =
         resolvedExtraSheetNames.postSettlement ||
-        resolvedSheetNames.postSettlement ||
         DEFAULT_POST_SETTLEMENT_SHEET_NAME;
       const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
       const manualRowsForMonth = manualRows.filter((entry) => entry.month === month);
@@ -948,11 +969,10 @@ function setupObRoutes(app) {
       }
 
       const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
-      const sheetNames = configEntry.sheetNames || {};
       const extraSheetNames = configEntry.extraSheetNames || {};
+      // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
       const manualSheetName =
         normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
-        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
         DEFAULT_POST_SETTLEMENT_SHEET_NAME;
 
       const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
@@ -1008,25 +1028,31 @@ function setupObRoutes(app) {
       }
 
       const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
-      const sheetNames = configEntry.sheetNames || {};
       const extraSheetNames = configEntry.extraSheetNames || {};
+      // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
       const manualSheetName =
         normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
-        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
         DEFAULT_POST_SETTLEMENT_SHEET_NAME;
 
       await ensureManualSheetStructure(sheets, targetSheetId, manualSheetName);
 
       const id = uuidv4();
       const nowIso = new Date().toISOString();
+      const typeLabel = normalizedType === 'labor' ? '인건비' : '비용';
+      const employeeName = ''; // 프론트엔드에서 전달받지 않으면 빈 문자열
+      const fixedSalary = normalizedType === 'labor' ? adjustedAmount : 0;
+      const incentive = normalizedType === 'labor' ? 0 : adjustedAmount;
+      const total = adjustedAmount;
       const row = [
         month,
-        normalizedType,
+        typeLabel,
         label,
-        adjustedAmount.toString(),
-        id,
+        employeeName,
+        fixedSalary.toString(),
+        incentive.toString(),
+        total.toString(),
         note || '',
-        nowIso,
+        '', // 작성자 (추후 추가 가능)
         nowIso
       ];
 
@@ -1086,11 +1112,10 @@ function setupObRoutes(app) {
       }
 
       const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
-      const sheetNames = configEntry.sheetNames || {};
       const extraSheetNames = configEntry.extraSheetNames || {};
+      // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
       const manualSheetName =
         normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
-        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
         DEFAULT_POST_SETTLEMENT_SHEET_NAME;
 
       const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
@@ -1115,6 +1140,12 @@ function setupObRoutes(app) {
 
       const updatedNote = note != null ? note : targetEntry.note;
       const updatedAt = new Date().toISOString();
+      const typeLabel = nextType === 'labor' ? '인건비' : '비용';
+      const employeeName = targetEntry.employeeName || '';
+      const fixedSalary = nextType === 'labor' ? adjustedAmount : (targetEntry.fixedSalary || 0);
+      const incentive = nextType === 'cost' ? adjustedAmount : (targetEntry.incentive || 0);
+      const total = adjustedAmount;
+      const registrant = targetEntry.registrant || '';
       const range = `${manualSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}${targetEntry.rowNumber}`;
 
       await sheets.spreadsheets.values.update({
@@ -1124,13 +1155,15 @@ function setupObRoutes(app) {
         resource: {
           values: [[
             targetEntry.month,
-            nextType,
+            typeLabel,
             nextLabel,
-            adjustedAmount.toString(),
-            targetEntry.id,
+            employeeName,
+            fixedSalary.toString(),
+            incentive.toString(),
+            total.toString(),
             updatedNote || '',
-            targetEntry.createdAt || updatedAt,
-            updatedAt
+            registrant,
+            targetEntry.createdAt || updatedAt
           ]]
         }
       });
@@ -1171,11 +1204,10 @@ function setupObRoutes(app) {
       }
 
       const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
-      const sheetNames = configEntry.sheetNames || {};
       const extraSheetNames = configEntry.extraSheetNames || {};
+      // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
       const manualSheetName =
         normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
-        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
         DEFAULT_POST_SETTLEMENT_SHEET_NAME;
 
       const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);

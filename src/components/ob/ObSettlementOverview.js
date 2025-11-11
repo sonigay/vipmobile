@@ -68,7 +68,6 @@ const RECONTRACT_COLUMNS = [
   { key: 'remarkRecontract', label: '재약정-비고' },
   { key: 'offerGiftCard', label: '상품권 지급액' },
   { key: 'offerDeposit', label: '입금 지급액' },
-  { key: 'promoterId', label: '유치자ID' },
   { key: 'promoterName', label: '유치자명' }
 ];
 
