@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ExistingCalculatorPanel from './ob/ExistingCalculatorPanel';
 import TogetherCalculatorPanel from './ob/TogetherCalculatorPanel';
 import { api } from '../api';
@@ -43,6 +43,12 @@ const TAB_KEYS = {
   MANAGEMENT: 'management'
 };
 
+const TAB_DEFINITIONS = [
+  { key: TAB_KEYS.CALCULATOR, label: '투게더 계산기', roles: ['O', 'S', 'M'] },
+  { key: TAB_KEYS.OVERVIEW, label: 'OB 정산 확인', roles: ['S', 'M'] },
+  { key: TAB_KEYS.MANAGEMENT, label: 'OB 정산 관리', roles: ['M'] }
+];
+
 const ObManagementMode = ({ 
   loggedInStore, 
   onLogout, 
@@ -76,6 +82,41 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
     message: '',
     severity: 'success'
   });
+
+  const obManagementRole = useMemo(() => {
+    const candidates = [
+      loggedInStore?.obManagementRole,
+      loggedInStore?.agentInfo?.obManagementRole
+    ]
+      .map((role) => (role || '').toString().toUpperCase())
+      .filter(Boolean);
+    const matched = candidates.find((role) => ['M', 'S', 'O'].includes(role));
+    return matched || 'O';
+  }, [loggedInStore]);
+
+  const allowedTabs = useMemo(
+    () => TAB_DEFINITIONS.filter((tab) => tab.roles.includes(obManagementRole)),
+    [obManagementRole]
+  );
+  const allowedTabKeys = useMemo(
+    () => allowedTabs.map((tab) => tab.key),
+    [allowedTabs]
+  );
+
+  useEffect(() => {
+    if (allowedTabs.length === 0) {
+      if (activeTab !== TAB_KEYS.CALCULATOR) {
+        setActiveTab(TAB_KEYS.CALCULATOR);
+      }
+      return;
+    }
+    if (!allowedTabKeys.includes(activeTab)) {
+      const fallbackTab = allowedTabs[0]?.key || TAB_KEYS.CALCULATOR;
+      if (activeTab !== fallbackTab) {
+        setActiveTab(fallbackTab);
+      }
+    }
+  }, [allowedTabs, allowedTabKeys, activeTab]);
 
   // OB 관리모드 진입 시 데이터 로드 + 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
@@ -210,6 +251,9 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
   };
 
   const handleTabChange = (_event, value) => {
+    if (!allowedTabKeys.includes(value)) {
+      return;
+    }
     setActiveTab(value);
   };
 
@@ -806,9 +850,9 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
               variant="scrollable"
               scrollButtons="auto"
             >
-              <Tab value={TAB_KEYS.CALCULATOR} label="투게더 계산기" />
-              <Tab value={TAB_KEYS.OVERVIEW} label="OB 정산 확인" />
-              <Tab value={TAB_KEYS.MANAGEMENT} label="OB 정산 관리" />
+              {allowedTabs.map((tab) => (
+                <Tab key={tab.key} value={tab.key} label={tab.label} />
+              ))}
             </Tabs>
           </Box>
           
@@ -854,10 +898,10 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
       {/* 콘텐츠 */}
       <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: '#f5f5f5' }}>
         {activeTab === TAB_KEYS.CALCULATOR && renderCalculatorSection()}
-        {activeTab === TAB_KEYS.OVERVIEW && (
+        {activeTab === TAB_KEYS.OVERVIEW && allowedTabKeys.includes(TAB_KEYS.OVERVIEW) && (
           <ObSettlementOverview sheetConfigs={sheetConfigs} />
         )}
-        {activeTab === TAB_KEYS.MANAGEMENT && (
+        {activeTab === TAB_KEYS.MANAGEMENT && allowedTabKeys.includes(TAB_KEYS.MANAGEMENT) && (
           <ObSettlementManagementPanel
             sheetConfigs={sheetConfigs}
             storageSheetUrl={SHEET_CONFIG_DRIVE_URL}

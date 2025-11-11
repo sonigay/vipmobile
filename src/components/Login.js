@@ -281,6 +281,7 @@ function Login({ onLogin }) {
         qualification: data.agentInfo.qualification,
         contactId: data.agentInfo.contactId,
         userRole: data.agentInfo.userRole,
+        obManagementRole: data.agentInfo.obManagementRole,
         modePermissions: data.modePermissions
       });
     } else if (data.isInventory) {

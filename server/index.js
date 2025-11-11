@@ -3196,6 +3196,7 @@ app.post('/api/login', async (req, res) => {
           success: true,
           isAgent: true,
           modePermissions: modePermissions,
+          obManagementRole: obManagementPermissionRaw || '',
           agentInfo: {
             target: agent[0] || '',       // A열: 대상
             qualification: agent[1] || '', // B열: 자격
@@ -3206,6 +3207,7 @@ app.post('/api/login', async (req, res) => {
             office: agent[5] || '',        // F열: 사무실 (기존 D열)
             department: agent[6] || '',    // G열: 소속 (기존 E열)
             userRole: agent[17] || '',     // R열: 권한 (기존 P열)
+            obManagementRole: obManagementPermissionRaw || '',
             onSaleLink: hasOnSaleLinkPermission || hasOnSalePolicyPermission, // AA열: 온세일 링크관리 권한 (S 또는 M)
             onSalePolicy: hasOnSalePolicyPermission // AA열: 온세일 정책게시판 권한 (M 권한만)
           }
