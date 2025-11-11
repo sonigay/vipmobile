@@ -29,6 +29,7 @@ const HEADERS_SETTLEMENT_LINKS = [
 ];
 
 const SHEET_EXCLUSIONS = '제외인원';
+const DEFAULT_EXCLUSION_SHEET_NAME = SHEET_EXCLUSIONS;
 const HEADERS_EXCLUSIONS = [
   '연월',
   '구분(맞춤제안/재약정)',
@@ -358,9 +359,9 @@ function mapExclusionRow(row = [], index = 0) {
   };
 }
 
-async function loadExclusionRows(sheets, spreadsheetId) {
-  await ensureExclusionSheetStructure(sheets, spreadsheetId, SHEET_EXCLUSIONS);
-  const values = await loadSheetRows(sheets, spreadsheetId, SHEET_EXCLUSIONS);
+async function loadExclusionRows(sheets, spreadsheetId, sheetName = DEFAULT_EXCLUSION_SHEET_NAME) {
+  await ensureExclusionSheetStructure(sheets, spreadsheetId, sheetName);
+  const values = await loadSheetRows(sheets, spreadsheetId, sheetName);
   if (!values || values.length <= 2) return [];
   return values
     .slice(2)
@@ -1108,7 +1109,10 @@ function setupObRoutes(app) {
       const manualRowsForMonth = manualRows.filter((entry) => entry.month === month);
       const manualSummary = buildManualSummary(manualRowsForMonth);
 
-      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const exclusionSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
+
+      const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
       const exclusionConfig = buildExclusionConfig(exclusionRows, month);
 
       const customSummary = buildCustomProposalSummary(customRows, exclusionConfig.custom);
@@ -1431,8 +1435,23 @@ function setupObRoutes(app) {
       const monthParam = parseString(req.query.month || '');
       const typeParam = parseString(req.query.type || 'all').toLowerCase();
 
+      if (!monthParam) {
+        return res.status(400).json({ success: false, error: 'month query parameter is required' });
+      }
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, monthParam);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const exclusionSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
+
+      const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
       const exclusionConfig = buildExclusionConfig(exclusionRows, monthParam);
 
       if (typeParam === 'custom') {
@@ -1490,7 +1509,18 @@ function setupObRoutes(app) {
           : EXCLUSION_TYPE_LABELS.custom;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      await ensureExclusionSheetStructure(sheets, SPREADSHEET_ID, SHEET_EXCLUSIONS);
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const exclusionSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
+
+      await ensureExclusionSheetStructure(sheets, targetSheetId, exclusionSheetName);
 
       const id = uuidv4();
       const nowIso = new Date().toISOString();
@@ -1509,8 +1539,8 @@ function setupObRoutes(app) {
       ];
 
       await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_EXCLUSIONS}!A3`,
+        spreadsheetId: targetSheetId,
+        range: `${exclusionSheetName}!A3`,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -1570,20 +1600,31 @@ function setupObRoutes(app) {
           : EXCLUSION_TYPE_LABELS.custom;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, trimmedMonth);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const exclusionSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
+
+      const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
       const targetEntry = exclusionRows.find((entry) => entry.id === idParam);
 
       if (!targetEntry) {
         return res.status(404).json({ success: false, error: '해당 ID의 제외 인원이 존재하지 않습니다.' });
       }
 
-      const range = `${SHEET_EXCLUSIONS}!A${targetEntry.rowNumber}:${String.fromCharCode(
+      const range = `${exclusionSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(
         65 + HEADERS_EXCLUSIONS.length - 1
       )}${targetEntry.rowNumber}`;
       const monthCellValue = trimmedMonth ? `'${trimmedMonth}` : '';
 
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
+        spreadsheetId: targetSheetId,
         range,
         valueInputOption: 'USER_ENTERED',
         resource: {
@@ -1623,24 +1664,39 @@ function setupObRoutes(app) {
 
   router.delete('/exclusions/:id', async (req, res) => {
     const idParam = parseString(req.params.id || '');
+    const monthParam = parseString(req.query.month || '');
     if (!idParam) {
       return res.status(400).json({ success: false, error: 'id parameter is required' });
+    }
+    if (!monthParam) {
+      return res.status(400).json({ success: false, error: 'month query parameter is required' });
     }
 
     try {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, monthParam);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const exclusionSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
+
+      const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
       const targetEntry = exclusionRows.find((entry) => entry.id === idParam);
 
       if (!targetEntry) {
         return res.status(404).json({ success: false, error: '해당 ID의 제외 인원이 존재하지 않습니다.' });
       }
 
-      const range = `${SHEET_EXCLUSIONS}!A${targetEntry.rowNumber}:${String.fromCharCode(
+      const range = `${exclusionSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(
         65 + HEADERS_EXCLUSIONS.length - 1
       )}${targetEntry.rowNumber}`;
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
+        spreadsheetId: targetSheetId,
         range,
         valueInputOption: 'USER_ENTERED',
         resource: {

@@ -647,18 +647,24 @@ export const api = {
   },
 
   // OB 제외 인원 삭제
-  deleteObExclusion: async (id) => {
+  deleteObExclusion: async (id, month) => {
     if (!id) {
       throw new Error('id is required');
     }
+    if (!month) {
+      throw new Error('month is required');
+    }
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ob/exclusions/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        mode: 'cors'
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/ob/exclusions/${encodeURIComponent(id)}?month=${encodeURIComponent(month)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

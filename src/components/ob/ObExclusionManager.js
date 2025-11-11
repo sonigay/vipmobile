@@ -168,9 +168,14 @@ const ObExclusionManager = ({ monthOptions, defaultMonth, currentUser }) => {
     if (!confirmDelete) return;
 
     try {
+      const monthForDelete = entry.month || selectedMonth;
+      if (!monthForDelete) {
+        setError('삭제할 연월 정보를 확인할 수 없습니다. 다시 시도해 주세요.');
+        return;
+      }
       setLoading(true);
       setError('');
-      await api.deleteObExclusion(entry.id);
+      await api.deleteObExclusion(entry.id, monthForDelete);
       setSuccessMessage('제외 인원을 삭제했습니다.');
       await handleFetch();
     } catch (err) {
