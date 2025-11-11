@@ -241,7 +241,7 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
 }
 
 function mapManualPostSettlementRow(row = [], index = 0) {
-  const month = parseString(row[0]);
+  const month = parseString(row[0]).replace(/^'/, '');
   const rawType = parseString(row[1]).toLowerCase();
   const type =
     rawType === 'labor' || rawType === 'cost' || rawType === '인건비' || rawType === '비용'
@@ -1094,9 +1094,10 @@ function setupObRoutes(app) {
       const incentive = normalizedType === 'labor' ? 0 : adjustedAmount;
       const total = adjustedAmount;
       // month를 문자열로 명시적으로 변환 (숫자로 변환되지 않도록)
-      const monthString = String(month || '').trim();
+      const rawMonthString = String(month || '').trim();
+      const monthCellValue = rawMonthString ? `'${rawMonthString}` : '';
       const row = [
-        monthString,
+        monthCellValue,
         typeLabel,
         label,
         employeeName,
