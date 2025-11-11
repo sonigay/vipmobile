@@ -215,8 +215,13 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
   });
   const headerValues = headerResponse.data.values || [];
   const firstRow = headerValues[0] || [];
+  const secondRow = headerValues[1] || [];
+  // 1행 헤더가 올바른지 확인
   const needsHeader = HEADERS_POST_SETTLEMENT.some((header, index) => (firstRow[index] || '') !== header);
-  if (needsHeader || headerValues.length < 2) {
+  // 2행이 비어있거나 없으면 헤더를 다시 설정해야 함
+  const needsSecondRow = headerValues.length < 2 || secondRow.length === 0 || secondRow.every(cell => !cell || cell.trim() === '');
+  
+  if (needsHeader || needsSecondRow) {
     const values = [
       HEADERS_POST_SETTLEMENT,
       new Array(HEADERS_POST_SETTLEMENT.length).fill('')
@@ -227,15 +232,6 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
       valueInputOption: 'RAW',
       resource: {
         values
-      }
-    });
-  } else if (headerValues.length === 1) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetName}!A2:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}2`,
-      valueInputOption: 'RAW',
-      resource: {
-        values: [new Array(HEADERS_POST_SETTLEMENT.length).fill('')]
       }
     });
   }
@@ -551,9 +547,10 @@ function buildCustomProposalSummary(rows) {
     const sales = parseNumber(row[11]);
     const themeFlag = parseString(row[23]);
     const approvalFlagRaw = parseString(row[10]);
-    const approvalFlagNumber = parseNumber(approvalFlagRaw);
     // 숫자로 변환해서 1이면 '1', 아니면 '0'으로 정규화 (공백, 소수점 등 처리)
-    const approvalFlag = approvalFlagNumber === 1 ? '1' : (approvalFlagRaw === '1' ? '1' : '0');
+    // parseNumber는 쉼표, 공백 등을 제거하고 숫자로 변환하므로 "1.0", " 1 ", "1" 모두 1로 처리됨
+    const approvalFlagNumber = parseNumber(approvalFlagRaw);
+    const approvalFlag = (approvalFlagNumber === 1 || approvalFlagRaw === '1') ? '1' : '0';
     return {
       sourceSheet,
       rowNumber,

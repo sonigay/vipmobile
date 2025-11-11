@@ -136,7 +136,7 @@ const SummaryCard = ({ title, value, description, count, color }) => (
       </Typography>
       {count ? (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          {count}건
+          {count}
         </Typography>
       ) : null}
       {description ? (
