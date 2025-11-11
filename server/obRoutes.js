@@ -609,15 +609,26 @@ function filterCustomRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet
 
 function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet = new Set()) {
   const { row } = rowObject;
-  // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 91인덱스(유치자마당ID)
-  const promoterId = normalizeIdentifier(row[91]);
-  const promoterName = normalizeIdentifier(row[90]);
-  if (promoterId && excludedIdsSet.has(promoterId)) {
+  // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 90(유치자ID), 91(등록직원)
+  const promoterIdPrimary = normalizeIdentifier(row[90]);
+  const promoterIdSecondary = normalizeIdentifier(row[91]);
+  const promoterNamePrimary = normalizeIdentifier(row[91]);
+  const promoterNameSecondary = normalizeIdentifier(row[90]);
+
+  if (promoterIdPrimary && excludedIdsSet.has(promoterIdPrimary)) {
     return { include: false, reason: 'excludedId' };
   }
-  if (promoterName && excludedNamesSet.has(promoterName)) {
+  if (promoterIdSecondary && excludedIdsSet.has(promoterIdSecondary)) {
     return { include: false, reason: 'excludedId' };
   }
+
+  if (promoterNamePrimary && excludedNamesSet.has(promoterNamePrimary)) {
+    return { include: false, reason: 'excludedName' };
+  }
+  if (promoterNameSecondary && excludedNamesSet.has(promoterNameSecondary)) {
+    return { include: false, reason: 'excludedName' };
+  }
+
   return { include: true };
 }
 

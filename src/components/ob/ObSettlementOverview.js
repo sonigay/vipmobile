@@ -160,17 +160,19 @@ async function downloadXlsx(filename, columns, rows = []) {
   XLSX.writeFile(workbook, filename);
 }
 
-const SummaryCard = ({ title, value, description, count, color, activated, animate, children }) => (
+const SummaryCard = ({ title, value, description, count, color, activated, animate, children }) => {
+  const isActive = activated !== false;
+  return (
   <Card
     sx={{
       height: '100%',
       transition: 'all 0.35s ease',
-      opacity: activated ? 1 : 0.45,
-      filter: activated ? 'none' : 'grayscale(0.2)',
-      border: activated ? '1px solid rgba(94,53,177,0.24)' : '1px solid rgba(0,0,0,0.08)',
-      boxShadow: activated ? '0 16px 32px rgba(94,53,177,0.25)' : 'none',
+      opacity: isActive ? 1 : 0.45,
+      filter: isActive ? 'none' : 'grayscale(0.2)',
+      border: isActive ? '1px solid rgba(94,53,177,0.24)' : '1px solid rgba(0,0,0,0.08)',
+      boxShadow: isActive ? '0 16px 32px rgba(94,53,177,0.25)' : 'none',
       animation: animate ? `${glowAnimation} 1.2s ease-in-out` : 'none',
-      '&:hover': activated
+      '&:hover': isActive
         ? {
             transform: 'translateY(-4px)',
             boxShadow: '0 22px 38px rgba(94,53,177,0.32)'
@@ -198,7 +200,8 @@ const SummaryCard = ({ title, value, description, count, color, activated, anima
       {children ? <Box sx={{ mt: 2 }}>{children}</Box> : null}
     </CardContent>
   </Card>
-);
+  );
+};
 
 SummaryCard.propTypes = {
   title: PropTypes.string.isRequired,
@@ -215,7 +218,7 @@ SummaryCard.defaultProps = {
   description: '',
   count: '',
   color: undefined,
-  activated: false,
+  activated: true,
   animate: false,
   children: null
 };
@@ -1085,7 +1088,7 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
         {/* 최종 정산 섹션 - 맨 상단 */}
         <Section title="최종 정산" color={SECTION_COLORS.totals}>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid item xs={12}>
               <SummaryCard
                 title="총 정산 금액"
                 value={currencyFormatter.format(combinedGrandTotal)}
@@ -1096,9 +1099,10 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
               >
                 <Stack spacing={1.5}>
                   <Stack
-                    direction={{ xs: 'column', md: 'row' }}
-                    spacing={1}
-                    alignItems={{ xs: 'stretch', md: 'center' }}
+                    direction={{ xs: 'column', lg: 'row' }}
+                    spacing={1.5}
+                    alignItems={{ xs: 'stretch', lg: 'center' }}
+                    sx={{ flexWrap: 'wrap' }}
                   >
                     <Button
                       component="a"
@@ -1108,40 +1112,44 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                       variant="contained"
                       color="primary"
                       disabled={!invoiceControlsEnabled}
-                      sx={{ minWidth: 220 }}
+                      sx={{ minWidth: 240, whiteSpace: 'nowrap' }}
                     >
                       세금계산서 발행 및 승인 바로가기
                     </Button>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={invoiceStatus.issued}
-                          onChange={(event) =>
-                            setInvoiceStatus((prev) => ({
-                              ...prev,
-                              issued: event.target.checked && invoiceControlsEnabled
-                            }))
-                          }
-                          disabled={!invoiceControlsEnabled}
-                        />
-                      }
-                      label="세금계산서 발행"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={invoiceStatus.approved}
-                          onChange={(event) =>
-                            setInvoiceStatus((prev) => ({
-                              ...prev,
-                              approved: event.target.checked && invoiceControlsEnabled
-                            }))
-                          }
-                          disabled={!invoiceControlsEnabled}
-                        />
-                      }
-                      label="세금계산서 승인"
-                    />
+                    <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={invoiceStatus.issued}
+                            onChange={(event) =>
+                              setInvoiceStatus((prev) => ({
+                                ...prev,
+                                issued: event.target.checked && invoiceControlsEnabled
+                              }))
+                            }
+                            disabled={!invoiceControlsEnabled}
+                          />
+                        }
+                        label="세금계산서 발행"
+                        sx={{ whiteSpace: 'nowrap' }}
+                      />
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={invoiceStatus.approved}
+                            onChange={(event) =>
+                              setInvoiceStatus((prev) => ({
+                                ...prev,
+                                approved: event.target.checked && invoiceControlsEnabled
+                              }))
+                            }
+                            disabled={!invoiceControlsEnabled}
+                          />
+                        }
+                        label="세금계산서 승인"
+                        sx={{ whiteSpace: 'nowrap' }}
+                      />
+                    </Stack>
                   </Stack>
                   {workflowError ? (
                     <Alert severity="error" onClose={() => setWorkflowError('')}>
@@ -1162,7 +1170,7 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 </Stack>
               </SummaryCard>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid item xs={12} md={6}>
               <SummaryCard
                 title="(주)브이아이피플러스 30%"
                 value={currencyFormatter.format(combinedSplitVip)}
@@ -1170,7 +1178,12 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 activated={vipCompleted}
                 animate={vipCompleted}
               >
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems="center">
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  sx={{ flexWrap: 'wrap' }}
+                >
                   <FormControlLabel
                     control={
                       <Checkbox
@@ -1179,15 +1192,17 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                       />
                     }
                     label="정산확인 및 입력완료"
+                    sx={{ whiteSpace: 'nowrap' }}
                   />
                   <FormControlLabel
                     control={<Checkbox checked={!vipCompleted} disabled />}
                     label="입력중"
+                    sx={{ whiteSpace: 'nowrap' }}
                   />
                 </Stack>
               </SummaryCard>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid item xs={12} md={6}>
               <SummaryCard
                 title="(주)와이에이 70%"
                 value={currencyFormatter.format(combinedSplitYai)}
@@ -1195,7 +1210,12 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 activated={yaiCompleted}
                 animate={yaiCompleted}
               >
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems="center">
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  sx={{ flexWrap: 'wrap' }}
+                >
                   <FormControlLabel
                     control={
                       <Checkbox
@@ -1204,10 +1224,12 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                       />
                     }
                     label="정산확인 및 입력완료"
+                    sx={{ whiteSpace: 'nowrap' }}
                   />
                   <FormControlLabel
                     control={<Checkbox checked={!yaiCompleted} disabled />}
                     label="입력중"
+                    sx={{ whiteSpace: 'nowrap' }}
                   />
                 </Stack>
               </SummaryCard>
@@ -1238,7 +1260,7 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 은행 입금 확인과 정산 승인까지 모두 끝났습니다.
               </Typography>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#512DA8' }}>
-                한 달간 수고하셨습니다. 다음 달 정산도 함께 달려봅시다! ✨
+                한 달간 수고하셨습니다. ✨
               </Typography>
             </Paper>
           </Collapse>
