@@ -596,7 +596,7 @@ function buildCustomProposalSummary(rows) {
 
   const policy3Result = calculatePolicy3Payout(totalSales);
   // approvalFlag가 '1'인 행만 카운트 (이미 정규화되어 있음)
-  const perCaseCount = resultRows.filter((item) => item.approvalFlag === '1').length;
+  const perCaseCount = resultRows.length;
   const perCaseResult = calculatePerCasePayout(perCaseCount);
 
   const totalPayout =
