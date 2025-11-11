@@ -552,7 +552,8 @@ function buildCustomProposalSummary(rows) {
     const themeFlag = parseString(row[23]);
     const approvalFlagRaw = parseString(row[10]);
     const approvalFlagNumber = parseNumber(approvalFlagRaw);
-    const approvalFlag = parseString(approvalFlagRaw || (approvalFlagNumber ? '1' : '0'));
+    // 숫자로 변환해서 1이면 '1', 아니면 '0'으로 정규화 (공백, 소수점 등 처리)
+    const approvalFlag = approvalFlagNumber === 1 ? '1' : (approvalFlagRaw === '1' ? '1' : '0');
     return {
       sourceSheet,
       rowNumber,
@@ -571,11 +572,8 @@ function buildCustomProposalSummary(rows) {
     .reduce((sum, item) => sum + item.salesAmount, 0);
 
   const policy3Result = calculatePolicy3Payout(totalSales);
-  const perCaseCount = resultRows.filter((item) => {
-    if (item.approvalFlag === '1') return true;
-    const numeric = parseNumber(item.approvalFlag);
-    return Number.isFinite(numeric) && numeric > 0;
-  }).length;
+  // approvalFlag가 '1'인 행만 카운트 (이미 정규화되어 있음)
+  const perCaseCount = resultRows.filter((item) => item.approvalFlag === '1').length;
   const perCaseResult = calculatePerCasePayout(perCaseCount);
 
   const totalPayout =
@@ -696,7 +694,9 @@ function buildRecontractSummary(rows) {
 async function getManualSheetRows(sheets, spreadsheetId, sheetName) {
   await ensureManualSheetStructure(sheets, spreadsheetId, sheetName);
   const values = await loadSheetRows(sheets, spreadsheetId, sheetName);
-  return values.map((row, index) => mapManualPostSettlementRow(row, index));
+  // 헤더 2행(1행, 2행)을 건너뛰고 3행부터 데이터 읽기
+  if (!values || values.length <= 2) return [];
+  return values.slice(2).map((row, index) => mapManualPostSettlementRow(row, index));
 }
 
 function buildTotals(customSummary, recontractSummary, manualSummary) {
