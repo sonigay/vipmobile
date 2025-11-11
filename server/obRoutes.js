@@ -209,6 +209,7 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
     });
   }
 
+  // 헤더는 항상 1행과 2행에 설정 (1행: 헤더, 2행: 빈 행)
   const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}2`;
   const headerResponse = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -217,16 +218,19 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
   const headerValues = headerResponse.data.values || [];
   const firstRow = headerValues[0] || [];
   const secondRow = headerValues[1] || [];
+  
   // 1행 헤더가 올바른지 확인
   const needsHeader = HEADERS_POST_SETTLEMENT.some((header, index) => (firstRow[index] || '') !== header);
-  // 2행이 비어있거나 없으면 헤더를 다시 설정해야 함
-  const needsSecondRow = headerValues.length < 2 || secondRow.length === 0 || secondRow.every(cell => !cell || cell.trim() === '');
+  // 2행이 없거나 비어있지 않으면 헤더를 다시 설정해야 함
+  const needsSecondRow = headerValues.length < 2 || !secondRow || secondRow.length === 0 || !secondRow.every(cell => !cell || String(cell).trim() === '');
   
+  // 헤더가 필요하거나 2행이 제대로 설정되지 않았으면 항상 1행과 2행을 모두 설정
   if (needsHeader || needsSecondRow) {
     const values = [
       HEADERS_POST_SETTLEMENT,
       new Array(HEADERS_POST_SETTLEMENT.length).fill('')
     ];
+    // 항상 2행까지 명시적으로 설정
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: headerRange,
@@ -1087,8 +1091,10 @@ function setupObRoutes(app) {
       const fixedSalary = normalizedType === 'labor' ? adjustedAmount : 0;
       const incentive = normalizedType === 'labor' ? 0 : adjustedAmount;
       const total = adjustedAmount;
+      // month를 문자열로 명시적으로 변환 (숫자로 변환되지 않도록)
+      const monthString = String(month || '').trim();
       const row = [
-        month,
+        monthString,
         typeLabel,
         label,
         employeeName,
