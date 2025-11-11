@@ -241,19 +241,24 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
 function mapManualPostSettlementRow(row = [], index = 0) {
   const month = parseString(row[0]);
   const rawType = parseString(row[1]).toLowerCase();
-  const type = rawType === 'labor' || rawType === 'cost' || rawType === '인건비' || rawType === '비용' 
-    ? (rawType === '인건비' ? 'labor' : rawType === '비용' ? 'cost' : rawType)
-    : 'labor';
-  const label = parseString(row[2]); // 항목명
-  const employeeName = parseString(row[3]); // 직원명
-  const fixedSalary = parseNumber(row[4]); // 고정급여
-  const incentive = parseNumber(row[5]); // 인센티브/추가비용
-  const total = parseNumber(row[6]); // 총합(자동계산용)
-  const amount = Number.isFinite(total) && total !== 0 ? total : (fixedSalary + incentive);
-  const id = parseString(row[7]) || `${month}-${type}-${index + 3}-${Date.now()}`; // ID (시트에 저장된 값 또는 자동 생성)
-  const note = parseString(row[8]); // 비고
-  const registrant = parseString(row[9]); // 작성자
-  const createdAt = parseString(row[10]); // 작성일시
+  const type =
+    rawType === 'labor' || rawType === 'cost' || rawType === '인건비' || rawType === '비용'
+      ? rawType === '인건비'
+        ? 'labor'
+        : rawType === '비용'
+          ? 'cost'
+          : rawType
+      : 'labor';
+  const label = parseString(row[2]);
+  const employeeName = parseString(row[3]);
+  const fixedSalary = parseNumber(row[4]);
+  const incentive = parseNumber(row[5]);
+  const total = parseNumber(row[6]);
+  const id = parseString(row[7]);
+  const amount = Number.isFinite(total) && total !== 0 ? total : fixedSalary + incentive;
+  const note = parseString(row[8]);
+  const registrant = parseString(row[9]);
+  const createdAt = parseString(row[10]);
   return {
     id,
     month,
@@ -548,10 +553,22 @@ function buildCustomProposalSummary(rows) {
     const sales = parseNumber(row[11]);
     const themeFlag = parseString(row[23]);
     const approvalFlagRaw = parseString(row[10]);
-    // 숫자로 변환해서 1이면 '1', 아니면 '0'으로 정규화 (공백, 소수점 등 처리)
-    // parseNumber는 쉼표, 공백 등을 제거하고 숫자로 변환하므로 "1.0", " 1 ", "1" 모두 1로 처리됨
+    const approvalFlagLower = approvalFlagRaw.toLowerCase();
     const approvalFlagNumber = parseNumber(approvalFlagRaw);
-    const approvalFlag = (approvalFlagNumber === 1 || approvalFlagRaw === '1') ? '1' : '0';
+    let approvalFlag = '0';
+    if (approvalFlagNumber > 0) {
+      approvalFlag = '1';
+    } else if (
+      approvalFlagLower === 'y' ||
+      approvalFlagLower === 'yes' ||
+      approvalFlagLower === 'true' ||
+      approvalFlagLower === 't' ||
+      approvalFlagLower === '승인' ||
+      approvalFlagLower === '확인' ||
+      approvalFlagLower === 'o'
+    ) {
+      approvalFlag = '1';
+    }
     return {
       sourceSheet,
       rowNumber,
@@ -692,9 +709,38 @@ function buildRecontractSummary(rows) {
 async function getManualSheetRows(sheets, spreadsheetId, sheetName) {
   await ensureManualSheetStructure(sheets, spreadsheetId, sheetName);
   const values = await loadSheetRows(sheets, spreadsheetId, sheetName);
-  // 헤더 2행(1행, 2행)을 건너뛰고 3행부터 데이터 읽기
   if (!values || values.length <= 2) return [];
-  return values.slice(2).map((row, index) => mapManualPostSettlementRow(row, index));
+
+  const dataRows = values.slice(2);
+  const entries = [];
+  const updates = [];
+
+  dataRows.forEach((row, index) => {
+    const entry = mapManualPostSettlementRow(row, index);
+    if (!entry.id) {
+      entry.id = uuidv4();
+      updates.push({
+        rowNumber: entry.rowNumber,
+        id: entry.id
+      });
+    }
+    entries.push(entry);
+  });
+
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      resource: {
+        valueInputOption: 'USER_ENTERED',
+        data: updates.map((item) => ({
+          range: `${sheetName}!H${item.rowNumber}`,
+          values: [[item.id]]
+        }))
+      }
+    });
+  }
+
+  return entries;
 }
 
 function buildTotals(customSummary, recontractSummary, manualSummary) {
