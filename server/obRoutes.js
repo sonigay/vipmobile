@@ -28,45 +28,22 @@ const HEADERS_SETTLEMENT_LINKS = [
   '등록일시'
 ];
 
-const CUSTOM_PROPOSAL_EXCLUDED_IDS = new Set([
-  'a306891291',
-  'a306891341',
-  'rlatjddk901',
-  'chldmswls520',
-  'a315835213',
-  'a315835905',
-  'rlgpwls611',
-  'a306891917',
-  'a306891345',
-  'wkdalgus521'
-]);
-
-const CUSTOM_PROPOSAL_EXCLUDED_NAMES = new Set([
-  '정다운',
-  '김보라',
-  '김성아',
-  '최은진',
-  '주혜지',
-  '남혜원',
-  '기혜진',
-  '김태희',
-  '주선영',
-  '장미현'
-]);
-
-const RECONTRACT_EXCLUDED_IDS = new Set([
-  'VIP│김보라',
-  'VIP│정다운',
-  'VIP│김태희',
-  'VIP│남예원',
-  'VIP│주혜지',
-  '이은영 대리',
-  'VIP│신유나',
-  'MIN│최은진',
-  'MIN│장미현',
-  'MIN│기혜진',
-  'MIN│김성아'
-]);
+const SHEET_EXCLUSIONS = '제외인원';
+const HEADERS_EXCLUSIONS = [
+  '연월',
+  '구분(맞춤제안/재약정)',
+  '유치자ID',
+  '유치자명',
+  '사유',
+  'ID',
+  '비고',
+  '등록자',
+  '등록일시'
+];
+const EXCLUSION_TYPE_LABELS = {
+  custom: '맞춤제안',
+  recontract: '재약정'
+};
 
 const PLACEHOLDER_SHEET_TOKENS = [
   '시트이름(맞춤제안)',
@@ -298,6 +275,149 @@ function buildManualSummary(entries = []) {
   };
 }
 
+async function ensureExclusionSheetStructure(sheets, spreadsheetId, sheetName) {
+  const spreadsheetMeta = await sheets.spreadsheets.get({
+    spreadsheetId
+  });
+  const sheetExists = (spreadsheetMeta.data.sheets || []).some(
+    (sheet) => sheet.properties && sheet.properties.title === sheetName
+  );
+
+  if (!sheetExists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      resource: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + HEADERS_EXCLUSIONS.length - 1)}2`;
+  const headerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: headerRange
+  });
+  const headerValues = headerResponse.data.values || [];
+  const firstRow = headerValues[0] || [];
+  const secondRow = headerValues[1] || [];
+  const isFirstRowBlank =
+    firstRow.length === 0 || firstRow.every((cell) => !cell || String(cell).trim() === '');
+  const isSecondRowHeader = HEADERS_EXCLUSIONS.every(
+    (header, index) => (secondRow[index] || '') === header
+  );
+
+  if (!isFirstRowBlank || !isSecondRowHeader) {
+    const values = [
+      new Array(HEADERS_EXCLUSIONS.length).fill(''),
+      HEADERS_EXCLUSIONS
+    ];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: headerRange,
+      valueInputOption: 'RAW',
+      resource: {
+        values
+      }
+    });
+  }
+}
+
+function mapExclusionRow(row = [], index = 0) {
+  const monthRaw = parseString(row[0]);
+  const month = monthRaw.replace(/^'/, '');
+  const rawType = parseString(row[1]);
+  const normalizedType =
+    rawType === EXCLUSION_TYPE_LABELS.recontract ? 'recontract' : 'custom';
+  const targetId = parseString(row[2]);
+  const targetName = parseString(row[3]);
+  const reason = parseString(row[4]);
+  const id = parseString(row[5]);
+  const note = parseString(row[6]);
+  const registrant = parseString(row[7]);
+  const createdAt = parseString(row[8]);
+
+  return {
+    id,
+    month,
+    type: normalizedType,
+    targetId,
+    targetName,
+    reason,
+    note,
+    registrant,
+    createdAt,
+    rowNumber: index + 3
+  };
+}
+
+async function loadExclusionRows(sheets, spreadsheetId) {
+  await ensureExclusionSheetStructure(sheets, spreadsheetId, SHEET_EXCLUSIONS);
+  const values = await loadSheetRows(sheets, spreadsheetId, SHEET_EXCLUSIONS);
+  if (!values || values.length <= 2) return [];
+  return values
+    .slice(2)
+    .map((row, index) => mapExclusionRow(row, index))
+    .filter((entry) => entry.id);
+}
+
+function normalizeIdentifier(value) {
+  return parseString(value).toLowerCase();
+}
+
+function buildExclusionConfig(entries = [], month) {
+  const targetMonth = parseString(month);
+  const normalizedMonth = targetMonth ? targetMonth : '';
+  const result = {
+    custom: {
+      entries: [],
+      idSet: new Set(),
+      nameSet: new Set()
+    },
+    recontract: {
+      entries: [],
+      idSet: new Set(),
+      nameSet: new Set()
+    }
+  };
+
+  entries.forEach((entry) => {
+    const monthMatches =
+      !normalizedMonth ||
+      !entry.month ||
+      entry.month === normalizedMonth ||
+      entry.month === '전체';
+    if (!monthMatches) return;
+
+    if (entry.type === 'recontract') {
+      result.recontract.entries.push(entry);
+      if (entry.targetId) {
+        result.recontract.idSet.add(normalizeIdentifier(entry.targetId));
+      }
+      if (entry.targetName) {
+        result.recontract.nameSet.add(normalizeIdentifier(entry.targetName));
+      }
+    } else {
+      result.custom.entries.push(entry);
+      if (entry.targetId) {
+        result.custom.idSet.add(normalizeIdentifier(entry.targetId));
+      }
+      if (entry.targetName) {
+        result.custom.nameSet.add(normalizeIdentifier(entry.targetName));
+      }
+    }
+  });
+
+  return result;
+}
+
 function mapSettlementRow(row = []) {
   const [
     month = '',
@@ -466,28 +586,32 @@ function normalizeRecontractRows(values, sourceSheet) {
   }));
 }
 
-function filterCustomRow(rowObject) {
+function filterCustomRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet = new Set()) {
   const { row } = rowObject;
   // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 38인덱스(유치자마당ID), 39인덱스(유치자명)
-  const proposerId = parseString(row[38]);
-  const proposerName = parseString(row[39]);
+  const proposerId = normalizeIdentifier(row[38]);
+  const proposerName = normalizeIdentifier(row[39]);
 
-  if (CUSTOM_PROPOSAL_EXCLUDED_IDS.has(proposerId)) {
+  if (proposerId && excludedIdsSet.has(proposerId)) {
     return { include: false, reason: 'excludedId' };
   }
 
-  if (CUSTOM_PROPOSAL_EXCLUDED_NAMES.has(proposerName)) {
+  if (proposerName && excludedNamesSet.has(proposerName)) {
     return { include: false, reason: 'excludedName' };
   }
 
   return { include: true };
 }
 
-function filterRecontractRow(rowObject) {
+function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedNamesSet = new Set()) {
   const { row } = rowObject;
   // 사용자가 이미 -1을 해서 알려준 인덱스 기준: 91인덱스(유치자마당ID)
-  const promoterId = parseString(row[91]);
-  if (RECONTRACT_EXCLUDED_IDS.has(promoterId)) {
+  const promoterId = normalizeIdentifier(row[91]);
+  const promoterName = normalizeIdentifier(row[90]);
+  if (promoterId && excludedIdsSet.has(promoterId)) {
+    return { include: false, reason: 'excludedId' };
+  }
+  if (promoterName && excludedNamesSet.has(promoterName)) {
     return { include: false, reason: 'excludedId' };
   }
   return { include: true };
@@ -524,18 +648,22 @@ function calculatePerCasePayout(caseCount) {
   };
 }
 
-function buildCustomProposalSummary(rows) {
+function buildCustomProposalSummary(rows, exclusionConfig = {}) {
+  const excludedIdsSet = exclusionConfig.idSet || new Set();
+  const excludedNamesSet = exclusionConfig.nameSet || new Set();
+  const exclusionEntries = exclusionConfig.entries || [];
   const included = [];
   const excluded = {
     count: 0,
     reasons: {
       excludedId: 0,
       excludedName: 0
-    }
+    },
+    entries: exclusionEntries
   };
 
   rows.forEach((rowObj) => {
-    const decision = filterCustomRow(rowObj);
+    const decision = filterCustomRow(rowObj, excludedIdsSet, excludedNamesSet);
     if (decision.include) {
       included.push(rowObj);
     } else {
@@ -625,16 +753,20 @@ function buildCustomProposalSummary(rows) {
       threshold: perCaseResult.threshold
     },
     totalPayout,
+    exclusions: exclusionEntries,
     rows: resultRows
   };
 }
 
-function buildRecontractSummary(rows) {
+function buildRecontractSummary(rows, exclusionConfig = {}) {
+  const excludedIdsSet = exclusionConfig.idSet || new Set();
+  const excludedNamesSet = exclusionConfig.nameSet || new Set();
+  const exclusionEntries = exclusionConfig.entries || [];
   const included = [];
   let excludedCount = 0;
 
   rows.forEach((rowObj) => {
-    const decision = filterRecontractRow(rowObj);
+    const decision = filterRecontractRow(rowObj, excludedIdsSet, excludedNamesSet);
     if (decision.include) {
       included.push(rowObj);
     } else {
@@ -708,6 +840,7 @@ function buildRecontractSummary(rows) {
       total: offerTotal
     },
     totalPayout: feeTotal + offerTotal,
+    exclusions: exclusionEntries,
     rows: filteredRows
   };
 }
@@ -975,8 +1108,11 @@ function setupObRoutes(app) {
       const manualRowsForMonth = manualRows.filter((entry) => entry.month === month);
       const manualSummary = buildManualSummary(manualRowsForMonth);
 
-      const customSummary = buildCustomProposalSummary(customRows);
-      const recontractSummary = buildRecontractSummary(recontractRows);
+      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const exclusionConfig = buildExclusionConfig(exclusionRows, month);
+
+      const customSummary = buildCustomProposalSummary(customRows, exclusionConfig.custom);
+      const recontractSummary = buildRecontractSummary(recontractRows, exclusionConfig.recontract);
       const totals = buildTotals(customSummary, recontractSummary, manualSummary);
 
       res.json({
@@ -995,6 +1131,7 @@ function setupObRoutes(app) {
             ...manualSummary,
             sheetName: manualSheetName
           },
+          exclusions: exclusionConfig,
           totals
         }
       });
@@ -1286,6 +1423,235 @@ function setupObRoutes(app) {
     } catch (error) {
       console.error('[OB] manual-adjustments DELETE error:', error);
       res.status(500).json({ success: false, error: '수기 데이터를 삭제하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.get('/exclusions', async (req, res) => {
+    try {
+      const monthParam = parseString(req.query.month || '');
+      const typeParam = parseString(req.query.type || 'all').toLowerCase();
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const exclusionConfig = buildExclusionConfig(exclusionRows, monthParam);
+
+      if (typeParam === 'custom') {
+        return res.json({
+          success: true,
+          data: exclusionConfig.custom.entries
+        });
+      }
+      if (typeParam === 'recontract') {
+        return res.json({
+          success: true,
+          data: exclusionConfig.recontract.entries
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          custom: exclusionConfig.custom.entries,
+          recontract: exclusionConfig.recontract.entries
+        }
+      });
+    } catch (error) {
+      console.error('[OB] exclusions GET error:', error);
+      res
+        .status(500)
+        .json({ success: false, error: '제외 인원 정보를 불러오지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.post('/exclusions', async (req, res) => {
+    try {
+      const {
+        month,
+        type,
+        targetId = '',
+        targetName = '',
+        reason = '',
+        note = '',
+        registrant = ''
+      } = req.body || {};
+
+      const trimmedMonth = parseString(month);
+      const normalizedType = parseString(type).toLowerCase();
+      if (!trimmedMonth || !normalizedType) {
+        return res.status(400).json({ success: false, error: 'month와 type은 필수값입니다.' });
+      }
+      if (!targetId && !targetName) {
+        return res.status(400).json({ success: false, error: '유치자 ID 또는 유치자명을 입력해주세요.' });
+      }
+
+      const typeLabel =
+        normalizedType === 'recontract'
+          ? EXCLUSION_TYPE_LABELS.recontract
+          : EXCLUSION_TYPE_LABELS.custom;
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      await ensureExclusionSheetStructure(sheets, SPREADSHEET_ID, SHEET_EXCLUSIONS);
+
+      const id = uuidv4();
+      const nowIso = new Date().toISOString();
+      const monthCellValue = trimmedMonth ? `'${trimmedMonth}` : '';
+
+      const row = [
+        monthCellValue,
+        typeLabel,
+        targetId,
+        targetName,
+        reason,
+        id,
+        note,
+        registrant,
+        nowIso
+      ];
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_EXCLUSIONS}!A3`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [row]
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id,
+          month: trimmedMonth,
+          type: normalizedType === 'recontract' ? 'recontract' : 'custom',
+          targetId,
+          targetName,
+          reason,
+          note,
+          registrant,
+          createdAt: nowIso
+        }
+      });
+    } catch (error) {
+      console.error('[OB] exclusions POST error:', error);
+      res.status(500).json({ success: false, error: '제외 인원을 등록하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.put('/exclusions/:id', async (req, res) => {
+    const idParam = parseString(req.params.id || '');
+    if (!idParam) {
+      return res.status(400).json({ success: false, error: 'id parameter is required' });
+    }
+
+    try {
+      const {
+        month,
+        type,
+        targetId = '',
+        targetName = '',
+        reason = '',
+        note = '',
+        registrant
+      } = req.body || {};
+
+      const trimmedMonth = parseString(month);
+      const normalizedType = parseString(type).toLowerCase();
+      if (!trimmedMonth || !normalizedType) {
+        return res.status(400).json({ success: false, error: 'month와 type은 필수값입니다.' });
+      }
+      if (!targetId && !targetName) {
+        return res.status(400).json({ success: false, error: '유치자 ID 또는 유치자명을 입력해주세요.' });
+      }
+
+      const typeLabel =
+        normalizedType === 'recontract'
+          ? EXCLUSION_TYPE_LABELS.recontract
+          : EXCLUSION_TYPE_LABELS.custom;
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const targetEntry = exclusionRows.find((entry) => entry.id === idParam);
+
+      if (!targetEntry) {
+        return res.status(404).json({ success: false, error: '해당 ID의 제외 인원이 존재하지 않습니다.' });
+      }
+
+      const range = `${SHEET_EXCLUSIONS}!A${targetEntry.rowNumber}:${String.fromCharCode(
+        65 + HEADERS_EXCLUSIONS.length - 1
+      )}${targetEntry.rowNumber}`;
+      const monthCellValue = trimmedMonth ? `'${trimmedMonth}` : '';
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [[
+            monthCellValue,
+            typeLabel,
+            targetId,
+            targetName,
+            reason,
+            targetEntry.id,
+            note,
+            registrant || targetEntry.registrant,
+            targetEntry.createdAt || new Date().toISOString()
+          ]]
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id: targetEntry.id,
+          month: trimmedMonth,
+          type: normalizedType === 'recontract' ? 'recontract' : 'custom',
+          targetId,
+          targetName,
+          reason,
+          note,
+          registrant: registrant || targetEntry.registrant,
+          createdAt: targetEntry.createdAt
+        }
+      });
+    } catch (error) {
+      console.error('[OB] exclusions PUT error:', error);
+      res.status(500).json({ success: false, error: '제외 인원을 수정하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.delete('/exclusions/:id', async (req, res) => {
+    const idParam = parseString(req.params.id || '');
+    if (!idParam) {
+      return res.status(400).json({ success: false, error: 'id parameter is required' });
+    }
+
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const exclusionRows = await loadExclusionRows(sheets, SPREADSHEET_ID);
+      const targetEntry = exclusionRows.find((entry) => entry.id === idParam);
+
+      if (!targetEntry) {
+        return res.status(404).json({ success: false, error: '해당 ID의 제외 인원이 존재하지 않습니다.' });
+      }
+
+      const range = `${SHEET_EXCLUSIONS}!A${targetEntry.rowNumber}:${String.fromCharCode(
+        65 + HEADERS_EXCLUSIONS.length - 1
+      )}${targetEntry.rowNumber}`;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [new Array(HEADERS_EXCLUSIONS.length).fill('')]
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[OB] exclusions DELETE error:', error);
+      res.status(500).json({ success: false, error: '제외 인원을 삭제하지 못했습니다.', message: error.message });
     }
   });
 

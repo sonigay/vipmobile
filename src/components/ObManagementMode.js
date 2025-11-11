@@ -102,6 +102,15 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
     () => allowedTabs.map((tab) => tab.key),
     [allowedTabs]
   );
+  const currentUserName = useMemo(() => {
+    return (
+      loggedInStore?.name ||
+      loggedInStore?.target ||
+      loggedInStore?.agentInfo?.target ||
+      loggedInStore?.userId ||
+      ''
+    );
+  }, [loggedInStore]);
 
   useEffect(() => {
     if (allowedTabs.length === 0) {
@@ -911,6 +920,7 @@ const [sheetConfigs, setSheetConfigs] = useState([]);
             onEdit={handleEditSheetConfig}
             onDelete={handleDeleteSheetConfig}
             onDownloadTemplate={handleDownloadTemplate}
+            currentUser={currentUserName}
           />
         )}
       </Box>

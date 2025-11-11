@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
   Box,
@@ -24,6 +24,7 @@ import {
   Delete as DeleteIcon,
   FileDownload as FileDownloadIcon
 } from '@mui/icons-material';
+import ObExclusionManager from './ObExclusionManager';
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -55,9 +56,19 @@ const ObSettlementManagementPanel = ({
   onCreate,
   onEdit,
   onDelete,
-  onDownloadTemplate
+  onDownloadTemplate,
+  currentUser
 }) => {
   const sortedConfigs = [...sheetConfigs].sort((a, b) => (b.month || '').localeCompare(a.month || ''));
+  const monthOptions = useMemo(() => {
+    const uniqueMonths = Array.from(
+      new Set(sortedConfigs.map((config) => config.month).filter(Boolean))
+    );
+    return uniqueMonths.map((month) => ({
+      value: month,
+      label: month
+    }));
+  }, [sortedConfigs]);
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
@@ -228,6 +239,12 @@ const ObSettlementManagementPanel = ({
         </Table>
       </TableContainer>
       )}
+
+      <ObExclusionManager
+        monthOptions={monthOptions}
+        defaultMonth={sortedConfigs[0]?.month}
+        currentUser={currentUser}
+      />
     </Box>
   );
 };
@@ -260,7 +277,8 @@ ObSettlementManagementPanel.propTypes = {
   onCreate: PropTypes.func,
   onEdit: PropTypes.func,
   onDelete: PropTypes.func,
-  onDownloadTemplate: PropTypes.func
+  onDownloadTemplate: PropTypes.func,
+  currentUser: PropTypes.string
 };
 
 ObSettlementManagementPanel.defaultProps = {
@@ -271,7 +289,8 @@ ObSettlementManagementPanel.defaultProps = {
   onCreate: undefined,
   onEdit: undefined,
   onDelete: undefined,
-  onDownloadTemplate: undefined
+  onDownloadTemplate: undefined,
+  currentUser: ''
 };
 
 export default ObSettlementManagementPanel;

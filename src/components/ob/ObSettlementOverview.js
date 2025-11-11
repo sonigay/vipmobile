@@ -6,9 +6,13 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
+  Chip,
   CircularProgress,
+  Collapse,
   Divider,
   FormControl,
+  FormControlLabel,
   Grid,
   IconButton,
   InputLabel,
@@ -31,10 +35,41 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import { keyframes } from '@emotion/react';
 import api from '../../api';
 
 const currencyFormatter = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 });
 const numberFormatter = new Intl.NumberFormat('ko-KR');
+
+const glowAnimation = keyframes`
+  0% {
+    box-shadow: 0 0 0 rgba(94, 53, 177, 0);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 18px 30px rgba(94, 53, 177, 0.28);
+    transform: scale(1.008);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(94, 53, 177, 0);
+    transform: scale(1);
+  }
+`;
+
+const COMPANY_LABELS = {
+  vip: '(주)브이아이피플러스',
+  yai: '(주)와이에이'
+};
+
+const createCompanyWorkflowState = () => ({
+  completed: false,
+  bankName: '',
+  accountNumber: '',
+  isSaved: false,
+  editing: true,
+  depositDone: false,
+  confirmDone: false
+});
 
 const parseManualAmount = (value) => {
   if (typeof value === 'string') {
@@ -125,8 +160,24 @@ async function downloadXlsx(filename, columns, rows = []) {
   XLSX.writeFile(workbook, filename);
 }
 
-const SummaryCard = ({ title, value, description, count, color }) => (
-  <Card sx={{ height: '100%', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 } }}>
+const SummaryCard = ({ title, value, description, count, color, activated, animate, children }) => (
+  <Card
+    sx={{
+      height: '100%',
+      transition: 'all 0.35s ease',
+      opacity: activated ? 1 : 0.45,
+      filter: activated ? 'none' : 'grayscale(0.2)',
+      border: activated ? '1px solid rgba(94,53,177,0.24)' : '1px solid rgba(0,0,0,0.08)',
+      boxShadow: activated ? '0 16px 32px rgba(94,53,177,0.25)' : 'none',
+      animation: animate ? `${glowAnimation} 1.2s ease-in-out` : 'none',
+      '&:hover': activated
+        ? {
+            transform: 'translateY(-4px)',
+            boxShadow: '0 22px 38px rgba(94,53,177,0.32)'
+          }
+        : {}
+    }}
+  >
     <CardContent>
       <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
         {title}
@@ -144,6 +195,7 @@ const SummaryCard = ({ title, value, description, count, color }) => (
           {description}
         </Typography>
       ) : null}
+      {children ? <Box sx={{ mt: 2 }}>{children}</Box> : null}
     </CardContent>
   </Card>
 );
@@ -153,13 +205,19 @@ SummaryCard.propTypes = {
   value: PropTypes.string.isRequired,
   description: PropTypes.string,
   count: PropTypes.string,
-  color: PropTypes.string
+  color: PropTypes.string,
+  activated: PropTypes.bool,
+  animate: PropTypes.bool,
+  children: PropTypes.node
 };
 
 SummaryCard.defaultProps = {
   description: '',
   count: '',
-  color: undefined
+  color: undefined,
+  activated: false,
+  animate: false,
+  children: null
 };
 
 const Section = ({ title, subtitle, color, children, spacing }) => (
@@ -221,12 +279,52 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
   const [editingLaborForm, setEditingLaborForm] = useState({ label: '', amount: '' });
   const [editingCostId, setEditingCostId] = useState(null);
   const [editingCostForm, setEditingCostForm] = useState({ label: '', amount: '' });
+  const [companyWorkflow, setCompanyWorkflow] = useState({
+    vip: createCompanyWorkflowState(),
+    yai: createCompanyWorkflowState()
+  });
+  const [invoiceStatus, setInvoiceStatus] = useState({ issued: false, approved: false });
+  const [workflowError, setWorkflowError] = useState('');
+  const [workflowSuccess, setWorkflowSuccess] = useState('');
 
   useEffect(() => {
     if (sheetConfigs && sheetConfigs.length > 0) {
       setSelectedMonth((prev) => prev || sheetConfigs[0].month);
     }
   }, [sheetConfigs]);
+
+  useEffect(() => {
+    setCompanyWorkflow({
+      vip: createCompanyWorkflowState(),
+      yai: createCompanyWorkflowState()
+    });
+    setInvoiceStatus({ issued: false, approved: false });
+    setWorkflowError('');
+    setWorkflowSuccess('');
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    if (!invoiceStatus.issued || !invoiceStatus.approved) {
+      setCompanyWorkflow((prev) => ({
+        vip: {
+          ...prev.vip,
+          isSaved: false,
+          editing: true,
+          depositDone: false,
+          confirmDone: false
+        },
+        yai: {
+          ...prev.yai,
+          isSaved: false,
+          editing: true,
+          depositDone: false,
+          confirmDone: false
+        }
+      }));
+      setWorkflowError('');
+      setWorkflowSuccess('');
+    }
+  }, [invoiceStatus.issued, invoiceStatus.approved]);
 
   const fetchSummary = useCallback(
     async (month) => {
@@ -620,6 +718,158 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     }
   };
 
+  const handleCompanyCompletionToggle = (company) => (event) => {
+    const checked = event.target.checked;
+    setCompanyWorkflow((prev) => {
+      if (checked) {
+        return {
+          ...prev,
+          [company]: {
+            ...prev[company],
+            completed: true
+          }
+        };
+      }
+      return {
+        ...prev,
+        [company]: createCompanyWorkflowState()
+      };
+    });
+    if (!checked) {
+      setInvoiceStatus({ issued: false, approved: false });
+      setWorkflowError('');
+      setWorkflowSuccess('');
+    }
+  };
+
+  const handleBankFieldChange = (company, field) => (event) => {
+    const value = event.target.value;
+    setCompanyWorkflow((prev) => ({
+      ...prev,
+      [company]: {
+        ...prev[company],
+        [field]: value,
+        editing: true,
+        isSaved: false
+      }
+    }));
+  };
+
+  const handleBankSave = (company) => () => {
+    let hasError = false;
+    setCompanyWorkflow((prev) => {
+      const state = prev[company];
+      const bankNameValue = (state.bankName || '').trim();
+      const accountValue = (state.accountNumber || '').trim();
+      if (!bankNameValue || !accountValue) {
+        hasError = true;
+        return prev;
+      }
+      return {
+        ...prev,
+        [company]: {
+          ...state,
+          bankName: bankNameValue,
+          accountNumber: accountValue,
+          isSaved: true,
+          editing: false
+        }
+      };
+    });
+    if (hasError) {
+      setWorkflowError('은행과 계좌번호를 모두 입력해 주세요.');
+      setWorkflowSuccess('');
+    } else {
+      setWorkflowError('');
+      setWorkflowSuccess(`${COMPANY_LABELS[company]} 계좌 정보를 저장했습니다.`);
+    }
+  };
+
+  const handleBankEdit = (company) => () => {
+    setCompanyWorkflow((prev) => ({
+      ...prev,
+      [company]: {
+        ...prev[company],
+        editing: true
+      }
+    }));
+    setWorkflowSuccess('');
+  };
+
+  const handleBankReset = (company) => () => {
+    setCompanyWorkflow((prev) => ({
+      ...prev,
+      [company]: {
+        ...createCompanyWorkflowState(),
+        completed: prev[company].completed
+      }
+    }));
+    setWorkflowError('');
+    setWorkflowSuccess(`${COMPANY_LABELS[company]} 입력 내용을 초기화했습니다.`);
+  };
+
+  const handleDepositComplete = (company) => () => {
+    let errorMessage = '';
+    let successMessage = '';
+    setCompanyWorkflow((prev) => {
+      const state = prev[company];
+      if (!state.isSaved) {
+        errorMessage = '계좌 정보를 저장한 후 입금완료를 진행해 주세요.';
+        return prev;
+      }
+      if (state.depositDone) {
+        successMessage = `${COMPANY_LABELS[company]} 입금 완료가 이미 처리되었습니다.`;
+        return prev;
+      }
+      successMessage = `${COMPANY_LABELS[company]} 입금이 확인되었습니다.`;
+      return {
+        ...prev,
+        [company]: {
+          ...state,
+          depositDone: true
+        }
+      };
+    });
+    if (errorMessage) {
+      setWorkflowError(errorMessage);
+      setWorkflowSuccess('');
+    } else if (successMessage) {
+      setWorkflowError('');
+      setWorkflowSuccess(successMessage);
+    }
+  };
+
+  const handleConfirmComplete = (company) => () => {
+    let errorMessage = '';
+    let successMessage = '';
+    setCompanyWorkflow((prev) => {
+      const state = prev[company];
+      if (!state.depositDone) {
+        errorMessage = '입금완료 후 확인완료를 진행해 주세요.';
+        return prev;
+      }
+      if (state.confirmDone) {
+        successMessage = `${COMPANY_LABELS[company]} 정산이 이미 확인되었습니다.`;
+        return prev;
+      }
+      successMessage = `${COMPANY_LABELS[company]} 정산을 확인했습니다.`;
+      return {
+        ...prev,
+        [company]: {
+          ...state,
+          confirmDone: true
+        }
+      };
+    });
+    if (errorMessage) {
+      setWorkflowError(errorMessage);
+      setWorkflowSuccess('');
+    } else if (successMessage) {
+      setWorkflowError('');
+      setWorkflowSuccess(successMessage);
+    }
+  };
+
   const renderSummary = () => {
     if (loading) {
       return (
@@ -663,6 +913,142 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     const combinedSplitVip = totals.split?.vip ?? Math.round(combinedGrandTotal * 0.3);
     const combinedSplitYai = totals.split?.yai ?? Math.round(combinedGrandTotal * 0.7);
 
+    const vipState = companyWorkflow.vip;
+    const yaiState = companyWorkflow.yai;
+    const vipCompleted = Boolean(vipState.completed);
+    const yaiCompleted = Boolean(yaiState.completed);
+    const bothCompleted = vipCompleted && yaiCompleted;
+    const invoiceControlsEnabled = bothCompleted;
+    const invoiceChecksDone = invoiceStatus.issued && invoiceStatus.approved;
+    const allConfirmed = vipState.confirmDone && yaiState.confirmDone;
+
+    const renderCompanyWorkflow = (companyKey, label, accentColor) => {
+      const state = companyWorkflow[companyKey];
+      const bankNameValue = (state.bankName || '').trim();
+      const accountValue = (state.accountNumber || '').trim();
+      const fieldsDisabled = !invoiceChecksDone || !state.editing;
+      const saveDisabled =
+        !invoiceChecksDone || !state.editing || !bankNameValue || !accountValue;
+      const editDisabled = !invoiceChecksDone || state.editing || !state.isSaved;
+      const hasAnyProgress = Boolean(
+        bankNameValue || accountValue || state.isSaved || state.depositDone || state.confirmDone
+      );
+      const resetDisabled = !invoiceChecksDone || !hasAnyProgress;
+      const depositDisabled = !invoiceChecksDone || !state.isSaved || state.depositDone;
+      const confirmDisabled =
+        !invoiceChecksDone || !state.depositDone || state.confirmDone;
+
+      return (
+        <Paper
+          key={companyKey}
+          elevation={invoiceChecksDone ? 2 : 0}
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            border: `1px solid ${invoiceChecksDone ? accentColor : 'rgba(0,0,0,0.08)'}`,
+            backgroundColor: invoiceChecksDone ? 'rgba(255,255,255,0.95)' : 'rgba(250,250,250,0.8)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <Stack spacing={1.5}>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={1}
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {label}
+              </Typography>
+              <Chip
+                size="small"
+                label={state.isSaved ? '계좌 저장됨' : '계좌 입력 필요'}
+                color={state.isSaved ? 'success' : 'default'}
+                variant={state.isSaved ? 'filled' : 'outlined'}
+              />
+              <Chip
+                size="small"
+                label={state.depositDone ? '입금 완료' : '입금 대기'}
+                color={state.depositDone ? 'primary' : 'default'}
+                variant={state.depositDone ? 'filled' : 'outlined'}
+              />
+              <Chip
+                size="small"
+                label={state.confirmDone ? '확인 완료' : '확인 대기'}
+                color={state.confirmDone ? 'success' : 'default'}
+                variant={state.confirmDone ? 'filled' : 'outlined'}
+              />
+            </Stack>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+              <TextField
+                label="은행명"
+                size="small"
+                fullWidth
+                value={state.bankName}
+                onChange={handleBankFieldChange(companyKey, 'bankName')}
+                disabled={fieldsDisabled}
+              />
+              <TextField
+                label="계좌번호"
+                size="small"
+                fullWidth
+                value={state.accountNumber}
+                onChange={handleBankFieldChange(companyKey, 'accountNumber')}
+                disabled={fieldsDisabled}
+              />
+            </Stack>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleBankSave(companyKey)}
+                disabled={saveDisabled}
+              >
+                저장
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleBankEdit(companyKey)}
+                disabled={editDisabled}
+              >
+                수정
+              </Button>
+              <Button
+                variant="text"
+                size="small"
+                onClick={handleBankReset(companyKey)}
+                disabled={resetDisabled}
+              >
+                초기화
+              </Button>
+            </Stack>
+            <Divider />
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              <Button
+                variant="contained"
+                size="small"
+                color="primary"
+                onClick={handleDepositComplete(companyKey)}
+                disabled={depositDisabled}
+              >
+                입금완료
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                color="success"
+                onClick={handleConfirmComplete(companyKey)}
+                disabled={confirmDisabled}
+              >
+                확인완료
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      );
+    };
+
+
     const laborFormAmountNumber = parseManualAmount(laborForm.amount);
     const laborAddDisabled =
       !laborForm.label.trim() || Number.isNaN(laborFormAmountNumber) || laborFormAmountNumber === 0;
@@ -705,21 +1091,126 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                 value={currencyFormatter.format(combinedGrandTotal)}
                 description={`맞춤제안 ${currencyFormatter.format(customBase)} + 재약정 ${currencyFormatter.format(recontractBase)} + 인건비 ${currencyFormatter.format(combinedLaborTotal)} + 비용 ${currencyFormatter.format(combinedCostTotal)}`}
                 color="#1976d2"
-              />
+                activated={bothCompleted}
+                animate={bothCompleted}
+              >
+                <Stack spacing={1.5}>
+                  <Stack
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={1}
+                    alignItems={{ xs: 'stretch', md: 'center' }}
+                  >
+                    <Button
+                      component="a"
+                      href="https://www.wehago.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      variant="contained"
+                      color="primary"
+                      disabled={!invoiceControlsEnabled}
+                      sx={{ minWidth: 220 }}
+                    >
+                      세금계산서 발행 및 승인 바로가기
+                    </Button>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={invoiceStatus.issued}
+                          onChange={(event) =>
+                            setInvoiceStatus((prev) => ({
+                              ...prev,
+                              issued: event.target.checked && invoiceControlsEnabled
+                            }))
+                          }
+                          disabled={!invoiceControlsEnabled}
+                        />
+                      }
+                      label="세금계산서 발행"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={invoiceStatus.approved}
+                          onChange={(event) =>
+                            setInvoiceStatus((prev) => ({
+                              ...prev,
+                              approved: event.target.checked && invoiceControlsEnabled
+                            }))
+                          }
+                          disabled={!invoiceControlsEnabled}
+                        />
+                      }
+                      label="세금계산서 승인"
+                    />
+                  </Stack>
+                  {workflowError ? (
+                    <Alert severity="error" onClose={() => setWorkflowError('')}>
+                      {workflowError}
+                    </Alert>
+                  ) : null}
+                  {workflowSuccess ? (
+                    <Alert severity="success" onClose={() => setWorkflowSuccess('')}>
+                      {workflowSuccess}
+                    </Alert>
+                  ) : null}
+                  <Collapse in={invoiceChecksDone}>
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+                      {renderCompanyWorkflow('vip', COMPANY_LABELS.vip, '#6A1B9A')}
+                      {renderCompanyWorkflow('yai', COMPANY_LABELS.yai, '#00838F')}
+                    </Stack>
+                  </Collapse>
+                </Stack>
+              </SummaryCard>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard
                 title="(주)브이아이피플러스 30%"
                 value={currencyFormatter.format(combinedSplitVip)}
                 color="#6A1B9A"
-              />
+                activated={vipCompleted}
+                animate={vipCompleted}
+              >
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems="center">
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={vipCompleted}
+                        onChange={handleCompanyCompletionToggle('vip')}
+                      />
+                    }
+                    label="정산확인 및 입력완료"
+                  />
+                  <FormControlLabel
+                    control={<Checkbox checked={!vipCompleted} disabled />}
+                    label="입력중"
+                  />
+                </Stack>
+              </SummaryCard>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard
                 title="(주)와이에이 70%"
                 value={currencyFormatter.format(combinedSplitYai)}
                 color="#00838F"
-              />
+                activated={yaiCompleted}
+                animate={yaiCompleted}
+              >
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems="center">
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={yaiCompleted}
+                        onChange={handleCompanyCompletionToggle('yai')}
+                      />
+                    }
+                    label="정산확인 및 입력완료"
+                  />
+                  <FormControlLabel
+                    control={<Checkbox checked={!yaiCompleted} disabled />}
+                    label="입력중"
+                  />
+                </Stack>
+              </SummaryCard>
             </Grid>
           </Grid>
           <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
@@ -727,6 +1218,30 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
               <strong>항목별 합계:</strong> 맞춤제안 {currencyFormatter.format(customBase)} | 재약정 {currencyFormatter.format(recontractBase)} | 인건비 {currencyFormatter.format(combinedLaborTotal)} (시트 {currencyFormatter.format(laborSheetTotal)} / 수기 {currencyFormatter.format(manualLaborTotal)}) | 비용 {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costSheetTotal)} / 수기 {currencyFormatter.format(manualCostTotal)})
             </Typography>
           </Box>
+          <Collapse in={allConfirmed}>
+            <Paper
+              elevation={3}
+              sx={{
+                mt: 3,
+                p: 3,
+                textAlign: 'center',
+                background:
+                  'linear-gradient(135deg, rgba(103,58,183,0.12), rgba(63,81,181,0.18))',
+                border: '1px solid rgba(103,58,183,0.32)',
+                animation: `${glowAnimation} 1.4s ease-in-out`
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                대상월 최종 완료!
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                은행 입금 확인과 정산 승인까지 모두 끝났습니다.
+              </Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#512DA8' }}>
+                한 달간 수고하셨습니다. 다음 달 정산도 함께 달려봅시다! ✨
+              </Typography>
+            </Paper>
+          </Collapse>
         </Section>
 
         {/* 맞춤제안 섹션 */}

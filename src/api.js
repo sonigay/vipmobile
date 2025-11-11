@@ -566,6 +566,112 @@ export const api = {
     }
   },
 
+  // OB 제외 인원 조회
+  getObExclusions: async ({ month, type = 'all' }) => {
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/ob/exclusions?month=${encodeURIComponent(month)}&type=${encodeURIComponent(type)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 제외 인원 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 제외 인원 등록
+  createObExclusion: async (payload) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/exclusions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 제외 인원 등록 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 제외 인원 수정
+  updateObExclusion: async (id, payload) => {
+    if (!id) {
+      throw new Error('id is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/exclusions/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 제외 인원 수정 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 제외 인원 삭제
+  deleteObExclusion: async (id) => {
+    if (!id) {
+      throw new Error('id is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/exclusions/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 제외 인원 삭제 오류:', error);
+      throw error;
+    }
+  },
+
   // 매장 목록 조회
   getStores: async (options = {}) => {
     try {
