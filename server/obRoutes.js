@@ -89,6 +89,7 @@ const HEADERS_POST_SETTLEMENT = [
   '고정급여',
   '인센티브/추가비용',
   '총합(자동계산용)',
+  'ID',
   '비고',
   '작성자',
   '작성일시'
@@ -249,10 +250,10 @@ function mapManualPostSettlementRow(row = [], index = 0) {
   const incentive = parseNumber(row[5]); // 인센티브/추가비용
   const total = parseNumber(row[6]); // 총합(자동계산용)
   const amount = Number.isFinite(total) && total !== 0 ? total : (fixedSalary + incentive);
-  const note = parseString(row[7]); // 비고
-  const registrant = parseString(row[8]); // 작성자
-  const createdAt = parseString(row[9]); // 작성일시
-  const id = `${month}-${type}-${index + 3}-${Date.now()}`; // ID는 자동 생성
+  const id = parseString(row[7]) || `${month}-${type}-${index + 3}-${Date.now()}`; // ID (시트에 저장된 값 또는 자동 생성)
+  const note = parseString(row[8]); // 비고
+  const registrant = parseString(row[9]); // 작성자
+  const createdAt = parseString(row[10]); // 작성일시
   return {
     id,
     month,
@@ -1048,6 +1049,7 @@ function setupObRoutes(app) {
         fixedSalary.toString(),
         incentive.toString(),
         total.toString(),
+        id, // ID 저장
         note || '',
         '', // 작성자 (추후 추가 가능)
         nowIso
@@ -1158,6 +1160,7 @@ function setupObRoutes(app) {
             fixedSalary.toString(),
             incentive.toString(),
             total.toString(),
+            targetEntry.id, // ID 유지
             updatedNote || '',
             registrant,
             targetEntry.createdAt || updatedAt
