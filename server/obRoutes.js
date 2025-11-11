@@ -209,7 +209,7 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
     });
   }
 
-  // 헤더는 항상 1행과 2행에 설정 (1행: 헤더, 2행: 빈 행)
+  // 헤더는 항상 1행: 빈 행, 2행: 실제 헤더
   const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}2`;
   const headerResponse = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -218,19 +218,17 @@ async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
   const headerValues = headerResponse.data.values || [];
   const firstRow = headerValues[0] || [];
   const secondRow = headerValues[1] || [];
-  
-  // 1행 헤더가 올바른지 확인
-  const needsHeader = HEADERS_POST_SETTLEMENT.some((header, index) => (firstRow[index] || '') !== header);
-  // 2행이 없거나 비어있지 않으면 헤더를 다시 설정해야 함
-  const needsSecondRow = headerValues.length < 2 || !secondRow || secondRow.length === 0 || !secondRow.every(cell => !cell || String(cell).trim() === '');
-  
-  // 헤더가 필요하거나 2행이 제대로 설정되지 않았으면 항상 1행과 2행을 모두 설정
-  if (needsHeader || needsSecondRow) {
+
+  const isFirstRowBlank = firstRow.length === 0 || firstRow.every((cell) => !cell || String(cell).trim() === '');
+  const isSecondRowHeader = HEADERS_POST_SETTLEMENT.every(
+    (header, index) => (secondRow[index] || '') === header
+  );
+
+  if (!isFirstRowBlank || !isSecondRowHeader) {
     const values = [
-      HEADERS_POST_SETTLEMENT,
-      new Array(HEADERS_POST_SETTLEMENT.length).fill('')
+      new Array(HEADERS_POST_SETTLEMENT.length).fill(''),
+      HEADERS_POST_SETTLEMENT
     ];
-    // 항상 2행까지 명시적으로 설정
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: headerRange,
