@@ -36,6 +36,15 @@ import api from '../../api';
 const currencyFormatter = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 });
 const numberFormatter = new Intl.NumberFormat('ko-KR');
 
+const parseManualAmount = (value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return NaN;
+    return Number(trimmed.replace(/,/g, ''));
+  }
+  return Number(value);
+};
+
 const CUSTOM_COLUMNS = [
   { key: 'sourceSheet', label: '시트' },
   { key: 'rowNumber', label: '행번호' },
@@ -250,37 +259,6 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     }
   }, [selectedMonth, fetchSummary]);
 
-  useEffect(() => {
-    if (!selectedMonth) return;
-    setManualError('');
-    setManualSuccess('');
-    loadManualEntries(selectedMonth);
-  }, [selectedMonth, loadManualEntries]);
-
-  const monthOptions = useMemo(
-    () => sheetConfigs.map((config) => ({ value: config.month, label: config.month })),
-    [sheetConfigs]
-  );
-
-  const manualLaborTotal = useMemo(
-    () => laborEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
-    [laborEntries]
-  );
-
-  const manualCostTotal = useMemo(
-    () => costEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
-    [costEntries]
-  );
-
-  const parseManualAmount = (value) => {
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return NaN;
-      return Number(trimmed.replace(/,/g, ''));
-    }
-    return Number(value);
-  };
-
   const loadManualEntries = useCallback(
     async (month) => {
       if (!month) {
@@ -325,6 +303,28 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
       }
     },
     []
+  );
+
+  useEffect(() => {
+    if (!selectedMonth) return;
+    setManualError('');
+    setManualSuccess('');
+    loadManualEntries(selectedMonth);
+  }, [selectedMonth, loadManualEntries]);
+
+  const monthOptions = useMemo(
+    () => sheetConfigs.map((config) => ({ value: config.month, label: config.month })),
+    [sheetConfigs]
+  );
+
+  const manualLaborTotal = useMemo(
+    () => laborEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
+    [laborEntries]
+  );
+
+  const manualCostTotal = useMemo(
+    () => costEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
+    [costEntries]
   );
 
   const refreshManualData = useCallback(async () => {
