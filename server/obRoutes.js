@@ -559,8 +559,12 @@ function buildCustomProposalSummary(rows) {
     const approvalFlagRaw = parseString(row[10]);
     const approvalFlagLower = approvalFlagRaw.toLowerCase();
     const approvalFlagNumber = parseNumber(approvalFlagRaw);
+    // 숫자로 변환했을 때 1 이상이면 '1', 아니면 문자열 체크
+    // "1", "1.0", "1.00" 등도 모두 인정
     let approvalFlag = '0';
-    if (approvalFlagNumber > 0) {
+    if (approvalFlagNumber >= 1) {
+      approvalFlag = '1';
+    } else if (approvalFlagRaw === '1' || approvalFlagRaw === '1.0' || approvalFlagRaw === '1.00') {
       approvalFlag = '1';
     } else if (
       approvalFlagLower === 'y' ||
