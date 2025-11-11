@@ -243,15 +243,28 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     const stats = {};
     summary.customProposal.rows.forEach((row) => {
       const name = row.proposerName || '미지정';
+      const sales = row.salesAmount || 0;
+      const themeFlag = row.themeFlag;
       if (!stats[name]) {
-        stats[name] = { count: 0, totalSales: 0 };
+        stats[name] = {
+          count: 0,
+          policy1Amount: 0,
+          policy2Amount: 0
+        };
       }
       stats[name].count += 1;
-      stats[name].totalSales += row.salesAmount || 0;
+      stats[name].policy1Amount += sales;
+      if (themeFlag === '1') {
+        stats[name].policy2Amount += sales;
+      }
     });
     return Object.entries(stats)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.totalSales - a.totalSales);
+      .map(([name, data]) => ({
+        name,
+        ...data,
+        totalAmount: (data.policy1Amount || 0) + (data.policy2Amount || 0)
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
   }, [summary]);
 
   // 재약정: 등록직원별 집계
@@ -456,7 +469,9 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600 }}>유치자명</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>건수</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>매출 합계</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>정책① 기본</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>정책② 테마 업셀</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>매출 합계(①+②)</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -464,7 +479,11 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
                       <TableRow key={stat.name}>
                         <TableCell>{stat.name}</TableCell>
                         <TableCell align="right">{numberFormatter.format(stat.count)}건</TableCell>
-                        <TableCell align="right">{currencyFormatter.format(stat.totalSales)}</TableCell>
+                        <TableCell align="right">{currencyFormatter.format(stat.policy1Amount)}</TableCell>
+                        <TableCell align="right">{currencyFormatter.format(stat.policy2Amount)}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {currencyFormatter.format(stat.totalAmount)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
