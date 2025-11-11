@@ -80,6 +80,9 @@ const PLACEHOLDER_SHEET_TOKENS = [
   'sheet name (post)'
 ];
 
+const DEFAULT_POST_SETTLEMENT_SHEET_NAME = '기타후정산';
+const HEADERS_POST_SETTLEMENT = ['연월', '유형', '항목', '금액', 'ID', '비고', '등록일시', '수정일시'];
+
 const OB_RECONTRACT_OFFER_PATTERNS = {
   giftCard: /상품권/i,
   deposit: /입금/i
@@ -154,6 +157,120 @@ function resolveSheetUrl(sheetId, sheetUrl) {
   if (sheetUrl) return sheetUrl;
   if (!sheetId) return '';
   return `https://docs.google.com/spreadsheets/d/${sheetId}`;
+}
+
+async function fetchSettlementConfig(sheets, baseSpreadsheetId, month) {
+  await ensureSheetHeaders(sheets, baseSpreadsheetId, SHEET_SETTLEMENT_LINKS, HEADERS_SETTLEMENT_LINKS);
+  const configResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: baseSpreadsheetId,
+    range: SHEET_SETTLEMENT_LINKS
+  });
+  const configRows = configResponse.data.values || [];
+  return configRows
+    .slice(1)
+    .map((row) => mapSettlementRow(row))
+    .find((config) => config.month === month);
+}
+
+async function ensureManualSheetStructure(sheets, spreadsheetId, sheetName) {
+  const spreadsheetMeta = await sheets.spreadsheets.get({
+    spreadsheetId
+  });
+  const sheetExists = (spreadsheetMeta.data.sheets || []).some(
+    (sheet) => sheet.properties && sheet.properties.title === sheetName
+  );
+
+  if (!sheetExists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      resource: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: sheetName
+              }
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}2`;
+  const headerResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: headerRange
+  });
+  const headerValues = headerResponse.data.values || [];
+  const firstRow = headerValues[0] || [];
+  const needsHeader = HEADERS_POST_SETTLEMENT.some((header, index) => (firstRow[index] || '') !== header);
+  if (needsHeader || headerValues.length < 2) {
+    const values = [
+      HEADERS_POST_SETTLEMENT,
+      new Array(HEADERS_POST_SETTLEMENT.length).fill('')
+    ];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: headerRange,
+      valueInputOption: 'RAW',
+      resource: {
+        values
+      }
+    });
+  } else if (headerValues.length === 1) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetName}!A2:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}2`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [new Array(HEADERS_POST_SETTLEMENT.length).fill('')]
+      }
+    });
+  }
+}
+
+function mapManualPostSettlementRow(row = [], index = 0) {
+  const month = parseString(row[0]);
+  const rawType = parseString(row[1]).toLowerCase();
+  const type = rawType === 'labor' || rawType === 'cost' ? rawType : 'labor';
+  const label = parseString(row[2]);
+  const amount = parseNumber(row[3]);
+  const id = parseString(row[4]) || `manual-${index + 3}`;
+  const note = parseString(row[5]);
+  const createdAt = parseString(row[6]);
+  const updatedAt = parseString(row[7]);
+  return {
+    id,
+    month,
+    type,
+    label,
+    amount,
+    note,
+    createdAt,
+    updatedAt,
+    rowNumber: index + 3
+  };
+}
+
+function buildManualSummary(entries = []) {
+  const laborEntries = entries.filter((entry) => entry.type === 'labor');
+  const costEntries = entries.filter((entry) => entry.type === 'cost');
+  const laborManualTotal = laborEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+  const costManualTotal = costEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+  const laborSheetTotal = 0;
+  const costSheetTotal = 0;
+
+  return {
+    laborEntries,
+    costEntries,
+    laborManualTotal,
+    costManualTotal,
+    laborSheetTotal,
+    costSheetTotal,
+    laborTotal: laborSheetTotal + laborManualTotal,
+    costTotal: costSheetTotal + costManualTotal
+  };
 }
 
 function mapSettlementRow(row = []) {
@@ -555,11 +672,17 @@ function buildRecontractSummary(rows) {
   };
 }
 
-function buildTotals(customSummary, recontractSummary) {
+async function getManualSheetRows(sheets, spreadsheetId, sheetName) {
+  await ensureManualSheetStructure(sheets, spreadsheetId, sheetName);
+  const values = await loadSheetRows(sheets, spreadsheetId, sheetName);
+  return values.map((row, index) => mapManualPostSettlementRow(row, index));
+}
+
+function buildTotals(customSummary, recontractSummary, manualSummary) {
   const customTotal = customSummary.totalPayout || 0;
   const recontractTotal = recontractSummary.totalPayout || 0;
-  const laborTotal = 0;
-  const costTotal = 0;
+  const laborTotal = manualSummary?.laborTotal || 0;
+  const costTotal = manualSummary?.costTotal || 0;
   const grandTotal = customTotal + recontractTotal + laborTotal + costTotal;
 
   return {
@@ -701,17 +824,7 @@ function setupObRoutes(app) {
 
     try {
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTLEMENT_LINKS, HEADERS_SETTLEMENT_LINKS);
-
-      const configResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_SETTLEMENT_LINKS
-      });
-      const configRows = configResponse.data.values || [];
-      const configEntry = configRows
-        .slice(1)
-        .map((row) => mapSettlementRow(row))
-        .find((config) => config.month === month);
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, month);
 
       if (!configEntry) {
         return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
@@ -783,9 +896,17 @@ function setupObRoutes(app) {
         )
       ];
 
+      const manualSheetName =
+        resolvedExtraSheetNames.postSettlement ||
+        resolvedSheetNames.postSettlement ||
+        DEFAULT_POST_SETTLEMENT_SHEET_NAME;
+      const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
+      const manualRowsForMonth = manualRows.filter((entry) => entry.month === month);
+      const manualSummary = buildManualSummary(manualRowsForMonth);
+
       const customSummary = buildCustomProposalSummary(customRows);
       const recontractSummary = buildRecontractSummary(recontractRows);
-      const totals = buildTotals(customSummary, recontractSummary);
+      const totals = buildTotals(customSummary, recontractSummary, manualSummary);
 
       res.json({
         success: true,
@@ -794,16 +915,290 @@ function setupObRoutes(app) {
           config: {
             ...configEntry,
             sheetNames: resolvedSheetNames,
-            extraSheetNames: resolvedExtraSheetNames
+            extraSheetNames: resolvedExtraSheetNames,
+            manualSheetName
           },
           customProposal: customSummary,
           recontract: recontractSummary,
+          manual: {
+            ...manualSummary,
+            sheetName: manualSheetName
+          },
           totals
         }
       });
     } catch (error) {
       console.error('[OB] settlement-summary GET error:', error);
       res.status(500).json({ success: false, error: '정산 데이터를 불러오지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.get('/manual-adjustments', async (req, res) => {
+    const month = (req.query.month || '').trim();
+    if (!month) {
+      return res.status(400).json({ success: false, error: 'month query parameter is required' });
+    }
+
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, month);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const sheetNames = configEntry.sheetNames || {};
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const manualSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
+        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
+        DEFAULT_POST_SETTLEMENT_SHEET_NAME;
+
+      const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
+      const manualRowsForMonth = manualRows.filter((entry) => entry.month === month);
+      const manualSummary = buildManualSummary(manualRowsForMonth);
+
+      res.json({
+        success: true,
+        data: {
+          labor: manualSummary.laborEntries,
+          cost: manualSummary.costEntries,
+          laborTotal: manualSummary.laborTotal,
+          costTotal: manualSummary.costTotal
+        }
+      });
+    } catch (error) {
+      console.error('[OB] manual-adjustments GET error:', error);
+      res.status(500).json({ success: false, error: '수기 데이터를 불러오지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.post('/manual-adjustments', async (req, res) => {
+    try {
+      const {
+        month,
+        type,
+        label,
+        amount,
+        note = ''
+      } = req.body || {};
+
+      if (!month || !type || !label) {
+        return res.status(400).json({ success: false, error: 'month, type, label은 필수값입니다.' });
+      }
+
+      const normalizedType = type.toLowerCase();
+      if (!['labor', 'cost'].includes(normalizedType)) {
+        return res.status(400).json({ success: false, error: 'type은 labor 또는 cost 이어야 합니다.' });
+      }
+
+      const parsedAmount = parseNumber(amount);
+      if (!Number.isFinite(parsedAmount) || parsedAmount === 0) {
+        return res.status(400).json({ success: false, error: 'amount는 0이 아닌 숫자여야 합니다.' });
+      }
+
+      const adjustedAmount = parsedAmount > 0 ? parsedAmount * -1 : parsedAmount;
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, month);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const sheetNames = configEntry.sheetNames || {};
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const manualSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
+        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
+        DEFAULT_POST_SETTLEMENT_SHEET_NAME;
+
+      await ensureManualSheetStructure(sheets, targetSheetId, manualSheetName);
+
+      const id = uuidv4();
+      const nowIso = new Date().toISOString();
+      const row = [
+        month,
+        normalizedType,
+        label,
+        adjustedAmount.toString(),
+        id,
+        note || '',
+        nowIso,
+        nowIso
+      ];
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: targetSheetId,
+        range: `${manualSheetName}!A3`,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [row]
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id,
+          month,
+          type: normalizedType,
+          label,
+          amount: adjustedAmount,
+          note: note || '',
+          createdAt: nowIso,
+          updatedAt: nowIso
+        }
+      });
+    } catch (error) {
+      console.error('[OB] manual-adjustments POST error:', error);
+      res.status(500).json({ success: false, error: '수기 데이터를 저장하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.put('/manual-adjustments/:id', async (req, res) => {
+    const idParam = (req.params.id || '').trim();
+    if (!idParam) {
+      return res.status(400).json({ success: false, error: 'id parameter is required' });
+    }
+
+    try {
+      const {
+        month,
+        type,
+        label,
+        amount,
+        note = ''
+      } = req.body || {};
+
+      if (!month) {
+        return res.status(400).json({ success: false, error: 'month는 필수값입니다.' });
+      }
+
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, month);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const sheetNames = configEntry.sheetNames || {};
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const manualSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
+        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
+        DEFAULT_POST_SETTLEMENT_SHEET_NAME;
+
+      const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
+      const targetEntry = manualRows.find((entry) => entry.id === idParam);
+
+      if (!targetEntry) {
+        return res.status(404).json({ success: false, error: '해당 ID의 수기 데이터가 존재하지 않습니다.' });
+      }
+
+      const nextType = type && ['labor', 'cost'].includes(type.toLowerCase())
+        ? type.toLowerCase()
+        : targetEntry.type;
+
+      const nextLabel = label != null ? label : targetEntry.label;
+
+      const hasAmount = amount != null;
+      const parsedAmount = hasAmount ? parseNumber(amount) : targetEntry.amount;
+      if (!Number.isFinite(parsedAmount) || parsedAmount === 0) {
+        return res.status(400).json({ success: false, error: 'amount는 0이 아닌 숫자여야 합니다.' });
+      }
+      const adjustedAmount = parsedAmount > 0 ? parsedAmount * -1 : parsedAmount;
+
+      const updatedNote = note != null ? note : targetEntry.note;
+      const updatedAt = new Date().toISOString();
+      const range = `${manualSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}${targetEntry.rowNumber}`;
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: targetSheetId,
+        range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [[
+            targetEntry.month,
+            nextType,
+            nextLabel,
+            adjustedAmount.toString(),
+            targetEntry.id,
+            updatedNote || '',
+            targetEntry.createdAt || updatedAt,
+            updatedAt
+          ]]
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id: targetEntry.id,
+          month: targetEntry.month,
+          type: nextType,
+          label: nextLabel,
+          amount: adjustedAmount,
+          note: updatedNote || '',
+          createdAt: targetEntry.createdAt || updatedAt,
+          updatedAt
+        }
+      });
+    } catch (error) {
+      console.error('[OB] manual-adjustments PUT error:', error);
+      res.status(500).json({ success: false, error: '수기 데이터를 수정하지 못했습니다.', message: error.message });
+    }
+  });
+
+  router.delete('/manual-adjustments/:id', async (req, res) => {
+    const idParam = (req.params.id || '').trim();
+    const month = (req.query.month || '').trim();
+
+    if (!idParam || !month) {
+      return res.status(400).json({ success: false, error: 'id와 month는 필수값입니다.' });
+    }
+
+    try {
+      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      const configEntry = await fetchSettlementConfig(sheets, SPREADSHEET_ID, month);
+
+      if (!configEntry) {
+        return res.status(404).json({ success: false, error: '해당 월의 정산 링크 구성이 존재하지 않습니다.' });
+      }
+
+      const targetSheetId = configEntry.sheetId || SPREADSHEET_ID;
+      const sheetNames = configEntry.sheetNames || {};
+      const extraSheetNames = configEntry.extraSheetNames || {};
+      const manualSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.postSettlement) ||
+        normalizeConfiguredSheetName(sheetNames.postSettlement) ||
+        DEFAULT_POST_SETTLEMENT_SHEET_NAME;
+
+      const manualRows = await getManualSheetRows(sheets, targetSheetId, manualSheetName);
+      const targetEntry = manualRows.find((entry) => entry.id === idParam);
+
+      if (!targetEntry) {
+        return res.status(404).json({ success: false, error: '해당 ID의 수기 데이터가 존재하지 않습니다.' });
+      }
+
+      const range = `${manualSheetName}!A${targetEntry.rowNumber}:${String.fromCharCode(65 + HEADERS_POST_SETTLEMENT.length - 1)}${targetEntry.rowNumber}`;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: targetSheetId,
+        range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [new Array(HEADERS_POST_SETTLEMENT.length).fill('')]
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[OB] manual-adjustments DELETE error:', error);
+      res.status(500).json({ success: false, error: '수기 데이터를 삭제하지 못했습니다.', message: error.message });
     }
   });
 

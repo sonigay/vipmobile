@@ -460,6 +460,112 @@ export const api = {
     }
   },
 
+  // OB 정산 수기 입력 데이터 조회
+  getObManualAdjustments: async (month) => {
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/manual-adjustments?month=${encodeURIComponent(month)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 수기 입력 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 정산 수기 입력 추가
+  createObManualAdjustment: async (payload) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/manual-adjustments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 수기 입력 저장 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 정산 수기 입력 수정
+  updateObManualAdjustment: async (id, payload) => {
+    if (!id) {
+      throw new Error('id is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/manual-adjustments/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 수기 입력 수정 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 정산 수기 입력 삭제
+  deleteObManualAdjustment: async (id, month) => {
+    if (!id) {
+      throw new Error('id is required');
+    }
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/manual-adjustments/${encodeURIComponent(id)}?month=${encodeURIComponent(month)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 수기 입력 삭제 오류:', error);
+      throw error;
+    }
+  },
+
   // 매장 목록 조회
   getStores: async (options = {}) => {
     try {

@@ -10,6 +10,7 @@ import {
   Divider,
   FormControl,
   Grid,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -21,9 +22,15 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography
 } from '@mui/material';
 import GetAppIcon from '@mui/icons-material/GetApp';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import api from '../../api';
 
 const currencyFormatter = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 });
@@ -195,6 +202,17 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
+  const [laborEntries, setLaborEntries] = useState([]);
+  const [costEntries, setCostEntries] = useState([]);
+  const [laborForm, setLaborForm] = useState({ label: '', amount: '' });
+  const [costForm, setCostForm] = useState({ label: '', amount: '' });
+  const [manualError, setManualError] = useState('');
+  const [manualSuccess, setManualSuccess] = useState('');
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [editingLaborId, setEditingLaborId] = useState(null);
+  const [editingLaborForm, setEditingLaborForm] = useState({ label: '', amount: '' });
+  const [editingCostId, setEditingCostId] = useState(null);
+  const [editingCostForm, setEditingCostForm] = useState({ label: '', amount: '' });
 
   useEffect(() => {
     if (sheetConfigs && sheetConfigs.length > 0) {
@@ -232,10 +250,293 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     }
   }, [selectedMonth, fetchSummary]);
 
+  useEffect(() => {
+    if (!selectedMonth) return;
+    setManualError('');
+    setManualSuccess('');
+    loadManualEntries(selectedMonth);
+  }, [selectedMonth, loadManualEntries]);
+
   const monthOptions = useMemo(
     () => sheetConfigs.map((config) => ({ value: config.month, label: config.month })),
     [sheetConfigs]
   );
+
+  const manualLaborTotal = useMemo(
+    () => laborEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
+    [laborEntries]
+  );
+
+  const manualCostTotal = useMemo(
+    () => costEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0),
+    [costEntries]
+  );
+
+  const parseManualAmount = (value) => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return NaN;
+      return Number(trimmed.replace(/,/g, ''));
+    }
+    return Number(value);
+  };
+
+  const loadManualEntries = useCallback(
+    async (month) => {
+      if (!month) {
+        setLaborEntries([]);
+        setCostEntries([]);
+        return;
+      }
+      try {
+        const convertAmount = (value) => {
+          const parsed =
+            typeof value === 'number' ? value : parseManualAmount(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const response = await api.getObManualAdjustments(month);
+        if (response?.success) {
+          const laborList = (response.data?.labor || []).map((entry) => ({
+            ...entry,
+            amount: convertAmount(entry.amount)
+          }));
+          const costList = (response.data?.cost || []).map((entry) => ({
+            ...entry,
+            amount: convertAmount(entry.amount)
+          }));
+          setLaborEntries(laborList);
+          setCostEntries(costList);
+          setManualError('');
+        } else {
+          setLaborEntries([]);
+          setCostEntries([]);
+          setManualError(response?.error || '수기 입력 데이터를 불러오지 못했습니다.');
+        }
+      } catch (err) {
+        console.error('[OB] manual adjustments fetch error:', err);
+        setLaborEntries([]);
+        setCostEntries([]);
+        setManualError(err.message || '수기 입력 데이터를 불러오지 못했습니다.');
+      } finally {
+        setEditingLaborId(null);
+        setEditingLaborForm({ label: '', amount: '' });
+        setEditingCostId(null);
+        setEditingCostForm({ label: '', amount: '' });
+      }
+    },
+    []
+  );
+
+  const refreshManualData = useCallback(async () => {
+    if (!selectedMonth) return;
+    await Promise.all([fetchSummary(selectedMonth), loadManualEntries(selectedMonth)]);
+  }, [selectedMonth, fetchSummary, loadManualEntries]);
+
+  const handleLaborFormChange = (field) => (event) => {
+    const { value } = event.target;
+    setLaborForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCostFormChange = (field) => (event) => {
+    const { value } = event.target;
+    setCostForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddLaborEntry = async () => {
+    if (!selectedMonth) return;
+    const label = laborForm.label.trim();
+    const rawAmount = parseManualAmount(laborForm.amount);
+    if (!label || Number.isNaN(rawAmount) || rawAmount === 0) {
+      return;
+    }
+    const normalizedAmount = rawAmount > 0 ? rawAmount * -1 : rawAmount;
+    try {
+      setManualError('');
+      setManualSuccess('');
+      setManualSubmitting(true);
+      await api.createObManualAdjustment({
+        month: selectedMonth,
+        type: 'labor',
+        label,
+        amount: normalizedAmount
+      });
+      setLaborForm({ label: '', amount: '' });
+      setManualSuccess('인건비 항목을 추가했습니다.');
+      await refreshManualData();
+    } catch (error) {
+      console.error('[OB] add labor manual entry error:', error);
+      setManualError(error.message || '인건비 항목을 추가하지 못했습니다.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
+  const handleAddCostEntry = async () => {
+    if (!selectedMonth) return;
+    const label = costForm.label.trim();
+    const rawAmount = parseManualAmount(costForm.amount);
+    if (!label || Number.isNaN(rawAmount) || rawAmount === 0) {
+      return;
+    }
+    const normalizedAmount = rawAmount > 0 ? rawAmount * -1 : rawAmount;
+    try {
+      setManualError('');
+      setManualSuccess('');
+      setManualSubmitting(true);
+      await api.createObManualAdjustment({
+        month: selectedMonth,
+        type: 'cost',
+        label,
+        amount: normalizedAmount
+      });
+      setCostForm({ label: '', amount: '' });
+      setManualSuccess('비용 항목을 추가했습니다.');
+      await refreshManualData();
+    } catch (error) {
+      console.error('[OB] add cost manual entry error:', error);
+      setManualError(error.message || '비용 항목을 추가하지 못했습니다.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
+  const handleRemoveLaborEntry = async (id) => {
+    if (!selectedMonth) return;
+    try {
+      setManualError('');
+      setManualSuccess('');
+      setManualSubmitting(true);
+      setEditingLaborId((prev) => (prev === id ? null : prev));
+      await api.deleteObManualAdjustment(id, selectedMonth);
+      setManualSuccess('인건비 항목을 삭제했습니다.');
+      await refreshManualData();
+    } catch (error) {
+      console.error('[OB] remove labor manual entry error:', error);
+      setManualError(error.message || '인건비 항목을 삭제하지 못했습니다.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
+  const handleRemoveCostEntry = async (id) => {
+    if (!selectedMonth) return;
+    try {
+      setManualError('');
+      setManualSuccess('');
+      setManualSubmitting(true);
+      setEditingCostId((prev) => (prev === id ? null : prev));
+      await api.deleteObManualAdjustment(id, selectedMonth);
+      setManualSuccess('비용 항목을 삭제했습니다.');
+      await refreshManualData();
+    } catch (error) {
+      console.error('[OB] remove cost manual entry error:', error);
+      setManualError(error.message || '비용 항목을 삭제하지 못했습니다.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
+  const handleEditingLaborChange = (field) => (event) => {
+    const { value } = event.target;
+    setEditingLaborForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditingCostChange = (field) => (event) => {
+    const { value } = event.target;
+    setEditingCostForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const startLaborEdit = (entry) => {
+    setManualError('');
+    setManualSuccess('');
+    setEditingLaborId(entry.id);
+    setEditingLaborForm({
+      label: entry.label || '',
+      amount: Math.abs(entry.amount || 0).toString()
+    });
+  };
+
+  const cancelLaborEdit = () => {
+    setEditingLaborId(null);
+    setEditingLaborForm({ label: '', amount: '' });
+  };
+
+  const startCostEdit = (entry) => {
+    setManualError('');
+    setManualSuccess('');
+    setEditingCostId(entry.id);
+    setEditingCostForm({
+      label: entry.label || '',
+      amount: Math.abs(entry.amount || 0).toString()
+    });
+  };
+
+  const cancelCostEdit = () => {
+    setEditingCostId(null);
+    setEditingCostForm({ label: '', amount: '' });
+  };
+
+  const handleSaveLaborEntry = async (id) => {
+    if (!selectedMonth) return;
+    const label = editingLaborForm.label.trim();
+    const rawAmount = parseManualAmount(editingLaborForm.amount);
+    if (!label || Number.isNaN(rawAmount) || rawAmount === 0) {
+      setManualError('인건비 항목의 이름과 금액을 확인해 주세요.');
+      return;
+    }
+    const normalizedAmount = rawAmount > 0 ? rawAmount * -1 : rawAmount;
+    try {
+      setManualError('');
+      setManualSuccess('');
+      setManualSubmitting(true);
+      await api.updateObManualAdjustment(id, {
+        month: selectedMonth,
+        type: 'labor',
+        label,
+        amount: normalizedAmount
+      });
+      setManualSuccess('인건비 항목을 수정했습니다.');
+      setEditingLaborId(null);
+      setEditingLaborForm({ label: '', amount: '' });
+      await refreshManualData();
+    } catch (error) {
+      console.error('[OB] update labor manual entry error:', error);
+      setManualError(error.message || '인건비 항목을 수정하지 못했습니다.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
+  const handleSaveCostEntry = async (id) => {
+    if (!selectedMonth) return;
+    const label = editingCostForm.label.trim();
+    const rawAmount = parseManualAmount(editingCostForm.amount);
+    if (!label || Number.isNaN(rawAmount) || rawAmount === 0) {
+      setManualError('비용 항목의 이름과 금액을 확인해 주세요.');
+      return;
+    }
+    const normalizedAmount = rawAmount > 0 ? rawAmount * -1 : rawAmount;
+    try {
+      setManualError('');
+      setManualSuccess('');
+      setManualSubmitting(true);
+      await api.updateObManualAdjustment(id, {
+        month: selectedMonth,
+        type: 'cost',
+        label,
+        amount: normalizedAmount
+      });
+      setManualSuccess('비용 항목을 수정했습니다.');
+      setEditingCostId(null);
+      setEditingCostForm({ label: '', amount: '' });
+      await refreshManualData();
+    } catch (error) {
+      console.error('[OB] update cost manual entry error:', error);
+      setManualError(error.message || '비용 항목을 수정하지 못했습니다.');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
 
   // 맞춤제안: 유치자명별 집계
   const customProposerStats = useMemo(() => {
@@ -347,6 +648,29 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
 
     const { customProposal, recontract, totals } = summary;
 
+    const manualData = summary.manual || {};
+    const customBase = totals?.customTotal || 0;
+    const recontractBase = totals?.recontractTotal || 0;
+    const laborSheetTotal = manualData.laborSheetTotal ?? 0;
+    const costSheetTotal = manualData.costSheetTotal ?? 0;
+    const laborManualTotalDisplay = manualData.laborManualTotal ?? manualLaborTotal;
+    const costManualTotalDisplay = manualData.costManualTotal ?? manualCostTotal;
+    const combinedLaborTotal =
+      manualData.laborTotal ?? laborSheetTotal + laborManualTotalDisplay;
+    const combinedCostTotal =
+      manualData.costTotal ?? costSheetTotal + costManualTotalDisplay;
+    const combinedGrandTotal =
+      totals.grandTotal ?? customBase + recontractBase + combinedLaborTotal + combinedCostTotal;
+    const combinedSplitVip = totals.split?.vip ?? Math.round(combinedGrandTotal * 0.3);
+    const combinedSplitYai = totals.split?.yai ?? Math.round(combinedGrandTotal * 0.7);
+
+    const laborFormAmountNumber = parseManualAmount(laborForm.amount);
+    const laborAddDisabled =
+      !laborForm.label.trim() || Number.isNaN(laborFormAmountNumber) || laborFormAmountNumber === 0;
+    const costFormAmountNumber = parseManualAmount(costForm.amount);
+    const costAddDisabled =
+      !costForm.label.trim() || Number.isNaN(costFormAmountNumber) || costFormAmountNumber === 0;
+
     // 맞춤제안 유치자명 목록 (제외인원 제외)
     const customProposerNames = customProposerStats.map((s) => s.name).join(', ');
     const customProposerCount = customProposerStats.reduce((sum, s) => sum + s.count, 0);
@@ -362,6 +686,16 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
             {downloadError}
           </Alert>
         ) : null}
+        {manualError ? (
+          <Alert severity="error" onClose={() => setManualError('')}>
+            {manualError}
+          </Alert>
+        ) : null}
+        {manualSuccess ? (
+          <Alert severity="success" onClose={() => setManualSuccess('')}>
+            {manualSuccess}
+          </Alert>
+        ) : null}
 
         {/* 최종 정산 섹션 - 맨 상단 */}
         <Section title="최종 정산" color={SECTION_COLORS.totals}>
@@ -369,29 +703,29 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard
                 title="총 정산 금액"
-                value={currencyFormatter.format(totals.grandTotal)}
-                description={`맞춤제안 ${currencyFormatter.format(totals.customTotal)} + 재약정 ${currencyFormatter.format(totals.recontractTotal)}`}
+                value={currencyFormatter.format(combinedGrandTotal)}
+                description={`맞춤제안 ${currencyFormatter.format(customBase)} + 재약정 ${currencyFormatter.format(recontractBase)} + 인건비 ${currencyFormatter.format(combinedLaborTotal)} + 비용 ${currencyFormatter.format(combinedCostTotal)}`}
                 color="#1976d2"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard
                 title="(주)브이아이피플러스 30%"
-                value={currencyFormatter.format(totals.split.vip)}
+                value={currencyFormatter.format(combinedSplitVip)}
                 color="#6A1B9A"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard
                 title="(주)와이에이 70%"
-                value={currencyFormatter.format(totals.split.yai)}
+                value={currencyFormatter.format(combinedSplitYai)}
                 color="#00838F"
               />
             </Grid>
           </Grid>
           <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              <strong>항목별 합계:</strong> 맞춤제안 {currencyFormatter.format(totals.customTotal)} | 재약정 {currencyFormatter.format(totals.recontractTotal)} | 인건비 {currencyFormatter.format(totals.laborTotal)} | 비용 {currencyFormatter.format(totals.costTotal)}
+              <strong>항목별 합계:</strong> 맞춤제안 {currencyFormatter.format(customBase)} | 재약정 {currencyFormatter.format(recontractBase)} | 인건비 {currencyFormatter.format(combinedLaborTotal)} (시트 {currencyFormatter.format(laborBase)} / 수기 {currencyFormatter.format(manualLaborTotal)}) | 비용 {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costBase)} / 수기 {currencyFormatter.format(manualCostTotal)})
             </Typography>
           </Box>
         </Section>
@@ -578,16 +912,250 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
           )}
         </Section>
 
-        {/* 인건비/비용 섹션 (준비 중) */}
+        {/* 인건비/비용 섹션 */}
         <Section title="인건비 / 비용" color={SECTION_COLORS.laborCost}>
-          <Alert severity="info">
-            인건비 및 비용 데이터는 준비 중입니다. 데이터가 준비되면 여기에 표시됩니다.
-          </Alert>
-          <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+          <Stack spacing={2}>
             <Typography variant="body2" color="text.secondary">
-              <strong>인건비/비용 합계:</strong> {currencyFormatter.format(totals.laborTotal + totals.costTotal)} (인건비 {currencyFormatter.format(totals.laborTotal)} + 비용 {currencyFormatter.format(totals.costTotal)})
+              <strong>인건비 합계:</strong> {currencyFormatter.format(combinedLaborTotal)} (시트 {currencyFormatter.format(laborSheetTotal)} / 수기 입력 {currencyFormatter.format(laborManualTotalDisplay)})
             </Typography>
-          </Box>
+            <Typography variant="body2" color="text.secondary">
+              <strong>비용 합계:</strong> {currencyFormatter.format(combinedCostTotal)} (시트 {currencyFormatter.format(costSheetTotal)} / 수기 입력 {currencyFormatter.format(costManualTotalDisplay)})
+            </Typography>
+            <Alert severity="info">
+              인건비 및 비용 데이터는 준비 중입니다. 수기 입력 금액은 자동으로 음수(-) 처리되어 최종 합계에 반영됩니다.
+            </Alert>
+            <Stack spacing={3} direction={{ xs: 'column', md: 'row' }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  인건비 수기 입력
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 1 }}>
+                  <TextField
+                    label="항목명"
+                    value={laborForm.label}
+                    onChange={handleLaborFormChange('label')}
+                    fullWidth
+                  />
+                  <TextField
+                    label="금액"
+                    type="number"
+                    value={laborForm.amount}
+                    onChange={handleLaborFormChange('amount')}
+                    fullWidth
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<AddCircleOutlineIcon />}
+                    onClick={handleAddLaborEntry}
+                    disabled={laborAddDisabled || manualSubmitting}
+                  >
+                    추가
+                  </Button>
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  금액을 입력하면 자동으로 음수(-)로 변환됩니다.
+                </Typography>
+                {laborEntries.length > 0 && (
+                  <TableContainer component={Paper} elevation={0} sx={{ mt: 1, backgroundColor: 'rgba(255,255,255,0.8)' }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600 }}>항목명</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>금액</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>관리</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {laborEntries.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              {editingLaborId === entry.id ? (
+                                <TextField
+                                  value={editingLaborForm.label}
+                                  onChange={handleEditingLaborChange('label')}
+                                  size="small"
+                                  fullWidth
+                                  disabled={manualSubmitting}
+                                />
+                              ) : (
+                                entry.label
+                              )}
+                            </TableCell>
+                            <TableCell align="right">
+                              {editingLaborId === entry.id ? (
+                                <TextField
+                                  value={editingLaborForm.amount}
+                                  onChange={handleEditingLaborChange('amount')}
+                                  size="small"
+                                  type="number"
+                                  inputProps={{ min: 0 }}
+                                  disabled={manualSubmitting}
+                                />
+                              ) : (
+                                currencyFormatter.format(entry.amount)
+                              )}
+                            </TableCell>
+                            <TableCell align="center">
+                              {editingLaborId === entry.id ? (
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleSaveLaborEntry(entry.id)}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <CheckCircleOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={cancelLaborEdit}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <CancelOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                </>
+                              ) : (
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => startLaborEdit(entry)}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <EditOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleRemoveLaborEntry(entry.id)}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  비용 수기 입력
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 1 }}>
+                  <TextField
+                    label="항목명"
+                    value={costForm.label}
+                    onChange={handleCostFormChange('label')}
+                    fullWidth
+                  />
+                  <TextField
+                    label="금액"
+                    type="number"
+                    value={costForm.amount}
+                    onChange={handleCostFormChange('amount')}
+                    fullWidth
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<AddCircleOutlineIcon />}
+                    onClick={handleAddCostEntry}
+                    disabled={costAddDisabled || manualSubmitting}
+                  >
+                    추가
+                  </Button>
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  금액을 입력하면 자동으로 음수(-)로 변환됩니다.
+                </Typography>
+                {costEntries.length > 0 && (
+                  <TableContainer component={Paper} elevation={0} sx={{ mt: 1, backgroundColor: 'rgba(255,255,255,0.8)' }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600 }}>항목명</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>금액</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>관리</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {costEntries.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              {editingCostId === entry.id ? (
+                                <TextField
+                                  value={editingCostForm.label}
+                                  onChange={handleEditingCostChange('label')}
+                                  size="small"
+                                  fullWidth
+                                  disabled={manualSubmitting}
+                                />
+                              ) : (
+                                entry.label
+                              )}
+                            </TableCell>
+                            <TableCell align="right">
+                              {editingCostId === entry.id ? (
+                                <TextField
+                                  value={editingCostForm.amount}
+                                  onChange={handleEditingCostChange('amount')}
+                                  size="small"
+                                  type="number"
+                                  inputProps={{ min: 0 }}
+                                  disabled={manualSubmitting}
+                                />
+                              ) : (
+                                currencyFormatter.format(entry.amount)
+                              )}
+                            </TableCell>
+                            <TableCell align="center">
+                              {editingCostId === entry.id ? (
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleSaveCostEntry(entry.id)}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <CheckCircleOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={cancelCostEdit}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <CancelOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                </>
+                              ) : (
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => startCostEdit(entry)}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <EditOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleRemoveCostEntry(entry.id)}
+                                    disabled={manualSubmitting}
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            </Stack>
+          </Stack>
         </Section>
       </Stack>
     );
