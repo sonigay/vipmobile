@@ -8,10 +8,19 @@ import {
   CardContent,
   CircularProgress,
   Divider,
+  FormControl,
   Grid,
+  InputLabel,
   MenuItem,
+  Paper,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography
 } from '@mui/material';
 import GetAppIcon from '@mui/icons-material/GetApp';
@@ -43,6 +52,13 @@ const RECONTRACT_COLUMNS = [
   { key: 'promoterId', label: '유치자ID' },
   { key: 'promoterName', label: '유치자명' }
 ];
+
+const SECTION_COLORS = {
+  totals: '#F5F0FF',
+  custom: '#F0F7FF',
+  recontract: '#FFF5F0',
+  laborCost: '#F6FBF0'
+};
 
 let xlsxLoaderPromise;
 
@@ -91,17 +107,22 @@ async function downloadXlsx(filename, columns, rows = []) {
   XLSX.writeFile(workbook, filename);
 }
 
-const SummaryCard = ({ title, value, description, color }) => (
-  <Card>
+const SummaryCard = ({ title, value, description, count, color }) => (
+  <Card sx={{ height: '100%', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 } }}>
     <CardContent>
-      <Typography variant="subtitle2" color="text.secondary">
+      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
         {title}
       </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 700, color: color || 'text.primary' }}>
+      <Typography variant="h5" sx={{ fontWeight: 700, color: color || 'text.primary', mb: 0.5 }}>
         {value}
       </Typography>
+      {count ? (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+          {count}건
+        </Typography>
+      ) : null}
       {description ? (
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
           {description}
         </Typography>
       ) : null}
@@ -113,12 +134,56 @@ SummaryCard.propTypes = {
   title: PropTypes.string.isRequired,
   value: PropTypes.string.isRequired,
   description: PropTypes.string,
+  count: PropTypes.string,
   color: PropTypes.string
 };
 
 SummaryCard.defaultProps = {
   description: '',
+  count: '',
   color: undefined
+};
+
+const Section = ({ title, subtitle, color, children, spacing }) => (
+  <Paper
+    elevation={0}
+    sx={{
+      p: 3,
+      borderRadius: 3,
+      backgroundColor: color,
+      border: '1px solid rgba(0,0,0,0.06)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+    }}
+  >
+    <Stack spacing={spacing ?? 3}>
+      <Box>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+          {title}
+        </Typography>
+        {subtitle ? (
+          <Typography variant="body2" color="text.secondary">
+            {subtitle}
+          </Typography>
+        ) : null}
+      </Box>
+      {children}
+    </Stack>
+  </Paper>
+);
+
+Section.propTypes = {
+  title: PropTypes.string.isRequired,
+  subtitle: PropTypes.string,
+  color: PropTypes.string,
+  children: PropTypes.node,
+  spacing: PropTypes.number
+};
+
+Section.defaultProps = {
+  subtitle: '',
+  color: '#fff',
+  children: null,
+  spacing: 3
 };
 
 const ObSettlementOverview = ({ sheetConfigs }) => {
@@ -168,6 +233,41 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
     () => sheetConfigs.map((config) => ({ value: config.month, label: config.month })),
     [sheetConfigs]
   );
+
+  // 맞춤제안: 유치자명별 집계
+  const customProposerStats = useMemo(() => {
+    if (!summary?.customProposal?.rows) return [];
+    const stats = {};
+    summary.customProposal.rows.forEach((row) => {
+      const name = row.proposerName || '미지정';
+      if (!stats[name]) {
+        stats[name] = { count: 0, totalSales: 0 };
+      }
+      stats[name].count += 1;
+      stats[name].totalSales += row.salesAmount || 0;
+    });
+    return Object.entries(stats)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.totalSales - a.totalSales);
+  }, [summary]);
+
+  // 재약정: 등록직원별 집계
+  const recontractPromoterStats = useMemo(() => {
+    if (!summary?.recontract?.rows) return [];
+    const stats = {};
+    summary.recontract.rows.forEach((row) => {
+      const name = row.promoterName || '미지정';
+      if (!stats[name]) {
+        stats[name] = { count: 0, feeTotal: 0, offerTotal: 0 };
+      }
+      stats[name].count += 1;
+      stats[name].feeTotal += row.settlementAmount || 0;
+      stats[name].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0);
+    });
+    return Object.entries(stats)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.feeTotal - a.feeTotal);
+  }, [summary]);
 
   if (!sheetConfigs || sheetConfigs.length === 0) {
     return (
@@ -231,6 +331,14 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
 
     const { customProposal, recontract, totals } = summary;
 
+    // 맞춤제안 유치자명 목록 (제외인원 제외)
+    const customProposerNames = customProposerStats.map((s) => s.name).join(', ');
+    const customProposerCount = customProposerStats.reduce((sum, s) => sum + s.count, 0);
+
+    // 재약정 등록직원 목록 (제외인원 제외)
+    const recontractPromoterNames = recontractPromoterStats.map((s) => s.name).join(', ');
+    const recontractPromoterCount = recontractPromoterStats.reduce((sum, s) => sum + s.count, 0);
+
     return (
       <Stack spacing={4}>
         {downloadError ? (
@@ -239,126 +347,8 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
           </Alert>
         ) : null}
 
-        {/* 맞춤제안 섹션 */}
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            맞춤제안
-          </Typography>
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <SummaryCard
-                title="정책① 기본 (2배 지급)"
-                value={currencyFormatter.format(customProposal.policy1.payout)}
-                description={`매출 합계: ${currencyFormatter.format(customProposal.policy1.totalSales)}`}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <SummaryCard
-                title="정책② 테마 업셀"
-                value={currencyFormatter.format(customProposal.policy2.qualifyingSales)}
-                description="테마 업셀 플래그가 1인 매출 합계"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <SummaryCard
-                title="정책③ 인건비 지원"
-                value={currencyFormatter.format(customProposal.policy3.payout)}
-                description={customProposal.policy3.tier
-                  ? `기준 매출 ${numberFormatter.format(customProposal.policy3.tier.sales)}만원 이상 → ${numberFormatter.format(customProposal.policy3.tier.payout)}만원 지급`
-                  : '기준 매출 미달'}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <SummaryCard
-                title="건수 구간별 지급"
-                value={currencyFormatter.format(customProposal.perCase.payout)}
-                description={customProposal.perCase.threshold
-                  ? `${numberFormatter.format(customProposal.perCase.count)}건 × ${currencyFormatter.format(customProposal.perCase.unitAmount)}`
-                  : `${numberFormatter.format(customProposal.perCase.count)}건`}
-              />
-            </Grid>
-          </Grid>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              총 지급액: <strong>{currencyFormatter.format(customProposal.totalPayout)}</strong> (대상 {numberFormatter.format(customProposal.includedCount)}건, 제외 {numberFormatter.format(customProposal.excluded.count)}건)
-            </Typography>
-            <Button
-              startIcon={<GetAppIcon />}
-              variant="outlined"
-              size="small"
-              onClick={() => handleDownload('custom')}
-              disabled={!customProposal.rows || customProposal.rows.length === 0}
-            >
-              엑셀 다운로드
-            </Button>
-          </Box>
-        </Box>
-
-        <Divider />
-
-        {/* 재약정 섹션 */}
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            재약정
-          </Typography>
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6} md={4}>
-              <SummaryCard
-                title="재약정 수수료"
-                value={currencyFormatter.format(recontract.feeTotal)}
-                description={`대상 ${numberFormatter.format(recontract.includedCount)}건`}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <SummaryCard
-                title="재약정 오퍼 지급"
-                value={currencyFormatter.format(recontract.offer.total)}
-                description={`상품권 ${currencyFormatter.format(recontract.offer.giftCard)} / 입금 ${currencyFormatter.format(recontract.offer.deposit)}`}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <SummaryCard
-                title="재약정 총 지급액"
-                value={currencyFormatter.format(recontract.totalPayout)}
-                description={`제외 ${numberFormatter.format(recontract.excludedCount)}건`}
-              />
-            </Grid>
-          </Grid>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              수수료 + 오퍼 금액 합계
-            </Typography>
-            <Button
-              startIcon={<GetAppIcon />}
-              variant="outlined"
-              size="small"
-              onClick={() => handleDownload('recontract')}
-              disabled={!recontract.rows || recontract.rows.length === 0}
-            >
-              엑셀 다운로드
-            </Button>
-          </Box>
-        </Box>
-
-        <Divider />
-
-        {/* 인건비/비용 섹션 (준비 중) */}
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            인건비 / 비용
-          </Typography>
-          <Alert severity="info">
-            인건비 및 비용 데이터는 준비 중입니다. 데이터가 준비되면 여기에 표시됩니다.
-          </Alert>
-        </Box>
-
-        <Divider />
-
-        {/* 최종 정산 섹션 */}
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            최종 정산
-          </Typography>
+        {/* 최종 정산 섹션 - 맨 상단 */}
+        <Section title="최종 정산" color={SECTION_COLORS.totals}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={4}>
               <SummaryCard
@@ -383,32 +373,225 @@ const ObSettlementOverview = ({ sheetConfigs }) => {
               />
             </Grid>
           </Grid>
-        </Box>
+          <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              <strong>항목별 합계:</strong> 맞춤제안 {currencyFormatter.format(totals.customTotal)} | 재약정 {currencyFormatter.format(totals.recontractTotal)} | 인건비 {currencyFormatter.format(totals.laborTotal)} | 비용 {currencyFormatter.format(totals.costTotal)}
+            </Typography>
+          </Box>
+        </Section>
+
+        {/* 맞춤제안 섹션 */}
+        <Section
+          title="맞춤제안"
+          subtitle={`본사 raw 데이터 (39인덱스) 유치자명: ${customProposerNames || '없음'} (${customProposerCount}건)`}
+          color={SECTION_COLORS.custom}
+        >
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <SummaryCard
+                title="정책① 기본 (2배 지급)"
+                value={currencyFormatter.format(customProposal.policy1.payout)}
+                count={`${numberFormatter.format(customProposal.includedCount)}건`}
+                description={`매출 합계: ${currencyFormatter.format(customProposal.policy1.totalSales)}`}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <SummaryCard
+                title="정책② 테마 업셀"
+                value={currencyFormatter.format(customProposal.policy2.qualifyingSales)}
+                count={`${numberFormatter.format(customProposal.rows.filter((r) => r.themeFlag === '1').length)}건`}
+                description="테마 업셀 플래그가 1인 매출 합계"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <SummaryCard
+                title="정책③ 인건비 지원"
+                value={currencyFormatter.format(customProposal.policy3.payout)}
+                count={`${numberFormatter.format(customProposal.includedCount)}건`}
+                description={customProposal.policy3.tier
+                  ? `기준 매출 ${numberFormatter.format(customProposal.policy3.tier.sales)}만원 이상 → ${numberFormatter.format(customProposal.policy3.tier.payout)}만원 지급`
+                  : '기준 매출 미달'}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <SummaryCard
+                title="건수 구간별 지급"
+                value={currencyFormatter.format(customProposal.perCase.payout)}
+                count={`${numberFormatter.format(customProposal.perCase.count)}건`}
+                description={customProposal.perCase.threshold
+                  ? `건당 ${currencyFormatter.format(customProposal.perCase.unitAmount)}`
+                  : '건수 구간 미달'}
+              />
+            </Grid>
+          </Grid>
+          <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>맞춤제안 합계:</strong> {currencyFormatter.format(customProposal.totalPayout)} (대상 {numberFormatter.format(customProposal.includedCount)}건, 제외 {numberFormatter.format(customProposal.excluded.count)}건)
+              </Typography>
+              <Button
+                startIcon={<GetAppIcon />}
+                variant="outlined"
+                size="small"
+                onClick={() => handleDownload('custom')}
+                disabled={!customProposal.rows || customProposal.rows.length === 0}
+              >
+                엑셀 다운로드
+              </Button>
+            </Box>
+          </Box>
+
+          {/* 맞춤제안 유치자별 상세 테이블 */}
+          {customProposerStats.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                유치자별 상세 내역
+              </Typography>
+              <TableContainer component={Paper} elevation={0} sx={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>유치자명</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>건수</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>매출 합계</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {customProposerStats.map((stat) => (
+                      <TableRow key={stat.name}>
+                        <TableCell>{stat.name}</TableCell>
+                        <TableCell align="right">{numberFormatter.format(stat.count)}건</TableCell>
+                        <TableCell align="right">{currencyFormatter.format(stat.totalSales)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </Section>
+
+        {/* 재약정 섹션 */}
+        <Section
+          title="재약정"
+          subtitle={`폰클 홈데이터 (91인덱스) 등록직원: ${recontractPromoterNames || '없음'} (${recontractPromoterCount}건)`}
+          color={SECTION_COLORS.recontract}
+        >
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={4}>
+              <SummaryCard
+                title="재약정 수수료"
+                value={currencyFormatter.format(recontract.feeTotal)}
+                count={`${numberFormatter.format(recontract.includedCount)}건`}
+                description="수수료 합계"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <SummaryCard
+                title="재약정 오퍼 지급"
+                value={currencyFormatter.format(recontract.offer.total)}
+                count={`${numberFormatter.format(recontract.includedCount)}건`}
+                description={`상품권 ${currencyFormatter.format(recontract.offer.giftCard)} / 입금 ${currencyFormatter.format(recontract.offer.deposit)}`}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <SummaryCard
+                title="재약정 총 지급액"
+                value={currencyFormatter.format(recontract.totalPayout)}
+                count={`${numberFormatter.format(recontract.includedCount)}건`}
+                description={`제외 ${numberFormatter.format(recontract.excludedCount)}건`}
+              />
+            </Grid>
+          </Grid>
+          <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>재약정 합계:</strong> {currencyFormatter.format(recontract.totalPayout)} (수수료 {currencyFormatter.format(recontract.feeTotal)} + 오퍼 {currencyFormatter.format(recontract.offer.total)})
+              </Typography>
+              <Button
+                startIcon={<GetAppIcon />}
+                variant="outlined"
+                size="small"
+                onClick={() => handleDownload('recontract')}
+                disabled={!recontract.rows || recontract.rows.length === 0}
+              >
+                엑셀 다운로드
+              </Button>
+            </Box>
+          </Box>
+
+          {/* 재약정 등록직원별 상세 테이블 */}
+          {recontractPromoterStats.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                등록직원별 상세 내역
+              </Typography>
+              <TableContainer component={Paper} elevation={0} sx={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>등록직원</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>건수</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>수수료 합계</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>오퍼 합계</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>총액</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {recontractPromoterStats.map((stat) => (
+                      <TableRow key={stat.name}>
+                        <TableCell>{stat.name}</TableCell>
+                        <TableCell align="right">{numberFormatter.format(stat.count)}건</TableCell>
+                        <TableCell align="right">{currencyFormatter.format(stat.feeTotal)}</TableCell>
+                        <TableCell align="right">{currencyFormatter.format(stat.offerTotal)}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {currencyFormatter.format(stat.feeTotal + stat.offerTotal)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </Section>
+
+        {/* 인건비/비용 섹션 (준비 중) */}
+        <Section title="인건비 / 비용" color={SECTION_COLORS.laborCost}>
+          <Alert severity="info">
+            인건비 및 비용 데이터는 준비 중입니다. 데이터가 준비되면 여기에 표시됩니다.
+          </Alert>
+          <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              <strong>인건비/비용 합계:</strong> {currencyFormatter.format(totals.laborTotal + totals.costTotal)} (인건비 {currencyFormatter.format(totals.laborTotal)} + 비용 {currencyFormatter.format(totals.costTotal)})
+            </Typography>
+          </Box>
+        </Section>
       </Stack>
     );
   };
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5} sx={{ mb: 3 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2} sx={{ mb: 4 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
             OB 정산 확인
           </Typography>
           <Typography variant="body2" color="text.secondary">
             월별 정산 데이터를 확인하고 엑셀 파일로 다운로드할 수 있습니다.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="body2">연월 선택</Typography>
-          <Select size="small" value={selectedMonth} onChange={handleMonthChange}>
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>연월 선택</InputLabel>
+          <Select value={selectedMonth} onChange={handleMonthChange} label="연월 선택">
             {monthOptions.map((option) => (
               <MenuItem key={option.value} value={option.value}>
                 {option.label}
               </MenuItem>
             ))}
           </Select>
-        </Stack>
+        </FormControl>
       </Stack>
       {renderSummary()}
     </Box>

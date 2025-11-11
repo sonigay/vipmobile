@@ -459,15 +459,18 @@ function buildRecontractSummary(rows) {
       const status = parseString(row[11]);
       const isObOutlet = outlet.includes('OB');
       const isCompleted = status === '완료';
-      const settlementAmount = parseNumber(row[20]);
+      const rawSettlementAmount = parseNumber(row[20]);
+      const settlementAmount = rawSettlementAmount * -1; // sheet stores negative values → convert to positive
       const remarkPlate = parseString(row[59]);
       const remarkRecontract = parseString(row[74]);
 
       const remarkPlateAmounts = extractOfferAmounts(remarkPlate);
       const remarkRecontractAmounts = extractOfferAmounts(remarkRecontract);
 
-      const offerGiftCard = remarkPlateAmounts.giftCard + remarkRecontractAmounts.giftCard;
-      const offerDeposit = remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit;
+      const offerGiftCard =
+        (remarkPlateAmounts.giftCard + remarkRecontractAmounts.giftCard) * -1;
+      const offerDeposit =
+        (remarkPlateAmounts.deposit + remarkRecontractAmounts.deposit) * -1;
 
       const promoterId = parseString(row[91]);
       const promoterName = parseString(row[92] || '');
