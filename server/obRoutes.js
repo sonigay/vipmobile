@@ -370,7 +370,10 @@ async function loadExclusionRows(sheets, spreadsheetId, sheetName = DEFAULT_EXCL
 }
 
 function normalizeIdentifier(value) {
-  return parseString(value).toLowerCase();
+  const normalized = parseString(value)
+    .replace(/\s+/g, '')
+    .toLowerCase();
+  return normalized;
 }
 
 function buildExclusionConfig(entries = [], month) {
