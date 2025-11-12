@@ -376,9 +376,11 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
   const [invoiceStatus, setInvoiceStatus] = useState({ issued: false, approved: false });
   const [workflowError, setWorkflowError] = useState('');
   const [workflowSuccess, setWorkflowSuccess] = useState('');
+  const [summaryExpanded, setSummaryExpanded] = useState(true);
   const invoiceStatusRef = useRef(invoiceStatus);
   const companyWorkflowRef = useRef(companyWorkflow);
   const isApplyingProgressRef = useRef(false);
+  const autoCollapseAppliedRef = useRef(false);
 
   useEffect(() => {
     invoiceStatusRef.current = invoiceStatus;
@@ -387,6 +389,21 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
   useEffect(() => {
     companyWorkflowRef.current = companyWorkflow;
   }, [companyWorkflow]);
+
+  const vipConfirmDone = Boolean(companyWorkflow.vip?.confirmDone);
+  const yaiConfirmDone = Boolean(companyWorkflow.yai?.confirmDone);
+
+  useEffect(() => {
+    if (vipConfirmDone && yaiConfirmDone) {
+      if (!autoCollapseAppliedRef.current) {
+        setSummaryExpanded(false);
+        autoCollapseAppliedRef.current = true;
+      }
+    } else {
+      autoCollapseAppliedRef.current = false;
+      setSummaryExpanded(true);
+    }
+  }, [vipConfirmDone, yaiConfirmDone]);
 
   useEffect(() => {
     if (sheetConfigs && sheetConfigs.length > 0) {
@@ -404,6 +421,8 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     companyWorkflowRef.current = initialWorkflow;
     setInvoiceStatus(initialInvoice);
     invoiceStatusRef.current = initialInvoice;
+    setSummaryExpanded(true);
+    autoCollapseAppliedRef.current = false;
     setWorkflowError('');
     setWorkflowSuccess('');
   }, [selectedMonth]);
@@ -1142,7 +1161,8 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         bankNameValue || accountValue || state.isSaved || state.depositDone || state.confirmDone
       );
       const resetDisabled = !invoiceChecksDone || !hasAnyProgress;
-      const depositDisabled = !invoiceChecksDone || (!state.depositDone && !state.isSaved);
+      const depositDisabled =
+        !invoiceChecksDone || (!state.depositDone && !state.isSaved);
       const confirmDisabled =
         !invoiceChecksDone || (!state.depositDone && !state.confirmDone);
 
@@ -1272,67 +1292,64 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     const recontractPromoterNames = recontractPromoterStats.map((s) => s.name).join(', ');
     const recontractPromoterCount = recontractPromoterStats.reduce((sum, s) => sum + s.count, 0);
 
-    const renderCompanyProgress = useCallback(
-      (companyKey) => {
-        const state = companyWorkflow[companyKey] || createCompanyWorkflowState();
-        const isCompleted = Boolean(state.completed);
-        const depositDone = Boolean(state.depositDone);
-        const confirmDone = Boolean(state.confirmDone);
-        const toggleHandler = handleCompanyCompletionToggle(companyKey);
-        const stepOneActive = !isCompleted;
+    const renderCompanyProgress = (companyKey) => {
+      const state = companyWorkflow[companyKey] || createCompanyWorkflowState();
+      const isCompleted = Boolean(state.completed);
+      const depositDone = Boolean(state.depositDone);
+      const confirmDone = Boolean(state.confirmDone);
+      const toggleHandler = handleCompanyCompletionToggle(companyKey);
+      const stepOneActive = !isCompleted;
 
-        let stepTwoDescription = '정산 검토를 마쳤다면 체크해 다음 단계로 이동하세요.';
-        if (isCompleted) {
-          if (!state.isSaved) {
-            stepTwoDescription = '계좌 정보를 저장해 주세요.';
-          } else if (!depositDone) {
-            stepTwoDescription = '계좌 저장이 끝났다면 입금완료 버튼으로 진행하세요.';
-          } else if (!confirmDone) {
-            stepTwoDescription = '입금 확인 후 확인완료 버튼을 눌러 마무리하세요.';
-          } else {
-            stepTwoDescription = '완료되었습니다. 필요 시 언제든지 상태를 되돌릴 수 있습니다.';
-          }
+      let stepTwoDescription = '정산 검토를 마쳤다면 체크해 다음 단계로 이동하세요.';
+      if (isCompleted) {
+        if (!state.isSaved) {
+          stepTwoDescription = '계좌 정보를 저장해 주세요.';
+        } else if (!depositDone) {
+          stepTwoDescription = '계좌 저장이 끝났다면 입금완료 버튼으로 진행하세요.';
+        } else if (!confirmDone) {
+          stepTwoDescription = '입금 확인 후 확인완료 버튼을 눌러 마무리하세요.';
+        } else {
+          stepTwoDescription = '완료되었습니다. 필요 시 언제든지 상태를 되돌릴 수 있습니다.';
         }
+      }
 
-        return (
-          <Stack spacing={1.25}>
-            <Box sx={getStepBoxStyles(stepOneActive)}>
-              <FormControlLabel
-                control={<Checkbox checked={!stepOneActive} disabled />}
-                label={
-                  <StepLabel
-                    step={1}
-                    title="입력중"
-                    description={
-                      stepOneActive
-                        ? '현재 단계입니다. 시트 데이터를 검토하고 입력을 마무리해 주세요.'
-                        : '완료된 단계입니다.'
-                    }
-                    active={stepOneActive}
-                  />
-                }
-                sx={{ alignItems: 'flex-start', m: 0 }}
-              />
-            </Box>
-            <Box sx={getStepBoxStyles(!stepOneActive)}>
-              <FormControlLabel
-                control={<Checkbox checked={isCompleted} onChange={toggleHandler} />}
-                label={
-                  <StepLabel
-                    step={2}
-                    title="정산확인 및 입력완료"
-                    description={stepTwoDescription}
-                    active={!stepOneActive}
-                  />
-                }
-                sx={{ alignItems: 'flex-start', m: 0 }}
-              />
-            </Box>
-          </Stack>
-        );
-      },
-      [companyWorkflow, handleCompanyCompletionToggle]
-    );
+      return (
+        <Stack spacing={1.25}>
+          <Box sx={getStepBoxStyles(stepOneActive)}>
+            <FormControlLabel
+              control={<Checkbox checked={!stepOneActive} disabled />}
+              label={
+                <StepLabel
+                  step={1}
+                  title="입력중"
+                  description={
+                    stepOneActive
+                      ? '현재 단계입니다. 시트 데이터를 검토하고 입력을 마무리해 주세요.'
+                      : '완료된 단계입니다.'
+                  }
+                  active={stepOneActive}
+                />
+              }
+              sx={{ alignItems: 'flex-start', m: 0 }}
+            />
+          </Box>
+          <Box sx={getStepBoxStyles(!stepOneActive)}>
+            <FormControlLabel
+              control={<Checkbox checked={isCompleted} onChange={toggleHandler} />}
+              label={
+                <StepLabel
+                  step={2}
+                  title="정산확인 및 입력완료"
+                  description={stepTwoDescription}
+                  active={!stepOneActive}
+                />
+              }
+              sx={{ alignItems: 'flex-start', m: 0 }}
+            />
+          </Box>
+        </Stack>
+      );
+    };
 
     return (
       <Stack spacing={4}>
@@ -1378,79 +1395,100 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
               </Typography>
             </Paper>
           </Collapse>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <SummaryCard
-                title="총 정산 금액"
-                value={currencyFormatter.format(combinedGrandTotal)}
-                description={`맞춤제안 ${currencyFormatter.format(customBase)} + 재약정 ${currencyFormatter.format(recontractBase)} + 인건비 ${currencyFormatter.format(combinedLaborTotal)} + 비용 ${currencyFormatter.format(combinedCostTotal)}`}
-                color="#1976d2"
-                activated={bothCompleted}
-                animate={bothCompleted}
+          {allConfirmed ? (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: summaryExpanded ? 1 : 0 }}>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setSummaryExpanded((prev) => !prev)}
               >
-                <Stack spacing={1.5}>
-                  <Stack
-                    direction={{ xs: 'column', lg: 'row' }}
-                    spacing={1.5}
-                    alignItems={{ xs: 'stretch', lg: 'center' }}
-                    sx={{ flexWrap: 'wrap' }}
-                  >
-                    <Button
-                      component="a"
-                      href="https://www.wehago.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      variant="contained"
-                      color="primary"
-                      disabled={!invoiceControlsEnabled}
-                      sx={{ minWidth: 240, whiteSpace: 'nowrap' }}
+                {summaryExpanded ? '총 정산 금액 접기' : '총 정산 금액 펼치기'}
+              </Button>
+            </Box>
+          ) : null}
+          <Grid container spacing={2}>
+            {(!allConfirmed || summaryExpanded) && (
+              <Grid item xs={12}>
+                <Collapse in={!allConfirmed || summaryExpanded} mountOnEnter unmountOnExit>
+                  <Box>
+                    <SummaryCard
+                      title="총 정산 금액"
+                      value={currencyFormatter.format(combinedGrandTotal)}
+                      description={`맞춤제안 ${currencyFormatter.format(customBase)} + 재약정 ${currencyFormatter.format(recontractBase)} + 인건비 ${currencyFormatter.format(combinedLaborTotal)} + 비용 ${currencyFormatter.format(combinedCostTotal)}`}
+                      color="#1976d2"
+                      activated={bothCompleted}
+                      animate={bothCompleted}
                     >
-                      세금계산서 발행 및 승인 바로가기
-                    </Button>
-                    <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={invoiceStatus.issued}
-                            onChange={(event) => updateInvoiceStatusField('issued', event.target.checked)}
+                      <Stack spacing={1.5}>
+                        <Stack
+                          direction={{ xs: 'column', lg: 'row' }}
+                          spacing={1.5}
+                          alignItems={{ xs: 'stretch', lg: 'center' }}
+                          sx={{ flexWrap: 'wrap' }}
+                        >
+                          <Button
+                            component="a"
+                            href="https://www.wehago.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="contained"
+                            color="primary"
                             disabled={!invoiceControlsEnabled}
-                          />
-                        }
-                        label="세금계산서 발행"
-                        sx={{ whiteSpace: 'nowrap' }}
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={invoiceStatus.approved}
-                            onChange={(event) => updateInvoiceStatusField('approved', event.target.checked)}
-                            disabled={!invoiceControlsEnabled}
-                          />
-                        }
-                        label="세금계산서 승인"
-                        sx={{ whiteSpace: 'nowrap' }}
-                      />
-                    </Stack>
-                  </Stack>
-                  {workflowError ? (
-                    <Alert severity="error" onClose={() => setWorkflowError('')}>
-                      {workflowError}
-                    </Alert>
-                  ) : null}
-                  {workflowSuccess ? (
-                    <Alert severity="success" onClose={() => setWorkflowSuccess('')}>
-                      {workflowSuccess}
-                    </Alert>
-                  ) : null}
-                  <Collapse in={invoiceChecksDone}>
-                    <Stack spacing={2} sx={{ mt: 1 }}>
-                      {renderCompanyWorkflow('vip', COMPANY_LABELS.vip, '#6A1B9A')}
-                      {renderCompanyWorkflow('yai', COMPANY_LABELS.yai, '#00838F')}
-                    </Stack>
-                  </Collapse>
-                </Stack>
-              </SummaryCard>
-            </Grid>
+                            sx={{ minWidth: 240, whiteSpace: 'nowrap' }}
+                          >
+                            세금계산서 발행 및 승인 바로가기
+                          </Button>
+                          <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={invoiceStatus.issued}
+                                  onChange={(event) =>
+                                    updateInvoiceStatusField('issued', event.target.checked)
+                                  }
+                                  disabled={!invoiceControlsEnabled}
+                                />
+                              }
+                              label="세금계산서 발행"
+                              sx={{ whiteSpace: 'nowrap' }}
+                            />
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={invoiceStatus.approved}
+                                  onChange={(event) =>
+                                    updateInvoiceStatusField('approved', event.target.checked)
+                                  }
+                                  disabled={!invoiceControlsEnabled}
+                                />
+                              }
+                              label="세금계산서 승인"
+                              sx={{ whiteSpace: 'nowrap' }}
+                            />
+                          </Stack>
+                        </Stack>
+                        {workflowError ? (
+                          <Alert severity="error" onClose={() => setWorkflowError('')}>
+                            {workflowError}
+                          </Alert>
+                        ) : null}
+                        {workflowSuccess ? (
+                          <Alert severity="success" onClose={() => setWorkflowSuccess('')}>
+                            {workflowSuccess}
+                          </Alert>
+                        ) : null}
+                        <Collapse in={invoiceChecksDone}>
+                          <Stack spacing={2} sx={{ mt: 1 }}>
+                            {renderCompanyWorkflow('vip', COMPANY_LABELS.vip, '#6A1B9A')}
+                            {renderCompanyWorkflow('yai', COMPANY_LABELS.yai, '#00838F')}
+                          </Stack>
+                        </Collapse>
+                      </Stack>
+                    </SummaryCard>
+                  </Box>
+                </Collapse>
+              </Grid>
+            )}
             <Grid item xs={12} md={6}>
               <SummaryCard
                 title="(주)브이아이피플러스 30%"
