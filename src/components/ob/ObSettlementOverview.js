@@ -811,7 +811,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
       .sort((a, b) => b.totalAmount - a.totalAmount);
   }, [summary]);
 
-  // 재약정: 등록직원별 집계
+  // 재약정: 등록직원별 + 출고처별 집계
   const recontractPromoterStats = useMemo(() => {
     if (!summary?.recontract?.rows) return [];
     const targetOutletNames = summary?.targetOutlets?.outletNames || [];
@@ -819,34 +819,40 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
     
     summary.recontract.rows.forEach((row) => {
       const name = row.promoterName || '미지정';
-      if (!stats[name]) {
-        stats[name] = { count: 0, feeTotal: 0, offerTotal: 0, outlets: new Set() };
-      }
-      stats[name].count += 1;
-      stats[name].feeTotal += row.settlementAmount || 0;
-      stats[name].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0);
+      const outlet = row.outlet || '';
       
-      // 출고처와 대상점 매칭 - 실제 출고처 값 저장
-      if (row.outlet) {
-        const matchedOutlets = targetOutletNames.filter((outletName) =>
-          row.outlet.includes(outletName.trim())
-        );
-        // 매칭된 경우 실제 출고처 값을 추가
-        if (matchedOutlets.length > 0) {
-          stats[name].outlets.add(row.outlet);
+      // 출고처와 대상점 매칭 확인
+      const matchedOutlets = targetOutletNames.filter((outletName) =>
+        outlet.includes(outletName.trim())
+      );
+      
+      // 대상점과 매칭된 경우만 집계
+      if (matchedOutlets.length > 0 && outlet) {
+        // 등록직원 + 출고처 조합으로 키 생성
+        const key = `${name}|||${outlet}`;
+        if (!stats[key]) {
+          stats[key] = { 
+            name, 
+            outlet,
+            count: 0, 
+            feeTotal: 0, 
+            offerTotal: 0 
+          };
         }
+        stats[key].count += 1;
+        stats[key].feeTotal += row.settlementAmount || 0;
+        stats[key].offerTotal += (row.offerGiftCard || 0) + (row.offerDeposit || 0);
       }
     });
     
-    return Object.entries(stats)
-      .map(([name, data]) => ({
-        name,
-        count: data.count,
-        feeTotal: data.feeTotal,
-        offerTotal: data.offerTotal,
-        targetOutlets: Array.from(data.outlets).sort()
-      }))
-      .sort((a, b) => b.feeTotal - a.feeTotal);
+    return Object.values(stats)
+      .sort((a, b) => {
+        // 먼저 등록직원명으로 정렬, 같으면 출고처로 정렬
+        if (a.name !== b.name) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.outlet.localeCompare(b.outlet);
+      });
   }, [summary]);
 
   if (!sheetConfigs || sheetConfigs.length === 0) {
@@ -1702,14 +1708,10 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {recontractPromoterStats.map((stat) => (
-                      <TableRow key={stat.name}>
+                    {recontractPromoterStats.map((stat, index) => (
+                      <TableRow key={`${stat.name}-${stat.outlet}-${index}`}>
                         <TableCell>{stat.name}</TableCell>
-                        <TableCell>
-                          {stat.targetOutlets && stat.targetOutlets.length > 0
-                            ? stat.targetOutlets.join(', ')
-                            : '-'}
-                        </TableCell>
+                        <TableCell>{stat.outlet || '-'}</TableCell>
                         <TableCell align="right">{numberFormatter.format(stat.count)}건</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.feeTotal)}</TableCell>
                         <TableCell align="right">{currencyFormatter.format(stat.offerTotal)}</TableCell>
