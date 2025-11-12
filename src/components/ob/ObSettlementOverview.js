@@ -35,6 +35,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { keyframes } from '@emotion/react';
 import api from '../../api';
 
@@ -310,7 +312,7 @@ const buildProgressPayload = (invoiceState = {}, workflowState = {}) => ({
   }
 });
 
-const Section = ({ title, subtitle, color, children, spacing }) => (
+const Section = ({ title, subtitle, color, children, spacing, collapsible = false, expanded = false, onToggle }) => (
   <Paper
     elevation={0}
     sx={{
@@ -322,17 +324,34 @@ const Section = ({ title, subtitle, color, children, spacing }) => (
     }}
   >
     <Stack spacing={spacing ?? 3}>
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          {title}
-        </Typography>
-        {subtitle ? (
-          <Typography variant="body2" color="text.secondary">
-            {subtitle}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+            {title}
           </Typography>
-        ) : null}
+          {subtitle ? (
+            <Typography variant="body2" color="text.secondary">
+              {subtitle}
+            </Typography>
+          ) : null}
+        </Box>
+        {collapsible && (
+          <IconButton
+            size="small"
+            onClick={onToggle}
+            sx={{ ml: 1 }}
+          >
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        )}
       </Box>
-      {children}
+      {collapsible ? (
+        <Collapse in={expanded}>
+          {children}
+        </Collapse>
+      ) : (
+        children
+      )}
     </Stack>
   </Paper>
 );
@@ -342,7 +361,10 @@ Section.propTypes = {
   subtitle: PropTypes.string,
   color: PropTypes.string,
   children: PropTypes.node,
-  spacing: PropTypes.number
+  spacing: PropTypes.number,
+  collapsible: PropTypes.bool,
+  expanded: PropTypes.bool,
+  onToggle: PropTypes.func
 };
 
 Section.defaultProps = {
@@ -377,6 +399,10 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
   const [workflowError, setWorkflowError] = useState('');
   const [workflowSuccess, setWorkflowSuccess] = useState('');
   const [summaryExpanded, setSummaryExpanded] = useState(true);
+  const [finalSettlementExpanded, setFinalSettlementExpanded] = useState(false);
+  const [customProposalExpanded, setCustomProposalExpanded] = useState(false);
+  const [recontractExpanded, setRecontractExpanded] = useState(false);
+  const [laborCostExpanded, setLaborCostExpanded] = useState(false);
   const invoiceStatusRef = useRef(invoiceStatus);
   const companyWorkflowRef = useRef(companyWorkflow);
   const isApplyingProgressRef = useRef(false);
@@ -1412,7 +1438,13 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         ) : null}
 
         {/* 최종 정산 섹션 - 맨 상단 */}
-        <Section title="최종 정산" color={SECTION_COLORS.totals}>
+        <Section 
+          title="최종 정산" 
+          color={SECTION_COLORS.totals}
+          collapsible
+          expanded={finalSettlementExpanded}
+          onToggle={() => setFinalSettlementExpanded((prev) => !prev)}
+        >
           <Collapse in={allConfirmed}>
             <Paper
               elevation={3}
@@ -1562,6 +1594,9 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         {/* 맞춤제안 섹션 */}
         <Section
           title="맞춤제안"
+          collapsible
+          expanded={customProposalExpanded}
+          onToggle={() => setCustomProposalExpanded((prev) => !prev)}
           subtitle={`본사 raw 데이터 (39인덱스) 유치자명: ${customProposerNames || '없음'} (${customProposerCount}건)`}
           color={SECTION_COLORS.custom}
         >
@@ -1665,6 +1700,9 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
           title="재약정"
           subtitle={`폰클 홈데이터 (91인덱스) 등록직원: ${recontractPromoterNames || '없음'} (${recontractPromoterCount}건)`}
           color={SECTION_COLORS.recontract}
+          collapsible
+          expanded={recontractExpanded}
+          onToggle={() => setRecontractExpanded((prev) => !prev)}
         >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={4}>
@@ -1752,7 +1790,13 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
         </Section>
 
         {/* 인건비/비용 섹션 */}
-        <Section title="인건비 / 비용" color={SECTION_COLORS.laborCost}>
+        <Section 
+          title="인건비 / 비용" 
+          color={SECTION_COLORS.laborCost}
+          collapsible
+          expanded={laborCostExpanded}
+          onToggle={() => setLaborCostExpanded((prev) => !prev)}
+        >
           <Stack spacing={2}>
             <Typography variant="body2" color="text.secondary">
               <strong>인건비 합계:</strong> {currencyFormatter.format(combinedLaborTotal)} (시트 {currencyFormatter.format(laborSheetTotal)} / 수기 입력 {currencyFormatter.format(laborManualTotalDisplay)})
