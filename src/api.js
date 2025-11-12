@@ -738,6 +738,134 @@ export const api = {
     }
   },
 
+  // OB 대상점 조회
+  getObTargetOutlets: async ({ month }) => {
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/ob/target-outlets?month=${encodeURIComponent(month)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result.success ? result.data : [];
+    } catch (error) {
+      console.error('OB 대상점 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 대상점 등록
+  createObTargetOutlet: async (payload) => {
+    if (!payload.month) {
+      throw new Error('month is required');
+    }
+    if (!payload.outletName || !payload.outletName.trim()) {
+      throw new Error('outletName is required');
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ob/target-outlets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 대상점 등록 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 대상점 수정
+  updateObTargetOutlet: async (id, payload) => {
+    if (!id) {
+      throw new Error('id is required');
+    }
+    if (!payload.month) {
+      throw new Error('month is required');
+    }
+    if (!payload.outletName || !payload.outletName.trim()) {
+      throw new Error('outletName is required');
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/ob/target-outlets/${encodeURIComponent(id)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          mode: 'cors'
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 대상점 수정 오류:', error);
+      throw error;
+    }
+  },
+
+  // OB 대상점 삭제
+  deleteObTargetOutlet: async (id, month) => {
+    if (!id) {
+      throw new Error('id is required');
+    }
+    if (!month) {
+      throw new Error('month is required');
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/ob/target-outlets/${encodeURIComponent(id)}?month=${encodeURIComponent(month)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('OB 대상점 삭제 오류:', error);
+      throw error;
+    }
+  },
+
   // 매장 목록 조회
   getStores: async (options = {}) => {
     try {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Box,
@@ -16,7 +16,9 @@ import {
   Typography,
   IconButton,
   CircularProgress,
-  Alert
+  Alert,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -25,6 +27,7 @@ import {
   FileDownload as FileDownloadIcon
 } from '@mui/icons-material';
 import ObExclusionManager from './ObExclusionManager';
+import ObTargetOutletManager from './ObTargetOutletManager';
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -59,6 +62,7 @@ const ObSettlementManagementPanel = ({
   onDownloadTemplate,
   currentUser
 }) => {
+  const [activeTab, setActiveTab] = useState('exclusions');
   const sortedConfigs = [...sheetConfigs].sort((a, b) => (b.month || '').localeCompare(a.month || ''));
   const monthOptions = useMemo(() => {
     const uniqueMonths = Array.from(
@@ -240,11 +244,32 @@ const ObSettlementManagementPanel = ({
       </TableContainer>
       )}
 
-      <ObExclusionManager
-        monthOptions={monthOptions}
-        defaultMonth={sortedConfigs[0]?.month}
-        currentUser={currentUser}
-      />
+      <Paper sx={{ mt: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(e, newValue) => setActiveTab(newValue)}
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="제외인원" value="exclusions" />
+          <Tab label="대상점" value="target-outlets" />
+        </Tabs>
+        <Box sx={{ p: 2 }}>
+          {activeTab === 'exclusions' && (
+            <ObExclusionManager
+              monthOptions={monthOptions}
+              defaultMonth={sortedConfigs[0]?.month}
+              currentUser={currentUser}
+            />
+          )}
+          {activeTab === 'target-outlets' && (
+            <ObTargetOutletManager
+              monthOptions={monthOptions}
+              defaultMonth={sortedConfigs[0]?.month}
+              currentUser={currentUser}
+            />
+          )}
+        </Box>
+      </Paper>
     </Box>
   );
 };

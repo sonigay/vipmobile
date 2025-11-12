@@ -34654,37 +34654,37 @@ app.get('/api/quick-cost/quality', async (req, res) => {
       const stdDev = Math.sqrt(variance);
 
       entries.forEach((entry) => {
-        const deviation = Math.abs(entry.cost - mean);
-        const deviationRatio = mean === 0 ? 0 : deviation / mean;
+          const deviation = Math.abs(entry.cost - mean);
+          const deviationRatio = mean === 0 ? 0 : deviation / mean;
 
-        if (
-          (stdDev > 0 && deviation > stdDev * 2) ||
-          deviationRatio >= 0.3
-        ) {
-          outliers.push({
-            companyName: entry.companyName,
-            normalizedName: entry.normalizedName,
-            phoneNumber: entry.phoneNumber,
-            cost: entry.cost,
-            meanCost: Math.round(mean),
-            deviation: Math.round(deviation),
-            deviationRatio: Math.round(deviationRatio * 100),
-            rowNumber: entry.rowNumber,
-            fromStoreName: entry.fromStoreName,
-            toStoreName: entry.toStoreName,
+          if (
+            (stdDev > 0 && deviation > stdDev * 2) ||
+            deviationRatio >= 0.3
+          ) {
+            outliers.push({
+              companyName: entry.companyName,
+              normalizedName: entry.normalizedName,
+              phoneNumber: entry.phoneNumber,
+              cost: entry.cost,
+              meanCost: Math.round(mean),
+              deviation: Math.round(deviation),
+              deviationRatio: Math.round(deviationRatio * 100),
+              rowNumber: entry.rowNumber,
+              fromStoreName: entry.fromStoreName,
+              toStoreName: entry.toStoreName,
             fromStoreId: entry.fromStoreId,
             toStoreId: entry.toStoreId,
             routeKey: label.key || label.routeKey || '',
             routeLabel: label.display || label.routeLabel || '',
-            modeType: entry.modeType,
-            speeds: {
-              dispatch: entry.dispatchSpeed,
-              pickup: entry.pickupSpeed,
-              arrival: entry.arrivalSpeed
-            }
-          });
+              modeType: entry.modeType,
+              speeds: {
+                dispatch: entry.dispatchSpeed,
+                pickup: entry.pickupSpeed,
+                arrival: entry.arrivalSpeed
+              }
+            });
 
-          outlierCountMap.set(
+            outlierCountMap.set(
             entry.normalizedName,
             (outlierCountMap.get(entry.normalizedName) || 0) + 1
           );
