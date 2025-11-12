@@ -1758,7 +1758,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                           <TableCell>{entry.item || '-'}</TableCell>
                           <TableCell>{entry.target || '-'}</TableCell>
                           <TableCell>{entry.content || '-'}</TableCell>
-                          <TableCell>{entry.detail || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'pre-wrap', maxWidth: 300 }}>{entry.detail || '-'}</TableCell>
                           <TableCell align="right">{currencyFormatter.format(entry.amount || 0)}</TableCell>
                         </TableRow>
                       ))}
@@ -1767,7 +1767,7 @@ const ObSettlementOverview = ({ sheetConfigs, currentUser }) => {
                           <TableCell>{entry.item || '-'}</TableCell>
                           <TableCell>{entry.target || '-'}</TableCell>
                           <TableCell>{entry.content || '-'}</TableCell>
-                          <TableCell>{entry.detail || '-'}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'pre-wrap', maxWidth: 300 }}>{entry.detail || '-'}</TableCell>
                           <TableCell align="right">{currencyFormatter.format(entry.amount || 0)}</TableCell>
                         </TableRow>
                       ))}
