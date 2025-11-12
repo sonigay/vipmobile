@@ -1519,6 +1519,21 @@ function setupObRoutes(app) {
           resolvedExtraSheetNames.postSettlement || '기타후정산'
         )
       ];
+
+      // 제외인원 및 대상점 설정 로드 (postSettlementSummary 및 recontractSummary를 위해 필요)
+      const exclusionSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
+
+      const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
+      const exclusionConfig = buildExclusionConfig(exclusionRows, month);
+
+      const targetOutletSheetName =
+        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
+      const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
+      const recontractTargetOutletConfig = buildTargetOutletConfig(targetOutletRows, month, 'recontract');
+      const postSettlementTargetOutletConfig = buildTargetOutletConfig(targetOutletRows, month, 'postSettlement');
+
+      // 후정산 시트 데이터 요약 (대상점 설정 필요)
       const postSettlementSummary = buildPostSettlementSummary(postSettlementRows, postSettlementTargetOutletConfig);
 
       // 항상 "기타후정산" 시트를 사용 (extraSheetNames.postSettlement가 있으면 사용, 없으면 기본값)
@@ -1532,18 +1547,6 @@ function setupObRoutes(app) {
       // 시트 데이터와 수기 입력 데이터 합산
       const combinedLaborTotal = (postSettlementSummary.laborTotal || 0) + (manualSummary.laborTotal || 0);
       const combinedCostTotal = (postSettlementSummary.costTotal || 0) + (manualSummary.costTotal || 0);
-
-      const exclusionSheetName =
-        normalizeConfiguredSheetName(extraSheetNames.exclusion) || DEFAULT_EXCLUSION_SHEET_NAME;
-
-      const exclusionRows = await loadExclusionRows(sheets, targetSheetId, exclusionSheetName);
-      const exclusionConfig = buildExclusionConfig(exclusionRows, month);
-
-      const targetOutletSheetName =
-        normalizeConfiguredSheetName(extraSheetNames.targetOutlet) || DEFAULT_TARGET_OUTLET_SHEET_NAME;
-      const targetOutletRows = await loadTargetOutletRows(sheets, targetSheetId, targetOutletSheetName);
-      const recontractTargetOutletConfig = buildTargetOutletConfig(targetOutletRows, month, 'recontract');
-      const postSettlementTargetOutletConfig = buildTargetOutletConfig(targetOutletRows, month, 'postSettlement');
 
       const progressSheetName =
         normalizeConfiguredSheetName(extraSheetNames.progress) || DEFAULT_PROGRESS_SHEET_NAME;
