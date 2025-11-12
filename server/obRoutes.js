@@ -891,11 +891,12 @@ function filterRecontractRow(rowObject, excludedIdsSet = new Set(), excludedName
   );
 
   // OR 조건: 제외인원에 없거나, 출고처에 대상점 문자열이 포함된 경우 포함
-  if (!isExcluded || matchesTargetOutlet) {
-    return { include: true };
+  // 단, 제외인원에 있고 대상점도 매칭되지 않으면 제외
+  if (isExcluded && !matchesTargetOutlet) {
+    return { include: false, reason: 'excluded' };
   }
 
-  return { include: false, reason: 'excluded' };
+  return { include: true };
 }
 
 function calculatePolicy3Payout(totalSales) {
@@ -1046,6 +1047,15 @@ function buildRecontractSummary(rows, exclusionConfig = {}, targetOutletConfig =
   const targetOutletNames = targetOutletConfig.outletNames || [];
   const included = [];
   let excludedCount = 0;
+
+  // 디버깅: 제외인원 목록 확인
+  if (exclusionEntries.length > 0) {
+    console.log('[OB] 재약정 제외인원 목록:', {
+      entries: exclusionEntries.map(e => ({ targetId: e.targetId, targetName: e.targetName })),
+      idSet: Array.from(excludedIdsSet),
+      nameSet: Array.from(excludedNamesSet)
+    });
+  }
 
   rows.forEach((rowObj) => {
     const decision = filterRecontractRow(rowObj, excludedIdsSet, excludedNamesSet, targetOutletNames);
